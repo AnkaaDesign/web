@@ -1,5 +1,6 @@
 import { useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useReturnTo } from "@/hooks/common/use-return-to";
 import type { Task } from "@/types";
 import { useTasks } from "@/hooks";
 import { routes } from "@/constants";
@@ -17,6 +18,7 @@ interface BudgetTableProps {
 
 export function BudgetTable({ className, searchingFor, filters }: BudgetTableProps) {
   const navigate = useNavigate();
+  const returnTo = useReturnTo();
 
   const {
     page,
@@ -130,8 +132,8 @@ export function BudgetTable({ className, searchingFor, filters }: BudgetTablePro
   const totalPages = data?.meta?.totalPages || 1;
 
   const handleRowClick = useCallback((task: Task) => {
-    navigate(routes.financial.budget.details(task.id));
-  }, [navigate]);
+    navigate(routes.financial.budget.details(task.id), { state: { returnTo } });
+  }, [navigate, returnTo]);
 
   return (
     <div className="flex-1 min-h-0 overflow-auto">

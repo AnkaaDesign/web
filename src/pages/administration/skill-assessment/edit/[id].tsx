@@ -10,7 +10,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { CampaignForm, type CampaignSubmitOptions } from "@/components/administration/skill-assessment/campaign-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { toast } from "@/components/ui/sonner";
 
 export const SkillAssessmentEditPage = () => {
   usePageTracker({ title: "Editar Campanha", icon: "clipboard-list" });
@@ -85,13 +84,11 @@ export const SkillAssessmentEditPage = () => {
 
       if (opts.openAfter) {
         try {
+          // Success/error toasts handled by the axios interceptor.
           await openMutation.mutateAsync(id);
-          toast.success("Campanha atualizada e aberta para coleta.");
         } catch (openErr) {
           if (process.env.NODE_ENV !== "production") console.error(openErr);
         }
-      } else {
-        toast.success("Campanha atualizada");
       }
 
       navigate(routes.administration.skillAssessment.details(id));

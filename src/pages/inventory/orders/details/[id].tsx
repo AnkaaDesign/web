@@ -310,7 +310,7 @@ const OrderDetailsPage = () => {
                 <br />
                 <strong>Fornecedor:</strong> {order.supplier?.fantasyName || "Não especificado"}
                 <br />
-                <strong>Valor Total:</strong> <OrderTotalBadge orderItems={order.items} />
+                <strong>Valor Total:</strong> <OrderTotalBadge orderItems={order.items} discount={order.discount} />
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -336,7 +336,7 @@ const OrderDetailsPage = () => {
                     <span className="font-medium">Fornecedor:</span> {order.supplier?.fantasyName || "Não especificado"}
                   </p>
                   <p className="text-sm">
-                    <span className="font-medium">Valor Total:</span> <OrderTotalBadge orderItems={order.items} />
+                    <span className="font-medium">Valor Total:</span> <OrderTotalBadge orderItems={order.items} discount={order.discount} />
                   </p>
                   <p className="text-sm">
                     <span className="font-medium">Itens:</span> {order.items?.length || 0}

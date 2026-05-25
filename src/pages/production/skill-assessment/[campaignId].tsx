@@ -34,7 +34,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/sonner";
 
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useAssessment } from "@/hooks/skill/use-assessment";
@@ -241,7 +240,7 @@ export const SkillAssessmentCampaignPage = () => {
     savedScore: activeSavedResponse?.score ?? null,
     savedJustification: activeSavedResponse?.justification ?? "",
     disabled: !activeEntry || !activeTopic || activeIsReadOnly,
-    onError: (err) => toast.error(err.message ?? "Falha ao salvar"),
+    // Error toast emitted by the axios interceptor (PUT /assessment-entry/:id/responses).
   });
 
   // Display score for the picker: live cell takes precedence over optimistic

@@ -253,21 +253,18 @@ export const SkillAssessmentFillPage = () => {
       }
       try {
         if (hasResponses) {
-          await upsertResponses.mutateAsync(payload);
+          await upsertResponses.mutateAsync({ ...payload, suppressToast: opts?.silent });
         }
         if (notesChanged) {
-          await updateMeta.mutateAsync({ notes: values.notes ?? null });
+          await updateMeta.mutateAsync({ notes: values.notes ?? null, suppressToast: opts?.silent });
         }
         lastSavedRef.current = sig;
         setLastSavedAt(new Date());
         form.reset(values, { keepValues: true, keepDirty: false });
-        if (!opts?.silent) {
-          toast.success("Rascunho salvo");
-        }
-      } catch (err: any) {
-        if (!opts?.silent) {
-          toast.error(err?.message ?? "Falha ao salvar rascunho");
-        }
+        // Success/error toasts are emitted by the axios interceptor (PUT
+        // /assessment-entry/:id/responses, PATCH /assessment-entry/:id).
+      } catch {
+        // Error toast emitted by the axios error interceptor.
       }
     },
     [entryId, isReadOnly, form, buildPayload, upsertResponses, updateMeta, entry?.notes],
@@ -365,11 +362,12 @@ export const SkillAssessmentFillPage = () => {
       // their last autosave debounce window.
       await flush({ silent: true });
       await submitEntry.mutateAsync();
-      toast.success("Avaliação enviada");
+      // Success/error toasts are emitted by the axios interceptor (POST
+      // /assessment-entry/:id/submit).
       setSubmitDialogOpen(false);
       navigate(routes.skillAssessmentLeader.pending);
-    } catch (err: any) {
-      toast.error(err?.message ?? "Falha ao enviar avaliação");
+    } catch {
+      // Error toast emitted by the axios error interceptor.
     }
   };
 

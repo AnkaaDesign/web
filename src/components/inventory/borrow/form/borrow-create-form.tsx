@@ -114,15 +114,12 @@ export function BorrowCreateForm() {
         toast.error("Erro interno: método de criação não disponível");
       }
     } catch (error) {
+      // Error toast is handled automatically by the API client interceptor
       if (process.env.NODE_ENV !== "production") {
         console.error("Borrow create error:", error);
         console.error("Error message:", (error as any)?.message);
         console.error("Error response:", (error as any)?.response);
       }
-
-      // Show a more detailed error message
-      const errorMessage = (error as any)?.response?.data?.message || (error as any)?.message || "Erro ao criar empréstimo";
-      toast.error(`Erro: ${errorMessage}`);
     }
   };
 

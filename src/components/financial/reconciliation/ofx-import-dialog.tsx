@@ -55,13 +55,7 @@ export function OfxImportDialog({ open, onOpenChange, onImported }: Props) {
         onImported?.(data);
         onOpenChange(false);
       },
-      onError: err => {
-        toast({
-          title: "Erro ao importar extratos",
-          description: (err as Error).message || "Tente novamente",
-          variant: "error",
-        });
-      },
+      // Error toast is emitted by the axios error interceptor.
     });
   };
 

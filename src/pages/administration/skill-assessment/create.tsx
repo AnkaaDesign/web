@@ -9,7 +9,6 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { CampaignForm, type CampaignSubmitOptions } from "@/components/administration/skill-assessment/campaign-form";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { toast } from "@/components/ui/sonner";
 
 export const SkillAssessmentCreatePage = () => {
   usePageTracker({ title: "Nova Campanha", icon: "clipboard-list" });
@@ -24,13 +23,11 @@ export const SkillAssessmentCreatePage = () => {
 
       if (opts.openAfter && newId) {
         try {
+          // Success/error toasts handled by the axios interceptor.
           await openMutation.mutateAsync(newId);
-          toast.success("Campanha criada e aberta para coleta.");
         } catch (openErr) {
           if (process.env.NODE_ENV !== "production") console.error(openErr);
         }
-      } else {
-        toast.success("Campanha criada em rascunho.");
       }
 
       if (newId) {

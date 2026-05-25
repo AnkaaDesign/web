@@ -9,7 +9,6 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkillForm } from "@/components/administration/skill/skill-form";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { toast } from "@/components/ui/sonner";
 
 export const SkillCreatePage = () => {
   const navigate = useNavigate();
@@ -20,14 +19,14 @@ export const SkillCreatePage = () => {
   const handleSubmit = async (data: SkillCreateFormData) => {
     try {
       const result = await createAsync(data);
-      toast.success("Competência criada com sucesso");
+      // Success/error toasts handled by the axios interceptor.
       if (result.data?.id) {
         navigate(routes.administration.skill.details(result.data.id));
       } else {
         navigate(routes.administration.skill.root);
       }
     } catch (err) {
-      toast.error("Erro ao criar competência");
+      // Error toast handled by the axios interceptor.
       if (process.env.NODE_ENV !== "production") console.error(err);
     }
   };

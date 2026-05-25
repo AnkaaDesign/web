@@ -94,10 +94,6 @@ export const useNotificationConfigurationMutations = () => {
       notificationConfigurationService.createConfiguration(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationConfigurationKeys.all });
-      toast.success("Configuração criada com sucesso");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Erro ao criar configuração");
     },
   });
 
@@ -106,10 +102,6 @@ export const useNotificationConfigurationMutations = () => {
       notificationConfigurationService.updateConfiguration(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationConfigurationKeys.all });
-      toast.success("Configuração atualizada com sucesso");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Erro ao atualizar configuração");
     },
   });
 
@@ -118,10 +110,6 @@ export const useNotificationConfigurationMutations = () => {
       notificationConfigurationService.deleteConfiguration(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationConfigurationKeys.all });
-      toast.success("Configuração excluída com sucesso");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Erro ao excluir configuração");
     },
   });
 
@@ -150,10 +138,6 @@ export const useChannelConfigMutation = () => {
     }) => notificationConfigurationService.updateChannelConfig(configId, channel, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationConfigurationKeys.all });
-      toast.success("Canal atualizado com sucesso");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Erro ao atualizar canal");
     },
   });
 };
@@ -176,10 +160,6 @@ export const useSectorOverrideMutation = () => {
     }) => notificationConfigurationService.updateSectorOverride(configId, sector, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationConfigurationKeys.all });
-      toast.success("Override de setor atualizado com sucesso");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Erro ao atualizar override de setor");
     },
   });
 };
@@ -191,9 +171,6 @@ export const useTestConfiguration = () => {
   return useMutation({
     mutationFn: ({ key, data }: { key: string; data?: TestConfigurationDto }) =>
       notificationConfigurationService.testConfiguration(key, data),
-    onError: (error: Error) => {
-      toast.error(error.message || "Erro ao testar configuração");
-    },
   });
 };
 
@@ -206,11 +183,10 @@ export const useSendByConfiguration = () => {
       notificationConfigurationService.sendByConfiguration(key, data),
     onSuccess: (response) => {
       if (response.success) {
+        // Distinct from the interceptor's generic success message: reports the
+        // count of notifications actually created by this configuration send.
         toast.success(`${response.data?.notificationsCreated || 0} notificações enviadas`);
       }
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Erro ao enviar notificações");
     },
   });
 };

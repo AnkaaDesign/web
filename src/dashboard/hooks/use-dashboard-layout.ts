@@ -123,10 +123,10 @@ export function useDashboardLayout(): UseDashboardLayoutReturn {
       await updateMine({ dashboardLayoutWeb: next as unknown as any });
       snapshotRef.current = null;
       setIsEditing(false);
-      toast.success("Layout salvo");
+      // Success/error toasts are emitted by the axios interceptor (PUT /preferences/:id).
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erro ao salvar layout";
-      toast.error(message);
+      // Error toast emitted by the axios error interceptor. Re-throw so callers
+      // can still react to the failure.
       throw err;
     }
   }, [working, updateMine]);

@@ -48,7 +48,9 @@ import {
   TaskTableContextMenu,
   type TaskAction,
 } from "../../components/production/task/schedule/task-table-context-menu";
-import { isTaskQuoteBillingPhase } from "../../constants/enum-labels";
+import { SetTermModal } from "../../components/production/task/schedule/set-term-modal";
+import { getTaskQuoteEditRoute } from "../../utils/task";
+import { useReturnTo } from "../../hooks/common/use-return-to";
 import { useSectors } from "../../hooks/administration/use-sector";
 import { useCustomers } from "../../hooks/administration/use-customer";
 import {
@@ -120,7 +122,6 @@ import {
   ToggleRow,
   LimitInput,
   DensitySegmented,
-  DENSITY_VALUES,
   REFETCH_INTERVAL_OPTIONS,
   densityClasses,
   makeTableDisplaySchema,
@@ -1719,6 +1720,7 @@ function TaskTableRender({
 }: WidgetRenderProps<TaskTableConfig>) {
   const config = useMemo(() => normalizeConfig(rawConfig), [rawConfig]);
   const navigate = useNavigate();
+  const returnTo = useReturnTo();
   const [searchInput, setSearchInput] = useState("");
   const [activeStatusTab, setActiveStatusTab] = useState<TASK_STATUS | "ALL">("ALL");
   const debouncedSearch = useDeferredValue(searchInput);
@@ -1828,6 +1830,9 @@ function TaskTableRender({
   const [deleteDialog, setDeleteDialog] = useState<{ tasks: Task[] } | null>(
     null,
   );
+  const [setTermDialog, setSetTermDialog] = useState<{ tasks: Task[] } | null>(
+    null,
+  );
 
   const handleContextMenu = useCallback((e: React.MouseEvent, task: Task) => {
     e.preventDefault();
@@ -1878,12 +1883,11 @@ function TaskTableRender({
             break;
           case "quote":
             if (actionTasks.length === 1) {
-              const t = actionTasks[0];
-              const quoteRoute = isTaskQuoteBillingPhase(t.quote?.status as any)
-                ? `/financeiro/cobranca/detalhes/${t.id}`
-                : `/financeiro/orcamento/detalhes/${t.id}`;
-              navigate(quoteRoute);
+              navigate(getTaskQuoteEditRoute(actionTasks[0]), { state: { returnTo } });
             }
+            break;
+          case "setTerm":
+            setSetTermDialog({ tasks: actionTasks });
             break;
           case "delete":
             setDeleteDialog({ tasks: actionTasks });
@@ -1899,7 +1903,7 @@ function TaskTableRender({
         // Mutation hooks fire toasts on failure.
       }
     },
-    [updateAsync, navigate],
+    [updateAsync, navigate, returnTo],
   );
 
   const confirmDelete = useCallback(async () => {
@@ -1912,6 +1916,20 @@ function TaskTableRender({
       setDeleteDialog(null);
     }
   }, [deleteDialog, deleteTaskAsync]);
+
+  const confirmSetTerm = useCallback(
+    async (term: Date | null) => {
+      if (!setTermDialog) return;
+      try {
+        for (const t of setTermDialog.tasks) {
+          await updateAsync({ id: t.id, data: { term } } as any);
+        }
+      } finally {
+        setSetTermDialog(null);
+      }
+    },
+    [setTermDialog, updateAsync],
+  );
 
   // Strip financial columns (price/quoteTotal/quoteStatus) for sectors
   // that aren't allowed to see them. The widget allowlist gates access to
@@ -2192,6 +2210,12 @@ function TaskTableRender({
         contextMenu={contextMenu}
         onClose={() => setContextMenu(null)}
         onAction={handleAction}
+      />
+      <SetTermModal
+        open={!!setTermDialog}
+        onOpenChange={(open) => !open && setSetTermDialog(null)}
+        tasks={setTermDialog?.tasks ?? []}
+        onConfirm={confirmSetTerm}
       />
       <AlertDialog
         open={!!deleteDialog}

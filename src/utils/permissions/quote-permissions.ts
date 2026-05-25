@@ -102,3 +102,35 @@ export function getAvailableQuoteStatusTransitions(
 
   return transitions;
 }
+
+/**
+ * Compute the ordered sequence of legal status hops to get from `from` to `to`.
+ * Returns the statuses to APPLY in order (excluding `from`, including `to`), or
+ * [] when `from === to` or no legal path exists.
+ *
+ * The status dropdowns gate their options by the *form* status, so within one
+ * editing session a user can advance several steps (e.g. PENDING →
+ * BUDGET_APPROVED → COMMERCIAL_APPROVED). The server only accepts single legal
+ * hops, so the save must replay the path hop-by-hop. BFS yields the shortest
+ * legal path through VALID_TRANSITIONS.
+ */
+export function getQuoteStatusPath(
+  from: TASK_QUOTE_STATUS,
+  to: TASK_QUOTE_STATUS,
+): TASK_QUOTE_STATUS[] {
+  if (from === to) return [];
+  const queue: TASK_QUOTE_STATUS[][] = [[from]];
+  const visited = new Set<TASK_QUOTE_STATUS>([from]);
+  while (queue.length > 0) {
+    const path = queue.shift()!;
+    const last = path[path.length - 1];
+    for (const next of VALID_TRANSITIONS[last] || []) {
+      if (next === to) return [...path.slice(1), next];
+      if (!visited.has(next)) {
+        visited.add(next);
+        queue.push([...path, next]);
+      }
+    }
+  }
+  return [];
+}

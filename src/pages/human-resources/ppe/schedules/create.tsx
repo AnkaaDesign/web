@@ -28,20 +28,13 @@ export const PPEScheduleCreatePage = () => {
       };
     };
 
-    // Show result message
-    if (result.message) {
-      // Check if there were immediate deliveries created
-      if (result.immediateDeliveries) {
-        const { deliveriesCreated, userCount, errors } = result.immediateDeliveries;
-        if (deliveriesCreated > 0) {
-          toast.success(`Agendamento criado! ${deliveriesCreated} entrega(s) criada(s) para ${userCount} usuário(s).`);
-        } else if (errors && errors.length > 0) {
-          toast.warning(`Agendamento criado, mas nenhuma entrega foi gerada. Verifique: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '...' : ''}`);
-        } else {
-          toast.info(result.message);
-        }
-      } else {
-        toast.success(result.message);
+    // Success toast is emitted by the axios success interceptor. We only surface
+    // the partial-failure case (schedule created but no deliveries generated),
+    // which the interceptor's generic success message cannot convey.
+    if (result.immediateDeliveries) {
+      const { deliveriesCreated, errors } = result.immediateDeliveries;
+      if (deliveriesCreated === 0 && errors && errors.length > 0) {
+        toast.warning(`Agendamento criado, mas nenhuma entrega foi gerada. Verifique: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '...' : ''}`);
       }
     }
 

@@ -1,8 +1,22 @@
-import { TASK_OBSERVATION_TYPE, TASK_STATUS } from "../constants";
+import { routes, TASK_OBSERVATION_TYPE, TASK_STATUS } from "../constants";
 import { TASK_OBSERVATION_TYPE_LABELS, TASK_STATUS_LABELS } from "../constants";
+import { isTaskQuoteBillingPhase } from "../constants/enum-labels";
 import type { Task } from "../types";
 import { dateUtils } from "./date";
 import { numberUtils } from "./number";
+
+/**
+ * Resolve where to send a user when they "edit" a task's quote (commercial
+ * users, and the quote-section edit button). Billing (faturamento) is only
+ * reachable once the task is FINISHED and the quote has moved past the budget
+ * phase; otherwise the user lands on the budget (orçamento) detail page.
+ */
+export function getTaskQuoteEditRoute(task: Task): string {
+  const isFinished = task.status === TASK_STATUS.COMPLETED;
+  return isFinished && isTaskQuoteBillingPhase(task.quote?.status)
+    ? routes.financial.billing.details(task.id)
+    : routes.financial.budget.details(task.id);
+}
 
 /**
  * Check if task status transition is valid

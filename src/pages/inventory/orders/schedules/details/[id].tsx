@@ -19,7 +19,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate, formatDateTime } from "../../../../../utils";
 import { useOrderSchedule, useOrderScheduleMutations, useItems } from "../../../../../hooks";
@@ -145,10 +144,8 @@ export function OrderScheduleDetailsPage() {
     setIsDeleting(true);
     try {
       await deleteSchedule(schedule.id);
-      toast.success("Agendamento excluído com sucesso");
       navigate(routes.inventory.orders.schedules.root);
     } catch (error) {
-      toast.error("Erro ao excluir agendamento");
       if (process.env.NODE_ENV !== "production") {
         console.error("Error deleting schedule:", error);
       }
@@ -161,10 +158,9 @@ export function OrderScheduleDetailsPage() {
   const handleToggleActive = async () => {
     try {
       await updateSchedule({ id: schedule.id, data: { isActive: !schedule.isActive } });
-      toast.success(schedule.isActive ? "Agendamento desativado" : "Agendamento ativado");
       refetch();
     } catch (error) {
-      toast.error("Erro ao atualizar agendamento");
+      // Error toast handled by API client interceptor
     }
   };
 

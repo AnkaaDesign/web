@@ -27,7 +27,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { toast } from "@/components/ui/sonner";
 
 interface CampaignStatusActionsProps {
   assessment: Assessment;
@@ -51,16 +50,13 @@ export function CampaignStatusActions({ assessment }: CampaignStatusActionsProps
     try {
       if (pendingAction === "open") {
         await openMut.mutateAsync(assessment.id);
-        toast.success("Campanha aberta. Entradas foram geradas para os avaliadores.");
       } else if (pendingAction === "close") {
         await closeMut.mutateAsync(assessment.id);
-        toast.success("Campanha fechada.");
       } else if (pendingAction === "cancel") {
         await cancelMut.mutateAsync(assessment.id);
-        toast.success("Campanha cancelada.");
       }
     } catch (err) {
-      toast.error("Erro ao alterar status da campanha");
+      // Success/error toasts handled by the axios interceptor.
       if (process.env.NODE_ENV !== "production") console.error(err);
     } finally {
       setPendingAction(null);

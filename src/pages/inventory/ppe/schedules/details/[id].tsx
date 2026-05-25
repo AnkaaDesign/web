@@ -6,7 +6,6 @@ import { PpeScheduleInfoCard, PpeScheduleItemsCard, PpeScheduleDeliveriesCard } 
 import { PageHeader } from "@/components/ui/page-header";
 import { IconEdit, IconRefresh, IconTrash, IconPlayerPlay, IconPlayerPause, IconAlertTriangle } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -89,12 +88,12 @@ const EPIScheduleDetails = () => {
 
     try {
       setIsExecuting(true);
-      const result = await executeMutation.mutateAsync(ppeSchedule.id);
-      toast.success(result.message || `${result.data.deliveriesCreated} entregas criadas com sucesso!`);
+      await executeMutation.mutateAsync(ppeSchedule.id);
       refetch();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Erro ao executar agendamento";
-      toast.error(errorMessage);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error executing schedule:", error);
+      }
     } finally {
       setIsExecuting(false);
     }

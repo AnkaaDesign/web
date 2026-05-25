@@ -131,7 +131,7 @@ export function SystemLogsFilters({
             <Input
               id="log-search"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(value) => setSearchTerm(value as string)}
               placeholder="Filtrar linhas que contenham..."
             />
           </div>

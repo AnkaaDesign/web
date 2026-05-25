@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTaskDetail, useCurrentUser, useTaskMutations, taskKeys } from "@/hooks";
@@ -20,8 +20,9 @@ import { SECTOR_PRIVILEGES, IMPLEMENT_TYPE, routes } from "@/constants";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
-import { canUpdateQuoteStatus, canEditQuote } from "@/utils/permissions/quote-permissions";
+import { canUpdateQuoteStatus, canEditQuote, getQuoteStatusPath } from "@/utils/permissions/quote-permissions";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { readReturnTo } from "@/hooks/common/use-return-to";
 import { toast } from "@/components/ui/sonner";
 import {
   IconArrowLeft,
@@ -47,6 +48,9 @@ import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
 export const BillingDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Where to return after save — set by whoever sent the user here.
+  const returnTo = readReturnTo(location.state);
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const customersCache = useRef<Map<string, any>>(new Map());
@@ -474,8 +478,8 @@ export const BillingDetailPage = () => {
               streetType: config.customerData.streetType || undefined,
               registrationStatus: config.customerData.registrationStatus ?? undefined,
             });
-          } catch (err: any) {
-            toast.error(`Erro ao atualizar cliente: ${err?.message || "Erro desconhecido"}`);
+          } catch {
+            // Error toast is emitted by the axios error interceptor.
           }
         }
       }
@@ -550,12 +554,54 @@ export const BillingDetailPage = () => {
             })),
           };
 
+      // Status handling — two phases, deterministic:
+      //  (1) The VALUE update pins the CURRENT status so the backend's
+      //      auto-revert-to-PENDING (which fires only when no status is sent) is
+      //      suppressed — editing values keeps the existing approval.
+      //  (2) The status TRANSITION runs through the dedicated /status endpoint
+      //      AFTER the values are saved, so it validates the transition graph AND
+      //      its prerequisites (e.g. "total > 0") against the freshly-persisted
+      //      values — this is why an immediate/pre-save status change could fail
+      //      and leave the quote PENDING. It also handles BILLING_APPROVED's
+      //      invoice/boleto/NFS-e generation. Forwards the optional reject reason.
+      // Locked quotes (BILLING_APPROVED+) send a reduced payload with no status
+      // (those statuses don't auto-revert and the generic path can't change them).
+      const statusChanged = targetStatus && targetStatus !== quote.status;
+
+      if (!isQuoteLocked) {
+        quotePayload.status = quote.status;
+      }
+
       await taskQuoteService.update(quote.id, quotePayload);
 
-      // 4. Update status if changed — forward optional reason captured by the reject/cancel dialog
-      if (targetStatus && targetStatus !== quote.status) {
+      if (statusChanged) {
+        // The dropdown gates options by the FORM status, so the user can advance
+        // several steps in one session. The server only accepts single legal
+        // hops, so replay the whole path hop-by-hop. Guard: never auto-pass
+        // THROUGH BILLING_APPROVED as an intermediate (it triggers invoice/boleto
+        // generation) — it may only be the final target.
+        const path = getQuoteStatusPath(
+          quote.status as TASK_QUOTE_STATUS,
+          targetStatus as TASK_QUOTE_STATUS,
+        );
+        if (path.length === 0) {
+          throw new Error(
+            `Não há um caminho de status válido de "${quote.status}" até "${targetStatus}".`,
+          );
+        }
+        if (path.slice(0, -1).includes("BILLING_APPROVED" as TASK_QUOTE_STATUS)) {
+          throw new Error(
+            'Aprove o faturamento como uma etapa separada antes de avançar para o próximo status.',
+          );
+        }
         const reason = (formData as any).statusReason?.trim() || undefined;
-        await taskQuoteService.updateStatus(quote.id, targetStatus as TASK_QUOTE_STATUS, reason);
+        for (const step of path) {
+          await taskQuoteService.updateStatus(
+            quote.id,
+            step as TASK_QUOTE_STATUS,
+            step === "PENDING" ? reason : undefined,
+          );
+        }
         // Clear once consumed so a later edit doesn't accidentally re-send the same reason.
         form.setValue("statusReason" as any, "");
       }
@@ -574,11 +620,10 @@ export const BillingDetailPage = () => {
           duration: 6000,
         });
       } else {
-        toast.success("Faturamento atualizado com sucesso");
-        navigate(routes.financial.billing.root);
+        navigate(returnTo ?? routes.financial.billing.root);
       }
-    } catch (err: any) {
-      toast.error(err?.message || "Erro ao salvar faturamento");
+    } catch {
+      // Error toast is emitted by the axios error interceptor.
     } finally {
       setIsSaving(false);
     }
@@ -592,6 +637,7 @@ export const BillingDetailPage = () => {
     navigate,
     layoutFiles,
     canSeeBudgetInfoStep,
+    returnTo,
   ]);
 
   // Save handler — validates and shows confirmation for BILLING_APPROVED

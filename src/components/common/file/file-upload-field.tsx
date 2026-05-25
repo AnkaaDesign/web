@@ -258,16 +258,12 @@ export function FileUploadField({
     return uniqueExtensions.join(", ");
   }, [acceptedFileTypes]);
 
-  // Clean up object URLs on unmount
-  React.useEffect(() => {
-    return () => {
-      files.forEach((file) => {
-        if (file.preview) {
-          URL.revokeObjectURL(file.preview);
-        }
-      });
-    };
-  }, []);
+  // NOTE: We deliberately do NOT revoke preview object URLs on unmount.
+  // This field is frequently unmounted/remounted by parents (e.g. inside a
+  // collapsible accordion), while the file objects — and their `preview` blob
+  // URLs — are owned by the parent's state and outlive this component. Revoking
+  // here broke the thumbnail of a just-added file when the accordion was
+  // collapsed and reopened. Explicit removal still revokes in `removeFile`.
 
   if (variant === "mini") {
     return (

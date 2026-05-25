@@ -209,25 +209,6 @@ function availableYsFor(x: SkillStatsXAxisMode): SkillStatsYAxisMode[] {
   }
 }
 
-// Which compare modes are valid for each (X, Y) combination.
-function availableComparesFor(x: SkillStatsXAxisMode, y: SkillStatsYAxisMode): SkillStatsCompareMode[] {
-  if (y === 'distribution') return ['none'];
-  if (y === 'volume') return ['none'];
-  switch (x) {
-    case 'skill':
-      // 'position' is derived client-side from overview.byUser (needs
-      // perSkillAverage), so it only works here.
-      return ['none', 'sector', 'user', 'position'];
-    case 'topic':
-      return ['none', 'sector', 'user'];
-    case 'sector':
-    case 'user':
-      return ['none', 'skill'];
-    case 'campaign':
-      return ['none', 'sector', 'user'];
-  }
-}
-
 // Which chart types are valid for each (X, Y, compare) combination.
 function availableChartTypesFor(
   x: SkillStatsXAxisMode,

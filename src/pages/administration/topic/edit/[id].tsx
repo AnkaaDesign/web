@@ -32,7 +32,6 @@ import {
 } from "@/components/ui/form";
 import { TopicLevelFields } from "@/components/administration/topic/topic-level-fields";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { toast } from "@/components/ui/sonner";
 
 // Combined schema for the edit page: topic fields + levels (always 6 rows)
 const editSchema = topicUpdateSchema.extend({
@@ -140,10 +139,10 @@ export const TopicEditPage = () => {
       };
       await upsertLevels.mutateAsync(levelsPayload);
 
-      toast.success("Tópico e níveis atualizados");
+      // Success/error toasts handled by the axios interceptor.
       navigate(routes.administration.topic.details(id));
     } catch (err) {
-      toast.error("Erro ao salvar tópico");
+      // Error toast handled by the axios interceptor.
       if (process.env.NODE_ENV !== "production") console.error(err);
     } finally {
       setIsSubmittingAll(false);

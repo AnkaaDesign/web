@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconDownload, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconNotes, IconClipboardList, IconCreditCard } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconNotes, IconClipboardList, IconCreditCard, IconPercentage } from "@tabler/icons-react";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import type { OrderTemporaryItem } from "@/hooks/inventory/use-order-form-url-state";
@@ -13,7 +13,6 @@ import { useOrderMutations, useItems } from "../../../../hooks";
 import { routes } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormMessage } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
@@ -25,7 +24,9 @@ import { FormSteps } from "@/components/ui/form-steps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useOrderFormUrlState, composeTempItemDescription } from "@/hooks/inventory/use-order-form-url-state";
-import { formatCurrency, formatDate, formatDateTime, formatPixKey } from "../../../../utils";
+import { formatCurrency, formatDate, formatPixKey } from "../../../../utils";
+import { exportOrderPdf } from "@/utils/order-pdf-generator";
+import { OrderPdfExportButton } from "../common/order-pdf-export-button";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { useSuppliers } from "../../../../hooks";
@@ -227,6 +228,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       forecast: order.forecast,
       notes: order.notes || "",
       freight: (order as any).freight ?? 0,
+      discount: (order as any).discount ?? 0,
       selectedItems: initialSelectedItems,
       quantities: initialQuantities,
       prices: initialPrices,
@@ -240,6 +242,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     order.forecast,
     order.notes,
     (order as any).freight,
+    (order as any).discount,
     initialSelectedItems,
     initialQuantities,
     initialPrices,
@@ -260,6 +263,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     forecast,
     notes,
     freight,
+    discount,
     temporaryItems,
     addTemporaryItem,
     updateTemporaryItem,
@@ -269,6 +273,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     updateForecast,
     updateNotes,
     updateFreight,
+    updateDiscount,
     showSelectedOnly,
     searchTerm,
     showInactive,
@@ -312,6 +317,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     forecast: forecast || order.forecast || undefined,
     notes: notes || order.notes || "",
     freight: freight ?? (order as any).freight ?? 0,
+    discount: discount ?? (order as any).discount ?? 0,
     // Items list is computed from URL state at submit time.
     items: [],
     // Payment fields
@@ -409,6 +415,16 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [freight]);
+
+  // Sync URL discount to form state.
+  useEffect(() => {
+    const currentValue = form.getValues("discount");
+    const newValue = discount ?? 0;
+    if (currentValue !== newValue) {
+      form.setValue("discount", newValue, { shouldValidate: false, shouldDirty: false, shouldTouch: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discount]);
 
   // Mutations - use update instead of create
   const { updateAsync, isLoading: isSubmitting } = useOrderMutations();
@@ -522,11 +538,24 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       }, 0);
   }, [temporaryItems]);
 
+  // Goods subtotal (before ICMS/IPI) across inventory + temporary items — the discount base.
+  const goodsSubtotal = useMemo(() => {
+    const inventoryGoods = Array.from(selectedItems).reduce((total, itemId) => {
+      return total + (quantities[itemId] || 1) * (prices[itemId] || 0);
+    }, 0);
+    const temporaryGoods = (temporaryItems || [])
+      .filter(t => t.temporaryItemDescription.trim() !== "")
+      .reduce((total, t) => total + (Number(t.orderedQuantity) || 0) * (Number(t.price) || 0), 0);
+    return inventoryGoods + temporaryGoods;
+  }, [selectedItems, quantities, prices, temporaryItems]);
+
   // Combined items total (without freight).
   const totalPrice = inventoryTotal + temporaryTotal;
   const itemCount = selectionCount + (temporaryItems || []).filter(t => t.temporaryItemDescription.trim() !== "").length;
   const watchedFreight = Number(form.watch("freight")) || 0;
-  const grandTotal = totalPrice + watchedFreight;
+  const watchedDiscount = Number(form.watch("discount")) || 0;
+  const discountAmount = watchedDiscount > 0 ? goodsSubtotal * (watchedDiscount / 100) : 0;
+  const grandTotal = totalPrice + watchedFreight - discountAmount;
 
   // Navigation helpers
   const nextStep = useCallback(() => {
@@ -576,6 +605,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     const forecastChanged = (forecast ? new Date(forecast).getTime() : null) !== (order.forecast ? new Date(order.forecast).getTime() : null);
     const notesChanged = (localNotes?.trim() || "") !== (order.notes?.trim() || "");
     const freightChanged = Number(watchedFreight || 0) !== Number((order as any).freight || 0);
+    const discountChanged = Number(watchedDiscount || 0) !== Number((order as any).discount || 0);
 
     // Payment fields
     const paymentMethodChanged = (watchedPaymentMethod || null) !== (order.paymentMethod || null);
@@ -621,11 +651,11 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     });
 
     return (
-      descriptionChanged || supplierChanged || forecastChanged || notesChanged || freightChanged ||
+      descriptionChanged || supplierChanged || forecastChanged || notesChanged || freightChanged || discountChanged ||
       inventoryItemsChanged || inventoryDetailsChanged || tempCountChanged || tempContentChanged ||
       hasFileChanges || paymentMethodChanged || paymentPixChanged || paymentDueDaysChanged || paymentResponsibleChanged
     );
-  }, [description, supplierId, forecast, localNotes, watchedFreight, selectedItems, quantities, prices, icmses, ipis, temporaryItems, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedPaymentResponsibleId]);
+  }, [description, supplierId, forecast, localNotes, watchedFreight, watchedDiscount, selectedItems, quantities, prices, icmses, ipis, temporaryItems, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedPaymentResponsibleId]);
 
   // Stage validation
   const validateCurrentStep = useCallback((): boolean => {
@@ -723,6 +753,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const currentPaymentDueDays = form.getValues("paymentDueDays");
       const currentPaymentResponsibleId = form.getValues("paymentResponsibleId");
       const currentFreight = Number(form.getValues("freight")) || 0;
+      const currentDiscount = Number(form.getValues("discount")) || 0;
 
       const data = {
         description: description!.trim(),
@@ -730,6 +761,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         forecast: forecast, // Keep null to allow clearing the forecast date
         notes: notes?.trim() || undefined,
         freight: currentFreight,
+        discount: currentDiscount,
         items,
         paymentMethod: currentPaymentMethod || undefined,
         paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
@@ -827,378 +859,46 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
   // PDF Export function
   const exportToPDF = useCallback(
-    (e?: React.MouseEvent) => {
-      if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+    (includePricing: boolean) => {
+      const selectedSupplier = suppliers.find((s) => s.id === supplierId);
 
-      const pdfContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Pedido - ${formatDate(new Date())}</title>
-        <style>
-          @page {
-            size: A4;
-            margin: 12mm;
-          }
-          
-          * { 
-            box-sizing: border-box; 
-            margin: 0;
-            padding: 0;
-          }
-          
-          html, body { 
-            height: 100vh;
-            width: 100vw;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: white;
-            font-size: 12px;
-            line-height: 1.3;
-          }
-          
-          body {
-            display: grid;
-            grid-template-rows: auto 1fr auto;
-            min-height: 100vh;
-            padding: 0;
-          }
-          
-          .header {
-            display: flex;
-            align-items: flex-start;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e5e7eb;
-            flex-shrink: 0;
-          }
-          
-          .logo {
-            width: 100px;
-            height: 40px;
-            background: #0066cc;
-            border-radius: 4px;
-            margin-right: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-          }
-          
-          .header-content {
-            flex: 1;
-          }
-          
-          .header-content h1 {
-            font-size: 18px;
-            margin-bottom: 4px;
-            color: #111827;
-          }
-          
-          .header-content p {
-            font-size: 12px;
-            color: #6b7280;
-          }
-          
-          .info-section {
-            background: #f9fafb;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            flex-shrink: 0;
-          }
-          
-          .info-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-          }
-          
-          .info-item {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-          }
-          
-          .info-item.full-width {
-            grid-column: 1 / -1;
-          }
-          
-          .info-label {
-            font-size: 11px;
-            color: #6b7280;
-            font-weight: 500;
-          }
-          
-          .info-value {
-            font-size: 12px;
-            color: #111827;
-            font-weight: 600;
-          }
-          
-          .table-container {
-            margin-bottom: 20px;
-            overflow: visible;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-          }
-          
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11px;
-          }
-          
-          thead {
-            background: #f3f4f6;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-          }
-          
-          th {
-            text-align: left;
-            padding: 10px 12px;
-            font-weight: 600;
-            color: #374151;
-            border-bottom: 1px solid #e5e7eb;
-            font-size: 11px;
-            white-space: nowrap;
-          }
-          
-          td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #f3f4f6;
-            color: #374151;
-          }
-          
-          tr:hover {
-            background: #f9fafb;
-          }
-          
-          .text-right {
-            text-align: right;
-          }
-          
-          .text-mono {
-            font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
-            font-size: 10px;
-          }
-          
-          .font-medium {
-            font-weight: 500;
-          }
-          
-          .total-row {
-            background: #f3f4f6;
-            font-weight: 600;
-          }
-          
-          .total-row td {
-            padding: 12px;
-            border-top: 2px solid #e5e7eb;
-            border-bottom: none;
-          }
-          
-          
-          .footer {
-            margin-top: auto;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-            text-align: center;
-            font-size: 10px;
-            color: #6b7280;
-            flex-shrink: 0;
-          }
-          
-          @media print {
-            body {
-              height: auto;
-              min-height: 100vh;
-            }
-            
-            .table-container {
-              overflow: visible;
-            }
-            
-            table {
-              page-break-inside: auto;
-            }
-            
-            tr {
-              page-break-inside: avoid;
-              page-break-after: auto;
-            }
-            
-            thead {
-              display: table-header-group;
-            }
-            
-            tfoot {
-              display: table-footer-group;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="logo">LOGO</div>
-          <div class="header-content">
-            <h1>Pedido #${order.id.slice(-8)}</h1>
-            <p>Gerado em ${formatDateTime(new Date())}</p>
-          </div>
-        </div>
-        
-        <div class="info-section">
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">Descrição</span>
-              <span class="info-value">${description}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Fornecedor</span>
-              <span class="info-value">${supplierId ? suppliers.find((s) => s.id === supplierId)?.fantasyName || "-" : "-"}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Previsão</span>
-              <span class="info-value">${forecast ? formatDate(forecast) : "-"}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Quantidade de Itens</span>
-              <span class="info-value">${itemCount} ${itemCount === 1 ? "item" : "itens"}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Frete</span>
-              <span class="info-value">${formatCurrency(watchedFreight)}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Valor Total</span>
-              <span class="info-value">${formatCurrency(grandTotal)}</span>
-            </div>
-            ${
-              notes
-                ? `
-              <div class="info-item full-width">
-                <span class="info-label">Observações</span>
-                <span class="info-value">${notes}</span>
-              </div>
-            `
-                : ""
-            }
-          </div>
-        </div>
-        
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Item</th>
-                <th>Categoria</th>
-                <th>Marca</th>
-                <th class="text-right">Quantidade</th>
-                <th class="text-right">Preço Unit.</th>
-                <th class="text-right">ICMS %</th>
-                <th class="text-right">IPI %</th>
-                <th class="text-right">Subtotal</th>
-                <th class="text-right">Impostos</th>
-                <th class="text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${[
-                ...selectedItemsData.map((item) => {
-                  const quantity = quantities[item.id] || 1;
-                  const price = prices[item.id] || 0;
-                  const icms = icmses[item.id] || 0;
-                  const ipi = ipis[item.id] || 0;
-                  const subtotal = quantity * price;
-                  const taxAmount = subtotal * (icms / 100) + subtotal * (ipi / 100);
-                  const itemTotal = subtotal + taxAmount;
-                  const measureUnit = getMeasureUnitDisplay(item.measures);
-                  return `
-                  <tr>
-                    <td class="text-mono">${item.uniCode}</td>
-                    <td>${item.name}</td>
-                    <td>${item.category?.name || "-"}</td>
-                    <td>${item.brand?.name || "-"}</td>
-                    <td class="text-right">${quantity} ${measureUnit}</td>
-                    <td class="text-right">${formatCurrency(price, "pt-BR", "BRL", 3)}</td>
-                    <td class="text-right">${icms}%</td>
-                    <td class="text-right">${ipi}%</td>
-                    <td class="text-right">${formatCurrency(subtotal)}</td>
-                    <td class="text-right">${formatCurrency(taxAmount)}</td>
-                    <td class="text-right font-medium">${formatCurrency(itemTotal)}</td>
-                  </tr>
-                `;
-                }),
-                ...(temporaryItems || []).filter(t => t.temporaryItemDescription.trim() !== "").map((t) => {
-                  const quantity = Number(t.orderedQuantity) || 0;
-                  const price = Number(t.price) || 0;
-                  const icms = Number(t.icms) || 0;
-                  const ipi = Number(t.ipi) || 0;
-                  const subtotal = quantity * price;
-                  const taxAmount = subtotal * (icms / 100) + subtotal * (ipi / 100);
-                  const itemTotal = subtotal + taxAmount;
-                  return `
-                  <tr>
-                    <td class="text-mono">${t.uniCode || "-"}</td>
-                    <td>${composeTempItemDescription(t)} <span style="background:#e0e7ff;color:#3730a3;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600;margin-left:4px;">TEMP</span></td>
-                    <td>${t.brand || "-"}</td>
-                    <td>${t.measures || "-"}</td>
-                    <td class="text-right">${quantity}</td>
-                    <td class="text-right">${formatCurrency(price, "pt-BR", "BRL", 3)}</td>
-                    <td class="text-right">${icms}%</td>
-                    <td class="text-right">${ipi}%</td>
-                    <td class="text-right">${formatCurrency(subtotal)}</td>
-                    <td class="text-right">${formatCurrency(taxAmount)}</td>
-                    <td class="text-right font-medium">${formatCurrency(itemTotal)}</td>
-                  </tr>
-                `;
-                }),
-              ].join("")}
-            </tbody>
-            <tfoot>
-              ${watchedFreight > 0 ? `
-              <tr class="total-row">
-                <td colspan="10" class="text-right">Frete</td>
-                <td class="text-right">${formatCurrency(watchedFreight)}</td>
-              </tr>` : ""}
-              <tr class="total-row">
-                <td colspan="10" class="text-right">Total Geral</td>
-                <td class="text-right">${formatCurrency(grandTotal)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        
-        <div class="footer">
-          <p>Documento gerado eletronicamente - ${formatDate(new Date())}</p>
-        </div>
-      </body>
-      </html>
-    `;
+      const inventoryItems = selectedItemsData.map((item: any) => ({
+        code: item.uniCode || "-",
+        name: item.name,
+        brand: item.brand?.name || "-",
+        measures: getMeasureUnitDisplay(item.measures),
+        quantity: Number(quantities[item.id]) || 1,
+        unitPrice: Number(prices[item.id]) || 0,
+        icms: Number(icmses[item.id]) || 0,
+        ipi: Number(ipis[item.id]) || 0,
+      }));
+      const tempItems = (temporaryItems || [])
+        .filter((t) => t.temporaryItemDescription.trim() !== "")
+        .map((t) => ({
+          code: t.uniCode || "-",
+          name: composeTempItemDescription(t),
+          brand: t.brand || "-",
+          measures: t.measures || "-",
+          quantity: Number(t.orderedQuantity) || 0,
+          unitPrice: Number(t.price) || 0,
+          icms: Number(t.icms) || 0,
+          ipi: Number(t.ipi) || 0,
+        }));
 
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        printWindow.document.write(pdfContent);
-        printWindow.document.close();
-        printWindow.focus();
-
-        printWindow.onload = () => {
-          printWindow.print();
-          printWindow.onafterprint = () => {
-            printWindow.close();
-          };
-        };
-      }
+      exportOrderPdf({
+        title: includePricing ? "Pedido de Compra" : "Solicitação de Orçamento",
+        includePricing,
+        description: description || order.description || undefined,
+        supplierName: selectedSupplier?.fantasyName || order.supplier?.fantasyName || undefined,
+        orderDate: order.createdAt,
+        forecastDate: forecast || order.forecast,
+        freight: watchedFreight,
+        discount: watchedDiscount,
+        notes: notes || order.notes,
+        items: [...inventoryItems, ...tempItems],
+      });
     },
-    [description, supplierId, forecast, notes, itemCount, selectedItemsData, quantities, prices, icmses, ipis, temporaryItems, totalPrice, watchedFreight, grandTotal, order.id, suppliers],
+    [description, supplierId, forecast, notes, selectedItemsData, quantities, prices, icmses, ipis, temporaryItems, watchedFreight, watchedDiscount, order, suppliers],
   );
 
   // Generate navigation actions based on current step
@@ -1544,10 +1244,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                         <h2 className="text-xl font-semibold text-foreground">Revisão do Pedido</h2>
                         <p className="text-sm text-muted-foreground mt-1">Confirme os detalhes antes de finalizar</p>
                       </div>
-                      <Button type="button" variant="ghost" size="sm" onClick={exportToPDF} className="gap-2 text-muted-foreground hover:text-foreground">
-                        <IconDownload className="h-4 w-4" />
-                        Exportar PDF
-                      </Button>
+                      <OrderPdfExportButton onExport={exportToPDF} fixedVersion={false} />
                     </div>
 
                     {/* Info + Payment side by side */}
@@ -1584,6 +1281,13 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               {itemCount} {itemCount === 1 ? "item" : "itens"}
                             </span>
                           </div>
+
+                          {discountAmount > 0 && (
+                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                              <span className="text-sm text-muted-foreground">Desconto ({watchedDiscount}%)</span>
+                              <span className="text-sm font-semibold text-red-600 dark:text-red-400">- {formatCurrency(discountAmount)}</span>
+                            </div>
+                          )}
 
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                             <span className="text-sm text-muted-foreground">Valor Total</span>
@@ -1752,6 +1456,28 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               />
                             </div>
                           </div>
+
+                          {/* Discount (desconto) — percentage applied to the goods subtotal (before ICMS/IPI). */}
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
+                            <span className="text-sm text-muted-foreground whitespace-nowrap mr-4 flex items-center gap-2">
+                              <IconPercentage className="h-4 w-4" />
+                              Desconto
+                            </span>
+                            <div className="flex-1 max-w-[55%]">
+                              <Input
+                                type="percentage"
+                                value={form.watch("discount") ?? 0}
+                                onChange={(value) => {
+                                  const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+                                  const sanitized = Number.isFinite(n) && n >= 0 ? Math.min(n, 100) : 0;
+                                  form.setValue("discount", sanitized, { shouldDirty: true, shouldTouch: true });
+                                  updateDiscount(sanitized);
+                                }}
+                                placeholder="0%"
+                                className="h-8 w-full border-neutral-500"
+                              />
+                            </div>
+                          </div>
                         </CardContent>
                       </Card>
                     </div>
@@ -1842,6 +1568,12 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 <TableRow>
                                   <TableCell colSpan={10} className="text-right text-sm text-muted-foreground">Frete</TableCell>
                                   <TableCell className="text-right font-medium">{formatCurrency(watchedFreight)}</TableCell>
+                                </TableRow>
+                              )}
+                              {discountAmount > 0 && (
+                                <TableRow>
+                                  <TableCell colSpan={10} className="text-right text-sm text-muted-foreground">Desconto ({watchedDiscount}%)</TableCell>
+                                  <TableCell className="text-right font-medium text-red-600 dark:text-red-400">- {formatCurrency(discountAmount)}</TableCell>
                                 </TableRow>
                               )}
                               <TableRow>

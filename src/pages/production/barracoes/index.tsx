@@ -483,16 +483,9 @@ export function GaragesPage() {
     if (!movementRequest) return;
     try {
       await requestMovement(movementRequest);
-      toast({
-        title: 'Solicitação enviada',
-        description: 'A equipe de logística foi notificada sobre a movimentação.',
-      });
+      // Success/error toasts are emitted by the axios interceptor (POST /trucks/request-movement).
     } catch {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível enviar a solicitação.',
-        variant: 'error',
-      });
+      // Error toast emitted by the axios error interceptor.
     }
     setMovementRequest(null);
   }, [movementRequest, toast]);

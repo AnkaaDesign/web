@@ -23,7 +23,8 @@ import { SetStatusModal } from "./set-status-modal";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { toast } from "@/components/ui/sonner";
-import { isTaskQuoteBillingPhase } from "@/constants/enum-labels";
+import { getTaskQuoteEditRoute } from "@/utils/task";
+import { useReturnTo } from "@/hooks/common/use-return-to";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -51,6 +52,7 @@ interface TaskRow extends Task {
 
 export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: externalSelectedTaskIds, onSelectedTaskIdsChange, advancedActionsRef: externalAdvancedActionsRef, allSelectedTasks, isSelectingSourceTask, onSourceTaskSelect, onStartCopyFromTask, onShiftClickSelect, onSingleClickSelect }: TaskScheduleTableProps) {
   const navigate = useNavigate();
+  const returnTo = useReturnTo();
   const { user } = useAuth();
   const canEdit = canEditTasks(user);
   const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([]);
@@ -437,10 +439,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
         case "edit":
           if (tasks.length === 1) {
             if (user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL) {
-              const quoteRoute = isTaskQuoteBillingPhase(tasks[0].quote?.status)
-                ? routes.financial.billing.details(tasks[0].id)
-                : routes.financial.budget.details(tasks[0].id);
-              navigate(quoteRoute);
+              navigate(getTaskQuoteEditRoute(tasks[0]), { state: { returnTo } });
             } else {
               navigate(routes.production.schedule.edit(tasks[0].id));
             }
@@ -454,10 +453,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
 
         case "quote":
           if (tasks.length === 1) {
-            const quoteRoute = isTaskQuoteBillingPhase(tasks[0].quote?.status)
-              ? routes.financial.billing.details(tasks[0].id)
-              : routes.financial.budget.details(tasks[0].id);
-            navigate(quoteRoute);
+            navigate(getTaskQuoteEditRoute(tasks[0]), { state: { returnTo } });
           }
           break;
 

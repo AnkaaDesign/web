@@ -14,7 +14,6 @@ import type { Cut } from "../../../../types";
 import { CUT_TYPE, CUT_STATUS, CUT_ORIGIN, CUT_REQUEST_REASON, CUT_TYPE_LABELS, CUT_STATUS_LABELS, CUT_ORIGIN_LABELS, CUT_REQUEST_REASON_LABELS } from "../../../../constants";
 import { useCutMutations, useCut } from "../../../../hooks";
 import { mapCutToFormData } from "../../../../schemas";
-import { useToast } from "@/hooks/common/use-toast";
 
 interface CutFormProps {
   cutId?: string;
@@ -123,7 +122,6 @@ type CreateFormData = z.infer<typeof createFormSchema>;
 type UpdateFormData = z.infer<typeof updateFormSchema>;
 
 export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, onCancel, className }: CutFormProps) {
-  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch existing cut data for edit mode
@@ -229,18 +227,11 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
         result = response.data!;
       }
 
-      toast({
-        title: mode === "create" ? "Corte criado" : "Corte atualizado",
-        description: `Corte ${mode === "create" ? "criado" : "atualizado"} com sucesso.`,
-      });
-
+      // Success/error toasts are emitted by the axios interceptor (non-batch
+      // create/update write-method).
       onSuccess?.(result);
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: `Erro ao ${mode === "create" ? "criar" : "atualizar"} corte.`,
-        variant: "error",
-      });
+    } catch {
+      // Error toast emitted by the axios error interceptor.
     } finally {
       setIsSubmitting(false);
     }

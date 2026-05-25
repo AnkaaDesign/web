@@ -854,19 +854,16 @@ export default function BonusListPage() {
     if (!singlePeriod || adjustmentPending === null) return;
     const parsed = adjustmentPending;
     try {
-      const res: any = await applyPeriodAdjustment.mutateAsync({
+      await applyPeriodAdjustment.mutateAsync({
         year: singlePeriod.year,
         month: singlePeriod.month,
         percentage: parsed,
       });
-      toast.success(
-        res?.message || `Reajuste de ${parsed > 0 ? "+" : ""}${parsed}% aplicado ao período.`,
-      );
       setAdjustmentConfirmOpen(false);
       setAdjustmentModalOpen(false);
       setAdjustmentPending(null);
-    } catch (err: any) {
-      toast.error(err?.message || "Falha ao aplicar reajuste.");
+    } catch {
+      // Error toast is emitted by the axios error interceptor.
       setAdjustmentConfirmOpen(false);
     }
   };

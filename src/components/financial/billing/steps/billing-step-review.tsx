@@ -224,14 +224,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     setRevertBillingLoading(true);
     try {
       await taskQuoteService.revertBilling(task.quoteId);
-      toast.success("Faturamento revertido com sucesso.", {
-        description: "O orçamento retornou para Aprovado pelo Comercial.",
-      });
       window.location.reload();
-    } catch (err: any) {
-      toast.error("Erro ao reverter faturamento", {
-        description: err?.response?.data?.message || String(err),
-      });
+    } catch {
+      // Error toast is emitted by the axios error interceptor.
     } finally {
       setRevertBillingLoading(false);
       setRevertBillingDialogOpen(false);

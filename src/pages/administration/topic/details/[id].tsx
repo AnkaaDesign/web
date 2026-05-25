@@ -45,7 +45,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { toast } from "@/components/ui/sonner";
 
 export const TopicDetailsPage = () => {
   usePageTracker({ title: "Detalhes do Tópico", icon: "clipboard-list" });
@@ -81,10 +80,10 @@ export const TopicDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteAsync(id);
-      toast.success("Tópico excluído");
+      // Success/error toasts handled by the axios interceptor.
       navigate(routes.administration.topic.root);
-    } catch (err) {
-      toast.error("Erro ao excluir tópico");
+    } catch {
+      // Error toast handled by the axios interceptor.
     } finally {
       setIsDeleteOpen(false);
     }

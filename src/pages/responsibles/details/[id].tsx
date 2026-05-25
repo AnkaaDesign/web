@@ -12,7 +12,6 @@ import { BasicInfoCard, ContactDetailsCard, ResponsibleDetailSkeleton } from "@/
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { toast } from "@/components/ui/sonner";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const ResponsibleDetailsPage = () => {
@@ -66,10 +65,10 @@ export const ResponsibleDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteAsync(id);
-      toast.success("Responsável excluído com sucesso");
+      // Success/error toasts handled by the axios interceptor.
       navigate(routes.responsibles.root);
     } catch (error) {
-      toast.error("Erro ao excluir responsável");
+      // Error toast handled by the axios interceptor.
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error deleting responsible:", error);
       }

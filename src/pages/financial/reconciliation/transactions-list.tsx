@@ -379,12 +379,7 @@ export const ReconciliationTransactionsListPage = () => {
                       });
                       refetch();
                     },
-                    onError: err =>
-                      toast({
-                        title: "Falha ao reexecutar conciliação",
-                        description: (err as Error).message,
-                        variant: "error",
-                      }),
+                    // Error toast is emitted by the axios error interceptor.
                   },
                 );
               },
@@ -481,16 +476,10 @@ export const ReconciliationTransactionsListPage = () => {
           matchMut.mutate(
             { transactionId: matchTx.id, payload },
             {
+              // Success/error toasts are emitted by the axios interceptors.
               onSuccess: () => {
-                toast({ title: "Conciliação salva", variant: "success" });
                 txDialog.clear();
               },
-              onError: err =>
-                toast({
-                  title: "Falha ao salvar conciliação",
-                  description: (err as Error).message,
-                  variant: "error",
-                }),
             },
           );
         }}
@@ -504,16 +493,10 @@ export const ReconciliationTransactionsListPage = () => {
         onConfirm={() => {
           if (!unmatchTx) return;
           unmatchMut.mutate(unmatchTx.id, {
+            // Success/error toasts are emitted by the axios interceptors.
             onSuccess: () => {
-              toast({ title: "Conciliação desfeita", variant: "success" });
               unmatchDialog.clear();
             },
-            onError: err =>
-              toast({
-                title: "Falha ao desfazer conciliação",
-                description: (err as Error).message,
-                variant: "error",
-              }),
           });
         }}
       />
@@ -527,16 +510,10 @@ export const ReconciliationTransactionsListPage = () => {
           ignoreMut.mutate(
             { transactionId: ignoreTx.id, payload: { reason } },
             {
+              // Success/error toasts are emitted by the axios interceptors.
               onSuccess: () => {
-                toast({ title: "Transação ignorada", variant: "success" });
                 ignoreDialog.clear();
               },
-              onError: err =>
-                toast({
-                  title: "Falha ao ignorar transação",
-                  description: (err as Error).message,
-                  variant: "error",
-                }),
             },
           );
         }}
@@ -552,16 +529,10 @@ export const ReconciliationTransactionsListPage = () => {
           categoryMut.mutate(
             { transactionId: categoryTx.id, payload },
             {
+              // Success/error toasts are emitted by the axios interceptors.
               onSuccess: () => {
-                toast({ title: "Categoria atualizada", variant: "success" });
                 categoryDialog.clear();
               },
-              onError: err =>
-                toast({
-                  title: "Falha ao alterar categoria",
-                  description: (err as Error).message,
-                  variant: "error",
-                }),
             },
           );
         }}

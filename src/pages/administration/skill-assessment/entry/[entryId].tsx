@@ -59,7 +59,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ScoreBadge } from "@/components/production/skill-assessment/score-badge";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { AssessmentEntryStatusBadge } from "@/components/production/skill-assessment/assessment-entry-status-badge";
 
@@ -194,10 +193,10 @@ export const SkillAssessmentEntryDetailsPage = () => {
   const handleReopen = async () => {
     try {
       await reopenMut.mutateAsync();
-      toast.success("Avaliação reaberta. O líder pode editar novamente.");
+      // Success/error toasts handled by the axios interceptor.
       setIsReopenOpen(false);
     } catch (err) {
-      toast.error("Erro ao reabrir avaliação");
+      // Error toast handled by the axios interceptor.
       if (import.meta.env.DEV) console.error(err);
     }
   };

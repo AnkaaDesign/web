@@ -1,6 +1,6 @@
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconPlayerPlay, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconLayout } from "@tabler/icons-react";
+import { IconPlayerPlay, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconLayout, IconCalendarTime } from "@tabler/icons-react";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
 import type { Task } from "../../../../types";
@@ -20,7 +20,7 @@ interface TaskTableContextMenuProps {
   onAction: (action: TaskAction, tasks: Task[]) => void;
 }
 
-export type TaskAction = "start" | "finish" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkBaseFiles" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask" | "bulkServiceOrder" | "bulkLayout" | "bulkDocuments" | "quote";
+export type TaskAction = "start" | "finish" | "duplicate" | "setSector" | "setTerm" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkBaseFiles" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask" | "bulkServiceOrder" | "bulkLayout" | "bulkDocuments" | "quote";
 
 export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTableContextMenuProps) {
   const { user } = useAuth();
@@ -101,8 +101,10 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           </DropdownMenuItem>
         )}
 
-        {/* Quote - ADMIN, FINANCIAL, COMMERCIAL (single selection only) */}
-        {canViewQuote(user?.sector?.privileges || "") && !isMultiSelection && (
+        {/* Quote - ADMIN, FINANCIAL (single selection only).
+            Hidden for COMMERCIAL: their "Editar" already routes to this same
+            quote page (getTaskQuoteEditRoute), so the entry would be redundant. */}
+        {canViewQuote(user?.sector?.privileges || "") && !isMultiSelection && !isCommercial && (
           <DropdownMenuItem onClick={() => handleAction("quote")}>
             <IconReceipt className="mr-2 h-4 w-4" />
             {getTaskQuoteDisplayLabel(tasks[0]?.quote?.status)}
@@ -113,6 +115,14 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           <DropdownMenuItem onClick={() => handleAction("setSector")}>
             <IconBuildingFactory2 className="mr-2 h-4 w-4" />
             {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
+          </DropdownMenuItem>
+        )}
+
+        {/* Set Term action - Production Manager, Commercial (and Admin) */}
+        {(isAdmin || isProductionManager || isCommercial) && (
+          <DropdownMenuItem onClick={() => handleAction("setTerm")}>
+            <IconCalendarTime className="mr-2 h-4 w-4" />
+            {tasks.some((t) => t.term) ? "Alterar Prazo" : "Definir Prazo"}
           </DropdownMenuItem>
         )}
 

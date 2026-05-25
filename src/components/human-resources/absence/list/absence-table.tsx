@@ -84,9 +84,8 @@ export function AbsenceTable({
   const handleDeleteOne = async (rec: SecullumAggregatedAbsence) => {
     try {
       await deleteMut.mutateAsync(rec.Id);
-      toast.success("Férias removidas");
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Falha ao remover");
+    } catch {
+      // Error toast is emitted by the axios error interceptor.
     }
   };
 

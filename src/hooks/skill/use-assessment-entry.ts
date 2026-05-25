@@ -129,10 +129,10 @@ export function useBatchUpsertResponses(entryId: string) {
   return useMutation<
     AssessmentEntryGetUniqueResponse,
     Error,
-    AssessmentEntryResponsesUpsertFormData
+    AssessmentEntryResponsesUpsertFormData & { suppressToast?: boolean }
   >({
-    mutationFn: (data: AssessmentEntryResponsesUpsertFormData) =>
-      upsertAssessmentEntryResponses(entryId, data),
+    mutationFn: ({ suppressToast, ...data }) =>
+      upsertAssessmentEntryResponses(entryId, data, { suppressToast }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: assessmentEntryKeys.detail(entryId) });
       queryClient.invalidateQueries({ queryKey: assessmentEntryKeys.lists() });
@@ -146,9 +146,13 @@ export function useBatchUpsertResponses(entryId: string) {
  */
 export function useUpdateAssessmentEntryMeta(entryId: string) {
   const queryClient = useQueryClient();
-  return useMutation<AssessmentEntryUpdateResponse, Error, AssessmentEntryUpdateFormData>({
-    mutationFn: (data: AssessmentEntryUpdateFormData) =>
-      updateAssessmentEntryMeta(entryId, data),
+  return useMutation<
+    AssessmentEntryUpdateResponse,
+    Error,
+    AssessmentEntryUpdateFormData & { suppressToast?: boolean }
+  >({
+    mutationFn: ({ suppressToast, ...data }) =>
+      updateAssessmentEntryMeta(entryId, data, { suppressToast }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: assessmentEntryKeys.detail(entryId) });
     },

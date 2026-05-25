@@ -131,17 +131,17 @@ export function PublicBudgetPage() {
       setUploading(true);
       const response = await taskQuoteService.uploadPublicSignature(id, signatureFile);
       if (response.data?.success) {
-        toast.success("Assinatura enviada com sucesso!");
+        // Success toast handled by the axios interceptor.
         // Refresh quote data
         await fetchQuote();
         setSignatureFile(null);
         setSignaturePreview(null);
       } else {
+        // success === false skips the interceptor toast, so show it here.
         toast.error(response.data?.message || "Erro ao enviar assinatura.");
       }
-    } catch (err: any) {
-      const message = err.response?.data?.message || "Erro ao enviar assinatura.";
-      toast.error(message);
+    } catch {
+      // Error toast handled by the axios interceptor.
     } finally {
       setUploading(false);
     }

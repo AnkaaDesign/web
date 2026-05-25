@@ -158,10 +158,9 @@ export function GoalRowModal({ open, onOpenChange, year, existingRows }: GoalRow
         sectorId: data.sectorId ?? null,
         values: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, targetValue: 0 })),
       });
-      toast.success("Métrica adicionada.");
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "Erro ao adicionar métrica.");
+    } catch {
+      // Success/error toasts handled by the axios interceptor.
     }
   };
 

@@ -51,7 +51,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { toast } from "@/components/ui/sonner";
 
 export const SkillDetailsPage = () => {
   usePageTracker({ title: "Detalhes da Competência", icon: "clipboard-list" });
@@ -111,10 +110,10 @@ export const SkillDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteAsync(id);
-      toast.success("Competência excluída");
+      // Success/error toasts handled by the axios interceptor.
       navigate(routes.administration.skill.root);
-    } catch (err) {
-      toast.error("Erro ao excluir competência");
+    } catch {
+      // Error toast handled by the axios interceptor.
     } finally {
       setIsDeleteOpen(false);
     }
@@ -124,9 +123,9 @@ export const SkillDetailsPage = () => {
     if (!topicToDelete) return;
     try {
       await deleteTopicAsync(topicToDelete.id);
-      toast.success("Tópico excluído");
-    } catch (err) {
-      toast.error("Erro ao excluir tópico");
+      // Success/error toasts handled by the axios interceptor.
+    } catch {
+      // Error toast handled by the axios interceptor.
     } finally {
       setTopicToDelete(null);
     }

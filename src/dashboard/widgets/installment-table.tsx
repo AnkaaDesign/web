@@ -30,6 +30,7 @@ import {
 } from "react";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
+import { useReturnTo } from "@/hooks/common/use-return-to";
 import {
   IconReceipt,
   IconSearch,
@@ -81,7 +82,6 @@ import {
   LimitInput,
   REFETCH_INTERVAL_OPTIONS,
   DensitySegmented,
-  DENSITY_VALUES,
   densityClasses,
   makeTableDisplaySchema,
   TABLE_DISPLAY_DEFAULTS,
@@ -810,6 +810,7 @@ function writeStoredWidths(instanceId: string, widths: Record<string, string>): 
 
 function Render({ config, instanceId }: WidgetRenderProps<InstallmentTableConfig>) {
   const navigate = useNavigate();
+  const returnTo = useReturnTo();
   const display = config.display;
   const dens = densityClasses(display.density);
 
@@ -935,9 +936,9 @@ function Render({ config, instanceId }: WidgetRenderProps<InstallmentTableConfig
 
   const onRowClick = useCallback(
     (r: FlatInstallment) => {
-      navigate(routes.financial.billing.details(r.taskId));
+      navigate(routes.financial.billing.details(r.taskId), { state: { returnTo } });
     },
-    [navigate],
+    [navigate, returnTo],
   );
 
   const headerExtra = (

@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Combobox } from "@/components/ui/combobox";
 import { PageHeader } from "@/components/ui/page-header";
@@ -209,31 +208,16 @@ function DepartamentoMappingCard() {
                 isPendingLink={linkSector.isPending}
                 isPendingHorario={setSectorHorario.isPending}
                 onLink={(sectorId) =>
-                  linkSector.mutate(
-                    { sectorId, departamentoId: g.departamento.Id },
-                    {
-                      onSuccess: () => toast.success(`Setor vinculado a ${g.departamento.Descricao}`),
-                      onError: (e) => toast.error(`Falha: ${(e as Error).message}`),
-                    },
-                  )
+                  // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+                  linkSector.mutate({ sectorId, departamentoId: g.departamento.Id })
                 }
                 onUnlink={(sectorId) =>
-                  linkSector.mutate(
-                    { sectorId, departamentoId: null },
-                    {
-                      onSuccess: () => toast.success("Setor desvinculado"),
-                      onError: (e) => toast.error(`Falha: ${(e as Error).message}`),
-                    },
-                  )
+                  // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+                  linkSector.mutate({ sectorId, departamentoId: null })
                 }
                 onSetHorario={(sectorId, horarioId) =>
-                  setSectorHorario.mutate(
-                    { sectorId, horarioId },
-                    {
-                      onSuccess: () => toast.success("Horário padrão atualizado"),
-                      onError: (e) => toast.error(`Falha: ${(e as Error).message}`),
-                    },
-                  )
+                  // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+                  setSectorHorario.mutate({ sectorId, horarioId })
                 }
               />
             ))}
@@ -257,12 +241,10 @@ function DepartamentoMappingCard() {
                   disabled={upsert.isPending}
                   onClick={async () => {
                     try {
-                      const created = await upsert.mutateAsync({ Descricao: s.name });
-                      toast.success(
-                        `Departamento "${created.Descricao}" criado (#${created.Id}). Agora vincule o setor.`,
-                      );
-                    } catch (e) {
-                      toast.error(`Falha ao criar: ${(e as Error).message}`);
+                      await upsert.mutateAsync({ Descricao: s.name });
+                      // Success/error toasts emitted by the axios interceptor (POST /integrations/secullum/departamentos).
+                    } catch {
+                      // Error toast emitted by the axios error interceptor.
                     }
                   }}
                 >
@@ -509,22 +491,12 @@ function FuncaoMappingCard() {
                 availablePositions={unmappedPositions}
                 isPendingLink={linkPosition.isPending}
                 onLink={(positionId) =>
-                  linkPosition.mutate(
-                    { positionId, funcaoId: g.funcao.Id },
-                    {
-                      onSuccess: () => toast.success(`Cargo vinculado a ${g.funcao.Descricao}`),
-                      onError: (e) => toast.error(`Falha: ${(e as Error).message}`),
-                    },
-                  )
+                  // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+                  linkPosition.mutate({ positionId, funcaoId: g.funcao.Id })
                 }
                 onUnlink={(positionId) =>
-                  linkPosition.mutate(
-                    { positionId, funcaoId: null },
-                    {
-                      onSuccess: () => toast.success("Cargo desvinculado"),
-                      onError: (e) => toast.error(`Falha: ${(e as Error).message}`),
-                    },
-                  )
+                  // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+                  linkPosition.mutate({ positionId, funcaoId: null })
                 }
               />
             ))}
@@ -548,12 +520,10 @@ function FuncaoMappingCard() {
                   disabled={upsert.isPending}
                   onClick={async () => {
                     try {
-                      const created = await upsert.mutateAsync({ Descricao: p.name });
-                      toast.success(
-                        `Função "${created.Descricao}" criada (#${created.Id}). Agora vincule o cargo.`,
-                      );
-                    } catch (e) {
-                      toast.error(`Falha ao criar: ${(e as Error).message}`);
+                      await upsert.mutateAsync({ Descricao: p.name });
+                      // Success/error toasts emitted by the axios interceptor (POST /integrations/secullum/funcoes).
+                    } catch {
+                      // Error toast emitted by the axios error interceptor.
                     }
                   }}
                 >
@@ -857,42 +827,25 @@ function FuncionariosTable({
   const linkMutation = useLinkUserFuncionario();
   const [pendingId, setPendingId] = useState<number | null>(null);
 
-  const handleLink = async (
-    funcionarioId: number,
-    userId: string,
-    funcionarioNome: string,
-    userName: string,
-  ) => {
+  const handleLink = async (funcionarioId: number, userId: string) => {
     setPendingId(funcionarioId);
     try {
       await linkMutation.mutateAsync({ userId, funcionarioId });
-      toast.success(`${userName} vinculado a ${funcionarioNome}`);
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Falha ao vincular usuário",
-      );
+      // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+    } catch {
+      // Error toast emitted by the axios error interceptor.
     } finally {
       setPendingId(null);
     }
   };
 
-  const handleUnlink = async (
-    funcionarioId: number,
-    userId: string,
-    userName: string,
-  ) => {
+  const handleUnlink = async (funcionarioId: number, userId: string) => {
     setPendingId(funcionarioId);
     try {
       await linkMutation.mutateAsync({ userId, funcionarioId: null });
-      toast.success(`${userName} desvinculado`);
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Falha ao desvincular usuário",
-      );
+      // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+    } catch {
+      // Error toast emitted by the axios error interceptor.
     } finally {
       setPendingId(null);
     }
@@ -968,7 +921,7 @@ function FuncionariosTable({
                         variant="ghost"
                         className="h-7 px-2 text-xs text-muted-foreground"
                         disabled={isBusy}
-                        onClick={() => handleUnlink(f.Id, u!.id, u!.name)}
+                        onClick={() => handleUnlink(f.Id, u!.id)}
                       >
                         <IconX className="h-3.5 w-3.5" /> Desvincular
                       </Button>
@@ -979,7 +932,7 @@ function FuncionariosTable({
                       variant="default"
                       className="h-7 gap-1 px-2 text-xs"
                       disabled={isBusy}
-                      onClick={() => handleLink(f.Id, u!.id, f.Nome, u!.name)}
+                      onClick={() => handleLink(f.Id, u!.id)}
                     >
                       <IconLink className="h-3.5 w-3.5" />
                       {isBusy ? "Vinculando…" : "Vincular"}

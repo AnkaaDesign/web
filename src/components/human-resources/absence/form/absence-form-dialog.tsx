@@ -110,10 +110,9 @@ export function AbsenceFormDialog({ open, onOpenChange, editing }: AbsenceFormDi
             FuncionarioId: editing.FuncionarioId,
           },
         });
-        toast.success("Registro atualizado");
         onOpenChange(false);
-      } catch (err: any) {
-        toast.error(err?.response?.data?.message || "Falha ao atualizar registro");
+      } catch {
+        // Error toast is emitted by the axios error interceptor.
       }
       return;
     }
@@ -135,9 +134,6 @@ export function AbsenceFormDialog({ open, onOpenChange, editing }: AbsenceFormDi
       const created: number = result?.created ?? 0;
       const failed: number = result?.failed ?? 0;
       if (created > 0 && failed === 0) {
-        toast.success(
-          created === 1 ? "Férias registradas" : `${created} férias registradas`,
-        );
         onOpenChange(false);
       } else if (created > 0 && failed > 0) {
         const failedNames = (result?.results ?? [])
@@ -151,8 +147,8 @@ export function AbsenceFormDialog({ open, onOpenChange, editing }: AbsenceFormDi
         const firstError = (result?.results ?? []).find((r: any) => !r.ok)?.error;
         toast.error(firstError || "Nenhuma férias registrada.");
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Falha ao registrar férias");
+    } catch {
+      // Error toast is emitted by the axios error interceptor.
     }
   };
 

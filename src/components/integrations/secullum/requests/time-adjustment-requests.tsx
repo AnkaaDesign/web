@@ -389,21 +389,18 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
 
       const result = (response as any)?.data;
       if (result && result.success === false) {
+        // success===false on a 2xx response: the axios interceptor skips its
+        // auto success-toast for this case, so this is the only toast shown.
         toast.error(result.message || "Falha ao aprovar solicitação.");
         return;
       }
 
-      toast.success(result?.message || "Solicitação aprovada com sucesso.");
-
+      // Success toast emitted by the axios interceptor (POST write-method).
       await refetch();
       setSelectedRequest(null);
       onSelectedRequestChange?.(null);
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Falha ao aprovar solicitação.";
-      toast.error(message);
+    } catch {
+      // Error toast emitted by the axios error interceptor.
     }
   }, [selectedRequest, approveRequest, refetch, onSelectedRequestChange]);
 
@@ -431,23 +428,20 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
 
       const result = (response as any)?.data;
       if (result && result.success === false) {
+        // success===false on a 2xx response: the axios interceptor skips its
+        // auto success-toast for this case, so this is the only toast shown.
         toast.error(result.message || "Falha ao rejeitar solicitação.");
         return;
       }
 
-      toast.success(result?.message || "Solicitação rejeitada com sucesso.");
-
+      // Success toast emitted by the axios interceptor (POST write-method).
       await refetch();
       setSelectedRequest(null);
       onSelectedRequestChange?.(null);
       setRejectDialogOpen(false);
       setRejectReason("");
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Falha ao rejeitar solicitação.";
-      toast.error(message);
+    } catch {
+      // Error toast emitted by the axios error interceptor.
     }
   }, [selectedRequest, rejectReason, rejectRequest, refetch, onSelectedRequestChange]);
 

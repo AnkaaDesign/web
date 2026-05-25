@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taskQuoteService } from '@/api-client/task-quote';
-import { toast } from '@/components/ui/sonner';
 
 export const taskQuoteKeys = {
   all: ['task-quotes'] as const,
@@ -63,11 +62,8 @@ export function useCreateTaskQuote() {
   return useMutation({
     mutationFn: taskQuoteService.create,
     onSuccess: () => {
+      // Success/error toasts are emitted by the axios interceptor (POST /task-quotes).
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
-      toast.success('Orçamento criado com sucesso');
-    },
-    onError: () => {
-      toast.error('Erro ao criar orçamento');
     },
   });
 }
@@ -80,11 +76,8 @@ export function useUpdateTaskQuote() {
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       taskQuoteService.update(id, data),
     onSuccess: () => {
+      // Success/error toasts are emitted by the axios interceptor (PUT /task-quotes/:id).
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
-      toast.success('Orçamento atualizado com sucesso');
-    },
-    onError: () => {
-      toast.error('Erro ao atualizar orçamento');
     },
   });
 }
@@ -96,11 +89,8 @@ export function useApproveQuote() {
   return useMutation({
     mutationFn: (id: string) => taskQuoteService.approve(id),
     onSuccess: () => {
+      // Success/error toasts are emitted by the axios interceptor (PUT /task-quotes/:id/budget-approve).
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
-      toast.success('Orçamento aprovado com sucesso');
-    },
-    onError: () => {
-      toast.error('Erro ao aprovar orçamento');
     },
   });
 }
@@ -113,11 +103,8 @@ export function useRejectQuote() {
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
       taskQuoteService.reject(id, reason),
     onSuccess: () => {
+      // Success/error toasts are emitted by the axios interceptor (PUT /task-quotes/:id/status).
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
-      toast.success('Orçamento rejeitado');
-    },
-    onError: () => {
-      toast.error('Erro ao rejeitar orçamento');
     },
   });
 }

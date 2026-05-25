@@ -9,7 +9,6 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { TopicForm } from "@/components/administration/topic/topic-form";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { toast } from "@/components/ui/sonner";
 
 export const TopicCreatePage = () => {
   const navigate = useNavigate();
@@ -23,14 +22,14 @@ export const TopicCreatePage = () => {
   const handleSubmit = async (data: TopicCreateFormData) => {
     try {
       const result = await createAsync(data);
-      toast.success("Tópico criado. Agora defina os 6 níveis (0..5).");
+      // Success/error toasts handled by the axios interceptor.
       if (result.data?.id) {
         navigate(routes.administration.topic.edit(result.data.id));
       } else {
         navigate(routes.administration.topic.root);
       }
     } catch (err) {
-      toast.error("Erro ao criar tópico");
+      // Error toast handled by the axios interceptor.
       if (process.env.NODE_ENV !== "production") console.error(err);
     }
   };

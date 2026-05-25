@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconDownload, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconTruck, IconNotes, IconClipboardList, IconCreditCard } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconTruck, IconNotes, IconClipboardList, IconCreditCard, IconPercentage } from "@tabler/icons-react";
 import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useSuppliers } from "../../../../hooks";
@@ -10,7 +10,6 @@ import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS
 import { toast } from "@/components/ui/sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Form, FormMessage } from "@/components/ui/form";
@@ -27,6 +26,8 @@ import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { useOrderFormUrlState, composeTempItemDescription } from "@/hooks/inventory/use-order-form-url-state";
 import { formatCurrency, formatDate, measureUtils, formatPixKey } from "../../../../utils";
+import { exportOrderPdf } from "@/utils/order-pdf-generator";
+import { OrderPdfExportButton } from "../common/order-pdf-export-button";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 export const OrderCreateForm = () => {
@@ -52,11 +53,13 @@ export const OrderCreateForm = () => {
     forecast,
     notes,
     freight,
+    discount,
     updateDescription,
     updateSupplierId,
     updateForecast,
     updateNotes,
     updateFreight,
+    updateDiscount,
     addTemporaryItem,
     updateTemporaryItem,
     removeTemporaryItem,
@@ -122,6 +125,7 @@ export const OrderCreateForm = () => {
       forecast: forecast || undefined,
       notes: notes || "",
       freight: freight ?? 0,
+      discount: discount ?? 0,
       items: [],
       paymentMethod: null,
       paymentPix: null,
@@ -217,6 +221,16 @@ export const OrderCreateForm = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [freight]);
 
+  // Sync URL discount back to form
+  useEffect(() => {
+    const isTouched = form.formState.touchedFields.discount;
+    form.setValue("discount", discount ?? 0, {
+      shouldValidate: isTouched,
+      shouldDirty: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discount]);
+
   // Mutations
   const { createAsync, isLoading: isSubmitting } = useOrderMutations();
 
@@ -263,6 +277,13 @@ export const OrderCreateForm = () => {
     const ipiAmount = subtotal * (ipi / 100);
     const taxAmount = icmsAmount + ipiAmount;
     return total + subtotal + taxAmount;
+  }, 0);
+
+  // Goods subtotal (before ICMS/IPI) for the selected inventory items — used as the discount base.
+  const inventoryGoodsSubtotal = Array.from(selectedItems).reduce((total: number, itemId: string) => {
+    const quantity = Number(quantities[itemId]) || 1;
+    const price = Number(prices[itemId]) || 0;
+    return total + quantity * price;
   }, 0);
 
   // Navigation helpers - use the hook's setStep which properly manages URL state
@@ -502,6 +523,7 @@ export const OrderCreateForm = () => {
       const currentForecast = form.getValues("forecast");
       const currentNotes = form.getValues("notes");
       const currentFreight = form.getValues("freight");
+      const currentDiscount = form.getValues("discount");
       const currentPaymentMethod = form.getValues("paymentMethod");
       const currentPaymentPix = form.getValues("paymentPix");
       const currentPaymentDueDays = form.getValues("paymentDueDays");
@@ -515,6 +537,7 @@ export const OrderCreateForm = () => {
         forecast: currentForecast || undefined,
         notes: currentNotes?.trim() || undefined,
         freight: Number(currentFreight) || 0,
+        discount: Number(currentDiscount) || 0,
         items: itemsData,
         paymentMethod: currentPaymentMethod || undefined,
         paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
@@ -618,7 +641,7 @@ export const OrderCreateForm = () => {
       }
       // Error is handled by the mutation hook, but let's log it
     }
-  }, [validateCurrentStep, description, supplierId, forecast, notes, freight, selectedItems, quantities, prices, icmses, ipis, temporaryItems, budgetFiles, receiptFiles, invoiceFiles, suppliers, createAsync, form, clearAllSelections, clearTemporaryItems, navigate]);
+  }, [validateCurrentStep, description, supplierId, forecast, notes, freight, discount, selectedItems, quantities, prices, icmses, ipis, temporaryItems, budgetFiles, receiptFiles, invoiceFiles, suppliers, createAsync, form, clearAllSelections, clearTemporaryItems, navigate]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.orders.root);
@@ -663,14 +686,8 @@ export const OrderCreateForm = () => {
 
   // PDF Export function
   const exportToPDF = useCallback(
-    (e?: React.MouseEvent) => {
-      if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-
+    (includePricing: boolean) => {
       const selectedSupplier = suppliers.find((s) => s.id === form.watch("supplierId"));
-      const orderDescription = form.watch("description") || "Pedido de Compra";
 
       // Helper function to format measures like MeasureDisplayCompact
       const formatMeasuresCompact = (measures: any[]) => {
@@ -702,260 +719,43 @@ export const OrderCreateForm = () => {
         return measureStrings.join(" - ");
       };
 
-      const pdfContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>${orderDescription} - ${formatDate(new Date())}</title>
-        <style>
-          @page {
-            size: A4;
-            margin: 12mm;
-          }
+      const inventoryItems = selectedItemsData.map((item: any) => ({
+        code: item.uniCode || "-",
+        name: item.name,
+        brand: item.brand?.name || "-",
+        measures: formatMeasuresCompact(item.measures || []),
+        quantity: Number(quantities[item.id]) || 1,
+        unitPrice: Number(prices[item.id]) || 0,
+        icms: Number(icmses[item.id]) || 0,
+        ipi: Number(ipis[item.id]) || 0,
+      }));
+      const tempItems = (temporaryItems || [])
+        .filter((t) => t.temporaryItemDescription.trim() !== "")
+        .map((t) => ({
+          code: t.uniCode || "-",
+          name: composeTempItemDescription(t),
+          brand: t.brand || "-",
+          measures: t.measures || "-",
+          quantity: Number(t.orderedQuantity) || 0,
+          unitPrice: Number(t.price) || 0,
+          icms: Number(t.icms) || 0,
+          ipi: Number(t.ipi) || 0,
+        }));
 
-          * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-          }
-
-          html, body {
-            height: 100vh;
-            width: 100vw;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: white;
-            font-size: 12px;
-            line-height: 1.3;
-          }
-
-          body {
-            display: grid;
-            grid-template-rows: auto 1fr auto;
-            min-height: 100vh;
-            padding: 0;
-          }
-
-          .header {
-            display: flex;
-            align-items: center;
-            margin-top: 20px;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e5e7eb;
-          }
-
-          .logo {
-            width: 100px;
-            height: auto;
-            margin-right: 15px;
-          }
-
-          .header-info {
-            flex: 1;
-          }
-
-          .title {
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 8px;
-            color: #1f2937;
-          }
-
-          .info {
-            color: #6b7280;
-            font-size: 12px;
-          }
-
-          .info p {
-            margin: 2px 0;
-          }
-
-          .content-wrapper {
-            flex: 1;
-            overflow: auto;
-            min-height: 0;
-            padding-bottom: 40px;
-          }
-
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            border: 1px solid #e5e7eb;
-            font-size: 12px;
-          }
-
-          th {
-            background-color: #f9fafb;
-            font-weight: 600;
-            color: #374151;
-            padding: 10px 6px;
-            border-bottom: 2px solid #e5e7eb;
-            border-right: 1px solid #e5e7eb;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            text-align: left;
-          }
-
-          td {
-            padding: 8px 6px;
-            border-bottom: 1px solid #f3f4f6;
-            border-right: 1px solid #f3f4f6;
-            vertical-align: top;
-          }
-
-          tbody tr:nth-child(even) {
-            background-color: #fafafa;
-          }
-
-          .text-left { text-align: left; }
-          .text-center { text-align: center; }
-          .text-right { text-align: right; }
-
-          .font-mono {
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            font-size: 11px;
-          }
-
-          .font-medium {
-            font-weight: 500;
-          }
-
-          .font-semibold {
-            font-weight: 600;
-          }
-
-          .notes-section {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f9fafb;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-          }
-
-          .notes-title {
-            font-weight: 600;
-            margin-bottom: 5px;
-            color: #374151;
-          }
-
-          .footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 15px;
-            border-top: 1px solid #e5e7eb;
-            color: #6b7280;
-            font-size: 10px;
-            background: white;
-          }
-
-          /* Print optimizations */
-          @media print {
-            .footer {
-              position: fixed;
-              bottom: 15px;
-              left: 12mm;
-              right: 12mm;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <img src="/logo.png" alt="Logo" class="logo" />
-          <div class="header-info">
-            <h1 class="title">${orderDescription}</h1>
-            <div class="info">
-              <p><strong>Data do Pedido:</strong> ${formatDate(new Date())}${form.watch("forecast") ? ` | <strong>Data de Entrega:</strong> ${formatDate(form.watch("forecast") as Date)}` : ""} | <strong>Fornecedor:</strong> ${selectedSupplier ? selectedSupplier.fantasyName : "-"} | <strong>Total de itens:</strong> ${selectedItemsData.length + (temporaryItems || []).filter(t => t.temporaryItemDescription.trim() !== "").length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="content-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th class="text-left">Código</th>
-                <th class="text-left">Nome</th>
-                <th class="text-left">Marca</th>
-                <th class="text-left">Medidas</th>
-                <th class="text-center">Quantidade</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${[
-                ...selectedItemsData.map((item) => {
-                  const quantity = Number(quantities[item.id]) || 1;
-                  const measuresDisplay = formatMeasuresCompact(item.measures || []);
-                  return `
-                        <tr>
-                          <td class="font-mono text-left">${item.uniCode || "-"}</td>
-                          <td class="font-medium text-left">${item.name}</td>
-                          <td class="text-left">${item.brand?.name || "-"}</td>
-                          <td class="text-left">${measuresDisplay}</td>
-                          <td class="text-center font-medium">${quantity.toLocaleString("pt-BR")}</td>
-                        </tr>
-                      `;
-                }),
-                ...(temporaryItems || [])
-                  .filter(t => t.temporaryItemDescription.trim() !== "")
-                  .map((t) => {
-                    const quantity = Number(t.orderedQuantity) || 0;
-                    return `
-                        <tr>
-                          <td class="font-mono text-left">${t.uniCode || "-"}</td>
-                          <td class="font-medium text-left">${composeTempItemDescription(t)} <span style="background:#e0e7ff;color:#3730a3;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600;margin-left:4px;">TEMP</span></td>
-                          <td class="text-left">${t.brand || "-"}</td>
-                          <td class="text-left">${t.measures || "-"}</td>
-                          <td class="text-center font-medium">${quantity.toLocaleString("pt-BR")}</td>
-                        </tr>
-                      `;
-                  }),
-              ].join("")}
-            </tbody>
-          </table>
-
-          ${
-            form.watch("notes")
-              ? `
-          <div class="notes-section">
-            <div class="notes-title">Observações:</div>
-            <div>${form.watch("notes")}</div>
-          </div>
-          `
-              : ""
-          }
-        </div>
-
-        <div class="footer">
-          <div>
-            <p>Relatório gerado pelo sistema Ankaa</p>
-          </div>
-          <div>
-            <p><strong>Gerado em:</strong> ${formatDate(new Date())} ${new Date().toLocaleTimeString("pt-BR")}</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        printWindow.document.write(pdfContent);
-        printWindow.document.close();
-        printWindow.focus();
-
-        printWindow.onload = () => {
-          printWindow.print();
-          printWindow.onafterprint = () => {
-            printWindow.close();
-          };
-        };
-      }
+      exportOrderPdf({
+        title: includePricing ? "Pedido de Compra" : "Solicitação de Orçamento",
+        includePricing,
+        description: form.watch("description") || undefined,
+        supplierName: selectedSupplier?.fantasyName || undefined,
+        orderDate: new Date(),
+        forecastDate: (form.watch("forecast") as Date) || undefined,
+        freight: Number(form.watch("freight")) || 0,
+        discount: Number(form.watch("discount")) || 0,
+        notes: form.watch("notes"),
+        items: [...inventoryItems, ...tempItems],
+      });
     },
-    [form, suppliers, selectionCount, selectedItemsData, quantities, prices, temporaryItems],
+    [form, suppliers, selectedItemsData, quantities, prices, icmses, ipis, temporaryItems],
   );
 
   // Generate navigation actions based on current step
@@ -1310,10 +1110,7 @@ export const OrderCreateForm = () => {
                         <h2 className="text-xl font-semibold text-foreground">Revisão do Pedido</h2>
                         <p className="text-sm text-muted-foreground mt-1">Confirme os detalhes antes de finalizar</p>
                       </div>
-                      <Button type="button" variant="ghost" size="sm" onClick={exportToPDF} className="gap-2 text-muted-foreground hover:text-foreground">
-                        <IconDownload className="h-4 w-4" />
-                        Exportar PDF
-                      </Button>
+                      <OrderPdfExportButton onExport={exportToPDF} fixedVersion={false} />
                     </div>
 
                     {/* Info + Payment side by side */}
@@ -1358,8 +1155,13 @@ export const OrderCreateForm = () => {
                               const subtotal = quantity * price;
                               return total + subtotal + (subtotal * (icms / 100)) + (subtotal * (ipi / 100));
                             }, 0);
+                            const tempGoodsSubtotal = validTemp.reduce((total: number, t) => {
+                              return total + (Number(t.orderedQuantity) || 0) * (Number(t.price) || 0);
+                            }, 0);
                             const watchedFreight = Number(form.watch("freight")) || 0;
-                            const grandTotal = totalPrice + tempTotal + watchedFreight;
+                            const watchedDiscount = Number(form.watch("discount")) || 0;
+                            const discountAmount = watchedDiscount > 0 ? (inventoryGoodsSubtotal + tempGoodsSubtotal) * (watchedDiscount / 100) : 0;
+                            const grandTotal = totalPrice + tempTotal + watchedFreight - discountAmount;
                             return (
                               <>
                                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -1368,6 +1170,13 @@ export const OrderCreateForm = () => {
                                     {totalItemCount} itens / {totalUnits} unidades
                                   </span>
                                 </div>
+
+                                {discountAmount > 0 && (
+                                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                                    <span className="text-sm text-muted-foreground">Desconto ({watchedDiscount}%)</span>
+                                    <span className="text-sm font-semibold text-red-600 dark:text-red-400">- {formatCurrency(discountAmount)}</span>
+                                  </div>
+                                )}
 
                                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                                   <span className="text-sm text-muted-foreground">Valor Total</span>
@@ -1544,6 +1353,28 @@ export const OrderCreateForm = () => {
                               />
                             </div>
                           </div>
+
+                          {/* Discount (desconto) — percentage applied to the goods subtotal (before ICMS/IPI). */}
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
+                            <span className="text-sm text-muted-foreground whitespace-nowrap mr-4 flex items-center gap-2">
+                              <IconPercentage className="h-4 w-4" />
+                              Desconto
+                            </span>
+                            <div className="flex-1 max-w-[55%]">
+                              <Input
+                                type="percentage"
+                                value={form.watch("discount") ?? 0}
+                                onChange={(value) => {
+                                  const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+                                  const sanitized = Number.isFinite(n) && n >= 0 ? Math.min(n, 100) : 0;
+                                  form.setValue("discount", sanitized, { shouldDirty: true, shouldTouch: true });
+                                  updateDiscount(sanitized);
+                                }}
+                                placeholder="0%"
+                                className="h-8 w-full border-neutral-500"
+                              />
+                            </div>
+                          </div>
                         </CardContent>
                       </Card>
                     </div>
@@ -1617,8 +1448,11 @@ export const OrderCreateForm = () => {
                             });
                           const rows = [...inventoryRows, ...tempRows];
                           const itemsTotal = rows.reduce((sum, r) => sum + r.total, 0);
+                          const goodsSubtotal = rows.reduce((sum, r) => sum + r.subtotal, 0);
                           const watchedFreight = Number(form.watch("freight")) || 0;
-                          const grandTotal = itemsTotal + watchedFreight;
+                          const watchedDiscount = Number(form.watch("discount")) || 0;
+                          const discountAmount = watchedDiscount > 0 ? goodsSubtotal * (watchedDiscount / 100) : 0;
+                          const grandTotal = itemsTotal + watchedFreight - discountAmount;
 
                           return (
                             <div className="rounded-md border border-border overflow-hidden w-full">
@@ -1663,6 +1497,14 @@ export const OrderCreateForm = () => {
                                         Frete:
                                       </TableCell>
                                       <TableCell className="text-right font-medium">{formatCurrency(watchedFreight)}</TableCell>
+                                    </TableRow>
+                                  )}
+                                  {discountAmount > 0 && (
+                                    <TableRow className="bg-muted/20">
+                                      <TableCell colSpan={7} className="text-right text-sm text-muted-foreground">
+                                        Desconto ({watchedDiscount}%):
+                                      </TableCell>
+                                      <TableCell className="text-right font-medium text-red-600 dark:text-red-400">- {formatCurrency(discountAmount)}</TableCell>
                                     </TableRow>
                                   )}
                                   <TableRow className="bg-muted/30 font-semibold">

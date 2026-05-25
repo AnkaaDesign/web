@@ -69,7 +69,6 @@ import {
   ToggleRow,
   LimitInput,
   DensitySegmented,
-  DENSITY_VALUES,
   densityClasses,
   makeTableDisplaySchema,
   TABLE_DISPLAY_DEFAULTS,

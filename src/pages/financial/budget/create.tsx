@@ -576,8 +576,8 @@ export const FinancialBudgetCreatePage = () => {
                     stateRegistration: config.customerData.stateRegistration || undefined,
                     streetType: config.customerData.streetType || undefined,
                   });
-                } catch (err: any) {
-                  toast.error(`Erro ao atualizar cliente: ${err?.message || "Erro desconhecido"}`);
+                } catch {
+                  // Error toast is emitted by the axios error interceptor.
                 }
               }
             }
@@ -604,30 +604,21 @@ export const FinancialBudgetCreatePage = () => {
             await createQuoteMutation.mutateAsync(quoteData);
           }
         } catch (error: any) {
+          // Error toast is emitted by the axios error interceptor.
           console.error("Error creating task/quote:", error);
-          toast.error(
-            error?.response?.data?.message || `Erro ao criar tarefa${combinations.length > 1 ? ` (${i + 1}/${combinations.length})` : ""}.`,
-          );
         }
       }
 
       if (successCount > 0) {
         queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
-        toast.success(
-          combinations.length === 1
-            ? "Tarefa e orçamento criados com sucesso!"
-            : `${successCount} tarefas e orçamentos criados com sucesso!`,
-        );
         navigate(firstCreatedTaskId
           ? routes.production.preparation.details(firstCreatedTaskId)
           : routes.financial.budget.root
         );
       }
     } catch (error: any) {
+      // Error toast is emitted by the axios error interceptor.
       console.error("Error in budget creation:", error);
-      toast.error(
-        error?.response?.data?.message || "Erro ao criar orçamento.",
-      );
     } finally {
       setIsSubmitting(false);
     }

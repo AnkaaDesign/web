@@ -4,6 +4,7 @@ import type { OrderGetManyFormData } from "../../../../schemas";
 import { orderService } from "../../../../api-client";
 import { formatCurrency, formatDate } from "../../../../utils";
 import { ORDER_STATUS_LABELS } from "../../../../constants";
+import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 
 interface OrderExportProps {
   className?: string;
@@ -201,40 +202,61 @@ export function OrderExport({ className, currentItems, totalRecords, selectedIte
         <meta charset="UTF-8">
         <title>Pedidos - Exportação</title>
         <style>
-          @page { size: ${orientation}; margin: 10mm; }
-          body { font-family: Arial, sans-serif; font-size: ${fontSize}; }
-          h1 { font-size: 18px; margin-bottom: 10px; }
-          .info { margin-bottom: 10px; font-size: 11px; color: #666; }
-          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th { background-color: #f3f4f6; font-weight: bold; text-transform: uppercase; }
-          th, td { padding: 8px; border: 1px solid #e5e7eb; }
-          tr:nth-child(even) { background-color: #f9fafb; }
-          .footer { margin-top: 20px; font-size: 10px; color: #666; text-align: center; }
+          /* margin: 0 removes the browser's own print header/footer (page URL/date). */
+          @page { size: ${orientation}; margin: 0; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: ${fontSize}; color: ${BRAND_COLORS.textDark}; }
+          .sheet { padding: 12mm; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8px; }
+          .logo { height: 16mm; width: auto; }
+          .company-info { text-align: right; font-size: 10px; color: #444; line-height: 1.5; }
+          .company-name { font-weight: bold; color: ${BRAND_COLORS.primaryGreen}; font-size: 12px; }
+          .header-line { height: 2px; background: linear-gradient(to right, #888 0%, ${BRAND_COLORS.primaryGreen} 35%); margin: 4px 0 12px 0; }
+          h1 { font-size: 16px; margin-bottom: 2px; color: ${BRAND_COLORS.primaryGreen}; }
+          .info { margin-bottom: 12px; font-size: 10px; color: ${BRAND_COLORS.textGray}; }
+          table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+          th { background-color: ${BRAND_COLORS.primaryGreen}; color: #fff; font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.03em; }
+          th, td { padding: 7px 6px; border-bottom: 1px solid #eee; }
+          tr:nth-child(even) td { background-color: #f6f8f6; }
+          .footer { margin-top: 18px; padding-top: 8px; border-top: 1px solid; border-image: linear-gradient(to right, #888 0%, ${BRAND_COLORS.primaryGreen} 35%) 1; display: flex; justify-content: space-between; font-size: 9px; color: ${BRAND_COLORS.textGray}; }
+          .footer-company { font-weight: bold; color: ${BRAND_COLORS.primaryGreen}; }
         </style>
       </head>
       <body>
-        <h1>Pedidos</h1>
-        <div class="info">
-          Exportado em: ${new Date().toLocaleString("pt-BR")}<br>
-          Total de registros: ${data.length}
-        </div>
-        <table>
-          <thead>
-            <tr>
-              ${columns
-                .map((col) => {
-                  const align = col.id === "total" ? "text-align: right;" : col.id === "itemCount" || col.id === "status" ? "text-align: center;" : "";
-                  return `<th style="padding: 8px; border: 1px solid #e5e7eb; ${align}">${col.label}</th>`;
-                })
-                .join("")}
-            </tr>
-          </thead>
-          <tbody>
-            ${tableRows.join("")}
-          </tbody>
-        </table>
-        <div class="footer">
-          Sistema de Gestão - Pedidos
+        <div class="sheet">
+          <div class="header">
+            <img src="/logo.png" alt="${COMPANY_INFO.name}" class="logo" />
+            <div class="company-info">
+              <div class="company-name">${COMPANY_INFO.name}</div>
+              <div>${COMPANY_INFO.address}</div>
+              <div>${COMPANY_INFO.phone} &middot; ${COMPANY_INFO.website}</div>
+            </div>
+          </div>
+          <div class="header-line"></div>
+
+          <h1>Pedidos</h1>
+          <div class="info">
+            Exportado em: ${new Date().toLocaleString("pt-BR")} &nbsp;|&nbsp; Total de registros: ${data.length}
+          </div>
+          <table>
+            <thead>
+              <tr>
+                ${columns
+                  .map((col) => {
+                    const align = col.id === "total" ? "text-align: right;" : col.id === "itemCount" || col.id === "status" ? "text-align: center;" : "text-align: left;";
+                    return `<th style="${align}">${col.label}</th>`;
+                  })
+                  .join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows.join("")}
+            </tbody>
+          </table>
+          <div class="footer">
+            <span class="footer-company">${COMPANY_INFO.name}</span>
+            <span>Documento gerado pelo sistema Ankaa</span>
+          </div>
         </div>
       </body>
       </html>

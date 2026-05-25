@@ -9,7 +9,6 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkillForm } from "@/components/administration/skill/skill-form";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { toast } from "@/components/ui/sonner";
 
 export const SkillEditPage = () => {
   usePageTracker({ title: "Editar Competência", icon: "clipboard-list" });
@@ -34,10 +33,10 @@ export const SkillEditPage = () => {
   const handleSubmit = async (formData: SkillUpdateFormData) => {
     try {
       await updateAsync({ id, data: formData });
-      toast.success("Competência atualizada");
+      // Success/error toasts handled by the axios interceptor.
       navigate(routes.administration.skill.details(id));
     } catch (err) {
-      toast.error("Erro ao atualizar competência");
+      // Error toast handled by the axios interceptor.
       if (process.env.NODE_ENV !== "production") console.error(err);
     }
   };

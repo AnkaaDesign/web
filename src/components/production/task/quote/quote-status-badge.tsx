@@ -48,10 +48,13 @@ export function QuoteStatusBadge({ status, className, size = 'default', paidCoun
     },
   };
 
-  const { label, variant } = config[status] || { label: status, variant: 'secondary' };
+  // Normalize casing so an unexpectedly-cased value (e.g. "commercial_approved"
+  // from a legacy payload) still resolves to a label instead of leaking raw.
+  const normalized = (typeof status === 'string' ? status.toUpperCase() : status) as TASK_QUOTE_STATUS;
+  const { label, variant } = config[normalized] || { label: 'Desconhecido', variant: 'secondary' };
 
   // Show paid/total count for PARTIAL status
-  const displayLabel = status === 'PARTIAL' && paidCount != null && totalCount != null
+  const displayLabel = normalized === 'PARTIAL' && paidCount != null && totalCount != null
     ? `Parcial (${paidCount}/${totalCount})`
     : label;
 

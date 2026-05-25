@@ -72,6 +72,7 @@ interface UseOrderFormUrlStateOptions {
     forecast?: Date | null;
     notes?: string;
     freight?: number;
+    discount?: number;
     selectedItems?: Set<string>;
     quantities?: Record<string, number>;
     prices?: Record<string, number>;
@@ -161,6 +162,11 @@ const orderFormFilterConfig = {
   },
   freight: {
     schema: z.coerce.number().min(0).default(0),
+    defaultValue: 0,
+    debounceMs: 0,
+  },
+  discount: {
+    schema: z.coerce.number().min(0).max(100).default(0),
     defaultValue: 0,
     debounceMs: 0,
   },
@@ -312,6 +318,12 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
           defaultValue: initialData.freight as any,
         };
       }
+      if (initialData.discount !== undefined) {
+        config.discount = {
+          ...config.discount,
+          defaultValue: initialData.discount as any,
+        };
+      }
     }
 
     return config;
@@ -362,6 +374,7 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
   const forecast = filters.forecast;
   const notes = filters.notes || "";
   const freight = (filters as any).freight ?? 0;
+  const discount = (filters as any).discount ?? 0;
   const temporaryItems: OrderTemporaryItem[] = (filters.temporaryItems as OrderTemporaryItem[]) || [];
   const showSelectedOnly = filters.showSelectedOnly !== undefined ? filters.showSelectedOnly : false;
   const searchTerm = filters.searchTerm || "";
@@ -426,6 +439,14 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     (value: number) => {
       const sanitized = Number.isFinite(value) && value >= 0 ? value : 0;
       setFilter("freight", sanitized === 0 ? undefined : sanitized);
+    },
+    [setFilter],
+  );
+
+  const updateDiscount = useCallback(
+    (value: number) => {
+      const sanitized = Number.isFinite(value) && value >= 0 ? Math.min(value, 100) : 0;
+      setFilter("discount", sanitized === 0 ? undefined : sanitized);
     },
     [setFilter],
   );
@@ -922,9 +943,10 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
       forecast: forecast || undefined,
       notes: notes.trim() || undefined,
       freight: freight || 0,
+      discount: discount || 0,
       items: [...inventoryItems, ...tempItems],
     };
-  }, [description, supplierId, forecast, notes, freight, temporaryItems, getSelectedItemsWithData]);
+  }, [description, supplierId, forecast, notes, freight, discount, temporaryItems, getSelectedItemsWithData]);
 
   const resetForm = useCallback(() => {
     setFilters({
@@ -943,6 +965,7 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
       forecast: undefined,
       notes: undefined,
       freight: undefined,
+      discount: undefined,
       temporaryItems: undefined,
     });
   }, [setFilters]);
@@ -955,10 +978,11 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
       forecast !== undefined ||
       notes.trim() !== "" ||
       freight > 0 ||
+      discount > 0 ||
       selectedItems.size > 0 ||
       temporaryItems.length > 0
     );
-  }, [description, supplierId, forecast, notes, freight, selectedItems.size, temporaryItems.length]);
+  }, [description, supplierId, forecast, notes, freight, discount, selectedItems.size, temporaryItems.length]);
 
   // Generate a stable client-side key for a new temporary item.
   // crypto.randomUUID is available in modern browsers; fall back for older runtimes/tests.
@@ -1038,6 +1062,7 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     forecast,
     notes,
     freight,
+    discount,
     validation,
 
     // Filter and Pagination State
@@ -1061,6 +1086,7 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     updateForecast,
     updateNotes,
     updateFreight,
+    updateDiscount,
 
     // Filter Update Functions
     setShowSelectedOnly,

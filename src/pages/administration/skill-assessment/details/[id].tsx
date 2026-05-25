@@ -56,7 +56,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { EntriesTable, type PlannedEntry } from "@/components/administration/skill-assessment/entries-table";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { toast } from "@/components/ui/sonner";
 
 /**
  * Flatten the AssessmentSector + evaluatees graph into one pseudo-entry per
@@ -177,10 +176,10 @@ export const SkillAssessmentDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteMutation.mutateAsync(id);
-      toast.success("Campanha excluída");
+      // Success/error toasts handled by the axios interceptor.
       navigate(routes.administration.skillAssessment.root);
-    } catch (err) {
-      toast.error("Erro ao excluir campanha");
+    } catch {
+      // Error toast handled by the axios interceptor.
     } finally {
       setIsDeleteOpen(false);
     }
@@ -191,13 +190,11 @@ export const SkillAssessmentDetailsPage = () => {
     try {
       if (pendingLifecycleAction === "close") {
         await closeMut.mutateAsync(id);
-        toast.success("Campanha fechada.");
       } else if (pendingLifecycleAction === "cancel") {
         await cancelMut.mutateAsync(id);
-        toast.success("Campanha cancelada.");
       }
     } catch (err) {
-      toast.error("Erro ao alterar status da campanha");
+      // Success/error toasts handled by the axios interceptor.
       if (process.env.NODE_ENV !== "production") console.error(err);
     } finally {
       setPendingLifecycleAction(null);

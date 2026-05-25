@@ -98,14 +98,28 @@ export function calculateOrderItemTotal(item: OrderItem): number {
 }
 
 /**
- * Calculate order total value
+ * Calculate order discount amount.
+ * The discount is a percentage applied to the goods subtotal (before ICMS/IPI).
+ */
+export function calculateOrderDiscount(order: Order): number {
+  const discountPercent = order.discount ?? 0;
+  if (discountPercent <= 0) return 0;
+
+  const subtotal = calculateOrderSubtotal(order);
+  return subtotal * (discountPercent / 100);
+}
+
+/**
+ * Calculate order total value (items + taxes − discount)
  */
 export function calculateOrderTotal(order: Order): number {
   if (!order.items || order.items.length === 0) return 0;
 
-  return order.items.reduce((total, item) => {
+  const itemsTotal = order.items.reduce((total, item) => {
     return total + calculateOrderItemTotal(item);
   }, 0);
+
+  return itemsTotal - calculateOrderDiscount(order);
 }
 
 /**

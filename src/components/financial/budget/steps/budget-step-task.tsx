@@ -35,6 +35,7 @@ import { TaskNameAutocomplete } from "@/components/production/task/form/task-nam
 import { GeneralPaintingSelector } from "@/components/production/task/form/general-painting-selector";
 import { ResponsibleManager } from "@/components/administration/customer/responsible";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { FileUploadField } from "@/components/common/file";
 import { ArtworkFileUploadField } from "@/components/production/task/form/artwork-file-upload-field";
 import type { FileWithPreview } from "@/components/common/file";
@@ -432,6 +433,11 @@ export function BudgetStepTask({
                 <CardTitle className="flex items-center gap-2">
                   <IconFileText className="h-5 w-5" />
                   Arquivos Base
+                  {baseFiles.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {baseFiles.length}
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
             </AccordionTrigger>
@@ -476,6 +482,11 @@ export function BudgetStepTask({
                   <CardTitle className="flex items-center gap-2">
                     <IconPhoto className="h-5 w-5" />
                     Layouts
+                    {artworkFiles.length > 0 && (
+                      <Badge variant="secondary" className="ml-1">
+                        {artworkFiles.length}
+                      </Badge>
+                    )}
                   </CardTitle>
                 </CardHeader>
               </AccordionTrigger>

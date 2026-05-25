@@ -101,7 +101,6 @@ import {
   LimitInput,
   SORT_DIRECTION_OPTIONS,
   DensitySegmented,
-  DENSITY_VALUES,
   cardDensityClasses,
   makeTableDisplaySchema,
   TABLE_DISPLAY_DEFAULTS,

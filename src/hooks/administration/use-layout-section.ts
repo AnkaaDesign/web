@@ -105,12 +105,6 @@ export const useLayoutSectionMutations = () => {
       queryClient.invalidateQueries({
         queryKey: ["layouts"],
       });
-
-      toast.success("Seção excluída com sucesso");
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message || "Erro ao excluir seção";
-      toast.error(message);
     },
   });
 

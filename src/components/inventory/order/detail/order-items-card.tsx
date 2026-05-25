@@ -15,10 +15,11 @@ import {
   IconAlertCircle,
   IconShoppingCart,
   IconTruck,
-  IconDownload,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatDate, measureUtils } from "../../../../utils";
+import { formatCurrency, measureUtils } from "../../../../utils";
+import { exportOrderPdf } from "@/utils/order-pdf-generator";
+import { OrderPdfExportButton } from "../common/order-pdf-export-button";
 import type { Order, OrderItem } from "../../../../types";
 import { ORDER_STATUS, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, MEASURE_TYPE } from "../../../../constants";
 import { useOrderItemBatchMutations, useOrderItemSpecializedBatchMutations } from "../../../../hooks";
@@ -218,6 +219,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
     let totalReceived = 0;
     let totalValue = 0;
     let receivedValue = 0;
+    let goodsSubtotal = 0;
 
     items.forEach((item) => {
       const currentValues = getItemValue(item);
@@ -235,7 +237,13 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
       totalReceived += currentValues.receivedQuantity;
       totalValue += itemTotal;
       receivedValue += itemReceivedTotal;
+      goodsSubtotal += subtotal;
     });
+
+    // Percentage discount applies to the goods subtotal (before ICMS/IPI).
+    const discountPercent = order.discount ?? 0;
+    const discountAmount = discountPercent > 0 ? goodsSubtotal * (discountPercent / 100) : 0;
+    totalValue -= discountAmount;
 
     return {
       itemCount: items.length,
@@ -243,9 +251,11 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
       totalReceived,
       totalValue,
       receivedValue,
+      discountPercent,
+      discountAmount,
       percentComplete: totalOrdered > 0 ? (totalReceived / totalOrdered) * 100 : 0,
     };
-  }, [order.items, getItemValue]);
+  }, [order.items, order.discount, getItemValue]);
 
   // Get row status
   const getRowStatus = useCallback(
@@ -270,9 +280,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
   );
 
   // PDF Export function
-  const exportToPDF = useCallback(() => {
-    const orderDescription = order.description || "Pedido de Compra";
-
+  const exportToPDF = useCallback((includePricing: boolean) => {
     // Helper function to format measures like MeasureDisplayCompact
     const formatMeasuresCompact = (measures: any[]) => {
       if (!measures || measures.length === 0) return "-";
@@ -303,249 +311,29 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
       return measureStrings.join(" - ");
     };
 
-    const pdfContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>${orderDescription} - ${formatDate(new Date())}</title>
-        <style>
-          @page {
-            size: A4;
-            margin: 12mm;
-          }
-
-          * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-          }
-
-          html, body {
-            height: 100vh;
-            width: 100vw;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: white;
-            font-size: 12px;
-            line-height: 1.3;
-          }
-
-          body {
-            display: grid;
-            grid-template-rows: auto 1fr auto;
-            min-height: 100vh;
-            padding: 0;
-          }
-
-          .header {
-            display: flex;
-            align-items: center;
-            margin-top: 20px;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e5e7eb;
-          }
-
-          .logo {
-            width: 100px;
-            height: auto;
-            margin-right: 15px;
-          }
-
-          .header-info {
-            flex: 1;
-          }
-
-          .title {
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 8px;
-            color: #1f2937;
-          }
-
-          .info {
-            color: #6b7280;
-            font-size: 12px;
-          }
-
-          .info p {
-            margin: 2px 0;
-          }
-
-          .content-wrapper {
-            flex: 1;
-            overflow: auto;
-            min-height: 0;
-            padding-bottom: 40px;
-          }
-
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            border: 1px solid #e5e7eb;
-            font-size: 12px;
-          }
-
-          th {
-            background-color: #f9fafb;
-            font-weight: 600;
-            color: #374151;
-            padding: 10px 6px;
-            border-bottom: 2px solid #e5e7eb;
-            border-right: 1px solid #e5e7eb;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            text-align: left;
-          }
-
-          td {
-            padding: 8px 6px;
-            border-bottom: 1px solid #f3f4f6;
-            border-right: 1px solid #f3f4f6;
-            vertical-align: top;
-          }
-
-          tbody tr:nth-child(even) {
-            background-color: #fafafa;
-          }
-
-          .text-left { text-align: left; }
-          .text-center { text-align: center; }
-          .text-right { text-align: right; }
-
-          .font-mono {
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            font-size: 11px;
-          }
-
-          .font-medium {
-            font-weight: 500;
-          }
-
-          .font-semibold {
-            font-weight: 600;
-          }
-
-          .notes-section {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f9fafb;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-          }
-
-          .notes-title {
-            font-weight: 600;
-            margin-bottom: 5px;
-            color: #374151;
-          }
-
-          .footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 15px;
-            border-top: 1px solid #e5e7eb;
-            color: #6b7280;
-            font-size: 10px;
-            background: white;
-          }
-
-          /* Print optimizations */
-          @media print {
-            .footer {
-              position: fixed;
-              bottom: 15px;
-              left: 12mm;
-              right: 12mm;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <img src="/logo.png" alt="Logo" class="logo" />
-          <div class="header-info">
-            <h1 class="title">${orderDescription}</h1>
-            <div class="info">
-              <p><strong>Data do Pedido:</strong> ${order.createdAt ? formatDate(new Date(order.createdAt)) : formatDate(new Date())}${order.forecast ? ` | <strong>Data de Entrega:</strong> ${formatDate(new Date(order.forecast))}` : ""} | <strong>Fornecedor:</strong> ${order.supplier ? (order.supplier.fantasyName || order.supplier.corporateName) : "-"} | <strong>Total de itens:</strong> ${order.items?.length || 0}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="content-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th class="text-left">Código</th>
-                <th class="text-left">Nome</th>
-                <th class="text-left">Marca</th>
-                <th class="text-left">Medidas</th>
-                <th class="text-center">Quantidade</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(order.items || [])
-                .map((item) => {
-                  const itemCode = item.item?.uniCode || "-";
-                  const itemName = item.temporaryItemDescription || item.item?.name || "-";
-                  const brandName = item.item?.brand?.name || "-";
-                  const measuresDisplay = item.item ? formatMeasuresCompact(item.item.measures || []) : "-";
-                  const orderedQuantity = item.orderedQuantity || 0;
-
-                  return `
-                    <tr>
-                      <td class="font-mono text-left">${itemCode}</td>
-                      <td class="font-medium text-left">${itemName}</td>
-                      <td class="text-left">${brandName}</td>
-                      <td class="text-left">${measuresDisplay}</td>
-                      <td class="text-center font-medium">${orderedQuantity.toLocaleString("pt-BR")}</td>
-                    </tr>
-                  `;
-                })
-                .join("")}
-            </tbody>
-          </table>
-
-          ${
-            order.notes
-              ? `
-          <div class="notes-section">
-            <div class="notes-title">Observações:</div>
-            <div>${order.notes}</div>
-          </div>
-          `
-              : ""
-          }
-        </div>
-
-        <div class="footer">
-          <div>
-            <p>Relatório gerado pelo sistema Ankaa</p>
-          </div>
-          <div>
-            <p><strong>Gerado em:</strong> ${formatDate(new Date())} ${new Date().toLocaleTimeString("pt-BR")}</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(pdfContent);
-      printWindow.document.close();
-      printWindow.focus();
-
-      printWindow.onload = () => {
-        printWindow.print();
-        printWindow.onafterprint = () => {
-          printWindow.close();
-        };
-      };
-    }
+    exportOrderPdf({
+      title: includePricing ? "Pedido de Compra" : "Solicitação de Orçamento",
+      includePricing,
+      description: order.description || undefined,
+      supplierName: order.supplier?.fantasyName || order.supplier?.corporateName || undefined,
+      orderDate: order.createdAt,
+      forecastDate: order.forecast,
+      freight: (order as any).freight ?? 0,
+      discount: order.discount ?? 0,
+      notes: order.notes,
+      items: (order.items || []).map((item) => ({
+        code: item.item?.uniCode || "-",
+        name: item.temporaryItemDescription || item.item?.name || "-",
+        brand: item.item?.brand?.name || "-",
+        measures: item.item ? formatMeasuresCompact(item.item.measures || []) : "-",
+        quantity: item.orderedQuantity || 0,
+        unitPrice: item.price ?? 0,
+        icms: item.icms ?? 0,
+        ipi: item.ipi ?? 0,
+      })),
+    });
   }, [order]);
+
 
   if (!order.items || order.items.length === 0) {
     return (
@@ -614,13 +402,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap gap-2">
-          {/* PDF Export button - always visible */}
-          <Button variant="outline" size="sm" onClick={exportToPDF}>
-            <IconDownload className="mr-2 h-4 w-4" />
-            Exportar PDF
-          </Button>
-
+        <div className="flex flex-wrap items-center gap-2">
           {/* Edit action buttons - only visible when can edit */}
           {canEditItems && (
             <>
@@ -650,6 +432,9 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
               )}
             </>
           )}
+
+          {/* PDF Export button - always visible, pushed to the right */}
+          <OrderPdfExportButton className="ml-auto" onExport={exportToPDF} />
         </div>
 
         {/* Items Table */}

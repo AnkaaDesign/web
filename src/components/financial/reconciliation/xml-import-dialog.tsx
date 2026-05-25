@@ -41,13 +41,7 @@ export function XmlImportDialog({ open, onOpenChange }: Props) {
         });
         onOpenChange(false);
       },
-      onError: err => {
-        toast({
-          title: "Erro ao importar",
-          description: (err as Error).message || "Tente novamente",
-          variant: "error",
-        });
-      },
+      // Error toast is emitted by the axios error interceptor.
     });
   };
 

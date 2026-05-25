@@ -56,8 +56,8 @@ export function GoalCell({ goal, rowKey }: GoalCellProps) {
           values: [{ month: rowKey.month, targetValue: parsed }],
         });
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "Erro ao salvar.");
+    } catch {
+      // Error toast handled by the axios interceptor.
     } finally {
       setEditing(false);
     }

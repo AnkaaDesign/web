@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import {
   IconArrowLeft,
@@ -22,7 +22,9 @@ import { taskQuoteService } from "@/api-client/task-quote";
 import {
   canViewQuote,
   canEditQuote,
+  getQuoteStatusPath,
 } from "@/utils/permissions/quote-permissions";
+import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
 import { validateResponsibleRows } from "@/components/administration/customer/responsible";
 import { useAuth } from "@/contexts/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
@@ -35,6 +37,7 @@ import { uploadSingleFile, getFileById } from "@/api-client/file";
 import { getCustomers } from "@/api-client";
 import { customerService } from "@/api-client/customer";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { readReturnTo } from "@/hooks/common/use-return-to";
 import type { FileWithPreview } from "@/components/common/file";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole } from "@/types/responsible";
@@ -55,6 +58,9 @@ function getDefaultExpiresAt() {
 export const FinancialBudgetDetailPage = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Where to return after save/cancel — set by whoever sent the user here.
+  const returnTo = readReturnTo(location.state);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -68,6 +74,7 @@ export const FinancialBudgetDetailPage = () => {
         customer: true,
         truck: true,
         artworks: { include: { file: true } },
+        baseFiles: true,
         responsibles: true,
       },
     },
@@ -111,9 +118,14 @@ export const FinancialBudgetDetailPage = () => {
   const [responsibleRows, setResponsibleRows] = useState<ResponsibleRowData[]>([]);
   const [artworkFiles, setArtworkFiles] = useState<FileWithPreview[]>([]);
   const [artworkStatuses, setArtworkStatuses] = useState<Record<string, string>>({});
+  const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
 
   const handleArtworkFilesChange = useCallback((files: FileWithPreview[]) => {
     setArtworkFiles(files);
+  }, []);
+
+  const handleBaseFilesChange = useCallback((files: FileWithPreview[]) => {
+    setBaseFiles(files);
   }, []);
 
   const handleArtworkStatusChange = useCallback((fileId: string, status: string) => {
@@ -152,7 +164,7 @@ export const FinancialBudgetDetailPage = () => {
       expiresAt: getDefaultExpiresAt(),
       status: "PENDING" as string,
       // Captured by BudgetStepReview when rejecting a quote (status -> PENDING).
-      // Forwarded to taskQuoteService.updateStatus by handleStatusChange.
+      // Forwarded to taskQuoteService.updateStatus on Save (see handleSubmit).
       statusReason: "" as string,
       subtotal: 0,
       total: 0,
@@ -457,6 +469,23 @@ export const FinancialBudgetDetailPage = () => {
       });
       setArtworkStatuses(statuses);
     }
+
+    // Base files
+    if ((task as any).baseFiles && (task as any).baseFiles.length > 0) {
+      setBaseFiles(
+        (task as any).baseFiles.map((file: any) => ({
+          id: file.id,
+          name: file.filename || file.originalName || "arquivo",
+          size: file.size || 0,
+          type: file.mimetype || "application/octet-stream",
+          lastModified: Date.now(),
+          uploaded: true,
+          uploadProgress: 100,
+          uploadedFileId: file.id,
+          thumbnailUrl: file.thumbnailUrl,
+        }) as FileWithPreview),
+      );
+    }
   }, [task]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dynamic steps based on customer count
@@ -583,6 +612,25 @@ export const FinancialBudgetDetailPage = () => {
         }
       }
 
+      // 1b. Upload new base files (already-uploaded ones keep their id)
+      const uploadedBaseFileIds: string[] = [];
+      for (const file of baseFiles) {
+        if (file.uploaded && file.uploadedFileId) {
+          uploadedBaseFileIds.push(file.uploadedFileId);
+        } else if (!file.error) {
+          try {
+            const response = await uploadSingleFile(file, {
+              fileContext: "task-base",
+            });
+            if (response.success && response.data) {
+              uploadedBaseFileIds.push(response.data.id);
+            }
+          } catch (error: any) {
+            toast.error(`Erro ao enviar arquivo ${file.name}: ${error.message}`);
+          }
+        }
+      }
+
       // 2. Resolve layoutFileId from the current layoutFiles state — NOT from
       // form.data.layoutFileId, which isn't updated when the user removes the
       // file via the upload widget. Empty layoutFiles ⇒ null ⇒ backend disconnects.
@@ -644,6 +692,10 @@ export const FinancialBudgetDetailPage = () => {
           Object.keys(remappedArtworkStatuses).length > 0
             ? remappedArtworkStatuses
             : undefined,
+        // Full set (existing kept + newly uploaded) so adds AND removals persist.
+        // baseFiles is loaded into state from the task query, so this won't wipe
+        // pre-existing files.
+        baseFileIds: uploadedBaseFileIds,
         responsibleIds:
           existingRepIds.length > 0 ? existingRepIds : undefined,
         newResponsibles:
@@ -658,10 +710,8 @@ export const FinancialBudgetDetailPage = () => {
 
       try {
         await updateTaskAsync({ id: taskId, data: taskUpdateData });
-      } catch (error: any) {
-        toast.error(
-          error?.response?.data?.message || "Erro ao atualizar tarefa.",
-        );
+      } catch {
+        // Error toast is emitted by the axios error interceptor.
         setIsSubmitting(false);
         return;
       }
@@ -687,10 +737,8 @@ export const FinancialBudgetDetailPage = () => {
                 config.customerData.stateRegistration || undefined,
               streetType: config.customerData.streetType || undefined,
             });
-          } catch (err: any) {
-            toast.error(
-              `Erro ao atualizar cliente: ${err?.message || "Erro desconhecido"}`,
-            );
+          } catch {
+            // Error toast is emitted by the axios error interceptor.
           }
         }
       }
@@ -755,10 +803,52 @@ export const FinancialBudgetDetailPage = () => {
               dirty.services,
           );
         if (quoteFieldDirty) {
+          // Pin the CURRENT server status on the value update so the backend's
+          // auto-revert-to-PENDING (which fires only when no status is sent) is
+          // suppressed — editing values keeps the existing approval. The status
+          // TRANSITION itself is applied separately below, AFTER the values are
+          // saved, so it validates against the fresh values.
+          quoteData.status = existingQuote.status;
           await updateQuoteMutation.mutateAsync({
             id: existingQuote.id,
             data: quoteData,
           });
+        }
+
+        // Apply the chosen status transition AFTER the value save, through the
+        // dedicated /status endpoint. This is the single, deterministic place
+        // status is committed (the dropdown no longer fires an immediate call
+        // that races unsaved edits). Running it post-save means the backend
+        // validates prerequisites (e.g. "total > 0") against the values we just
+        // persisted.
+        //
+        // The dropdown gates options by the FORM status, so the user can advance
+        // several steps in one session (PENDING → BUDGET_APPROVED →
+        // COMMERCIAL_APPROVED). The server only accepts single legal hops, so we
+        // replay the whole path hop-by-hop — each validated by the backend.
+        const targetStatus = data.status as TASK_QUOTE_STATUS | undefined;
+        if (targetStatus && targetStatus !== existingQuote.status) {
+          const path = getQuoteStatusPath(
+            existingQuote.status as TASK_QUOTE_STATUS,
+            targetStatus,
+          );
+          if (path.length === 0) {
+            throw new Error(
+              `Não há um caminho de status válido de "${existingQuote.status}" até "${targetStatus}".`,
+            );
+          }
+          const reason =
+            (form.getValues("statusReason" as any) as string | undefined)?.trim() ||
+            undefined;
+          for (const step of path) {
+            await taskQuoteService.updateStatus(
+              existingQuote.id,
+              step as any,
+              // Reason only applies to a downgrade-to-PENDING step.
+              step === "PENDING" ? reason : undefined,
+            );
+          }
+          if (reason) form.setValue("statusReason" as any, "");
         }
       } else {
         quoteData.status = "PENDING";
@@ -766,12 +856,8 @@ export const FinancialBudgetDetailPage = () => {
       }
 
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
-      toast.success(
-        existingQuote
-          ? "Tarefa e orçamento atualizados com sucesso!"
-          : "Tarefa e orçamento criados com sucesso!",
-      );
-      navigate(-1);
+      if (returnTo) navigate(returnTo);
+      else navigate(-1);
     } catch (error: any) {
       console.error("Error saving budget:", error);
       toast.error(
@@ -793,28 +879,14 @@ export const FinancialBudgetDetailPage = () => {
     updateQuoteMutation,
     updateTaskAsync,
     navigate,
+    returnTo,
   ]);
 
-  // Handle status change. The reject-reason dialog stores the reason in
-  // form.statusReason; we forward it then clear so it isn't reused.
-  const handleStatusChange = useCallback(
-    async (newStatus: string) => {
-      if (!existingQuote?.id) return;
-      try {
-        const reason = (form.getValues("statusReason" as any) as string | undefined)?.trim() || undefined;
-        await taskQuoteService.updateStatus(existingQuote.id, newStatus, reason);
-        queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
-        if (reason) form.setValue("statusReason" as any, "");
-        toast.success("Status atualizado com sucesso!");
-      } catch (error: any) {
-        console.error("Error updating quote status:", error);
-        toast.error(
-          error?.response?.data?.message || "Erro ao atualizar status.",
-        );
-      }
-    },
-    [existingQuote, queryClient, form],
-  );
+  // Status changes are NOT persisted immediately from the dropdown anymore — that
+  // raced unsaved value edits (the backend validates prerequisites like "total > 0"
+  // against the persisted quote, so an immediate call before saving could fail and
+  // leave the quote PENDING). The dropdown only updates the form; the transition is
+  // committed on Save, after the values are persisted (see handleSubmit).
 
   // Build header info
   const taskName = task?.name || task?.truck?.plate || "Tarefa";
@@ -894,7 +966,7 @@ export const FinancialBudgetDetailPage = () => {
           {
             key: "cancel",
             label: "Cancelar",
-            onClick: () => navigate(-1),
+            onClick: () => (returnTo ? navigate(returnTo) : navigate(-1)),
             variant: "outline" as const,
           },
           ...(currentStep > 1
@@ -947,8 +1019,8 @@ export const FinancialBudgetDetailPage = () => {
               responsibleRows={responsibleRows}
               onResponsibleRowsChange={handleResponsibleRowsChange}
               showResponsibleErrors={showResponsibleErrors}
-              baseFiles={[]}
-              onBaseFilesChange={() => {}}
+              baseFiles={baseFiles}
+              onBaseFilesChange={handleBaseFilesChange}
               artworkFiles={artworkFiles}
               onArtworkFilesChange={handleArtworkFilesChange}
               onArtworkStatusChange={handleArtworkStatusChange}
@@ -1003,7 +1075,6 @@ export const FinancialBudgetDetailPage = () => {
               existingQuote={existingQuote}
               userRole={userRole}
               selectedCustomers={selectedCustomers}
-              onStatusChange={handleStatusChange}
               layoutFiles={layoutFiles}
             />
           )}

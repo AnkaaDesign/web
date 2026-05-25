@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useReturnTo } from "@/hooks/common/use-return-to";
 import { IconFileCheck } from "@tabler/icons-react";
 import { DashboardCardList, DashboardPagination } from "./dashboard-card-list";
 import { formatCurrency } from "../../utils/number";
@@ -14,6 +15,7 @@ interface AwaitingQuoteApprovalListProps {
 
 export function AwaitingQuoteApprovalList({ tasks }: AwaitingQuoteApprovalListProps) {
   const navigate = useNavigate();
+  const returnTo = useReturnTo();
   const [page, setPage] = useState(0);
 
   const pagedTasks = tasks.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -48,7 +50,7 @@ export function AwaitingQuoteApprovalList({ tasks }: AwaitingQuoteApprovalListPr
           <div
             key={task.id}
             className={`grid grid-cols-[1.2fr_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.7fr)] gap-x-3 items-center px-4 py-2 hover:bg-secondary/50 cursor-pointer border-b border-border last:border-b-0 transition-colors ${index % 2 === 1 ? "bg-muted/30" : ""}`}
-            onClick={() => navigate(`/financeiro/faturamento/detalhes/${task.id}`)}
+            onClick={() => navigate(`/financeiro/faturamento/detalhes/${task.id}`, { state: { returnTo } })}
           >
             <span className="text-sm text-foreground truncate">
               {task.name || "Sem Nome"}

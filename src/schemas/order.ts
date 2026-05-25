@@ -1303,6 +1303,13 @@ export const orderCreateSchema = z
       .transform((val) => Math.round(val * 1000) / 1000)
       .default(0)
       .optional(),
+    discount: z
+      .number()
+      .min(0, "Desconto deve ser maior ou igual a 0")
+      .max(100, "Desconto deve ser menor ou igual a 100")
+      .transform((val) => Math.round(val * 100) / 100)
+      .default(0)
+      .optional(),
     // Payment fields
     paymentMethod: z
       .enum(Object.values(PAYMENT_METHOD) as [string, ...string[]], {
@@ -1394,6 +1401,12 @@ export const orderUpdateSchema = z
       .number()
       .min(0, "Frete deve ser maior ou igual a 0")
       .transform((val) => Math.round(val * 1000) / 1000)
+      .optional(),
+    discount: z
+      .number()
+      .min(0, "Desconto deve ser maior ou igual a 0")
+      .max(100, "Desconto deve ser menor ou igual a 100")
+      .transform((val) => Math.round(val * 100) / 100)
       .optional(),
     // Payment fields
     paymentMethod: z
@@ -1872,6 +1885,7 @@ export const mapOrderToFormData = createMapToFormDataHelper<Order, OrderUpdateFo
   reimbursementInvoiceIds: order.invoiceReimbursements?.map((reimbursementInvoice) => reimbursementInvoice.id),
   notes: order.notes || undefined,
   freight: (order as any).freight ?? 0,
+  discount: (order as any).discount ?? 0,
   paymentMethod: order.paymentMethod || undefined,
   paymentPix: order.paymentPix || undefined,
   paymentDueDays: order.paymentDueDays || undefined,

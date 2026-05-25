@@ -160,7 +160,7 @@ const BackupManagementPage = () => {
         if (process.env.NODE_ENV !== "production") {
           console.error("Failed to fetch storage folders:", error);
         }
-        toast.error("Erro ao carregar pastas de armazenamento");
+        // Error toast handled by the axios interceptor.
         setStorageFolders([]);
       } finally {
         setLoadingFolders(false);
@@ -743,21 +743,13 @@ const BackupManagementPage = () => {
         await deleteBackup(backupToDelete[0].id);
       }
 
-      toast.success(
-        isBulk
-          ? `${backupToDelete.length} backups excluídos com sucesso`
-          : "Backup excluído com sucesso"
-      );
+      // Success/error toasts handled by the axios interceptor.
       refetchBackups();
       setDeleteDialogOpen(false);
       setBackupToDelete(null);
     } catch (error) {
       console.error('Failed to delete backup:', error);
-      toast.error(
-        error instanceof Error
-          ? `Erro ao excluir backup: ${error.message}`
-          : "Erro ao excluir backup. Tente novamente."
-      );
+      // Error toast handled by the axios interceptor.
     }
   }, [backupToDelete, deleteBackup, resetSelection, refetchBackups]);
 
@@ -836,7 +828,7 @@ const BackupManagementPage = () => {
       if (process.env.NODE_ENV !== "production") {
         console.error("Error in handleCreateSchedule:", error);
       }
-      toast.error(`Erro ao criar agendamento: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      // Error toast handled by the axios interceptor.
     }
   }, [newSchedule, scheduleBackup, getFrequencyLabel, generateCronExpression]);
 

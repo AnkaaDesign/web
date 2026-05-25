@@ -6,9 +6,7 @@ import { usePpeDeliveryScheduleMutations } from "../../../../hooks";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconCalendar, IconX, IconCheck, IconLoader2 } from "@tabler/icons-react";
 import type { PpeDeliveryScheduleCreateFormData } from "../../../../schemas";
-import type { PpeDeliveryScheduleCreateResponse } from "../../../../types";
 import { PpeScheduleForm } from "@/components/inventory/epi/schedule/ppe-schedule-form";
-import { toast } from "@/components/ui/sonner";
 
 export const PPEScheduleCreatePage = () => {
   const navigate = useNavigate();
@@ -21,30 +19,8 @@ export const PPEScheduleCreatePage = () => {
   });
 
   const handleSubmit = async (data: PpeDeliveryScheduleCreateFormData) => {
-    const result = await createMutation.mutateAsync({ data }) as PpeDeliveryScheduleCreateResponse & {
-      immediateDeliveries?: {
-        deliveriesCreated: number;
-        userCount: number;
-        errors?: string[];
-      };
-    };
-
-    // Show result message
-    if (result.message) {
-      // Check if there were immediate deliveries created
-      if (result.immediateDeliveries) {
-        const { deliveriesCreated, userCount, errors } = result.immediateDeliveries;
-        if (deliveriesCreated > 0) {
-          toast.success(`Agendamento criado! ${deliveriesCreated} entrega(s) criada(s) para ${userCount} usuário(s).`);
-        } else if (errors && errors.length > 0) {
-          toast.warning(`Agendamento criado, mas nenhuma entrega foi gerada. Verifique: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '...' : ''}`);
-        } else {
-          toast.info(result.message);
-        }
-      } else {
-        toast.success(result.message);
-      }
-    }
+    // Success toast is handled automatically by the API client interceptor
+    await createMutation.mutateAsync({ data });
 
     navigate(routes.inventory.ppe.schedules.root);
   };

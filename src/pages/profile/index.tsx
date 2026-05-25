@@ -97,8 +97,8 @@ export function ProfilePage() {
       await refreshUser(); // Refresh auth context user data
       await loadProfile(); // Reload profile data
       toast.success("Dados atualizados com sucesso!");
-    } catch (error: any) {
-      toast.error("Erro ao atualizar dados");
+    } catch {
+      // Error toast is emitted by the axios error interceptor.
     } finally {
       setIsRefreshing(false);
     }
@@ -130,8 +130,8 @@ export function ProfilePage() {
           zipCode: response.data.zipCode || "",
         });
       }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Erro ao carregar perfil");
+    } catch {
+      // Error toast is emitted by the axios error interceptor.
     } finally {
       setIsLoading(false);
     }
@@ -184,13 +184,11 @@ export function ProfilePage() {
 
       if (response.success) {
         setUser(response.data ?? null);
-        toast.success("Foto de perfil atualizada com sucesso!");
       }
     } catch (error: any) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error uploading photo:", error);
       }
-      toast.error("Erro ao fazer upload da foto");
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -203,13 +201,11 @@ export function ProfilePage() {
 
       if (response.success) {
         setUser(response.data ?? null);
-        toast.success("Foto de perfil removida com sucesso!");
       }
     } catch (error: any) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error deleting photo:", error);
       }
-      toast.error("Erro ao remover foto");
     } finally {
       setIsUploadingPhoto(false);
       setShowDeletePhotoDialog(false);

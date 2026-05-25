@@ -1,5 +1,6 @@
 import { useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useReturnTo } from "@/hooks/common/use-return-to";
 import type { Task } from "@/types";
 import { useTasks } from "@/hooks";
 import { routes } from "@/constants";
@@ -17,6 +18,7 @@ interface BillingTableProps {
 
 export function BillingTable({ className, searchingFor, filters }: BillingTableProps) {
   const navigate = useNavigate();
+  const returnTo = useReturnTo();
 
   const {
     page,
@@ -142,8 +144,8 @@ export function BillingTable({ className, searchingFor, filters }: BillingTableP
   const totalPages = data?.meta?.totalPages || 1;
 
   const handleRowClick = useCallback((task: Task) => {
-    navigate(routes.financial.billing.details(task.id));
-  }, [navigate]);
+    navigate(routes.financial.billing.details(task.id), { state: { returnTo } });
+  }, [navigate, returnTo]);
 
   return (
     <div className="flex-1 min-h-0 overflow-auto">

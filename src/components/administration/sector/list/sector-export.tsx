@@ -61,7 +61,7 @@ export function SectorExport({ className, filters, currentSectors = [], totalRec
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error fetching all sectors:", error);
       }
-      toast.error("Erro ao buscar setores para exportação");
+      // Error toast handled by the axios interceptor.
       throw error;
     }
   };

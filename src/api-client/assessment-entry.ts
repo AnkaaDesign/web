@@ -55,10 +55,13 @@ export class AssessmentEntryService {
   async upsertResponses(
     entryId: string,
     data: AssessmentEntryResponsesUpsertFormData,
+    options?: { suppressToast?: boolean },
   ): Promise<AssessmentEntryGetUniqueResponse> {
+    const config = options?.suppressToast ? ({ metadata: { suppressToast: true } } as any) : undefined;
     const response = await apiClient.put<AssessmentEntryGetUniqueResponse>(
       `${this.basePath}/${entryId}/responses`,
       data,
+      config,
     );
     return response.data;
   }
@@ -67,10 +70,13 @@ export class AssessmentEntryService {
   async updateEntryMeta(
     id: string,
     data: AssessmentEntryUpdateFormData,
+    options?: { suppressToast?: boolean },
   ): Promise<AssessmentEntryUpdateResponse> {
+    const config = options?.suppressToast ? ({ metadata: { suppressToast: true } } as any) : undefined;
     const response = await apiClient.patch<AssessmentEntryUpdateResponse>(
       `${this.basePath}/${id}`,
       data,
+      config,
     );
     return response.data;
   }
@@ -110,8 +116,12 @@ export const getAssessmentEntryById = (id: string, params?: AssessmentEntryQuery
 export const upsertAssessmentEntryResponses = (
   entryId: string,
   data: AssessmentEntryResponsesUpsertFormData,
-) => assessmentEntryService.upsertResponses(entryId, data);
-export const updateAssessmentEntryMeta = (id: string, data: AssessmentEntryUpdateFormData) =>
-  assessmentEntryService.updateEntryMeta(id, data);
+  options?: { suppressToast?: boolean },
+) => assessmentEntryService.upsertResponses(entryId, data, options);
+export const updateAssessmentEntryMeta = (
+  id: string,
+  data: AssessmentEntryUpdateFormData,
+  options?: { suppressToast?: boolean },
+) => assessmentEntryService.updateEntryMeta(id, data, options);
 export const submitAssessmentEntry = (id: string) => assessmentEntryService.submitEntry(id);
 export const reopenAssessmentEntry = (id: string) => assessmentEntryService.reopenEntry(id);

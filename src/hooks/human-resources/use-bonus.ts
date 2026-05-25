@@ -138,29 +138,26 @@ export const useCalculateBonuses = () => {
       queryClient.invalidateQueries({ queryKey: bonusKeys.all });
       queryClient.invalidateQueries({ queryKey: userKeys.all });
 
-      const monthName = new Date(variables.year, variables.month - 1).toLocaleDateString('pt-BR', { month: 'long' });
       const successCount = result.data?.totalSuccess ?? 0;
       const failedCount = result.data?.totalFailed ?? 0;
 
       // Dismiss loading toast and show success
       toast.dismiss(`calc-${variables.year}-${variables.month}`);
 
+      // Only the partial-failure case is surfaced here; the full-success toast
+      // is emitted by the axios success interceptor.
       if (failedCount > 0) {
         toast.warning(`Bônus calculados: ${successCount} sucessos, ${failedCount} falhas`);
-      } else {
-        toast.success(`Bônus de ${monthName} calculados com sucesso! ${successCount} funcionários processados.`);
       }
     },
-    onError: (error: any, variables, context) => {
+    onError: (_error: any, variables, context) => {
       // Rollback optimistic update if needed
       if (context?.previousBonuses) {
         queryClient.setQueryData(bonusKeys.list(), context.previousBonuses);
       }
 
-      // Dismiss loading toast and show error
+      // Dismiss loading toast. The error toast is emitted by the axios interceptor.
       toast.dismiss(`calc-${variables.year}-${variables.month}`);
-      const message = error?.response?.data?.message ?? 'Erro ao calcular bônus';
-      toast.error(message);
     }
   });
 };
@@ -483,10 +480,6 @@ export const useExportPayroll = () => {
       window.URL.revokeObjectURL(url);
 
       toast.success('Folha de pagamento exportada com sucesso!');
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message ?? 'Erro ao exportar folha de pagamento';
-      toast.error(message);
     }
   });
 };
@@ -599,10 +592,6 @@ export const useExportBonuses = () => {
       window.URL.revokeObjectURL(url);
 
       toast.success('Bônus exportados com sucesso!');
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message ?? 'Erro ao exportar bônus';
-      toast.error(message);
     }
   });
 };
@@ -638,11 +627,6 @@ export const useBonusDiscountMutations = () => {
       onSuccess: (_data, variables) => {
         invalidateAll();
         invalidateBonusDetail(variables?.bonusId);
-        toast.success('Desconto adicionado com sucesso');
-      },
-      onError: (error: any) => {
-        const message = error?.response?.data?.message ?? 'Erro ao adicionar desconto';
-        toast.error(message);
       }
     }),
 
@@ -658,11 +642,6 @@ export const useBonusDiscountMutations = () => {
         if (typeof variables !== 'string') {
           invalidateBonusDetail(variables?.bonusId);
         }
-        toast.success('Desconto removido com sucesso');
-      },
-      onError: (error: any) => {
-        const message = error?.response?.data?.message ?? 'Erro ao remover desconto';
-        toast.error(message);
       }
     })
   };

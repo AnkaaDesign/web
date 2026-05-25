@@ -183,12 +183,7 @@ export const ReconciliationFiscalDocumentsListPage = () => {
             description: `${r.created} criadas, ${r.skipped} duplicadas`,
             variant: "success",
           }),
-        onError: err =>
-          toast({
-            title: "Erro na sincronização SIEG",
-            description: (err as Error).message,
-            variant: "error",
-          }),
+        // Error toast is emitted by the axios error interceptor.
       },
     );
   };

@@ -5,7 +5,7 @@ import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdo
 import { IconExternalLink, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter, IconReceipt, IconCalendarTime } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
-import { getTaskQuoteDisplayLabel, isTaskQuoteBillingPhase } from "@/constants/enum-labels";
+import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
 import type { Task } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
 import { SetStatusModal } from "../schedule/set-status-modal";
@@ -17,6 +17,8 @@ import { canDeleteTasks, canFinishTask } from "@/utils/permissions/entity-permis
 import { canViewQuote } from "@/utils/permissions/quote-permissions";
 import { isTeamLeader } from "@/utils/user";
 import { canLeaderManageTask } from "@/utils/permissions/entity-permissions";
+import { getTaskQuoteEditRoute } from "@/utils/task";
+import { useReturnTo } from "@/hooks/common/use-return-to";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +51,7 @@ export function TaskHistoryContextMenu({
 }: TaskHistoryContextMenuProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const returnTo = useReturnTo();
   const { update, delete: deleteTask } = useTaskMutations();
   const { batchUpdate, batchDeleteAsync } = useTaskBatchMutations();
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
@@ -190,10 +193,7 @@ export function TaskHistoryContextMenu({
   const handleEdit = () => {
     if (taskIds.length === 1) {
       if (isCommercial) {
-        const quoteRoute = isTaskQuoteBillingPhase(task?.quote?.status)
-          ? routes.financial.billing.details(taskIds[0])
-          : routes.financial.budget.details(taskIds[0]);
-        navigate(quoteRoute);
+        navigate(getTaskQuoteEditRoute(task), { state: { returnTo } });
       } else {
         const editRoute =
           navigationRoute === 'preparation' ? routes.production.preparation.edit(taskIds[0]) :
@@ -648,13 +648,12 @@ export function TaskHistoryContextMenu({
             </DropdownMenuItem>
           )}
 
-          {/* Quote - ADMIN, FINANCIAL, COMMERCIAL (single selection only) */}
-          {canViewQuote(user?.sector?.privileges || "") && !isBulk && (
+          {/* Quote - ADMIN, FINANCIAL (single selection only).
+              Hidden for COMMERCIAL: their "Editar" already routes to this same
+              quote page (getTaskQuoteEditRoute), so the entry would be redundant. */}
+          {canViewQuote(user?.sector?.privileges || "") && !isBulk && !isCommercial && (
             <DropdownMenuItem onClick={() => {
-              const route = isTaskQuoteBillingPhase(task.quote?.status)
-                ? routes.financial.billing.details(task.id)
-                : routes.financial.budget.details(task.id);
-              navigate(route);
+              navigate(getTaskQuoteEditRoute(task), { state: { returnTo } });
               setDropdownOpen(false);
             }}>
               <IconReceipt className="mr-2 h-4 w-4" />
@@ -673,8 +672,8 @@ export function TaskHistoryContextMenu({
             </DropdownMenuItem>
           )}
 
-          {/* Set Term action - Production Manager (and Admin) */}
-          {(isAdmin || isProductionManager) && (
+          {/* Set Term action - Production Manager, Commercial (and Admin) */}
+          {(isAdmin || isProductionManager || isCommercial) && (
             <DropdownMenuItem
               onClick={handleSetTerm}
               onSelect={(e) => e.preventDefault()}

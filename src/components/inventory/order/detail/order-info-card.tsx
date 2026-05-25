@@ -100,7 +100,7 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
                 <IconCurrencyReal className="h-4 w-4" />
                 Valor Total
               </span>
-              <OrderTotalBadge orderItems={order.items} />
+              <OrderTotalBadge orderItems={order.items} discount={order.discount} />
             </div>
 
             <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">

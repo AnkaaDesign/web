@@ -111,18 +111,11 @@ export function CutStatusForm({ cut, onSuccess, onCancel, className }: CutStatus
         },
       });
 
-      toast({
-        title: "Status atualizado",
-        description: `Status alterado para "${CUT_STATUS_LABELS[data.status]}".`,
-      });
-
+      // Success/error toasts are emitted by the axios interceptor (non-batch
+      // update write-method).
       onSuccess?.(response.data!);
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar status do corte.",
-        variant: "error",
-      });
+    } catch {
+      // Error toast emitted by the axios error interceptor.
     } finally {
       setIsSubmitting(false);
     }

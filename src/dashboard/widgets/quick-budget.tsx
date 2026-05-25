@@ -24,6 +24,7 @@
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
+import { useReturnTo } from "@/hooks/common/use-return-to";
 import { toast } from "sonner";
 import {
   IconReceipt,
@@ -98,6 +99,7 @@ function todayPlusDays(days: number): string {
 
 function Render({ config }: WidgetRenderProps<Config>) {
   const navigate = useNavigate();
+  const returnTo = useReturnTo();
   const { data: customersData } = useCustomers({
     orderBy: { fantasyName: "asc" },
   } as any);
@@ -195,7 +197,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
         description: "Você pode abrir o detalhe para finalizar.",
         action: {
           label: "Abrir",
-          onClick: () => navigate(`/financeiro/orcamento/detalhes/${taskId}`),
+          onClick: () => navigate(`/financeiro/orcamento/detalhes/${taskId}`, { state: { returnTo } }),
         },
       });
       reset();

@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/sonner";
 
 interface RescheduleForecastDialogProps {
   taskId: string;
@@ -42,11 +41,11 @@ export function RescheduleForecastDialog({
   const onSubmit = async (data: TaskRescheduleForecastFormData) => {
     try {
       await mutateAsync({ id: taskId, data });
-      toast.success("Previsao de liberacao reagendada com sucesso");
+      // Success/error toasts are emitted by the axios interceptor (PUT write-method).
       onOpenChange(false);
       form.reset();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Erro ao reagendar previsao");
+    } catch {
+      // Error toast emitted by the axios error interceptor.
     }
   };
 

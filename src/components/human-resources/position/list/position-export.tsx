@@ -75,8 +75,8 @@ export function PositionExport({ className, filters, currentPositions = [], tota
 
       return allPositions;
     } catch (error) {
+      // Error toast is emitted by the axios error interceptor.
       console.error("Error fetching all positions:", error);
-      toast.error("Erro ao buscar cargos para exportação");
       throw error;
     }
   };

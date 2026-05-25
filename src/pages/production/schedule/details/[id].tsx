@@ -48,7 +48,7 @@ import { nfseService } from "@/api-client/nfse";
 import type { Invoice } from "@/types/invoice";
 import { taskQuoteService } from "@/api-client/task-quote";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
-import { isTaskQuoteBillingPhase } from "@/constants/enum-labels";
+import { getTaskQuoteEditRoute } from "@/utils/task";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { getApiBaseUrl, rewriteCdnUrl } from "@/utils/file";
 import { exportDossiePdf } from "@/utils/dossie-pdf-generator";
@@ -936,6 +936,7 @@ export const TaskDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const returnTo = `${location.pathname}${location.search}`;
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { update } = useTaskMutations();
@@ -1872,11 +1873,7 @@ export const TaskDetailsPage = () => {
                 onClick: () => {
                   // Commercial users edit the quote, not the task itself — quote editing is their primary workflow.
                   if (userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL && task.quote) {
-                    navigate(
-                      isTaskQuoteBillingPhase(task.quote.status)
-                        ? routes.financial.billing.details(task.id)
-                        : routes.financial.budget.details(task.id)
-                    );
+                    navigate(getTaskQuoteEditRoute(task), { state: { returnTo } });
                     return;
                   }
                   navigate(breadcrumbConfig.editRoute(task.id), {
@@ -2283,11 +2280,7 @@ export const TaskDetailsPage = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => navigate(
-                                isTaskQuoteBillingPhase(task.quote?.status)
-                                  ? routes.financial.billing.details(task.id)
-                                  : routes.financial.budget.details(task.id)
-                              )}
+                              onClick={() => navigate(getTaskQuoteEditRoute(task), { state: { returnTo } })}
                               className="gap-2"
                             >
                               <IconEdit className="h-4 w-4" />
@@ -2330,12 +2323,20 @@ export const TaskDetailsPage = () => {
                               SETTLED: 'Liquidado',
                             };
 
-                            // Task detail page only exposes PENDING and BUDGET_APPROVED;
-                            // further status changes must be done in the financial billing page.
-                            // The transitions helper still gates by user role.
-                            const allStatuses: TASK_QUOTE_STATUS[] = [
-                              'PENDING', 'BUDGET_APPROVED',
-                            ];
+                            // Task detail page focuses on the early phase (PENDING/
+                            // BUDGET_APPROVED); further status changes happen in the
+                            // financial pages. We ALWAYS include the current status so
+                            // the Combobox can render its label — otherwise a
+                            // COMMERCIAL_APPROVED+ quote shows the "Selecione uma opção"
+                            // placeholder. The current status is shown selected+disabled;
+                            // the transitions helper still gates the rest by role.
+                            const allStatuses: TASK_QUOTE_STATUS[] = Array.from(
+                              new Set<TASK_QUOTE_STATUS>([
+                                'PENDING',
+                                'BUDGET_APPROVED',
+                                quoteStatus,
+                              ]),
+                            );
                             const userPrivilege = currentUser?.sector?.privileges || '';
                             const allowedNext = getAvailableQuoteStatusTransitions(
                               quoteStatus,

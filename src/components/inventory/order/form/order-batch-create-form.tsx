@@ -8,6 +8,7 @@ import { orderCreateSchema } from "../../../../schemas";
 import { useOrderBatchMutations, useSuppliers, useItems } from "../../../../hooks";
 import { routes, ORDER_STATUS, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
+import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
@@ -309,9 +310,10 @@ export const OrderBatchCreateForm = () => {
         <meta charset="UTF-8">
         <title>Pedidos de Compra (Lote) - ${formatDate(new Date())}</title>
         <style>
+          /* margin: 0 removes the browser's own print header/footer (page URL/date). */
           @page {
             size: A4;
-            margin: 12mm;
+            margin: 0;
           }
           
           * { 
@@ -333,7 +335,7 @@ export const OrderBatchCreateForm = () => {
             display: grid;
             grid-template-rows: auto 1fr auto;
             min-height: 100vh;
-            padding: 0;
+            padding: 12mm;
           }
           
           .header {
@@ -341,7 +343,7 @@ export const OrderBatchCreateForm = () => {
             align-items: flex-start;
             margin-bottom: 20px;
             padding-bottom: 15px;
-            border-bottom: 2px solid #e5e7eb;
+            border-bottom: 2px solid ${BRAND_COLORS.primaryGreen};
             flex-shrink: 0;
           }
           
@@ -359,7 +361,7 @@ export const OrderBatchCreateForm = () => {
             font-size: 24px;
             font-weight: 700;
             margin-bottom: 10px;
-            color: #1f2937;
+            color: ${BRAND_COLORS.primaryGreen};
           }
           
           .subtitle {
@@ -596,7 +598,7 @@ export const OrderBatchCreateForm = () => {
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="/logo.png" alt="${COMPANY_INFO.name}" class="logo" />
           <div class="header-info">
             <h1 class="title">Pedidos de Compra (Lote)</h1>
             <p class="subtitle">Documento de controle de múltiplos pedidos de materiais</p>

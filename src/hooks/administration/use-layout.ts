@@ -127,11 +127,6 @@ export const useLayoutMutations = () => {
       queryClient.invalidateQueries({
         queryKey: layoutQueryKeys.detail(id),
       });
-      toast.success("Layout excluído com sucesso");
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message || "Erro ao excluir layout";
-      toast.error(message);
     },
   });
 
@@ -169,10 +164,10 @@ export const useLayoutSVGDownload = () => {
   const downloadSVG = async (id: string, filename?: string) => {
     try {
       await layoutService.downloadSVG(id, filename);
+      // Success feedback for the local file download (GET is not toasted by the interceptor).
       toast.success("SVG baixado com sucesso");
-    } catch (error: any) {
-      const message = error?.response?.data?.message || "Erro ao baixar SVG";
-      toast.error(message);
+    } catch {
+      // Error toast handled by the axios interceptor.
     }
   };
 

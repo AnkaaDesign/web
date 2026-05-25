@@ -75,6 +75,11 @@ export function BudgetStepReview({
   const navigate = useNavigate();
   const { control, setValue } = useFormContext();
 
+  // The form's status field is the single source of truth here: it reflects the
+  // user's selection immediately, and the save always sends the status inline
+  // with value edits so the backend never auto-reverts behind it (which would
+  // otherwise make this copy stale). Driving the display off the server value
+  // instead would lag the async refetch and show a stale status.
   const currentStatus = useWatch({ control, name: "status" }) || "";
   const services = useWatch({ control, name: "services" });
   const customerConfigs = useWatch({ control, name: "customerConfigs" });

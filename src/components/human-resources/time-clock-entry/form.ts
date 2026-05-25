@@ -375,34 +375,20 @@ export function useTimeClockForm(config: TimeClockFormConfig) {
         const changedEntries = Array.from(changedEntriesMap.values());
 
         // Submit to Secullum API
-        let successCount = 0;
         let errorCount = 0;
-        const errors: string[] = [];
 
         for (const entry of changedEntries) {
           try {
             await secullumService.updateTimeEntry(parseInt(entry.id), entry);
-            successCount++;
-          } catch (error: any) {
+          } catch {
+            // Per-entry error toast is emitted by the axios error interceptor.
             errorCount++;
-            const errorMessage = error.response?.data?.message || error.message || "Erro desconhecido";
-            errors.push(`Entrada ${entry.id}: ${errorMessage}`);
           }
         }
 
-        // Show results
-        if (successCount > 0) {
-          toast.success(`${successCount} registros salvos com sucesso`);
-        }
-
-        if (errorCount > 0) {
-          toast.error(`${errorCount} registros falharam`);
-          if (errors.length <= 3) {
-            errors.forEach((error) => toast.error(error));
-          } else {
-            toast.error("Múltiplos erros ocorreram. Verifique os dados e tente novamente.");
-          }
-        }
+        // Per-entry success/error toasts are emitted by the axios interceptors
+        // (the single-entry PUT endpoint is not in the skip-list), so no aggregate
+        // toast is shown here to avoid duplicates.
 
         // If all succeeded, clear state
         if (errorCount === 0) {

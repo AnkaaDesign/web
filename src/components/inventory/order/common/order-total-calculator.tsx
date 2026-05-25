@@ -8,12 +8,13 @@ import type { OrderItem as OrderItemType } from "../../../../types";
 
 interface OrderTotalCalculatorProps {
   orderItems?: OrderItemType[]; // Pass actual OrderItem objects from the order
+  discount?: number; // Percentage discount applied to the goods subtotal
   className?: string;
   showItemBreakdown?: boolean;
   showTaxBreakdown?: boolean;
 }
 
-const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ orderItems = [], className, showItemBreakdown = false, showTaxBreakdown = false }) => {
+const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ orderItems = [], discount = 0, className, showItemBreakdown = false, showTaxBreakdown = false }) => {
   // Calculate individual item totals, taxes, and grand total
   const itemCalculations = React.useMemo(() => {
     return orderItems.map((orderItem) => {
@@ -43,7 +44,7 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
   }, [orderItems]);
 
   const totals = React.useMemo(() => {
-    return itemCalculations.reduce(
+    const base = itemCalculations.reduce(
       (acc, calc) => ({
         subtotal: acc.subtotal + calc.subtotal,
         taxAmount: acc.taxAmount + calc.taxAmount,
@@ -51,7 +52,9 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
       }),
       { subtotal: 0, taxAmount: 0, grandTotal: 0 },
     );
-  }, [itemCalculations]);
+    const discountAmount = discount > 0 ? base.subtotal * (discount / 100) : 0;
+    return { ...base, discountAmount, grandTotal: base.grandTotal - discountAmount };
+  }, [itemCalculations, discount]);
 
   const totalItems = orderItems.length;
   const totalQuantity = React.useMemo(() => {
@@ -129,6 +132,17 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
           </>
         )}
 
+        {/* Discount line (only when a discount is applied) */}
+        {totals.discountAmount > 0 && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground flex items-center">
+              <IconPercentage className="w-3 h-3 mr-1" />
+              Desconto ({discount}%):
+            </span>
+            <span className="font-medium text-red-600 dark:text-red-400">- {formatCurrency(totals.discountAmount)}</span>
+          </div>
+        )}
+
         {/* Grand total highlight */}
         <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
           <div className="flex items-center justify-between">
@@ -156,18 +170,23 @@ export const OrderTotalCalculator = React.memo(OrderTotalCalculatorComponent);
 // Compact version for header display
 const OrderTotalBadgeComponent: React.FC<{
   orderItems?: OrderItemType[];
-}> = ({ orderItems = [] }) => {
+  discount?: number;
+}> = ({ orderItems = [], discount = 0 }) => {
   const grandTotal = React.useMemo(() => {
-    return orderItems.reduce((total, orderItem) => {
+    let goodsSubtotal = 0;
+    const total = orderItems.reduce((acc, orderItem) => {
       const quantity = orderItem.orderedQuantity;
       const unitPrice = orderItem.price;
       const subtotal = quantity * unitPrice;
       const icmsAmount = subtotal * (orderItem.icms / 100);
       const ipiAmount = subtotal * (orderItem.ipi / 100);
       const taxAmount = icmsAmount + ipiAmount;
-      return total + subtotal + taxAmount;
+      goodsSubtotal += subtotal;
+      return acc + subtotal + taxAmount;
     }, 0);
-  }, [orderItems]);
+    const discountAmount = discount > 0 ? goodsSubtotal * (discount / 100) : 0;
+    return total - discountAmount;
+  }, [orderItems, discount]);
 
   return (
     <Badge variant={grandTotal > 0 ? "default" : "outline"} className="text-sm">
@@ -199,6 +218,7 @@ interface OrderFormTotalCalculatorProps {
   icmses?: Record<string, number>;
   ipis?: Record<string, number>;
   items?: OrderFormItem[];
+  discount?: number; // Percentage discount applied to the goods subtotal
   className?: string;
   showItemBreakdown?: boolean;
   showTaxBreakdown?: boolean;
@@ -211,6 +231,7 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
   icmses = {},
   ipis = {},
   items = [],
+  discount = 0,
   className,
   showItemBreakdown = false,
   showTaxBreakdown = false,
@@ -247,7 +268,7 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
   }, [selectedItems, quantities, prices, icmses, ipis, items]);
 
   const totals = React.useMemo(() => {
-    return itemCalculations.reduce(
+    const base = itemCalculations.reduce(
       (acc, calc) => ({
         subtotal: acc.subtotal + calc.subtotal,
         taxAmount: acc.taxAmount + calc.taxAmount,
@@ -255,7 +276,9 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
       }),
       { subtotal: 0, taxAmount: 0, grandTotal: 0 },
     );
-  }, [itemCalculations]);
+    const discountAmount = discount > 0 ? base.subtotal * (discount / 100) : 0;
+    return { ...base, discountAmount, grandTotal: base.grandTotal - discountAmount };
+  }, [itemCalculations, discount]);
 
   const itemsArray = Array.isArray(selectedItems) ? selectedItems : Array.from(selectedItems);
   const totalItems = itemsArray.length;
@@ -335,6 +358,17 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
           </>
         )}
 
+        {/* Discount line (only when a discount is applied) */}
+        {totals.discountAmount > 0 && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground flex items-center">
+              <IconPercentage className="w-3 h-3 mr-1" />
+              Desconto ({discount}%):
+            </span>
+            <span className="font-medium text-red-600 dark:text-red-400">- {formatCurrency(totals.discountAmount)}</span>
+          </div>
+        )}
+
         {/* Grand total highlight */}
         <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
           <div className="flex items-center justify-between">
@@ -367,10 +401,12 @@ const OrderFormTotalBadgeComponent: React.FC<{
   icmses?: Record<string, number>;
   ipis?: Record<string, number>;
   items?: OrderFormItem[];
-}> = ({ selectedItems, quantities, prices, icmses = {}, ipis = {}, items = [] }) => {
+  discount?: number;
+}> = ({ selectedItems, quantities, prices, icmses = {}, ipis = {}, items = [], discount = 0 }) => {
   const grandTotal = React.useMemo(() => {
     const itemsArray = Array.isArray(selectedItems) ? selectedItems : Array.from(selectedItems);
-    return itemsArray.reduce((total, itemId) => {
+    let goodsSubtotal = 0;
+    const total = itemsArray.reduce((acc, itemId) => {
       const item = items.find((i) => i.id === itemId);
       const quantity = quantities[itemId] || 1;
       const unitPrice = prices[itemId] || item?.prices?.[0]?.value || 0;
@@ -378,9 +414,12 @@ const OrderFormTotalBadgeComponent: React.FC<{
       const icmsAmount = subtotal * ((icmses[itemId] || 0) / 100);
       const ipiAmount = subtotal * ((ipis[itemId] || 0) / 100);
       const taxAmount = icmsAmount + ipiAmount;
-      return total + subtotal + taxAmount;
+      goodsSubtotal += subtotal;
+      return acc + subtotal + taxAmount;
     }, 0);
-  }, [selectedItems, quantities, prices, icmses, ipis, items]);
+    const discountAmount = discount > 0 ? goodsSubtotal * (discount / 100) : 0;
+    return total - discountAmount;
+  }, [selectedItems, quantities, prices, icmses, ipis, items, discount]);
 
   return (
     <Badge variant={grandTotal > 0 ? "default" : "outline"} className="text-sm">

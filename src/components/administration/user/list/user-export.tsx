@@ -91,7 +91,7 @@ export function UserExport({ className, filters, currentUsers = [], totalRecords
       return allUsers;
     } catch (error) {
       console.error("Error fetching all users:", error);
-      toast.error("Erro ao buscar colaboradores para exportação");
+      // Error toast handled by the axios interceptor.
       throw error;
     }
   };

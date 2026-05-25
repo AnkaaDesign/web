@@ -89,16 +89,10 @@ export function FiscalDocumentDetailSheet({ doc, open, onOpenChange }: Props) {
 
   const runUnmatch = (txId: string) => {
     unmatchMut.mutate(txId, {
+      // Success/error toasts are emitted by the axios interceptors.
       onSuccess: () => {
-        toast({ title: "Conciliação desfeita", variant: "success" });
         setUnmatchTarget(null);
       },
-      onError: err =>
-        toast({
-          title: "Falha ao desvincular",
-          description: (err as Error).message,
-          variant: "error",
-        }),
     });
   };
 
