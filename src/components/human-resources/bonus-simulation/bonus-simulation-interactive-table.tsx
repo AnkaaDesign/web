@@ -31,7 +31,7 @@ import {
 import { formatCurrency, getBonusPeriod, getCurrentPayrollPeriod, formatDate } from "../../../utils";
 import { useUsers, useSectors } from "../../../hooks";
 import { bonusService } from "../../../api-client";
-import { useBonusSimulation } from "../../../hooks/human-resources/use-bonus";
+import { useBonusSimulation, usePeriodAdjustment } from "../../../hooks/human-resources/use-bonus";
 import { cn } from "@/lib/utils";
 import { USER_STATUS } from "../../../constants";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
@@ -178,6 +178,9 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   // If today is Sept 26th or later, this returns October
   const { year: periodYear, month: periodMonth } = getCurrentPayrollPeriod();
   const currentPeriod = getBonusPeriod(periodYear, periodMonth);
+
+  // Fetch the period-level adjustment (reajuste) so the simulation reflects it
+  const { data: periodAdjustmentData } = usePeriodAdjustment(periodYear, periodMonth);
 
 
   // Fetch sectors for filtering (Sector model has no status field)
@@ -414,8 +417,11 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
               sectorName: u.sectorName ?? undefined,
               performanceLevel: u.performanceLevel,
             })),
+            config: {
+              adjustment: (periodAdjustmentData?.adjustment ?? 0) / 100,
+            },
           },
-    [simulatedUsers, averageTasksPerUser],
+    [simulatedUsers, averageTasksPerUser, periodAdjustmentData],
   );
   const { data: simulation } = useBonusSimulation(simulationInput, {
     enabled: simulationInput !== null,
