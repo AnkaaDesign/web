@@ -63,6 +63,7 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
     defaultSort: [
       { column: "status", direction: "asc" },
       { column: "scheduledDate", direction: "desc" },
+      { column: "createdAt", direction: "desc" },
     ],
   });
 
