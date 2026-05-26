@@ -54,6 +54,9 @@ import type {
   OrderScheduleBatchCreateResponse,
   OrderScheduleBatchUpdateResponse,
   OrderScheduleBatchDeleteResponse,
+  OrderScheduleProjectionResponse,
+  OrderScheduleTriggerResponse,
+  OrderScheduleCascadeMode,
 } from "../types";
 
 // =====================
@@ -251,6 +254,16 @@ export class OrderService {
     const response = await apiClient.post<any>(`${this.schedulesBasePath}/${id}/create-order`);
     return response.data;
   }
+
+  async getOrderScheduleProjection(id: string): Promise<OrderScheduleProjectionResponse> {
+    const response = await apiClient.get<OrderScheduleProjectionResponse>(`${this.schedulesBasePath}/${id}/projection`);
+    return response.data;
+  }
+
+  async triggerOrderSchedule(id: string, data: { cascadeMode: OrderScheduleCascadeMode }): Promise<OrderScheduleTriggerResponse> {
+    const response = await apiClient.post<OrderScheduleTriggerResponse>(`${this.schedulesBasePath}/${id}/trigger`, data);
+    return response.data;
+  }
 }
 
 // =====================
@@ -300,3 +313,5 @@ export const batchUpdateOrderSchedules = (data: OrderScheduleBatchUpdateFormData
 export const batchDeleteOrderSchedules = (data: OrderScheduleBatchDeleteFormData) => orderService.batchDeleteOrderSchedules(data);
 export const finishOrderSchedule = (id: string) => orderService.finishOrderSchedule(id);
 export const createOrderFromSchedule = (id: string) => orderService.createOrderFromSchedule(id);
+export const getOrderScheduleProjection = (id: string) => orderService.getOrderScheduleProjection(id);
+export const triggerOrderSchedule = (id: string, data: { cascadeMode: OrderScheduleCascadeMode }) => orderService.triggerOrderSchedule(id, data);

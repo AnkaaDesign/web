@@ -461,3 +461,56 @@ export interface OrderScheduleBatchDeleteResponse extends BaseBatchResponse<{ id
 export interface OrderRuleBatchCreateResponse<T> extends BaseBatchResponse<OrderRule, T> {}
 export interface OrderRuleBatchUpdateResponse<T> extends BaseBatchResponse<OrderRule, T & { id: string }> {}
 export interface OrderRuleBatchDeleteResponse extends BaseBatchResponse<{ id: string; deleted: boolean }, { id: string }> {}
+
+// =====================
+// OrderSchedule Projection & Trigger
+// =====================
+
+export type OrderScheduleCascadeMode = "GAP_ONLY" | "GAP_PLUS_CYCLE";
+
+export interface OrderScheduleProjectionItem {
+  itemId: string;
+  itemName: string;
+  unitPrice: number;
+  quantityToday: number;
+  quantityScheduled: number;
+  totalToday: number;
+  totalScheduled: number;
+  reasonToday: string | null;
+  reasonScheduled: string | null;
+  skipped: boolean;
+}
+
+export interface OrderScheduleProjectionMeta {
+  nextRun: string | null;
+  scheduledDate: string | null;
+  gapDays: number;
+  intervalDays: number | null;
+  coverageDays: number;
+  totalToday: number;
+  totalScheduled: number;
+}
+
+export interface OrderScheduleProjectionResponse {
+  success: boolean;
+  message: string;
+  data: {
+    items: OrderScheduleProjectionItem[];
+    meta: OrderScheduleProjectionMeta;
+  };
+}
+
+export interface OrderScheduleTriggerData {
+  order: Order;
+  cascadeMode: OrderScheduleCascadeMode;
+  coverageDays: number;
+  gapDays: number;
+  intervalDays: number | null;
+  nextRun: string | null;
+}
+
+export interface OrderScheduleTriggerResponse {
+  success: boolean;
+  message: string;
+  data: OrderScheduleTriggerData | null;
+}

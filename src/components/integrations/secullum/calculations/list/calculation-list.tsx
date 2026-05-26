@@ -4,15 +4,16 @@ import { useSecullumCalculations, useMySecullumCalculations, useUsers, useTeamSt
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CalculationTable } from "./calculation-table";
+import { CalculationExport } from "./calculation-export";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createCalculationColumns } from "./calculation-table-columns";
+import { PeriodControl } from "@/components/human-resources/time-clock-entry/period-control";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { USER_STATUS } from "../../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { IconChevronLeft, IconChevronRight, IconCalendar } from "@tabler/icons-react";
+import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { addMonths, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -420,6 +421,45 @@ export function CalculationList({ className, mode = 'hr', teamScope = false, onE
 
   const { period, monthName } = getPayrollPeriodDisplay(selectedMonth);
 
+  // Regular monthly period bounds (26th prev month → 25th) as Dates.
+  const monthBounds = useMemo(() => {
+    const p = getPayrollPeriod(selectedMonth);
+    return {
+      start: new Date(p.startDate + "T00:00:00"),
+      end: new Date(p.endDate + "T00:00:00"),
+    };
+  }, [selectedMonth]);
+
+  // A custom range is "active" when the current custom dates differ from the
+  // regular monthly bounds (handleMonthChange keeps them in sync otherwise).
+  const isCustomRange = useMemo(() => {
+    if (!customStartDate || !customEndDate) return true;
+    return (
+      format(customStartDate, "yyyy-MM-dd") !== format(monthBounds.start, "yyyy-MM-dd") ||
+      format(customEndDate, "yyyy-MM-dd") !== format(monthBounds.end, "yyyy-MM-dd")
+    );
+  }, [customStartDate, customEndDate, monthBounds]);
+
+  // Chip labels + bounds passed to PeriodControl.
+  const periodTitle = isCustomRange ? "Período personalizado" : monthName;
+  const periodSubtitle = isCustomRange
+    ? `${customStartDate ? format(customStartDate, "dd/MM/yyyy") : "—"} a ${customEndDate ? format(customEndDate, "dd/MM/yyyy") : "—"}`
+    : period;
+  const periodStart = customStartDate ?? monthBounds.start;
+  const periodEnd = customEndDate ?? monthBounds.end;
+
+  // Stepping a month resets to the regular monthly period (handleMonthChange
+  // rewrites customStartDate/customEndDate + their URL params), so the prev/next
+  // chevrons effectively clear any active custom range.
+  const handlePrevPeriod = handlePreviousMonth;
+  const handleNextPeriod = handleNextMonth;
+
+  // Calendar range pick → set both custom dates (and their URL params).
+  const handlePeriodRangeChange = (start: Date | null, end: Date | null) => {
+    handleCustomStartDateChange(start);
+    handleCustomEndDateChange(end);
+  };
+
   // Prepare user options for combobox
   const userOptions: ComboboxOption[] = useMemo(() => {
     if (!usersData?.data) return [];
@@ -464,7 +504,7 @@ export function CalculationList({ className, mode = 'hr', teamScope = false, onE
           {/* Left: user selector */}
           {!isPersonalMode && (
             <div className="flex gap-1 shrink-0">
-              <Button type="button" variant="outline" size="icon" onClick={handlePreviousUser} disabled={!usersData?.data || usersData.data.length === 0} className="h-10 w-10">
+              <Button type="button" variant="default" size="icon" onClick={handlePreviousUser} disabled={!usersData?.data || usersData.data.length === 0} className="h-10 w-10">
                 <IconChevronLeft className="h-4 w-4" />
               </Button>
               <Combobox
@@ -477,38 +517,33 @@ export function CalculationList({ className, mode = 'hr', teamScope = false, onE
                 className="w-96"
                 disabled={usersLoading}
               />
-              <Button type="button" variant="outline" size="icon" onClick={handleNextUser} disabled={!usersData?.data || usersData.data.length === 0} className="h-10 w-10">
+              <Button type="button" variant="default" size="icon" onClick={handleNextUser} disabled={!usersData?.data || usersData.data.length === 0} className="h-10 w-10">
                 <IconChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
 
-          {/* Right: period + dates + actions */}
+          {/* Right: period chip + actions */}
           <div className="flex items-center gap-2 ml-auto">
-            <div className="flex items-center gap-1">
-              <Button type="button" variant="outline" size="icon" onClick={handlePreviousMonth} className="h-10 w-10">
-                <IconChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex flex-col items-center px-2">
-                <div className="flex items-center gap-1 text-sm font-medium">
-                  <IconCalendar className="h-4 w-4" />
-                  <span className="capitalize">{monthName}</span>
-                </div>
-                <div className="text-xs text-muted-foreground">Período: {period}</div>
-              </div>
-              <Button type="button" variant="outline" size="icon" onClick={handleNextMonth} className="h-10 w-10">
-                <IconChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <DateTimeInput mode="date" value={customStartDate} onChange={handleCustomStartDateChange} className="w-[140px]" placeholder="Data inicial" showClearButton={true} />
-              <span className="text-muted-foreground text-sm px-1">até</span>
-              <DateTimeInput mode="date" value={customEndDate} onChange={handleCustomEndDateChange} className="w-[140px]" placeholder="Data final" showClearButton={true} />
-            </div>
+            <PeriodControl
+              variant="range"
+              title={periodTitle}
+              subtitle={periodSubtitle}
+              startDate={periodStart}
+              endDate={periodEnd}
+              onRangeChange={handlePeriodRangeChange}
+              onPrev={handlePrevPeriod}
+              onNext={handleNextPeriod}
+            />
 
             <div className="flex gap-2 shrink-0">
               <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
+              <CalculationExport
+                filters={exportFilters}
+                currentItems={calculationRows}
+                totalRecords={calculationRows.length}
+                visibleColumns={visibleColumns}
+              />
             </div>
           </div>
         </div>

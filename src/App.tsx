@@ -370,10 +370,19 @@ const HumanResourcesSchedules = lazy(() => import("@/pages/human-resources/sched
 const HumanResourcesVacations = lazy(() => import("@/pages/human-resources/vacations/list").then((module) => ({ default: module.VacationsListPage })));
 const HumanResourcesHRCalendar = lazy(() => import("@/pages/human-resources/calendar").then((module) => ({ default: module.HRCalendarPage })));
 const HumanResourcesTimeClock = lazy(() => import("@/pages/human-resources/time-clock/list"));
-const HumanResourcesAssinaturaDigitalList = lazy(
+const HumanResourcesTimeClockColaborador = lazy(
+  () => import("@/pages/human-resources/time-clock/colaborador"),
+);
+const HumanResourcesTimeClockDia = lazy(() => import("@/pages/human-resources/time-clock/dia"));
+const HumanResourcesTimeClockEdicao = lazy(() => import("@/pages/human-resources/time-clock/edicao"));
+const HumanResourcesTimeClockAusencias = lazy(
+  () => import("@/pages/human-resources/time-clock/ausencias"),
+);
+// "Fechamento" (page files still live under the assinatura-digital folder).
+const HumanResourcesFechamentoList = lazy(
   () => import("@/pages/human-resources/time-clock/assinatura-digital/list"),
 );
-const HumanResourcesAssinaturaDigitalDetails = lazy(
+const HumanResourcesFechamentoDetails = lazy(
   () => import("@/pages/human-resources/time-clock/assinatura-digital/details"),
 );
 const HumanResourcesPerformanceLevels = lazy(() => import("@/pages/human-resources/performance-levels/list").then((module) => ({ default: module.default })));
@@ -2588,18 +2597,50 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.timeClock.assinaturaDigital.list}
+                  path={routes.humanResources.timeClock.colaborador}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesAssinaturaDigitalList />
+                      <HumanResourcesTimeClockColaborador />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.humanResources.timeClock.assinaturaDigital.details(":id")}
+                  path={routes.humanResources.timeClock.dia}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesAssinaturaDigitalDetails />
+                      <HumanResourcesTimeClockDia />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.humanResources.timeClock.edicao}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <HumanResourcesTimeClockEdicao />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.humanResources.timeClock.ausencias}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <HumanResourcesTimeClockAusencias />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.humanResources.timeClock.fechamento.list}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <HumanResourcesFechamentoList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.humanResources.timeClock.fechamento.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <HumanResourcesFechamentoDetails />
                     </Suspense>
                   }
                 />

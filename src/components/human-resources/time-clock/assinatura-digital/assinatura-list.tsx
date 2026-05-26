@@ -5,6 +5,8 @@ import { debounce } from "../../../../utils";
 import { cn } from "@/lib/utils";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { IconPlus } from "@tabler/icons-react";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AssinaturaTable, type SecullumAssinatura } from "./assinatura-table";
@@ -12,11 +14,12 @@ import { AssinaturaEmpty } from "./assinatura-empty";
 
 interface AssinaturaListProps {
   className?: string;
+  onNewApuracao?: () => void;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
 
-export function AssinaturaList({ className }: AssinaturaListProps) {
+export function AssinaturaList({ className, onNewApuracao }: AssinaturaListProps) {
   const [displaySearchText, setDisplaySearchText] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -100,13 +103,20 @@ export function AssinaturaList({ className }: AssinaturaListProps) {
   return (
     <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
       <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
           <TableSearchInput
             value={displaySearchText}
             onChange={handleSearchChange}
             placeholder="Buscar por descrição ou número..."
             isPending={displaySearchText !== searchText}
+            className="flex-1"
           />
+          {onNewApuracao && (
+            <Button type="button" onClick={onNewApuracao} className="shrink-0">
+              <IconPlus className="h-4 w-4 mr-2" />
+              Nova Apuração
+            </Button>
+          )}
         </div>
 
         <div className="flex-1 min-h-0 overflow-auto">

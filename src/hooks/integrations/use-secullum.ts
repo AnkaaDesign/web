@@ -812,6 +812,7 @@ export const useCreateAssinaturaWithProgress = () => {
     async (data: {
       userIds?: string[];
       applyToAll?: boolean;
+      onlyOpen?: boolean;
       DataInicio: string;
       DataFim: string;
       EmpresaId?: number;
@@ -924,8 +925,12 @@ export const useDeleteAssinatura = () => {
  */
 export const useDownloadAssinaturasZip = () => {
   return useMutation({
-    mutationFn: async (apuracaoIds: number[]) => {
-      const res = await secullumService.downloadAssinaturasZip(apuracaoIds);
+    mutationFn: async (
+      arg: number[] | { apuracaoIds: number[]; status?: "approved" | "rejected" | "both" },
+    ) => {
+      const apuracaoIds = Array.isArray(arg) ? arg : arg.apuracaoIds;
+      const status = Array.isArray(arg) ? undefined : arg.status;
+      const res = await secullumService.downloadAssinaturasZip(apuracaoIds, status);
       const blob =
         res.data instanceof Blob
           ? res.data

@@ -100,64 +100,48 @@ export function AssinaturaDetail({ apuracaoId, className }: AssinaturaDetailProp
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
-      {/* Header / read-only metadata */}
+      {/* Header / read-only metadata — single row */}
       <Card className="shadow-sm border border-border">
-        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-2">
+        <CardContent className="p-4 flex flex-row items-end gap-3">
+          <div className="flex-[1.6] min-w-0">
             <Label className="text-xs text-muted-foreground">Descrição</Label>
             {isListLoading && !header ? (
               <Skeleton className="h-9 w-full mt-1" />
             ) : (
-              <Input value={header?.Descricao ?? `Apuração #${apuracaoId}`} readOnly disabled />
+              <Input value={header?.Descricao ?? `Apuração #${apuracaoId}`} readOnly />
             )}
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <Label className="text-xs text-muted-foreground">Data Inicial</Label>
             {isListLoading && !header ? (
               <Skeleton className="h-9 w-full mt-1" />
             ) : (
-              <Input value={header?.DataInicio ? formatDate(header.DataInicio) : "—"} readOnly disabled />
+              <Input value={header?.DataInicio ? formatDate(header.DataInicio) : "—"} readOnly />
             )}
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <Label className="text-xs text-muted-foreground">Data Final</Label>
             {isListLoading && !header ? (
               <Skeleton className="h-9 w-full mt-1" />
             ) : (
-              <Input value={header?.DataFim ? formatDate(header.DataFim) : "—"} readOnly disabled />
+              <Input value={header?.DataFim ? formatDate(header.DataFim) : "—"} readOnly />
             )}
           </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Data de Criação</Label>
-            {isListLoading && !header ? (
-              <Skeleton className="h-9 w-full mt-1" />
-            ) : (
-              <Input
-                value={
-                  header?.DataInclusao && new Date(header.DataInclusao).getFullYear() > 1
-                    ? formatDateTime(header.DataInclusao)
-                    : "—"
-                }
-                readOnly
-                disabled
-              />
-            )}
-          </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <Label className="text-xs text-muted-foreground">Número</Label>
-            <Input value={String(apuracaoId)} readOnly disabled />
+            <Input value={String(apuracaoId)} readOnly />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <Label className="text-xs text-muted-foreground">Cartões</Label>
-            <Input value={header?.NumeroCartoes != null ? String(header.NumeroCartoes) : "—"} readOnly disabled />
+            <Input value={header?.NumeroCartoes != null ? String(header.NumeroCartoes) : "—"} readOnly />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <Label className="text-xs text-muted-foreground">Aprovados</Label>
-            <Input value={header?.Aprovados != null ? String(header.Aprovados) : "—"} readOnly disabled />
+            <Input value={header?.Aprovados != null ? String(header.Aprovados) : "—"} readOnly />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <Label className="text-xs text-muted-foreground">Rejeitados</Label>
-            <Input value={header?.Rejeitados != null ? String(header.Rejeitados) : "—"} readOnly disabled />
+            <Input value={header?.Rejeitados != null ? String(header.Rejeitados) : "—"} readOnly />
           </div>
         </CardContent>
       </Card>
@@ -165,10 +149,7 @@ export function AssinaturaDetail({ apuracaoId, className }: AssinaturaDetailProp
       {/* Items table */}
       <Card className="flex-1 flex flex-col shadow-sm border border-border min-h-0">
         <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Cartões Ponto ({totalRecords})
-            </h3>
+          <div className="flex flex-col sm:flex-row gap-3">
             <TableSearchInput
               value={displaySearchText}
               onChange={(v) => {

@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { DateTimeInput } from "@/components/ui/date-time-input";
+import { TableSearchInput } from "@/components/ui/table-search-input";
+import { PeriodControl } from "./period-control";
+import { TimeClockDayViewExport } from "./time-clock-day-view-export";
 import {
-  IconChevronLeft,
-  IconChevronRight,
   IconLoader2,
   IconPencil,
   IconUser,
@@ -226,6 +226,12 @@ export function TimeClockDayView({ className, onExportDataChange }: TimeClockDay
   };
 
   const rows: DayRow[] = (data?.data?.data ?? []) as DayRow[];
+  const [searchText, setSearchText] = useState("");
+  const filteredRows = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => r.user.name?.toLowerCase().includes(q));
+  }, [rows, searchText]);
 
   const visibleCols = DAY_VIEW_COLUMNS.filter((c) => isVisible(c.key));
 
@@ -372,41 +378,34 @@ export function TimeClockDayView({ className, onExportDataChange }: TimeClockDay
           </div>
         )}
 
+        {/* Search on the left; date/period controls on the RIGHT (matching the other views). */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => shiftDay(-1)}
-              className="h-10 w-10"
-            >
-              <IconChevronLeft className="h-4 w-4" />
-            </Button>
-            <DateTimeInput
-              mode="date"
-              value={selectedDate}
-              onChange={handleDateChange}
-              className="w-[200px]"
-              placeholder="Selecione um dia"
+          <TableSearchInput
+            value={searchText}
+            onChange={setSearchText}
+            placeholder="Buscar funcionário..."
+            className="flex-1"
+          />
+          <div className="flex items-center gap-2 shrink-0">
+            <PeriodControl
+              variant="day"
+              title={format(selectedDate, "EEEE", { locale: ptBR })}
+              subtitle={format(selectedDate, "dd/MM/yyyy")}
+              date={selectedDate}
+              onDateChange={(d) => handleDateChange(d)}
+              onPrev={() => shiftDay(-1)}
+              onNext={() => shiftDay(1)}
             />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => shiftDay(1)}
-              className="h-10 w-10"
-            >
-              <IconChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="ml-auto">
             <ColumnVisibilityManager
               columns={DAY_VIEW_COLUMNS}
               visibleColumns={visibleColumns}
               onVisibilityChange={setVisibleColumns}
               defaultVisibleColumns={DAY_VIEW_DEFAULT_COLUMNS}
+            />
+            <TimeClockDayViewExport
+              currentItems={exportRows}
+              visibleColumns={exportVisibleColumns}
+              date={selectedDate}
             />
           </div>
         </div>
@@ -416,10 +415,14 @@ export function TimeClockDayView({ className, onExportDataChange }: TimeClockDay
             <div className="flex items-center justify-center h-96">
               <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : rows.length === 0 ? (
+          ) : filteredRows.length === 0 ? (
             <div className="flex items-center justify-center h-96 text-muted-foreground">
               <div className="text-center">
-                <div className="text-lg font-medium">Nenhum colaborador ativo encontrado</div>
+                <div className="text-lg font-medium">
+                  {searchText.trim()
+                    ? "Nenhum colaborador corresponde ao filtro"
+                    : "Nenhum colaborador ativo encontrado"}
+                </div>
               </div>
             </div>
           ) : (
@@ -448,7 +451,7 @@ export function TimeClockDayView({ className, onExportDataChange }: TimeClockDay
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ user, entry }, idx) => {
+                {filteredRows.map(({ user, entry }, idx) => {
                   const stripe = idx % 2 === 1;
                   return (
                     <tr

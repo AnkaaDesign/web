@@ -20,8 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDate, formatDateTime } from "../../../../../utils";
-import { useOrderSchedule, useOrderScheduleMutations, useItems } from "../../../../../hooks";
+import { formatDate, formatDateTime, formatNumber, formatCurrency } from "../../../../../utils";
+import { useOrderSchedule, useOrderScheduleMutations, useItems, useOrderScheduleProjection, useTriggerOrderSchedule } from "../../../../../hooks";
 import { routes, getDynamicFrequencyLabel, CHANGE_LOG_ENTITY_TYPE, WEEK_DAY_LABELS, MONTH_LABELS, MONTH_OCCURRENCE_LABELS } from "../../../../../constants";
 import type { WEEK_DAY, MONTH, MONTH_OCCURRENCE } from "../../../../../constants";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
@@ -35,6 +35,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { toast } from "@/components/ui/sonner";
+import type { OrderScheduleCascadeMode } from "../../../../../types";
 import { cn } from "@/lib/utils";
 
 export function OrderScheduleDetailsPage() {
@@ -42,8 +53,11 @@ export function OrderScheduleDetailsPage() {
   const navigate = useNavigate();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showTriggerDialog, setShowTriggerDialog] = useState(false);
+  const [cascadeMode, setCascadeMode] = useState<OrderScheduleCascadeMode>("GAP_ONLY");
 
   const { delete: deleteSchedule, update: updateSchedule } = useOrderScheduleMutations();
+  const triggerSchedule = useTriggerOrderSchedule();
 
   const {
     data: response,
@@ -75,6 +89,15 @@ export function OrderScheduleDetailsPage() {
   });
 
   const items = itemsResponse?.data || [];
+
+  // Fetch order projection (quantities/totals for today vs the scheduled trigger date)
+  const { data: projectionResponse } = useOrderScheduleProjection(id!, {
+    enabled: !!id,
+  });
+
+  const projection = projectionResponse?.data;
+  const projectionMeta = projection?.meta;
+  const projectionByItem = new Map((projection?.items || []).map((p) => [p.itemId, p]));
 
   if (isLoading) {
     return (
@@ -164,7 +187,35 @@ export function OrderScheduleDetailsPage() {
     }
   };
 
+  const handleOpenTrigger = () => {
+    // When there's no gap (overdue / once), the "bridge" option doesn't apply — default to the full cycle.
+    setCascadeMode((projectionMeta?.gapDays ?? 0) > 0 ? "GAP_ONLY" : "GAP_PLUS_CYCLE");
+    setShowTriggerDialog(true);
+  };
+
+  const handleConfirmTrigger = () => {
+    triggerSchedule.mutate(
+      { id: schedule.id, cascadeMode },
+      {
+        onSuccess: (response) => {
+          setShowTriggerDialog(false);
+          if (response.data?.order?.id) {
+            toast.success("Pedido criado a partir do agendamento.");
+            navigate(routes.inventory.orders.details(response.data.order.id));
+          } else {
+            toast.info("Nenhum item precisava ser pedido no momento.");
+            refetch();
+          }
+        },
+      },
+    );
+  };
+
   const isOverdue = schedule?.nextRun ? new Date(schedule.nextRun) < new Date() : false;
+
+  const gapDays = projectionMeta?.gapDays ?? 0;
+  const intervalDays = projectionMeta?.intervalDays ?? null;
+  const hasGapOption = gapDays > 0;
 
   const getScheduleDetails = () => {
     if (schedule.weeklyConfig) {
@@ -236,6 +287,12 @@ export function OrderScheduleDetailsPage() {
             icon: schedule.isActive ? IconPlayerPause : IconPlayerPlay,
           },
           {
+            key: "trigger",
+            label: "Disparar agora",
+            onClick: handleOpenTrigger,
+            icon: IconPlayerPlay,
+          },
+          {
             key: "edit",
             label: "Editar",
             onClick: () => navigate(routes.inventory.orders.schedules.edit(schedule.id)),
@@ -253,7 +310,7 @@ export function OrderScheduleDetailsPage() {
 
       <div className="flex-1 overflow-y-auto pb-6">
         <div className="space-y-4">
-          {/* Configuration and Items Grid */}
+          {/* Configuration + Changelog Grid */}
           <div className="animate-in fade-in-50 duration-700">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Schedule Configuration Card */}
@@ -356,72 +413,109 @@ export function OrderScheduleDetailsPage() {
                 </CardContent>
               </Card>
 
-              {/* Items Card */}
-              <Card className="shadow-sm border border-border flex flex-col">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2">
-                    <IconPackage className="h-5 w-5 text-muted-foreground" />
-                    Itens do Agendamento
-                    {items.length > 0 && (
-                      <Badge variant="secondary" className="ml-2">
-                        {items.length}
-                      </Badge>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 flex-1">
-                  {items.length > 0 ? (
-                    <div className="border rounded-lg overflow-hidden dark:border-border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/50">
-                            <TableHead className="font-semibold">Código</TableHead>
-                            <TableHead className="font-semibold">Nome</TableHead>
-                            <TableHead className="font-semibold">Marca</TableHead>
-                            <TableHead className="font-semibold">Categoria</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {items.map((item) => (
-                            <TableRow
-                              key={item.id}
-                              className="cursor-pointer hover:bg-muted/30"
-                              onClick={() => navigate(routes.inventory.products.details(item.id))}
-                            >
-                              <TableCell className="font-mono text-sm">{item.uniCode || "-"}</TableCell>
-                              <TableCell className="font-medium">{item.name}</TableCell>
-                              <TableCell>{item.brand?.name || "-"}</TableCell>
-                              <TableCell>{item.category?.name || "-"}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <div className="p-4 bg-muted/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                        <IconPackage className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <h3 className="text-lg font-semibold mb-2 text-foreground">Nenhum item configurado</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Este agendamento não possui itens configurados.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              {/* Changelog History — next to the schedule info */}
+              <ChangelogHistory
+                entityType={CHANGE_LOG_ENTITY_TYPE.ORDER_SCHEDULE}
+                entityId={schedule.id}
+                entityName={schedule.name || `Agendamento #${schedule.id.slice(-8)}`}
+                entityCreatedAt={schedule.createdAt}
+                maxHeight="500px"
+              />
             </div>
           </div>
 
-          {/* Changelog History */}
+          {/* Items Card — full width, after the changelog */}
           <div className="animate-in fade-in-50 duration-1000">
-            <ChangelogHistory
-              entityType={CHANGE_LOG_ENTITY_TYPE.ORDER_SCHEDULE}
-              entityId={schedule.id}
-              entityName={schedule.name || `Agendamento #${schedule.id.slice(-8)}`}
-              entityCreatedAt={schedule.createdAt}
-              maxHeight="500px"
-            />
+            <Card className="shadow-sm border border-border flex flex-col">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <IconPackage className="h-5 w-5 text-muted-foreground" />
+                  Itens do Agendamento
+                  {items.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {items.length}
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 flex-1">
+                {items.length > 0 ? (
+                  <>
+                    {projectionMeta && (
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        {projectionMeta.scheduledDate && (
+                          <Badge variant="secondary" className="gap-1">
+                            <IconCalendarClock className="h-3 w-3" />
+                            Disparo previsto: {formatDate(new Date(projectionMeta.scheduledDate))}
+                            {projectionMeta.gapDays > 0 && ` (${projectionMeta.gapDays} dias)`}
+                          </Badge>
+                        )}
+                        <Badge variant="outline">Total hoje: {formatCurrency(projectionMeta.totalToday)}</Badge>
+                        <Badge variant="outline">Total na data: {formatCurrency(projectionMeta.totalScheduled)}</Badge>
+                      </div>
+                    )}
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      hoje = se pedir agora · na data = projeção do estoque na data de disparo
+                    </p>
+                    <div className="border rounded-lg overflow-hidden dark:border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="font-semibold">Código</TableHead>
+                          <TableHead className="font-semibold">Nome</TableHead>
+                          <TableHead className="font-semibold">Marca</TableHead>
+                          <TableHead className="font-semibold">Categoria</TableHead>
+                          <TableHead className="font-semibold text-right">Qtd. hoje</TableHead>
+                          <TableHead className="font-semibold text-right">Qtd. na data</TableHead>
+                          <TableHead className="font-semibold text-right">Preço hoje</TableHead>
+                          <TableHead className="font-semibold text-right">Preço na data</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map((item) => {
+                          const p = projectionByItem.get(item.id);
+                          const showProjection = p && !p.skipped;
+                          return (
+                          <TableRow
+                            key={item.id}
+                            className="cursor-pointer hover:bg-muted/30"
+                            onClick={() => navigate(routes.inventory.products.details(item.id))}
+                          >
+                            <TableCell className="font-mono text-sm">{item.uniCode || "-"}</TableCell>
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell>{item.brand?.name || "-"}</TableCell>
+                            <TableCell>{item.category?.name || "-"}</TableCell>
+                            <TableCell className="text-right tabular-nums">{showProjection ? formatNumber(p!.quantityToday) : "—"}</TableCell>
+                            <TableCell className="text-right tabular-nums">{showProjection ? formatNumber(p!.quantityScheduled) : "—"}</TableCell>
+                            <TableCell className="text-right tabular-nums">{showProjection ? formatCurrency(p!.totalToday) : "—"}</TableCell>
+                            <TableCell className="text-right tabular-nums">{showProjection ? formatCurrency(p!.totalScheduled) : "—"}</TableCell>
+                          </TableRow>
+                          );
+                        })}
+                        {projectionMeta && (
+                          <TableRow className="bg-muted/50 font-semibold">
+                            <TableCell colSpan={6} className="text-right">Total</TableCell>
+                            <TableCell className="text-right tabular-nums">{formatCurrency(projectionMeta.totalToday)}</TableCell>
+                            <TableCell className="text-right tabular-nums">{formatCurrency(projectionMeta.totalScheduled)}</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="p-4 bg-muted/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                      <IconPackage className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2 text-foreground">Nenhum item configurado</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Este agendamento não possui itens configurados.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
@@ -445,6 +539,87 @@ export function OrderScheduleDetailsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showTriggerDialog} onOpenChange={setShowTriggerDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Disparar agendamento agora</DialogTitle>
+            <DialogDescription>
+              Escolha quanto este pedido deve cobrir. O agendamento permanece configurado normalmente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <RadioGroup value={cascadeMode} onValueChange={(value) => setCascadeMode(value as OrderScheduleCascadeMode)}>
+              {hasGapOption && (
+                <label
+                  htmlFor="cascade-gap-only"
+                  className={cn(
+                    "flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer hover:bg-muted/30",
+                    cascadeMode === "GAP_ONLY" && "border-primary bg-muted/30",
+                  )}
+                >
+                  <RadioGroupItem value="GAP_ONLY" id="cascade-gap-only" className="mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      Cobrir apenas até o próximo disparo
+                      <span className="ml-1 text-muted-foreground">({gapDays} dias)</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">o agendamento ainda dispara na data prevista</p>
+                  </div>
+                </label>
+              )}
+
+              <label
+                htmlFor="cascade-gap-cycle"
+                className={cn(
+                  "flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer hover:bg-muted/30",
+                  cascadeMode === "GAP_PLUS_CYCLE" && "border-primary bg-muted/30",
+                )}
+              >
+                <RadioGroupItem value="GAP_PLUS_CYCLE" id="cascade-gap-cycle" className="mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">
+                    Cobrir até o próximo disparo + ciclo completo
+                    <span className="ml-1 text-muted-foreground">
+                      ({gapDays}{intervalDays != null ? ` + ${intervalDays}` : ""} dias)
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">o próximo disparo é adiado um ciclo</p>
+                </div>
+              </label>
+            </RadioGroup>
+
+            {projectionMeta && (
+              <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+                {projectionMeta.scheduledDate && (
+                  <div className="flex justify-between">
+                    <span>Disparo previsto</span>
+                    <span className="font-medium text-foreground">{formatDate(new Date(projectionMeta.scheduledDate))}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span>Total se pedir hoje</span>
+                  <span className="font-medium text-foreground">{formatCurrency(projectionMeta.totalToday)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total projetado na data</span>
+                  <span className="font-medium text-foreground">{formatCurrency(projectionMeta.totalScheduled)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTriggerDialog(false)} disabled={triggerSchedule.isPending}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmTrigger} disabled={triggerSchedule.isPending}>
+              {triggerSchedule.isPending ? "Disparando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

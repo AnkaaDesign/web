@@ -29,9 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { ItemSelectorTable } from "../../common/item-selector/item-selector-table";
-import { computeCyclePreviewQuantity } from "../../common/item-selector/item-selector-columns";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { useItems } from "../../../../hooks";
 
 export const OrderScheduleCreateForm = () => {
   const navigate = useNavigate();
@@ -312,39 +310,6 @@ export const OrderScheduleCreateForm = () => {
     },
     [form],
   );
-
-  // Approximate cycle length in days for the selected frequency. Used by the
-  // item selector table to render the "QTD. POR CICLO (ESTIMADA)" column
-  // (algorithm-spec §9 — system auto-calculates quantities per cycle).
-  const cycleDays = useMemo(() => {
-    const baseByFrequency: Record<string, number> = {
-      [SCHEDULE_FREQUENCY.DAILY]: 1,
-      [SCHEDULE_FREQUENCY.WEEKLY]: 7,
-      [SCHEDULE_FREQUENCY.BIWEEKLY]: 14,
-      [SCHEDULE_FREQUENCY.MONTHLY]: 30,
-      [SCHEDULE_FREQUENCY.BIMONTHLY]: 60,
-      [SCHEDULE_FREQUENCY.QUARTERLY]: 90,
-      [SCHEDULE_FREQUENCY.TRIANNUAL]: 120,
-      [SCHEDULE_FREQUENCY.QUADRIMESTRAL]: 120,
-      [SCHEDULE_FREQUENCY.SEMI_ANNUAL]: 180,
-      [SCHEDULE_FREQUENCY.ANNUAL]: 365,
-      [SCHEDULE_FREQUENCY.ONCE]: 30,
-      [SCHEDULE_FREQUENCY.CUSTOM]: 30,
-    };
-    const base = baseByFrequency[watchedFrequency] ?? 30;
-    const interval = watchedFrequencyCount && watchedFrequencyCount > 0 ? watchedFrequencyCount : 1;
-    return base * interval;
-  }, [watchedFrequency, watchedFrequencyCount]);
-
-  // Fetch full data for the items selected in Step 2, so Step 3 can render the
-  // preview column with name + estimated quantity per cycle.
-  const { data: selectedItemsResponse } = useItems({
-    where: watchedItems.length > 0 ? { id: { in: watchedItems } } : undefined,
-    include: { brand: true },
-    take: watchedItems.length || 1,
-    enabled: currentStep === 3 && watchedItems.length > 0,
-  });
-  const selectedItemsData = selectedItemsResponse?.data || [];
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
@@ -738,11 +703,9 @@ export const OrderScheduleCreateForm = () => {
                       'supplier',
                       'quantity',
                       'reorderPoint',
-                      'computedCycleQuantity',
                     ]}
                     storageKey="order-schedule-item-selector"
                     className="flex-1 min-h-0"
-                    cycleDays={cycleDays}
                   />
                 )}
 
@@ -840,52 +803,6 @@ export const OrderScheduleCreateForm = () => {
                           <span className="text-sm font-bold text-primary">{watchedItems.length}</span>
                         </div>
 
-                        {/* Per-cycle quantity preview (algorithm-spec §9) */}
-                        {selectedItemsData.length > 0 && (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-foreground">
-                                Quantidade por ciclo (estimada)
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                Ciclo de ~{cycleDays} dia(s)
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              Valores estimados — confirmados a cada ciclo, no momento da execução.
-                            </p>
-                            <div className="border border-border rounded-lg overflow-hidden">
-                              <table className="w-full text-sm">
-                                <thead className="bg-muted/50">
-                                  <tr>
-                                    <th className="text-left font-semibold uppercase text-xs px-3 py-2">Item</th>
-                                    <th className="text-right font-semibold uppercase text-xs px-3 py-2">Qtd. estimada</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {selectedItemsData.map((it: any) => {
-                                    const qty = computeCyclePreviewQuantity(it, cycleDays);
-                                    return (
-                                      <tr key={it.id} className="border-t border-border">
-                                        <td className="px-3 py-2 truncate">
-                                          <span className="font-medium">{it.name}</span>
-                                          {it.uniCode && (
-                                            <span className="ml-2 text-xs text-muted-foreground">
-                                              {it.uniCode}
-                                            </span>
-                                          )}
-                                        </td>
-                                        <td className="px-3 py-2 text-right font-semibold tabular-nums">
-                                          {qty != null ? qty.toLocaleString("pt-BR") : "—"}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
                       </CardContent>
                     </Card>
                   </div>

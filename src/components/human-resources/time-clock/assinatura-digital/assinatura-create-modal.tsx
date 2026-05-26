@@ -6,18 +6,18 @@ import {
   IconCalendar,
   IconCheck,
   IconCircleX,
+  IconLoader2,
   IconUsers,
 } from "@tabler/icons-react";
 import { z } from "zod";
 
 import type { User } from "../../../../types";
-import { userService } from "../../../../api-client";
+import { secullumService } from "../../../../api-client";
 import { useCreateAssinaturaWithProgress } from "../../../../hooks";
 
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/form";
 
 const ALL_OPTION_ID = "__ALL__";
+const ONLY_OPEN_OPTION_ID = "__OPEN__";
 
 // Start of the cartão-ponto cycle: the 26th of the month before `ref`.
 // Mirrors the server's normalization — the apuração period must align to the
@@ -124,60 +125,54 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
 
   const selectedIds = form.watch("userIds") ?? [];
   const isCollective = selectedIds.includes(ALL_OPTION_ID);
+  const isOnlyOpen = selectedIds.includes(ONLY_OPEN_OPTION_ID);
+  const isSpecial = isCollective || isOnlyOpen;
 
   // Searchable user picker scoped to Secullum-linked users. The first page
   // prepends a synthetic "Todos os colaboradores" option so users can pick
   // it like any other entry.
   const userQueryFn = useCallback(async (search: string, page: number = 1) => {
-    const params: any = {
+    // Server-side filtered to Secullum-linked, NON-dismissed employees (excludes
+    // /FuncionariosDemitidos — a user dismissed only in Secullum won't show even
+    // if still active in our DB).
+    const response = await secullumService.getAssinaturaEligibleUsers({
+      search: search?.trim() || undefined,
       page,
       take: 50,
-      where: { isActive: true, secullumEmployeeId: { not: null } },
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        secullumEmployeeId: true,
-        position: { select: { id: true, name: true } },
-        sector: { select: { id: true, name: true } },
-      },
-    };
-    if (search?.trim()) params.searchingFor = search.trim();
-    const response = await userService.getUsers(params);
-    const filtered = (response.data || []).filter(
-      (u: any) => u.secullumEmployeeId != null,
-    );
+    });
+    const filtered = (response.data?.data ?? []) as unknown as User[];
 
-    const allOption: User = {
-      id: ALL_OPTION_ID,
-      name: "Todos os colaboradores",
-    } as User;
+    const allOption: User = { id: ALL_OPTION_ID, name: "Todos os colaboradores" } as User;
+    const openOption: User = { id: ONLY_OPEN_OPTION_ID, name: "Apenas em aberto (não assinados)" } as User;
 
     const term = search?.trim().toLowerCase() ?? "";
-    const allMatches = !term || "todos os colaboradores".includes(term);
-    const data: User[] = page === 1 && allMatches
-      ? [allOption, ...filtered]
-      : filtered;
+    const synthetic: User[] =
+      page === 1
+        ? [
+            ...(!term || "todos os colaboradores".includes(term) ? [allOption] : []),
+            ...(!term || "apenas em aberto nao assinados".includes(term) ? [openOption] : []),
+          ]
+        : [];
+    const data: User[] = [...synthetic, ...filtered];
 
-    return { data, hasMore: response.meta?.hasNextPage || false };
+    return { data, hasMore: response.data?.meta?.hasNextPage || false };
   }, []);
 
   const handleSelectionChange = useCallback(
     (next: string[]) => {
-      const wasAll = selectedIds.includes(ALL_OPTION_ID);
-      const hasAll = next.includes(ALL_OPTION_ID);
-      // If "Todos" was just added, drop everything else; if other options
-      // were added while "Todos" was already selected, drop "Todos".
-      if (hasAll && !wasAll) {
-        form.setValue("userIds", [ALL_OPTION_ID], { shouldValidate: true });
+      const SPECIAL = [ALL_OPTION_ID, ONLY_OPEN_OPTION_ID];
+      const wasSpecial = selectedIds.find((id) => SPECIAL.includes(id));
+      const addedSpecial = next.find((id) => SPECIAL.includes(id) && id !== wasSpecial);
+      // A special option ("Todos" / "Apenas em aberto") was just chosen → it
+      // becomes the sole selection.
+      if (addedSpecial) {
+        form.setValue("userIds", [addedSpecial], { shouldValidate: true });
         return;
       }
-      if (hasAll && wasAll && next.length > 1) {
-        form.setValue(
-          "userIds",
-          next.filter((id) => id !== ALL_OPTION_ID),
-          { shouldValidate: true },
-        );
+      // A normal collaborator was added while a special was selected → drop the
+      // special.
+      if (wasSpecial && next.length > 1) {
+        form.setValue("userIds", next.filter((id) => !SPECIAL.includes(id)), { shouldValidate: true });
         return;
       }
       form.setValue("userIds", next, { shouldValidate: true });
@@ -193,17 +188,15 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
 
     const userIds = raw.userIds ?? [];
     const sendAll = userIds.includes(ALL_OPTION_ID);
+    const sendOpen = userIds.includes(ONLY_OPEN_OPTION_ID);
     // Fire-and-track: the hook starts the job and polls progress. We keep the
-    // modal open so the user watches the "X de N" bar; results render below.
+    // modal open so the user sees the loading state; results render below.
     await gen.start({
-      ...(sendAll ? { applyToAll: true } : { userIds }),
+      ...(sendOpen ? { onlyOpen: true } : sendAll ? { applyToAll: true } : { userIds }),
       DataInicio: format(startDate, "yyyy-MM-dd"),
       DataFim: format(endDate, "yyyy-MM-dd"),
     });
   };
-
-  const progressPct =
-    gen.total > 0 ? Math.min(100, Math.round((gen.atual / gen.total) * 100)) : null;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!isRunning) onOpenChange(o); }}>
@@ -222,7 +215,7 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
                   <FormLabel className="flex items-center gap-2">
                     <IconUsers className="h-4 w-4" />
                     Colaboradores <span className="text-destructive">*</span>
-                    {selectedIds.length > 0 && !isCollective && (
+                    {selectedIds.length > 0 && !isSpecial && (
                       <span className="ml-1 text-xs text-muted-foreground font-normal">
                         ({selectedIds.length} selecionado{selectedIds.length === 1 ? "" : "s"})
                       </span>
@@ -250,6 +243,16 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
                               <p className="font-medium">Todos os colaboradores</p>
                               <p className="text-xs text-muted-foreground">
                                 Envia para todos os colaboradores ativos vinculados ao Secullum
+                              </p>
+                            </div>
+                          );
+                        }
+                        if (u.id === ONLY_OPEN_OPTION_ID) {
+                          return (
+                            <div>
+                              <p className="font-medium">Apenas em aberto (não assinados)</p>
+                              <p className="text-xs text-muted-foreground">
+                                Reenvia só para quem rejeitou ou ainda não assinou a última apuração do período
                               </p>
                             </div>
                           );
@@ -315,19 +318,21 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
             </div>
 
             {isRunning && (
-              <div className="rounded-lg border border-border p-4 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">{gen.phase || "Gerando apuração..."}</span>
-                  {gen.total > 0 && (
-                    <span className="text-muted-foreground tabular-nums">
-                      {gen.atual} de {gen.total}
-                    </span>
-                  )}
+              <div className="rounded-lg border border-border p-4 flex items-center gap-3">
+                <IconLoader2 className="h-5 w-5 animate-spin text-primary shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {gen.phase || "Gerando apuração no Secullum..."}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Isso pode levar alguns segundos. Não feche esta janela.
+                  </p>
                 </div>
-                <Progress value={progressPct ?? 0} className={progressPct === null ? "animate-pulse" : undefined} />
-                <p className="text-xs text-muted-foreground">
-                  Gerando a assinatura no Secullum. Não feche esta janela.
-                </p>
+                {gen.total > 0 && (
+                  <span className="ml-auto text-sm text-muted-foreground tabular-nums shrink-0">
+                    {gen.atual}/{gen.total}
+                  </span>
+                )}
               </div>
             )}
 
@@ -372,9 +377,11 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
               <Button type="submit" disabled={isRunning}>
                 {isRunning
                   ? "Gerando..."
-                  : isCollective
-                    ? "Enviar para todos"
-                    : "Enviar para selecionados"}
+                  : isOnlyOpen
+                    ? "Reenviar em aberto"
+                    : isCollective
+                      ? "Enviar para todos"
+                      : "Enviar para selecionados"}
               </Button>
             </DialogFooter>
           </form>

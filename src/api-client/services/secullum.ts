@@ -272,6 +272,24 @@ export const secullumService = {
       };
     }>(`/integrations/secullum/assinatura-digital/${id}`),
 
+  // Linked users NOT dismissed in Secullum — for the "Nova Apuração" picker.
+  // Excludes funcionários in /FuncionariosDemitidos (our DB may not have the
+  // dismissal synced), so terminated employees never appear.
+  getAssinaturaEligibleUsers: (params: { search?: string; page?: number; take?: number }) =>
+    apiClient.get<{
+      success: boolean;
+      data: Array<{
+        id: string;
+        name: string;
+        secullumEmployeeId: number | null;
+        position: { id: string; name: string } | null;
+        sector: { id: string; name: string } | null;
+      }>;
+      meta: { page: number; take: number; totalRecords: number; hasNextPage: boolean };
+    }>("/integrations/secullum/assinatura-digital/eligible-users", {
+      params: { search: params.search, page: params.page, take: params.take },
+    }),
+
   // Downloads the per-employee signed time-card PDF as a Blob.
   // Secullum keys the PDF by funcionarioId, not by the signature item's Id.
   downloadAssinaturaItemPdf: (apuracaoId: number, funcionarioId: number) =>
@@ -288,6 +306,7 @@ export const secullumService = {
   createAssinaturaForUsers: (data: {
     userIds?: string[];
     applyToAll?: boolean;
+    onlyOpen?: boolean;
     DataInicio: string; // YYYY-MM-DD or ISO datetime
     DataFim: string;
     EmpresaId?: number;
@@ -334,10 +353,10 @@ export const secullumService = {
 
   // Download every employee's signed time-card PDF, across one or many
   // apurações, merged into a single ZIP (Blob).
-  downloadAssinaturasZip: (apuracaoIds: number[]) =>
+  downloadAssinaturasZip: (apuracaoIds: number[], status?: "approved" | "rejected" | "both") =>
     apiClient.post<Blob>(
       "/integrations/secullum/assinatura-digital/download-zip",
-      { apuracaoIds },
+      { apuracaoIds, status },
       { responseType: "blob" },
     ),
 

@@ -4,13 +4,11 @@ import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
 import type { ComboboxOption } from "@/components/ui/combobox";
 import {
   IconChevronLeft,
   IconChevronRight,
-  IconCalendar,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useSecullumTimeEntries, useSecullumConfiguration, useUsers, useSecullumHolidays } from "../../../hooks";
@@ -20,6 +18,8 @@ import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { ColumnVisibilityManager } from "@/components/integrations/secullum/calculations/list";
 import type { ColumnDef } from "@/components/integrations/secullum/calculations/list";
 import { USER_STATUS } from "../../../constants";
+import { PeriodControl } from "./period-control";
+import { TimeClockEntryEditExport } from "./time-clock-entry-edit-export";
 import type { EditExportRow } from "./time-clock-entry-edit-export";
 import type { User } from "@/types";
 
@@ -443,6 +443,31 @@ export function TimeClockEntryEditList({
 
   const periodDisplay = getPayrollPeriodDisplay(selectedMonth);
 
+  // Chip labels + bounds for the range PeriodControl. A custom range is "active"
+  // when startDate/endDate diverge from the regular monthly payroll period (26th
+  // of previous month → 25th of selectedMonth). The month chevrons re-populate
+  // startDate/endDate with those exact bounds via handleMonthChange, so a pure
+  // null check can't tell "custom" from "regular month" — compare the bounds.
+  const monthPeriodStart = new Date(
+    subMonths(selectedMonth, 1).getFullYear(),
+    subMonths(selectedMonth, 1).getMonth(),
+    26,
+  );
+  const monthPeriodEnd = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 25);
+
+  const sameDay = (a: Date | null, b: Date | null) =>
+    a != null && b != null && format(a, "yyyy-MM-dd") === format(b, "yyyy-MM-dd");
+  const matchesMonthPeriod =
+    sameDay(startDate, monthPeriodStart) && sameDay(endDate, monthPeriodEnd);
+  const hasCustomRange = (startDate != null || endDate != null) && !matchesMonthPeriod;
+
+  const periodControlTitle = hasCustomRange ? "Período personalizado" : periodDisplay.monthName;
+  const periodControlSubtitle = hasCustomRange
+    ? `${startDate ? format(startDate, "dd/MM/yyyy") : ""} a ${endDate ? format(endDate, "dd/MM/yyyy") : ""}`
+    : periodDisplay.period;
+  const periodControlStart = startDate ?? monthPeriodStart;
+  const periodControlEnd = endDate ?? monthPeriodEnd;
+
   // Push the export-friendly entry list up to the unified page so it can render
   // the export popover in the page header for this mode.
   const selectedUser: User | null = useMemo(() => {
@@ -510,7 +535,7 @@ export function TimeClockEntryEditList({
           <div className="flex gap-1 shrink-0">
             <Button
               type="button"
-              variant="outline"
+              variant="default"
               size="icon"
               onClick={handlePreviousUser}
               disabled={!usersData?.data || usersData.data.length === 0}
@@ -532,7 +557,7 @@ export function TimeClockEntryEditList({
             />
             <Button
               type="button"
-              variant="outline"
+              variant="default"
               size="icon"
               onClick={handleNextUser}
               disabled={!usersData?.data || usersData.data.length === 0}
@@ -543,60 +568,41 @@ export function TimeClockEntryEditList({
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={handlePreviousMonth}
-                className="h-10 w-10"
-              >
-                <IconChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex flex-col items-center px-2">
-                <div className="flex items-center gap-1 text-sm font-medium">
-                  <IconCalendar className="h-4 w-4" />
-                  <span className="capitalize">{periodDisplay.monthName}</span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Período: {periodDisplay.period}
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={handleNextMonth}
-                className="h-10 w-10"
-              >
-                <IconChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <DateTimeInput
-                mode="date"
-                value={startDate}
-                onChange={handleStartDateChange}
-                className="w-[140px]"
-                placeholder="Data inicial"
-                showClearButton={true}
-              />
-              <span className="text-muted-foreground text-sm px-1">até</span>
-              <DateTimeInput
-                mode="date"
-                value={endDate}
-                onChange={handleEndDateChange}
-                className="w-[140px]"
-                placeholder="Data final"
-                showClearButton={true}
-              />
-            </div>
+            <PeriodControl
+              variant="range"
+              title={periodControlTitle}
+              subtitle={periodControlSubtitle}
+              startDate={periodControlStart}
+              endDate={periodControlEnd}
+              onRangeChange={(start, end) => {
+                handleStartDateChange(start);
+                handleEndDateChange(end);
+              }}
+              onPrev={() => {
+                handleStartDateChange(null);
+                handleEndDateChange(null);
+                handlePreviousMonth();
+              }}
+              onNext={() => {
+                handleStartDateChange(null);
+                handleEndDateChange(null);
+                handleNextMonth();
+              }}
+            />
 
             <ColumnVisibilityManager
               columns={TIME_CLOCK_COLUMNS}
               visibleColumns={visibleColumns}
               onVisibilityChange={setVisibleColumns}
+            />
+
+            <TimeClockEntryEditExport
+              currentItems={exportRows}
+              visibleColumns={exportVisibleColumns}
+              user={selectedUser}
+              userId={selectedUserId || null}
+              startDate={startDate}
+              endDate={endDate}
             />
           </div>
         </div>

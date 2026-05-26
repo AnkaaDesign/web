@@ -1,6 +1,7 @@
 // packages/hooks/src/useOrderSchedule.ts
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { UseQueryOptions } from "@tanstack/react-query";
 import {
   getOrderSchedules,
   getOrderSchedule,
@@ -12,6 +13,8 @@ import {
   batchDeleteOrderSchedules,
   finishOrderSchedule,
   createOrderFromSchedule,
+  getOrderScheduleProjection,
+  triggerOrderSchedule,
 } from "../../api-client";
 import type {
   OrderScheduleGetManyFormData,
@@ -30,6 +33,9 @@ import type {
   OrderScheduleBatchCreateResponse,
   OrderScheduleBatchUpdateResponse,
   OrderScheduleBatchDeleteResponse,
+  OrderScheduleProjectionResponse,
+  OrderScheduleTriggerResponse,
+  OrderScheduleCascadeMode,
 } from "../../types";
 import { orderScheduleKeys, orderKeys } from "../common/query-keys";
 import { createEntityHooks, createSpecializedQueryHook } from "../common/create-entity-hooks";
@@ -312,6 +318,42 @@ export const useCreateOrderFromSchedule = (options?: {
       queryClient.invalidateQueries({ queryKey: orderScheduleKeys.all });
       queryClient.invalidateQueries({ queryKey: orderKeys.all });
       options?.onSuccess?.(data);
+    },
+  });
+};
+
+// =====================================================
+// Projection & Trigger Hooks
+// =====================================================
+
+export const useOrderScheduleProjection = (
+  id: string,
+  options?: { enabled?: boolean } & Omit<UseQueryOptions<OrderScheduleProjectionResponse>, "queryKey" | "queryFn">,
+) => {
+  const { enabled = true, ...queryOptions } = options || {};
+
+  return useQuery<OrderScheduleProjectionResponse>({
+    queryKey: [...orderScheduleKeys.detail(id), "projection"],
+    queryFn: () => getOrderScheduleProjection(id),
+    enabled: enabled && !!id,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    ...queryOptions,
+  });
+};
+
+export const useTriggerOrderSchedule = (options?: {
+  onSuccess?: (data: OrderScheduleTriggerResponse, variables: { id: string; cascadeMode: OrderScheduleCascadeMode }) => void;
+}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, cascadeMode }: { id: string; cascadeMode: OrderScheduleCascadeMode }) => triggerOrderSchedule(id, { cascadeMode }),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: orderScheduleKeys.all });
+      queryClient.invalidateQueries({ queryKey: orderScheduleKeys.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: [...orderScheduleKeys.detail(variables.id), "projection"] });
+      queryClient.invalidateQueries({ queryKey: orderKeys.all });
+      options?.onSuccess?.(data, variables);
     },
   });
 };

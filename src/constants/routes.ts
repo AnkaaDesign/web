@@ -243,11 +243,17 @@ export const routes = {
     timeClock: {
       list: "/recursos-humanos/controle-ponto",
       root: "/recursos-humanos/controle-ponto",
-      assinaturaDigital: {
-        root: "/recursos-humanos/controle-ponto/assinatura-digital",
-        list: "/recursos-humanos/controle-ponto/assinatura-digital",
+      // Each view is its own subpage (with a sidebar submenu).
+      colaborador: "/recursos-humanos/controle-ponto/colaborador",
+      dia: "/recursos-humanos/controle-ponto/dia",
+      edicao: "/recursos-humanos/controle-ponto/edicao",
+      ausencias: "/recursos-humanos/controle-ponto/ausencias",
+      // Fechamento (formerly "Assinatura Digital").
+      fechamento: {
+        root: "/recursos-humanos/controle-ponto/fechamento",
+        list: "/recursos-humanos/controle-ponto/fechamento",
         details: (id: string | number) =>
-          `/recursos-humanos/controle-ponto/assinatura-digital/${id}`,
+          `/recursos-humanos/controle-ponto/fechamento/${id}`,
       },
     },
     vacations: {

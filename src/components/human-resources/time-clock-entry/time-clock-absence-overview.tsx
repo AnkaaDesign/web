@@ -2,10 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  IconCalendar,
   IconCalendarOff,
-  IconChevronLeft,
-  IconChevronRight,
   IconEdit,
 } from "@tabler/icons-react";
 
@@ -22,15 +19,21 @@ import { AbsenceFormDialog } from "@/components/human-resources/absence/form/abs
 import type { SecullumAggregatedAbsence } from "@/types";
 import {
   toAbsenceExportRow,
+  TimeClockAbsenceExport,
   type AbsenceExportRow,
 } from "./time-clock-absence-export";
+import { PeriodControl } from "./period-control";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import type { ComboboxOption } from "@/components/ui/combobox";
-import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -39,6 +42,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
+import { ColumnVisibilityManager } from "@/components/integrations/secullum/calculations/list";
+import type { ColumnDef } from "@/components/integrations/secullum/calculations/list";
 import { cn } from "@/lib/utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -64,15 +70,13 @@ const getPayrollPeriod = (month: Date) => ({
   end: new Date(month.getFullYear(), month.getMonth(), 25),
 });
 
-const periodContaining = (anchor: Date) => {
-  const refMonth =
-    anchor.getDate() >= 26
-      ? new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1)
-      : new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+// Default to today's month — matches the other Controle de Ponto views: when
+// today is May, the period is 26/04 → 25/05 ("Maio"). (Previously this advanced
+// to the cycle CONTAINING today, so on/after the 26th it jumped a month ahead.)
+const defaultPeriod = () => {
+  const refMonth = new Date();
   return { refMonth, ...getPayrollPeriod(refMonth) };
 };
-
-const defaultPeriod = () => periodContaining(new Date());
 
 const getPayrollPeriodDisplay = (month: Date) => {
   const start = new Date(month.getFullYear(), month.getMonth() - 1, 26);
@@ -139,28 +143,57 @@ function TipoPill({ justificativaId, descricao }: { justificativaId: number; des
 
 // ─── Absence overview table ───────────────────────────────────────────────────
 
-const ABSENCE_TABLE_HEADS = ["Colaborador", "Data", "Faltas", "Tipo", "Setor", "Motivo", ""];
+const ABSENCE_COLUMNS: ColumnDef[] = [
+  { key: "data", header: "Data" },
+  { key: "colaborador", header: "Colaborador" },
+  { key: "faltas", header: "Faltas" },
+  { key: "tipo", header: "Tipo" },
+  { key: "setor", header: "Setor" },
+  { key: "motivo", header: "Motivo" },
+];
 
 function AbsenceOverviewTable({
   records,
   isLoading,
   onEdit,
+  visibleColumns,
 }: {
   records: SecullumAbsenceDayRow[];
   isLoading: boolean;
   onEdit: (r: SecullumAbsenceDayRow) => void;
+  visibleColumns: Set<string>;
 }) {
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    row: SecullumAbsenceDayRow;
+  } | null>(null);
+
+  // Close the context menu on any outside click / scroll.
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [contextMenu]);
+
+  const cols = ABSENCE_COLUMNS.filter((c) => visibleColumns.has(c.key));
+
   if (isLoading) {
     return (
       <Table>
         <TableHeader>
           <TableRow className="bg-muted hover:bg-muted">
-            {ABSENCE_TABLE_HEADS.map((h) => (
+            {cols.map((c) => (
               <TableHead
-                key={h}
+                key={c.key}
                 className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border"
               >
-                {h}
+                {c.header}
               </TableHead>
             ))}
           </TableRow>
@@ -168,8 +201,8 @@ function AbsenceOverviewTable({
         <TableBody>
           {Array.from({ length: 6 }).map((_, i) => (
             <TableRow key={i}>
-              {Array.from({ length: 7 }).map((_, j) => (
-                <TableCell key={j} className="px-4">
+              {cols.map((c) => (
+                <TableCell key={c.key} className="px-4">
                   <Skeleton className="h-4 w-full" />
                 </TableCell>
               ))}
@@ -190,69 +223,100 @@ function AbsenceOverviewTable({
   }
 
   return (
-    <Table>
-      <TableHeader className="sticky top-0 z-10">
-        <TableRow className="bg-muted hover:bg-muted">
-          {ABSENCE_TABLE_HEADS.map((h) => (
-            <TableHead
-              key={h}
-              className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border"
-            >
-              {h}
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {records.map((r, i) => (
-          <TableRow
-            key={`${r.userId}-${r.date}-${i}`}
-            className={cn(
-              "transition-colors border-b border-border [&>td]:py-2",
-              i % 2 === 1 && "bg-muted/10",
-              "hover:bg-muted/20",
-            )}
-          >
-            <TableCell className="font-medium px-4 whitespace-nowrap">
-              {r.userName}
-            </TableCell>
-            <TableCell className="tabular-nums px-4 whitespace-nowrap">
-              {fmtDate(r.date)}
-              <span className="ml-1 text-xs text-muted-foreground">{fmtWeekday(r.date)}</span>
-              {r.isPartialDay && (
-                <span className="ml-1.5 text-xs text-amber-600 dark:text-amber-400">(parcial)</span>
-              )}
-            </TableCell>
-            <TableCell className="tabular-nums px-4 whitespace-nowrap text-muted-foreground text-sm">
-              {r.faltas ?? "—"}
-            </TableCell>
-            <TableCell className="px-4">
-              <TipoPill justificativaId={r.JustificativaId} descricao={r.JustificativaDescricao} />
-            </TableCell>
-            <TableCell className="text-muted-foreground px-4 whitespace-nowrap">
-              {r.sectorName ?? "—"}
-            </TableCell>
-            <TableCell
-              className="text-muted-foreground px-4 truncate max-w-[260px]"
-              title={r.Motivo ?? ""}
-            >
-              {r.Motivo || "—"}
-            </TableCell>
-            <TableCell className="text-right pr-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2"
-                onClick={() => onEdit(r)}
+    <>
+      <Table>
+        <TableHeader className="sticky top-0 z-10">
+          <TableRow className="bg-muted hover:bg-muted">
+            {cols.map((c) => (
+              <TableHead
+                key={c.key}
+                className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border"
               >
-                <IconEdit className="h-3.5 w-3.5" />
-              </Button>
-            </TableCell>
+                {c.header}
+              </TableHead>
+            ))}
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {records.map((r, i) => (
+            <TableRow
+              key={`${r.userId}-${r.date}-${i}`}
+              className={cn(
+                "transition-colors border-b border-border [&>td]:py-2 cursor-pointer",
+                i % 2 === 1 && "bg-muted/10",
+                "hover:bg-muted/20",
+              )}
+              onClick={() => onEdit(r)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setContextMenu({ x: e.clientX, y: e.clientY, row: r });
+              }}
+            >
+              {visibleColumns.has("data") && (
+                <TableCell className="tabular-nums px-4 whitespace-nowrap">
+                  {fmtDate(r.date)}
+                  <span className="ml-1 text-xs text-muted-foreground">{fmtWeekday(r.date)}</span>
+                  {r.isPartialDay && (
+                    <span className="ml-1.5 text-xs text-amber-600 dark:text-amber-400">(parcial)</span>
+                  )}
+                </TableCell>
+              )}
+              {visibleColumns.has("colaborador") && (
+                <TableCell className="font-medium px-4 whitespace-nowrap">
+                  {r.userName}
+                </TableCell>
+              )}
+              {visibleColumns.has("faltas") && (
+                <TableCell className="tabular-nums px-4 whitespace-nowrap text-muted-foreground text-sm">
+                  {r.faltas ?? "—"}
+                </TableCell>
+              )}
+              {visibleColumns.has("tipo") && (
+                <TableCell className="px-4">
+                  <TipoPill justificativaId={r.JustificativaId} descricao={r.JustificativaDescricao} />
+                </TableCell>
+              )}
+              {visibleColumns.has("setor") && (
+                <TableCell className="text-muted-foreground px-4 whitespace-nowrap">
+                  {r.sectorName ?? "—"}
+                </TableCell>
+              )}
+              {visibleColumns.has("motivo") && (
+                <TableCell
+                  className="text-muted-foreground px-4 truncate max-w-[260px]"
+                  title={r.Motivo ?? ""}
+                >
+                  {r.Motivo || "—"}
+                </TableCell>
+              )}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      {/* Right-click context menu — anchored at the cursor */}
+      {contextMenu && (
+        <div className="fixed z-50" style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <DropdownMenu open={true} onOpenChange={(o) => !o && setContextMenu(null)}>
+            <DropdownMenuTrigger asChild>
+              <div className="w-0 h-0" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuItem
+                onClick={() => {
+                  onEdit(contextMenu.row);
+                  setContextMenu(null);
+                }}
+              >
+                <IconEdit className="mr-2 h-4 w-4" />
+                Editar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -296,6 +360,11 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
   const [selectedUserId, setSelectedUserId] = useState<string>(ALL_USERS);
   const [filterMode, setFilterMode] = useState<AbsenceFilterMode>("TODOS");
   const [editing, setEditing] = useState<SecullumAggregatedAbsence | null>(null);
+
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility(
+    "absence-overview-visible-columns",
+    new Set(["data", "colaborador", "faltas", "tipo", "setor", "motivo"]),
+  );
 
   const fetchParams = useMemo(
     () => ({
@@ -374,19 +443,41 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
 
   const { period, monthName } = getPayrollPeriodDisplay(selectedMonth);
 
+  // Custom range = the effective dates no longer line up with the selected
+  // month's regular 26th→25th payroll bounds.
+  const isCustomRange = useMemo(() => {
+    const { start: s, end: e } = getPayrollPeriod(selectedMonth);
+    return (
+      startDate.getTime() !== s.getTime() || endDate.getTime() !== e.getTime()
+    );
+  }, [selectedMonth, startDate, endDate]);
+
+  const periodTitle = isCustomRange ? "Período personalizado" : monthName;
+  const periodSubtitle = isCustomRange
+    ? `${format(startDate, "dd/MM/yyyy", { locale: ptBR })} a ${format(endDate, "dd/MM/yyyy", { locale: ptBR })}`
+    : period;
+
+  const filterLabel = useMemo(
+    () => ABSENCE_FILTER_OPTIONS.find((o) => o.value === filterMode)?.label,
+    [filterMode],
+  );
+  const exportRows = useMemo(
+    () => filteredAbsences.map(toAbsenceExportRow),
+    [filteredAbsences],
+  );
+
   // Push filtered data up to the parent so the page-header export button
   // can mirror what the user sees on screen.
   useEffect(() => {
     if (!onExportDataChange) return;
-    const filterOpt = ABSENCE_FILTER_OPTIONS.find((o) => o.value === filterMode);
     onExportDataChange({
-      rows: filteredAbsences.map(toAbsenceExportRow),
+      rows: exportRows,
       startDate,
       endDate,
-      filterLabel: filterOpt?.label,
+      filterLabel,
     });
     return () => onExportDataChange(null);
-  }, [filteredAbsences, startDate, endDate, filterMode, onExportDataChange]);
+  }, [exportRows, startDate, endDate, filterLabel, onExportDataChange]);
 
   return (
     <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
@@ -417,59 +508,32 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
             clearable={false}
           />
 
-          {/* Right: period navigator + date range */}
+          {/* Right: period control + column visibility + export */}
           <div className="flex items-center gap-2 ml-auto">
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-10 w-10"
-                onClick={() => handleMonthChange(subMonths(selectedMonth, 1))}
-              >
-                <IconChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex flex-col items-center px-2">
-                <div className="flex items-center gap-1 text-sm font-medium">
-                  <IconCalendar className="h-4 w-4" />
-                  <span className="capitalize">{monthName}</span>
-                </div>
-                <div className="text-xs text-muted-foreground">Período: {period}</div>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-10 w-10"
-                onClick={() => handleMonthChange(addMonths(selectedMonth, 1))}
-              >
-                <IconChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <DateTimeInput
-                mode="date"
-                value={startDate}
-                onChange={(d) => {
-                  if (d instanceof Date) setStartDate(d);
-                }}
-                className="w-[140px]"
-                placeholder="Data inicial"
-                showClearButton={true}
-              />
-              <span className="text-muted-foreground text-sm px-1">até</span>
-              <DateTimeInput
-                mode="date"
-                value={endDate}
-                onChange={(d) => {
-                  if (d instanceof Date) setEndDate(d);
-                }}
-                className="w-[140px]"
-                placeholder="Data final"
-                showClearButton={true}
-              />
-            </div>
+            <PeriodControl
+              variant="range"
+              title={periodTitle}
+              subtitle={periodSubtitle}
+              startDate={startDate}
+              endDate={endDate}
+              onRangeChange={(s, e) => {
+                if (s) setStartDate(s);
+                if (e) setEndDate(e);
+              }}
+              onPrev={() => handleMonthChange(subMonths(selectedMonth, 1))}
+              onNext={() => handleMonthChange(addMonths(selectedMonth, 1))}
+            />
+            <ColumnVisibilityManager
+              columns={ABSENCE_COLUMNS}
+              visibleColumns={visibleColumns}
+              onVisibilityChange={setVisibleColumns}
+            />
+            <TimeClockAbsenceExport
+              currentItems={exportRows}
+              startDate={startDate}
+              endDate={endDate}
+              filterLabel={filterLabel}
+            />
           </div>
         </div>
 
@@ -479,6 +543,7 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
             records={filteredAbsences}
             isLoading={absenceDaysLoading}
             onEdit={(r) => setEditing(rowToAggregated(r))}
+            visibleColumns={visibleColumns}
           />
         </div>
       </CardContent>

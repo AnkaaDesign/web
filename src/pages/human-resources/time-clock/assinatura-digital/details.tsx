@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { AssinaturaDetail } from "@/components/human-resources/time-clock/assinatura-digital/assinatura-detail";
+import { AssinaturaDownloadButton } from "@/components/human-resources/time-clock/assinatura-digital/assinatura-download-button";
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -27,11 +28,14 @@ export default function AssinaturaDigitalDetailsPage() {
             { label: "Recursos Humanos", href: routes.humanResources.root },
             { label: "Controle de Ponto", href: routes.humanResources.timeClock.list },
             {
-              label: "Assinatura Digital",
-              href: routes.humanResources.timeClock.assinaturaDigital.list,
+              label: "Fechamento",
+              href: routes.humanResources.timeClock.fechamento.list,
             },
             { label: apuracaoId ? `#${apuracaoId}` : "—" },
           ]}
+          headerExtra={
+            apuracaoId ? <AssinaturaDownloadButton apuracaoIds={[apuracaoId]} /> : undefined
+          }
           className="flex-shrink-0"
         />
         <div className="flex-1 min-h-0 pb-6 overflow-auto">
