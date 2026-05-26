@@ -22,6 +22,8 @@ import type { PaintFormula } from "../../../types";
 import { formatCurrency } from "../../../utils";
 import { measureUtils } from "../../../utils";
 import { MEASURE_UNIT } from "../../../constants";
+import { useCanViewPrices } from "../../../hooks";
+import { cn } from "@/lib/utils";
 
 interface ProductionCalculatorProps {
   formula: PaintFormula;
@@ -55,6 +57,7 @@ interface ComponentRequirement {
 }
 
 export function ProductionCalculator({ formula, onStartProduction }: ProductionCalculatorProps) {
+  const canViewPrices = useCanViewPrices();
   const [targetWeight, setTargetWeight] = useState<number>(1000); // Default 1kg
   const [targetWeightUnit, setTargetWeightUnit] = useState<MEASURE_UNIT>(MEASURE_UNIT.GRAM);
   const [productionMode, setProductionMode] = useState<"weight" | "volume">("weight");
@@ -333,13 +336,15 @@ export function ProductionCalculator({ formula, onStartProduction }: ProductionC
                       </div>
 
                       {/* Cost */}
-                      <div>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <IconCurrencyDollar className="h-3 w-3" />
-                          <span>Custo:</span>
+                      {canViewPrices && (
+                        <div>
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <IconCurrencyDollar className="h-3 w-3" />
+                            <span>Custo:</span>
+                          </div>
+                          <Badge variant="outline">{formatCurrency(req.totalCost)}</Badge>
                         </div>
-                        <Badge variant="outline">{formatCurrency(req.totalCost)}</Badge>
-                      </div>
+                      )}
                     </div>
 
                     <div className="mt-2 text-xs text-muted-foreground">
@@ -364,7 +369,7 @@ export function ProductionCalculator({ formula, onStartProduction }: ProductionC
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className={cn("grid grid-cols-1 gap-4", canViewPrices ? "md:grid-cols-4" : "md:grid-cols-2")}>
             <div className="text-center p-3 bg-muted rounded-lg">
               <div className="text-sm text-muted-foreground">Peso Total</div>
               <div className="text-xl font-bold">
@@ -380,15 +385,19 @@ export function ProductionCalculator({ formula, onStartProduction }: ProductionC
               <div className="text-xl font-bold">{productionPlan.estimatedVolume.toFixed(2)} L</div>
             </div>
 
-            <div className="text-center p-3 bg-muted rounded-lg">
-              <div className="text-sm text-muted-foreground">Custo Total</div>
-              <div className="text-xl font-bold">{formatCurrency(productionPlan.totalCost)}</div>
-            </div>
+            {canViewPrices && (
+              <div className="text-center p-3 bg-muted rounded-lg">
+                <div className="text-sm text-muted-foreground">Custo Total</div>
+                <div className="text-xl font-bold">{formatCurrency(productionPlan.totalCost)}</div>
+              </div>
+            )}
 
-            <div className="text-center p-3 bg-muted rounded-lg">
-              <div className="text-sm text-muted-foreground">Custo por Litro</div>
-              <div className="text-xl font-bold">{formatCurrency(costPerLiter)}</div>
-            </div>
+            {canViewPrices && (
+              <div className="text-center p-3 bg-muted rounded-lg">
+                <div className="text-sm text-muted-foreground">Custo por Litro</div>
+                <div className="text-xl font-bold">{formatCurrency(costPerLiter)}</div>
+              </div>
+            )}
           </div>
 
           <Separator className="my-4" />

@@ -63,6 +63,11 @@ type CampaignFormProps = (CreateModeProps | UpdateModeProps) & {
 export function CampaignForm(props: CampaignFormProps) {
   const formId = props.formId ?? "campaign-form";
 
+  // OPEN campaigns already spawned AssessmentEntry rows tied to their sectors /
+  // topics, so those are locked — only nome / descrição / período stay editable.
+  const restricted =
+    props.mode === "update" && props.assessment.status === ASSESSMENT_STATUS.OPEN;
+
   const baseValues =
     props.mode === "create"
       ? {
@@ -253,30 +258,32 @@ export function CampaignForm(props: CampaignFormProps) {
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <FormControl>
-                    <Combobox
-                      value={field.value ?? ASSESSMENT_STATUS.DRAFT}
-                      onValueChange={(v) => field.onChange(v as string)}
-                      options={STATUS_OPTIONS}
-                      searchable={false}
-                      clearable={false}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    "Aberta" libera a coleta para os líderes assim que a campanha for salva.
-                    Para fechar ou cancelar, use as ações na página de detalhes.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!restricted && (
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <FormControl>
+                      <Combobox
+                        value={field.value ?? ASSESSMENT_STATUS.DRAFT}
+                        onValueChange={(v) => field.onChange(v as string)}
+                        options={STATUS_OPTIONS}
+                        searchable={false}
+                        clearable={false}
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      "Aberta" libera a coleta para os líderes assim que a campanha for salva.
+                      Para fechar ou cancelar, use as ações na página de detalhes.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -288,6 +295,12 @@ export function CampaignForm(props: CampaignFormProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {restricted && (
+              <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                A campanha já está aberta. Setores e tópicos ficam bloqueados para não invalidar
+                as avaliações em andamento — altere apenas nome, descrição e período.
+              </div>
+            )}
             <FormItem>
               <FormLabel>
                 Setores <span className="text-destructive">*</span>
@@ -296,7 +309,7 @@ export function CampaignForm(props: CampaignFormProps) {
                 <SectorMultiSelect
                   value={selectedSectorIds}
                   onChange={handleSectorPickerChange}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || restricted}
                 />
               </FormControl>
               <FormDescription>
@@ -320,10 +333,14 @@ export function CampaignForm(props: CampaignFormProps) {
                       key={field._key as string}
                       index={idx}
                       sectorId={cfg.sectorId}
-                      disabled={isSubmitting}
-                      onRemove={() => {
-                        sectorFieldArray.remove(idx);
-                      }}
+                      disabled={isSubmitting || restricted}
+                      onRemove={
+                        restricted
+                          ? undefined
+                          : () => {
+                              sectorFieldArray.remove(idx);
+                            }
+                      }
                     />
                   );
                 })}
@@ -340,7 +357,7 @@ export function CampaignForm(props: CampaignFormProps) {
                     <TopicMultiSelect
                       value={field.value ?? []}
                       onChange={field.onChange}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || restricted}
                     />
                   </FormControl>
                   <FormDescription>

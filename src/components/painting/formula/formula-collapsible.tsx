@@ -5,6 +5,7 @@ import { IconChevronDown, IconCurrencyReal, IconDroplet, IconFlask } from "@tabl
 import { formatCurrency, formatNumberWithDecimals } from "../../../utils";
 import { cn } from "@/lib/utils";
 import type { PaintFormula } from "../../../types";
+import { useCanViewPrices } from "../../../hooks";
 
 interface FormulaCollapsibleProps {
   formula: PaintFormula;
@@ -14,6 +15,7 @@ interface FormulaCollapsibleProps {
 }
 
 export function FormulaCollapsible({ formula, isOpen = false, onOpenChange, className }: FormulaCollapsibleProps) {
+  const canViewPrices = useCanViewPrices();
   const hasComponents = formula.components && formula.components.length > 0;
   const componentsCount = formula.components?.length || 0;
   const totalRatio = formula.components?.reduce((sum, comp) => sum + (comp.ratio || 0), 0) || 0;
@@ -32,7 +34,7 @@ export function FormulaCollapsible({ formula, isOpen = false, onOpenChange, clas
                     {componentsCount} {componentsCount === 1 ? "componente" : "componentes"}
                   </Badge>
                 )}
-                {formula.pricePerLiter && Number(formula.pricePerLiter) > 0 && (
+                {canViewPrices && formula.pricePerLiter && Number(formula.pricePerLiter) > 0 && (
                   <Badge variant="outline" className="text-xs">
                     {formatCurrency(Number(formula.pricePerLiter))}/L
                   </Badge>
@@ -87,7 +89,7 @@ export function FormulaCollapsible({ formula, isOpen = false, onOpenChange, clas
           )}
 
           {/* Formula Properties */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className={cn("grid gap-4", canViewPrices ? "grid-cols-2" : "grid-cols-1")}>
             {/* Density */}
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
               <IconDroplet className="h-4 w-4 text-muted-foreground" />
@@ -98,13 +100,15 @@ export function FormulaCollapsible({ formula, isOpen = false, onOpenChange, clas
             </div>
 
             {/* Price per Liter */}
-            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-              <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Preço por Litro</p>
-                <p className="font-medium">{formula.pricePerLiter && Number(formula.pricePerLiter) > 0 ? formatCurrency(Number(formula.pricePerLiter)) : "-"}</p>
+            {canViewPrices && (
+              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Preço por Litro</p>
+                  <p className="font-medium">{formula.pricePerLiter && Number(formula.pricePerLiter) > 0 ? formatCurrency(Number(formula.pricePerLiter)) : "-"}</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Warning if no components */}

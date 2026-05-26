@@ -13,8 +13,9 @@ interface Column {
   header: string;
 }
 
-export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["uniCode", "name", "brand.name", "category.name", "neededQuantity", "quantity", "price", "subtotal"]);
+export function getDefaultVisibleColumns(canViewPrices: boolean = true): Set<string> {
+  const base = ["uniCode", "name", "brand.name", "category.name", "neededQuantity", "quantity", "price", "subtotal"];
+  return new Set(base.filter((key) => canViewPrices || (key !== "price" && key !== "subtotal")));
 }
 
 interface ColumnVisibilityManagerProps {

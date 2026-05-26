@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import {
   IconCalendar,
   IconCheck,
@@ -12,11 +12,12 @@ import { z } from "zod";
 
 import type { User } from "../../../../types";
 import { userService } from "../../../../api-client";
-import { useCreateAssinaturaForUsers } from "../../../../hooks";
+import { useCreateAssinaturaWithProgress } from "../../../../hooks";
 
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,20 @@ import {
 } from "@/components/ui/form";
 
 const ALL_OPTION_ID = "__ALL__";
+
+// Start of the cartão-ponto cycle: the 26th of the month before `ref`.
+// Mirrors the server's normalization — the apuração period must align to the
+// account's cutoff day (the 26th), otherwise Secullum's SalvarAsync fails with
+// a DbUpdateException. The server is authoritative; this just keeps the
+// displayed period honest.
+function cartaoPontoStart(ref: Date): Date {
+  const d = new Date(ref);
+  d.setDate(1); // avoid month-overflow when stepping back
+  d.setMonth(d.getMonth() - 1);
+  d.setDate(26);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
 const schema = z
   .object({
@@ -70,14 +85,15 @@ interface AssinaturaCreateModalProps {
 }
 
 export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateModalProps) {
-  const createMut = useCreateAssinaturaForUsers();
-  const [results, setResults] = useState<ResultRow[] | null>(null);
+  const gen = useCreateAssinaturaWithProgress();
+  const isRunning = gen.status === "running";
+  const results = (gen.result?.data?.results ?? null) as ResultRow[] | null;
 
   const defaultPeriod = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return {
-      startDate: subDays(today, 4),
+      startDate: cartaoPontoStart(today),
       endDate: today,
     };
   }, []);
@@ -91,15 +107,15 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
     },
   });
 
-  // Reset form + results whenever the modal is reopened.
+  // Reset form + progress whenever the modal is reopened.
   useEffect(() => {
     if (open) {
-      setResults(null);
+      gen.reset();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       form.reset({
         userIds: [],
-        startDate: subDays(today, 4),
+        startDate: cartaoPontoStart(today),
         endDate: today,
       });
     }
@@ -170,7 +186,6 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
   );
 
   const onSubmit = async (raw: FormInput) => {
-    setResults(null);
     const startDate =
       raw.startDate instanceof Date ? raw.startDate : new Date(raw.startDate);
     const endDate =
@@ -178,25 +193,20 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
 
     const userIds = raw.userIds ?? [];
     const sendAll = userIds.includes(ALL_OPTION_ID);
-    try {
-      const response = await createMut.mutateAsync({
-        ...(sendAll ? { applyToAll: true } : { userIds }),
-        DataInicio: format(startDate, "yyyy-MM-dd"),
-        DataFim: format(endDate, "yyyy-MM-dd"),
-      });
-      const r = response.data?.data;
-      if (r?.results?.length) setResults(r.results);
-      // If everything succeeded, close the modal so the user sees the new batches in the list.
-      if (r && r.failed === 0 && (r.created ?? 0) > 0) {
-        onOpenChange(false);
-      }
-    } catch {
-      // Toast is shown by the mutation's onError; nothing else to do here.
-    }
+    // Fire-and-track: the hook starts the job and polls progress. We keep the
+    // modal open so the user watches the "X de N" bar; results render below.
+    await gen.start({
+      ...(sendAll ? { applyToAll: true } : { userIds }),
+      DataInicio: format(startDate, "yyyy-MM-dd"),
+      DataFim: format(endDate, "yyyy-MM-dd"),
+    });
   };
 
+  const progressPct =
+    gen.total > 0 ? Math.min(100, Math.round((gen.atual / gen.total) * 100)) : null;
+
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!createMut.isPending) onOpenChange(o); }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!isRunning) onOpenChange(o); }}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Nova Apuração para Assinatura</DialogTitle>
@@ -304,6 +314,23 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
               />
             </div>
 
+            {isRunning && (
+              <div className="rounded-lg border border-border p-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{gen.phase || "Gerando apuração..."}</span>
+                  {gen.total > 0 && (
+                    <span className="text-muted-foreground tabular-nums">
+                      {gen.atual} de {gen.total}
+                    </span>
+                  )}
+                </div>
+                <Progress value={progressPct ?? 0} className={progressPct === null ? "animate-pulse" : undefined} />
+                <p className="text-xs text-muted-foreground">
+                  Gerando a assinatura no Secullum. Não feche esta janela.
+                </p>
+              </div>
+            )}
+
             {results && results.length > 0 && (
               <div className="rounded-lg border border-border">
                 <div className="px-4 py-2 border-b border-border bg-muted/40 text-sm font-medium">
@@ -311,23 +338,20 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
                 </div>
                 <ul className="divide-y divide-border max-h-48 overflow-auto">
                   {results.map((r) => (
-                    <li
-                      key={r.userId}
-                      className="flex items-center justify-between px-4 py-2 text-sm"
-                    >
+                    <li key={r.userId} className="px-4 py-2 text-sm">
                       <div className="flex items-center gap-2 min-w-0">
                         {r.ok ? (
                           <IconCheck className="h-4 w-4 text-emerald-500 flex-shrink-0" />
                         ) : (
                           <IconCircleX className="h-4 w-4 text-destructive flex-shrink-0" />
                         )}
-                        <span className="truncate">{r.userName}</span>
+                        <span className="truncate font-medium">{r.userName}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground ml-3 truncate">
+                      <span className="mt-0.5 block pl-6 text-xs text-muted-foreground break-words [overflow-wrap:anywhere]">
                         {r.ok
                           ? r.apuracaoId
                             ? `Apuração #${r.apuracaoId}`
-                            : "OK"
+                            : "Criado com sucesso"
                           : (r.error ?? "Falhou")}
                       </span>
                     </li>
@@ -341,13 +365,13 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={createMut.isPending}
+                disabled={isRunning}
               >
-                Cancelar
+                {gen.status === "done" || gen.status === "error" ? "Fechar" : "Cancelar"}
               </Button>
-              <Button type="submit" disabled={createMut.isPending}>
-                {createMut.isPending
-                  ? "Enviando..."
+              <Button type="submit" disabled={isRunning}>
+                {isRunning
+                  ? "Gerando..."
                   : isCollective
                     ? "Enviar para todos"
                     : "Enviar para selecionados"}

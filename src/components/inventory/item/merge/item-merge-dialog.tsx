@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconArrowRight, IconCheck, IconLoader2, IconInfoCircle } from "@tabler/icons-react";
 import type { Item } from "../../../../types";
 import { formatCurrency } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 
 interface ConflictField {
   field: string;
@@ -34,6 +35,7 @@ interface ItemMergeDialogProps {
 }
 
 export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMergeDialogProps) {
+  const canViewPrices = useCanViewPrices();
   const [targetItemId, setTargetItemId] = useState<string>("");
   const [resolutions, setResolutions] = useState<Map<string, MergeResolution>>(new Map());
   const [customValues, setCustomValues] = useState<Map<string, string>>(new Map());
@@ -44,6 +46,7 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
     if (items.length < 2) return [];
 
     const conflictFields: ConflictField[] = [];
+    const priceFields = new Set(["icms", "ipi", "totalPrice"]);
     const fieldsToCheck = [
       { field: "name", label: "Nome", type: "single" as const },
       { field: "uniCode", label: "Código Único", type: "single" as const },
@@ -63,7 +66,7 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
       { field: "brandId", label: "Marca", type: "single" as const },
       { field: "categoryId", label: "Categoria", type: "single" as const },
       { field: "supplierId", label: "Fornecedor", type: "single" as const },
-    ];
+    ].filter((f) => canViewPrices || !priceFields.has(f.field));
 
     for (const { field, label, type } of fieldsToCheck) {
       const values = items
@@ -118,7 +121,7 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
     }
 
     return conflictFields;
-  }, [items]);
+  }, [items, canViewPrices]);
 
   // Auto-select first item as target if not set
   useMemo(() => {
@@ -473,10 +476,12 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
                     <Label className="text-muted-foreground">Quantidade</Label>
                     <p className="font-medium">{mergedPreview.quantity}</p>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">Preço Total</Label>
-                    <p className="font-medium">{mergedPreview.totalPrice !== null && mergedPreview.totalPrice !== undefined ? formatCurrency(mergedPreview.totalPrice) : "N/A"}</p>
-                  </div>
+                  {canViewPrices && (
+                    <div>
+                      <Label className="text-muted-foreground">Preço Total</Label>
+                      <p className="font-medium">{mergedPreview.totalPrice !== null && mergedPreview.totalPrice !== undefined ? formatCurrency(mergedPreview.totalPrice) : "N/A"}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

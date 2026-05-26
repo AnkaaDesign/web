@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { usePriceHistory } from "../../../../hooks";
+import { usePriceHistory, useCanViewPrices } from "../../../../hooks";
 import { IconCurrencyReal, IconLoader, IconHistory, IconArrowUp, IconArrowDown, IconMinus } from "@tabler/icons-react";
 import { formatDate, formatCurrency } from "../../../../utils";
 import type { Price } from "../../../../types";
@@ -15,9 +15,15 @@ interface PriceHistoryCardProps {
 }
 
 export function PriceHistoryCard({ itemId, itemName, limit = 10, showViewMore = true, onViewMore }: PriceHistoryCardProps) {
+  const canViewPrices = useCanViewPrices();
   const { data: historyResponse, isLoading, error } = usePriceHistory(itemId, limit);
 
   const prices = historyResponse?.data || [];
+
+  // Warehouse users must not see any monetary information
+  if (!canViewPrices) {
+    return null;
+  }
 
   const getPriceChangeIcon = (currentPrice: number, previousPrice: number) => {
     if (currentPrice > previousPrice) {

@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useExternalWithdrawals, useExternalWithdrawalMutations, useExternalWithdrawalStatusMutations } from "../../../../hooks";
+import { useExternalWithdrawals, useExternalWithdrawalMutations, useExternalWithdrawalStatusMutations, useCanViewPrices } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { ExternalWithdrawalGetManyFormData } from "../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -52,7 +52,8 @@ interface ExternalWithdrawalColumn {
   align?: "left" | "center" | "right";
 }
 
-const createExternalWithdrawalColumns = (): ExternalWithdrawalColumn[] => [
+const createExternalWithdrawalColumns = (canViewPrices: boolean = true): ExternalWithdrawalColumn[] => {
+  const columns: ExternalWithdrawalColumn[] = [
   {
     key: "withdrawerName",
     header: "RETIRADO POR",
@@ -193,18 +194,22 @@ const createExternalWithdrawalColumns = (): ExternalWithdrawalColumn[] => [
     sortable: true,
     className: "w-44",
   },
-];
+  ];
+  return columns.filter((column) => canViewPrices || column.key !== "total");
+};
 
-export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["withdrawerName", "status", "type", "total", "createdAt"]);
+export function getDefaultVisibleColumns(canViewPrices: boolean = true): Set<string> {
+  const base = ["withdrawerName", "status", "type", "total", "createdAt"];
+  return new Set(base.filter((key) => canViewPrices || key !== "total"));
 }
 
-export function getAllColumns(): ExternalWithdrawalColumn[] {
-  return createExternalWithdrawalColumns();
+export function getAllColumns(canViewPrices: boolean = true): ExternalWithdrawalColumn[] {
+  return createExternalWithdrawalColumns(canViewPrices);
 }
 
 export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _onEdit, onDelete: _onDelete, filters = {}, onDataChange }: ExternalWithdrawalTableProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const { delete: deleteWithdrawal } = useExternalWithdrawalMutations();
   const { markAsFullyReturned, markAsCharged, markAsLiquidated, markAsDelivered } = useExternalWithdrawalStatusMutations();
 
@@ -323,7 +328,7 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
   }, [withdrawals, totalRecords, onDataChange]);
 
   // Get columns
-  const columns = React.useMemo(() => createExternalWithdrawalColumns(), []);
+  const columns = React.useMemo(() => createExternalWithdrawalColumns(canViewPrices), [canViewPrices]);
   const filteredColumns = React.useMemo(() => columns.filter((col) => visibleColumns.has(col.key)), [columns, visibleColumns]);
 
   // Handle selection

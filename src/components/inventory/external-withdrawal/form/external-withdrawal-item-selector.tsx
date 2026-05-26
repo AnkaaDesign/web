@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { IconSearch, IconFilter, IconChevronUp, IconChevronDown, IconRefresh, IconSelector } from "@tabler/icons-react";
-import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
+import { useItems, useItemCategories, useItemBrands, useSuppliers, useCanViewPrices } from "../../../../hooks";
 import type { Item, ItemCategory, ItemBrand, Supplier } from "../../../../types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,7 +73,7 @@ export const ExternalWithdrawalItemSelector = ({
   prices = {},
   isSelected = (itemId: string) => selectedItems.has(itemId),
   showQuantityInput = true,
-  showPriceInput = false,
+  showPriceInput: showPriceInputProp = false,
   // URL state props with defaults
   showSelectedOnly: showSelectedOnlyProp = false,
   searchTerm: searchTermProp = "",
@@ -96,6 +96,10 @@ export const ExternalWithdrawalItemSelector = ({
   onPageSizeChange,
   onTotalRecordsChange,
 }: ExternalWithdrawalItemSelectorProps) => {
+  // Warehouse users cannot see or edit any monetary values
+  const canViewPrices = useCanViewPrices();
+  const showPriceInput = showPriceInputProp && canViewPrices;
+
   // Use direct filter update for immediate, atomic URL updates
   const { updateFilters: directUpdateFilters } = useDirectFilterUpdate();
 
@@ -627,15 +631,17 @@ export const ExternalWithdrawalItemSelector = ({
                     {renderSortIndicator("quantity")}
                   </button>
                 </TableHead>
-                <TableHead className="w-24 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
-                  <button
-                    onClick={() => toggleSort("prices.value")}
-                    className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
-                  >
-                    <TruncatedTextWithTooltip text="PREÇO" />
-                    {renderSortIndicator("prices.value")}
-                  </button>
-                </TableHead>
+                {canViewPrices && (
+                  <TableHead className="w-24 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                    <button
+                      onClick={() => toggleSort("prices.value")}
+                      className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
+                    >
+                      <TruncatedTextWithTooltip text="PREÇO" />
+                      {renderSortIndicator("prices.value")}
+                    </button>
+                  </TableHead>
+                )}
                 {showQuantityInput && (
                   <TableHead className="w-32 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
@@ -754,13 +760,15 @@ export const ExternalWithdrawalItemSelector = ({
                           <span className="font-medium tabular-nums">{item.quantity}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="w-24 p-0 !border-r-0">
-                        <div className="px-4 py-1">
-                          <span className="font-medium tabular-nums">
-                            {item.prices?.[0]?.value ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(item.prices[0].value) : "-"}
-                          </span>
-                        </div>
-                      </TableCell>
+                      {canViewPrices && (
+                        <TableCell className="w-24 p-0 !border-r-0">
+                          <div className="px-4 py-1">
+                            <span className="font-medium tabular-nums">
+                              {item.prices?.[0]?.value ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(item.prices[0].value) : "-"}
+                            </span>
+                          </div>
+                        </TableCell>
+                      )}
                       {showQuantityInput && (
                         <TableCell className="w-32 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
                           <div className="px-4 py-1">

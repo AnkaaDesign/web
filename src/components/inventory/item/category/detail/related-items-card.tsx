@@ -11,6 +11,7 @@ import { STOCK_LEVEL_LABELS, ORDER_STATUS, STOCK_LEVEL } from "../../../../../co
 import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "react-router-dom";
 import { routes } from "../../../../../constants";
+import { useCanViewPrices } from "../../../../../hooks";
 
 interface RelatedItemsCardProps {
   category?: ItemCategory;
@@ -20,6 +21,7 @@ interface RelatedItemsCardProps {
 
 export function RelatedItemsCard({ category, className, maxHeight }: RelatedItemsCardProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const items = category?.items || [];
 
   // Sort items by quantity (low stock first) and name
@@ -123,7 +125,7 @@ export function RelatedItemsCard({ category, className, maxHeight }: RelatedItem
 
       <CardContent className="pt-0 flex-grow flex flex-col min-h-0">
         {/* Statistics Summary */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className={cn("grid gap-3 mb-6", canViewPrices ? "grid-cols-3" : "grid-cols-2")}>
           <div className="bg-card-nested rounded-lg p-3 border border-border">
             <span className="text-xs font-medium text-muted-foreground block">Total de Produtos</span>
             <p className="text-xl font-bold mt-1">{statistics.totalItems}</p>
@@ -134,10 +136,12 @@ export function RelatedItemsCard({ category, className, maxHeight }: RelatedItem
             <p className="text-xl font-bold mt-1 text-green-800 dark:text-green-200">{statistics.activeItems}</p>
           </div>
 
-          <div className="bg-blue-50/80 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200/40 dark:border-blue-700/40">
-            <span className="text-xs font-medium text-blue-800 dark:text-blue-200 block">Valor Total</span>
-            <p className="text-xl font-bold mt-1 text-blue-800 dark:text-blue-200">{formatCurrency(statistics.totalValue)}</p>
-          </div>
+          {canViewPrices && (
+            <div className="bg-blue-50/80 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200/40 dark:border-blue-700/40">
+              <span className="text-xs font-medium text-blue-800 dark:text-blue-200 block">Valor Total</span>
+              <p className="text-xl font-bold mt-1 text-blue-800 dark:text-blue-200">{formatCurrency(statistics.totalValue)}</p>
+            </div>
+          )}
         </div>
 
         {/* Stock Level Summary */}
@@ -216,7 +220,7 @@ export function RelatedItemsCard({ category, className, maxHeight }: RelatedItem
                             <span className="font-medium tabular-nums text-sm">{quantity.toLocaleString("pt-BR")} un</span>
                           </div>
 
-                          {item.totalPrice && item.totalPrice > 0 && <p className="text-xs text-muted-foreground font-medium">{formatCurrency(item.totalPrice)}</p>}
+                          {canViewPrices && item.totalPrice && item.totalPrice > 0 && <p className="text-xs text-muted-foreground font-medium">{formatCurrency(item.totalPrice)}</p>}
                         </div>
                       </div>
                     </div>

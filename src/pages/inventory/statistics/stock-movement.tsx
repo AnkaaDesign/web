@@ -38,6 +38,7 @@ import {
 } from '@/types/statistics-common';
 import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
+import { useCanViewPrices } from '@/hooks';
 import { toast } from '@/components/ui/sonner';
 import {
   IconChartBar, IconChartLine, IconChartArea, IconStack2,
@@ -180,10 +181,11 @@ interface FilterSheetProps {
   selectedYears: string[];
   selectedMonths: string[];
   onApply: (filters: StockMovementFilters, years: string[], months: string[]) => void;
+  canViewPrices: boolean;
 }
 
 function FilterSheet({
-  open, onOpenChange, filters, selectedYears, selectedMonths, onApply,
+  open, onOpenChange, filters, selectedYears, selectedMonths, onApply, canViewPrices,
 }: FilterSheetProps) {
   const [localX, setLocalX] = useState<StockMovementXAxisMode>(filters.xAxisMode);
   const [localY, setLocalY] = useState<StockMovementYAxisMode>(filters.yAxisMode);
@@ -260,7 +262,7 @@ function FilterSheet({
               <Combobox
                 value={localY}
                 onValueChange={v => setLocalY(v as StockMovementYAxisMode)}
-                options={Y_AXIS_OPTIONS}
+                options={canViewPrices ? Y_AXIS_OPTIONS : Y_AXIS_OPTIONS.filter(o => o.value !== 'value')}
                 placeholder="Selecione..."
                 searchable={false}
                 clearable={false}
@@ -331,6 +333,8 @@ function FilterSheet({
 const StockMovementPage = () => {
   usePageTracker({ page: 'inventory-stock-movement-statistics', title: 'Movimentação de Estoque' });
 
+  const canViewPrices = useCanViewPrices();
+
   const [showFilters, setShowFilters] = useState(false);
   const [chartType, setChartType] = useState<StockMovementChartType>('bar-stacked');
   const [trendLine, setTrendLine] = useState<TrendLineType | null>(null);
@@ -345,7 +349,8 @@ const StockMovementPage = () => {
   const { data, isLoading, isError, error, refetch } = useStockMovementAnalytics(filters);
   const items = data?.data?.items ?? [];
   const summary = data?.data?.summary;
-  const isValue = filters.yAxisMode === 'value';
+  // Warehouse users never see monetary value mode
+  const isValue = filters.yAxisMode === 'value' && canViewPrices;
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
@@ -397,10 +402,10 @@ const StockMovementPage = () => {
   const handleExportCSV = useCallback(() => {
     if (!items.length) { toast.error('Nenhum dado para exportar'); return; }
     try {
-      const headers = ['Período', 'Entradas (qtd)', 'Saídas (qtd)', 'Saldo', 'Itens Movimentados', 'Entradas (R$)', 'Saídas (R$)'];
+      const headers = ['Período', 'Entradas (qtd)', 'Saídas (qtd)', 'Saldo', 'Itens Movimentados', ...(canViewPrices ? ['Entradas (R$)', 'Saídas (R$)'] : [])];
       const rows = items.map(i => [
         i.periodLabel, i.inbound, i.outbound, i.balance, i.itemsMoved,
-        i.inboundValue.toFixed(2), i.outboundValue.toFixed(2),
+        ...(canViewPrices ? [i.inboundValue.toFixed(2), i.outboundValue.toFixed(2)] : []),
       ]);
       const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -412,15 +417,15 @@ const StockMovementPage = () => {
     } catch {
       toast.error('Erro ao exportar CSV');
     }
-  }, [items]);
+  }, [items, canViewPrices]);
 
   const handleExportXLSX = useCallback(() => {
     if (!items.length) { toast.error('Nenhum dado para exportar'); return; }
     try {
-      const headers = ['Período', 'Entradas (qtd)', 'Saídas (qtd)', 'Saldo', 'Itens Movimentados', 'Entradas (R$)', 'Saídas (R$)'];
+      const headers = ['Período', 'Entradas (qtd)', 'Saídas (qtd)', 'Saldo', 'Itens Movimentados', ...(canViewPrices ? ['Entradas (R$)', 'Saídas (R$)'] : [])];
       const rows = items.map(i => [
         i.periodLabel, i.inbound, i.outbound, i.balance, i.itemsMoved,
-        i.inboundValue, i.outboundValue,
+        ...(canViewPrices ? [i.inboundValue, i.outboundValue] : []),
       ]);
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
       ws['!cols'] = headers.map((_, idx) => ({ wch: idx === 0 ? 22 : 16 }));
@@ -431,7 +436,7 @@ const StockMovementPage = () => {
     } catch {
       toast.error('Erro ao exportar XLSX');
     }
-  }, [items]);
+  }, [items, canViewPrices]);
 
   // -------- Render --------
 
@@ -715,6 +720,7 @@ const StockMovementPage = () => {
           selectedYears={selectedYears}
           selectedMonths={selectedMonths}
           onApply={handleFilterApply}
+          canViewPrices={canViewPrices}
         />
       </div>
     </PrivilegeRoute>

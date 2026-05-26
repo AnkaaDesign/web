@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Item, BatchOperationResult } from "../../../../types";
 import { itemUpdateSchema } from "../../../../schemas";
-import { useItemBatchMutations } from "../../../../hooks";
+import { useItemBatchMutations, useCanViewPrices } from "../../../../hooks";
 import { BatchOperationResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -44,6 +44,7 @@ interface ItemBatchEditTableProps {
 
 export function ItemBatchEditTable({ items, onCancel: _onCancel, onSubmit: _onSubmit }: ItemBatchEditTableProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState<BatchOperationResult<Item, Item> | null>(null);
   const [showResultDialog, setShowResultDialog] = useState(false);
@@ -191,11 +192,13 @@ export function ItemBatchEditTable({ items, onCancel: _onCancel, onSubmit: _onSu
                       <span className="truncate">Status</span>
                     </div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-44">
-                    <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                      <span className="truncate">Preço</span>
-                    </div>
-                  </TableHead>
+                  {canViewPrices && (
+                    <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-44">
+                      <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
+                        <span className="truncate">Preço</span>
+                      </div>
+                    </TableHead>
+                  )}
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-32">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
                       <span className="truncate">Quantidade</span>
@@ -253,11 +256,13 @@ export function ItemBatchEditTable({ items, onCancel: _onCancel, onSubmit: _onSu
                           <StatusCell control={form.control} index={index} />
                         </div>
                       </TableCell>
-                      <TableCell className="w-44 p-0 !border-r-0">
-                        <div className="px-4 py-2">
-                          <PriceCell control={form.control} index={index} />
-                        </div>
-                      </TableCell>
+                      {canViewPrices && (
+                        <TableCell className="w-44 p-0 !border-r-0">
+                          <div className="px-4 py-2">
+                            <PriceCell control={form.control} index={index} />
+                          </div>
+                        </TableCell>
+                      )}
                       <TableCell className="w-32 p-0 !border-r-0">
                         <div className="px-4 py-2">
                           <QuantityCell control={form.control} index={index} />

@@ -5,7 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { IconInfoCircle, IconClipboardList, IconCurrencyDollar, IconBarcode, IconSettings, IconCalculator } from "@tabler/icons-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemUpdateFormData } from "../../../../schemas";
-import { useItemCategories } from "../../../../hooks";
+import { useItemCategories, useCanViewPrices } from "../../../../hooks";
 import { ITEM_CATEGORY_TYPE, ABC_CATEGORY_LABELS, XYZ_CATEGORY_LABELS } from "../../../../constants";
 import { serializeItemFormToUrlParams, debounce } from "@/utils/url-form-state";
 import type { Supplier, ItemBrand, ItemCategory } from "../../../../types";
@@ -55,6 +55,7 @@ type ItemFormProps = CreateItemFormProps | UpdateItemFormProps;
 export function ItemForm(props: ItemFormProps) {
   const { isSubmitting, defaultValues, mode, onFormStateChange, onDirtyChange, initialSupplier, initialBrand, initialCategory } = props;
   const [searchParams, setSearchParams] = useSearchParams();
+  const canViewPrices = useCanViewPrices();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(defaultValues?.categoryId || undefined);
   const [isPPE, setIsPPE] = useState(false);
@@ -382,34 +383,36 @@ export function ItemForm(props: ItemFormProps) {
           </Card>
 
           {/* Pricing */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconCurrencyDollar className="h-5 w-5 text-muted-foreground" />
-                Preço e Taxas
-              </CardTitle>
-              <CardDescription>Informações de preço e impostos</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <PriceInput disabled={isSubmitting} />
-                <IcmsInput
-                  control={form.control}
-                  disabled={isSubmitting}
-                  priceFieldName="price"
-                  onPriceUpdate={(newPrice) => form.setValue("price", newPrice, { shouldDirty: true, shouldValidate: true })}
-                  watch={form.watch}
-                />
-                <IpiInput
-                  control={form.control}
-                  disabled={isSubmitting}
-                  priceFieldName="price"
-                  onPriceUpdate={(newPrice) => form.setValue("price", newPrice, { shouldDirty: true, shouldValidate: true })}
-                  watch={form.watch}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          {canViewPrices && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <IconCurrencyDollar className="h-5 w-5 text-muted-foreground" />
+                  Preço e Taxas
+                </CardTitle>
+                <CardDescription>Informações de preço e impostos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <PriceInput disabled={isSubmitting} />
+                  <IcmsInput
+                    control={form.control}
+                    disabled={isSubmitting}
+                    priceFieldName="price"
+                    onPriceUpdate={(newPrice) => form.setValue("price", newPrice, { shouldDirty: true, shouldValidate: true })}
+                    watch={form.watch}
+                  />
+                  <IpiInput
+                    control={form.control}
+                    disabled={isSubmitting}
+                    priceFieldName="price"
+                    onPriceUpdate={(newPrice) => form.setValue("price", newPrice, { shouldDirty: true, shouldValidate: true })}
+                    watch={form.watch}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Multiple Measures - Only show for non-PPE categories */}
           {!isPPE && <MeasureInput fieldArray={measuresFieldArray} disabled={isSubmitting} required={isRequired} categoryId={selectedCategoryId} />}

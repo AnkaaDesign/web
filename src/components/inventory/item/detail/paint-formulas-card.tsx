@@ -3,9 +3,8 @@ import { IconFlask, IconPlus, IconCurrencyDollar, IconWeight, IconBrush, IconAle
 
 import type { Item } from "../../../../types";
 import { formatCurrency } from "../../../../utils";
-import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
-import { usePaintFormulas } from "../../../../hooks";
-import { useCurrentUser } from "../../../../hooks/common/use-auth";
+import { routes } from "../../../../constants";
+import { usePaintFormulas, useCanViewPrices } from "../../../../hooks";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,8 +19,7 @@ interface PaintFormulasCardProps {
 
 export function PaintFormulasCard({ item, className }: PaintFormulasCardProps) {
   const navigate = useNavigate();
-  const { data: currentUser } = useCurrentUser();
-  const isWarehouseSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
+  const canViewPrices = useCanViewPrices();
 
   // Fetch all formulas that use this item as a component
   const {
@@ -159,7 +157,7 @@ export function PaintFormulasCard({ item, className }: PaintFormulasCardProps) {
                         </div>
                         <p className="text-sm text-muted-foreground">{formula.description}</p>
                         <div className="flex flex-wrap gap-4 text-sm">
-                          {!isWarehouseSector && (
+                          {canViewPrices && (
                             <div className="flex items-center gap-1 text-muted-foreground">
                               <IconCurrencyDollar className="h-4 w-4" />
                               <span>{formatCurrency(formula.pricePerLiter)}/L</span>

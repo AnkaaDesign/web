@@ -5,6 +5,10 @@ import type { ItemGetManyFormData } from "../../../../schemas";
 import { formatCurrency, formatDate, formatDateTime, itemUtils } from "../../../../utils";
 import { MEASURE_UNIT_LABELS } from "../../../../constants";
 import { itemService } from "../../../../api-client";
+import { useCanViewPrices } from "../../../../hooks";
+
+// Export column ids that expose monetary information (hidden from warehouse users)
+const PRICE_EXPORT_COLUMN_IDS = new Set(["price", "totalPrice", "icms", "ipi"]);
 
 interface ItemExportProps {
   className?: string;
@@ -59,6 +63,12 @@ const EXPORT_COLUMNS: ExportColumn<Item>[] = [
 const DEFAULT_VISIBLE_COLUMNS = new Set(["uniCode", "name", "brand.name", "category.name", "quantity", "monthlyConsumption", "price", "totalPrice"]);
 
 export function ItemExport({ className, filters = {}, currentItems = [], totalRecords = 0, visibleColumns, selectedItems }: ItemExportProps) {
+  const canViewPrices = useCanViewPrices();
+
+  // Hide monetary columns from warehouse users
+  const exportColumns = canViewPrices ? EXPORT_COLUMNS : EXPORT_COLUMNS.filter((col) => !PRICE_EXPORT_COLUMN_IDS.has(col.id));
+  const defaultVisibleColumns = canViewPrices ? DEFAULT_VISIBLE_COLUMNS : new Set([...DEFAULT_VISIBLE_COLUMNS].filter((id) => !PRICE_EXPORT_COLUMN_IDS.has(id)));
+
   const handleExport = async (format: ExportFormat, items: Item[], columns: ExportColumn<Item>[]) => {
     // Generate export based on format
     switch (format) {
@@ -625,8 +635,8 @@ export function ItemExport({ className, filters = {}, currentItems = [], totalRe
       totalRecords={totalRecords}
       selectedItems={selectedItems}
       visibleColumns={visibleColumns}
-      exportColumns={EXPORT_COLUMNS}
-      defaultVisibleColumns={DEFAULT_VISIBLE_COLUMNS}
+      exportColumns={exportColumns}
+      defaultVisibleColumns={defaultVisibleColumns}
       onExport={handleExport}
       onFetchAllItems={fetchAllItems}
       entityName="item"

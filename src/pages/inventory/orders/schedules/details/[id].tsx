@@ -22,8 +22,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate, formatDateTime } from "../../../../../utils";
 import { useOrderSchedule, useOrderScheduleMutations, useItems } from "../../../../../hooks";
-import { routes, getDynamicFrequencyLabel, CHANGE_LOG_ENTITY_TYPE, WEEK_DAY_LABELS, MONTH_LABELS } from "../../../../../constants";
-import type { WEEK_DAY, MONTH } from "../../../../../constants";
+import { routes, getDynamicFrequencyLabel, CHANGE_LOG_ENTITY_TYPE, WEEK_DAY_LABELS, MONTH_LABELS, MONTH_OCCURRENCE_LABELS } from "../../../../../constants";
+import type { WEEK_DAY, MONTH, MONTH_OCCURRENCE } from "../../../../../constants";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import {
   AlertDialog,
@@ -182,14 +182,23 @@ export function OrderScheduleDetailsPage() {
     if (schedule.dayOfWeek) {
       return `Dia: ${WEEK_DAY_LABELS[schedule.dayOfWeek as WEEK_DAY] || schedule.dayOfWeek}`;
     }
-    if (schedule.monthlyConfig && schedule.monthlyConfig.dayOfMonth) {
+    // Monthly: positional (Nth weekday, e.g. "2ª quinta-feira") takes precedence over fixed day.
+    if (schedule.monthlyConfig?.occurrence && schedule.monthlyConfig?.dayOfWeek) {
+      return `${MONTH_OCCURRENCE_LABELS[schedule.monthlyConfig.occurrence as MONTH_OCCURRENCE]} ${(WEEK_DAY_LABELS[schedule.monthlyConfig.dayOfWeek as WEEK_DAY] || "").toLowerCase()}`;
+    }
+    if (schedule.monthlyConfig?.dayOfMonth) {
       return `Dia ${schedule.monthlyConfig.dayOfMonth} de cada mês`;
     }
     if (schedule.dayOfMonth) {
       return `Dia ${schedule.dayOfMonth} de cada mês`;
     }
     if (schedule.yearlyConfig) {
-      return `${schedule.yearlyConfig.dayOfMonth}/${schedule.yearlyConfig.month}`;
+      const y = schedule.yearlyConfig;
+      const monthLabel = MONTH_LABELS[y.month as MONTH] || y.month;
+      if (y.occurrence && y.dayOfWeek) {
+        return `${MONTH_OCCURRENCE_LABELS[y.occurrence as MONTH_OCCURRENCE]} ${(WEEK_DAY_LABELS[y.dayOfWeek as WEEK_DAY] || "").toLowerCase()} de ${monthLabel}`;
+      }
+      return `${y.dayOfMonth} de ${monthLabel}`;
     }
     if (schedule.month) {
       return `Mês: ${MONTH_LABELS[schedule.month as MONTH] || schedule.month}`;

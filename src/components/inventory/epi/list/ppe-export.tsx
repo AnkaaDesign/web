@@ -5,6 +5,7 @@ import type { ItemGetManyFormData } from "../../../../schemas";
 import { formatCurrency, formatDate, formatDateTime, itemUtils } from "../../../../utils";
 import { MEASURE_UNIT_LABELS, MEASURE_TYPE_LABELS, PPE_TYPE_LABELS } from "../../../../constants";
 import { itemService } from "../../../../api-client";
+import { useCanViewPrices } from "../../../../hooks";
 
 interface PpeExportProps {
   className?: string;
@@ -59,6 +60,19 @@ const EXPORT_COLUMNS: ExportColumn<Item>[] = [
 const DEFAULT_VISIBLE_COLUMNS = new Set(["uniCode", "name", "brand.name", "category.name", "ppeCA", "ppeType", "measures", "quantity"]);
 
 export function PpeExport({ className, filters = {}, currentItems = [], totalRecords = 0, visibleColumns, selectedPpes }: PpeExportProps) {
+  const canViewPrices = useCanViewPrices();
+  const MONETARY_COLUMN_IDS = ["price", "totalPrice"];
+  // Hide monetary columns from warehouse users
+  const exportColumns = canViewPrices ? EXPORT_COLUMNS : EXPORT_COLUMNS.filter((col) => !MONETARY_COLUMN_IDS.includes(col.id));
+  const effectiveVisibleColumns = canViewPrices
+    ? visibleColumns
+    : visibleColumns
+      ? new Set(Array.from(visibleColumns).filter((key) => !MONETARY_COLUMN_IDS.includes(key)))
+      : visibleColumns;
+  const effectiveDefaultColumns = canViewPrices
+    ? DEFAULT_VISIBLE_COLUMNS
+    : new Set(Array.from(DEFAULT_VISIBLE_COLUMNS).filter((key) => !MONETARY_COLUMN_IDS.includes(key)));
+
   const handleExport = async (format: ExportFormat, items: Item[], columns: ExportColumn<Item>[]) => {
     // Generate export based on format
     switch (format) {
@@ -492,9 +506,9 @@ export function PpeExport({ className, filters = {}, currentItems = [], totalRec
       currentItems={currentItems}
       totalRecords={totalRecords}
       selectedItems={selectedPpes}
-      visibleColumns={visibleColumns}
-      exportColumns={EXPORT_COLUMNS}
-      defaultVisibleColumns={DEFAULT_VISIBLE_COLUMNS}
+      visibleColumns={effectiveVisibleColumns}
+      exportColumns={exportColumns}
+      defaultVisibleColumns={effectiveDefaultColumns}
       onExport={handleExport}
       onFetchAllItems={fetchAllPpes}
       entityName="EPI"

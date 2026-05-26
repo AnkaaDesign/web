@@ -801,7 +801,7 @@ export const OrderScheduleCreateForm = () => {
                             <span className="text-sm font-medium text-muted-foreground">Dia no mês</span>
                             <span className="text-sm font-semibold text-foreground">
                               {(MONTH_OCCURRENCE_LABELS as any)[watchedMonthlySchedule.occurrence]}{" "}
-                              {(WEEK_DAY_LABELS as any)[watchedMonthlySchedule.dayOfWeek]?.toLowerCase()}-feira
+                              {(WEEK_DAY_LABELS as any)[watchedMonthlySchedule.dayOfWeek]?.toLowerCase()}
                             </span>
                           </div>
                         )}

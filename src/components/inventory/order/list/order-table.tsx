@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useOrders, useOrderMutations, useOrderBatchMutations } from "../../../../hooks";
+import { useOrders, useOrderMutations, useOrderBatchMutations, useCanViewPrices } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { OrderGetManyFormData } from "../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -41,6 +41,7 @@ interface OrderTableProps {
 
 export function OrderTable({ visibleColumns, className, onEdit, filters = {}, onDataChange }: OrderTableProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const { user, isLoading: _isAuthLoading } = useAuth();
   const { delete: deleteOrder, updateAsync: updateOrder } = useOrderMutations();
   const { batchDelete } = useOrderBatchMutations();
@@ -175,7 +176,7 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
   }, [orders, totalRecords, onDataChange]);
 
   // Get columns
-  const columns = React.useMemo(() => createOrderColumns(), []);
+  const columns = React.useMemo(() => createOrderColumns(canViewPrices), [canViewPrices]);
   const filteredColumns = React.useMemo(() => columns.filter((col) => visibleColumns.has(col.key)), [columns, visibleColumns]);
 
   // Handle selection

@@ -2,9 +2,8 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconFlask, IconChevronDown, IconChevronRight, IconCurrencyReal, IconDroplet, IconFilter } from "@tabler/icons-react";
 
-import { usePaintFormulas } from "../../../hooks";
-import { useCurrentUser } from "../../../hooks/common/use-auth";
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { usePaintFormulas, useCanViewPrices } from "../../../hooks";
+import { routes } from "../../../constants";
 import { formatCurrency, formatNumberWithDecimals } from "../../../utils";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,8 +24,7 @@ import type { FormulaFiltersData } from "@/components/painting/formula/formula-f
 
 export default function FormulasList() {
   const navigate = useNavigate();
-  const { data: currentUser } = useCurrentUser();
-  const isWarehouseSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
+  const canViewPrices = useCanViewPrices();
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [openFormulas, setOpenFormulas] = useState<Set<string>>(new Set());
@@ -321,7 +319,7 @@ export default function FormulasList() {
                                   {formula.description || "Fórmula sem descrição"}
                                 </h3>
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1">
-                                  {!isWarehouseSector && (
+                                  {canViewPrices && (
                                     <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
                                       <IconCurrencyReal className="h-3 w-3 sm:h-4 sm:w-4" />
                                       <span className="font-mono">{hasValidPrice ? formatCurrency(Number(formula.pricePerLiter)) + "/L" : "-"}</span>
@@ -365,7 +363,7 @@ export default function FormulasList() {
                                 <TableHeader>
                                   <TableRow className="bg-muted hover:bg-muted">
                                     <TableHead className="font-semibold text-xs uppercase">Componente</TableHead>
-                                    {!isWarehouseSector && (
+                                    {canViewPrices && (
                                       <TableHead className="text-right font-semibold text-xs uppercase w-32">Preço</TableHead>
                                     )}
                                     <TableHead className="text-right font-semibold text-xs uppercase w-32">Proporção</TableHead>
@@ -390,7 +388,7 @@ export default function FormulasList() {
                                             </div>
                                           </div>
                                         </TableCell>
-                                        {!isWarehouseSector && (
+                                        {canViewPrices && (
                                           <TableCell className="p-0 text-right">
                                             <div className="px-4 py-2 tabular-nums text-base">
                                               {(() => {
@@ -410,9 +408,9 @@ export default function FormulasList() {
                             </div>
 
                             {/* Summary */}
-                            {((!isWarehouseSector && hasValidPrice) || hasValidDensity) && (
+                            {((canViewPrices && hasValidPrice) || hasValidDensity) && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {!isWarehouseSector && hasValidPrice && (
+                                {canViewPrices && hasValidPrice && (
                                   <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
                                     <IconCurrencyReal className="h-4 w-4 text-primary" />
                                     <span className="text-sm text-muted-foreground">Preço por litro:</span>

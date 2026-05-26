@@ -280,10 +280,11 @@ export const secullumService = {
       { responseType: "blob" },
     ),
 
-  // Create signature batch(es) for one or many internal users.
+  // Start generating signature apurações for one or many internal users.
   // - userIds: array of internal user IDs to send to
-  // - applyToAll: ignores userIds and fans out to every active linked user
-  // Server resolves userId → secullumEmployeeId and POSTs one batch per user.
+  // - applyToAll: ignores userIds and sends to every active linked user
+  // Generation drives Secullum's report WebSocket and can be slow, so this
+  // returns a jobId immediately; poll getAssinaturaProgress(jobId) for status.
   createAssinaturaForUsers: (data: {
     userIds?: string[];
     applyToAll?: boolean;
@@ -291,22 +292,54 @@ export const secullumService = {
     DataFim: string;
     EmpresaId?: number;
   }) =>
-    apiClient.post<{
+    apiClient.post<{ success: boolean; jobId: string }>(
+      "/integrations/secullum/assinatura-digital",
+      data,
+    ),
+
+  // Poll the progress of a signature-generation job.
+  getAssinaturaProgress: (jobId: string) =>
+    apiClient.get<{
       success: boolean;
-      message: string;
-      data?: {
-        created: number;
-        failed: number;
-        results: Array<{
-          userId: string;
-          userName: string;
-          funcionarioId?: number;
-          ok: boolean;
-          apuracaoId?: number;
-          error?: string;
-        }>;
+      data: {
+        status: "running" | "done" | "error";
+        phase: string;
+        atual: number;
+        total: number;
+        error?: string;
+        result?: {
+          success: boolean;
+          message: string;
+          data?: {
+            created: number;
+            failed: number;
+            results: Array<{
+              userId: string;
+              userName: string;
+              funcionarioId?: number;
+              ok: boolean;
+              apuracaoId?: number;
+              error?: string;
+            }>;
+          };
+        };
       };
-    }>("/integrations/secullum/assinatura-digital", data),
+    }>(`/integrations/secullum/assinatura-digital/progress/${jobId}`),
+
+  // Delete an apuração (signature batch) entirely.
+  deleteAssinatura: (id: number) =>
+    apiClient.delete<{ success: boolean; message: string }>(
+      `/integrations/secullum/assinatura-digital/${id}`,
+    ),
+
+  // Download every employee's signed time-card PDF, across one or many
+  // apurações, merged into a single ZIP (Blob).
+  downloadAssinaturasZip: (apuracaoIds: number[]) =>
+    apiClient.post<Blob>(
+      "/integrations/secullum/assinatura-digital/download-zip",
+      { apuracaoIds },
+      { responseType: "blob" },
+    ),
 
   // Schedules (Horarios)
   getHorarios: (params?: { incluirDesativados?: boolean }) =>

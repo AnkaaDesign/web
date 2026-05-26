@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { IconLoader2, IconCheck, IconShoppingCart, IconCalendar, IconDownload, IconPackages } from "@tabler/icons-react";
 import type { OrderCreateFormData, OrderBatchCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
-import { useOrderBatchMutations, useSuppliers, useItems } from "../../../../hooks";
+import { useOrderBatchMutations, useSuppliers, useItems, useCanViewPrices } from "../../../../hooks";
 import { routes, ORDER_STATUS, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
@@ -23,6 +23,7 @@ import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 export const OrderBatchCreateForm = () => {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
 
   // Form setup for individual order data (used for common fields)
   const form = useForm<OrderCreateFormData>({
@@ -619,7 +620,7 @@ export const OrderBatchCreateForm = () => {
         <div class="summary-box">
           <h3 class="summary-title">Resumo do Lote</h3>
           <p><strong>Total de Pedidos:</strong> ${selectedItems.size} pedidos individuais</p>
-          <p><strong>Valor Total do Lote:</strong> ${formatCurrency(totalPrice)}</p>
+          ${canViewPrices ? `<p><strong>Valor Total do Lote:</strong> ${formatCurrency(totalPrice)}</p>` : ""}
         </div>
         
         <div class="content-wrapper">
@@ -631,8 +632,7 @@ export const OrderBatchCreateForm = () => {
                 <th>Marca</th>
                 <th>Medida</th>
                 <th class="text-right">Quantidade</th>
-                <th class="text-right">Preço Unit.</th>
-                <th class="text-right">Total</th>
+                ${canViewPrices ? `<th class="text-right">Preço Unit.</th><th class="text-right">Total</th>` : ""}
               </tr>
             </thead>
             <tbody>
@@ -679,16 +679,15 @@ export const OrderBatchCreateForm = () => {
                     <td>${item.brand?.name || "-"}</td>
                     <td>${getMeasureDisplay()}</td>
                     <td class="text-right font-medium">${quantity.toLocaleString("pt-BR")}</td>
-                    <td class="text-right">${formatCurrency(price)}</td>
-                    <td class="text-right font-semibold">${formatCurrency(total)}</td>
+                    ${canViewPrices ? `<td class="text-right">${formatCurrency(price)}</td><td class="text-right font-semibold">${formatCurrency(total)}</td>` : ""}
                   </tr>
                 `;
                 })
                 .join("")}
-              <tr class="total-row">
+              ${canViewPrices ? `<tr class="total-row">
                 <td colspan="6" class="text-right">Total Geral:</td>
                 <td class="text-right font-semibold">${formatCurrency(totalPrice)}</td>
-              </tr>
+              </tr>` : ""}
             </tbody>
           </table>
           
@@ -875,9 +874,11 @@ export const OrderBatchCreateForm = () => {
                           <p>
                             <span className="text-muted-foreground">Itens selecionados:</span> <span className="font-medium">{selectedItems.size}</span>
                           </p>
-                          <p>
-                            <span className="text-muted-foreground">Valor total:</span> <span className="font-medium">{formatCurrency(totalPrice)}</span>
-                          </p>
+                          {canViewPrices && (
+                            <p>
+                              <span className="text-muted-foreground">Valor total:</span> <span className="font-medium">{formatCurrency(totalPrice)}</span>
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>

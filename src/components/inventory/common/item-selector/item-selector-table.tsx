@@ -3,7 +3,7 @@ import type { MouseEvent, ReactNode } from "react";
 
 import { IconFilter, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
-import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
+import { useItems, useItemCategories, useItemBrands, useSuppliers, useCanViewPrices } from "../../../../hooks";
 import { formatCurrency } from "../../../../utils";
 import type { OrderTemporaryItem } from "@/hooks/inventory/use-order-form-url-state";
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,8 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   onTemporaryItemRemove,
   cycleDays,
 }) => {
+  const canViewPrices = useCanViewPrices();
+
   // Local state for immediate UI updates
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTermProp || "");
   const [localFilters, setLocalFilters] = useState<Partial<ItemGetManyFormData>>(filtersProp || {});
@@ -185,10 +187,14 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
     isSelected: (itemId: string) => selectedItems.has(itemId),
   };
 
-  const allColumns = useMemo(
-    () => createItemSelectorColumns(editableColumns, contextRef.current, { cycleDays }),
-    [editableColumns, cycleDays]
-  );
+  // Column keys that expose monetary information (hidden from warehouse users)
+  const PRICE_COLUMN_KEYS = useMemo(() => new Set(["price", "totalPrice", "orderSubtotal", "priceInput", "icmsInput", "ipiInput"]), []);
+
+  const allColumns = useMemo(() => {
+    const cols = createItemSelectorColumns(editableColumns, contextRef.current, { cycleDays });
+    if (canViewPrices) return cols;
+    return cols.filter((col) => !PRICE_COLUMN_KEYS.has(col.key));
+  }, [editableColumns, cycleDays, canViewPrices, PRICE_COLUMN_KEYS]);
 
   // Filter columns by visibility
   const displayColumns = useMemo(() => {
@@ -225,10 +231,24 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
     // Extract where clause from additionalFilters to handle separately
     const { where: additionalWhere, ...additionalFiltersRest } = additionalFilters;
 
+    // "Ver selecionados" mode: show EVERY currently-selected item, regardless of
+    // active status or any browsing filter. Otherwise a selected item that is
+    // inactive (or excluded by a category/brand/etc. filter) can never be shown,
+    // so the user can't unselect it — yet save is blocked while it stays selected.
+    if (showSelectedOnly) {
+      return {
+        where: { id: { in: Array.from(selectedItems) } },
+        page: currentPage + 1,
+        limit: pageSize,
+        include: includeConfig,
+        ...(sortConfigs.length > 0 && {
+          orderBy: convertSortConfigsToOrderBy(sortConfigs),
+        }),
+      };
+    }
+
     const baseParams: any = {
-      ...(!showSelectedOnly && {
-        searchingFor: debouncedSearchTerm,
-      }),
+      searchingFor: debouncedSearchTerm,
       where: {
         // Apply additional filters FIRST (e.g., category type filter for borrow)
         ...(additionalWhere || {}),
@@ -238,8 +258,6 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
         ...(localFilters.brandIds?.length && { brandId: { in: localFilters.brandIds } }),
         ...(localFilters.supplierIds?.length && { supplierId: { in: localFilters.supplierIds } }),
         ...(localFilters.where || {}),
-        // Finally apply showSelectedOnly filter LAST (highest priority)
-        ...(showSelectedOnly && selectedItems.size > 0 && { id: { in: Array.from(selectedItems) } }),
       },
       page: currentPage + 1,
       limit: pageSize,

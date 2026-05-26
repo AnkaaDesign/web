@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useItems } from "../../../../hooks";
+import { useItems, useCanViewPrices } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -40,6 +40,7 @@ interface PpeTableProps {
 
 export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeactivate, filters = {}, onDataChange }: PpeTableProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
 
   // Permission checks
   const { user, isLoading: _isAuthLoading } = useAuth();
@@ -135,7 +136,7 @@ export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeac
   const totalRecords = data?.meta?.totalRecords || 0;
 
   // Get visible columns based on selection
-  const columns = createPpeColumns();
+  const columns = createPpeColumns(canViewPrices);
   const visibleColumnConfigs = columns.filter((col) => visibleColumns.has(col.key));
 
   // Row actions

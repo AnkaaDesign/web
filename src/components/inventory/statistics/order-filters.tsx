@@ -27,6 +27,7 @@ import { getItems } from '@/api-client/item';
 import { getItemBrands } from '@/api-client/item-brand';
 import { getItemCategories } from '@/api-client/item-category';
 import { supplierKeys, itemKeys, itemBrandKeys, itemCategoryKeys } from '@/hooks/common/query-keys';
+import { useCanViewPrices } from '@/hooks';
 
 
 
@@ -92,6 +93,7 @@ export function OrderFilters({
   yAxisMode = 'quantity',
   onYAxisModeChange,
 }: OrderFiltersProps) {
+  const canViewPrices = useCanViewPrices();
   const [localFilters, setLocalFilters] = useState<OrderAnalyticsFilters>(filters);
   const [localYAxisMode, setLocalYAxisMode] = useState<YAxisMode>(yAxisMode);
 
@@ -324,7 +326,7 @@ export function OrderFilters({
               <Combobox
                 value={localYAxisMode}
                 onValueChange={(value) => handleYAxisModeChange(value as YAxisMode)}
-                options={Y_AXIS_OPTIONS}
+                options={canViewPrices ? Y_AXIS_OPTIONS : Y_AXIS_OPTIONS.filter((o) => o.value !== 'value')}
                 placeholder="Selecione..."
                 searchable={false}
                 clearable={false}

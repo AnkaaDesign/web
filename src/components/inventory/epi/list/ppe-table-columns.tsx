@@ -81,7 +81,8 @@ const renderCurrentPrice = (item: Item) => {
   return <div className="truncate text-sm font-medium tabular-nums">{formatCurrency(currentPrice.value)}</div>;
 };
 
-export const createPpeColumns = (): PpeColumn[] => [
+export const createPpeColumns = (canViewPrices: boolean = true): PpeColumn[] => {
+  const columns: PpeColumn[] = [
   // Primary columns in the correct order
   {
     key: "uniCode",
@@ -216,7 +217,9 @@ export const createPpeColumns = (): PpeColumn[] => [
     className: "w-40",
     align: "left",
   },
-];
+  ];
+  return columns.filter((column) => canViewPrices || column.key !== "currentPrice");
+};
 
 // Default visible columns
 export const getDefaultVisibleColumns = (): Set<string> => {

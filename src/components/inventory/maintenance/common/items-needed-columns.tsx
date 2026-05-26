@@ -12,7 +12,8 @@ export interface ItemNeededColumn {
   align?: "left" | "center" | "right";
 }
 
-export const createItemsNeededColumns = (): ItemNeededColumn[] => [
+export const createItemsNeededColumns = (canViewPrices: boolean = true): ItemNeededColumn[] => {
+  const columns: ItemNeededColumn[] = [
   {
     key: "uniCode",
     header: "CÓDIGO",
@@ -93,4 +94,6 @@ export const createItemsNeededColumns = (): ItemNeededColumn[] => [
     className: "w-28",
     align: "left",
   },
-];
+  ];
+  return columns.filter((column) => canViewPrices || (column.key !== "price" && column.key !== "subtotal"));
+};

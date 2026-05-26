@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconChartBar, IconClock, IconCurrencyDollar } from "@tabler/icons-react";
 import type { Maintenance } from "../../../../types";
 import { formatCurrency } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ interface MaintenanceMetricsCardProps {
 }
 
 export function MaintenanceMetricsCard({ maintenance, className }: MaintenanceMetricsCardProps) {
+  const canViewPrices = useCanViewPrices();
   const metrics = useMemo(() => {
     // Debug the maintenance structure// Calculate estimated cost per maintenance
     const estimatedCost =
@@ -54,15 +56,17 @@ export function MaintenanceMetricsCard({ maintenance, className }: MaintenanceMe
       <CardContent className="pt-0 flex-1">
         <div className="space-y-6">
           {/* Key Metrics Grid */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className={cn("grid gap-4", canViewPrices ? "grid-cols-2" : "grid-cols-1")}>
             {/* Estimated Cost */}
-            <div className="p-4 rounded-xl bg-primary/5 border-0">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                <IconCurrencyDollar className="h-4 w-4 text-primary" />
-                Custo Estimado
+            {canViewPrices && (
+              <div className="p-4 rounded-xl bg-primary/5 border-0">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
+                  <IconCurrencyDollar className="h-4 w-4 text-primary" />
+                  Custo Estimado
+                </div>
+                <p className="text-lg font-bold text-primary">{formatCurrency(metrics.estimatedCost)}</p>
               </div>
-              <p className="text-lg font-bold text-primary">{formatCurrency(metrics.estimatedCost)}</p>
-            </div>
+            )}
 
             {/* Last Run */}
             <div className="p-4 rounded-xl bg-muted/50 border-0">

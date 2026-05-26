@@ -3,6 +3,7 @@ import { IconClock, IconCalendarTime, IconAlertTriangle, IconCircleCheck, IconTr
 import type { Borrow } from "../../../../types";
 import { BORROW_STATUS } from "../../../../constants";
 import { getDaysBetween, formatRelativeTime, formatCurrency } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 import { cn } from "@/lib/utils";
 
 interface BorrowMetricsCardProps {
@@ -41,6 +42,7 @@ function MetricItem({ icon, label, value, subValue, color = "default" }: MetricI
 }
 
 export function BorrowMetricsCard({ borrow, className }: BorrowMetricsCardProps) {
+  const canViewPrices = useCanViewPrices();
   const isReturned = borrow.status === BORROW_STATUS.RETURNED;
 
   // Calculate days borrowed
@@ -90,7 +92,7 @@ export function BorrowMetricsCard({ borrow, className }: BorrowMetricsCardProps)
           )}
 
           {/* Estimated Value */}
-          {estimatedValue && (
+          {canViewPrices && estimatedValue && (
             <MetricItem
               icon={<IconCoins className="h-5 w-5" />}
               label="Valor Estimado"

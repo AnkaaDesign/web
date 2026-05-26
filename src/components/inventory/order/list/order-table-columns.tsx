@@ -17,7 +17,8 @@ export interface OrderColumn {
   align?: "left" | "center" | "right";
 }
 
-export const createOrderColumns = (): OrderColumn[] => [
+export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[] => {
+  const columns: OrderColumn[] = [
   {
     key: "description",
     header: "DESCRIÇÃO",
@@ -97,9 +98,12 @@ export const createOrderColumns = (): OrderColumn[] => [
     align: "left",
     className: "w-32",
   },
-];
+  ];
+  return columns.filter((column) => canViewPrices || column.key !== "total");
+};
 
 // Default visible columns
-export const getDefaultVisibleColumns = (): Set<string> => {
-  return new Set(["description", "supplier.fantasyName", "statusOrder", "itemCount", "total", "forecast"]);
+export const getDefaultVisibleColumns = (canViewPrices: boolean = true): Set<string> => {
+  const base = ["description", "supplier.fantasyName", "statusOrder", "itemCount", "total", "forecast"];
+  return new Set(base.filter((key) => canViewPrices || key !== "total"));
 };

@@ -5,10 +5,10 @@ import { Separator } from "@/components/ui/separator";
 import { IconFlask, IconPackage, IconDroplet } from "@tabler/icons-react";
 import { IconBrush, IconCurrencyReal } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes } from "../../../constants";
 import type { PaintFormula } from "../../../types";
 import { formatCurrency, formatNumberWithDecimals } from "../../../utils";
-import { useCurrentUser } from "../../../hooks/common/use-auth";
+import { useCanViewPrices } from "../../../hooks";
 import { cn } from "@/lib/utils";
 
 interface PaintFormulaListItemProps {
@@ -18,8 +18,7 @@ interface PaintFormulaListItemProps {
 
 export function PaintFormulaListItem({ formula, className }: PaintFormulaListItemProps) {
   const navigate = useNavigate();
-  const { data: currentUser } = useCurrentUser();
-  const isWarehouseSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
+  const canViewPrices = useCanViewPrices();
 
   const handleClick = () => {
     // Navigate to paint details page since formulas are now managed there
@@ -63,9 +62,9 @@ export function PaintFormulaListItem({ formula, className }: PaintFormulaListIte
         <Separator />
 
         {/* Metrics */}
-        <div className={cn("grid gap-3 sm:gap-4", isWarehouseSector ? "grid-cols-1" : "grid-cols-2")}>
+        <div className={cn("grid gap-3 sm:gap-4", canViewPrices ? "grid-cols-2" : "grid-cols-1")}>
           {/* Price per Liter - Hidden for warehouse users */}
-          {!isWarehouseSector && (
+          {canViewPrices && (
             <div className="space-y-1">
               <div className="flex items-center gap-1 sm:gap-1.5">
                 <IconCurrencyReal className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />

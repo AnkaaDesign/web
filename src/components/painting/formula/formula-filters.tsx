@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useCanViewPrices } from "../../../hooks";
 
 export interface FormulaFiltersData {
   paintNames?: string[];
@@ -34,6 +35,7 @@ export function FormulaFilters({
   onFilterChange,
   availablePaintNames,
 }: FormulaFiltersProps) {
+  const canViewPrices = useCanViewPrices();
   const [localFilters, setLocalFilters] = useState<FormulaFiltersData>(filters);
 
   useEffect(() => {
@@ -99,15 +101,17 @@ export function FormulaFilters({
                   Data de Criação
                 </label>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="pricePerLiter" id="sort-price" />
-                <label
-                  htmlFor="sort-price"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Preço por Litro
-                </label>
-              </div>
+              {canViewPrices && (
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="pricePerLiter" id="sort-price" />
+                  <label
+                    htmlFor="sort-price"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Preço por Litro
+                  </label>
+                </div>
+              )}
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="density" id="sort-density" />
                 <label

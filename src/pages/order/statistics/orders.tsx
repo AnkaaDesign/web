@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { GOAL_METRIC, GOAL_METRIC_UNIT, routes, FAVORITE_PAGES, ORDER_STATUS_LABELS } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
+import { useCanViewPrices } from '@/hooks';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
 import { GoalMetaPopover } from '@/components/statistics/goal-meta-popover';
 import { useOrderAnalytics } from '@/hooks/inventory/use-order-analytics';
@@ -177,6 +178,8 @@ function OrderFiltersSheet({
   open, onOpenChange, filters, xMode, yMode,
   selectedYears, selectedMonths, yearCompareMode, onApply,
 }: FilterSheetProps) {
+  const canViewPrices = useCanViewPrices();
+  const yAxisOptions = canViewPrices ? Y_AXIS_OPTIONS : Y_AXIS_OPTIONS.filter(o => o.value !== 'value');
   const [local, setLocal] = useState<OrderAnalyticsFilters>(filters);
   const [localX, setLocalX] = useState<XMode>(xMode);
   const [localY, setLocalY] = useState<OrderYAxisMode>(yMode);
@@ -296,9 +299,9 @@ function OrderFiltersSheet({
                 Métrica do Eixo Y
               </Label>
               <Combobox
-                value={localY}
+                value={canViewPrices ? localY : 'quantity'}
                 onValueChange={v => setLocalY(v as OrderYAxisMode)}
-                options={Y_AXIS_OPTIONS}
+                options={yAxisOptions}
                 placeholder="Selecione..."
                 searchable={false}
                 clearable={false}
@@ -443,6 +446,7 @@ interface OrdersDrilldownModalProps {
 function OrdersDrilldownModal({
   open, onOpenChange, title, range, supplierId, supplierIds,
 }: OrdersDrilldownModalProps) {
+  const canViewPrices = useCanViewPrices();
   const [search, setSearch] = useState('');
 
   useEffect(() => { if (open) setSearch(''); }, [open]);
@@ -521,7 +525,7 @@ function OrdersDrilldownModal({
                 <>
                   <span className="font-medium">{total}</span>{' '}
                   pedido{total !== 1 ? 's' : ''}
-                  {totalValueSum > 0 && (
+                  {canViewPrices && totalValueSum > 0 && (
                     <>
                       {' · '}
                       <span className="font-medium">{formatCurrency(totalValueSum)}</span>{' '}
@@ -561,7 +565,7 @@ function OrdersDrilldownModal({
               <TableHeader className="sticky top-0 z-10 bg-muted shadow-[inset_0_-1px_0_hsl(var(--border))]">
                 <TableRow>
                   <TableHead>Fornecedor</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
+                  {canViewPrices && <TableHead className="text-right">Valor</TableHead>}
                   <TableHead className="text-right">Itens</TableHead>
                   <TableHead className="text-right">Data</TableHead>
                   <TableHead>Status</TableHead>
@@ -571,20 +575,20 @@ function OrdersDrilldownModal({
                 {isLoading ? (
                   Array.from({ length: 8 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 5 }).map((_, j) => (
+                      {Array.from({ length: canViewPrices ? 5 : 4 }).map((_, j) => (
                         <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : isError ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-destructive py-10">
+                    <TableCell colSpan={canViewPrices ? 5 : 4} className="text-center text-destructive py-10">
                       Erro ao carregar os pedidos. Tente novamente.
                     </TableCell>
                   </TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-12 text-center text-sm text-foreground/60">
+                    <TableCell colSpan={canViewPrices ? 5 : 4} className="py-12 text-center text-sm text-foreground/60">
                       {search ? 'Nenhum resultado.' : 'Nenhum pedido encontrado'}
                     </TableCell>
                   </TableRow>
@@ -597,7 +601,7 @@ function OrdersDrilldownModal({
                     return (
                       <TableRow key={o.id} className="text-sm">
                         <TableCell className="font-medium max-w-[220px] truncate">{supplierName(o)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(orderValue(o))}</TableCell>
+                        {canViewPrices && <TableCell className="text-right">{formatCurrency(orderValue(o))}</TableCell>}
                         <TableCell className="text-right">{itemCount(o)}</TableCell>
                         <TableCell className="text-right text-xs text-foreground/80 whitespace-nowrap">{date}</TableCell>
                         <TableCell>
@@ -625,6 +629,8 @@ const OrderPage = () => {
     page: 'order-analytics',
     title: 'Análise de Pedidos',
   });
+
+  const canViewPrices = useCanViewPrices();
 
   // Defaults match productivity / collection: current year, all months.
   const initialYear = useMemo(() => new Date().getFullYear().toString(), []);
@@ -672,6 +678,13 @@ const OrderPage = () => {
   useEffect(() => {
     setGoalOverride(null);
   }, [yMode, xMode]);
+
+  // Warehouse users must never see monetary (value) mode
+  useEffect(() => {
+    if (!canViewPrices && yMode === 'value') {
+      setYMode('quantity');
+    }
+  }, [canViewPrices, yMode]);
 
   const defaultGoal = useDefaultGoal({
     metric: goalMetric,
@@ -813,9 +826,10 @@ const OrderPage = () => {
     return displayBuckets.map(b => ({
       name: b.name,
       value: yMode === 'value' ? b.totalValue : b.orderCount,
-      secondaryValue: yMode === 'value' ? b.orderCount : b.totalValue,
+      // Warehouse users must not see monetary values, even as a chart secondary series
+      secondaryValue: canViewPrices ? (yMode === 'value' ? b.orderCount : b.totalValue) : undefined,
     }));
-  }, [displayBuckets, yMode]);
+  }, [displayBuckets, yMode, canViewPrices]);
 
   const chartYAxisMode: YAxisMode = yMode === 'value' ? 'value' : 'quantity';
 
@@ -885,13 +899,12 @@ const OrderPage = () => {
       return;
     }
     try {
-      const headers = ['Período', 'Pedidos', 'Valor Total (R$)', 'Itens'];
-      const rows = displayBuckets.map(b => [
-        b.name,
-        b.orderCount.toString(),
-        b.totalValue.toFixed(2),
-        b.itemCount.toString(),
-      ]);
+      const headers = canViewPrices
+        ? ['Período', 'Pedidos', 'Valor Total (R$)', 'Itens']
+        : ['Período', 'Pedidos', 'Itens'];
+      const rows = displayBuckets.map(b => canViewPrices
+        ? [b.name, b.orderCount.toString(), b.totalValue.toFixed(2), b.itemCount.toString()]
+        : [b.name, b.orderCount.toString(), b.itemCount.toString()]);
       const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
@@ -902,7 +915,7 @@ const OrderPage = () => {
     } catch {
       toast.error('Erro ao exportar dados');
     }
-  }, [displayBuckets]);
+  }, [displayBuckets, canViewPrices]);
 
   // -------- Main chart render --------
   const renderMainChart = () => {
@@ -958,7 +971,7 @@ const OrderPage = () => {
         perPeriodGoalLine={perPeriodGoalValues?.some(v => v != null) ? { values: perPeriodGoalValues, label: 'Meta Pedidos' } : null}
         tooltipLabels={{
           primary: yMode === 'value' ? 'Valor' : 'Pedidos',
-          secondary: yMode === 'value' ? 'Pedidos' : 'Valor (R$)',
+          secondary: !canViewPrices ? undefined : (yMode === 'value' ? 'Pedidos' : 'Valor (R$)'),
         }}
         onDataPointClick={handleChartClick}
       />
@@ -1140,42 +1153,46 @@ const OrderPage = () => {
               </Card>
 
               {/* Valor Total — clickable */}
-              <Card
-                className={`py-2 ${canDrillTotalValue ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''}`}
-                onClick={canDrillTotalValue ? openAllOrders : undefined}
-                role={canDrillTotalValue ? 'button' : undefined}
-                tabIndex={canDrillTotalValue ? 0 : undefined}
-                onKeyDown={e => {
-                  if (canDrillTotalValue && (e.key === 'Enter' || e.key === ' ')) {
-                    e.preventDefault();
-                    openAllOrders();
-                  }
-                }}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                  <CardTitle className="text-xs font-medium">Valor Total</CardTitle>
-                  <IconCash className="h-3.5 w-3.5 text-muted-foreground" />
-                </CardHeader>
-                <CardContent className="pb-0 px-4">
-                  {isLoading ? <Skeleton className="h-7 w-20" /> : (
-                    <div className="text-xl font-bold">{formatCurrency(summary?.totalValue ?? 0)}</div>
-                  )}
-                </CardContent>
-              </Card>
+              {canViewPrices && (
+                <Card
+                  className={`py-2 ${canDrillTotalValue ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''}`}
+                  onClick={canDrillTotalValue ? openAllOrders : undefined}
+                  role={canDrillTotalValue ? 'button' : undefined}
+                  tabIndex={canDrillTotalValue ? 0 : undefined}
+                  onKeyDown={e => {
+                    if (canDrillTotalValue && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      openAllOrders();
+                    }
+                  }}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                    <CardTitle className="text-xs font-medium">Valor Total</CardTitle>
+                    <IconCash className="h-3.5 w-3.5 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent className="pb-0 px-4">
+                    {isLoading ? <Skeleton className="h-7 w-20" /> : (
+                      <div className="text-xl font-bold">{formatCurrency(summary?.totalValue ?? 0)}</div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Ticket Médio — not clickable, average */}
-              <Card className="py-2">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                  <CardTitle className="text-xs font-medium">Ticket Médio</CardTitle>
-                  <IconBox className="h-3.5 w-3.5 text-muted-foreground" />
-                </CardHeader>
-                <CardContent className="pb-0 px-4">
-                  {isLoading ? <Skeleton className="h-7 w-20" /> : (
-                    <div className="text-xl font-bold">{formatCurrency(summary?.averageOrderValue ?? 0)}</div>
-                  )}
-                  <div className="text-[11px] text-foreground/70 mt-0.5">valor médio por pedido</div>
-                </CardContent>
-              </Card>
+              {canViewPrices && (
+                <Card className="py-2">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                    <CardTitle className="text-xs font-medium">Ticket Médio</CardTitle>
+                    <IconBox className="h-3.5 w-3.5 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent className="pb-0 px-4">
+                    {isLoading ? <Skeleton className="h-7 w-20" /> : (
+                      <div className="text-xl font-bold">{formatCurrency(summary?.averageOrderValue ?? 0)}</div>
+                    )}
+                    <div className="text-[11px] text-foreground/70 mt-0.5">valor médio por pedido</div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Top Fornecedor — clickable */}
               <Card

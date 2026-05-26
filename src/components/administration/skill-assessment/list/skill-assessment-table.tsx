@@ -27,9 +27,8 @@ import {
 } from "../../../../constants";
 import { useAuth } from "../../../../hooks/common/use-auth";
 import {
-  canEditHrEntities,
-  canDeleteHrEntities,
-  shouldShowInteractiveElements,
+  canEditAssessments,
+  canDeleteAssessments,
 } from "@/utils/permissions/entity-permissions";
 import {
   useAssessments,
@@ -120,9 +119,9 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { user } = useAuth();
-  const canEdit = user ? canEditHrEntities(user) : false;
-  const canDelete = user ? canDeleteHrEntities(user) : false;
-  const showInteractive = user ? shouldShowInteractiveElements(user, "hr") : false;
+  const canEdit = user ? canEditAssessments(user) : false;
+  const canDelete = user ? canDeleteAssessments(user) : false;
+  const showInteractive = canEdit;
 
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -706,7 +705,7 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
                   </DropdownMenuItem>
                 )}
 
-                {single && canEdit && isDraft && (
+                {single && canEdit && (isDraft || isOpen) && (
                   <DropdownMenuItem onClick={handleEdit}>
                     <IconEdit className="mr-2 h-4 w-4" />
                     Editar

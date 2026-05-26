@@ -6,7 +6,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { FormInput } from "@/components/ui/form-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
-import { useItems } from "../../../../hooks";
+import { useItems, useCanViewPrices } from "../../../../hooks";
 import { priceCreateSchema, type PriceCreateFormData } from "../../../../schemas";
 import { IconCurrencyReal, IconPackage } from "@tabler/icons-react";
 import type { Item } from "../../../../types";
@@ -18,6 +18,8 @@ interface PriceCreateFormProps {
 }
 
 export function PriceCreateForm({ itemId, onSuccess, onCancel }: PriceCreateFormProps) {
+  const canViewPrices = useCanViewPrices();
+
   // Note: Price mutations should be added to hooks
   const create = async (_data: any): Promise<{ success: boolean; data?: any; message?: string }> => {
     throw new Error('Price mutations not implemented');
@@ -70,6 +72,11 @@ export function PriceCreateForm({ itemId, onSuccess, onCancel }: PriceCreateForm
       }
     }
   };
+
+  // Warehouse users must not see or edit monetary information
+  if (!canViewPrices) {
+    return null;
+  }
 
   return (
     <Card>

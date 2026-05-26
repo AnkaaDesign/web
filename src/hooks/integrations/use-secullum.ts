@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { secullumService } from "../../api-client";
 import type { SecullumAuthCredentials } from "../../api-client";
@@ -717,44 +718,147 @@ export const useSecullumAssinaturaById = (
   });
 };
 
+export interface AssinaturaResultItem {
+  userId: string;
+  userName: string;
+  funcionarioId?: number;
+  ok: boolean;
+  apuracaoId?: number;
+  error?: string;
+}
+
+type AssinaturaStatus = "idle" | "running" | "done" | "error";
+
 /**
- * Create signature batch(es) for one or many users. Server resolves internal
- * userIds → secullumEmployeeIds and POSTs one batch per user. Returns a
- * per-user result list so the form can show partial-success toasts.
+ * Start generating signature apurações and track live progress. Generation
+ * drives Secullum's report WebSocket (which streams "X de N" progress), so the
+ * backend runs it as a job and we poll its progress — mirroring Secullum's own
+ * "Generating report… 23 of 25" modal.
  *
- * Toasts are emitted here (not the axios interceptor) because the response
- * shape is partial-success — the interceptor's "success: false" check would
- * otherwise show a generic error toast for any partial failure.
+ * Returns: { start, reset, status, phase, atual, total, result, error }.
  */
-export const useCreateAssinaturaForUsers = () => {
+export const useCreateAssinaturaWithProgress = () => {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: {
+  const [status, setStatus] = useState<AssinaturaStatus>("idle");
+  const [phase, setPhase] = useState("");
+  const [atual, setAtual] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [result, setResult] = useState<{
+    success: boolean;
+    message: string;
+    data?: { created: number; failed: number; results: AssinaturaResultItem[] };
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelledRef = useRef(false);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  const poll = useCallback(
+    async (jobId: string) => {
+      if (cancelledRef.current) return;
+      try {
+        const res = await secullumService.getAssinaturaProgress(jobId);
+        const job = res.data?.data;
+        if (!job) throw new Error("empty");
+        setPhase(job.phase);
+        setAtual(job.atual);
+        setTotal(job.total);
+
+        if (job.status === "running") {
+          pollRef.current = setTimeout(() => poll(jobId), 800);
+          return;
+        }
+
+        stopPolling();
+        if (job.status === "done") {
+          setStatus("done");
+          setResult(job.result ?? null);
+          const r = job.result;
+          const created = r?.data?.created ?? 0;
+          const failed = r?.data?.failed ?? 0;
+          if (r?.success) {
+            toast.success(r.message || `${created} apuração(ões) criada(s) com sucesso`);
+          } else if (created > 0) {
+            toast.warning(`${created} criada(s), ${failed} falharam. Verifique os detalhes.`);
+          } else {
+            toast.error(r?.message || "Falha ao gerar apuração");
+          }
+          queryClient.invalidateQueries({ queryKey: secullumKeys.assinaturas() });
+        } else {
+          setStatus("error");
+          setError(job.error || "Falha ao gerar a apuração");
+          toast.error(job.error || "Falha ao gerar a apuração no Secullum");
+        }
+      } catch (err: any) {
+        stopPolling();
+        setStatus("error");
+        const msg =
+          err?.response?.data?.message || "Falha ao consultar o progresso da apuração";
+        setError(msg);
+        toast.error(msg);
+      }
+    },
+    [queryClient, stopPolling],
+  );
+
+  const start = useCallback(
+    async (data: {
       userIds?: string[];
       applyToAll?: boolean;
       DataInicio: string;
       DataFim: string;
       EmpresaId?: number;
-    }) => secullumService.createAssinaturaForUsers(data),
-    onSuccess: (response) => {
-      const r = response.data;
-      if (r?.success && r.data) {
-        toast.success(`${r.data.created} apuração(ões) criada(s) com sucesso`);
-      } else if (r?.data && (r.data.created ?? 0) > 0) {
-        toast.warning(
-          `${r.data.created} criada(s), ${r.data.failed} falharam. Verifique os detalhes abaixo.`,
-        );
-      } else {
-        toast.error(r?.message || "Falha ao criar apurações");
+    }) => {
+      cancelledRef.current = false;
+      stopPolling();
+      setStatus("running");
+      setPhase("Iniciando...");
+      setAtual(0);
+      setTotal(0);
+      setResult(null);
+      setError(null);
+      try {
+        const res = await secullumService.createAssinaturaForUsers(data);
+        const jobId = res.data?.jobId;
+        if (!jobId) throw new Error("Sem jobId");
+        void poll(jobId);
+      } catch (err: any) {
+        setStatus("error");
+        const msg = err?.response?.data?.message || "Falha ao iniciar a apuração";
+        setError(msg);
+        toast.error(msg);
       }
-      queryClient.invalidateQueries({ queryKey: secullumKeys.assinaturas() });
     },
-    onError: (err: any) => {
-      toast.error(
-        err?.response?.data?.message || "Falha ao criar apurações no Secullum",
-      );
-    },
-  });
+    [poll, stopPolling],
+  );
+
+  const reset = useCallback(() => {
+    cancelledRef.current = true;
+    stopPolling();
+    setStatus("idle");
+    setPhase("");
+    setAtual(0);
+    setTotal(0);
+    setResult(null);
+    setError(null);
+  }, [stopPolling]);
+
+  // Stop polling on unmount.
+  useEffect(() => {
+    return () => {
+      cancelledRef.current = true;
+      stopPolling();
+    };
+  }, [stopPolling]);
+
+  return { start, reset, status, phase, atual, total, result, error };
 };
 
 /**
@@ -790,6 +894,82 @@ export const useDownloadAssinaturaItemPdf = () => {
     },
     onError: () => {
       toast.error("Falha ao baixar o cartão ponto. Tente novamente.");
+    },
+  });
+};
+
+/**
+ * Delete an apuração (signature batch) from Secullum. Invalidates the list so
+ * the row disappears on success.
+ */
+export const useDeleteAssinatura = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => secullumService.deleteAssinatura(id),
+    onSuccess: (response) => {
+      toast.success(response.data?.message || "Apuração removida com sucesso");
+      queryClient.invalidateQueries({ queryKey: secullumKeys.assinaturas() });
+    },
+    onError: (err: any) => {
+      toast.error(
+        err?.response?.data?.message || "Falha ao remover apuração no Secullum",
+      );
+    },
+  });
+};
+
+/**
+ * Download every employee's signed time-card PDF, across one or many selected
+ * apurações, merged into a single ZIP. Triggers a browser download.
+ */
+export const useDownloadAssinaturasZip = () => {
+  return useMutation({
+    mutationFn: async (apuracaoIds: number[]) => {
+      const res = await secullumService.downloadAssinaturasZip(apuracaoIds);
+      const blob =
+        res.data instanceof Blob
+          ? res.data
+          : new Blob([res.data as any], { type: "application/zip" });
+
+      // Prefer the filename the server set; otherwise derive one.
+      const disposition = (res.headers?.["content-disposition"] as string) || "";
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      const filename =
+        match?.[1] ||
+        (apuracaoIds.length === 1
+          ? `CartoesPonto_Apuracao_${apuracaoIds[0]}.zip`
+          : `CartoesPonto_${apuracaoIds.length}_apuracoes.zip`);
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      return { filename };
+    },
+    onError: (err: any) => {
+      // The error body is a Blob (responseType: blob) — read it for the message.
+      const blob = err?.response?.data;
+      if (blob instanceof Blob) {
+        blob
+          .text()
+          .then((t) => {
+            try {
+              const j = JSON.parse(t);
+              toast.error(j?.message || "Falha ao baixar os cartões ponto.");
+            } catch {
+              toast.error("Falha ao baixar os cartões ponto.");
+            }
+          })
+          .catch(() => toast.error("Falha ao baixar os cartões ponto."));
+      } else {
+        toast.error(
+          err?.response?.data?.message || "Falha ao baixar os cartões ponto.",
+        );
+      }
     },
   });
 };

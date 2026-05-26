@@ -2,6 +2,7 @@ import { BaseExportPopover, type ExportColumn } from "@/components/ui/export-pop
 import type { ExternalWithdrawal } from "../../../../types";
 import type { ExternalWithdrawalGetManyFormData } from "../../../../schemas";
 import { externalWithdrawalService } from "../../../../api-client";
+import { useCanViewPrices } from "../../../../hooks";
 import { formatCurrency, formatDate } from "../../../../utils";
 import { EXTERNAL_WITHDRAWAL_STATUS_LABELS, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 
@@ -63,6 +64,16 @@ const EXPORT_COLUMNS: ExportColumn<ExternalWithdrawal>[] = [
 const DEFAULT_VISIBLE_COLUMNS = new Set(["withdrawerName", "status", "type", "total", "createdAt"]);
 
 export function ExternalWithdrawalExport({ className, currentItems, totalRecords, selectedItems, visibleColumns, filters }: ExternalWithdrawalExportProps) {
+  const canViewPrices = useCanViewPrices();
+  // Hide monetary columns from warehouse users
+  const exportColumns = canViewPrices ? EXPORT_COLUMNS : EXPORT_COLUMNS.filter((col) => col.id !== "total");
+  const effectiveVisibleColumns = canViewPrices
+    ? visibleColumns
+    : new Set(Array.from(visibleColumns).filter((key) => key !== "total"));
+  const effectiveDefaultColumns = canViewPrices
+    ? DEFAULT_VISIBLE_COLUMNS
+    : new Set(Array.from(DEFAULT_VISIBLE_COLUMNS).filter((key) => key !== "total"));
+
   // Fetch all data when needed
   const fetchAllItems = async (): Promise<ExternalWithdrawal[]> => {
     const response = await externalWithdrawalService.getExternalWithdrawals({
@@ -254,9 +265,9 @@ export function ExternalWithdrawalExport({ className, currentItems, totalRecords
       currentItems={currentItems}
       totalRecords={totalRecords}
       selectedItems={selectedItems}
-      visibleColumns={visibleColumns}
-      exportColumns={EXPORT_COLUMNS}
-      defaultVisibleColumns={DEFAULT_VISIBLE_COLUMNS}
+      visibleColumns={effectiveVisibleColumns}
+      exportColumns={exportColumns}
+      defaultVisibleColumns={effectiveDefaultColumns}
       onExport={handleExport}
       onFetchAllItems={fetchAllItems}
       entityName="retirada"

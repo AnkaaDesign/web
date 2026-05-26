@@ -4,8 +4,8 @@ import { IconAlertTriangle, IconScale, IconFlask, IconCalculator, IconPackage } 
 import type { PaintFormula } from "../../../types";
 import { formatCurrency } from "../../../utils";
 import { measureUtils } from "../../../utils";
-import { MEASURE_UNIT, SECTOR_PRIVILEGES } from "../../../constants";
-import { useAuth } from "@/contexts/auth-context";
+import { MEASURE_UNIT } from "../../../constants";
+import { useCanViewPrices } from "../../../hooks";
 import { DensityValidator } from "./density-validator";
 import { FormulaComponentsRatioTable } from "./formula-components-ratio-table";
 import { PaintFormulaChangelogHistoryCard } from "./paint-formula-changelog-history-card";
@@ -15,12 +15,10 @@ interface PaintFormulaDetailProps {
 }
 
 export function PaintFormulaDetail({ formula }: PaintFormulaDetailProps) {
-  const { user } = useAuth();
   const components = formula.components || [];
 
   // Hide prices for warehouse users
-  const isWarehouseUser = user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
-  const showPrices = !isWarehouseUser;
+  const showPrices = useCanViewPrices();
 
   // Calculate total ratio (should be 100%)
   const totalRatio = components.reduce((sum, comp) => sum + (comp.ratio || 0), 0);

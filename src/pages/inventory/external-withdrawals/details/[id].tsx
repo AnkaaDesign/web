@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useExternalWithdrawal, useExternalWithdrawalStatusMutations, useExternalWithdrawalMutations } from "../../../../hooks";
+import { useExternalWithdrawal, useExternalWithdrawalStatusMutations, useExternalWithdrawalMutations, useCanViewPrices } from "../../../../hooks";
 import { routes, EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { Button } from "@/components/ui/button";
 import type { Icon as TablerIcon } from "@tabler/icons-react";
@@ -36,6 +36,7 @@ const ExternalWithdrawalDetailsPage = () => {
   const [actionType, setActionType] = useState<"FULL_RETURN" | "CHARGE" | "DELIVER" | null>(null);
   const [actionNotes, setActionNotes] = useState("");
   const { user } = useAuth();
+  const canViewPrices = useCanViewPrices();
   const canManageWarehouse = canEditExternalWithdrawals(user);
   const statusMutations = useExternalWithdrawalStatusMutations();
   const { deleteMutation } = useExternalWithdrawalMutations();
@@ -358,9 +359,13 @@ const ExternalWithdrawalDetailsPage = () => {
                 <br />
                 <br />
                 <strong>Retirador:</strong> {withdrawal.withdrawerName}
-                <br />
-                <strong>Valor Total:</strong> R${" "}
-                {withdrawal.items ? withdrawal.items.reduce((sum, item) => sum + (item.withdrawedQuantity || 0) * (item.price || 0), 0).toFixed(2) : "0,00"}
+                {canViewPrices && (
+                  <>
+                    <br />
+                    <strong>Valor Total:</strong> R${" "}
+                    {withdrawal.items ? withdrawal.items.reduce((sum, item) => sum + (item.withdrawedQuantity || 0) * (item.price || 0), 0).toFixed(2) : "0,00"}
+                  </>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -384,10 +389,12 @@ const ExternalWithdrawalDetailsPage = () => {
                   <p className="text-sm">
                     <span className="font-medium">Retirador:</span> {withdrawal.withdrawerName}
                   </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Valor Total:</span> R${" "}
-                    {(withdrawal.items || []).reduce((sum, item) => sum + (item.withdrawedQuantity || 0) * (item.price || 0), 0).toFixed(2)}
-                  </p>
+                  {canViewPrices && (
+                    <p className="text-sm">
+                      <span className="font-medium">Valor Total:</span> R${" "}
+                      {(withdrawal.items || []).reduce((sum, item) => sum + (item.withdrawedQuantity || 0) * (item.price || 0), 0).toFixed(2)}
+                    </p>
+                  )}
                   <p className="text-sm">
                     <span className="font-medium">Itens:</span> {withdrawal.items?.length || 0}
                   </p>

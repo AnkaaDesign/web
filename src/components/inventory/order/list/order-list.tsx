@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useOrderBatchMutations, useSuppliers } from "../../../../hooks";
+import { useOrderBatchMutations, useSuppliers, useCanViewPrices } from "../../../../hooks";
 import type { Order } from "../../../../types";
 import type { OrderGetManyFormData } from "../../../../schemas";
 import { routes, ORDER_STATUS } from "../../../../constants";
@@ -39,6 +39,7 @@ const DEFAULT_PAGE_SIZE = 40;
 
 export function OrderList({ className }: OrderListProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const { batchDelete } = useOrderBatchMutations();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -177,11 +178,11 @@ export function OrderList({ className }: OrderListProps) {
   // Use column visibility hook with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
     "order-list-visible-columns",
-    new Set(["description", "supplier.fantasyName", "statusOrder", "itemCount", "total", "forecast"])
+    new Set(["description", "supplier.fantasyName", "statusOrder", "itemCount", ...(canViewPrices ? ["total"] : []), "forecast"])
   );
 
   // Get all available columns for column visibility manager
-  const allColumns = useMemo(() => createOrderColumns(), []);
+  const allColumns = useMemo(() => createOrderColumns(canViewPrices), [canViewPrices]);
 
   // Query filters to pass to the paginated table
   const queryFilters = useMemo(() => {

@@ -1,5 +1,6 @@
 import React from "react";
 import { formatCurrency } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -15,6 +16,7 @@ interface OrderTotalCalculatorProps {
 }
 
 const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ orderItems = [], discount = 0, className, showItemBreakdown = false, showTaxBreakdown = false }) => {
+  const canViewPrices = useCanViewPrices();
   // Calculate individual item totals, taxes, and grand total
   const itemCalculations = React.useMemo(() => {
     return orderItems.map((orderItem) => {
@@ -62,6 +64,8 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
       return total + orderItem.orderedQuantity;
     }, 0);
   }, [orderItems]);
+
+  if (!canViewPrices) return null;
 
   return (
     <Card className={className}>
@@ -172,6 +176,7 @@ const OrderTotalBadgeComponent: React.FC<{
   orderItems?: OrderItemType[];
   discount?: number;
 }> = ({ orderItems = [], discount = 0 }) => {
+  const canViewPrices = useCanViewPrices();
   const grandTotal = React.useMemo(() => {
     let goodsSubtotal = 0;
     const total = orderItems.reduce((acc, orderItem) => {
@@ -187,6 +192,8 @@ const OrderTotalBadgeComponent: React.FC<{
     const discountAmount = discount > 0 ? goodsSubtotal * (discount / 100) : 0;
     return total - discountAmount;
   }, [orderItems, discount]);
+
+  if (!canViewPrices) return null;
 
   return (
     <Badge variant={grandTotal > 0 ? "default" : "outline"} className="text-sm">
@@ -236,6 +243,7 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
   showItemBreakdown = false,
   showTaxBreakdown = false,
 }) => {
+  const canViewPrices = useCanViewPrices();
   // Calculate individual item totals, taxes, and grand total
   const itemCalculations = React.useMemo(() => {
     const itemsArray = Array.isArray(selectedItems) ? selectedItems : Array.from(selectedItems);
@@ -288,6 +296,8 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
       return total + (quantities[itemId] || 1);
     }, 0);
   }, [selectedItems, quantities]);
+
+  if (!canViewPrices) return null;
 
   return (
     <Card className={className}>
@@ -403,6 +413,7 @@ const OrderFormTotalBadgeComponent: React.FC<{
   items?: OrderFormItem[];
   discount?: number;
 }> = ({ selectedItems, quantities, prices, icmses = {}, ipis = {}, items = [], discount = 0 }) => {
+  const canViewPrices = useCanViewPrices();
   const grandTotal = React.useMemo(() => {
     const itemsArray = Array.isArray(selectedItems) ? selectedItems : Array.from(selectedItems);
     let goodsSubtotal = 0;
@@ -420,6 +431,8 @@ const OrderFormTotalBadgeComponent: React.FC<{
     const discountAmount = discount > 0 ? goodsSubtotal * (discount / 100) : 0;
     return total - discountAmount;
   }, [selectedItems, quantities, prices, icmses, ipis, items, discount]);
+
+  if (!canViewPrices) return null;
 
   return (
     <Badge variant={grandTotal > 0 ? "default" : "outline"} className="text-sm">

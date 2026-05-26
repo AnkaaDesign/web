@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { PaintFormula, Item } from "../../../types";
 import { formatCurrency, formatNumberWithDecimals } from "../../../utils";
 import { toast } from "@/components/ui/sonner";
-import { useItems } from "../../../hooks";
+import { useItems, useCanViewPrices } from "../../../hooks";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -25,13 +25,15 @@ interface FormulaCalculatorProps {
 
 export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibility = true }: FormulaCalculatorProps) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const canViewPrices = useCanViewPrices();
 
   // Initialize state from URL params
   const [desiredVolume, setDesiredVolume] = useState(() => searchParams.get("volume") || "2000");
   const [showPrices, setShowPrices] = useState(false);
 
-  // Effective price visibility: user must have permission AND toggle must be on
-  const effectiveShowPrices = allowPriceVisibility && showPrices;
+  // Effective price visibility: warehouse users can never view prices, then
+  // the caller must allow it AND the toggle must be on.
+  const effectiveShowPrices = canViewPrices && allowPriceVisibility && showPrices;
   const [isProducing, setIsProducing] = useState(false);
   const [selectedComponents, setSelectedComponents] = useState<string[]>(() => {
     const used = searchParams.get("used");
@@ -446,7 +448,7 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
         {/* Toggles */}
         <div className="flex items-center justify-end gap-6 flex-1">
           {/* Price Toggle - only show if user has permission to see prices */}
-          {allowPriceVisibility && (
+          {canViewPrices && allowPriceVisibility && (
             <div className="flex items-center space-x-3">
               <Label htmlFor="show-prices" className="text-sm font-medium">
                 Exibir Preços
@@ -671,7 +673,7 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
                 <p className="text-sm font-semibold">{formatNumberWithDecimals(Number(formula.density), 3)} g/ml</p>
               </div>
 
-{allowPriceVisibility && (
+{canViewPrices && allowPriceVisibility && (
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground">Preço por Litro</p>
                 <p className="text-sm font-semibold">

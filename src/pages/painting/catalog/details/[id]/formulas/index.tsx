@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { IconFlask, IconChevronDown, IconChevronRight, IconCurrencyDollar, IconWeight, IconEye } from "@tabler/icons-react";
 
-import { usePaint, usePaintFormulasByPaintId } from "../../../../../../hooks";
+import { usePaint, usePaintFormulasByPaintId, useCanViewPrices } from "../../../../../../hooks";
 import { formatCurrency } from "../../../../../../utils";
 import { routes } from "../../../../../../constants";
 
@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 export default function PaintFormulasPage() {
   const { id: paintId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const [openFormulas, setOpenFormulas] = useState<Set<string>>(new Set());
   const [hasInitialized, setHasInitialized] = useState(false);
 
@@ -205,10 +206,12 @@ export default function PaintFormulasPage() {
                               </div>
                             </div>
                             <div className="flex flex-col items-end gap-1 text-xs sm:text-sm">
-                              <span className="flex items-center gap-1 text-muted-foreground">
-                                <IconCurrencyDollar className="h-4 w-4" />
-                                <span className="font-medium">{formatCurrency(formula.pricePerLiter)}/L</span>
-                              </span>
+                              {canViewPrices && (
+                                <span className="flex items-center gap-1 text-muted-foreground">
+                                  <IconCurrencyDollar className="h-4 w-4" />
+                                  <span className="font-medium">{formatCurrency(formula.pricePerLiter)}/L</span>
+                                </span>
+                              )}
                               <span className="flex items-center gap-1 text-muted-foreground">
                                 <IconWeight className="h-4 w-4" />
                                 <span className="font-medium font-mono">{Number(formula.density).toFixed(3)} g/ml</span>
@@ -229,7 +232,7 @@ export default function PaintFormulasPage() {
                                 <TableHeader>
                                   <TableRow className="bg-muted hover:bg-muted">
                                     <TableHead className="font-semibold text-xs uppercase">Componente</TableHead>
-                                    <TableHead className="text-right font-semibold text-xs uppercase w-32">Preço</TableHead>
+                                    {canViewPrices && <TableHead className="text-right font-semibold text-xs uppercase w-32">Preço</TableHead>}
                                     <TableHead className="text-right font-semibold text-xs uppercase w-32">Proporção</TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -252,14 +255,16 @@ export default function PaintFormulasPage() {
                                             </div>
                                           </div>
                                         </TableCell>
-                                        <TableCell className="p-0 text-right">
-                                          <div className="px-4 py-2 tabular-nums text-base">
-                                            {(() => {
-                                              const price = calculateComponentPrice(component, formula);
-                                              return price !== null ? formatCurrency(price) : "-";
-                                            })()}
-                                          </div>
-                                        </TableCell>
+                                        {canViewPrices && (
+                                          <TableCell className="p-0 text-right">
+                                            <div className="px-4 py-2 tabular-nums text-base">
+                                              {(() => {
+                                                const price = calculateComponentPrice(component, formula);
+                                                return price !== null ? formatCurrency(price) : "-";
+                                              })()}
+                                            </div>
+                                          </TableCell>
+                                        )}
                                         <TableCell className="p-0 text-right">
                                           <div className="px-4 py-2 tabular-nums text-base">{component.ratio.toFixed(2)}%</div>
                                         </TableCell>
@@ -269,15 +274,17 @@ export default function PaintFormulasPage() {
                               </Table>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <div className={cn("grid grid-cols-1 gap-3 sm:gap-4", canViewPrices && "sm:grid-cols-2")}>
                               <div className="p-3 sm:p-4 bg-muted/50 rounded-lg">
                                 <p className="text-xs sm:text-sm text-muted-foreground mb-1">Densidade</p>
                                 <p className="font-semibold text-sm sm:text-base font-mono">{Number(formula.density).toFixed(3)} g/ml</p>
                               </div>
-                              <div className="p-3 sm:p-4 bg-muted/50 rounded-lg">
-                                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Preço por Litro</p>
-                                <p className="font-semibold text-sm sm:text-base">{formatCurrency(formula.pricePerLiter)}</p>
-                              </div>
+                              {canViewPrices && (
+                                <div className="p-3 sm:p-4 bg-muted/50 rounded-lg">
+                                  <p className="text-xs sm:text-sm text-muted-foreground mb-1">Preço por Litro</p>
+                                  <p className="font-semibold text-sm sm:text-base">{formatCurrency(formula.pricePerLiter)}</p>
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex justify-end pt-2">

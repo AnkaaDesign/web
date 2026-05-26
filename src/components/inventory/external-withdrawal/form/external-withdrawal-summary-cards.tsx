@@ -3,6 +3,7 @@ import { IconUser, IconFileText, IconPackage, IconHash, IconBoxMultiple, IconCur
 import type { Item } from "../../../../types";
 import { MEASURE_UNIT_LABELS, EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";
 import { formatCurrency } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -108,7 +109,9 @@ interface ItemsSummaryCardProps {
 }
 
 export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItems, type, totalItems, totalQuantity, className }) => {
+  const canViewPrices = useCanViewPrices();
   const items = Array.from(selectedItems.values());
+  const showPriceColumns = canViewPrices && type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE;
 
   if (items.length === 0) {
     return (
@@ -179,7 +182,7 @@ export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItem
                   <TableRow>
                     <TableHead>Item</TableHead>
                     <TableHead className="w-20">Qtd</TableHead>
-                    {type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
+                    {showPriceColumns && (
                       <>
                         <TableHead className="w-28">Preço Unit.</TableHead>
                         <TableHead className="w-28">Total</TableHead>
@@ -225,7 +228,7 @@ export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItem
                             )}
                           </div>
                         </TableCell>
-                        {type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
+                        {showPriceColumns && (
                           <>
                             <TableCell>
                               <div className="text-sm font-medium">{formatCurrency(item.unitPrice || 0)}</div>
@@ -258,12 +261,15 @@ interface TotalCalculationCardProps {
 }
 
 export const TotalCalculationCard: React.FC<TotalCalculationCardProps> = ({ selectedItems, totalValue, totalItems, totalQuantity, className }) => {
+  const canViewPrices = useCanViewPrices();
   const items = Array.from(selectedItems.values());
   const averageValue = totalQuantity > 0 ? totalValue / totalQuantity : 0;
 
   // Check if any items don't have prices set
   const itemsWithoutPrice = items.filter((item) => !item.unitPrice || item.unitPrice <= 0);
   const hasItemsWithoutPrice = itemsWithoutPrice.length > 0;
+
+  if (!canViewPrices) return null;
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>

@@ -6,6 +6,7 @@ import { IconPackage, IconUser, IconCalendar, IconCalendarCheck, IconCurrencyRea
 import type { ExternalWithdrawal } from "../../../../types";
 import { EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 import { formatDateTime } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 import { ExternalWithdrawalStatusBadge } from "../common/external-withdrawal-status-badge";
 import { cn } from "@/lib/utils";
 import { FileItem, type FileViewMode } from "@/components/common/file";
@@ -16,6 +17,7 @@ interface ExternalWithdrawalInfoCardProps {
 }
 
 export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWithdrawalInfoCardProps) {
+  const canViewPrices = useCanViewPrices();
   const [viewMode, setViewMode] = useState<FileViewMode>("list");
 
   const isFullyReturned = withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED;
@@ -63,7 +65,7 @@ export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWi
                 </Badge>
               </div>
 
-              {withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
+              {canViewPrices && withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCurrencyReal className="h-4 w-4" />

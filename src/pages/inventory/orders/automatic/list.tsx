@@ -3,6 +3,7 @@ import { PrivilegeRoute } from '@/components/navigation/privilege-route';
 import { PageHeader } from '@/components/ui/page-header';
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from '../../../../constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
+import { useCanViewPrices } from '@/hooks';
 import {
   IconRefresh,
   IconAlertTriangle,
@@ -42,6 +43,7 @@ const CRITICALITY_OPTIONS = [
 ];
 
 export const AutomaticOrderListPage = () => {
+  const canViewPrices = useCanViewPrices();
   const [searchValue, setSearchValue] = useState('');
   const [minStockCriteria, setMinStockCriteria] = useState<'all' | 'low' | 'critical'>('all');
   const [sortConfigs, setSortConfigs] = useState<Map<string, SortConfig>>(new Map());
@@ -199,17 +201,19 @@ export const AutomaticOrderListPage = () => {
             ) : (
               <>
                 {analysisData?.data.summary && (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className={`grid grid-cols-1 gap-4 ${canViewPrices ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
                     <div className="p-4 border border-border rounded-lg">
                       <div className="text-xs text-muted-foreground mb-1">Total de Itens</div>
                       <div className="text-2xl font-bold">{analysisData.data.summary.totalItems}</div>
                     </div>
-                    <div className="p-4 border border-border rounded-lg">
-                      <div className="text-xs text-muted-foreground mb-1">Valor Estimado</div>
-                      <div className="text-2xl font-bold">
-                        {formatCurrency(analysisData.data.summary.totalEstimatedCost || 0)}
+                    {canViewPrices && (
+                      <div className="p-4 border border-border rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Valor Estimado</div>
+                        <div className="text-2xl font-bold">
+                          {formatCurrency(analysisData.data.summary.totalEstimatedCost || 0)}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <div className="p-4 border border-border rounded-lg">
                       <div className="text-xs text-muted-foreground mb-1">Críticos</div>
                       <div className="text-2xl font-bold text-destructive">
@@ -288,7 +292,7 @@ export const AutomaticOrderListPage = () => {
                             <div className="flex items-center justify-between">
                               <h2 className="text-lg font-semibold">{group.supplierName || 'Sem Fornecedor'}</h2>
                               <div className="text-sm text-muted-foreground">
-                                {group.itemCount} item(ns) • Valor estimado: {formatCurrency(group.totalEstimatedCost || 0)}
+                                {group.itemCount} item(ns){canViewPrices && <> • Valor estimado: {formatCurrency(group.totalEstimatedCost || 0)}</>}
                               </div>
                             </div>
 

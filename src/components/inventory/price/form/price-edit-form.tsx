@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { priceUpdateSchema, type PriceUpdateFormData } from "../../../../schemas";
 import { IconCurrencyReal, IconLoader } from "@tabler/icons-react";
 import { formatDate } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 
 interface PriceEditFormProps {
   priceId: string;
@@ -19,6 +20,8 @@ interface PriceEditFormProps {
 }
 
 export function PriceEditForm({ priceId, onSuccess, onCancel }: PriceEditFormProps) {
+  const canViewPrices = useCanViewPrices();
+
   // Note: Price mutations should be added to hooks
   const update = async (_id: string, _data: any): Promise<{ success: boolean; data?: any; message?: string }> => {
     throw new Error('Price mutations not implemented');
@@ -51,6 +54,11 @@ export function PriceEditForm({ priceId, onSuccess, onCancel }: PriceEditFormPro
       });
     }
   }, [price, form]);
+
+  // Warehouse users must not see or edit monetary information
+  if (!canViewPrices) {
+    return null;
+  }
 
   const onSubmit = async (data: PriceUpdateFormData) => {
     try {

@@ -50,6 +50,24 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
     hasPositionalConfig ? "positional" : "fixed",
   );
 
+  // The recurrence is canonically stored in the config relations; older/seeded
+  // schedules may have the flat top-level columns null. Fall back to the config
+  // so the form shows the saved values on load.
+  const weeklyDayFromConfig = (() => {
+    const w = schedule.weeklyConfig;
+    if (!w) return undefined;
+    const days: Array<[boolean | null | undefined, WEEK_DAY]> = [
+      [w.monday, WEEK_DAY.MONDAY],
+      [w.tuesday, WEEK_DAY.TUESDAY],
+      [w.wednesday, WEEK_DAY.WEDNESDAY],
+      [w.thursday, WEEK_DAY.THURSDAY],
+      [w.friday, WEEK_DAY.FRIDAY],
+      [w.saturday, WEEK_DAY.SATURDAY],
+      [w.sunday, WEEK_DAY.SUNDAY],
+    ];
+    return days.find(([enabled]) => enabled)?.[1];
+  })();
+
   const steps = [
     {
       id: 1,
@@ -79,9 +97,9 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
       items: schedule.items || [],
       specificDate: schedule.specificDate ? new Date(schedule.specificDate) : undefined,
       nextRun: schedule.nextRun ? new Date(schedule.nextRun) : undefined,
-      dayOfMonth: schedule.dayOfMonth ?? undefined,
-      dayOfWeek: schedule.dayOfWeek ?? undefined,
-      month: schedule.month ?? undefined,
+      dayOfMonth: schedule.dayOfMonth ?? schedule.monthlyConfig?.dayOfMonth ?? schedule.yearlyConfig?.dayOfMonth ?? undefined,
+      dayOfWeek: (schedule.dayOfWeek as WEEK_DAY) ?? weeklyDayFromConfig ?? undefined,
+      month: schedule.month ?? schedule.yearlyConfig?.month ?? undefined,
       monthlySchedule: hasPositionalConfig
         ? {
             occurrence: schedule.monthlyConfig!.occurrence as MONTH_OCCURRENCE,
@@ -236,17 +254,41 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
       if (!isValid) return;
 
       const formData = form.getValues();
+
+      // Normalize the monthly config to the selected mode so the payload is always
+      // internally consistent: positional => send monthlySchedule (occurrence+dayOfWeek)
+      // and clear dayOfMonth; fixed => send flat dayOfMonth and drop monthlySchedule
+      // (the API derives monthlyConfig from whichever branch is present).
+      const freq = formData.frequency as SCHEDULE_FREQUENCY;
+      const isPositionalCapable =
+        frequencyGroups.needsDayOfMonth.includes(freq) && freq !== SCHEDULE_FREQUENCY.ANNUAL;
+      if (isPositionalCapable) {
+        if (monthlyScheduleMode === "positional") {
+          formData.dayOfMonth = null as any;
+        } else {
+          formData.monthlySchedule = undefined as any;
+        }
+      }
+
       await updateMutation.mutateAsync({ id, data: formData });
+      toast.success("Agendamento atualizado com sucesso");
 
       setTimeout(() => {
         navigate(routes.inventory.orders.schedules.root);
       }, 1500);
-    } catch (error) {
+    } catch (error: any) {
+      // Surface the failure instead of swallowing it — a silent catch made failed
+      // saves look like they succeeded (config silently not persisted).
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Erro ao salvar o agendamento. Verifique a configuração e tente novamente.";
+      toast.error(message);
       if (process.env.NODE_ENV !== "production") {
         console.error("Submission error:", error);
       }
     }
-  }, [validateCurrentStep, form, updateMutation, navigate, id]);
+  }, [validateCurrentStep, form, updateMutation, navigate, id, monthlyScheduleMode, frequencyGroups]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.orders.schedules.root);
@@ -316,11 +358,25 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
     (next: "fixed" | "positional") => {
       setMonthlyScheduleMode(next);
       if (next === "fixed") {
-        // undefined tells the form not to send a monthlySchedule key in the
-        // update payload; the API repo only acts on this key when present.
+        // Drop the positional object; the API derives a fixed monthlyConfig from
+        // the flat dayOfMonth and nulls occurrence/dayOfWeek.
         form.setValue("monthlySchedule", undefined as any, { shouldValidate: false });
       } else {
         form.setValue("dayOfMonth", null as any, { shouldValidate: false });
+        // Seed the positional object (preserving any loaded values) so RHF
+        // registers it as an object rather than leaving a partial that would
+        // fail the strict monthlySchedule schema.
+        const current = form.getValues("monthlySchedule") as
+          | { occurrence?: MONTH_OCCURRENCE; dayOfWeek?: WEEK_DAY }
+          | undefined;
+        form.setValue(
+          "monthlySchedule",
+          {
+            occurrence: current?.occurrence ?? schedule.monthlyConfig?.occurrence ?? undefined,
+            dayOfWeek: current?.dayOfWeek ?? schedule.monthlyConfig?.dayOfWeek ?? undefined,
+          } as any,
+          { shouldValidate: false },
+        );
       }
     },
     [form],
@@ -755,7 +811,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                             <span className="text-sm font-medium text-muted-foreground">Dia no mês</span>
                             <span className="text-sm font-semibold text-foreground">
                               {(MONTH_OCCURRENCE_LABELS as any)[watchedMonthlySchedule.occurrence]}{" "}
-                              {(WEEK_DAY_LABELS as any)[watchedMonthlySchedule.dayOfWeek]?.toLowerCase()}-feira
+                              {(WEEK_DAY_LABELS as any)[watchedMonthlySchedule.dayOfWeek]?.toLowerCase()}
                             </span>
                           </div>
                         )}

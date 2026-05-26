@@ -11,7 +11,7 @@ import { IconChevronUp, IconChevronDown, IconCheck, IconX, IconAlertTriangle, Ic
 import { ItemListSkeleton } from "./item-list-skeleton";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { useItemMutations, useItemBatchMutations, useItems } from "../../../../hooks";
+import { useItemMutations, useItemBatchMutations, useItems, useCanViewPrices } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -38,6 +38,7 @@ interface ItemTableProps {
 export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDeactivate, onDelete, onMerge, onStockBalance, filters = {}, onDataChange }: ItemTableProps) {
   const navigate = useNavigate();
   const { user, isLoading: _isAuthLoading } = useAuth();
+  const canViewPrices = useCanViewPrices();
   const { delete: _deleteItem } = useItemMutations();
   const { batchDelete: _batchDelete } = useItemBatchMutations();
 
@@ -448,8 +449,11 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
   ];
   */
 
-  // Filter columns based on visibility
-  const columns = allColumns.filter((col) => visibleColumns.has(col.key));
+  // Price columns hidden from warehouse users
+  const priceColumnKeys = new Set(["price", "totalPrice"]);
+
+  // Filter columns based on visibility and price-view privilege
+  const columns = allColumns.filter((col) => visibleColumns.has(col.key) && (canViewPrices || !priceColumnKeys.has(col.key)));
 
   // Get current page item IDs for selection
   const currentPageItemIds = React.useMemo(() => {
@@ -790,7 +794,7 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
             </DropdownMenuItem>
           )}
 
-          {canEdit && (
+          {canEdit && canViewPrices && (
             <DropdownMenuItem onClick={handlePriceAdjustment}>
               <IconPercentage className="mr-2 h-4 w-4" />
               Aplicar Ajuste
@@ -830,15 +834,17 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
       </DropdownMenu>
 
       {/* Price Adjustment Modal */}
-      <PriceAdjustmentModal
-        open={priceAdjustmentModal.open}
-        onOpenChange={(open) => setPriceAdjustmentModal({ ...priceAdjustmentModal, open })}
-        selectedItems={priceAdjustmentModal.items}
-        onSuccess={() => {
-          // Refetch data after successful price adjustment
-          // The hook will automatically refetch due to React Query's invalidation
-        }}
-      />
+      {canViewPrices && (
+        <PriceAdjustmentModal
+          open={priceAdjustmentModal.open}
+          onOpenChange={(open) => setPriceAdjustmentModal({ ...priceAdjustmentModal, open })}
+          selectedItems={priceAdjustmentModal.items}
+          onSuccess={() => {
+            // Refetch data after successful price adjustment
+            // The hook will automatically refetch due to React Query's invalidation
+          }}
+        />
+      )}
     </div>
   );
 }

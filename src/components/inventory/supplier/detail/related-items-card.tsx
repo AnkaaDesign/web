@@ -13,6 +13,7 @@ import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { ColumnVisibilityManager } from "../../item/list/column-visibility-manager";
 import { createItemColumns } from "../../item/list/item-table-columns";
+import { useCanViewPrices } from "../../../../hooks";
 
 interface RelatedItemsCardProps {
   items?: Item[];
@@ -24,6 +25,7 @@ const DEFAULT_PAGE_SIZE = 20;
 
 export function RelatedItemsCard({ items, supplierId, className }: RelatedItemsCardProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const safeItems = items || [];
 
   // Local state for search, pagination, and sorting
@@ -39,8 +41,12 @@ export function RelatedItemsCard({ items, supplierId, className }: RelatedItemsC
     new Set(["uniCode", "name", "brand.name", "category.name", "quantity", "price"])
   );
 
-  // Get all available columns for column visibility manager
-  const allColumns = useMemo(() => createItemColumns(), []);
+  // Get all available columns for column visibility manager (hide price columns from warehouse users)
+  const allColumns = useMemo(() => {
+    const cols = createItemColumns();
+    if (canViewPrices) return cols;
+    return cols.filter((col) => col.key !== "price" && col.key !== "totalPrice");
+  }, [canViewPrices]);
 
   // Filter items based on search
   const filteredItems = useMemo(() => {

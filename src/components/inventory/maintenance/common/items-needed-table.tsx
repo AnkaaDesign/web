@@ -5,7 +5,7 @@ import { routes } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { IconChevronUp, IconChevronDown, IconSelector, IconAlertTriangle, IconPackage } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useItems } from "../../../../hooks";
+import { useItems, useCanViewPrices } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
@@ -29,6 +29,7 @@ interface ItemsNeededTableProps {
 
 export function ItemsNeededTable({ itemsConfig, visibleColumns, className, filters = {}, onDataChange }: ItemsNeededTableProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -124,7 +125,7 @@ export function ItemsNeededTable({ itemsConfig, visibleColumns, className, filte
   }, [items, totalRecords, onDataChange]);
 
   // Define all available columns
-  const allColumns: ItemNeededColumn[] = createItemsNeededColumns();
+  const allColumns: ItemNeededColumn[] = createItemsNeededColumns(canViewPrices);
 
   // Filter visible columns
   const columns = React.useMemo(() => allColumns.filter((col) => visibleColumns.has(col.key)), [allColumns, visibleColumns]);

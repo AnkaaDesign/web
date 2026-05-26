@@ -1,5 +1,5 @@
 import { useParams, Navigate, useNavigate } from "react-router-dom";
-import { usePaintFormula, usePaintProductionMutations } from "../../../../hooks";
+import { usePaintFormula, usePaintProductionMutations, useCanViewPrices } from "../../../../hooks";
 import { FormulaCalculator } from "@/components/painting/formula/formula-calculator";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -17,6 +17,7 @@ export default function FormulaDetails() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canEdit = canEditPaints(user);
+  const canViewPrices = useCanViewPrices();
   const { create: createProduction } = usePaintProductionMutations();
 
   const {
@@ -138,14 +139,16 @@ export default function FormulaDetails() {
                   <p className="text-sm font-medium text-muted-foreground">Densidade</p>
                   <p className="text-lg font-semibold">{formula.density} g/ml</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Preço por Litro</p>
-                  <p className="text-lg font-semibold">
-                    {(() => {
-                      return formatCurrency(formula.pricePerLiter);
-                    })()}
-                  </p>
-                </div>
+                {canViewPrices && (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">Preço por Litro</p>
+                    <p className="text-lg font-semibold">
+                      {(() => {
+                        return formatCurrency(formula.pricePerLiter);
+                      })()}
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Descrição</p>
                   <p className="text-sm">{formula.description || "Sem descrição"}</p>

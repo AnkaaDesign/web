@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "react-router-dom";
 import { routes } from "../../../../constants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useCanViewPrices } from "../../../../hooks";
 
 interface RelatedOrdersCardProps {
   supplier: Supplier;
@@ -65,6 +66,7 @@ const ORDER_STATUS_CONFIG: Record<
 
 export function RelatedOrdersCard({ supplier, className }: RelatedOrdersCardProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const orders = supplier.orders || [];
 
   // Sort orders by status priority (active orders first) and then by date
@@ -167,7 +169,7 @@ export function RelatedOrdersCard({ supplier, className }: RelatedOrdersCardProp
 
       <CardContent className="pt-0">
         {/* Statistics Summary */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className={cn("grid gap-3 mb-6", canViewPrices ? "grid-cols-3" : "grid-cols-2")}>
           <div className="bg-card-nested rounded-lg p-3 border border-border">
             <span className="text-xs font-medium text-muted-foreground block">Total de Pedidos</span>
             <p className="text-xl font-bold mt-1">{statistics.totalOrders}</p>
@@ -178,10 +180,12 @@ export function RelatedOrdersCard({ supplier, className }: RelatedOrdersCardProp
             <p className="text-xl font-bold mt-1 text-yellow-800 dark:text-yellow-200">{statistics.activeOrders}</p>
           </div>
 
-          <div className="bg-blue-50/80 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200/40 dark:border-blue-700/40">
-            <span className="text-xs font-medium text-blue-800 dark:text-blue-200 block">Valor Total</span>
-            <p className="text-xl font-bold mt-1 text-blue-800 dark:text-blue-200">{formatCurrency(statistics.totalValue)}</p>
-          </div>
+          {canViewPrices && (
+            <div className="bg-blue-50/80 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200/40 dark:border-blue-700/40">
+              <span className="text-xs font-medium text-blue-800 dark:text-blue-200 block">Valor Total</span>
+              <p className="text-xl font-bold mt-1 text-blue-800 dark:text-blue-200">{formatCurrency(statistics.totalValue)}</p>
+            </div>
+          )}
         </div>
 
         {/* Status Summary */}
@@ -261,7 +265,7 @@ export function RelatedOrdersCard({ supplier, className }: RelatedOrdersCardProp
                             <span className="font-medium tabular-nums text-sm">{formatDate(order.createdAt)}</span>
                           </div>
 
-                          {orderTotal > 0 && <p className="text-xs text-muted-foreground font-medium">{formatCurrency(orderTotal)}</p>}
+                          {canViewPrices && orderTotal > 0 && <p className="text-xs text-muted-foreground font-medium">{formatCurrency(orderTotal)}</p>}
                         </div>
                       </div>
                     </div>

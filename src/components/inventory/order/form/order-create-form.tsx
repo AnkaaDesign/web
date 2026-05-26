@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconTruck, IconNotes, IconClipboardList, IconCreditCard, IconPercentage } from "@tabler/icons-react";
 import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
-import { useOrderMutations, useItems, useSuppliers } from "../../../../hooks";
+import { useOrderMutations, useItems, useSuppliers, useCanViewPrices } from "../../../../hooks";
 import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, SECTOR_PRIVILEGES } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
@@ -32,6 +32,7 @@ import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 export const OrderCreateForm = () => {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
 
   // File upload state
   const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>([]);
@@ -1171,19 +1172,21 @@ export const OrderCreateForm = () => {
                                   </span>
                                 </div>
 
-                                {discountAmount > 0 && (
+                                {canViewPrices && discountAmount > 0 && (
                                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                                     <span className="text-sm text-muted-foreground">Desconto ({watchedDiscount}%)</span>
                                     <span className="text-sm font-semibold text-red-600 dark:text-red-400">- {formatCurrency(discountAmount)}</span>
                                   </div>
                                 )}
 
-                                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                                  <span className="text-sm text-muted-foreground">Valor Total</span>
-                                  <span className="text-sm font-semibold text-primary">
-                                    {formatCurrency(grandTotal)}
-                                  </span>
-                                </div>
+                                {canViewPrices && (
+                                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                                    <span className="text-sm text-muted-foreground">Valor Total</span>
+                                    <span className="text-sm font-semibold text-primary">
+                                      {formatCurrency(grandTotal)}
+                                    </span>
+                                  </div>
+                                )}
                               </>
                             );
                           })()}
@@ -1333,28 +1336,31 @@ export const OrderCreateForm = () => {
                           )}
 
                           {/* Freight (frete) — supplier shipping cost added to the order total. */}
-                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
-                            <span className="text-sm text-muted-foreground whitespace-nowrap mr-4 flex items-center gap-2">
-                              <IconTruck className="h-4 w-4" />
-                              Frete
-                            </span>
-                            <div className="flex-1 max-w-[55%]">
-                              <Input
-                                type="currency"
-                                value={form.watch("freight") ?? 0}
-                                onChange={(value) => {
-                                  const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
-                                  const sanitized = Number.isFinite(n) && n >= 0 ? n : 0;
-                                  form.setValue("freight", sanitized, { shouldDirty: true, shouldTouch: true });
-                                  updateFreight(sanitized);
-                                }}
-                                placeholder="R$ 0,00"
-                                className="h-8 w-full border-neutral-500"
-                              />
+                          {canViewPrices && (
+                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
+                              <span className="text-sm text-muted-foreground whitespace-nowrap mr-4 flex items-center gap-2">
+                                <IconTruck className="h-4 w-4" />
+                                Frete
+                              </span>
+                              <div className="flex-1 max-w-[55%]">
+                                <Input
+                                  type="currency"
+                                  value={form.watch("freight") ?? 0}
+                                  onChange={(value) => {
+                                    const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+                                    const sanitized = Number.isFinite(n) && n >= 0 ? n : 0;
+                                    form.setValue("freight", sanitized, { shouldDirty: true, shouldTouch: true });
+                                    updateFreight(sanitized);
+                                  }}
+                                  placeholder="R$ 0,00"
+                                  className="h-8 w-full border-neutral-500"
+                                />
+                              </div>
                             </div>
-                          </div>
+                          )}
 
                           {/* Discount (desconto) — percentage applied to the goods subtotal (before ICMS/IPI). */}
+                          {canViewPrices && (
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
                             <span className="text-sm text-muted-foreground whitespace-nowrap mr-4 flex items-center gap-2">
                               <IconPercentage className="h-4 w-4" />
@@ -1375,6 +1381,7 @@ export const OrderCreateForm = () => {
                               />
                             </div>
                           </div>
+                          )}
                         </CardContent>
                       </Card>
                     </div>
@@ -1464,9 +1471,13 @@ export const OrderCreateForm = () => {
                                     <TableHead className="font-semibold">Marca</TableHead>
                                     <TableHead className="font-semibold">Medida</TableHead>
                                     <TableHead className="text-right font-semibold">Quantidade</TableHead>
-                                    <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
-                                    <TableHead className="text-right font-semibold">Impostos</TableHead>
-                                    <TableHead className="text-right font-semibold">Total</TableHead>
+                                    {canViewPrices && (
+                                      <>
+                                        <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
+                                        <TableHead className="text-right font-semibold">Impostos</TableHead>
+                                        <TableHead className="text-right font-semibold">Total</TableHead>
+                                      </>
+                                    )}
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -1486,12 +1497,16 @@ export const OrderCreateForm = () => {
                                       <TableCell>{row.brand}</TableCell>
                                       <TableCell>{row.measures}</TableCell>
                                       <TableCell className="text-right font-medium">{row.quantity.toLocaleString("pt-BR")}</TableCell>
-                                      <TableCell className="text-right">{formatCurrency(row.price, "pt-BR", "BRL", 3)}</TableCell>
-                                      <TableCell className="text-right">{formatCurrency(row.taxAmount)}</TableCell>
-                                      <TableCell className="text-right font-semibold">{formatCurrency(row.total)}</TableCell>
+                                      {canViewPrices && (
+                                        <>
+                                          <TableCell className="text-right">{formatCurrency(row.price, "pt-BR", "BRL", 3)}</TableCell>
+                                          <TableCell className="text-right">{formatCurrency(row.taxAmount)}</TableCell>
+                                          <TableCell className="text-right font-semibold">{formatCurrency(row.total)}</TableCell>
+                                        </>
+                                      )}
                                     </TableRow>
                                   ))}
-                                  {watchedFreight > 0 && (
+                                  {canViewPrices && watchedFreight > 0 && (
                                     <TableRow className="bg-muted/20">
                                       <TableCell colSpan={7} className="text-right text-sm text-muted-foreground">
                                         Frete:
@@ -1499,7 +1514,7 @@ export const OrderCreateForm = () => {
                                       <TableCell className="text-right font-medium">{formatCurrency(watchedFreight)}</TableCell>
                                     </TableRow>
                                   )}
-                                  {discountAmount > 0 && (
+                                  {canViewPrices && discountAmount > 0 && (
                                     <TableRow className="bg-muted/20">
                                       <TableCell colSpan={7} className="text-right text-sm text-muted-foreground">
                                         Desconto ({watchedDiscount}%):
@@ -1507,12 +1522,14 @@ export const OrderCreateForm = () => {
                                       <TableCell className="text-right font-medium text-red-600 dark:text-red-400">- {formatCurrency(discountAmount)}</TableCell>
                                     </TableRow>
                                   )}
-                                  <TableRow className="bg-muted/30 font-semibold">
-                                    <TableCell colSpan={7} className="text-right">
-                                      Total Geral:
-                                    </TableCell>
-                                    <TableCell className="text-right">{formatCurrency(grandTotal)}</TableCell>
-                                  </TableRow>
+                                  {canViewPrices && (
+                                    <TableRow className="bg-muted/30 font-semibold">
+                                      <TableCell colSpan={7} className="text-right">
+                                        Total Geral:
+                                      </TableCell>
+                                      <TableCell className="text-right">{formatCurrency(grandTotal)}</TableCell>
+                                    </TableRow>
+                                  )}
                                 </TableBody>
                               </Table>
                             </div>

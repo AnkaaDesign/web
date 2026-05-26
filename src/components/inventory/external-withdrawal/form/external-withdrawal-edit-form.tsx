@@ -6,7 +6,7 @@ import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconUser, IconPa
 import type { ExternalWithdrawalCreateFormData } from "../../../../schemas";
 import type { ExternalWithdrawal, ExternalWithdrawalItem, Item } from "../../../../types";
 import { externalWithdrawalCreateSchema } from "../../../../schemas";
-import { useExternalWithdrawalMutations, useItems } from "../../../../hooks";
+import { useExternalWithdrawalMutations, useItems, useCanViewPrices } from "../../../../hooks";
 import { routes, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
@@ -66,6 +66,7 @@ const setStepInUrl = (searchParams: URLSearchParams, step: number): URLSearchPar
 
 export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEditFormProps) => {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Initialize state from URL parameters
@@ -639,7 +640,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
               <span class="info-value">${selectionCount} ${selectionCount === 1 ? "item" : "itens"}</span>
             </div>
             ${
-              withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
+              canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
                 ? `
               <div class="info-item">
                 <span class="info-label">Valor Total</span>
@@ -670,7 +671,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                 <th>Categoria</th>
                 <th>Marca</th>
                 <th class="text-right">Quantidade</th>
-                ${withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? '<th class="text-right">Preço Unit.</th><th class="text-right">Total</th>' : ""}
+                ${canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? '<th class="text-right">Preço Unit.</th><th class="text-right">Total</th>' : ""}
               </tr>
             </thead>
             <tbody>
@@ -686,14 +687,14 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                     <td>${item.category?.name || "-"}</td>
                     <td>${item.brand?.name || "-"}</td>
                     <td class="text-right">${quantity}${item.measureUnit && MEASURE_UNIT_LABELS[item.measureUnit as keyof typeof MEASURE_UNIT_LABELS] ? ` ${MEASURE_UNIT_LABELS[item.measureUnit as keyof typeof MEASURE_UNIT_LABELS]}` : ""}</td>
-                    ${withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? `<td class="text-right">${formatCurrency(price)}</td><td class="text-right font-medium">${formatCurrency(itemTotal)}</td>` : ""}
+                    ${canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? `<td class="text-right">${formatCurrency(price)}</td><td class="text-right font-medium">${formatCurrency(itemTotal)}</td>` : ""}
                   </tr>
                 `;
                 })
                 .join("")}
             </tbody>
             ${
-              withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
+              canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
                 ? `
               <tfoot>
                 <tr class="total-row">
@@ -1045,7 +1046,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                               {selectionCount} {selectionCount === 1 ? "item" : "itens"}
                             </p>
                           </div>
-                          {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
+                          {canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                             <div>
                               <span className="text-sm font-medium text-muted-foreground">Valor Total:</span>
                               <p className="mt-1 font-medium">{formatCurrency(totalPrice)}</p>
@@ -1079,7 +1080,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                                 <TableHead>Categoria</TableHead>
                                 <TableHead>Marca</TableHead>
                                 <TableHead className="text-right">Quantidade</TableHead>
-                                {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
+                                {canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                                   <>
                                     <TableHead className="text-right">Preço Unit.</TableHead>
                                     <TableHead className="text-right">Total</TableHead>
@@ -1105,7 +1106,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                                         ? ` ${MEASURE_UNIT_LABELS[item.measureUnit as keyof typeof MEASURE_UNIT_LABELS]}`
                                         : ""}
                                     </TableCell>
-                                    {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
+                                    {canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                                       <>
                                         <TableCell className="text-right">{formatCurrency(price)}</TableCell>
                                         <TableCell className="text-right font-medium">{formatCurrency(itemTotal)}</TableCell>
@@ -1115,7 +1116,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                                 );
                               })}
                             </TableBody>
-                            {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
+                            {canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                               <TableFooter>
                                 <TableRow>
                                   <TableCell colSpan={5} className="text-right font-medium">

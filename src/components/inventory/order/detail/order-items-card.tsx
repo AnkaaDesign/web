@@ -22,7 +22,7 @@ import { exportOrderPdf } from "@/utils/order-pdf-generator";
 import { OrderPdfExportButton } from "../common/order-pdf-export-button";
 import type { Order, OrderItem } from "../../../../types";
 import { ORDER_STATUS, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, MEASURE_TYPE } from "../../../../constants";
-import { useOrderItemBatchMutations, useOrderItemSpecializedBatchMutations } from "../../../../hooks";
+import { useOrderItemBatchMutations, useOrderItemSpecializedBatchMutations, useCanViewPrices } from "../../../../hooks";
 import { toast } from "@/components/ui/sonner";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { StockStatusIndicator } from "../../item/list/stock-status-indicator";
@@ -45,6 +45,7 @@ interface SelectedItems {
 }
 
 export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCardProps) {
+  const canViewPrices = useCanViewPrices();
   const { batchUpdate } = useOrderItemBatchMutations({
     onBatchUpdateSuccess: () => {
       toast.success("Quantidades recebidas atualizadas com sucesso!");
@@ -379,13 +380,15 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
             <span className="text-lg font-semibold text-foreground">{summary.totalReceived.toLocaleString("pt-BR")}</span>
           </div>
 
-          <div className="bg-muted/50 rounded-lg px-4 py-3">
-            <div className="flex items-center gap-2 mb-1">
-              <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Valor Total</span>
+          {canViewPrices && (
+            <div className="bg-muted/50 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Valor Total</span>
+              </div>
+              <span className="text-lg font-semibold text-foreground">{formatCurrency(summary.totalValue)}</span>
             </div>
-            <span className="text-lg font-semibold text-foreground">{formatCurrency(summary.totalValue)}</span>
-          </div>
+          )}
 
           <div className="bg-muted/50 rounded-lg px-4 py-3">
             <div className="flex items-center gap-2 mb-1">
@@ -457,10 +460,14 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                 <TableHead className="text-center">Estoque</TableHead>
                 <TableHead className="text-center">Qtd. Pedida</TableHead>
                 <TableHead className="text-center">Qtd. Recebida</TableHead>
-                <TableHead className="text-right">Preço Unit.</TableHead>
-                <TableHead className="text-right">ICMS</TableHead>
-                <TableHead className="text-right">IPI</TableHead>
-                <TableHead className="text-right">Total</TableHead>
+                {canViewPrices && (
+                  <>
+                    <TableHead className="text-right">Preço Unit.</TableHead>
+                    <TableHead className="text-right">ICMS</TableHead>
+                    <TableHead className="text-right">IPI</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </>
+                )}
                 <TableHead className="text-center">Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -551,18 +558,22 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right py-2">
-                      <span className="text-sm">{formatCurrency(item.price)}</span>
-                    </TableCell>
-                    <TableCell className="text-right py-2">
-                      <span className="text-sm">{item.icms}%</span>
-                    </TableCell>
-                    <TableCell className="text-right py-2">
-                      <span className="text-sm">{item.ipi}%</span>
-                    </TableCell>
-                    <TableCell className="text-right py-2">
-                      <span className="text-sm font-medium">{formatCurrency(itemTotal)}</span>
-                    </TableCell>
+                    {canViewPrices && (
+                      <>
+                        <TableCell className="text-right py-2">
+                          <span className="text-sm">{formatCurrency(item.price)}</span>
+                        </TableCell>
+                        <TableCell className="text-right py-2">
+                          <span className="text-sm">{item.icms}%</span>
+                        </TableCell>
+                        <TableCell className="text-right py-2">
+                          <span className="text-sm">{item.ipi}%</span>
+                        </TableCell>
+                        <TableCell className="text-right py-2">
+                          <span className="text-sm font-medium">{formatCurrency(itemTotal)}</span>
+                        </TableCell>
+                      </>
+                    )}
                     <TableCell className="text-center py-2">
                       <div className="flex flex-wrap items-center justify-center gap-1">
                         {rowStatus === "pending" && (

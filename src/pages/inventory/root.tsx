@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, ORDER_STATUS_LABELS, STOCK_LEVEL, ACTIVITY_OPERATION } from "../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { useInventoryDashboard, useOrders, useBorrows, useItems, useSuppliers, useActivities } from "../../hooks";
+import { useInventoryDashboard, useOrders, useBorrows, useItems, useSuppliers, useActivities, useCanViewPrices } from "../../hooks";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "../../utils";
 import { useState, useMemo } from "react";
@@ -43,6 +43,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export const InventoryRootPage = () => {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const [timePeriod, setTimePeriod] = useState<string>(DASHBOARD_TIME_PERIOD.THIS_MONTH);
 
   // Track page access
@@ -248,7 +249,7 @@ export const InventoryRootPage = () => {
       return {
         item: order.description || "Sem descrição",
         info: `${order.items?.length || 0} ${order.items?.length === 1 ? "item" : "itens"}`,
-        quantity: formatCurrency(totalPrice),
+        quantity: canViewPrices ? formatCurrency(totalPrice) : "",
         time: ORDER_STATUS_LABELS[order.status] || order.status || "Status desconhecido",
       };
     });
@@ -533,14 +534,16 @@ export const InventoryRootPage = () => {
                   icon={Package}
                   subtitle="Produtos únicos"
                 />
-                <TrendCard
-                  title="Valor Total"
-                  value={formatCurrency(data?.overview?.totalValue?.value || 0)}
-                  trend={data?.overview?.totalValue?.trend}
-                  percentage={data?.overview?.totalValue?.changePercent}
-                  icon={DollarSign}
-                  subtitle="Em estoque"
-                />
+                {canViewPrices && (
+                  <TrendCard
+                    title="Valor Total"
+                    value={formatCurrency(data?.overview?.totalValue?.value || 0)}
+                    trend={data?.overview?.totalValue?.trend}
+                    percentage={data?.overview?.totalValue?.changePercent}
+                    icon={DollarSign}
+                    subtitle="Em estoque"
+                  />
+                )}
                 <TrendCard
                   title="Itens Críticos"
                   value={data?.overview?.criticalItems?.value || 0}

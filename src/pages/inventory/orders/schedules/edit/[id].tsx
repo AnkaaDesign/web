@@ -28,10 +28,15 @@ export const OrderScheduleEditPage = () => {
     isLoading,
     error,
   } = useOrderSchedule(id!, {
+    // weeklyConfig/monthlyConfig/yearlyConfig store their recurrence as scalar
+    // columns (e.g. monthlyConfig.occurrence + dayOfWeek for "1st Thursday").
+    // Requesting `true` returns those scalars. The previous nested includes
+    // (daysOfWeek/occurrences/monthlyConfigs) reference relations that do NOT
+    // exist on these models, so Prisma threw and the config never reached the form.
     include: {
-      weeklyConfig: { include: { daysOfWeek: true } },
-      monthlyConfig: { include: { occurrences: true } },
-      yearlyConfig: { include: { monthlyConfigs: true } },
+      weeklyConfig: true,
+      monthlyConfig: true,
+      yearlyConfig: true,
     },
     enabled: !!id,
   });

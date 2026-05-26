@@ -3,6 +3,7 @@ import { IconChartBar, IconPackage, IconShoppingCart, IconTrendingUp } from "@ta
 import type { Supplier } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 
 interface MetricsCardProps {
   supplier: Supplier;
@@ -10,6 +11,7 @@ interface MetricsCardProps {
 }
 
 export function MetricsCard({ supplier, className }: MetricsCardProps) {
+  const canViewPrices = useCanViewPrices();
   // Calculate statistics from relationships - prioritize _count over array length
   const itemsCount = supplier._count?.items ?? supplier.items?.length ?? 0;
   const ordersCount = supplier._count?.orders ?? supplier.orders?.length ?? 0;
@@ -60,7 +62,7 @@ export function MetricsCard({ supplier, className }: MetricsCardProps) {
           </div>
 
           {/* Financial Information */}
-          {totalOrderValue > 0 && (
+          {canViewPrices && totalOrderValue > 0 && (
             <div className="pt-6 border-t border-border">
               <h3 className="text-base font-semibold mb-4 text-foreground">Informações Financeiras</h3>
               <div className="bg-muted/50 rounded-lg px-4 py-3">

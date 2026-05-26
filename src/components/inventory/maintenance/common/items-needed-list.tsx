@@ -6,6 +6,7 @@ import { ItemsNeededTable } from "./items-needed-table";
 import { ItemsNeededColumnVisibilityManager, getDefaultVisibleColumns } from "./items-needed-column-visibility-manager";
 import { createItemsNeededColumns } from "./items-needed-columns";
 import { cn } from "@/lib/utils";
+import { useCanViewPrices } from "../../../../hooks";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { IconPackage } from "@tabler/icons-react";
@@ -21,6 +22,7 @@ interface ItemsNeededListProps {
 }
 
 export function ItemsNeededList({ itemsConfig, className }: ItemsNeededListProps) {
+  const canViewPrices = useCanViewPrices();
   // State to hold current page items and total count from the table
   const [_tableData, setTableData] = useState<{ items: Item[]; totalRecords: number }>({ items: [], totalRecords: 0 });
 
@@ -38,13 +40,13 @@ export function ItemsNeededList({ itemsConfig, className }: ItemsNeededListProps
   });
 
   // Default visible columns
-  const defaultVisibleColumns = useMemo(() => getDefaultVisibleColumns(), []);
+  const defaultVisibleColumns = useMemo(() => getDefaultVisibleColumns(canViewPrices), [canViewPrices]);
 
   // Column visibility state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility("items-needed-visible-columns", defaultVisibleColumns);
 
   // Get all columns for visibility manager
-  const allColumns = useMemo(() => createItemsNeededColumns(), []);
+  const allColumns = useMemo(() => createItemsNeededColumns(canViewPrices), [canViewPrices]);
 
   return (
     <Card className={cn("flex flex-col shadow-sm border border-border w-full", className)}>

@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { cn } from "@/lib/utils";
-import { useBatchUpdateExternalWithdrawalItems } from "../../../../hooks";
+import { useBatchUpdateExternalWithdrawalItems, useCanViewPrices } from "../../../../hooks";
 import { toast } from "@/components/ui/sonner";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 
@@ -33,6 +33,7 @@ interface SelectedItems {
 }
 
 export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawalUpdate }: ExternalWithdrawalItemsCardProps) {
+  const canViewPrices = useCanViewPrices();
   const { mutateAsync: batchUpdateItems } = useBatchUpdateExternalWithdrawalItems();
 
   // Track changes to items
@@ -309,13 +310,15 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
             </div>
           )}
 
-          <div className="bg-muted/50 rounded-lg px-4 py-3">
-            <div className="flex items-center gap-2 mb-1">
-              <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Valor Total</span>
+          {canViewPrices && (
+            <div className="bg-muted/50 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Valor Total</span>
+              </div>
+              <span className="text-lg font-semibold text-foreground">{formatCurrency(summary.totalValue)}</span>
             </div>
-            <span className="text-lg font-semibold text-foreground">{formatCurrency(summary.totalValue)}</span>
-          </div>
+          )}
 
           {isReturnable && (
             <div className="bg-muted/50 rounded-lg px-4 py-3">
@@ -378,8 +381,12 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
                 <TableHead>Item</TableHead>
                 <TableHead className="text-center">Qtd. Retirada</TableHead>
                 {isReturnable && <TableHead className="text-center">Qtd. Devolvida</TableHead>}
-                <TableHead className="text-right">Preço Unit.</TableHead>
-                <TableHead className="text-right">Total</TableHead>
+                {canViewPrices && (
+                  <>
+                    <TableHead className="text-right">Preço Unit.</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </>
+                )}
                 <TableHead className="text-center">Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -473,12 +480,16 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
                         )}
                       </TableCell>
                     )}
-                    <TableCell className="text-right">
-                      <span className="font-mono text-sm">{formatCurrency(withdrawalItem.price || 0)}</span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span className="font-mono text-sm font-medium">{formatCurrency(itemTotal)}</span>
-                    </TableCell>
+                    {canViewPrices && (
+                      <>
+                        <TableCell className="text-right">
+                          <span className="font-mono text-sm">{formatCurrency(withdrawalItem.price || 0)}</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="font-mono text-sm font-medium">{formatCurrency(itemTotal)}</span>
+                        </TableCell>
+                      </>
+                    )}
                     <TableCell className="text-center">
                       {rowStatus === "pending" && (
                         <Badge variant="outline" className="text-xs">

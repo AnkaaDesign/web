@@ -2,6 +2,7 @@ import { BaseExportPopover, type ExportColumn } from "@/components/ui/export-pop
 import type { Order } from "../../../../types";
 import type { OrderGetManyFormData } from "../../../../schemas";
 import { orderService } from "../../../../api-client";
+import { useCanViewPrices } from "../../../../hooks";
 import { formatCurrency, formatDate } from "../../../../utils";
 import { ORDER_STATUS_LABELS } from "../../../../constants";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
@@ -79,6 +80,16 @@ const EXPORT_COLUMNS: ExportColumn<Order>[] = [
 const DEFAULT_VISIBLE_COLUMNS = new Set(["id", "description", "supplier.fantasyName", "itemCount", "status", "forecast", "createdAt"]);
 
 export function OrderExport({ className, currentItems, totalRecords, selectedItems, visibleColumns, filters }: OrderExportProps) {
+  const canViewPrices = useCanViewPrices();
+  // Hide monetary columns from warehouse users
+  const exportColumns = canViewPrices ? EXPORT_COLUMNS : EXPORT_COLUMNS.filter((col) => col.id !== "total");
+  const effectiveVisibleColumns = canViewPrices
+    ? visibleColumns
+    : new Set(Array.from(visibleColumns).filter((key) => key !== "total"));
+  const effectiveDefaultColumns = canViewPrices
+    ? DEFAULT_VISIBLE_COLUMNS
+    : new Set(Array.from(DEFAULT_VISIBLE_COLUMNS).filter((key) => key !== "total"));
+
   // Fetch all data when needed
   const fetchAllItems = async (): Promise<Order[]> => {
     const response = await orderService.getOrders({
@@ -294,9 +305,9 @@ export function OrderExport({ className, currentItems, totalRecords, selectedIte
       currentItems={currentItems}
       totalRecords={totalRecords}
       selectedItems={selectedItems}
-      visibleColumns={visibleColumns}
-      exportColumns={EXPORT_COLUMNS}
-      defaultVisibleColumns={DEFAULT_VISIBLE_COLUMNS}
+      visibleColumns={effectiveVisibleColumns}
+      exportColumns={exportColumns}
+      defaultVisibleColumns={effectiveDefaultColumns}
       onExport={handleExport}
       onFetchAllItems={fetchAllItems}
       entityName="pedido"

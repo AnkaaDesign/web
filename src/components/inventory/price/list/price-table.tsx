@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { canEditItems, canDeleteItems } from "@/utils/permissions/entity-permissions";
 import { useAuth } from "@/hooks/common/use-auth";
+import { useCanViewPrices } from "../../../../hooks";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +32,7 @@ interface PriceTableProps {
 }
 
 export function PriceTable({ itemId, filters = {}, onEditPrice, onDeletePrice, showItemInfo = true }: PriceTableProps) {
+  const canViewPrices = useCanViewPrices();
   const [page, setPage] = useState(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -165,6 +167,11 @@ export function PriceTable({ itemId, filters = {}, onEditPrice, onDeletePrice, s
     manualPagination: true,
     pageCount: meta?.totalRecords ? Math.ceil(meta.totalRecords / (meta.limit || 20)) : 0,
   });
+
+  // Warehouse users must not see any monetary information
+  if (!canViewPrices) {
+    return null;
+  }
 
   if (isLoading) {
     return (

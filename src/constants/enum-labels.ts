@@ -979,16 +979,19 @@ function describeCadenceDetail(
 
   if (frequency === SCHEDULE_FREQUENCY.WEEKLY || frequency === SCHEDULE_FREQUENCY.BIWEEKLY) {
     if (opts?.weeklyConfig) {
-      const days: string[] = [];
       const w = opts.weeklyConfig;
-      if (w.monday) days.push("segunda");
-      if (w.tuesday) days.push("terça");
-      if (w.wednesday) days.push("quarta");
-      if (w.thursday) days.push("quinta");
-      if (w.friday) days.push("sexta");
-      if (w.saturday) days.push("sábado");
-      if (w.sunday) days.push("domingo");
-      if (days.length) return days.length === 1 ? `${days[0]}-feira` : days.join(", ");
+      // Use the full WEEK_DAY_LABELS (which already include "-feira" where
+      // applicable, and correctly omit it for Sábado/Domingo).
+      const days = [
+        w.monday && wd(WEEK_DAY.MONDAY),
+        w.tuesday && wd(WEEK_DAY.TUESDAY),
+        w.wednesday && wd(WEEK_DAY.WEDNESDAY),
+        w.thursday && wd(WEEK_DAY.THURSDAY),
+        w.friday && wd(WEEK_DAY.FRIDAY),
+        w.saturday && wd(WEEK_DAY.SATURDAY),
+        w.sunday && wd(WEEK_DAY.SUNDAY),
+      ].filter(Boolean) as string[];
+      if (days.length) return days.join(", ");
     }
     if (opts?.dayOfWeek) return wd(opts.dayOfWeek);
     return null;
@@ -1005,7 +1008,9 @@ function describeCadenceDetail(
   if (isMonthlyish) {
     const mc = opts?.monthlyConfig;
     if (mc?.occurrence && mc?.dayOfWeek) {
-      return `toda ${occ(mc.occurrence)} ${wd(mc.dayOfWeek)}-feira`;
+      // e.g. "primeira semana, quinta-feira" / "última semana, terça-feira".
+      // wd() already yields the full label (incl. "-feira"), so don't append it.
+      return `${occ(mc.occurrence)} semana, ${wd(mc.dayOfWeek)}`;
     }
     const dom = mc?.dayOfMonth ?? opts?.dayOfMonth ?? null;
     if (dom != null) return `dia ${dom}`;
@@ -1015,7 +1020,7 @@ function describeCadenceDetail(
   if (frequency === SCHEDULE_FREQUENCY.ANNUAL) {
     const yc = opts?.yearlyConfig;
     if (yc?.month && yc?.occurrence && yc?.dayOfWeek) {
-      return `${occ(yc.occurrence)} ${wd(yc.dayOfWeek)}-feira de ${mo(yc.month)}`;
+      return `${occ(yc.occurrence)} semana, ${wd(yc.dayOfWeek)} de ${mo(yc.month)}`;
     }
     if (yc?.month && yc?.dayOfMonth) return `${yc.dayOfMonth} de ${mo(yc.month)}`;
     if (opts?.month && opts?.dayOfMonth) return `${opts.dayOfMonth} de ${mo(opts.month)}`;

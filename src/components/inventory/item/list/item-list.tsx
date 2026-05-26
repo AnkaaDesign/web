@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useItemMutations, useItemBatchMutations, useItemBrands, useItemCategories, useSuppliers, useItemMerge } from "../../../../hooks";
+import { useItemMutations, useItemBatchMutations, useItemBrands, useItemCategories, useSuppliers, useItemMerge, useCanViewPrices } from "../../../../hooks";
 import type { Item } from "../../../../types";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { routes, STOCK_LEVEL } from "../../../../constants";
@@ -32,6 +32,7 @@ const DEFAULT_PAGE_SIZE = 40;
 
 export function ItemList({ className }: ItemListProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const { update } = useItemMutations();
   const { batchDelete, batchUpdate } = useItemBatchMutations();
   const { mutate: mergeItems, isPending: _isMerging } = useItemMerge();
@@ -262,8 +263,12 @@ export function ItemList({ className }: ItemListProps) {
     new Set(["uniCode", "name", "brand.name", "category.name", "quantity", "monthlyConsumption", "price"])
   );
 
-  // Get all available columns for column visibility manager
-  const allColumns = useMemo(() => createItemColumns(), []);
+  // Get all available columns for column visibility manager (hide price columns from warehouse users)
+  const allColumns = useMemo(() => {
+    const cols = createItemColumns();
+    if (canViewPrices) return cols;
+    return cols.filter((col) => col.key !== "price" && col.key !== "totalPrice");
+  }, [canViewPrices]);
 
   // Create a stable reference for filters using a ref to prevent infinite re-renders
   const queryFiltersRef = useRef<Partial<ItemGetManyFormData>>({});

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useItemCategories, useItemMutations, useItemBatchMutations } from "../../../../hooks";
+import { useItemCategories, useItemMutations, useItemBatchMutations, useCanViewPrices } from "../../../../hooks";
 import type { Item } from "../../../../types";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { routes, ITEM_CATEGORY_TYPE, PPE_TYPE } from "../../../../constants";
@@ -39,6 +39,7 @@ function createDebounce<T extends (...args: any[]) => any>(func: T, wait: number
 
 export function PpeList({ className }: PpeListProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -97,7 +98,7 @@ export function PpeList({ className }: PpeListProps) {
   );
 
   // Get all columns for the visibility manager
-  const columns = createPpeColumns();
+  const columns = createPpeColumns(canViewPrices);
 
   const [showFilterModal, setShowFilterModal] = useState(false);
 

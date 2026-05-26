@@ -38,8 +38,12 @@ export const SkillAssessmentEditPage = () => {
   const assessment = data?.data;
   if (!assessment) return <Navigate to={routes.administration.skillAssessment.root} replace />;
 
-  // Only DRAFT campaigns are editable
-  if (assessment.status !== ASSESSMENT_STATUS.DRAFT) {
+  const isOpen = assessment.status === ASSESSMENT_STATUS.OPEN;
+
+  // DRAFT (full edit) and OPEN (dates / nome / descrição) are editable.
+  // CLOSED and CANCELLED are frozen.
+  const isEditable = assessment.status === ASSESSMENT_STATUS.DRAFT || isOpen;
+  if (!isEditable) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
         <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
@@ -68,7 +72,8 @@ export const SkillAssessmentEditPage = () => {
               <CardContent className="py-10 text-center space-y-2">
                 <h2 className="text-lg font-semibold">Campanha não editável</h2>
                 <p className="text-sm text-muted-foreground">
-                  Apenas campanhas em rascunho (DRAFT) podem ser editadas. Esta campanha já foi aberta.
+                  Apenas campanhas em rascunho ou abertas podem ser editadas. Esta campanha já foi
+                  encerrada ou cancelada.
                 </p>
               </CardContent>
             </Card>
@@ -80,9 +85,22 @@ export const SkillAssessmentEditPage = () => {
 
   const handleSubmit = async (formData: AssessmentUpdateFormData, opts: CampaignSubmitOptions) => {
     try {
-      await updateMutation.mutateAsync({ id, data: formData });
+      // OPEN campaigns already spawned entries tied to their sectors/topics, so
+      // only metadata/dates may change. Strip structural fields so we never
+      // attempt to replace sectors/topics server-side.
+      const payload: AssessmentUpdateFormData = isOpen
+        ? {
+            name: formData.name,
+            description: formData.description,
+            periodStart: formData.periodStart,
+            periodEnd: formData.periodEnd,
+          }
+        : formData;
 
-      if (opts.openAfter) {
+      await updateMutation.mutateAsync({ id, data: payload });
+
+      // "Abrir após salvar" only applies to DRAFT campaigns.
+      if (!isOpen && opts.openAfter) {
         try {
           // Success/error toasts handled by the axios interceptor.
           await openMutation.mutateAsync(id);

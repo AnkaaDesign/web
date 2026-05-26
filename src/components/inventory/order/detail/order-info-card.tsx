@@ -7,6 +7,7 @@ import { OrderTotalBadge } from "../common/order-total-calculator";
 import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFileText, IconId, IconCreditCard, IconCopy, IconQrcode, IconUser } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime, formatCNPJ, formatPixKey } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 import type { Order } from "../../../../types";
 import { PAYMENT_METHOD_LABELS } from "../../../../constants";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
@@ -18,6 +19,7 @@ interface OrderInfoCardProps {
 }
 
 export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
+  const canViewPrices = useCanViewPrices();
   // Check if order has temporary items
   const hasTemporaryItems = order.items?.some((item) => item.temporaryItemDescription);
 
@@ -95,13 +97,15 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
               <span className="text-sm font-semibold text-foreground">{order.description || "-"}</span>
             </div>
 
-            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-              <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <IconCurrencyReal className="h-4 w-4" />
-                Valor Total
-              </span>
-              <OrderTotalBadge orderItems={order.items} discount={order.discount} />
-            </div>
+            {canViewPrices && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconCurrencyReal className="h-4 w-4" />
+                  Valor Total
+                </span>
+                <OrderTotalBadge orderItems={order.items} discount={order.discount} />
+              </div>
+            )}
 
             <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
               <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">

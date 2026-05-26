@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconUser, IconPackage, IconPackageExport, IconDownload, IconFileInvoice, IconReceipt } from "@tabler/icons-react";
 import type { ExternalWithdrawalCreateFormData, ItemGetManyFormData } from "../../../../schemas";
 import { externalWithdrawalCreateSchema } from "../../../../schemas";
-import { useExternalWithdrawalMutations, useItems } from "../../../../hooks";
+import { useExternalWithdrawalMutations, useItems, useCanViewPrices } from "../../../../hooks";
 import { routes, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
@@ -59,6 +59,7 @@ const setStepInUrl = (searchParams: URLSearchParams, step: number): URLSearchPar
 
 export const ExternalWithdrawalCreateForm = () => {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Initialize state from URL parameters
@@ -758,7 +759,7 @@ export const ExternalWithdrawalCreateForm = () => {
                 <th>Medida</th>
                 <th class="text-right">Quantidade</th>
                 ${
-                  withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
+                  canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
                     ? `
                 <th class="text-right">Preço Unit.</th>
                 <th class="text-right">Total</th>
@@ -879,7 +880,7 @@ export const ExternalWithdrawalCreateForm = () => {
                     <td>${getMeasureDisplay()}</td>
                     <td class="text-right font-medium">${quantity.toLocaleString("pt-BR")}</td>
                     ${
-                      withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
+                      canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
                         ? `
                     <td class="text-right">${formatCurrency(price)}</td>
                     <td class="text-right font-semibold">${formatCurrency(total)}</td>
@@ -891,7 +892,7 @@ export const ExternalWithdrawalCreateForm = () => {
                 })
                 .join("")}
               ${
-                withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
+                canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
                   ? `
               <tr class="total-row">
                 <td colspan="6" class="text-right">Total Geral:</td>
@@ -1235,7 +1236,7 @@ export const ExternalWithdrawalCreateForm = () => {
                               {selectionCount} {selectionCount === 1 ? "item" : "itens"}
                             </p>
                           </div>
-                          {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
+                          {canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                             <div>
                               <span className="text-sm font-medium text-muted-foreground">Valor Total:</span>
                               <p className="mt-1 font-medium">{formatCurrency(totalPrice)}</p>
@@ -1269,7 +1270,7 @@ export const ExternalWithdrawalCreateForm = () => {
                                 <TableHead className="font-semibold">Marca</TableHead>
                                 <TableHead className="font-semibold">Medida</TableHead>
                                 <TableHead className="text-right font-semibold">Quantidade</TableHead>
-                                {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
+                                {canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                                   <>
                                     <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
                                     <TableHead className="text-right font-semibold">Total</TableHead>
@@ -1325,7 +1326,7 @@ export const ExternalWithdrawalCreateForm = () => {
                                     <TableCell>{item.brand?.name || "-"}</TableCell>
                                     <TableCell>{getMeasureDisplay()}</TableCell>
                                     <TableCell className="text-right font-medium">{quantity.toLocaleString("pt-BR")}</TableCell>
-                                    {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
+                                    {canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                                       <>
                                         <TableCell className="text-right">{formatCurrency(price)}</TableCell>
                                         <TableCell className="text-right font-semibold">{formatCurrency(total)}</TableCell>
@@ -1334,7 +1335,7 @@ export const ExternalWithdrawalCreateForm = () => {
                                   </TableRow>
                                 );
                               })}
-                              {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
+                              {canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                                 <TableRow className="bg-muted/30 font-semibold">
                                   <TableCell colSpan={6} className="text-right">
                                     Total Geral:

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { IconDownload, IconFileText, IconCurrencyReal, IconChevronRight } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { useCanViewPrices } from "../../../../hooks";
 
 interface OrderPdfExportButtonProps {
   /** Called with the chosen version: true = with values, false = budget request (no values). */
@@ -27,6 +28,7 @@ interface OrderPdfExportButtonProps {
  */
 export function OrderPdfExportButton({ onExport, fixedVersion, label = "Exportar PDF", className, size = "sm", disabled }: OrderPdfExportButtonProps) {
   const [open, setOpen] = useState(false);
+  const canViewPrices = useCanViewPrices();
 
   const handleSelect = (includePricing: boolean) => {
     setOpen(false);
@@ -36,6 +38,11 @@ export function OrderPdfExportButton({ onExport, fixedVersion, label = "Exportar
   const handleClick = () => {
     if (fixedVersion !== undefined) {
       onExport(fixedVersion);
+      return;
+    }
+    // Warehouse users may only export the no-values (budget request) version.
+    if (!canViewPrices) {
+      onExport(false);
       return;
     }
     setOpen(true);
@@ -56,20 +63,22 @@ export function OrderPdfExportButton({ onExport, fixedVersion, label = "Exportar
           </DialogHeader>
 
           <div className="grid gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => handleSelect(true)}
-              className="group flex items-center gap-3 rounded-lg border border-border p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <IconCurrencyReal className="h-5 w-5" />
-              </div>
-              <div className="flex-1">
-                <div className="font-semibold text-foreground">Pedido com Valores</div>
-                <div className="text-sm text-muted-foreground">Documento completo com preços, impostos, desconto e total.</div>
-              </div>
-              <IconChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-            </button>
+            {canViewPrices && (
+              <button
+                type="button"
+                onClick={() => handleSelect(true)}
+                className="group flex items-center gap-3 rounded-lg border border-border p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <IconCurrencyReal className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-foreground">Pedido com Valores</div>
+                  <div className="text-sm text-muted-foreground">Documento completo com preços, impostos, desconto e total.</div>
+                </div>
+                <IconChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </button>
+            )}
 
             <button
               type="button"

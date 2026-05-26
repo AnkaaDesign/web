@@ -5,6 +5,7 @@ import { formatCurrency, determineStockLevel, getStockLevelMessage } from "../..
 import { STOCK_LEVEL_LABELS, ORDER_STATUS, ABC_CATEGORY_LABELS, XYZ_CATEGORY_LABELS, ACTIVITY_OPERATION, STOCK_LEVEL } from "../../../../constants";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { useCanViewPrices } from "../../../../hooks";
 
 interface MetricsCardProps {
   item: Item;
@@ -12,6 +13,7 @@ interface MetricsCardProps {
 }
 
 export function MetricsCard({ item, className }: MetricsCardProps) {
+  const canViewPrices = useCanViewPrices();
   const metrics = useMemo(() => {
     const activities = item.activities || [];
     const last30Days = new Date();
@@ -73,26 +75,30 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
       <CardContent className="pt-0 flex-1">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Current Price */}
-          <div className="p-4 rounded-xl bg-primary/5 border-0">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
-              <IconCurrencyDollar className="h-4 w-4 text-primary" />
-              Preço Atual
+          {canViewPrices && (
+            <div className="p-4 rounded-xl bg-primary/5 border-0">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
+                <IconCurrencyDollar className="h-4 w-4 text-primary" />
+                Preço Atual
+              </div>
+              <p className="text-3xl font-bold text-primary">{formatCurrency(metrics.currentPrice)}</p>
+              <p className="text-sm text-muted-foreground mt-1">por unidade</p>
             </div>
-            <p className="text-3xl font-bold text-primary">{formatCurrency(metrics.currentPrice)}</p>
-            <p className="text-sm text-muted-foreground mt-1">por unidade</p>
-          </div>
+          )}
 
           {/* Stock Value */}
-          <div className="p-4 rounded-xl bg-primary/5 border-0">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
-              <IconCurrencyDollar className="h-4 w-4 text-primary" />
-              Valor em Estoque
+          {canViewPrices && (
+            <div className="p-4 rounded-xl bg-primary/5 border-0">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
+                <IconCurrencyDollar className="h-4 w-4 text-primary" />
+                Valor em Estoque
+              </div>
+              <p className="text-3xl font-bold text-primary">{formatCurrency(item.totalPrice || metrics.stockValue)}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {item.quantity} unidades × {formatCurrency(metrics.currentPrice)}
+              </p>
             </div>
-            <p className="text-3xl font-bold text-primary">{formatCurrency(item.totalPrice || metrics.stockValue)}</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {item.quantity} unidades × {formatCurrency(metrics.currentPrice)}
-            </p>
-          </div>
+          )}
 
           {/* Movements */}
           <div className="p-4 rounded-xl bg-muted/50 border-0">
@@ -178,10 +184,12 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
               <div className="text-2xl font-bold text-primary mb-1">{(item as any)._count?.borrows || 0}</div>
               <div className="text-xs text-muted-foreground">Empréstimos</div>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50 border-0 text-center">
-              <div className="text-2xl font-bold text-primary mb-1">{(item as any)._count?.prices || 0}</div>
-              <div className="text-xs text-muted-foreground">Histórico Preços</div>
-            </div>
+            {canViewPrices && (
+              <div className="p-3 rounded-lg bg-muted/50 border-0 text-center">
+                <div className="text-2xl font-bold text-primary mb-1">{(item as any)._count?.prices || 0}</div>
+                <div className="text-xs text-muted-foreground">Histórico Preços</div>
+              </div>
+            )}
             <div className="p-3 rounded-lg bg-muted/50 border-0 text-center">
               <div className="text-2xl font-bold text-primary mb-1">{(item as any)._count?.relatedItems || 0}</div>
               <div className="text-xs text-muted-foreground">Itens Relacionados</div>

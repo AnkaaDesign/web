@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import type { MouseEvent } from "react";
 import { IconSearch, IconFilter, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
-import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
+import { useItems, useItemCategories, useItemBrands, useSuppliers, useCanViewPrices } from "../../../../hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -88,9 +88,9 @@ export const OrderItemSelector = ({
   ipis = {},
   isSelected = (itemId: string) => selectedItems.has(itemId),
   showQuantityInput = true,
-  showPriceInput = true,
-  showIcmsInput = false,
-  showIpiInput = false,
+  showPriceInput: showPriceInputProp = true,
+  showIcmsInput: showIcmsInputProp = false,
+  showIpiInput: showIpiInputProp = false,
   // URL state props with defaults
   showSelectedOnly: showSelectedOnlyProp = false,
   searchTerm: searchTermProp = "",
@@ -121,6 +121,12 @@ export const OrderItemSelector = ({
   // Batch selection function
   updateSelection,
 }: OrderItemSelectorProps) => {
+  // Warehouse users cannot see or edit any monetary values
+  const canViewPrices = useCanViewPrices();
+  const showPriceInput = showPriceInputProp && canViewPrices;
+  const showIcmsInput = showIcmsInputProp && canViewPrices;
+  const showIpiInput = showIpiInputProp && canViewPrices;
+
   // Use direct filter update for immediate, atomic URL updates
   const { updateFilters: directUpdateFilters } = useDirectFilterUpdate();
 
@@ -800,15 +806,17 @@ export const OrderItemSelector = ({
                     {renderSortIndicator("quantity")}
                   </button>
                 </TableHead>
-                <TableHead className="w-24 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
-                  <button
-                    onClick={() => toggleSort("prices.value")}
-                    className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
-                  >
-                    <TruncatedTextWithTooltip text="PREÇO" />
-                    {renderSortIndicator("prices.value")}
-                  </button>
-                </TableHead>
+                {canViewPrices && (
+                  <TableHead className="w-24 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                    <button
+                      onClick={() => toggleSort("prices.value")}
+                      className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
+                    >
+                      <TruncatedTextWithTooltip text="PREÇO" />
+                      {renderSortIndicator("prices.value")}
+                    </button>
+                  </TableHead>
+                )}
                 {showQuantityInput && (
                   <TableHead className="w-28 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
@@ -934,13 +942,15 @@ export const OrderItemSelector = ({
                           <StockStatusIndicator item={item} showQuantity={true} />
                         </div>
                       </TableCell>
-                      <TableCell className="w-24 p-0 !border-r-0">
-                        <div className="px-4 py-1">
-                          <span className="font-medium tabular-nums">
-                            {item.prices?.[0]?.value ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(item.prices[0].value) : "-"}
-                          </span>
-                        </div>
-                      </TableCell>
+                      {canViewPrices && (
+                        <TableCell className="w-24 p-0 !border-r-0">
+                          <div className="px-4 py-1">
+                            <span className="font-medium tabular-nums">
+                              {item.prices?.[0]?.value ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(item.prices[0].value) : "-"}
+                            </span>
+                          </div>
+                        </TableCell>
+                      )}
                       {showQuantityInput && (
                         <TableCell className="w-28 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
                           <div className="px-4 py-1">

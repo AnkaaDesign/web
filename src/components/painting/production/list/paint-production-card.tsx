@@ -7,6 +7,7 @@ import { IconFlask, IconCalendar, IconDroplet, IconScale, IconColorSwatch, IconT
 import { formatDateTime, formatCurrency } from "../../../../utils";
 import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
 import { CanvasNormalMapRenderer } from "../../effects/canvas-normal-map-renderer";
+import { useCanViewPrices } from "../../../../hooks";
 
 interface PaintProductionCardProps {
   production: PaintProduction;
@@ -14,6 +15,7 @@ interface PaintProductionCardProps {
 
 export function PaintProductionCard({ production }: PaintProductionCardProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
 
   const paint = production.formula?.paint;
   const formula = production.formula;
@@ -116,7 +118,7 @@ export function PaintProductionCard({ production }: PaintProductionCardProps) {
             <span className="text-sm text-muted-foreground">Densidade: {formula?.density?.toFixed(2) || "N/A"} g/ml</span>
           </div>
 
-          {formula?.pricePerLiter && (
+          {canViewPrices && formula?.pricePerLiter && (
             <div className="flex items-center gap-2">
               <IconScale className="h-4 w-4 text-orange-600" />
               <span className="text-sm text-muted-foreground">Custo: {formatCurrency(formula.pricePerLiter)}/L</span>

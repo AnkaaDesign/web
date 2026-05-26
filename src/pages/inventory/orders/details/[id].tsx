@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useOrder, useOrderMutations } from "../../../../hooks";
+import { useOrder, useOrderMutations, useCanViewPrices } from "../../../../hooks";
 import { routes, ORDER_STATUS, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { Button } from "@/components/ui/button";
 import { IconAlertTriangle, IconShoppingCart, IconTrash, IconRefresh, IconEdit, IconLoader2, IconCheck } from "@tabler/icons-react";
@@ -32,6 +32,7 @@ const OrderDetailsPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const { user } = useAuth();
+  const canViewPrices = useCanViewPrices();
   const canManageWarehouse = canEditOrders(user);
   const { deleteMutation, updateAsync } = useOrderMutations();
 
@@ -309,8 +310,12 @@ const OrderDetailsPage = () => {
                 <br />
                 <br />
                 <strong>Fornecedor:</strong> {order.supplier?.fantasyName || "Não especificado"}
-                <br />
-                <strong>Valor Total:</strong> <OrderTotalBadge orderItems={order.items} discount={order.discount} />
+                {canViewPrices && (
+                  <>
+                    <br />
+                    <strong>Valor Total:</strong> <OrderTotalBadge orderItems={order.items} discount={order.discount} />
+                  </>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -335,9 +340,11 @@ const OrderDetailsPage = () => {
                   <p className="text-sm">
                     <span className="font-medium">Fornecedor:</span> {order.supplier?.fantasyName || "Não especificado"}
                   </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Valor Total:</span> <OrderTotalBadge orderItems={order.items} discount={order.discount} />
-                  </p>
+                  {canViewPrices && (
+                    <p className="text-sm">
+                      <span className="font-medium">Valor Total:</span> <OrderTotalBadge orderItems={order.items} discount={order.discount} />
+                    </p>
+                  )}
                   <p className="text-sm">
                     <span className="font-medium">Itens:</span> {order.items?.length || 0}
                   </p>

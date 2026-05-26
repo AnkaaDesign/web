@@ -107,9 +107,9 @@ export function OrderScheduleTable({
       page: page + 1,
       limit: pageSize,
       include: {
-        weeklyConfig: { include: { daysOfWeek: true } },
-        monthlyConfig: { include: { occurrences: true } },
-        yearlyConfig: { include: { monthlyConfigs: true } },
+        weeklyConfig: true,
+        monthlyConfig: true,
+        yearlyConfig: true,
       },
       orderBy: convertSortConfigsToOrderBy(
         sortConfigs.length > 0 ? sortConfigs : [{ column: "createdAt", direction: "desc" }]

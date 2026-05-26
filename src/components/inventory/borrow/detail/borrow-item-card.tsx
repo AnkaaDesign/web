@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { IconExternalLink, IconAlertCircle, IconPackage, IconCurrencyDollar, IconBoxMultiple, IconAlertTriangleFilled } from "@tabler/icons-react";
 import type { Borrow } from "../../../../types";
 import { formatCurrency, determineStockLevel, getStockLevelMessage } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 import { routes, MEASURE_UNIT_LABELS, STOCK_LEVEL_LABELS, ORDER_STATUS, STOCK_LEVEL } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ interface BorrowItemCardProps {
 
 export const BorrowItemCard = ({ borrow, className }: BorrowItemCardProps) => {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
 
   if (!borrow.item) {
     return (
@@ -136,8 +138,8 @@ export const BorrowItemCard = ({ borrow, className }: BorrowItemCardProps) => {
 
           {/* Stock and Price Section */}
           <div className="pt-6 border-t border-border">
-            <h3 className="text-base font-semibold mb-4 text-foreground">Estoque e Preço</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h3 className="text-base font-semibold mb-4 text-foreground">{canViewPrices ? "Estoque e Preço" : "Estoque"}</h3>
+            <div className={cn("grid grid-cols-1 gap-4", canViewPrices && "md:grid-cols-2")}>
               <div className="bg-muted/30 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <IconBoxMultiple className="h-4 w-4 text-muted-foreground" />
@@ -165,17 +167,19 @@ export const BorrowItemCard = ({ borrow, className }: BorrowItemCardProps) => {
                 </div>
                 {item.measureUnit && <p className="text-sm text-muted-foreground mt-1">{MEASURE_UNIT_LABELS[item.measureUnit]}</p>}
               </div>
-              <div className="bg-muted/30 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <IconCurrencyDollar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Preço Unitário</span>
+              {canViewPrices && (
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <IconCurrencyDollar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground">Preço Unitário</span>
+                  </div>
+                  {currentPrice !== null && currentPrice !== undefined ? (
+                    <p className="text-2xl font-bold text-foreground">{formatCurrency(currentPrice)}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Não definido</p>
+                  )}
                 </div>
-                {currentPrice !== null && currentPrice !== undefined ? (
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency(currentPrice)}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Não definido</p>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </div>

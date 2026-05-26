@@ -4,6 +4,7 @@ import { IconSettings, IconCalendar, IconClock, IconRepeat, IconCurrencyDollar }
 import { type Maintenance } from "../../../../types";
 import { getDynamicFrequencyLabel, SCHEDULE_FREQUENCY } from "../../../../constants";
 import { formatDate, formatDateTime, formatCurrency } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 import { cn } from "@/lib/utils";
 import { MaintenanceStatusBadge } from "../common/maintenance-status-badge";
 import { useMemo } from "react";
@@ -41,6 +42,7 @@ interface MaintenanceInfoCardProps {
 }
 
 function MaintenanceInfoCard({ maintenance, className }: MaintenanceInfoCardProps) {
+  const canViewPrices = useCanViewPrices();
   // Calculate estimated cost
   const estimatedCost = useMemo(() => {
     return (
@@ -145,13 +147,15 @@ function MaintenanceInfoCard({ maintenance, className }: MaintenanceInfoCardProp
                 <Badge variant={maintenance.isActive !== false ? "success" : "secondary"}>{maintenance.isActive !== false ? "Ativo" : "Inativo"}</Badge>
               </div>
 
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <IconCurrencyDollar className="h-4 w-4" />
-                  Custo Estimado
-                </span>
-                <span className="text-sm font-semibold text-foreground">{formatCurrency(estimatedCost)}</span>
-              </div>
+              {canViewPrices && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCurrencyDollar className="h-4 w-4" />
+                    Custo Estimado
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatCurrency(estimatedCost)}</span>
+                </div>
+              )}
             </div>
             </div>
           )}
@@ -168,13 +172,15 @@ function MaintenanceInfoCard({ maintenance, className }: MaintenanceInfoCardProp
                   </span>
                   <span className="text-sm font-semibold text-foreground">Única</span>
                 </div>
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCurrencyDollar className="h-4 w-4" />
-                    Custo Estimado
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">{formatCurrency(estimatedCost)}</span>
-                </div>
+                {canViewPrices && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconCurrencyDollar className="h-4 w-4" />
+                      Custo Estimado
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{formatCurrency(estimatedCost)}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}

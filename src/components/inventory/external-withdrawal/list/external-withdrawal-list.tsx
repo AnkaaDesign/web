@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useExternalWithdrawalBatchMutations } from "../../../../hooks";
+import { useExternalWithdrawalBatchMutations, useCanViewPrices } from "../../../../hooks";
 import type { ExternalWithdrawal } from "../../../../types";
 import type { ExternalWithdrawalGetManyFormData } from "../../../../schemas";
 import { routes, EXTERNAL_WITHDRAWAL_STATUS } from "../../../../constants";
@@ -38,6 +38,7 @@ const DEFAULT_PAGE_SIZE = 40;
 
 export function ExternalWithdrawalList({ className }: ExternalWithdrawalListProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const { batchDelete } = useExternalWithdrawalBatchMutations();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,10 +65,10 @@ export function ExternalWithdrawalList({ className }: ExternalWithdrawalListProp
   });
 
   // Column visibility state with localStorage persistence
-  const { visibleColumns, setVisibleColumns } = useColumnVisibility("external-withdrawal-list-visible-columns", getDefaultVisibleColumns());
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility("external-withdrawal-list-visible-columns", getDefaultVisibleColumns(canViewPrices));
 
   // Get all available columns for column visibility manager
-  const allColumns = useMemo(() => getAllColumns(), []);
+  const allColumns = useMemo(() => getAllColumns(canViewPrices), [canViewPrices]);
 
   // Custom deserializer for external withdrawal filters
   const deserializeExternalWithdrawalFilters = useCallback((params: URLSearchParams): Partial<ExternalWithdrawalGetManyFormData> => {

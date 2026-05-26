@@ -28,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ItemsNeededList } from "@/components/inventory/maintenance/common/items-needed-list";
 import { MaintenanceHistoryTable } from "@/components/inventory/maintenance/common/maintenance-history-table";
 import { formatDate, formatDateTime, determineStockLevel, getStockLevelMessage, formatCurrency } from "../../../../../utils";
-import { useMaintenanceSchedule, useItems } from "../../../../../hooks";
+import { useMaintenanceSchedule, useItems, useCanViewPrices } from "../../../../../hooks";
 import { MAINTENANCE_STATUS, routes, getDynamicFrequencyLabel, CHANGE_LOG_ENTITY_TYPE, STOCK_LEVEL_LABELS, MEASURE_UNIT_LABELS, ORDER_STATUS, MEASURE_UNIT, STOCK_LEVEL } from "../../../../../constants";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { useState } from "react";
@@ -340,6 +340,7 @@ export function MaintenanceScheduleDetailPage() {
 
 // Schedule Configuration Card Component
 function ScheduleConfigurationCard({ schedule, isOverdue, totalCost, className }: { schedule: any; isOverdue: boolean; totalCost: number; className?: string }) {
+  const canViewPrices = useCanViewPrices();
   const getScheduleDetails = () => {
     if (schedule.weeklyConfig) {
       const days = schedule.weeklyConfig.daysOfWeek?.map((day: string) => day).join(", ") || "";
@@ -403,7 +404,7 @@ function ScheduleConfigurationCard({ schedule, isOverdue, totalCost, className }
                 </span>
                 <Badge variant={schedule.isActive !== false ? "success" : "secondary"}>{schedule.isActive !== false ? "Ativo" : "Inativo"}</Badge>
               </div>
-              {totalCost > 0 && (
+              {canViewPrices && totalCost > 0 && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCurrencyDollar className="h-4 w-4" />
@@ -469,6 +470,7 @@ function ScheduleConfigurationCard({ schedule, isOverdue, totalCost, className }
 // Maintenance Item Card Component
 function MaintenanceItemCard({ schedule, className }: { schedule: any; className?: string }) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const item = schedule.item;
 
   if (!item) {
@@ -590,8 +592,8 @@ function MaintenanceItemCard({ schedule, className }: { schedule: any; className
 
           {/* Stock and Price Section */}
           <div className="pt-6 border-t border-border">
-            <h3 className="text-base font-semibold mb-4 text-foreground">Estoque e Preço</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h3 className="text-base font-semibold mb-4 text-foreground">{canViewPrices ? "Estoque e Preço" : "Estoque"}</h3>
+            <div className={cn("grid grid-cols-1 gap-4", canViewPrices && "md:grid-cols-2")}>
               <div className="bg-muted/30 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <IconBoxMultiple className="h-4 w-4 text-muted-foreground" />
@@ -619,17 +621,19 @@ function MaintenanceItemCard({ schedule, className }: { schedule: any; className
                 </div>
                 {item.measureUnit && <p className="text-sm text-muted-foreground mt-1">{MEASURE_UNIT_LABELS[item.measureUnit as MEASURE_UNIT]}</p>}
               </div>
-              <div className="bg-muted/30 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <IconCurrencyDollar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Preço Unitário</span>
+              {canViewPrices && (
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <IconCurrencyDollar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground">Preço Unitário</span>
+                  </div>
+                  {currentPrice !== null && currentPrice !== undefined ? (
+                    <p className="text-2xl font-bold text-foreground">{formatCurrency(currentPrice)}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Não definido</p>
+                  )}
                 </div>
-                {currentPrice !== null && currentPrice !== undefined ? (
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency(currentPrice)}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Não definido</p>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </div>

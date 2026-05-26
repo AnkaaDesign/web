@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { GOAL_METRIC, GOAL_METRIC_UNIT, routes, FAVORITE_PAGES, ACTIVITY_OPERATION } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
+import { useCanViewPrices } from '@/hooks';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
 import { GoalMetaPopover } from '@/components/statistics/goal-meta-popover';
 import { useConsumptionAnalytics, consumptionAnalyticsKeys } from '@/hooks/inventory/use-consumption-analytics';
@@ -239,6 +240,7 @@ interface ConsumptionFiltersSheetProps {
   compareMode: ConsumptionCompareMode;
   selectedYears: string[];
   selectedMonths: string[];
+  canViewPrices: boolean;
   onApply: (
     filters: ConsumptionAnalyticsFilters,
     options: {
@@ -254,6 +256,7 @@ interface ConsumptionFiltersSheetProps {
 function ConsumptionFiltersSheet({
   open, onOpenChange,
   filters, xAxisMode, yAxisMode, compareMode, selectedYears, selectedMonths,
+  canViewPrices,
   onApply,
 }: ConsumptionFiltersSheetProps) {
   const [localFilters, setLocalFilters] = useState<ConsumptionAnalyticsFilters>(filters);
@@ -441,7 +444,7 @@ function ConsumptionFiltersSheet({
               <Combobox
                 value={localY}
                 onValueChange={v => setLocalY(v as ConsumptionYAxisMode)}
-                options={Y_AXIS_OPTIONS}
+                options={canViewPrices ? Y_AXIS_OPTIONS : Y_AXIS_OPTIONS.filter(o => o.value === 'quantity')}
                 placeholder="Selecione..."
                 searchable={false}
                 clearable={false}
@@ -710,6 +713,8 @@ function ConsumptionFiltersSheet({
 const ConsumptionPage = () => {
   usePageTracker({ page: 'consumption-analytics', title: 'Análise de Consumo' });
 
+  const canViewPrices = useCanViewPrices();
+
   const [showFilters, setShowFilters]   = useState(false);
   const [chartType, setChartType]       = useState<ConsumptionChartType>('bar');
   const [trendLine, setTrendLine]       = useState<TrendLineType | null>(null);
@@ -736,6 +741,13 @@ const ConsumptionPage = () => {
   const [compareMode, setCompareMode] = useState<ConsumptionCompareMode>('combined');
   const [selectedYears, setSelectedYears]   = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+
+  // Warehouse users must never use the monetary Y-axis modes.
+  useEffect(() => {
+    if (!canViewPrices && yAxisMode !== 'quantity') {
+      setYAxisMode('quantity');
+    }
+  }, [canViewPrices, yAxisMode]);
 
   // ── Derived mode flags ──
   const isTemporalMode = xAxisMode === 'month' || xAxisMode === 'year';
@@ -1267,7 +1279,7 @@ const ConsumptionPage = () => {
         doc.setTextColor(70, 70, 70);
         const stats: string[] = [
           `Quantidade Total: ${formatNumber(summary.totalQuantity, 0)}`,
-          `Valor Total: ${formatCurrency(summary.totalValue)}`,
+          ...(canViewPrices ? [`Valor Total: ${formatCurrency(summary.totalValue)}`] : []),
           `${isTemporalMode ? 'Períodos' : xAxisPluralLabel[xAxisMode]}: ${isTemporalMode ? (apiFilters.periods?.length ?? 0) : chartData.length}`,
         ];
         doc.text(stats.join('   |   '), pageW / 2, footerY, { align: 'center' });
@@ -1283,7 +1295,7 @@ const ConsumptionPage = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartData, xAxisMode, yAxisMode, isBothMode, isTemporalMode, isEntityComparisonMode,
-      selectedYears, selectedMonths, summary, apiFilters.periods]);
+      selectedYears, selectedMonths, summary, apiFilters.periods, canViewPrices]);
 
   // ── Chart render ──
   const renderChart = () => {
@@ -1679,6 +1691,7 @@ const ConsumptionPage = () => {
         compareMode={compareMode}
         selectedYears={selectedYears}
         selectedMonths={selectedMonths}
+        canViewPrices={canViewPrices}
         onApply={handleFilterApply}
       />
 
@@ -1700,7 +1713,7 @@ const ConsumptionPage = () => {
                 <TableRow>
                   <TableHead>Item</TableHead>
                   <TableHead className="text-right">Quantidade</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
+                  {canViewPrices && <TableHead className="text-right">Valor</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1715,14 +1728,16 @@ const ConsumptionPage = () => {
                     <TableCell className="text-right tabular-nums">
                       {formatNumber(item.totalQuantity, 0)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCurrency(item.totalValue)}
-                    </TableCell>
+                    {canViewPrices && (
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(item.totalValue)}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
                 {rawItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
+                    <TableCell colSpan={canViewPrices ? 3 : 2} className="text-center text-muted-foreground py-6">
                       Nenhum item no período.
                     </TableCell>
                   </TableRow>

@@ -1,5 +1,6 @@
 import React from "react";
 import { formatCurrency } from "../../../../utils";
+import { useCanViewPrices } from "../../../../hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -34,6 +35,7 @@ const ExternalWithdrawalTotalCalculatorComponent: React.FC<ExternalWithdrawalTot
   className,
   showItemBreakdown = false,
 }) => {
+  const canViewPrices = useCanViewPrices();
   // Calculate individual item totals and grand total
   const itemCalculations = React.useMemo(() => {
     if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) return [];
@@ -68,6 +70,9 @@ const ExternalWithdrawalTotalCalculatorComponent: React.FC<ExternalWithdrawalTot
       return total + (quantities[itemId] || 1);
     }, 0);
   }, [selectedItems, quantities]);
+
+  // Warehouse users must not see any monetary values
+  if (!canViewPrices) return null;
 
   // Don't render calculation if not chargeable
   if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
@@ -165,6 +170,7 @@ const ExternalWithdrawalTotalBadgeComponent: React.FC<{
   items?: ExternalWithdrawalItem[];
   type: EXTERNAL_WITHDRAWAL_TYPE;
 }> = ({ selectedItems, quantities, prices, items = [], type }) => {
+  const canViewPrices = useCanViewPrices();
   const grandTotal = React.useMemo(() => {
     if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) return 0;
 
@@ -176,6 +182,8 @@ const ExternalWithdrawalTotalBadgeComponent: React.FC<{
       return total + quantity * unitPrice;
     }, 0);
   }, [selectedItems, quantities, prices, items, type]);
+
+  if (!canViewPrices) return null;
 
   if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
     return (

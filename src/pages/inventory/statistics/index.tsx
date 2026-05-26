@@ -3,6 +3,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { useCanViewPrices } from "../../../hooks";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
@@ -72,8 +73,12 @@ const pages: StatPage[] = [
   },
 ];
 
+// Bullets that reference monetary information (hidden from warehouse users)
+const MONETARY_BULLETS = new Set(["Quantidade × valor monetário", "Valor total e ticket médio"]);
+
 export const InventoryStatisticsPage = () => {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
 
   usePageTracker({
     title: "Hub de Estatísticas do Estoque",
@@ -125,7 +130,7 @@ export const InventoryStatisticsPage = () => {
                   </CardHeader>
                   <CardContent className="flex-1 pt-2 flex flex-col">
                     <ul className="space-y-1.5 text-sm text-foreground/75 flex-1">
-                      {page.bullets.map((b) => (
+                      {page.bullets.filter((b) => canViewPrices || !MONETARY_BULLETS.has(b)).map((b) => (
                         <li key={b} className="flex items-start gap-2">
                           <IconCheck className={cn("h-3.5 w-3.5 mt-0.5 flex-shrink-0", tone.bullet)} />
                           <span>{b}</span>

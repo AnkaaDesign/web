@@ -549,6 +549,25 @@ export function canDeleteHrEntities(user: PermissionUser | null): boolean {
   return canEditHrEntities(user);
 }
 
+/**
+ * Can user manage skill-assessment campaigns (edit / open / close / cancel / delete)?
+ * HUMAN_RESOURCES and ADMIN run HR, and PRODUCTION_MANAGER owns the production
+ * skill matrix — so all three may manage campaigns. Mirrors the API @Roles on
+ * the /assessment endpoints (skill.controller.ts).
+ */
+export function canEditAssessments(user: PermissionUser | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.HUMAN_RESOURCES,
+    SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+export function canDeleteAssessments(user: PermissionUser | null): boolean {
+  return canEditAssessments(user);
+}
+
 // =====================
 // USER PERMISSIONS
 // =====================

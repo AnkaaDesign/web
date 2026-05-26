@@ -12,7 +12,7 @@ import type { PaintFormula } from "../../../types";
 import { formatCurrency } from "../../../utils";
 import { measureUtils } from "../../../utils";
 import { MEASURE_UNIT, routes } from "../../../constants";
-import { usePaintProductionMutations } from "../../../hooks";
+import { usePaintProductionMutations, useCanViewPrices } from "../../../hooks";
 
 interface PaintFormulaRatioCalculatorProps {
   formula: PaintFormula;
@@ -35,6 +35,7 @@ interface ComponentCalculation {
 
 export function PaintFormulaRatioCalculator({ formula }: PaintFormulaRatioCalculatorProps) {
   const navigate = useNavigate();
+  const canViewPrices = useCanViewPrices();
   const { createAsync: createProduction } = usePaintProductionMutations();
 
   const [targetWeight, setTargetWeight] = useState<number>(1000); // Default 1kg
@@ -325,7 +326,7 @@ export function PaintFormulaRatioCalculator({ formula }: PaintFormulaRatioCalcul
 
                       <div className="mt-1 text-xs text-muted-foreground">
                         Disponível: {calc.availableStock} {calc.stockUnit}
-                        {calc.unitPrice > 0 && (
+                        {canViewPrices && calc.unitPrice > 0 && (
                           <span className="ml-2">
                             <span className="font-enhanced-unicode">•</span> Custo: {formatCurrency(calc.totalCost)}
                           </span>
@@ -344,7 +345,7 @@ export function PaintFormulaRatioCalculator({ formula }: PaintFormulaRatioCalcul
 
             {/* Production Summary */}
             <Separator />
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className={`grid grid-cols-1 gap-4 ${canViewPrices ? "md:grid-cols-4" : "md:grid-cols-2"}`}>
               <div className="text-center p-3 bg-muted rounded-lg">
                 <div className="text-sm text-muted-foreground">Peso Total</div>
                 <div className="text-xl font-bold">
@@ -360,15 +361,19 @@ export function PaintFormulaRatioCalculator({ formula }: PaintFormulaRatioCalcul
                 <div className="text-xl font-bold">{calculatedTotals.calculatedVolumeInLiters.toFixed(2)} L</div>
               </div>
 
-              <div className="text-center p-3 bg-muted rounded-lg">
-                <div className="text-sm text-muted-foreground">Custo Total</div>
-                <div className="text-xl font-bold">{formatCurrency(calculatedTotals.totalCost)}</div>
-              </div>
+              {canViewPrices && (
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground">Custo Total</div>
+                  <div className="text-xl font-bold">{formatCurrency(calculatedTotals.totalCost)}</div>
+                </div>
+              )}
 
-              <div className="text-center p-3 bg-muted rounded-lg">
-                <div className="text-sm text-muted-foreground">Custo por Litro</div>
-                <div className="text-xl font-bold">{formatCurrency(calculatedTotals.costPerLiter)}</div>
-              </div>
+              {canViewPrices && (
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground">Custo por Litro</div>
+                  <div className="text-xl font-bold">{formatCurrency(calculatedTotals.costPerLiter)}</div>
+                </div>
+              )}
             </div>
 
             {/* Production Actions */}
