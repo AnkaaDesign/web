@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import {
   FormControl,
@@ -80,6 +80,10 @@ export function BudgetStepInfo({
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
   const [showLayoutUploadMode, setShowLayoutUploadMode] = useState(false);
   const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
+
+  // Stores the last single customer config before it was removed, so discount can be
+  // carried over when the user does a remove-then-add instead of atomic replacement.
+  const lastRemovedSingleConfigRef = useRef<any>(null);
 
   // Watch form values
   const quoteExpiresAt = useWatch({ control, name: "expiresAt" });
@@ -231,6 +235,25 @@ export function BudgetStepInfo({
       const selectedIds: string[] = Array.isArray(value) ? value : value ? [value] : [];
       const currentConfigs = getValues("customerConfigs") || [];
 
+      // Save the config before the last customer is removed so its discount can be
+      // restored when the user adds a new customer (remove-then-add flow).
+      if (currentConfigs.length === 1 && selectedIds.length === 0) {
+        lastRemovedSingleConfigRef.current = currentConfigs[0];
+      }
+      // In multi-customer mode the discount is per-customer, so don't carry over.
+      if (selectedIds.length >= 2) {
+        lastRemovedSingleConfigRef.current = null;
+      }
+
+      // Source for discount carry-over:
+      // 1. Atomic 1→1 replacement: the config being replaced is the source.
+      // 2. Remove-then-add (0→1): the last removed single config is the source.
+      const discountSource =
+        (currentConfigs.length === 1 && selectedIds.length === 1 ? currentConfigs[0] : null) ??
+        (currentConfigs.length === 0 && selectedIds.length === 1
+          ? lastRemovedSingleConfigRef.current
+          : null);
+
       const newConfigs = selectedIds.map((customerId) => {
         const existing = currentConfigs.find((c: any) => c.customerId === customerId);
         if (existing) return existing;
@@ -240,6 +263,9 @@ export function BudgetStepInfo({
           customerId,
           subtotal: 0,
           total: 0,
+          discountType: discountSource?.discountType ?? "NONE",
+          discountValue: discountSource?.discountValue ?? null,
+          discountReference: discountSource?.discountReference ?? null,
           paymentCondition: null,
           customPaymentText: null,
           generateInvoice: true,

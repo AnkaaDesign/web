@@ -24,11 +24,9 @@ export function computeCustomerConfigTotals(
   discountType?: string,
   discountValue?: number | null,
 ) {
-  const assigned = services.filter(
-    (s) =>
-      s.invoiceToCustomerId === customerId ||
-      (isSingleConfig && !s.invoiceToCustomerId),
-  );
+  const assigned = isSingleConfig
+    ? services
+    : services.filter((s) => s.invoiceToCustomerId === customerId);
   const subtotal = assigned.reduce((sum, s) => sum + (s.amount || 0), 0);
   const discount = computeConfigDiscount(subtotal, discountType, discountValue);
   const total = Math.max(0, subtotal - discount);

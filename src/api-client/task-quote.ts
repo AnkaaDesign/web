@@ -39,6 +39,10 @@ export const taskQuoteService = {
   // Cancel (sends back to PENDING)
   cancel: (id: string) => apiClient.put(`/task-quotes/${id}/status`, { status: 'PENDING' }),
 
+  // Update just the orderNumber on a customerConfig — safe to call on locked quotes
+  updateCustomerConfigOrderNumber: (id: string, customerId: string, orderNumber: string | null) =>
+    apiClient.patch(`/task-quotes/${id}/customer-config-order-number`, { customerId, orderNumber }),
+
   // Delete
   delete: (id: string) => apiClient.delete(`/task-quotes/${id}`),
 

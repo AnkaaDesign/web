@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import { useFormContext, useFieldArray, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,9 +42,9 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
       description: "",
       observation: null,
       amount: 0,
-      invoiceToCustomerId: customerConfigs.length === 1 ? customerConfigs[0].customerId : null,
+      invoiceToCustomerId: null,
     });
-  }, [append, customerConfigs]);
+  }, [append]);
 
   // Recalculate customer config totals when services change
   const recalculateTotals = useCallback(() => {
@@ -72,6 +72,23 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
     setFormValue("subtotal", subtotal, { shouldDirty: false });
     setFormValue("total", total, { shouldDirty: false });
   }, [getValues, setFormValue]);
+
+  // Stable string of billing customer IDs — changes only when customers are added/removed/replaced,
+  // NOT when subtotals/totals are updated. Used to trigger recalculation without infinite loops.
+  const customerConfigIds = useMemo(
+    () => (customerConfigs || []).map((c: any) => c.customerId).sort().join(","),
+    [customerConfigs],
+  );
+  const prevCustomerConfigIdsRef = useRef<string | null>(null);
+
+  // Auto-recalculate totals whenever the set of billing customers changes.
+  // Covers customer add/remove/replace from the info step and the trash button inline,
+  // since neither of those call recalculateTotals directly.
+  useEffect(() => {
+    if (customerConfigIds === prevCustomerConfigIdsRef.current) return;
+    prevCustomerConfigIdsRef.current = customerConfigIds;
+    recalculateTotals();
+  }, [customerConfigIds, recalculateTotals]);
 
   // Validate: any service with amount but no description
   const hasValidationIssue = services.some((s: any) => s.amount > 0 && !s.description?.trim());

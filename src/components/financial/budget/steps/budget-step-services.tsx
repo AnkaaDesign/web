@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo, useEffect } from "react";
+import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import { useFormContext, useFieldArray, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -157,9 +157,9 @@ export function BudgetStepServices({
       description: "",
       observation: null,
       amount: 0,
-      invoiceToCustomerId: customerConfigs.length === 1 ? customerConfigs[0]?.customerId : null,
+      invoiceToCustomerId: null,
     });
-  }, [append, customerConfigs]);
+  }, [append]);
 
   // Recalculate customer config totals when services change
   const recalculateTotals = useCallback(() => {
@@ -181,6 +181,25 @@ export function BudgetStepServices({
     setFormValue("subtotal", subtotal, { shouldDirty: false });
     setFormValue("total", total, { shouldDirty: false });
   }, [getValues, setFormValue]);
+
+  // Stable string of billing customer IDs — changes only when customers are added/removed/replaced,
+  // NOT when subtotals/totals are updated. Used to trigger recalculation without infinite loops.
+  const customerConfigIds = useMemo(
+    () => (customerConfigs || []).map((c: any) => c.customerId).sort().join(","),
+    [customerConfigs],
+  );
+  const prevCustomerConfigIdsRef = useRef<string | null>(null);
+
+  // Auto-recalculate totals whenever the set of billing customers changes.
+  // This covers the case where the user changes customers in the info step —
+  // the existing recalculateTotals path (triggered by service edits) is not
+  // called for customer changes, leaving totals at 0 until manually triggered.
+  useEffect(() => {
+    if (!formInitialized) return;
+    if (customerConfigIds === prevCustomerConfigIdsRef.current) return;
+    prevCustomerConfigIdsRef.current = customerConfigIds;
+    recalculateTotals();
+  }, [customerConfigIds, formInitialized, recalculateTotals]);
 
   // Fill services from suggestion
   const handleFillSuggestion = useCallback(() => {

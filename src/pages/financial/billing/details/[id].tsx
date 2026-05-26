@@ -574,6 +574,24 @@ export const BillingDetailPage = () => {
 
       await taskQuoteService.update(quote.id, quotePayload);
 
+      // For locked quotes, orderNumber is stripped from the main payload to avoid the
+      // financial obligation guard. Update it separately via the dedicated endpoint.
+      if (isQuoteLocked) {
+        const originalConfigs: any[] = (quote as any).customerConfigs || [];
+        for (const config of formData.customerConfigs as any[]) {
+          const original = originalConfigs.find((c: any) => c.customerId === config.customerId);
+          const originalOrderNumber = original?.orderNumber ?? null;
+          const newOrderNumber = config.orderNumber || null;
+          if (originalOrderNumber !== newOrderNumber) {
+            await taskQuoteService.updateCustomerConfigOrderNumber(
+              quote.id,
+              config.customerId,
+              newOrderNumber,
+            );
+          }
+        }
+      }
+
       if (statusChanged) {
         // The dropdown gates options by the FORM status, so the user can advance
         // several steps in one session. The server only accepts single legal
