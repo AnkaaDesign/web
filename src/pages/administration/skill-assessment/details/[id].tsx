@@ -410,9 +410,16 @@ export const SkillAssessmentDetailsPage = () => {
                               {group.topics.map((t) => (
                                 <div
                                   key={t.topicId}
-                                  className="rounded-md bg-muted/50 px-3 py-2 text-sm"
+                                  className="rounded-md bg-muted/50 px-3 py-2 text-sm space-y-1"
                                 >
-                                  {t.topic?.title ?? t.topicId}
+                                  <span className="font-medium leading-tight block">
+                                    {t.topic?.title ?? t.topicId}
+                                  </span>
+                                  {t.topic?.description && (
+                                    <p className="text-xs text-muted-foreground leading-snug">
+                                      {t.topic.description}
+                                    </p>
+                                  )}
                                 </div>
                               ))}
                             </div>

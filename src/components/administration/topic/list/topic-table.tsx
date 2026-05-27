@@ -54,23 +54,24 @@ interface TopicTableProps {
 
 function convertSortConfigsToTopicOrderBy(
   sortConfigs: Array<{ column: string; direction: "asc" | "desc" }>,
-): TopicOrderBy | TopicOrderBy[] | undefined {
+): any[] | undefined {
   if (sortConfigs.length === 0) return undefined;
-  const orderBy: TopicOrderBy = {};
+  const items: any[] = [];
   for (const config of sortConfigs) {
-    const field = config.column as keyof TopicOrderBy;
-    if (
-      field === "id" ||
-      field === "title" ||
-      field === "order" ||
-      field === "skillId" ||
-      field === "createdAt" ||
-      field === "updatedAt"
+    if (config.column === "skillId") {
+      // Sort by the skill's name, not the foreign-key UUID
+      items.push({ skill: { name: config.direction } });
+    } else if (
+      config.column === "id" ||
+      config.column === "title" ||
+      config.column === "order" ||
+      config.column === "createdAt" ||
+      config.column === "updatedAt"
     ) {
-      orderBy[field] = config.direction;
+      items.push({ [config.column]: config.direction });
     }
   }
-  return Object.keys(orderBy).length > 0 ? orderBy : undefined;
+  return items.length > 0 ? items : undefined;
 }
 
 export function TopicTable({ filters, onDataChange, className }: TopicTableProps) {
@@ -113,6 +114,10 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
+    defaultSort: [
+      { column: "skillId", direction: "asc" },
+      { column: "order", direction: "asc" },
+    ],
   });
 
   const queryParams = React.useMemo(
@@ -126,7 +131,7 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
       },
       ...(sortConfigs.length > 0
         ? { orderBy: convertSortConfigsToTopicOrderBy(sortConfigs) }
-        : { orderBy: [{ skillId: "asc" as const }, { order: "asc" as const }] }),
+        : { orderBy: [{ skill: { name: "asc" } }, { order: "asc" as const }] }),
       ...(showSelectedOnly &&
         selectedIds.length > 0 && {
           where: { id: { in: selectedIds } },
@@ -282,7 +287,7 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
         key: "title",
         header: "TÍTULO",
         sortable: true,
-        className: "w-72 min-w-[240px] max-w-[300px]",
+        className: "w-80 min-w-[280px] max-w-[360px]",
         align: "left" as const,
         accessor: (t: Topic) => (
           <span className="font-medium truncate block" title={t.title}>
@@ -323,11 +328,11 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
         key: "skillId",
         header: "COMPETÊNCIA",
         sortable: true,
-        className: "w-56 min-w-[200px] max-w-[220px]",
+        className: "w-80 min-w-[280px] max-w-[360px]",
         align: "left" as const,
         accessor: (t: Topic) =>
           t.skill ? (
-            <Badge variant="default" className="font-normal">
+            <Badge variant="default" className="font-normal whitespace-nowrap">
               {t.skill.name}
             </Badge>
           ) : (
@@ -339,7 +344,7 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
         header: "NÍVEIS",
         sortable: false,
         className: "w-32 min-w-[120px] max-w-[140px]",
-        align: "center" as const,
+        align: "right" as const,
         accessor: (t: Topic) => {
           const count = t._count?.levels ?? 0;
           return (
@@ -354,7 +359,7 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
         header: "STATUS",
         sortable: false,
         className: "w-36 min-w-[130px] max-w-[150px]",
-        align: "center" as const,
+        align: "right" as const,
         accessor: (t: Topic) =>
           t.isActive ? (
             <Badge variant="green" className="font-normal">
@@ -445,7 +450,11 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
                     <div
                       className={cn(
                         "flex items-center h-full min-h-[2.5rem] px-4 py-2",
-                        column.align === "center" ? "justify-center" : "justify-start",
+                        column.align === "center"
+                          ? "justify-center"
+                          : column.align === "right"
+                            ? "justify-end"
+                            : "justify-start",
                       )}
                     >
                       <span className="truncate">{column.header}</span>
@@ -538,13 +547,13 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
                         className={cn(
                           "p-0 !border-r-0",
                           column.className,
-                          column.align === "center" ? "text-center" : "text-left",
+                          column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left",
                         )}
                       >
                         <div
                           className={cn(
                             "px-4 py-2 text-sm",
-                            column.align === "center" ? "text-center" : "text-left",
+                            column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left",
                           )}
                         >
                           {column.accessor(topic)}

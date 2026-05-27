@@ -278,7 +278,7 @@ export function SkillTable({ filters, onDataChange, className }: SkillTableProps
         key: "name",
         header: "NOME",
         sortable: true,
-        className: "w-52 min-w-[180px] max-w-[220px]",
+        className: "w-96 min-w-[300px] max-w-[400px]",
         align: "left" as const,
         accessor: (s: Skill) => (
           <span className="font-medium truncate block" title={s.name}>

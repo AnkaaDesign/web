@@ -193,28 +193,31 @@ export const AdvancedBulkActionsHandler = forwardRef<
       // Fetch selected tasks to compute common values
       if (taskIds.length > 0) {
         try {
-          const tasksResponse = await taskService.getTasks({
-            where: {
-              id: { in: taskIds },
-            },
-            include: {
-              artworks: { include: { file: true } },
-              baseFiles: true,
-              cuts: { include: { file: true } },
-              logoPaints: true,
-              generalPainting: true,
-              truck: {
-                include: {
-                  leftSideLayout: { include: { layoutSections: true } },
-                  rightSideLayout: { include: { layoutSections: true } },
-                  backSideLayout: { include: { layoutSections: true } },
-                },
+          // Chunk requests to avoid URL length limits when many tasks are selected
+          const CHUNK_SIZE = 20;
+          const chunks: string[][] = [];
+          for (let i = 0; i < taskIds.length; i += CHUNK_SIZE) {
+            chunks.push(taskIds.slice(i, i + CHUNK_SIZE));
+          }
+          const include = {
+            artworks: { include: { file: true } },
+            baseFiles: true,
+            cuts: { include: { file: true } },
+            logoPaints: true,
+            generalPainting: true,
+            truck: {
+              include: {
+                leftSideLayout: { include: { layoutSections: true } },
+                rightSideLayout: { include: { layoutSections: true } },
+                backSideLayout: { include: { layoutSections: true } },
               },
-              serviceOrders: { include: { assignedTo: true } },
             },
-          });
-
-          const tasks = tasksResponse.data || [];
+            serviceOrders: { include: { assignedTo: true } },
+          };
+          const chunkResponses = await Promise.all(
+            chunks.map(chunk => taskService.getTasks({ where: { id: { in: chunk } }, include }))
+          );
+          const tasks = chunkResponses.flatMap(r => r.data || []);
           setCurrentTasks(tasks);
 
           // Compute common values across all tasks
@@ -604,12 +607,21 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
           const hasRemovals = removedFileIds.length > 0;
 
-          // Only compute per-task artworkIds (SET mode) when files were REMOVED.
-          // When only adding new files (no removals), skip artworkIds so the backend
-          // uses ADD mode (merge with existing) instead of SET/REPLACE mode.
-          // For status-only changes, skip artworkIds entirely so the backend
-          // won't touch task-artwork connections — only updates Artwork entity statuses.
-          if (hasRemovals) {
+          // Detect suggestion files: already-uploaded files the user added from the
+          // suggestion picker that are NOT part of the pre-loaded common artworks.
+          const commonArtworkFileIds = new Set(
+            commonValues.artworkFiles.map((f: any) => f.uploadedFileId || f.id).filter(Boolean)
+          );
+          const addedSuggestionFileIds = artworkFiles
+            .filter(f => !(f instanceof File) && (f as any).uploaded && ((f as any).uploadedFileId || (f as any).id))
+            .map((f: any) => f.uploadedFileId || f.id)
+            .filter((id: string) => id && !commonArtworkFileIds.has(id));
+          const hasAddedSuggestions = addedSuggestionFileIds.length > 0;
+
+          // Send artworkIds (SET mode) when files were removed OR suggestions were added.
+          // For pure new-file uploads (no removals, no suggestions), skip artworkIds so
+          // the backend uses ADD mode and doesn't touch existing task-artwork connections.
+          if (hasRemovals || hasAddedSuggestions) {
             const perTaskArtworkIds: Record<string, string[]> = {};
             currentTasks.forEach(task => {
               const keptIds: string[] = [];
@@ -622,6 +634,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
                   // Send File IDs so the backend conversion path applies artworkStatuses
                   keptIds.push(artworkFileId);
                 }
+              });
+              // Append suggestion file IDs that aren't already on this task
+              addedSuggestionFileIds.forEach((id: string) => {
+                if (!keptIds.includes(id)) keptIds.push(id);
               });
               perTaskArtworkIds[task.id] = keptIds;
             });
@@ -661,6 +677,16 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // 1. Keep ALL non-common base files (unique to this task) - user couldn't remove them
           // 2. Keep common base files only if user kept them in keptBaseFileFilenames
           // 3. New files will be uploaded via FormData and backend will add them automatically
+          // Detect suggestion files: already-uploaded files added from the suggestion
+          // picker that are NOT part of the pre-loaded common base files.
+          const commonBaseFileIds = new Set(
+            commonValues.baseFiles.map((f: any) => f.uploadedFileId || f.id).filter(Boolean)
+          );
+          const addedBaseFileSuggestionIds = baseFiles
+            .filter(f => !(f instanceof File) && (f as any).uploaded && ((f as any).uploadedFileId || (f as any).id))
+            .map((f: any) => f.uploadedFileId || f.id)
+            .filter((id: string) => id && !commonBaseFileIds.has(id));
+
           const perTaskBaseFileIds: Record<string, string[]> = {};
           currentTasks.forEach(task => {
             const taskBaseFileIds: string[] = [];
@@ -685,12 +711,16 @@ export const AdvancedBulkActionsHandler = forwardRef<
               }
             });
 
-            // New base files will be appended by the backend when processing FormData
+            // Append suggestion file IDs that aren't already on this task
+            addedBaseFileSuggestionIds.forEach((id: string) => {
+              if (!taskBaseFileIds.includes(id)) taskBaseFileIds.push(id);
+            });
+
             perTaskBaseFileIds[task.id] = taskBaseFileIds;
           });
 
-          // Store per-task data
-          if (newBaseFiles.length > 0 || commonBaseFilenames.length > 0) {
+          // Store per-task data — also triggered when suggestion files were added
+          if (newBaseFiles.length > 0 || commonBaseFilenames.length > 0 || addedBaseFileSuggestionIds.length > 0) {
             updateData._perTaskBaseFileIds = perTaskBaseFileIds;
             updateData._hasNewBaseFiles = newBaseFiles.length > 0;
           }

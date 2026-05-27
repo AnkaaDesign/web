@@ -89,7 +89,7 @@ export const SkillAssessmentEntryDetailsPage = () => {
     id ?? "",
     {
       include: {
-        topics: { include: { topic: { include: { skill: true } } } },
+        topics: { include: { topic: { include: { skill: true, levels: true } } } },
       } as any,
     } as any,
   );
@@ -405,20 +405,38 @@ export const SkillAssessmentEntryDetailsPage = () => {
                             </AccordionTrigger>
                             <AccordionContent>
                               <div className="space-y-2">
-                                {group.items.map(({ topic, response }) => (
+                                {group.items.map(({ topic, response }) => {
+                                  const level = response?.score != null
+                                    ? (topic?.levels as any[] | undefined)?.find((l: any) => l.score === response.score)
+                                    : undefined;
+                                  return (
                                   <div
                                     key={topic?.id}
                                     className="rounded-md border border-border/40 bg-muted/30 px-3 py-2.5 text-sm"
                                   >
                                     <div className="flex items-start justify-between gap-3">
-                                      <span className="font-medium leading-tight">
-                                        {topic?.title ?? "—"}
-                                      </span>
+                                      <div className="flex flex-col gap-1 min-w-0">
+                                        <span className="font-medium leading-tight">
+                                          {topic?.title ?? "—"}
+                                        </span>
+                                        {level?.description && (
+                                          <p className="text-xs text-muted-foreground/80 leading-snug">
+                                            {level.description}
+                                          </p>
+                                        )}
+                                      </div>
                                       {response?.score != null ? (
-                                        <ScoreBadge
-                                          score={response.score}
-                                          size="md"
-                                        />
+                                        <div className="flex flex-col items-end gap-0.5 shrink-0">
+                                          <ScoreBadge
+                                            score={response.score}
+                                            size="md"
+                                          />
+                                          {level?.name && (
+                                            <span className="text-[10px] text-muted-foreground font-medium">
+                                              {level.name}
+                                            </span>
+                                          )}
+                                        </div>
                                       ) : (
                                         <Badge
                                           variant="outline"
@@ -437,7 +455,8 @@ export const SkillAssessmentEntryDetailsPage = () => {
                                       </p>
                                     )}
                                   </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </AccordionContent>
                           </AccordionItem>
