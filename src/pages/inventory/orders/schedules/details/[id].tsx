@@ -518,8 +518,8 @@ export function OrderScheduleDetailsPage() {
                               <TableHead className="font-semibold text-right">Preço até a próxima</TableHead>
                             </>
                           )}
-                          <TableHead className="font-semibold text-right">Qtd. + ciclo</TableHead>
-                          <TableHead className="font-semibold text-right">Preço + ciclo</TableHead>
+                          <TableHead className="font-semibold text-right">Quantidade esperada</TableHead>
+                          <TableHead className="font-semibold text-right">Preço esperado</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

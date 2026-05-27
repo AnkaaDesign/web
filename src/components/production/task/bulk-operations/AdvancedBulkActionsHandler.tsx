@@ -25,6 +25,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { LayoutForm } from "@/components/production/layout/layout-form";
 import type { Task } from "../../../../types";
+import { toast } from "@/components/ui/sonner";
 
 // Type definitions for the operations
 type BulkOperationType = "arts" | "baseFiles" | "paints" | "cuttingPlans" | "layout" | "serviceOrder";
@@ -547,9 +548,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
             // The ServiceSelectorAutoGrouped component will use the form's serviceOrders field
           }
         } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error("Error fetching tasks for bulk operations:", error);
-          }
+          console.error("Error fetching tasks for bulk operations:", error);
+          toast.error("Erro ao carregar tarefas", {
+            description: error instanceof Error ? error.message : "Tente novamente.",
+          });
         } finally {
           setIsLoadingData(false);
         }
@@ -573,7 +575,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
   };
 
   const handleSubmit = async () => {
-    if (!operationType || currentTaskIds.length === 0) return;
+    console.log('[BulkActions] handleSubmit called', { operationType, currentTaskIds, currentTasksCount: currentTasks.length, layoutStates });
+    if (!operationType || currentTaskIds.length === 0) {
+      if (currentTaskIds.length === 0) toast.error("Nenhuma tarefa selecionada");
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -805,11 +811,13 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // This works for both:
           // - Tasks WITH trucks: truck is updated with new layouts
           // - Tasks WITHOUT trucks: truck is created with embedded layouts
+          console.log('[BulkActions] layout case - layoutStates:', JSON.stringify({ left: layoutStates.left, right: layoutStates.right, back: layoutStates.back }));
           const hasAnyLayoutState =
             (layoutStates.left?.layoutSections?.length && layoutStates.left.layoutSections.length > 0) ||
             (layoutStates.right?.layoutSections?.length && layoutStates.right.layoutSections.length > 0) ||
             (layoutStates.back?.layoutSections?.length && layoutStates.back.layoutSections.length > 0);
 
+          console.log('[BulkActions] hasAnyLayoutState:', hasAnyLayoutState, 'currentTasks:', currentTasks.length);
           if (hasAnyLayoutState) {
             // Build truck object with embedded layout data (following taskTruckCreateSchema)
             const truckWithLayouts: any = {};
@@ -1030,10 +1038,12 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
       const hasPerTaskData = perTaskArtworkIds || perTaskBaseFileIds || perTaskTruckUpdates;
       const hasData = Object.keys(updateData).length > 0 || hasPerTaskData || artworkStatusesMap || hasNewArtworkFiles;
+      console.log('[BulkActions] hasPerTaskData:', hasPerTaskData, 'hasData:', hasData, 'updateData keys:', Object.keys(updateData), 'perTaskTruckUpdates:', perTaskTruckUpdates);
 
       if (!hasData) {
+        toast.info("Nenhuma alteração para aplicar");
         handleClose();
-        return; // Nothing to update
+        return;
       }
 
       // Create batch request structure with per-task data
@@ -1080,6 +1090,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       const hasBaseFilesToUpload = hasNewBaseFiles && newBaseFiles.length > 0;
       const hasLayoutPhotoFiles = layoutPhotoFiles && layoutPhotoFiles.length > 0;
       const needsFormData = hasArtworkFilesToUpload || hasBaseFilesToUpload || hasLayoutPhotoFiles;
+      console.log('[BulkActions] about to call batchUpdateAsync, needsFormData:', needsFormData, 'batchRequest tasks:', batchRequest.tasks.length, JSON.stringify(batchRequest.tasks[0]));
 
       if (needsFormData) {
         const formData = new FormData();
@@ -1130,10 +1141,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
       handleClose();
       onClearSelection();
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Bulk operation error:", error);
-      }
-      // Error toast is handled by the API client
+      console.error("Bulk operation error:", error);
+      toast.error("Erro ao aplicar operação", {
+        description: error instanceof Error ? error.message : "Erro desconhecido. Tente novamente.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -1423,7 +1434,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
   };
 
   const canSubmit = () => {
-    if (!operationType || isSubmitting) return false;
+    if (!operationType || isSubmitting || isLoadingData) return false;
 
     // Allow submit even with no changes (for clearing values)
     return true;

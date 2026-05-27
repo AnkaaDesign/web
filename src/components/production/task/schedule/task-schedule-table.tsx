@@ -20,6 +20,7 @@ import { TaskTableContextMenu, type TaskAction } from "./task-table-context-menu
 import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetStatusModal } from "./set-status-modal";
+import { SetTermModal } from "./set-term-modal";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { toast } from "@/components/ui/sonner";
@@ -64,6 +65,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
   const [_duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
+  const [setTermModalOpen, setSetTermModalOpen] = useState(false);
   const [taskToDuplicate, setTaskToDuplicate] = useState<Task | null>(null);
   const [tasksToUpdate, setTasksToUpdate] = useState<Task[]>([]);
 
@@ -497,6 +499,32 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
             onStartCopyFromTask(tasks);
           }
           break;
+
+        case "setTerm":
+          setTasksToUpdate(tasks);
+          setSetTermModalOpen(true);
+          break;
+
+        case "bulkLayout":
+          if (advancedActionsRef.current) {
+            const taskIds = tasks.map(t => t.id);
+            advancedActionsRef.current.openModal("layout", taskIds);
+          }
+          break;
+
+        case "bulkServiceOrder":
+          if (advancedActionsRef.current) {
+            const taskIds = tasks.map(t => t.id);
+            advancedActionsRef.current.openModal("serviceOrder", taskIds);
+          }
+          break;
+
+        case "bulkBaseFiles":
+          if (advancedActionsRef.current) {
+            const taskIds = tasks.map(t => t.id);
+            advancedActionsRef.current.openModal("baseFiles", taskIds);
+          }
+          break;
       }
     },
     [updateAsync, createAsync, deleteTaskAsync, navigate, onStartCopyFromTask],
@@ -556,6 +584,16 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
         description: "Não foi possível atualizar o status das tarefas. Tente novamente.",
       });
     }
+  };
+
+  const handleSetTermConfirm = async (term: Date | null) => {
+    await batchUpdateAsync({
+      tasks: tasksToUpdate.map((task) => ({
+        id: task.id,
+        data: { term },
+      })),
+    });
+    setTasksToUpdate([]);
   };
 
   // Close context menu when clicking outside
@@ -776,6 +814,8 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       <SetSectorModal open={setSectorModalOpen} onOpenChange={setSetSectorModalOpen} tasks={tasksToUpdate} onConfirm={handleSetSectorConfirm} />
 
       <SetStatusModal open={setStatusModalOpen} onOpenChange={setSetStatusModalOpen} tasks={tasksToUpdate} onConfirm={handleSetStatusConfirm} />
+
+      <SetTermModal open={setTermModalOpen} onOpenChange={setSetTermModalOpen} tasks={tasksToUpdate} onConfirm={handleSetTermConfirm} />
 
       {/* Only render AdvancedBulkActionsHandler if using internal ref (not shared) */}
       {!externalAdvancedActionsRef && (
