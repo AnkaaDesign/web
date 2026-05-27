@@ -216,20 +216,26 @@ export function AssinaturaTable({
                   <TableCell className="font-medium px-4 py-2 truncate">{apuracao.Descricao || "-"}</TableCell>
                   <TableCell className="w-[120px] px-4 py-2">{formatDate(apuracao.DataInicio)}</TableCell>
                   <TableCell className="w-[120px] px-4 py-2">{formatDate(apuracao.DataFim)}</TableCell>
-                  <TableCell className="w-[110px] px-4 py-2 text-right tabular-nums">{apuracao.NumeroCartoes}</TableCell>
-                  <TableCell className="w-[120px] px-4 py-2 text-right">
-                    {apuracao.Aprovados > 0 ? (
-                      <Badge variant="success" className="tabular-nums">{apuracao.Aprovados}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground tabular-nums">0</span>
-                    )}
+                  <TableCell className="w-[110px] px-4 py-2 text-right">
+                    <Badge variant="secondary" className="tabular-nums justify-center min-w-[2.5rem]">
+                      {apuracao.NumeroCartoes}
+                    </Badge>
                   </TableCell>
                   <TableCell className="w-[120px] px-4 py-2 text-right">
-                    {apuracao.Rejeitados > 0 ? (
-                      <Badge variant="destructive" className="tabular-nums">{apuracao.Rejeitados}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground tabular-nums">0</span>
-                    )}
+                    <Badge
+                      variant={apuracao.Aprovados > 0 ? "success" : "secondary"}
+                      className="tabular-nums justify-center min-w-[2.5rem]"
+                    >
+                      {apuracao.Aprovados}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="w-[120px] px-4 py-2 text-right">
+                    <Badge
+                      variant={apuracao.Rejeitados > 0 ? "destructive" : "secondary"}
+                      className="tabular-nums justify-center min-w-[2.5rem]"
+                    >
+                      {apuracao.Rejeitados}
+                    </Badge>
                   </TableCell>
                 </TableRow>
               );

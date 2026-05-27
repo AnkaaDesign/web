@@ -56,6 +56,7 @@ import type {
   OrderScheduleBatchDeleteResponse,
   OrderScheduleProjectionResponse,
   OrderScheduleTriggerResponse,
+  OrderScheduleExpectedTotalsResponse,
   OrderScheduleCascadeMode,
 } from "../types";
 
@@ -260,8 +261,27 @@ export class OrderService {
     return response.data;
   }
 
-  async triggerOrderSchedule(id: string, data: { cascadeMode: OrderScheduleCascadeMode }): Promise<OrderScheduleTriggerResponse> {
-    const response = await apiClient.post<OrderScheduleTriggerResponse>(`${this.schedulesBasePath}/${id}/trigger`, data);
+  async triggerOrderSchedule(
+    id: string,
+    data: { cascadeMode: OrderScheduleCascadeMode },
+    options?: { suppressToast?: boolean },
+  ): Promise<OrderScheduleTriggerResponse> {
+    const config = options?.suppressToast ? ({ metadata: { suppressToast: true } } as any) : undefined;
+    const response = await apiClient.post<OrderScheduleTriggerResponse>(`${this.schedulesBasePath}/${id}/trigger`, data, config);
+    return response.data;
+  }
+
+  async getOrderScheduleExpectedTotals(
+    scheduleIds: string[],
+    options?: { suppressToast?: boolean },
+  ): Promise<OrderScheduleExpectedTotalsResponse> {
+    // Read-only batch lookup: suppress the interceptor's auto-toast by default.
+    const config = ({ metadata: { suppressToast: options?.suppressToast ?? true } } as any);
+    const response = await apiClient.post<OrderScheduleExpectedTotalsResponse>(
+      `${this.schedulesBasePath}/expected-totals`,
+      { scheduleIds },
+      config,
+    );
     return response.data;
   }
 }
@@ -314,4 +334,7 @@ export const batchDeleteOrderSchedules = (data: OrderScheduleBatchDeleteFormData
 export const finishOrderSchedule = (id: string) => orderService.finishOrderSchedule(id);
 export const createOrderFromSchedule = (id: string) => orderService.createOrderFromSchedule(id);
 export const getOrderScheduleProjection = (id: string) => orderService.getOrderScheduleProjection(id);
-export const triggerOrderSchedule = (id: string, data: { cascadeMode: OrderScheduleCascadeMode }) => orderService.triggerOrderSchedule(id, data);
+export const triggerOrderSchedule = (id: string, data: { cascadeMode: OrderScheduleCascadeMode }, options?: { suppressToast?: boolean }) =>
+  orderService.triggerOrderSchedule(id, data, options);
+export const getOrderScheduleExpectedTotals = (scheduleIds: string[], options?: { suppressToast?: boolean }) =>
+  orderService.getOrderScheduleExpectedTotals(scheduleIds, options);

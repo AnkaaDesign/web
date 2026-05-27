@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { PrivilegeRoute } from '@/components/navigation/privilege-route';
 import { PageHeader } from '@/components/ui/page-header';
-import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from '../../../../constants';
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, ITEM_CATEGORY_TYPE } from '../../../../constants';
+import { ITEM_CATEGORY_TYPE_LABELS } from '@/constants/enum-labels';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useCanViewPrices } from '@/hooks';
 import {
@@ -16,11 +17,21 @@ import {
   IconChevronDown,
   IconSelector,
   IconFilter,
+  IconShoppingCartPlus,
+  IconLoader2,
 } from '@tabler/icons-react';
-import { useAutoOrderAnalysis } from '@/services/api/auto-order';
+import {
+  useAutoOrderAnalysis,
+  useCreateOrdersFromAutoOrder,
+  type AutoOrderRecommendation,
+  type AutoOrderSupplierGroup,
+  type AutoOrderCreatePayload,
+} from '@/services/api/auto-order';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatCurrency, formatNumberWithDecimals } from '@/utils/number';
@@ -36,10 +47,26 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 };
 
+/** How to split the "no supplier" group into orders on creation. */
+type NoSupplierStrategy = 'combined' | 'per-item' | 'by-category';
+
 const CRITICALITY_OPTIONS = [
   { value: 'all', label: 'Todos' },
   { value: 'low', label: 'Baixo Estoque' },
   { value: 'critical', label: 'Críticos' },
+];
+
+const NO_SUPPLIER_STRATEGY_OPTIONS = [
+  { value: 'combined', label: 'Pedido único' },
+  { value: 'per-item', label: 'Um pedido por item' },
+  { value: 'by-category', label: 'Um pedido por categoria' },
+];
+
+const groupKey = (supplierId: string | null) => supplierId || 'no-supplier';
+
+const TOOL_TYPES: Array<ITEM_CATEGORY_TYPE | null> = [
+  ITEM_CATEGORY_TYPE.TOOL,
+  ITEM_CATEGORY_TYPE.ELECTRONIC_TOOL,
 ];
 
 export const AutomaticOrderListPage = () => {
@@ -48,6 +75,12 @@ export const AutomaticOrderListPage = () => {
   const [minStockCriteria, setMinStockCriteria] = useState<'all' | 'low' | 'critical'>('all');
   const [sortConfigs, setSortConfigs] = useState<Map<string, SortConfig>>(new Map());
   const [showFilters, setShowFilters] = useState(false);
+
+  // Selection + editable quantities for order creation.
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [noSupplierStrategy, setNoSupplierStrategy] = useState<NoSupplierStrategy>('combined');
+  const [creatingKey, setCreatingKey] = useState<string | null>(null);
 
   // Track page access
   usePageTracker({
@@ -63,6 +96,8 @@ export const AutomaticOrderListPage = () => {
   } = useAutoOrderAnalysis({
     minStockCriteria,
   });
+
+  const { mutateAsync: createOrders, isPending: isCreating } = useCreateOrdersFromAutoOrder();
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
@@ -89,7 +124,7 @@ export const AutomaticOrderListPage = () => {
   };
 
   const toggleSort = (supplierId: string | null, column: string) => {
-    const key = supplierId || 'no-supplier';
+    const key = groupKey(supplierId);
     const newConfigs = new Map(sortConfigs);
     const current = newConfigs.get(key);
 
@@ -107,8 +142,7 @@ export const AutomaticOrderListPage = () => {
   };
 
   const getSortIcon = (supplierId: string | null, column: string) => {
-    const key = supplierId || 'no-supplier';
-    const config = sortConfigs.get(key);
+    const config = sortConfigs.get(groupKey(supplierId));
 
     if (config?.column !== column) {
       return <IconSelector className="h-4 w-4 opacity-50" />;
@@ -121,15 +155,14 @@ export const AutomaticOrderListPage = () => {
     );
   };
 
-  const sortItems = (items: any[], supplierId: string | null) => {
-    const key = supplierId || 'no-supplier';
-    const config = sortConfigs.get(key);
+  const sortItems = (items: AutoOrderRecommendation[], supplierId: string | null) => {
+    const config = sortConfigs.get(groupKey(supplierId));
 
     if (!config) return items;
 
     return [...items].sort((a, b) => {
-      let aVal = a[config.column];
-      let bVal = b[config.column];
+      let aVal = (a as any)[config.column];
+      let bVal = (b as any)[config.column];
 
       if (aVal === null || aVal === undefined) return 1;
       if (bVal === null || bVal === undefined) return -1;
@@ -163,6 +196,116 @@ export const AutomaticOrderListPage = () => {
       .filter(group => group.items.length > 0);
   }, [analysisData?.data.supplierGroups, searchValue]);
 
+  // ---- Selection + quantity helpers ----
+
+  const getQty = (item: AutoOrderRecommendation) =>
+    quantities[item.itemId] ?? item.recommendedOrderQuantity;
+
+  const setItemQty = (itemId: string, value: number) => {
+    setQuantities(prev => ({ ...prev, [itemId]: value }));
+  };
+
+  const toggleItem = (itemId: string) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
+  const toggleGroupAll = (group: AutoOrderSupplierGroup, checked: boolean) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      group.items.forEach(item => {
+        if (checked) next.add(item.itemId);
+        else next.delete(item.itemId);
+      });
+      return next;
+    });
+  };
+
+  const selectedInGroup = (group: AutoOrderSupplierGroup) =>
+    group.items.filter(item => selectedItems.has(item.itemId));
+
+  /** Turns one supplier group's selected items into the orders[] payload,
+   *  honoring the no-supplier split strategy. */
+  const buildOrdersForGroup = (group: AutoOrderSupplierGroup): AutoOrderCreatePayload['orders'] => {
+    const selected = selectedInGroup(group);
+    if (selected.length === 0) return [];
+
+    const toLine = (item: AutoOrderRecommendation) => ({
+      itemId: item.itemId,
+      quantity: getQty(item),
+    });
+
+    // Items with a supplier → always one order for the group.
+    if (group.supplierId) {
+      return [{ supplierId: group.supplierId, items: selected.map(toLine) }];
+    }
+
+    // No-supplier group → apply the chosen split strategy.
+    if (noSupplierStrategy === 'per-item') {
+      return selected.map(item => ({ supplierId: null, items: [toLine(item)] }));
+    }
+    if (noSupplierStrategy === 'by-category') {
+      const byCategory = new Map<string, AutoOrderRecommendation[]>();
+      selected.forEach(item => {
+        const key = item.categoryId ?? 'no-category';
+        const arr = byCategory.get(key) ?? [];
+        arr.push(item);
+        byCategory.set(key, arr);
+      });
+      return Array.from(byCategory.values()).map(items => ({
+        supplierId: null,
+        items: items.map(toLine),
+      }));
+    }
+    // combined
+    return [{ supplierId: null, items: selected.map(toLine) }];
+  };
+
+  const handleCreate = async (orders: AutoOrderCreatePayload['orders'], key: string) => {
+    if (orders.length === 0) return;
+    setCreatingKey(key);
+    try {
+      await createOrders({ orders });
+      // Drop the items we just ordered from the selection + quantity overrides.
+      const orderedIds = orders.flatMap(o => o.items.map(i => i.itemId));
+      setSelectedItems(prev => {
+        const next = new Set(prev);
+        orderedIds.forEach(id => next.delete(id));
+        return next;
+      });
+      setQuantities(prev => {
+        const next = { ...prev };
+        orderedIds.forEach(id => delete next[id]);
+        return next;
+      });
+    } catch {
+      // The api-client interceptor surfaces the error toast; keep selection.
+    } finally {
+      setCreatingKey(null);
+    }
+  };
+
+  const handleCreateGroup = (group: AutoOrderSupplierGroup) =>
+    handleCreate(buildOrdersForGroup(group), groupKey(group.supplierId));
+
+  const handleCreateAllSelected = () =>
+    handleCreate(filteredGroups.flatMap(buildOrdersForGroup), 'all');
+
+  const totalSelected = selectedItems.size;
+
+  const renderCategoryBadge = (item: AutoOrderRecommendation) => {
+    if (!TOOL_TYPES.includes(item.categoryType)) return null;
+    return (
+      <Badge variant="outline" className="ml-2 text-[10px] font-medium">
+        {ITEM_CATEGORY_TYPE_LABELS[item.categoryType as ITEM_CATEGORY_TYPE]}
+      </Badge>
+    );
+  };
+
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
@@ -177,6 +320,15 @@ export const AutomaticOrderListPage = () => {
             { label: 'Automáticos' },
           ]}
           actions={[
+            {
+              key: 'create-selected',
+              label: totalSelected > 0 ? `Criar pedidos (${totalSelected})` : 'Criar pedidos',
+              icon: IconShoppingCartPlus,
+              onClick: handleCreateAllSelected,
+              variant: 'default',
+              disabled: totalSelected === 0 || isCreating,
+              loading: isCreating && creatingKey === 'all',
+            },
             {
               key: 'refresh',
               label: 'Atualizar',
@@ -285,14 +437,48 @@ export const AutomaticOrderListPage = () => {
                     <div className="space-y-6 pb-4">
                       {filteredGroups.map(group => {
                         const sortedItems = sortItems(group.items, group.supplierId);
+                        const groupSelected = selectedInGroup(group);
+                        const allSelected =
+                          group.items.length > 0 && groupSelected.length === group.items.length;
+                        const someSelected = groupSelected.length > 0 && !allSelected;
+                        const isNoSupplier = !group.supplierId;
+                        const key = groupKey(group.supplierId);
 
                         return (
-                          <div key={group.supplierId || 'no-supplier'} className="space-y-2">
+                          <div key={key} className="space-y-2">
                             {/* Supplier header */}
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                               <h2 className="text-lg font-semibold">{group.supplierName || 'Sem Fornecedor'}</h2>
-                              <div className="text-sm text-muted-foreground">
-                                {group.itemCount} item(ns){canViewPrices && <> • Valor estimado: {formatCurrency(group.totalEstimatedCost || 0)}</>}
+                              <div className="flex items-center gap-3">
+                                <div className="text-sm text-muted-foreground">
+                                  {group.itemCount} item(ns){canViewPrices && <> • Valor estimado: {formatCurrency(group.totalEstimatedCost || 0)}</>}
+                                </div>
+                                {isNoSupplier && (
+                                  <div className="w-[200px]">
+                                    <Combobox
+                                      options={NO_SUPPLIER_STRATEGY_OPTIONS}
+                                      value={noSupplierStrategy}
+                                      onValueChange={(value) =>
+                                        setNoSupplierStrategy(value as NoSupplierStrategy)
+                                      }
+                                      placeholder="Como criar?"
+                                      emptyText="Nenhuma opção"
+                                      searchPlaceholder="Buscar..."
+                                    />
+                                  </div>
+                                )}
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleCreateGroup(group)}
+                                  disabled={groupSelected.length === 0 || isCreating}
+                                >
+                                  {isCreating && creatingKey === key ? (
+                                    <IconLoader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  ) : (
+                                    <IconShoppingCartPlus className="h-4 w-4 mr-2" />
+                                  )}
+                                  Criar pedido{groupSelected.length > 0 ? ` (${groupSelected.length})` : ''}
+                                </Button>
                               </div>
                             </div>
 
@@ -301,6 +487,18 @@ export const AutomaticOrderListPage = () => {
                               <Table>
                                 <TableHeader>
                                   <TableRow>
+                                    <TableHead className="w-10">
+                                      <div className="flex items-center justify-center">
+                                        <Checkbox
+                                          checked={allSelected}
+                                          indeterminate={someSelected}
+                                          onCheckedChange={(checked) =>
+                                            toggleGroupAll(group, checked === true)
+                                          }
+                                          aria-label="Selecionar todos do grupo"
+                                        />
+                                      </div>
+                                    </TableHead>
                                     <TableHead
                                       className="whitespace-nowrap font-bold uppercase text-xs cursor-pointer select-none hover:bg-muted/50"
                                       onClick={() => toggleSort(group.supplierId, 'itemName')}
@@ -336,7 +534,7 @@ export const AutomaticOrderListPage = () => {
                                       onClick={() => toggleSort(group.supplierId, 'recommendedOrderQuantity')}
                                     >
                                       <div className="flex items-center gap-2">
-                                        QTD. RECOMENDADA
+                                        QTD. A PEDIR
                                         {getSortIcon(group.supplierId, 'recommendedOrderQuantity')}
                                       </div>
                                     </TableHead>
@@ -357,16 +555,32 @@ export const AutomaticOrderListPage = () => {
                                 <TableBody>
                                   {sortedItems.map(item => {
                                     const isSync = item.reason?.includes('Sincronização');
+                                    const checked = selectedItems.has(item.itemId);
                                     return (
                                       <TableRow
                                         key={item.itemId}
                                         className={cn(
                                           'hover:bg-muted/30',
+                                          checked && 'bg-primary/5',
                                           item.urgency === 'critical' && 'bg-red-50 dark:bg-red-900/10',
                                           isSync && 'bg-blue-50 dark:bg-blue-900/10'
                                         )}
                                       >
-                                        <TableCell className="font-medium py-2">{item.itemName}</TableCell>
+                                        <TableCell className="py-2">
+                                          <div className="flex items-center justify-center">
+                                            <Checkbox
+                                              checked={checked}
+                                              onCheckedChange={() => toggleItem(item.itemId)}
+                                              aria-label={`Selecionar ${item.itemName}`}
+                                            />
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="font-medium py-2">
+                                          <span className="inline-flex items-center">
+                                            {item.itemName}
+                                            {renderCategoryBadge(item)}
+                                          </span>
+                                        </TableCell>
                                         <TableCell className="text-center py-2">
                                           {formatNumberWithDecimals(item.currentStock, item.currentStock % 1 === 0 ? 0 : 2)}
                                         </TableCell>
@@ -390,10 +604,18 @@ export const AutomaticOrderListPage = () => {
                                             </span>
                                           </div>
                                         </TableCell>
-                                        <TableCell className="text-center font-bold text-primary py-2">
+                                        <TableCell className="py-2">
                                           <div className="flex items-center justify-center gap-1">
-                                            <IconPackage className="h-3 w-3" />
-                                            {formatNumberWithDecimals(item.recommendedOrderQuantity, item.recommendedOrderQuantity % 1 === 0 ? 0 : 2)}
+                                            <IconPackage className="h-3 w-3 text-primary" />
+                                            <Input
+                                              type="number"
+                                              min={0}
+                                              value={getQty(item)}
+                                              onChange={(value) =>
+                                                setItemQty(item.itemId, Number(value) || 0)
+                                              }
+                                              className="h-8 w-20 text-center font-bold text-primary"
+                                            />
                                           </div>
                                         </TableCell>
                                         <TableCell className="py-2">{getUrgencyBadge(item.urgency)}</TableCell>

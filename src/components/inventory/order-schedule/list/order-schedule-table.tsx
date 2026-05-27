@@ -27,7 +27,7 @@ import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditOrders, canDeleteOrders, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
-import { useOrderSchedules, useOrderScheduleMutations } from "../../../../hooks";
+import { useOrderSchedules, useOrderScheduleMutations, useOrderScheduleExpectedTotals } from "../../../../hooks";
 import type { OrderScheduleGetManyFormData } from "../../../../schemas";
 import { routes } from "../../../../constants";
 import type { OrderSchedule } from "../../../../types";
@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
-import { createOrderScheduleColumns, type OrderScheduleColumn } from "./order-schedule-table-columns";
+import { createOrderScheduleColumns, type OrderScheduleColumn, type OrderScheduleColumnContext } from "./order-schedule-table-columns";
 
 interface OrderScheduleTableProps {
   visibleColumns: Set<string>;
@@ -158,6 +158,26 @@ export function OrderScheduleTable({
   const currentPageItemIds = useMemo(() => {
     return schedules.map((schedule) => schedule.id);
   }, [schedules]);
+
+  // Expected-price column: one batch request per page for the visible schedules
+  // (only when the column is actually visible). The hook keys on the sorted ids
+  // and is disabled when there are none.
+  const expectedTotalsEnabled = visibleColumns.has("expectedTotal") && currentPageItemIds.length > 0;
+  const { data: expectedTotalsResponse, isLoading: expectedTotalsLoading } = useOrderScheduleExpectedTotals(
+    currentPageItemIds,
+    { enabled: expectedTotalsEnabled },
+  );
+
+  const columnContext: OrderScheduleColumnContext = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const entry of expectedTotalsResponse?.data ?? []) {
+      map.set(entry.id, entry.expectedTotal);
+    }
+    return {
+      expectedTotals: map,
+      expectedTotalsLoading: expectedTotalsEnabled && expectedTotalsLoading,
+    };
+  }, [expectedTotalsResponse, expectedTotalsEnabled, expectedTotalsLoading]);
 
   // Selection handlers
   const allSelected = isAllSelected(currentPageItemIds);
@@ -419,7 +439,7 @@ export function OrderScheduleTable({
                           !column.align && "text-left"
                         )}
                       >
-                        <div className="px-4 py-2">{column.accessor(schedule)}</div>
+                        <div className="px-4 py-2">{column.accessor(schedule, columnContext)}</div>
                       </TableCell>
                     ))}
                   </TableRow>

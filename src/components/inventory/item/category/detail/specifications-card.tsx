@@ -43,6 +43,11 @@ export function SpecificationsCard({ category, itemCount = 0, className }: Speci
                       <IconTool className="w-4 h-4 text-orange-600" />
                       <span className="text-sm font-semibold text-orange-600">{ITEM_CATEGORY_TYPE_LABELS[ITEM_CATEGORY_TYPE.TOOL]}</span>
                     </>
+                  ) : category.type === ITEM_CATEGORY_TYPE.ELECTRONIC_TOOL ? (
+                    <>
+                      <IconTool className="w-4 h-4 text-purple-600" />
+                      <span className="text-sm font-semibold text-purple-600">{ITEM_CATEGORY_TYPE_LABELS[ITEM_CATEGORY_TYPE.ELECTRONIC_TOOL]}</span>
+                    </>
                   ) : (
                     <span className="text-sm font-semibold text-foreground">{ITEM_CATEGORY_TYPE_LABELS[ITEM_CATEGORY_TYPE.REGULAR]}</span>
                   )}

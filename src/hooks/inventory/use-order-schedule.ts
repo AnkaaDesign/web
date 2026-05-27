@@ -15,6 +15,7 @@ import {
   createOrderFromSchedule,
   getOrderScheduleProjection,
   triggerOrderSchedule,
+  getOrderScheduleExpectedTotals,
 } from "../../api-client";
 import type {
   OrderScheduleGetManyFormData,
@@ -35,6 +36,7 @@ import type {
   OrderScheduleBatchDeleteResponse,
   OrderScheduleProjectionResponse,
   OrderScheduleTriggerResponse,
+  OrderScheduleExpectedTotalsResponse,
   OrderScheduleCascadeMode,
 } from "../../types";
 import { orderScheduleKeys, orderKeys } from "../common/query-keys";
@@ -341,13 +343,38 @@ export const useOrderScheduleProjection = (
   });
 };
 
+/**
+ * Batch lookup of the projected total order cost for each schedule when it next
+ * fires on its scheduled date. Issues a SINGLE POST for all provided ids.
+ * Disabled when there are no ids. Toast is suppressed (read-only request).
+ */
+export const useOrderScheduleExpectedTotals = (
+  scheduleIds: string[],
+  options?: { enabled?: boolean } & Omit<UseQueryOptions<OrderScheduleExpectedTotalsResponse>, "queryKey" | "queryFn">,
+) => {
+  const { enabled = true, ...queryOptions } = options || {};
+  // Stable key regardless of input order — the visible ids are the same set.
+  const sortedIds = [...scheduleIds].sort();
+
+  return useQuery<OrderScheduleExpectedTotalsResponse>({
+    queryKey: [...orderScheduleKeys.all, "expected-totals", sortedIds],
+    queryFn: () => getOrderScheduleExpectedTotals(scheduleIds, { suppressToast: true }),
+    enabled: enabled && scheduleIds.length > 0,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    ...queryOptions,
+  });
+};
+
 export const useTriggerOrderSchedule = (options?: {
   onSuccess?: (data: OrderScheduleTriggerResponse, variables: { id: string; cascadeMode: OrderScheduleCascadeMode }) => void;
 }) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, cascadeMode }: { id: string; cascadeMode: OrderScheduleCascadeMode }) => triggerOrderSchedule(id, { cascadeMode }),
+    // Suppress the interceptor's auto-toast: the caller shows its own contextual
+    // toast (differentiating "order created → navigate" vs "nothing to order").
+    mutationFn: ({ id, cascadeMode }: { id: string; cascadeMode: OrderScheduleCascadeMode }) =>
+      triggerOrderSchedule(id, { cascadeMode }, { suppressToast: true }),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: orderScheduleKeys.all });
       queryClient.invalidateQueries({ queryKey: orderScheduleKeys.detail(variables.id) });

@@ -306,7 +306,7 @@ export const secullumService = {
   createAssinaturaForUsers: (data: {
     userIds?: string[];
     applyToAll?: boolean;
-    onlyOpen?: boolean;
+    onlyRejected?: boolean;
     DataInicio: string; // YYYY-MM-DD or ISO datetime
     DataFim: string;
     EmpresaId?: number;

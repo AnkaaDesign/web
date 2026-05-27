@@ -812,7 +812,7 @@ export const useCreateAssinaturaWithProgress = () => {
     async (data: {
       userIds?: string[];
       applyToAll?: boolean;
-      onlyOpen?: boolean;
+      onlyRejected?: boolean;
       DataInicio: string;
       DataFim: string;
       EmpresaId?: number;

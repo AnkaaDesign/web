@@ -4,12 +4,25 @@ import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { IconCalendar, IconClock, IconPackage } from "@tabler/icons-react";
 import { getScheduleCadenceLabel } from "../../../../constants";
+import { formatCurrency } from "../../../../utils";
+import { cn } from "@/lib/utils";
 import type { OrderSchedule } from "../../../../types";
+
+/**
+ * Extra render-time context passed to every column accessor so columns whose
+ * value comes from a separate batch request (e.g. the expected-price column)
+ * can read it without each row triggering its own fetch.
+ */
+export interface OrderScheduleColumnContext {
+  // schedule id -> projected total order cost on its next scheduled date
+  expectedTotals?: Map<string, number>;
+  expectedTotalsLoading?: boolean;
+}
 
 export interface OrderScheduleColumn {
   key: string;
   header: string;
-  accessor: (schedule: OrderSchedule) => React.ReactNode;
+  accessor: (schedule: OrderSchedule, ctx?: OrderScheduleColumnContext) => React.ReactNode;
   sortable?: boolean;
   className?: string;
   align?: "left" | "center" | "right";
@@ -68,6 +81,25 @@ export function createOrderScheduleColumns(): OrderScheduleColumn[] {
       sortable: false,
       className: "w-20",
       align: "left",
+    },
+    {
+      key: "expectedTotal",
+      header: "Preço esperado",
+      accessor: (schedule: OrderSchedule, ctx?: OrderScheduleColumnContext) => {
+        const value = ctx?.expectedTotals?.get(schedule.id);
+        if (value === undefined) {
+          // Subtle skeleton while the batch request is in-flight, otherwise an em dash.
+          return ctx?.expectedTotalsLoading ? (
+            <div className={cn("ml-auto h-4 w-20 animate-pulse rounded bg-muted")} />
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          );
+        }
+        return <span className="tabular-nums font-medium">{formatCurrency(value)}</span>;
+      },
+      sortable: false,
+      className: "w-32",
+      align: "right",
     },
     {
       key: "nextRun",
@@ -136,5 +168,5 @@ export function createOrderScheduleColumns(): OrderScheduleColumn[] {
 
 // Default visible columns
 export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["name", "frequency", "itemsCount", "nextRun", "lastRun", "isActive"]);
+  return new Set(["name", "frequency", "itemsCount", "expectedTotal", "nextRun", "lastRun", "isActive"]);
 }

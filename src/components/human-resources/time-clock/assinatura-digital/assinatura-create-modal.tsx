@@ -17,7 +17,6 @@ import { useCreateAssinaturaWithProgress } from "../../../../hooks";
 
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
-import { DateTimeInput } from "@/components/ui/date-time-input";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +27,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -35,7 +35,12 @@ import {
 } from "@/components/ui/form";
 
 const ALL_OPTION_ID = "__ALL__";
-const ONLY_OPEN_OPTION_ID = "__OPEN__";
+const ONLY_REJECTED_OPTION_ID = "__REJECTED__";
+
+const MESES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+] as const;
 
 // Start of the cartão-ponto cycle: the 26th of the month before `ref`.
 // Mirrors the server's normalization — the apuração period must align to the
@@ -51,19 +56,56 @@ function cartaoPontoStart(ref: Date): Date {
   return d;
 }
 
+// The cartão-ponto cycle is fixed at 26 → 25, so the user only picks a month
+// (the cycle's end month, matching Secullum's "Apuração <Mês>/<Ano>" label)
+// instead of two free-form dates. A period value is "YYYY-MM" of that end month.
+//   end (last day)  = 25th of that month
+//   DataFim (sent)  = 26th of that month   (the boundary the report API expects)
+//   DataInicio      = 26th of the previous month
+// A cycle is "fechado" (selectable) once its 26th boundary has been reached.
+function periodEndBoundary(periodValue: string): Date {
+  const [y, m] = periodValue.split("-").map(Number);
+  return new Date(y, m - 1, 26, 0, 0, 0, 0);
+}
+
+function periodRangeLabel(periodValue: string): string {
+  if (!periodValue) return "";
+  const [y, m] = periodValue.split("-").map(Number);
+  const lastDay = new Date(y, m - 1, 25, 0, 0, 0, 0);
+  const firstDay = cartaoPontoStart(periodEndBoundary(periodValue));
+  return `${format(firstDay, "dd/MM/yyyy")} a ${format(lastDay, "dd/MM/yyyy")}`;
+}
+
+// Months offered in the picker: from 2 ahead down to 12 back. Future cycles whose
+// 26th boundary hasn't arrived yet are shown (for context) but disabled.
+function buildPeriodOptions(): {
+  value: string;
+  label: string;
+  description?: string;
+  disabled: boolean;
+}[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const base = new Date(today.getFullYear(), today.getMonth(), 1);
+  const opts: { value: string; label: string; description?: string; disabled: boolean }[] = [];
+  for (let off = 2; off >= -12; off--) {
+    const d = new Date(base.getFullYear(), base.getMonth() + off, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const closed = periodEndBoundary(value).getTime() <= today.getTime();
+    opts.push({
+      value,
+      label: `${MESES[d.getMonth()]}/${d.getFullYear()}`,
+      description: closed ? periodRangeLabel(value) : "Ainda em aberto — fecha no dia 25",
+      disabled: !closed,
+    });
+  }
+  return opts;
+}
+
 const schema = z
   .object({
     userIds: z.array(z.string()).default([]),
-    startDate: z
-      .union([z.string(), z.date()])
-      .transform((v) => (v instanceof Date ? v : new Date(v))),
-    endDate: z
-      .union([z.string(), z.date()])
-      .transform((v) => (v instanceof Date ? v : new Date(v))),
-  })
-  .refine((d) => d.endDate >= d.startDate, {
-    message: "A data final deve ser posterior ou igual à data inicial",
-    path: ["endDate"],
+    period: z.string().min(1, "Selecione um período"),
   })
   .refine((d) => d.userIds.length > 0, {
     message: "Selecione ao menos um colaborador",
@@ -90,21 +132,19 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
   const isRunning = gen.status === "running";
   const results = (gen.result?.data?.results ?? null) as ResultRow[] | null;
 
-  const defaultPeriod = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return {
-      startDate: cartaoPontoStart(today),
-      endDate: today,
-    };
-  }, []);
+  const periodOptions = useMemo(() => buildPeriodOptions(), []);
+  // Default to the most recently closed cycle (the first selectable option, since
+  // the list is newest-first with future/open months disabled at the top).
+  const defaultPeriod = useMemo(
+    () => periodOptions.find((o) => !o.disabled)?.value ?? "",
+    [periodOptions],
+  );
 
   const form = useForm<FormInput>({
     resolver: zodResolver(schema),
     defaultValues: {
       userIds: [],
-      startDate: defaultPeriod.startDate,
-      endDate: defaultPeriod.endDate,
+      period: defaultPeriod,
     },
   });
 
@@ -112,12 +152,9 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
   useEffect(() => {
     if (open) {
       gen.reset();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
       form.reset({
         userIds: [],
-        startDate: cartaoPontoStart(today),
-        endDate: today,
+        period: defaultPeriod,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,8 +162,8 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
 
   const selectedIds = form.watch("userIds") ?? [];
   const isCollective = selectedIds.includes(ALL_OPTION_ID);
-  const isOnlyOpen = selectedIds.includes(ONLY_OPEN_OPTION_ID);
-  const isSpecial = isCollective || isOnlyOpen;
+  const isOnlyRejected = selectedIds.includes(ONLY_REJECTED_OPTION_ID);
+  const isSpecial = isCollective || isOnlyRejected;
 
   // Searchable user picker scoped to Secullum-linked users. The first page
   // prepends a synthetic "Todos os colaboradores" option so users can pick
@@ -143,14 +180,14 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
     const filtered = (response.data?.data ?? []) as unknown as User[];
 
     const allOption: User = { id: ALL_OPTION_ID, name: "Todos os colaboradores" } as User;
-    const openOption: User = { id: ONLY_OPEN_OPTION_ID, name: "Apenas em aberto (não assinados)" } as User;
+    const rejectedOption: User = { id: ONLY_REJECTED_OPTION_ID, name: "Apenas rejeitados (reenviar)" } as User;
 
     const term = search?.trim().toLowerCase() ?? "";
     const synthetic: User[] =
       page === 1
         ? [
             ...(!term || "todos os colaboradores".includes(term) ? [allOption] : []),
-            ...(!term || "apenas em aberto nao assinados".includes(term) ? [openOption] : []),
+            ...(!term || "apenas rejeitados reenviar".includes(term) ? [rejectedOption] : []),
           ]
         : [];
     const data: User[] = [...synthetic, ...filtered];
@@ -160,10 +197,10 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
 
   const handleSelectionChange = useCallback(
     (next: string[]) => {
-      const SPECIAL = [ALL_OPTION_ID, ONLY_OPEN_OPTION_ID];
+      const SPECIAL = [ALL_OPTION_ID, ONLY_REJECTED_OPTION_ID];
       const wasSpecial = selectedIds.find((id) => SPECIAL.includes(id));
       const addedSpecial = next.find((id) => SPECIAL.includes(id) && id !== wasSpecial);
-      // A special option ("Todos" / "Apenas em aberto") was just chosen → it
+      // A special option ("Todos" / "Apenas rejeitados") was just chosen → it
       // becomes the sole selection.
       if (addedSpecial) {
         form.setValue("userIds", [addedSpecial], { shouldValidate: true });
@@ -181,18 +218,19 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
   );
 
   const onSubmit = async (raw: FormInput) => {
-    const startDate =
-      raw.startDate instanceof Date ? raw.startDate : new Date(raw.startDate);
-    const endDate =
-      raw.endDate instanceof Date ? raw.endDate : new Date(raw.endDate);
+    // The selected month gives a fixed 26 → 25 cycle. DataFim is the 26th boundary
+    // the report API expects; DataInicio is the 26th of the previous month (the
+    // server re-derives it from DataFim, so this is informational).
+    const endDate = periodEndBoundary(raw.period);
+    const startDate = cartaoPontoStart(endDate);
 
     const userIds = raw.userIds ?? [];
     const sendAll = userIds.includes(ALL_OPTION_ID);
-    const sendOpen = userIds.includes(ONLY_OPEN_OPTION_ID);
+    const sendRejected = userIds.includes(ONLY_REJECTED_OPTION_ID);
     // Fire-and-track: the hook starts the job and polls progress. We keep the
     // modal open so the user sees the loading state; results render below.
     await gen.start({
-      ...(sendOpen ? { onlyOpen: true } : sendAll ? { applyToAll: true } : { userIds }),
+      ...(sendRejected ? { onlyRejected: true } : sendAll ? { applyToAll: true } : { userIds }),
       DataInicio: format(startDate, "yyyy-MM-dd"),
       DataFim: format(endDate, "yyyy-MM-dd"),
     });
@@ -247,12 +285,12 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
                             </div>
                           );
                         }
-                        if (u.id === ONLY_OPEN_OPTION_ID) {
+                        if (u.id === ONLY_REJECTED_OPTION_ID) {
                           return (
                             <div>
-                              <p className="font-medium">Apenas em aberto (não assinados)</p>
+                              <p className="font-medium">Apenas rejeitados (reenviar)</p>
                               <p className="text-xs text-muted-foreground">
-                                Reenvia só para quem rejeitou ou ainda não assinou a última apuração do período
+                                Reenvia só para quem rejeitou o cartão-ponto da última apuração do período (quem ainda não assinou não é reenviado)
                               </p>
                             </div>
                           );
@@ -274,48 +312,39 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
               )}
             />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <IconCalendar className="h-4 w-4" />
-                      Início do período <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <DateTimeInput
-                        value={field.value as any}
-                        onChange={field.onChange}
-                        mode="date"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <IconCalendar className="h-4 w-4" />
-                      Fim do período <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <DateTimeInput
-                        value={field.value as any}
-                        onChange={field.onChange}
-                        mode="date"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="period"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4" />
+                    Período <span className="text-destructive">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Combobox
+                      mode="single"
+                      options={periodOptions}
+                      value={field.value}
+                      onValueChange={(v) =>
+                        field.onChange((Array.isArray(v) ? v[0] : v) ?? "")
+                      }
+                      placeholder="Selecione o mês"
+                      searchPlaceholder="Buscar mês..."
+                      emptyText="Nenhum período disponível"
+                      clearable={false}
+                      disabled={isRunning}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    O cartão-ponto vai do dia 26 ao 25
+                    {field.value ? ` (${periodRangeLabel(field.value)})` : ""}. Meses
+                    ainda não fechados aparecem desabilitados.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {isRunning && (
               <div className="rounded-lg border border-border p-4 flex items-center gap-3">
@@ -377,8 +406,8 @@ export function AssinaturaCreateModal({ open, onOpenChange }: AssinaturaCreateMo
               <Button type="submit" disabled={isRunning}>
                 {isRunning
                   ? "Gerando..."
-                  : isOnlyOpen
-                    ? "Reenviar em aberto"
+                  : isOnlyRejected
+                    ? "Reenviar rejeitados"
                     : isCollective
                       ? "Enviar para todos"
                       : "Enviar para selecionados"}

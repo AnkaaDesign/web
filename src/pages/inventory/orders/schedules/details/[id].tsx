@@ -44,6 +44,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { MeasureDisplayCompact } from "@/components/inventory/item/common/measure-display";
 import { toast } from "@/components/ui/sonner";
 import type { OrderScheduleCascadeMode } from "../../../../../types";
 import { cn } from "@/lib/utils";
@@ -84,13 +86,16 @@ export function OrderScheduleDetailsPage() {
     include: {
       brand: true,
       category: true,
+      measures: true,
     },
     enabled: itemIds.length > 0,
   });
 
   const items = itemsResponse?.data || [];
 
-  // Fetch order projection (quantities/totals for today vs the scheduled trigger date)
+  // Fetch the trigger-preview projection: per item, the quantity/total each
+  // "Executar agora" mode (gap-only vs gap+cycle) will create. Column totals
+  // reconcile exactly with the trigger dialog buttons.
   const { data: projectionResponse } = useOrderScheduleProjection(id!, {
     enabled: !!id,
   });
@@ -188,12 +193,15 @@ export function OrderScheduleDetailsPage() {
   };
 
   const handleOpenTrigger = () => {
+    // Don't allow manual execution of an inactive or finished schedule.
+    if (!schedule.isActive || schedule.finishedAt) return;
     // When there's no gap (overdue / once), the "bridge" option doesn't apply — default to the full cycle.
     setCascadeMode((projectionMeta?.gapDays ?? 0) > 0 ? "GAP_ONLY" : "GAP_PLUS_CYCLE");
     setShowTriggerDialog(true);
   };
 
   const handleConfirmTrigger = () => {
+    if (!schedule.isActive || schedule.finishedAt) return;
     triggerSchedule.mutate(
       { id: schedule.id, cascadeMode },
       {
@@ -212,6 +220,15 @@ export function OrderScheduleDetailsPage() {
   };
 
   const isOverdue = schedule?.nextRun ? new Date(schedule.nextRun) < new Date() : false;
+
+  // Manual execution only makes sense for an active, unfinished schedule.
+  const isFinished = !!schedule.finishedAt;
+  const canTrigger = schedule.isActive && !isFinished;
+  const triggerDisabledHint = isFinished
+    ? "Este agendamento já foi finalizado."
+    : !schedule.isActive
+      ? "Ative o agendamento para poder executá-lo."
+      : null;
 
   const gapDays = projectionMeta?.gapDays ?? 0;
   const intervalDays = projectionMeta?.intervalDays ?? null;
@@ -260,6 +277,25 @@ export function OrderScheduleDetailsPage() {
     return null;
   };
 
+  // Skipped/zero projection cells show "—". When the API explains why (reasonGapOnly/
+  // reasonGapPlusCycle), surface it as a tooltip instead of a bare dash.
+  const renderSkippableCell = (value: string | null, reason?: string | null) => {
+    if (value !== null) return value;
+    if (!reason) return "—";
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help text-muted-foreground underline decoration-dotted underline-offset-2">—</span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="max-w-xs text-xs">{reason}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
@@ -288,9 +324,10 @@ export function OrderScheduleDetailsPage() {
           },
           {
             key: "trigger",
-            label: "Disparar agora",
+            label: "Executar agora",
             onClick: handleOpenTrigger,
             icon: IconPlayerPlay,
+            disabled: !canTrigger,
           },
           {
             key: "edit",
@@ -398,6 +435,18 @@ export function OrderScheduleDetailsPage() {
                           </div>
                         )}
 
+                        {schedule.lastFiredAt && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                            <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <IconCalendarClock className="h-4 w-4" />
+                              Última verificação
+                            </span>
+                            <span className="text-sm font-semibold text-foreground">
+                              {formatDateTime(new Date(schedule.lastFiredAt))}
+                            </span>
+                          </div>
+                        )}
+
                         <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                           <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                             <IconCalendar className="h-4 w-4" />
@@ -437,26 +486,22 @@ export function OrderScheduleDetailsPage() {
                     </Badge>
                   )}
                 </CardTitle>
+                {items.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    As colunas mostram o que cada opção de <span className="font-medium">Executar agora</span> vai pedir — o total de cada coluna é igual ao botão correspondente.
+                    {projectionMeta && projectionMeta.scheduledTotal > 0 && (
+                      <>
+                        {" "}Estimativa do próximo pedido automático
+                        {projectionMeta.scheduledDate ? ` (${formatDate(new Date(projectionMeta.scheduledDate))})` : ""}:{" "}
+                        <span className="font-medium text-foreground">{formatCurrency(projectionMeta.scheduledTotal)}</span>.
+                      </>
+                    )}
+                  </p>
+                )}
               </CardHeader>
               <CardContent className="pt-0 flex-1">
                 {items.length > 0 ? (
                   <>
-                    {projectionMeta && (
-                      <div className="mb-3 flex flex-wrap items-center gap-2">
-                        {projectionMeta.scheduledDate && (
-                          <Badge variant="secondary" className="gap-1">
-                            <IconCalendarClock className="h-3 w-3" />
-                            Disparo previsto: {formatDate(new Date(projectionMeta.scheduledDate))}
-                            {projectionMeta.gapDays > 0 && ` (${projectionMeta.gapDays} dias)`}
-                          </Badge>
-                        )}
-                        <Badge variant="outline">Total hoje: {formatCurrency(projectionMeta.totalToday)}</Badge>
-                        <Badge variant="outline">Total na data: {formatCurrency(projectionMeta.totalScheduled)}</Badge>
-                      </div>
-                    )}
-                    <p className="mb-2 text-xs text-muted-foreground">
-                      hoje = se pedir agora · na data = projeção do estoque na data de disparo
-                    </p>
                     <div className="border rounded-lg overflow-hidden dark:border-border">
                     <Table>
                       <TableHeader>
@@ -465,16 +510,23 @@ export function OrderScheduleDetailsPage() {
                           <TableHead className="font-semibold">Nome</TableHead>
                           <TableHead className="font-semibold">Marca</TableHead>
                           <TableHead className="font-semibold">Categoria</TableHead>
-                          <TableHead className="font-semibold text-right">Qtd. hoje</TableHead>
-                          <TableHead className="font-semibold text-right">Qtd. na data</TableHead>
-                          <TableHead className="font-semibold text-right">Preço hoje</TableHead>
-                          <TableHead className="font-semibold text-right">Preço na data</TableHead>
+                          <TableHead className="font-semibold text-right">Estoque</TableHead>
+                          <TableHead className="font-semibold">Medidas</TableHead>
+                          {hasGapOption && (
+                            <>
+                              <TableHead className="font-semibold text-right">Qtd. até a próxima</TableHead>
+                              <TableHead className="font-semibold text-right">Preço até a próxima</TableHead>
+                            </>
+                          )}
+                          <TableHead className="font-semibold text-right">Qtd. + ciclo</TableHead>
+                          <TableHead className="font-semibold text-right">Preço + ciclo</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {items.map((item) => {
                           const p = projectionByItem.get(item.id);
-                          const showProjection = p && !p.skipped;
+                          const gapOnlyQty = p && p.quantityGapOnly > 0;
+                          const gpcQty = p && p.quantityGapPlusCycle > 0;
                           return (
                           <TableRow
                             key={item.id}
@@ -485,18 +537,30 @@ export function OrderScheduleDetailsPage() {
                             <TableCell className="font-medium">{item.name}</TableCell>
                             <TableCell>{item.brand?.name || "-"}</TableCell>
                             <TableCell>{item.category?.name || "-"}</TableCell>
-                            <TableCell className="text-right tabular-nums">{showProjection ? formatNumber(p!.quantityToday) : "—"}</TableCell>
-                            <TableCell className="text-right tabular-nums">{showProjection ? formatNumber(p!.quantityScheduled) : "—"}</TableCell>
-                            <TableCell className="text-right tabular-nums">{showProjection ? formatCurrency(p!.totalToday) : "—"}</TableCell>
-                            <TableCell className="text-right tabular-nums">{showProjection ? formatCurrency(p!.totalScheduled) : "—"}</TableCell>
+                            <TableCell className="text-right tabular-nums">{formatNumber(item.quantity)}</TableCell>
+                            <TableCell><MeasureDisplayCompact item={item} /></TableCell>
+                            {hasGapOption && (
+                              <>
+                                <TableCell className="text-right tabular-nums">{renderSkippableCell(gapOnlyQty ? formatNumber(p!.quantityGapOnly) : null, p?.reasonGapOnly)}</TableCell>
+                                <TableCell className="text-right tabular-nums">{renderSkippableCell(gapOnlyQty ? formatCurrency(p!.totalGapOnly) : null, p?.reasonGapOnly)}</TableCell>
+                              </>
+                            )}
+                            <TableCell className="text-right tabular-nums">{renderSkippableCell(gpcQty ? formatNumber(p!.quantityGapPlusCycle) : null, p?.reasonGapPlusCycle)}</TableCell>
+                            <TableCell className="text-right tabular-nums">{renderSkippableCell(gpcQty ? formatCurrency(p!.totalGapPlusCycle) : null, p?.reasonGapPlusCycle)}</TableCell>
                           </TableRow>
                           );
                         })}
                         {projectionMeta && (
                           <TableRow className="bg-muted/50 font-semibold">
                             <TableCell colSpan={6} className="text-right">Total</TableCell>
-                            <TableCell className="text-right tabular-nums">{formatCurrency(projectionMeta.totalToday)}</TableCell>
-                            <TableCell className="text-right tabular-nums">{formatCurrency(projectionMeta.totalScheduled)}</TableCell>
+                            {hasGapOption && (
+                              <>
+                                <TableCell />
+                                <TableCell className="text-right tabular-nums">{formatCurrency(projectionMeta.gapOnlyTotal)}</TableCell>
+                              </>
+                            )}
+                            <TableCell />
+                            <TableCell className="text-right tabular-nums">{formatCurrency(projectionMeta.gapPlusCycleTotal)}</TableCell>
                           </TableRow>
                         )}
                       </TableBody>
@@ -543,7 +607,7 @@ export function OrderScheduleDetailsPage() {
       <Dialog open={showTriggerDialog} onOpenChange={setShowTriggerDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Disparar agendamento agora</DialogTitle>
+            <DialogTitle>Executar agendamento agora</DialogTitle>
             <DialogDescription>
               Escolha quanto este pedido deve cobrir. O agendamento permanece configurado normalmente.
             </DialogDescription>
@@ -562,10 +626,13 @@ export function OrderScheduleDetailsPage() {
                   <RadioGroupItem value="GAP_ONLY" id="cascade-gap-only" className="mt-0.5" />
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-foreground">
-                      Cobrir apenas até o próximo disparo
+                      Cobrir apenas até a próxima execução
                       <span className="ml-1 text-muted-foreground">({gapDays} dias)</span>
                     </p>
-                    <p className="text-xs text-muted-foreground">o agendamento ainda dispara na data prevista</p>
+                    <p className="text-xs text-muted-foreground">o agendamento ainda executa na data prevista</p>
+                    {projectionMeta && (
+                      <p className="text-xs font-medium text-foreground">Total: {formatCurrency(projectionMeta.gapOnlyTotal)}</p>
+                    )}
                   </div>
                 </label>
               )}
@@ -580,42 +647,39 @@ export function OrderScheduleDetailsPage() {
                 <RadioGroupItem value="GAP_PLUS_CYCLE" id="cascade-gap-cycle" className="mt-0.5" />
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-foreground">
-                    Cobrir até o próximo disparo + ciclo completo
+                    Cobrir até a próxima execução + ciclo completo
                     <span className="ml-1 text-muted-foreground">
                       ({gapDays}{intervalDays != null ? ` + ${intervalDays}` : ""} dias)
                     </span>
                   </p>
-                  <p className="text-xs text-muted-foreground">o próximo disparo é adiado um ciclo</p>
+                  <p className="text-xs text-muted-foreground">a próxima execução é adiada um ciclo</p>
+                  {projectionMeta && (
+                    <p className="text-xs font-medium text-foreground">Total: {formatCurrency(projectionMeta.gapPlusCycleTotal)}</p>
+                  )}
                 </div>
               </label>
             </RadioGroup>
 
-            {projectionMeta && (
+            {projectionMeta?.scheduledDate && (
               <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
-                {projectionMeta.scheduledDate && (
-                  <div className="flex justify-between">
-                    <span>Disparo previsto</span>
-                    <span className="font-medium text-foreground">{formatDate(new Date(projectionMeta.scheduledDate))}</span>
-                  </div>
-                )}
                 <div className="flex justify-between">
-                  <span>Total se pedir hoje</span>
-                  <span className="font-medium text-foreground">{formatCurrency(projectionMeta.totalToday)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total projetado na data</span>
-                  <span className="font-medium text-foreground">{formatCurrency(projectionMeta.totalScheduled)}</span>
+                  <span>Execução prevista</span>
+                  <span className="font-medium text-foreground">{formatDate(new Date(projectionMeta.scheduledDate))}</span>
                 </div>
               </div>
             )}
           </div>
 
+          {!canTrigger && triggerDisabledHint && (
+            <p className="text-xs text-muted-foreground">{triggerDisabledHint}</p>
+          )}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTriggerDialog(false)} disabled={triggerSchedule.isPending}>
               Cancelar
             </Button>
-            <Button onClick={handleConfirmTrigger} disabled={triggerSchedule.isPending}>
-              {triggerSchedule.isPending ? "Disparando..." : "Confirmar"}
+            <Button onClick={handleConfirmTrigger} disabled={triggerSchedule.isPending || !canTrigger}>
+              {triggerSchedule.isPending ? "Executando..." : "Confirmar"}
             </Button>
           </DialogFooter>
         </DialogContent>

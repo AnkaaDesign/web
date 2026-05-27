@@ -534,11 +534,15 @@ input[type="time"]::-moz-calendar-picker-indicator {
     max-width: 40px !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
+    text-align: center; /* centers a checkbox placed directly in the cell */
   }
 
-  /* Center checkbox content */
-  table th:has([role="checkbox"]) > *,
-  table td:has([role="checkbox"]) > * {
+  /* Center checkbox content. Exclude the checkbox itself: when the checkbox is
+     the direct child (no wrapper div), stretching it to width/height:100% would
+     collapse its fixed 16px box into a flat line. The :not() guard is a no-op
+     for the common wrapped case (direct child is a <div>). */
+  table th:has([role="checkbox"]) > *:not([role="checkbox"]),
+  table td:has([role="checkbox"]) > *:not([role="checkbox"]) {
     display: flex;
     align-items: center;
     justify-content: center;

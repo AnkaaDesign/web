@@ -56,6 +56,9 @@ export interface OrderSchedule extends BaseEntity {
 
   nextRun: Date | null;
   lastRun: Date | null;
+  // When the schedule was last evaluated by the worker (distinct from lastRun,
+  // which is set only when an order is actually created).
+  lastFiredAt?: Date | null;
   finishedAt: Date | null;
   lastRunId: string | null;
   originalScheduleId: string | null;
@@ -472,13 +475,16 @@ export interface OrderScheduleProjectionItem {
   itemId: string;
   itemName: string;
   unitPrice: number;
-  quantityToday: number;
-  quantityScheduled: number;
-  totalToday: number;
-  totalScheduled: number;
-  reasonToday: string | null;
-  reasonScheduled: string | null;
-  skipped: boolean;
+  // GAP_ONLY ("Executar agora" — cover only until the next run).
+  quantityGapOnly: number;
+  totalGapOnly: number;
+  reasonGapOnly: string | null;
+  skippedGapOnly: boolean;
+  // GAP_PLUS_CYCLE ("Executar agora + ciclo" — gap + one full cycle).
+  quantityGapPlusCycle: number;
+  totalGapPlusCycle: number;
+  reasonGapPlusCycle: string | null;
+  skippedGapPlusCycle: boolean;
 }
 
 export interface OrderScheduleProjectionMeta {
@@ -486,9 +492,15 @@ export interface OrderScheduleProjectionMeta {
   scheduledDate: string | null;
   gapDays: number;
   intervalDays: number | null;
-  coverageDays: number;
-  totalToday: number;
-  totalScheduled: number;
+  hasGap: boolean;
+  // Column totals — each equals the order its trigger mode actually creates.
+  gapOnlyTotal: number;
+  gapOnlyCoverageDays: number;
+  gapPlusCycleTotal: number;
+  gapPlusCycleCoverageDays: number;
+  // Forecast of the next automatic order (informational; matches "Preço esperado").
+  scheduledTotal: number;
+  scheduledCoverageDays: number;
 }
 
 export interface OrderScheduleProjectionResponse {
@@ -513,4 +525,16 @@ export interface OrderScheduleTriggerResponse {
   success: boolean;
   message: string;
   data: OrderScheduleTriggerData | null;
+}
+
+export interface OrderScheduleExpectedTotal {
+  id: string;
+  expectedTotal: number;
+  nextRun: string | null;
+  gapDays: number;
+}
+
+export interface OrderScheduleExpectedTotalsResponse {
+  success: boolean;
+  data: OrderScheduleExpectedTotal[];
 }

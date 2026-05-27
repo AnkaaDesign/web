@@ -26,7 +26,6 @@ import { FormSteps } from "@/components/ui/form-steps";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { ItemSelectorTable } from "../../common/item-selector/item-selector-table";
 import { DateTimeInput } from "@/components/ui/date-time-input";
@@ -42,12 +41,9 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
   const [currentStep, setCurrentStep] = useState(1);
   const { updateMutation } = useOrderScheduleMutations();
 
-  // Initialize mode from loaded schedule: positional iff both occurrence+dayOfWeek present.
+  // Positional config is present iff both occurrence+dayOfWeek were saved.
   const hasPositionalConfig = Boolean(
     schedule.monthlyConfig?.occurrence && schedule.monthlyConfig?.dayOfWeek,
-  );
-  const [monthlyScheduleMode, setMonthlyScheduleMode] = useState<"fixed" | "positional">(
-    hasPositionalConfig ? "positional" : "fixed",
   );
 
   // The recurrence is canonically stored in the config relations; older/seeded
@@ -205,13 +201,59 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
 
   const validateCurrentStep = useCallback(async (): Promise<boolean> => {
     switch (currentStep) {
-      case 1:
-        const step1Valid = await form.trigger(["frequency", "frequencyCount"]);
-        if (!step1Valid) {
+      case 1: {
+        // Validate the base fields first.
+        const baseValid = await form.trigger(["frequency", "frequencyCount"]);
+
+        // The update schema has no cross-field refine, so frequency-specific
+        // requirements are enforced here: set a field-level error on the missing
+        // field so the user can't advance with an incomplete schedule.
+        const freq = form.getValues("frequency") as SCHEDULE_FREQUENCY | undefined;
+        const v = form.getValues();
+        let specificValid = true;
+
+        const requireField = (name: any, present: boolean, message: string) => {
+          if (!present) {
+            form.setError(name, { type: "manual", message });
+            specificValid = false;
+          }
+        };
+
+        if (freq && frequencyGroups.needsDayOfWeek.includes(freq)) {
+          requireField("dayOfWeek", !!v.dayOfWeek, "Selecione o dia da semana");
+        }
+        if (freq && frequencyGroups.needsDayOfMonth.includes(freq)) {
+          if (freq === SCHEDULE_FREQUENCY.ANNUAL) {
+            requireField("dayOfMonth", !!v.dayOfMonth, "Informe o dia do mês");
+          } else {
+            // Accept EITHER a fixed day-of-month OR a complete positional pair
+            // (occurrence + dayOfWeek). The two are mutually exclusive in the UI.
+            const hasFixed = v.dayOfMonth != null && String(v.dayOfMonth) !== "";
+            const hasOccurrence = !!v.monthlySchedule?.occurrence;
+            const hasPosDayOfWeek = !!v.monthlySchedule?.dayOfWeek;
+            const hasAnyPositional = hasOccurrence || hasPosDayOfWeek;
+            if (!hasFixed && !hasAnyPositional) {
+              requireField("dayOfMonth", false, "Informe o dia do mês ou a ocorrência + dia da semana");
+            } else if (hasAnyPositional && !(hasOccurrence && hasPosDayOfWeek)) {
+              // Positional partially filled — require both halves.
+              requireField("monthlySchedule.occurrence", hasOccurrence, "Selecione a ocorrência");
+              requireField("monthlySchedule.dayOfWeek", hasPosDayOfWeek, "Selecione o dia da semana");
+            }
+          }
+        }
+        if (freq && frequencyGroups.needsMonth.includes(freq)) {
+          requireField("month", !!v.month, "Selecione o mês");
+        }
+        if (freq && frequencyGroups.needsSpecificDate.includes(freq)) {
+          requireField("specificDate", !!v.specificDate, "Selecione a data");
+        }
+
+        if (!baseValid || !specificValid) {
           toast.error("Por favor, configure o cronograma corretamente");
           return false;
         }
         return true;
+      }
 
       case 2:
         const items = form.getValues("items");
@@ -227,7 +269,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
       default:
         return true;
     }
-  }, [currentStep, form]);
+  }, [currentStep, form, frequencyGroups]);
 
   const nextStep = useCallback(() => {
     if (currentStep < steps.length) {
@@ -255,19 +297,15 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
 
       const formData = form.getValues();
 
-      // Normalize the monthly config to the selected mode so the payload is always
-      // internally consistent: positional => send monthlySchedule (occurrence+dayOfWeek)
-      // and clear dayOfMonth; fixed => send flat dayOfMonth and drop monthlySchedule
-      // (the API derives monthlyConfig from whichever branch is present).
-      const freq = formData.frequency as SCHEDULE_FREQUENCY;
-      const isPositionalCapable =
-        frequencyGroups.needsDayOfMonth.includes(freq) && freq !== SCHEDULE_FREQUENCY.ANNUAL;
-      if (isPositionalCapable) {
-        if (monthlyScheduleMode === "positional") {
-          formData.dayOfMonth = null as any;
-        } else {
-          formData.monthlySchedule = undefined as any;
-        }
+      // Normalize the monthly config so the payload carries exactly one branch:
+      // a fixed dayOfMonth XOR a positional monthlySchedule (occurrence + dayOfWeek).
+      // The UI enforces mutual exclusion, but guard the payload regardless.
+      const fixedFilled = formData.dayOfMonth != null && String(formData.dayOfMonth) !== "";
+      const positionalFilled = !!formData.monthlySchedule?.occurrence || !!formData.monthlySchedule?.dayOfWeek;
+      if (fixedFilled) {
+        formData.monthlySchedule = undefined as any;
+      } else if (positionalFilled) {
+        formData.dayOfMonth = null as any;
       }
 
       await updateMutation.mutateAsync({ id, data: formData });
@@ -288,7 +326,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
         console.error("Submission error:", error);
       }
     }
-  }, [validateCurrentStep, form, updateMutation, navigate, id, monthlyScheduleMode, frequencyGroups]);
+  }, [validateCurrentStep, form, updateMutation, navigate, id]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.orders.schedules.root);
@@ -354,33 +392,10 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
   const watchedNextRun = form.watch("nextRun");
   const watchedMonthlySchedule = form.watch("monthlySchedule");
 
-  const handleMonthlyScheduleModeChange = useCallback(
-    (next: "fixed" | "positional") => {
-      setMonthlyScheduleMode(next);
-      if (next === "fixed") {
-        // Drop the positional object; the API derives a fixed monthlyConfig from
-        // the flat dayOfMonth and nulls occurrence/dayOfWeek.
-        form.setValue("monthlySchedule", undefined as any, { shouldValidate: false });
-      } else {
-        form.setValue("dayOfMonth", null as any, { shouldValidate: false });
-        // Seed the positional object (preserving any loaded values) so RHF
-        // registers it as an object rather than leaving a partial that would
-        // fail the strict monthlySchedule schema.
-        const current = form.getValues("monthlySchedule") as
-          | { occurrence?: MONTH_OCCURRENCE; dayOfWeek?: WEEK_DAY }
-          | undefined;
-        form.setValue(
-          "monthlySchedule",
-          {
-            occurrence: current?.occurrence ?? schedule.monthlyConfig?.occurrence ?? undefined,
-            dayOfWeek: current?.dayOfWeek ?? schedule.monthlyConfig?.dayOfWeek ?? undefined,
-          } as any,
-          { shouldValidate: false },
-        );
-      }
-    },
-    [form],
-  );
+  // Mutual-exclusion flags for the monthly day config: a filled fixed day greys out
+  // the positional pair and vice-versa. Reactive via the watched values above.
+  const fixedFilled = watchedDayOfMonth != null && String(watchedDayOfMonth) !== "";
+  const positionalFilled = !!watchedMonthlySchedule?.occurrence || !!watchedMonthlySchedule?.dayOfWeek;
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
@@ -469,13 +484,14 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                             />
                           </div>
 
-                          {/* Frequency Configuration */}
-                          <div className="flex flex-wrap gap-4">
+                          {/* Frequency Configuration — one full-width row; fields flex-fill
+                              evenly on desktop and wrap only on narrow screens. */}
+                          <div className="flex flex-wrap gap-4 items-start">
                                 <FormField
                                   control={form.control}
                                   name="frequency"
                                   render={({ field }) => (
-                                    <FormItem className="flex-1 min-w-[200px]">
+                                    <FormItem className="flex-1 min-w-[150px]">
                                       <FormLabel>Frequência <span className="text-destructive">*</span></FormLabel>
                                       <FormControl>
                                         <Combobox
@@ -540,7 +556,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                     control={form.control}
                                     name="specificDate"
                                     render={({ field: { onChange, onBlur, value, name } }) => (
-                                      <FormItem className="flex flex-col flex-1 min-w-[200px]">
+                                      <FormItem className="flex flex-col flex-1 min-w-[150px]">
                                         <FormLabel>
                                           {watchedFrequency === SCHEDULE_FREQUENCY.ONCE ? "Data do Pedido" : "Próxima Execução"}
                                           <span className="text-destructive">*</span>
@@ -551,6 +567,9 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                           placeholder="Selecione a data"
                                           mode="date"
                                           disabled={isSubmitting}
+                                          constraints={{
+                                            minDate: new Date(),
+                                          }}
                                         />
                                         <FormMessage />
                                       </FormItem>
@@ -564,7 +583,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                     control={form.control}
                                     name="dayOfWeek"
                                     render={({ field }) => (
-                                      <FormItem className="flex-1 min-w-[200px]">
+                                      <FormItem className="flex-1 min-w-[150px]">
                                         <FormLabel>Dia da Semana <span className="text-destructive">*</span></FormLabel>
                                         <FormControl>
                                           <Combobox
@@ -588,7 +607,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                     control={form.control}
                                     name="month"
                                     render={({ field }) => (
-                                      <FormItem className="flex-1 min-w-[200px]">
+                                      <FormItem className="flex-1 min-w-[150px]">
                                         <FormLabel>Mês <span className="text-destructive">*</span></FormLabel>
                                         <FormControl>
                                           <Combobox
@@ -606,104 +625,84 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                   />
                                 )}
 
-                                {/* Day-of-month vs positional weekday config (monthly-ish frequencies).
-                                    Annual still uses flat dayOfMonth+month — positional yearly is out of scope. */}
-                                {watchedFrequency && frequencyGroups.needsDayOfMonth.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
-                                  <div className="flex flex-col gap-2 w-full">
-                                    {watchedFrequency !== SCHEDULE_FREQUENCY.ANNUAL && (
-                                      <div className="flex flex-col gap-1">
-                                        <span className="text-sm font-medium">Quando executar no mês</span>
-                                        <ToggleGroup
-                                          type="single"
-                                          value={monthlyScheduleMode}
-                                          onValueChange={(v) => v && handleMonthlyScheduleModeChange(v as "fixed" | "positional")}
-                                          className="justify-start gap-2"
-                                        >
-                                          <ToggleGroupItem value="fixed" disabled={isSubmitting} className="px-3">
-                                            Dia fixo do mês
-                                          </ToggleGroupItem>
-                                          <ToggleGroupItem value="positional" disabled={isSubmitting} className="px-3">
-                                            Dia da semana (ex: 1ª quinta-feira)
-                                          </ToggleGroupItem>
-                                        </ToggleGroup>
-                                      </div>
-                                    )}
-
-                                    <div className="flex flex-wrap gap-4">
-                                      {(monthlyScheduleMode === "fixed" || watchedFrequency === SCHEDULE_FREQUENCY.ANNUAL) && (
-                                        <FormField
-                                          control={form.control}
-                                          name="dayOfMonth"
-                                          render={({ field }) => (
-                                            <FormItem className="flex-1 min-w-[150px]">
-                                              <FormLabel>Dia do Mês <span className="text-destructive">*</span></FormLabel>
-                                              <FormControl>
-                                                <Input
-                                                  type="number"
-                                                  min={1}
-                                                  max={31}
-                                                  placeholder="1-31"
-                                                  disabled={isSubmitting}
-                                                  className="bg-transparent"
-                                                  ref={field.ref}
-                                                  value={field.value ?? ""}
-                                                  onChange={(value) => field.onChange(typeof value === 'number' ? value : parseInt(String(value)) || undefined)}
-                                                  onBlur={field.onBlur}
-                                                />
-                                              </FormControl>
-                                              <FormMessage />
-                                            </FormItem>
-                                          )}
-                                        />
+                                {/* Monthly day config — fixed day-of-month and the positional
+                                    pair (occurrence + weekday) are shown together; filling one
+                                    side disables the other (mutual exclusion). ANNUAL keeps only
+                                    the fixed day-of-month (+ the Mês field above). */}
+                                {watchedFrequency &&
+                                  frequencyGroups.needsDayOfMonth.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
+                                    <FormField
+                                      control={form.control}
+                                      name="dayOfMonth"
+                                      render={({ field }) => (
+                                        <FormItem className="flex-1 min-w-[150px]">
+                                          <FormLabel>Dia do Mês <span className="text-destructive">*</span></FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              type="number"
+                                              min={1}
+                                              max={31}
+                                              placeholder="1-31"
+                                              disabled={isSubmitting || (watchedFrequency !== SCHEDULE_FREQUENCY.ANNUAL && positionalFilled)}
+                                              className="bg-transparent"
+                                              ref={field.ref}
+                                              value={field.value ?? ""}
+                                              onChange={(value) => field.onChange(typeof value === 'number' ? value : parseInt(String(value)) || undefined)}
+                                              onBlur={field.onBlur}
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
                                       )}
+                                    />
+                                  )}
 
-                                      {monthlyScheduleMode === "positional" && watchedFrequency !== SCHEDULE_FREQUENCY.ANNUAL && (
-                                        <>
-                                          <FormField
-                                            control={form.control}
-                                            name="monthlySchedule.occurrence"
-                                            render={({ field }) => (
-                                              <FormItem className="flex-1 min-w-[180px]">
-                                                <FormLabel>Ocorrência <span className="text-destructive">*</span></FormLabel>
-                                                <FormControl>
-                                                  <Combobox
-                                                    value={field.value || undefined}
-                                                    onValueChange={field.onChange}
-                                                    disabled={isSubmitting}
-                                                    options={Object.entries(MONTH_OCCURRENCE_LABELS).map(([value, label]) => ({ value, label }))}
-                                                    placeholder="Primeira, Segunda…"
-                                                    searchable={false}
-                                                  />
-                                                </FormControl>
-                                                <FormMessage />
-                                              </FormItem>
-                                            )}
-                                          />
-                                          <FormField
-                                            control={form.control}
-                                            name="monthlySchedule.dayOfWeek"
-                                            render={({ field }) => (
-                                              <FormItem className="flex-1 min-w-[200px]">
-                                                <FormLabel>Dia da Semana <span className="text-destructive">*</span></FormLabel>
-                                                <FormControl>
-                                                  <Combobox
-                                                    value={field.value || undefined}
-                                                    onValueChange={field.onChange}
-                                                    disabled={isSubmitting}
-                                                    options={Object.entries(WEEK_DAY_LABELS).map(([value, label]) => ({ value, label }))}
-                                                    placeholder="Selecione o dia da semana"
-                                                    searchable={false}
-                                                  />
-                                                </FormControl>
-                                                <FormMessage />
-                                              </FormItem>
-                                            )}
-                                          />
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
+                                {watchedFrequency &&
+                                  frequencyGroups.needsDayOfMonth.includes(watchedFrequency as SCHEDULE_FREQUENCY) &&
+                                  watchedFrequency !== SCHEDULE_FREQUENCY.ANNUAL && (
+                                    <>
+                                      <FormField
+                                        control={form.control}
+                                        name="monthlySchedule.occurrence"
+                                        render={({ field }) => (
+                                          <FormItem className="flex-1 min-w-[150px]">
+                                            <FormLabel>Ocorrência</FormLabel>
+                                            <FormControl>
+                                              <Combobox
+                                                value={field.value || undefined}
+                                                onValueChange={field.onChange}
+                                                disabled={isSubmitting || fixedFilled}
+                                                options={Object.entries(MONTH_OCCURRENCE_LABELS).map(([value, label]) => ({ value, label }))}
+                                                placeholder="Primeira, Segunda…"
+                                                searchable={false}
+                                              />
+                                            </FormControl>
+                                            <FormMessage />
+                                          </FormItem>
+                                        )}
+                                      />
+                                      <FormField
+                                        control={form.control}
+                                        name="monthlySchedule.dayOfWeek"
+                                        render={({ field }) => (
+                                          <FormItem className="flex-1 min-w-[150px]">
+                                            <FormLabel>Dia da Semana</FormLabel>
+                                            <FormControl>
+                                              <Combobox
+                                                value={field.value || undefined}
+                                                onValueChange={field.onChange}
+                                                disabled={isSubmitting || fixedFilled}
+                                                options={Object.entries(WEEK_DAY_LABELS).map(([value, label]) => ({ value, label }))}
+                                                placeholder="Selecione o dia da semana"
+                                                searchable={false}
+                                              />
+                                            </FormControl>
+                                            <FormMessage />
+                                          </FormItem>
+                                        )}
+                                      />
+                                    </>
+                                  )}
 
                                 {/* Next run date field (for all except ONCE and CUSTOM) */}
                                 {watchedFrequency && frequencyGroups.needsNextRun.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
@@ -711,7 +710,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                     control={form.control}
                                     name="nextRun"
                                     render={({ field: { onChange, onBlur, value, name } }) => (
-                                      <FormItem className="flex flex-col flex-1 min-w-[200px]">
+                                      <FormItem className="flex flex-col flex-1 min-w-[150px]">
                                         <FormLabel>Próxima Execução</FormLabel>
                                         <DateTimeInput
                                           field={{ onChange, onBlur, value: value || null, name }}
@@ -719,6 +718,9 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                           placeholder="Data de execução"
                                           mode="date"
                                           disabled={isSubmitting}
+                                          constraints={{
+                                            minDate: new Date(),
+                                          }}
                                         />
                                         <FormMessage />
                                       </FormItem>
@@ -726,6 +728,15 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                   />
                                 )}
                               </div>
+
+                          {/* Helper for the mutually-exclusive monthly day config. */}
+                          {watchedFrequency &&
+                            frequencyGroups.needsDayOfMonth.includes(watchedFrequency as SCHEDULE_FREQUENCY) &&
+                            watchedFrequency !== SCHEDULE_FREQUENCY.ANNUAL && (
+                              <p className="text-xs text-muted-foreground">
+                                Informe o dia do mês OU a ocorrência + dia da semana.
+                              </p>
+                            )}
                       </CardContent>
                     </Card>
                   </div>
@@ -750,7 +761,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                         name: 'Essencial para identificar o item',
                       },
                     }}
-                    defaultColumns={['uniCode', 'name', 'brand', 'supplier', 'quantity', 'reorderPoint']}
+                    defaultColumns={['uniCode', 'name', 'brand.name', 'category.name', 'measures', 'price', 'quantity', 'reorderPoint']}
                     storageKey="order-schedule-item-selector"
                     className="flex-1 min-h-0"
                   />
