@@ -22,7 +22,6 @@ export const questionnaireCreateSchema = z
     // When true, answers are NOT associated with any respondent — not even
     // administrators can see who answered what.
     isAnonymous: z.boolean().default(false),
-    sectorIds: z.array(z.string().uuid()).optional(),
     userIds: z.array(z.string().uuid()).optional(),
     questionIds: z.array(z.string().uuid()).optional(),
     groupIds: z.array(z.string().uuid()).optional(),
@@ -40,7 +39,6 @@ export const questionnaireUpdateSchema = z
     periodEnd: z.coerce.date().optional(),
     targetAllUsers: z.boolean().optional(),
     isAnonymous: z.boolean().optional(),
-    sectorIds: z.array(z.string().uuid()).optional(),
     userIds: z.array(z.string().uuid()).optional(),
     questionIds: z.array(z.string().uuid()).optional(),
     groupIds: z.array(z.string().uuid()).optional(),

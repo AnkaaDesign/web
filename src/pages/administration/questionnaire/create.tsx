@@ -2,7 +2,7 @@
 //
 // Create a questionnaire campaign. Mirrors the skill-assessment CampaignForm
 // look: FormCard sections (icon + subtitle), required asterisks, DateTimeInput
-// dates, Combobox for status + sectors + questions, a "Todos os colaboradores"
+// dates, Combobox for status + questions, a "Todos os colaboradores"
 // switch. react-hook-form + zod + hidden submit driven by the PageHeader action.
 
 import { useMemo, useState } from "react";

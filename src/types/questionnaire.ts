@@ -23,7 +23,6 @@ import type {
   QUESTIONNAIRE_ENTRY_STATUS,
 } from "../constants";
 import type { User, UserIncludes } from "./user";
-import type { Sector, SectorIncludes } from "./sector";
 
 export type QuestionnaireStatus = QUESTIONNAIRE_STATUS;
 export type QuestionnaireEntryStatus = QUESTIONNAIRE_ENTRY_STATUS;
@@ -68,13 +67,6 @@ export interface QuestionnaireGroup extends BaseEntity {
   questions?: QuestionnaireQuestion[];
 
   _count?: { questions?: number };
-}
-
-export interface QuestionnaireSector {
-  questionnaireId: string;
-  sectorId: string;
-  questionnaire?: Questionnaire;
-  sector?: Sector;
 }
 
 export interface QuestionnaireUser {
@@ -129,12 +121,11 @@ export interface Questionnaire extends BaseEntity {
   deletedAt?: Date | null;
 
   createdBy?: User;
-  sectors?: QuestionnaireSector[];
   targetUsers?: QuestionnaireUser[];
   questions?: QuestionnaireQuestionLink[];
   entries?: QuestionnaireEntry[];
 
-  _count?: { sectors?: number; targetUsers?: number; questions?: number; entries?: number };
+  _count?: { targetUsers?: number; questions?: number; entries?: number };
 }
 
 // =====================
@@ -167,10 +158,9 @@ export interface QuestionnaireEntryIncludes {
 
 export interface QuestionnaireIncludes {
   createdBy?: boolean | { include?: UserIncludes };
-  sectors?: boolean | { include?: { sector?: boolean | { include?: SectorIncludes } } };
   questions?: boolean | { include?: { question?: boolean | { include?: QuestionnaireQuestionIncludes } } };
   entries?: boolean | { include?: QuestionnaireEntryIncludes };
-  _count?: boolean | { select?: { sectors?: boolean; questions?: boolean; entries?: boolean } };
+  _count?: boolean | { select?: { questions?: boolean; entries?: boolean } };
 }
 
 // =====================
@@ -319,7 +309,6 @@ export interface QuestionnaireCreateFormData {
   periodEnd: Date;
   targetAllUsers?: boolean;
   isAnonymous?: boolean;
-  sectorIds?: string[];
   userIds?: string[];
   questionIds?: string[];
   groupIds?: string[];
@@ -331,7 +320,6 @@ export interface QuestionnaireUpdateFormData {
   periodEnd?: Date;
   targetAllUsers?: boolean;
   isAnonymous?: boolean;
-  sectorIds?: string[];
   userIds?: string[];
   questionIds?: string[];
   groupIds?: string[];
@@ -387,7 +375,6 @@ export interface QuestionnaireGetManyFormData {
   include?: QuestionnaireIncludes;
   searchingFor?: string;
   status?: QuestionnaireStatus | QuestionnaireStatus[];
-  sectorId?: string;
   createdById?: string;
 }
 export interface QuestionnaireEntryGetManyFormData {
