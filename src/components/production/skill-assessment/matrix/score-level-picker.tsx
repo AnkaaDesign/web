@@ -23,6 +23,10 @@ interface ScoreLevelPickerProps {
   isSaving?: boolean;
   /** No active entry to score — render the cards inert. */
   disabled?: boolean;
+  /** Render the "Notas" header bar. Defaults to true so the rail visually pairs
+   *  with the evaluatees table in the matrix fill page. Set false where the rail
+   *  stands alone (detail / self-fill pages) and needs no table-matching header. */
+  showHeader?: boolean;
   /** Optional element overlaid on the top-right of the SELECTED level card (e.g. a justification button). */
   selectedAction?: ReactNode;
   onPickScore: (score: number) => void;
@@ -31,7 +35,7 @@ interface ScoreLevelPickerProps {
 // Background palette — must mirror score-badge.SCORE_CLASSES so the picker
 // cards and the row Nota badges use the SAME colour for the same score.
 const LEVEL_BG: Record<number, string> = {
-  0: "bg-neutral-900 border border-red-500/70",
+  0: "bg-purple-700",
   1: "bg-red-700",
   2: "bg-orange-600",
   3: "bg-teal-700",
@@ -41,7 +45,7 @@ const LEVEL_BG: Record<number, string> = {
 
 // Hover state — slightly brighter.
 const LEVEL_BG_HOVER: Record<number, string> = {
-  0: "hover:bg-neutral-800",
+  0: "hover:bg-purple-600",
   1: "hover:bg-red-600",
   2: "hover:bg-orange-500",
   3: "hover:bg-teal-600",
@@ -55,6 +59,7 @@ export function ScoreLevelPicker({
   readOnly,
   isSaving,
   disabled,
+  showHeader = true,
   selectedAction,
   onPickScore,
 }: ScoreLevelPickerProps) {
@@ -75,9 +80,11 @@ export function ScoreLevelPicker({
 
   return (
     <Card className="flex h-full flex-col overflow-hidden p-0">
-      <div className="flex h-10 items-center border-b border-border/40 bg-muted px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Notas
-      </div>
+      {showHeader && (
+        <div className="flex h-10 items-center border-b border-border/40 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Notas
+        </div>
+      )}
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-2 p-3">
           {levels.map((lvl) => {
@@ -98,10 +105,10 @@ export function ScoreLevelPicker({
                     // In read-only/inert mode, dim ONLY the unselected cards so the
                     // chosen one stays vivid (never looks disabled).
                     isInert && !selected && "opacity-50",
-                    // Selected card always pops with the green primary ring.
-                    // primary (green-700) reads well on light backgrounds but is
-                    // too dark on the dark page — brighten + thicken it in dark mode.
-                    selected && "ring-2 ring-primary ring-offset-2 ring-offset-background dark:ring-[3px] dark:ring-green-400",
+                    // Selected card ring uses the foreground token so it reads
+                    // dark-gray on light backgrounds and near-white on dark ones —
+                    // consistent across every surface that uses this score design.
+                    selected && "ring-2 ring-foreground ring-offset-2 ring-offset-background dark:ring-[3px]",
                   )}
                 >
                   <div className="flex items-center gap-3">

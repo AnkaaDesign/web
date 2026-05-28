@@ -315,7 +315,7 @@ export const TopicEditPage = () => {
                     control={form.control}
                     name="isActive"
                     render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                      <FormItem className="flex items-center justify-between rounded-md border border-border/40 p-4">
                         <div className="space-y-0.5">
                           <FormLabel>Ativo</FormLabel>
                           <FormDescription>

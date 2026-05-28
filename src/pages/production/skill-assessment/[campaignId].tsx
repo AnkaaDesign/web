@@ -185,14 +185,20 @@ export const SkillAssessmentCampaignPage = () => {
 
   const hasScore = useCallback(
     (entryId: string, topicId: string): boolean => {
-      const over = optimisticByEntry.get(entryId);
-      if (over != null) return true;
+      // The optimistic map is keyed by entryId alone and only ever holds the
+      // score just picked for the ACTIVE topic. Apply it only when checking the
+      // active topic — otherwise the stepper (which probes every topic for one
+      // entry) would read every segment as scored and briefly fill completely.
+      if (topicId === activeTopicId) {
+        const over = optimisticByEntry.get(entryId);
+        if (over != null) return true;
+      }
       const e = sortedEntries.find((x) => x.id === entryId);
       if (!e) return false;
       const r = (e.responses ?? []).find((r) => r.topicId === topicId);
       return r?.score != null;
     },
-    [optimisticByEntry, sortedEntries],
+    [optimisticByEntry, sortedEntries, activeTopicId],
   );
 
   // When the topic changes, jump to the first unscored entry (or first row).

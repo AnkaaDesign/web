@@ -56,10 +56,6 @@ export function TopicLevelFields({ disabled }: { disabled?: boolean }) {
             key={field.id}
             className="flex items-start gap-3 rounded-md border border-border/40 p-3"
           >
-            <div className="shrink-0 pt-1">
-              <ScoreBadge score={idx} label={String(idx)} size="md" />
-            </div>
-
             <div className="min-w-0 flex-1 space-y-2">
               <FormField
                 control={control}
@@ -67,16 +63,23 @@ export function TopicLevelFields({ disabled }: { disabled?: boolean }) {
                 render={({ field: f }) => (
                   <FormItem>
                     <FormLabel className="text-xs">Nome do nível</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...f}
-                        value={f.value ?? ""}
-                        placeholder={`Nome (score ${idx})`}
-                        maxLength={120}
-                        disabled={disabled}
-                        transparent
+                    <div className="flex items-center gap-3">
+                      <ScoreBadge
+                        score={idx}
+                        label={String(idx)}
+                        className="h-10 w-10 shrink-0 justify-center rounded-md px-0 text-sm"
                       />
-                    </FormControl>
+                      <FormControl>
+                        <Input
+                          {...f}
+                          value={f.value ?? ""}
+                          placeholder={`Nome (score ${idx})`}
+                          maxLength={120}
+                          disabled={disabled}
+                          transparent
+                        />
+                      </FormControl>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -86,7 +89,7 @@ export function TopicLevelFields({ disabled }: { disabled?: boolean }) {
                 control={control}
                 name={`levels.${idx}.description`}
                 render={({ field: f }) => (
-                  <FormItem>
+                  <FormItem className="pl-[52px]">
                     <FormLabel className="text-xs">Descrição</FormLabel>
                     <FormControl>
                       <Textarea

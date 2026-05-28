@@ -294,7 +294,7 @@ export const QuestionnaireDetailsPage = () => {
                   {q.description && (
                     <>
                       <Separator />
-                      <p className="text-sm whitespace-pre-wrap text-foreground/90">{q.description}</p>
+                      <DetailRow label="Descrição" value={q.description} block />
                     </>
                   )}
                 </CardContent>

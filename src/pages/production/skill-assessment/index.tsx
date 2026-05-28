@@ -18,7 +18,7 @@ import {
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -360,7 +360,6 @@ export const SkillAssessmentLeaderPage = () => {
                               const a = s.assessment;
                               const total = s.entries.length;
                               const done = s.fullyScored || s.submitted;
-                              const inProgress = Math.max(0, total - done - s.pending);
                               return (
                                 <TableRow
                                   key={a.id}
@@ -404,21 +403,15 @@ export const SkillAssessmentLeaderPage = () => {
                                     </div>
                                   </TableCell>
                                   <TableCell className={cn("p-0 !border-r-0", COLUMNS[4].className)}>
-                                    <div className="px-4 py-2 text-sm">
-                                      <div className="flex items-center gap-2 text-xs">
-                                        <span className="tabular-nums font-medium">
+                                    <div className="px-4 py-2">
+                                      <div className="flex items-center gap-2">
+                                        <Progress
+                                          value={total > 0 ? Math.round((done / total) * 100) : 0}
+                                          className="h-2"
+                                        />
+                                        <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">
                                           {done}/{total}
                                         </span>
-                                        {s.pending > 0 && (
-                                          <Badge variant="outline" className="text-[10px]">
-                                            {s.pending} pendente
-                                          </Badge>
-                                        )}
-                                        {inProgress > 0 && (
-                                          <Badge variant="secondary" className="text-[10px]">
-                                            {inProgress} em progresso
-                                          </Badge>
-                                        )}
                                       </div>
                                     </div>
                                   </TableCell>

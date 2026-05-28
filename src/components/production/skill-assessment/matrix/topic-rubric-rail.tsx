@@ -18,7 +18,7 @@ interface TopicRubricRailProps {
 }
 
 const LEVEL_BORDER: Record<number, string> = {
-  0: "border-neutral-300 dark:border-neutral-700",
+  0: "border-purple-200 dark:border-purple-900/40",
   1: "border-red-200 dark:border-red-900/40",
   2: "border-orange-200 dark:border-orange-900/40",
   3: "border-amber-200 dark:border-amber-900/40",
@@ -27,7 +27,7 @@ const LEVEL_BORDER: Record<number, string> = {
 };
 
 const LEVEL_BORDER_ACTIVE: Record<number, string> = {
-  0: "border-neutral-700 bg-neutral-50 dark:bg-neutral-900/40",
+  0: "border-purple-500 bg-purple-50/70 dark:bg-purple-950/30",
   1: "border-red-500 bg-red-50/70 dark:bg-red-950/30",
   2: "border-orange-500 bg-orange-50/70 dark:bg-orange-950/30",
   3: "border-amber-500 bg-amber-50/70 dark:bg-amber-950/30",

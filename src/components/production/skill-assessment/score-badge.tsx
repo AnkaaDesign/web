@@ -4,8 +4,8 @@
 // Badge component. Provides a single source of truth for the score color
 // palette across the entire skill-assessment feature.
 //
-// Palette (black → red → orange → amber → blue → green):
-//   0: black   — Não atende
+// Palette (purple → red → orange → amber → blue → green):
+//   0: purple  — Não atende
 //   1: red     — Crítico
 //   2: orange  — Insuficiente
 //   3: amber   — Atende parcialmente
@@ -49,9 +49,9 @@ export interface ScoreBadgeProps {
 //   3 → teal-700    (neutral / acceptable threshold)
 //   2 → orange-600
 //   1 → red-700     (same as "cancelled")
-//   0 → neutral-900 (black)
+//   0 → purple-700  (purple — distinct from the warm "bad" reds/oranges)
 const SCORE_CLASSES: Record<number, string> = {
-  0: "border-transparent bg-neutral-900 text-white hover:bg-neutral-900",
+  0: "border-transparent bg-purple-700 text-white hover:bg-purple-700",
   1: "border-transparent bg-red-700 text-white hover:bg-red-700",
   2: "border-transparent bg-orange-600 text-white hover:bg-orange-600",
   3: "border-transparent bg-teal-700 text-white hover:bg-teal-700",

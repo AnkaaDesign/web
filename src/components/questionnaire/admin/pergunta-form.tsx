@@ -169,21 +169,25 @@ export function PerguntaForm({ formId = "pergunta-form", defaultValues, isSubmit
           <CardContent className="space-y-3">
             {fields.map((f, idx) => (
               <div key={f.id} className="flex items-start gap-3 rounded-md border border-border/40 p-3">
-                <div className="shrink-0 pt-7">
-                  <ScoreBadge score={idx + 1} label={String(idx + 1)} size="md" />
-                </div>
                 <div className="min-w-0 flex-1 space-y-2">
                   <FormField control={form.control} name={`options.${idx}.label`} render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs">Rótulo</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value ?? ""} placeholder="Ex.: Satisfeito" maxLength={120} transparent disabled={isSubmitting} />
-                      </FormControl>
+                      <div className="flex items-center gap-3">
+                        <ScoreBadge
+                          score={idx + 1}
+                          label={String(idx + 1)}
+                          className="h-10 w-10 shrink-0 justify-center rounded-md px-0 text-sm"
+                        />
+                        <FormControl>
+                          <Input {...field} value={field.value ?? ""} placeholder="Ex.: Satisfeito" maxLength={120} transparent disabled={isSubmitting} />
+                        </FormControl>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name={`options.${idx}.description`} render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="pl-[52px]">
                       <FormLabel className="text-xs">Descrição (opcional)</FormLabel>
                       <FormControl>
                         <Input {...field} value={field.value ?? ""} placeholder="Descrição do nível" maxLength={2000} transparent disabled={isSubmitting} />
@@ -195,7 +199,7 @@ export function PerguntaForm({ formId = "pergunta-form", defaultValues, isSubmit
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="shrink-0"
+                  className="mt-6 shrink-0"
                   disabled={isSubmitting || fields.length <= 2}
                   onClick={() => remove(idx)}
                 >

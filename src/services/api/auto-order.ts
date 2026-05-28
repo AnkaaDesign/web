@@ -22,13 +22,16 @@ export interface AutoOrderRecommendation {
   supplierName: string | null;
   categoryId: string | null;
   categoryName: string | null;
-  /** Category type so the UI can branch on tool / electronic-tool / regular.
+  /** Category type so the UI can branch on tool / regular.
    *  PPE never appears (excluded from the workflow for now). */
   categoryType: ITEM_CATEGORY_TYPE | null;
   lastOrderDate: Date | null;
   daysSinceLastOrder: number | null;
   hasActivePendingOrder: boolean;
   estimatedLeadTime: number;
+  /** Current unit price. Invariant: estimatedCost = unitPrice × recommendedOrderQuantity.
+   *  Used to recompute the expected price live as the user edits the quantity. */
+  unitPrice: number;
   estimatedCost: number;
   reorderPoint: number | null;
   maxQuantity: number | null;

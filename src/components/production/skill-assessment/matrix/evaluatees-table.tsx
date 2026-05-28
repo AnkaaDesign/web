@@ -27,7 +27,7 @@ interface EvaluateesTableProps {
 }
 
 const HEAD_BASE =
-  "h-10 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground !bg-muted/20";
+  "h-10 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 
 export function EvaluateesTable({
   entries,

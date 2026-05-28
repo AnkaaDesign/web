@@ -10,6 +10,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconClipboardList,
+  IconInfoCircle,
   IconLayoutGrid,
   IconLoader2,
   IconLockOpen,
@@ -133,29 +134,42 @@ export const QuestionnaireEntryDetailsPage = () => {
         {active && (
           <>
             <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
-              <Card className="flex flex-col">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <IconNotes className="h-4 w-4 text-muted-foreground" />
-                    {active.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-1 flex-col gap-3">
-                  <p className="text-sm leading-relaxed whitespace-pre-line text-foreground/90">
-                    {active.description || <span className="italic text-muted-foreground">Sem descrição.</span>}
-                  </p>
-                  {active.helpText && (
-                    <div className="rounded-md border border-blue-200 bg-blue-50/60 px-3 py-2 text-xs text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-200">
-                      {active.helpText}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <div className="flex flex-col gap-4">
+                <Card className="flex flex-1 flex-col">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <IconNotes className="h-4 w-4 text-muted-foreground" />
+                      Descrição
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-1 flex-col">
+                    <p className="text-sm leading-relaxed whitespace-pre-line text-foreground/90">
+                      {active.description || <span className="italic text-muted-foreground">Sem descrição.</span>}
+                    </p>
+                  </CardContent>
+                </Card>
+                {active.helpText && (
+                  <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900/40 dark:bg-blue-950/20">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-sm text-blue-900 dark:text-blue-200">
+                        <IconInfoCircle className="h-4 w-4" />
+                        Informação auxiliar
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="whitespace-pre-line text-sm leading-relaxed text-blue-900/90 dark:text-blue-200/90">
+                        {active.helpText}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
               <div className="flex flex-col">
                 <ScoreLevelPicker
                   topic={asTopic(active) as any}
                   currentScore={activeAnswer?.value ?? null}
                   readOnly
+                  showHeader={false}
                   onPickScore={noop}
                   selectedAction={activeAnswer?.comment?.trim() ? <CommentButton value={activeAnswer.comment} /> : undefined}
                 />

@@ -11,8 +11,6 @@ import {
   IconTrendingUp,
   IconTrendingDown,
   IconMinus,
-  IconPackage,
-  IconClock,
   IconChevronUp,
   IconChevronDown,
   IconSelector,
@@ -64,10 +62,21 @@ const NO_SUPPLIER_STRATEGY_OPTIONS = [
 
 const groupKey = (supplierId: string | null) => supplierId || 'no-supplier';
 
-const TOOL_TYPES: Array<ITEM_CATEGORY_TYPE | null> = [
-  ITEM_CATEGORY_TYPE.TOOL,
-  ITEM_CATEGORY_TYPE.ELECTRONIC_TOOL,
-];
+/** Shared column widths so every supplier-group table aligns identically
+ *  (used together with `table-fixed`). MOTIVO is left without a width so it
+ *  absorbs the remaining space. The checkbox column is fixed to w-12 by the
+ *  Table primitive's `:has([role=checkbox])` rule. */
+const COL = {
+  item: 'w-[20%]',
+  stock: 'w-[11%]',
+  days: 'w-[11%]',
+  trend: 'w-[10%]',
+  qty: 'w-[12%]',
+  price: 'w-[9%]',
+  urgency: 'w-[10%]',
+} as const;
+
+const TOOL_TYPES: Array<ITEM_CATEGORY_TYPE | null> = [ITEM_CATEGORY_TYPE.TOOL];
 
 export const AutomaticOrderListPage = () => {
   const canViewPrices = useCanViewPrices();
@@ -205,6 +214,30 @@ export const AutomaticOrderListPage = () => {
     setQuantities(prev => ({ ...prev, [itemId]: value }));
   };
 
+  // Expected price tracks the (possibly edited) quantity, mirroring the order
+  // schedule's "Preço esperado" column. unitPrice satisfies the invariant
+  // estimatedCost = unitPrice × recommendedOrderQuantity.
+  const getExpectedPrice = (item: AutoOrderRecommendation) => item.unitPrice * getQty(item);
+
+  const groupExpectedTotal = (group: AutoOrderSupplierGroup) =>
+    group.items.reduce((sum, item) => sum + getExpectedPrice(item), 0);
+
+  // Live total across the whole analysis (not search-filtered) so the summary
+  // card reflects quantity edits, consistent with the per-group totals.
+  const totalExpectedValue = useMemo(
+    () =>
+      (analysisData?.data.supplierGroups ?? []).reduce(
+        (sum, group) =>
+          sum +
+          group.items.reduce(
+            (s, item) => s + item.unitPrice * (quantities[item.itemId] ?? item.recommendedOrderQuantity),
+            0,
+          ),
+        0,
+      ),
+    [analysisData?.data.supplierGroups, quantities],
+  );
+
   const toggleItem = (itemId: string) => {
     setSelectedItems(prev => {
       const next = new Set(prev);
@@ -228,10 +261,17 @@ export const AutomaticOrderListPage = () => {
   const selectedInGroup = (group: AutoOrderSupplierGroup) =>
     group.items.filter(item => selectedItems.has(item.itemId));
 
-  /** Turns one supplier group's selected items into the orders[] payload,
+  /** The items a "create" action will act on: the explicit selection when the
+   *  user has picked rows, otherwise the whole table. */
+  const targetItemsInGroup = (group: AutoOrderSupplierGroup) => {
+    const selected = selectedInGroup(group);
+    return selected.length > 0 ? selected : group.items;
+  };
+
+  /** Turns one supplier group's target items into the orders[] payload,
    *  honoring the no-supplier split strategy. */
   const buildOrdersForGroup = (group: AutoOrderSupplierGroup): AutoOrderCreatePayload['orders'] => {
-    const selected = selectedInGroup(group);
+    const selected = targetItemsInGroup(group);
     if (selected.length === 0) return [];
 
     const toLine = (item: AutoOrderRecommendation) => ({
@@ -296,6 +336,12 @@ export const AutomaticOrderListPage = () => {
     handleCreate(filteredGroups.flatMap(buildOrdersForGroup), 'all');
 
   const totalSelected = selectedItems.size;
+  // What the top "Criar pedidos" button will act on: selected rows when any are
+  // picked, otherwise every visible row (full table).
+  const totalEffective = filteredGroups.reduce(
+    (sum, group) => sum + targetItemsInGroup(group).length,
+    0,
+  );
 
   const renderCategoryBadge = (item: AutoOrderRecommendation) => {
     if (!TOOL_TYPES.includes(item.categoryType)) return null;
@@ -322,11 +368,11 @@ export const AutomaticOrderListPage = () => {
           actions={[
             {
               key: 'create-selected',
-              label: totalSelected > 0 ? `Criar pedidos (${totalSelected})` : 'Criar pedidos',
+              label: totalEffective > 0 ? `Criar pedidos (${totalEffective})` : 'Criar pedidos',
               icon: IconShoppingCartPlus,
               onClick: handleCreateAllSelected,
               variant: 'default',
-              disabled: totalSelected === 0 || isCreating,
+              disabled: totalEffective === 0 || isCreating,
               loading: isCreating && creatingKey === 'all',
             },
             {
@@ -362,7 +408,7 @@ export const AutomaticOrderListPage = () => {
                       <div className="p-4 border border-border rounded-lg">
                         <div className="text-xs text-muted-foreground mb-1">Valor Estimado</div>
                         <div className="text-2xl font-bold">
-                          {formatCurrency(analysisData.data.summary.totalEstimatedCost || 0)}
+                          {formatCurrency(totalExpectedValue)}
                         </div>
                       </div>
                     )}
@@ -434,7 +480,7 @@ export const AutomaticOrderListPage = () => {
                 {/* Supplier-grouped tables */}
                 <div className="flex-1 min-h-0 overflow-y-auto">
                   {filteredGroups && filteredGroups.length > 0 ? (
-                    <div className="space-y-6 pb-4">
+                    <div className="space-y-10 pb-4">
                       {filteredGroups.map(group => {
                         const sortedItems = sortItems(group.items, group.supplierId);
                         const groupSelected = selectedInGroup(group);
@@ -451,7 +497,7 @@ export const AutomaticOrderListPage = () => {
                               <h2 className="text-lg font-semibold">{group.supplierName || 'Sem Fornecedor'}</h2>
                               <div className="flex items-center gap-3">
                                 <div className="text-sm text-muted-foreground">
-                                  {group.itemCount} item(ns){canViewPrices && <> • Valor estimado: {formatCurrency(group.totalEstimatedCost || 0)}</>}
+                                  {group.itemCount} item(ns){canViewPrices && <> • Valor estimado: {formatCurrency(groupExpectedTotal(group))}</>}
                                 </div>
                                 {isNoSupplier && (
                                   <div className="w-[200px]">
@@ -470,24 +516,24 @@ export const AutomaticOrderListPage = () => {
                                 <Button
                                   size="sm"
                                   onClick={() => handleCreateGroup(group)}
-                                  disabled={groupSelected.length === 0 || isCreating}
+                                  disabled={group.items.length === 0 || isCreating}
                                 >
                                   {isCreating && creatingKey === key ? (
                                     <IconLoader2 className="h-4 w-4 mr-2 animate-spin" />
                                   ) : (
                                     <IconShoppingCartPlus className="h-4 w-4 mr-2" />
                                   )}
-                                  Criar pedido{groupSelected.length > 0 ? ` (${groupSelected.length})` : ''}
+                                  Criar pedido{` (${groupSelected.length > 0 ? groupSelected.length : group.items.length})`}
                                 </Button>
                               </div>
                             </div>
 
                             {/* Table */}
                             <div className="border border-border rounded-lg overflow-hidden">
-                              <Table>
+                              <Table className="table-fixed">
                                 <TableHeader>
                                   <TableRow>
-                                    <TableHead className="w-10">
+                                    <TableHead className="w-12">
                                       <div className="flex items-center justify-center">
                                         <Checkbox
                                           checked={allSelected}
@@ -500,7 +546,7 @@ export const AutomaticOrderListPage = () => {
                                       </div>
                                     </TableHead>
                                     <TableHead
-                                      className="whitespace-nowrap font-bold uppercase text-xs cursor-pointer select-none hover:bg-muted/50"
+                                      className={cn(COL.item, 'whitespace-nowrap font-bold uppercase text-xs cursor-pointer select-none hover:bg-muted/50')}
                                       onClick={() => toggleSort(group.supplierId, 'itemName')}
                                     >
                                       <div className="flex items-center gap-2">
@@ -509,16 +555,16 @@ export const AutomaticOrderListPage = () => {
                                       </div>
                                     </TableHead>
                                     <TableHead
-                                      className="whitespace-nowrap font-bold uppercase text-xs cursor-pointer select-none hover:bg-muted/50"
+                                      className={cn(COL.stock, 'whitespace-nowrap font-bold uppercase text-xs cursor-pointer select-none hover:bg-muted/50')}
                                       onClick={() => toggleSort(group.supplierId, 'currentStock')}
                                     >
                                       <div className="flex items-center gap-2">
-                                        ESTOQUE ATUAL
+                                        ESTOQUE
                                         {getSortIcon(group.supplierId, 'currentStock')}
                                       </div>
                                     </TableHead>
                                     <TableHead
-                                      className="whitespace-nowrap font-bold uppercase text-xs cursor-pointer select-none hover:bg-muted/50"
+                                      className={cn(COL.days, 'whitespace-nowrap font-bold uppercase text-xs cursor-pointer select-none hover:bg-muted/50')}
                                       onClick={() => toggleSort(group.supplierId, 'daysUntilStockout')}
                                     >
                                       <div className="flex items-center gap-2">
@@ -526,11 +572,11 @@ export const AutomaticOrderListPage = () => {
                                         {getSortIcon(group.supplierId, 'daysUntilStockout')}
                                       </div>
                                     </TableHead>
-                                    <TableHead className="whitespace-nowrap font-bold uppercase text-xs">
+                                    <TableHead className={cn(COL.trend, 'whitespace-nowrap font-bold uppercase text-xs')}>
                                       TENDÊNCIA
                                     </TableHead>
                                     <TableHead
-                                      className="whitespace-nowrap font-bold uppercase text-xs cursor-pointer select-none hover:bg-muted/50"
+                                      className={cn(COL.qty, 'whitespace-nowrap font-bold uppercase text-xs cursor-pointer select-none hover:bg-muted/50')}
                                       onClick={() => toggleSort(group.supplierId, 'recommendedOrderQuantity')}
                                     >
                                       <div className="flex items-center gap-2">
@@ -538,8 +584,13 @@ export const AutomaticOrderListPage = () => {
                                         {getSortIcon(group.supplierId, 'recommendedOrderQuantity')}
                                       </div>
                                     </TableHead>
+                                    {canViewPrices && (
+                                      <TableHead className={cn(COL.price, 'whitespace-nowrap font-bold uppercase text-xs text-right')}>
+                                        PREÇO
+                                      </TableHead>
+                                    )}
                                     <TableHead
-                                      className="whitespace-nowrap font-bold uppercase text-xs cursor-pointer select-none hover:bg-muted/50"
+                                      className={cn(COL.urgency, 'whitespace-nowrap font-bold uppercase text-xs cursor-pointer select-none hover:bg-muted/50')}
                                       onClick={() => toggleSort(group.supplierId, 'urgency')}
                                     >
                                       <div className="flex items-center gap-2">
@@ -590,10 +641,7 @@ export const AutomaticOrderListPage = () => {
                                             item.daysUntilStockout <= 7 ? 'text-destructive' : 'text-foreground'
                                           )}
                                         >
-                                          <div className="flex items-center justify-center gap-1">
-                                            <IconClock className="h-3 w-3" />
-                                            {item.daysUntilStockout}
-                                          </div>
+                                          {item.daysUntilStockout}
                                         </TableCell>
                                         <TableCell className="py-2">
                                           <div className="flex items-center gap-1">
@@ -605,8 +653,7 @@ export const AutomaticOrderListPage = () => {
                                           </div>
                                         </TableCell>
                                         <TableCell className="py-2">
-                                          <div className="flex items-center justify-center gap-1">
-                                            <IconPackage className="h-3 w-3 text-primary" />
+                                          <div className="flex items-center justify-center">
                                             <Input
                                               type="number"
                                               min={0}
@@ -618,8 +665,28 @@ export const AutomaticOrderListPage = () => {
                                             />
                                           </div>
                                         </TableCell>
-                                        <TableCell className="py-2">{getUrgencyBadge(item.urgency)}</TableCell>
-                                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate py-2">
+                                        {canViewPrices && (
+                                          <TableCell className="text-right tabular-nums font-medium py-2">
+                                            {formatCurrency(getExpectedPrice(item))}
+                                          </TableCell>
+                                        )}
+                                        <TableCell className="py-2">
+                                          <div className="flex flex-col items-start gap-1">
+                                            {getUrgencyBadge(item.urgency)}
+                                            {item.isEmergencyOverride && (
+                                              <Badge
+                                                variant="outline"
+                                                className="border-orange-500 text-orange-500 text-[10px] font-medium"
+                                              >
+                                                EMERGENCIAL
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell
+                                          className="text-sm text-muted-foreground truncate py-2"
+                                          title={item.reason}
+                                        >
                                           {item.reason}
                                         </TableCell>
                                       </TableRow>
