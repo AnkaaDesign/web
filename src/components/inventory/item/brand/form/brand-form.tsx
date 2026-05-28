@@ -140,8 +140,8 @@ export function BrandForm(props: BrandFormProps) {
   // Memoize getOptionValue callback
   const getOptionValue = useCallback((option: any) => option.value, []);
 
-  // Function to search items from API
-  const searchItems = useCallback(async (searchTerm: string) => {
+  // Function to search items from API (paginated for infinite scroll)
+  const searchItems = useCallback(async (searchTerm: string, page = 1) => {
     const response = await apiClient.get("/items", {
       params: {
         searchingFor: searchTerm,
@@ -150,19 +150,21 @@ export function BrandForm(props: BrandFormProps) {
           category: true,
         },
         orderBy: { name: "asc" },
-        limit: 50,
+        page,
+        take: 50,
       },
     });
 
-    return (
+    const items =
       response.data?.data?.map((item: any) => ({
         value: item.id,
         label: item.name,
         unicode: item.uniCode,
         brand: item.brand?.name,
         category: item.category?.name,
-      })) || []
-    );
+      })) || [];
+
+    return { data: items, hasMore: response.data?.meta?.hasNextPage || false };
   }, []);
 
   const handleSubmit = async (data: any) => {
@@ -183,53 +185,51 @@ export function BrandForm(props: BrandFormProps) {
   const isRequired = mode === "create";
 
   return (
-    <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden min-h-0">
-        <Form {...form}>
-          <form id="brand-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-4xl flex-1 flex flex-col overflow-y-auto space-y-6">
-            {/* Hidden submit button for programmatic form submission */}
-            <button type="submit" id="brand-form-submit" className="hidden" aria-hidden="true" disabled={isSubmitting || !form.formState.isValid} />
-            {/* Basic Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Informações da Marca</CardTitle>
-                <CardDescription>{mode === "create" ? "Preencha os dados para criar uma nova marca" : "Atualize os dados da marca"}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <NameInput control={form.control} disabled={isSubmitting} required={isRequired} />
+    <Form {...form}>
+      <form id="brand-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-4xl">
+        {/* Hidden submit button for programmatic form submission */}
+        <button type="submit" id="brand-form-submit" className="hidden" aria-hidden="true" disabled={isSubmitting || !form.formState.isValid} />
+        <div className="space-y-6">
+        {/* Basic Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Informações da Marca</CardTitle>
+            <CardDescription>{mode === "create" ? "Preencha os dados para criar uma nova marca" : "Atualize os dados da marca"}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <NameInput control={form.control} disabled={isSubmitting} required={isRequired} />
 
-                <FormField
-                  control={form.control}
-                  name="itemIds"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Produtos Associados</FormLabel>
-                      <FormControl>
-                        <Combobox
-                          mode="multiple"
-                          async={true}
-                          value={field.value || []}
-                          onValueChange={field.onChange}
-                          placeholder="Selecione produtos para associar à marca"
-                          emptyText="Nenhum produto encontrado"
-                          queryKey={["brand-form-items"]}
-                          disabled={isSubmitting}
-                          queryFn={searchItems}
-                          formatDisplay="category"
-                          initialOptions={initialOptions}
-                          minSearchLength={0}
-                          getOptionLabel={getOptionLabel}
-                          getOptionValue={getOptionValue}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+            <FormField
+              control={form.control}
+              name="itemIds"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Produtos Associados</FormLabel>
+                  <FormControl>
+                    <Combobox
+                      mode="multiple"
+                      async={true}
+                      value={field.value || []}
+                      onValueChange={field.onChange}
+                      placeholder="Selecione produtos para associar à marca"
+                      emptyText="Nenhum produto encontrado"
+                      queryKey={["brand-form-items"]}
+                      disabled={isSubmitting}
+                      queryFn={searchItems}
+                      formatDisplay="category"
+                      initialOptions={initialOptions}
+                      minSearchLength={0}
+                      getOptionLabel={getOptionLabel}
+                      getOptionValue={getOptionValue}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+        </div>
+      </form>
+    </Form>
   );
 }

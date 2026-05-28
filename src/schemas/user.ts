@@ -1,7 +1,7 @@
 // packages/schemas/src/user.ts
 
 import { z } from "zod";
-import { createMapToFormDataHelper, orderByDirectionSchema, orderByWithNullsSchema, normalizeOrderBy, emailSchema, phoneSchema, cpfSchema, pisSchema, createNameSchema, nullableDate } from "./common";
+import { createMapToFormDataHelper, orderByDirectionSchema, orderByWithNullsSchema, normalizeOrderBy, emailSchema, phoneSchema, cpfSchema, pisSchema, createNameSchema, nullableDate, createDateSchema } from "./common";
 import { cleanCPF } from "../utils/cleaners";
 import { isValidCPF } from "../utils/validators";
 import type { User } from '@types';
@@ -1010,7 +1010,15 @@ export const userCreateSchema = z
       })
       .default(USER_STATUS.EXPERIENCE_PERIOD_1),
     phone: phoneSchema.nullable().optional(),
-    positionId: z.string().uuid("Cargo inválido").nullable().optional(),
+    // Cargo (position) — required at create time. The bound Secullum função is
+    // resolved from it, and HR workflows assume every collaborator has a cargo.
+    // userUpdateSchema keeps it nullable.optional so legacy rows aren't blocked.
+    positionId: z
+      .string({
+        required_error: "Cargo é obrigatório",
+        invalid_type_error: "Cargo é obrigatório",
+      })
+      .uuid("Cargo inválido"),
     pis: pisSchema.nullable().optional(),
     // CPF — required at create time. Secullum requires it for funcionario
     // creation and Brazilian payroll mandates it. The userUpdateSchema keeps
@@ -1026,7 +1034,15 @@ export const userCreateSchema = z
     verified: z.boolean().default(false),
     isActive: z.boolean().default(true),
     performanceLevel: z.number().int().min(0).max(5).default(0),
-    sectorId: z.string().uuid("Setor inválido").nullable().optional(),
+    // Setor (sector) — required at create time. Drives the Secullum departamento
+    // mapping and sector-scoped permissions/reports. userUpdateSchema keeps it
+    // nullable.optional so legacy rows aren't blocked.
+    sectorId: z
+      .string({
+        required_error: "Setor é obrigatório",
+        invalid_type_error: "Setor é obrigatório",
+      })
+      .uuid("Setor inválido"),
     password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres").nullable().optional(),
 
     // Address fields
@@ -1043,9 +1059,11 @@ export const userCreateSchema = z
       message: "URL inválida"
     }),
 
-    // Additional dates - birth is required with comprehensive validation
-    birth: z.coerce
-      .date({ errorMap: () => ({ message: "Data de nascimento inválida" }) })
+    // Additional dates - birth is required with comprehensive validation.
+    // createDateSchema rejects null/'' first; a bare z.coerce.date() would
+    // coerce an empty field to the 1970 epoch, which silently passes every
+    // age refine below.
+    birth: createDateSchema("Data de nascimento")
       .refine(
         (date) => {
           // Validate year is within reasonable range (1900 to current year)
@@ -1086,10 +1104,10 @@ export const userCreateSchema = z
     // Admission date — required at create time. Backend depends on it for
     // Secullum sync (Admissao) and CLT period auto-calculation. The form
     // shows a red asterisk on this field; the schema must agree.
-    exp1StartAt: z.coerce.date({
-      required_error: "Data de admissão é obrigatória",
-      invalid_type_error: "Data de admissão inválida",
-    }),
+    // createDateSchema rejects null/'' up front. A bare z.coerce.date() would
+    // coerce the form's null default to the 1970 epoch and pass validation,
+    // which is why the submit button used to enable with the field empty.
+    exp1StartAt: createDateSchema("Data de admissão"),
     exp1EndAt: nullableDate.optional(),
     exp2StartAt: nullableDate.optional(),
     exp2EndAt: nullableDate.optional(),

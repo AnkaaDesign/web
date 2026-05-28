@@ -990,6 +990,57 @@ export const assessmentEntryKeys = {
   myPending: () => ["assessment-entry", "me", "pending"] as const,
 };
 
+export const questionnaireGroupKeys = {
+  all: ["questionnaire-group"] as const,
+  lists: () => ["questionnaire-group", "list"] as const,
+  list: (filters?: any) =>
+    filters ? (["questionnaire-group", "list", filters] as const) : (["questionnaire-group", "list"] as const),
+  details: () => ["questionnaire-group", "detail"] as const,
+  detail: (id: string, include?: any) =>
+    include
+      ? (["questionnaire-group", "detail", id, include] as const)
+      : (["questionnaire-group", "detail", id] as const),
+};
+
+export const questionnaireQuestionKeys = {
+  all: ["questionnaire-question"] as const,
+  lists: () => ["questionnaire-question", "list"] as const,
+  list: (filters?: any) =>
+    filters ? (["questionnaire-question", "list", filters] as const) : (["questionnaire-question", "list"] as const),
+  details: () => ["questionnaire-question", "detail"] as const,
+  detail: (id: string, include?: any) =>
+    include
+      ? (["questionnaire-question", "detail", id, include] as const)
+      : (["questionnaire-question", "detail", id] as const),
+};
+
+export const questionnaireKeys = {
+  all: ["questionnaire"] as const,
+  lists: () => ["questionnaire", "list"] as const,
+  list: (filters?: any) =>
+    filters ? (["questionnaire", "list", filters] as const) : (["questionnaire", "list"] as const),
+  details: () => ["questionnaire", "detail"] as const,
+  detail: (id: string, include?: any) =>
+    include
+      ? (["questionnaire", "detail", id, include] as const)
+      : (["questionnaire", "detail", id] as const),
+};
+
+export const questionnaireEntryKeys = {
+  all: ["questionnaire-entry"] as const,
+  lists: () => ["questionnaire-entry", "list"] as const,
+  list: (filters?: any) =>
+    filters
+      ? (["questionnaire-entry", "list", filters] as const)
+      : (["questionnaire-entry", "list"] as const),
+  details: () => ["questionnaire-entry", "detail"] as const,
+  detail: (id: string, include?: any) =>
+    include
+      ? (["questionnaire-entry", "detail", id, include] as const)
+      : (["questionnaire-entry", "detail", id] as const),
+  mine: () => ["questionnaire-entry", "me", "list"] as const,
+};
+
 // Cross-campaign skill statistics (Overview / Comparison / Evolution).
 // Each variant gets its own subtree so we can invalidate a single view
 // without nuking the others.

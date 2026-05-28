@@ -23,6 +23,13 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/administracao/competencias/*": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
   "/administracao/topicos": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
   "/administracao/topicos/*": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
+  // Questionnaires — admin management (campaigns + temas + perguntas catalogue)
+  "/administracao/questionarios": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
+  "/administracao/questionarios/*": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
+  "/administracao/questionarios-temas": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
+  "/administracao/questionarios-temas/*": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
+  "/administracao/questionarios-perguntas": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
+  "/administracao/questionarios-perguntas/*": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
 
   // Servidor - Server management routes (mostly admin, file manager also accessible to commercial and production manager)
   "/servidor/gerenciador-de-arquivos": ["ADMIN", "COMMERCIAL", "PRODUCTION_MANAGER"],
@@ -126,6 +133,9 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/pessoal": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
   "/pessoal/mensagens": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
   "/pessoal/*": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  // Self-fill questionnaires — available to ALL users (sent to anyone)
+  "/pessoal/questionarios": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  "/pessoal/questionarios/*": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
 
   // Meu Pessoal - Team leader access (sector employee management)
   // Uses TEAM_LEADER virtual privilege which checks user.ledSector relation

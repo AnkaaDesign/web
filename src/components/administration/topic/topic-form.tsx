@@ -99,7 +99,7 @@ export function TopicForm(props: TopicFormProps) {
       <form
         id={formId}
         onSubmit={form.handleSubmit(handleSubmit)}
-        className="container mx-auto max-w-4xl space-y-4"
+        className="container mx-auto max-w-5xl space-y-4"
       >
         <button id={`${formId}-submit`} type="submit" className="hidden" disabled={isSubmitting} />
 
@@ -231,7 +231,7 @@ export function TopicForm(props: TopicFormProps) {
               control={form.control}
               name="isActive"
               render={({ field }) => (
-                <FormItem className="flex items-center justify-between rounded-lg bg-muted/30 p-4">
+                <FormItem className="flex items-center justify-between rounded-md border border-border/40 p-4">
                   <div className="space-y-0.5">
                     <FormLabel>Ativo</FormLabel>
                     <FormDescription>

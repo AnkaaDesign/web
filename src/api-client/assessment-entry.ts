@@ -101,6 +101,28 @@ export class AssessmentEntryService {
     );
     return response.data;
   }
+
+  /** Previous-assessment comparison for the same evaluatee (Δ vs last). */
+  async getEntryComparison(id: string): Promise<AssessmentEntryComparisonResponse> {
+    const response = await apiClient.get<AssessmentEntryComparisonResponse>(
+      `${this.basePath}/${id}/comparison`,
+    );
+    return response.data;
+  }
+}
+
+export interface AssessmentEntryComparison {
+  assessmentId: string;
+  assessmentName: string;
+  periodStart: string | Date;
+  periodEnd: string | Date;
+  /** topicId → score (0..5) from the evaluatee's previous assessment. */
+  responsesByTopic: Record<string, number>;
+}
+export interface AssessmentEntryComparisonResponse {
+  success: boolean;
+  message: string;
+  data: AssessmentEntryComparison | null;
 }
 
 export const assessmentEntryService = new AssessmentEntryService();
@@ -125,3 +147,5 @@ export const updateAssessmentEntryMeta = (
 ) => assessmentEntryService.updateEntryMeta(id, data, options);
 export const submitAssessmentEntry = (id: string) => assessmentEntryService.submitEntry(id);
 export const reopenAssessmentEntry = (id: string) => assessmentEntryService.reopenEntry(id);
+export const getAssessmentEntryComparison = (id: string) =>
+  assessmentEntryService.getEntryComparison(id);

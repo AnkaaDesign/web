@@ -138,8 +138,8 @@ export function AdminUserSelector<_T extends FieldValues = FieldValues>({
         email: null,
         phone: null,
         cpf: null as any,
-        positionId: null,
-        sectorId: null,
+        positionId: null as any,
+        sectorId: null as any,
         exp1StartAt: null as any,
         payrollNumber: null as any,
       });

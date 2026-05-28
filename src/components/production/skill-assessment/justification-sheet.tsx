@@ -25,6 +25,8 @@ interface JustificationSheetProps {
   required: boolean;
   initialValue: string;
   disabled?: boolean;
+  /** Label for the note (defaults to "Justificativa"; "Comentário" for questionnaires). */
+  label?: string;
   onOpenChange: (open: boolean) => void;
   onSave: (value: string) => void;
 }
@@ -36,6 +38,7 @@ export function JustificationSheet({
   required,
   initialValue,
   disabled,
+  label = "Justificativa",
   onOpenChange,
   onSave,
 }: JustificationSheetProps) {
@@ -57,7 +60,7 @@ export function JustificationSheet({
         <SheetHeader className="text-left">
           <SheetTitle className="flex items-center gap-2">
             {required && <IconAlertTriangle className="h-5 w-5 text-amber-500" />}
-            Justificativa
+            {label}
             {score !== null && (
               <span className="rounded-md bg-muted px-2 py-0.5 text-sm font-medium">
                 Nota {score}

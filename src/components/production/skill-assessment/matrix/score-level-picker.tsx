@@ -5,7 +5,7 @@
 // is clickable — clicking commits the score for the currently active entry
 // via the parent's onPickScore callback.
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { IconCheck, IconLoader2 } from "@tabler/icons-react";
 
 import { Card } from "@/components/ui/card";
@@ -23,6 +23,8 @@ interface ScoreLevelPickerProps {
   isSaving?: boolean;
   /** No active entry to score — render the cards inert. */
   disabled?: boolean;
+  /** Optional element overlaid on the top-right of the SELECTED level card (e.g. a justification button). */
+  selectedAction?: ReactNode;
   onPickScore: (score: number) => void;
 }
 
@@ -47,22 +49,13 @@ const LEVEL_BG_HOVER: Record<number, string> = {
   5: "hover:bg-green-600",
 };
 
-// Ring around the selected card.
-const LEVEL_RING: Record<number, string> = {
-  0: "ring-neutral-300 dark:ring-neutral-500",
-  1: "ring-red-300 dark:ring-red-300",
-  2: "ring-orange-300 dark:ring-orange-300",
-  3: "ring-teal-300 dark:ring-teal-300",
-  4: "ring-blue-300 dark:ring-blue-300",
-  5: "ring-green-300 dark:ring-green-300",
-};
-
 export function ScoreLevelPicker({
   topic,
   currentScore,
   readOnly,
   isSaving,
   disabled,
+  selectedAction,
   onPickScore,
 }: ScoreLevelPickerProps) {
   const levels = useMemo<TopicLevel[]>(
@@ -84,50 +77,56 @@ export function ScoreLevelPicker({
     <Card className="flex h-full flex-col overflow-hidden p-0">
       <div className="flex h-10 items-center border-b border-border/40 bg-muted px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Notas
-        {readOnly && (
-          <span className="ml-3 text-[10px] font-medium normal-case tracking-normal text-amber-600 dark:text-amber-400">
-            (somente leitura)
-          </span>
-        )}
       </div>
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-2 p-3">
           {levels.map((lvl) => {
             const selected = currentScore === lvl.score;
             return (
-              <button
-                key={lvl.id}
-                type="button"
-                onClick={() => !isInert && onPickScore(lvl.score)}
-                disabled={isInert}
-                aria-pressed={selected}
-                className={cn(
-                  "group relative w-full overflow-hidden rounded-lg p-3 text-left text-white shadow-sm transition-all",
-                  LEVEL_BG[lvl.score],
-                  !isInert && LEVEL_BG_HOVER[lvl.score],
-                  !isInert && "cursor-pointer hover:shadow-md active:scale-[0.99]",
-                  isInert && "cursor-not-allowed opacity-70",
-                  selected && cn("ring-2 ring-offset-2 ring-offset-card", LEVEL_RING[lvl.score]),
+              <div key={lvl.id} className="relative">
+                <button
+                  type="button"
+                  onClick={() => !isInert && onPickScore(lvl.score)}
+                  disabled={isInert}
+                  aria-pressed={selected}
+                  className={cn(
+                    "group relative w-full overflow-hidden rounded-lg p-3 text-left text-white shadow-sm transition-all",
+                    LEVEL_BG[lvl.score],
+                    !isInert && LEVEL_BG_HOVER[lvl.score],
+                    !isInert && "cursor-pointer hover:shadow-md active:scale-[0.99]",
+                    isInert && "cursor-default",
+                    // In read-only/inert mode, dim ONLY the unselected cards so the
+                    // chosen one stays vivid (never looks disabled).
+                    isInert && !selected && "opacity-50",
+                    // Selected card always pops with the green primary ring.
+                    // primary (green-700) reads well on light backgrounds but is
+                    // too dark on the dark page — brighten + thicken it in dark mode.
+                    selected && "ring-2 ring-primary ring-offset-2 ring-offset-background dark:ring-[3px] dark:ring-green-400",
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 font-bold tabular-nums">
+                      {selected && isSaving ? (
+                        <IconLoader2 className="h-4 w-4 animate-spin" />
+                      ) : selected ? (
+                        <IconCheck className="h-4 w-4" strokeWidth={3} />
+                      ) : (
+                        lvl.score
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1 pr-24">
+                      <div className="text-sm font-semibold leading-tight">{lvl.name}</div>
+                      <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-white/90">
+                        {lvl.description}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+                {/* Action overlaid on the SELECTED card (e.g. the justification button). */}
+                {selected && selectedAction && (
+                  <div className="absolute right-2 top-2 z-10">{selectedAction}</div>
                 )}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 font-bold tabular-nums">
-                    {selected && isSaving ? (
-                      <IconLoader2 className="h-4 w-4 animate-spin" />
-                    ) : selected ? (
-                      <IconCheck className="h-4 w-4" strokeWidth={3} />
-                    ) : (
-                      lvl.score
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold leading-tight">{lvl.name}</div>
-                    <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-white/90">
-                      {lvl.description}
-                    </p>
-                  </div>
-                </div>
-              </button>
+              </div>
             );
           })}
         </div>

@@ -45,6 +45,7 @@ import type { AssessmentEntry, Topic } from "@/types";
 import { EvaluateesTable } from "@/components/production/skill-assessment/matrix/evaluatees-table";
 import { ScoreLevelPicker } from "@/components/production/skill-assessment/matrix/score-level-picker";
 import { TopicPickerModal } from "@/components/production/skill-assessment/matrix/topic-picker-modal";
+import { StepperProgressBar } from "@/components/production/skill-assessment/matrix/stepper-progress-bar";
 
 const AUTO_ADVANCE_DELAY_MS = 450;
 
@@ -296,6 +297,8 @@ export const SkillAssessmentCampaignPage = () => {
     [activeEntry, activeTopicId, activeIsReadOnly, cell, sortedEntries, hasScore],
   );
 
+  // Stepper progress: % of topics with a saved score for the active entry.
+
   return (
     <PrivilegeRoute
       requiredPrivilege={[
@@ -359,38 +362,46 @@ export const SkillAssessmentCampaignPage = () => {
           <>
             {/* Topic pager — compact navigation row */}
             <Card className="overflow-hidden p-0">
-              <div className="flex items-center gap-2 px-3 py-2.5">
+              <div className="flex items-center gap-2 p-2">
                 <Button
                   size="icon"
                   variant="default"
                   onClick={() => goToOffset(-1)}
                   aria-label="Tópico anterior"
-                  className="h-8 w-8 shrink-0"
+                  className="h-12 w-12 shrink-0"
                 >
-                  <IconChevronLeft className="h-4 w-4" />
+                  <IconChevronLeft className="h-5 w-5" />
                 </Button>
                 <button
                   type="button"
                   onClick={() => setPickerOpen(true)}
-                  className="group flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-1 text-left hover:bg-muted/40"
+                  className="group flex min-w-0 flex-1 flex-col gap-2 rounded-md px-3 py-2 text-left hover:bg-muted/40"
                 >
-                  <span className="truncate text-sm font-semibold leading-tight">
-                    {activeTopic?.title ?? ""}
-                  </span>
-                  <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    Tópico {activeIndex + 1} de {totalTopics}
-                    {activeTopic?.skill?.name ? ` · ${activeTopic.skill.name}` : ""}
-                  </span>
-                  <IconLayoutGrid className="h-4 w-4 shrink-0 text-muted-foreground opacity-60 group-hover:opacity-100" />
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="truncate text-sm font-semibold leading-tight">
+                      {activeTopic?.title ?? ""}
+                    </span>
+                    <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Tópico {activeIndex + 1} de {totalTopics}
+                      {activeTopic?.skill?.name ? ` · ${activeTopic.skill.name}` : ""}
+                    </span>
+                    <IconLayoutGrid className="h-4 w-4 shrink-0 text-muted-foreground opacity-60 group-hover:opacity-100" />
+                  </div>
+                  <StepperProgressBar
+                    total={totalTopics}
+                    currentIndex={activeIndex}
+                    isScored={(i) => hasScore(activeEntry?.id ?? "", topics[i]?.id)}
+                    className="w-full"
+                  />
                 </button>
                 <Button
                   size="icon"
                   variant="default"
                   onClick={() => goToOffset(1)}
                   aria-label="Próximo tópico"
-                  className="h-8 w-8 shrink-0"
+                  className="h-12 w-12 shrink-0"
                 >
-                  <IconChevronRight className="h-4 w-4" />
+                  <IconChevronRight className="h-5 w-5" />
                 </Button>
               </div>
             </Card>

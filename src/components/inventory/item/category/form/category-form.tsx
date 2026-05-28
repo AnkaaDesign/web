@@ -110,9 +110,10 @@ export function CategoryForm(props: CategoryFormProps) {
   const handleSubmit = async (data: ItemCategoryCreateFormData | ItemCategoryUpdateFormData) => {
     try {
       if (mode === "create") {
+        // NOTE: onSubmit (the page handler) navigates away on success. Do NOT call
+        // setSearchParams() afterwards — it resolves relative to the create route and
+        // replaces the URL back to the form, cancelling the redirect.
         await (props as CreateCategoryFormProps).onSubmit(data as ItemCategoryCreateFormData & { itemIds?: string[] });
-        // Clear URL parameters on successful submission
-        setSearchParams({}, { replace: true });
       } else {
         await (props as UpdateCategoryFormProps).onSubmit(data as ItemCategoryUpdateFormData & { itemIds?: string[] });
       }
@@ -123,8 +124,8 @@ export function CategoryForm(props: CategoryFormProps) {
 
   const isRequired = mode === "create";
 
-  // Function to search items from API
-  const searchItems = useCallback(async (searchTerm: string) => {
+  // Function to search items from API (paginated for infinite scroll)
+  const searchItems = useCallback(async (searchTerm: string, page = 1) => {
     const response = await apiClient.get("/items", {
       params: {
         searchingFor: searchTerm,
@@ -133,19 +134,21 @@ export function CategoryForm(props: CategoryFormProps) {
           category: true,
         },
         orderBy: { name: "asc" },
-        limit: 50,
+        page,
+        take: 50,
       },
     });
 
-    return (
+    const items =
       response.data?.data?.map((item: { id: string; name: string; uniCode?: string; brand?: { name: string }; category?: { name: string } }) => ({
         value: item.id,
         label: item.name,
         unicode: item.uniCode,
         brand: item.brand?.name,
         category: item.category?.name,
-      })) || []
-    );
+      })) || [];
+
+    return { data: items, hasMore: response.data?.meta?.hasNextPage || false };
   }, []);
 
   // Create memoized initial options from initialItems
@@ -169,57 +172,55 @@ export function CategoryForm(props: CategoryFormProps) {
   const getOptionValue = useCallback((option: any) => option.value, []);
 
   return (
-    <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden min-h-0">
-        <Form {...form}>
-          <form id="category-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-4xl flex-1 flex flex-col overflow-y-auto space-y-6">
-            {/* Hidden submit button for programmatic form submission */}
-            <button type="submit" id="category-form-submit" className="hidden" aria-hidden="true" disabled={isSubmitting || !form.formState.isValid} />
-            {/* Basic Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Informações da Categoria</CardTitle>
-                <CardDescription>{mode === "create" ? "Preencha os dados para criar uma nova categoria" : "Atualize os dados da categoria"}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <NameInput control={form.control} disabled={isSubmitting} required={isRequired} />
+    <Form {...form}>
+      <form id="category-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-4xl">
+        {/* Hidden submit button for programmatic form submission */}
+        <button type="submit" id="category-form-submit" className="hidden" aria-hidden="true" disabled={isSubmitting || !form.formState.isValid} />
+        <div className="space-y-6">
+        {/* Basic Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Informações da Categoria</CardTitle>
+            <CardDescription>{mode === "create" ? "Preencha os dados para criar uma nova categoria" : "Atualize os dados da categoria"}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <NameInput control={form.control} disabled={isSubmitting} required={isRequired} />
 
-                  <TypeSelector control={form.control} disabled={isSubmitting} />
-                </div>
+              <TypeSelector control={form.control} disabled={isSubmitting} />
+            </div>
 
-                <FormField
-                  control={form.control}
-                  name="itemIds"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Produtos Associados</FormLabel>
-                      <FormControl>
-                        <Combobox
-                          mode="multiple"
-                          async={true}
-                          value={field.value || []}
-                          onValueChange={field.onChange}
-                          placeholder="Selecione produtos para associar à categoria"
-                          emptyText="Nenhum produto encontrado"
-                          disabled={isSubmitting}
-                          queryFn={searchItems}
-                          formatDisplay="brand"
-                          initialOptions={initialOptions}
-                          minSearchLength={0}
-                          getOptionLabel={getOptionLabel}
-                          getOptionValue={getOptionValue}
-                          queryKey={["category-form-items"]}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+            <FormField
+              control={form.control}
+              name="itemIds"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Produtos Associados</FormLabel>
+                  <FormControl>
+                    <Combobox
+                      mode="multiple"
+                      async={true}
+                      value={field.value || []}
+                      onValueChange={field.onChange}
+                      placeholder="Selecione produtos para associar à categoria"
+                      emptyText="Nenhum produto encontrado"
+                      disabled={isSubmitting}
+                      queryFn={searchItems}
+                      formatDisplay="brand"
+                      initialOptions={initialOptions}
+                      minSearchLength={0}
+                      getOptionLabel={getOptionLabel}
+                      getOptionValue={getOptionValue}
+                      queryKey={["category-form-items"]}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+        </div>
+      </form>
+    </Form>
   );
 }

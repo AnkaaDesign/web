@@ -12,7 +12,7 @@ import {
   IconPlus,
 } from "@tabler/icons-react";
 
-import type { Topic, TopicGetManyFormData, TopicOrderBy } from "../../../../types";
+import type { Topic, TopicGetManyFormData } from "../../../../types";
 import { routes } from "../../../../constants";
 import { useAuth } from "../../../../hooks/common/use-auth";
 import {
@@ -50,6 +50,15 @@ interface TopicTableProps {
   filters: Partial<TopicGetManyFormData>;
   onDataChange?: (data: { topics: Topic[]; totalRecords: number }) => void;
   className?: string;
+}
+
+interface TopicColumn {
+  key: string;
+  header: string;
+  sortable: boolean;
+  className: string;
+  align: "left" | "center" | "right";
+  accessor: (t: Topic) => React.ReactNode;
 }
 
 function convertSortConfigsToTopicOrderBy(
@@ -271,7 +280,7 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
-  const columns = useMemo(
+  const columns = useMemo<TopicColumn[]>(
     () => [
       {
         key: "order",

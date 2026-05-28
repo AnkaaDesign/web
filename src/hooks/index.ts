@@ -8,3 +8,4 @@ export * from "./administration";
 export * from "./server";
 export * from "./integrations";
 export * from "./skill";
+export * from "./questionnaire";

@@ -92,6 +92,24 @@ export const routes = {
         `/administracao/avaliacao-competencias/${id}/avaliacoes/${entryId}`,
       analytics: (id: string) => `/administracao/avaliacao-competencias/${id}/analytics`,
     },
+    questionnaire: {
+      root: "/administracao/questionarios",
+      create: "/administracao/questionarios/novo",
+      details: (id: string) => `/administracao/questionarios/${id}`,
+      edit: (id: string) => `/administracao/questionarios/${id}/editar`,
+      entry: (id: string, entryId: string) =>
+        `/administracao/questionarios/${id}/respostas/${entryId}`,
+      // Catalogue: Tema → Pergunta → Opção (separate roots so the "Campanhas"
+      // nav item — at /administracao/questionarios — isn't a path prefix of these).
+      temas: "/administracao/questionarios-temas",
+      temaCreate: "/administracao/questionarios-temas/novo",
+      temaDetail: (id: string) => `/administracao/questionarios-temas/${id}`,
+      temaEdit: (id: string) => `/administracao/questionarios-temas/${id}/editar`,
+      perguntas: "/administracao/questionarios-perguntas",
+      perguntaCreate: "/administracao/questionarios-perguntas/nova",
+      perguntaDetail: (id: string) => `/administracao/questionarios-perguntas/${id}`,
+      perguntaEdit: (id: string) => `/administracao/questionarios-perguntas/${id}/editar`,
+    },
   },
 
   // Leader fill — Produção: leader fills the assessment entries assigned to them
@@ -100,6 +118,13 @@ export const routes = {
     campaign: (campaignId: string) =>
       `/meu-pessoal/avaliacoes-competencias/${campaignId}`,
     fill: (entryId: string) => `/meu-pessoal/avaliacoes-competencias/preencher/${entryId}`,
+  },
+
+  // Self-fill questionnaire — personal domain, available to ALL users
+  questionnaire: {
+    mine: "/pessoal/questionarios",
+    fill: (entryId: string) => `/pessoal/questionarios/preencher/${entryId}`,
+    detail: (entryId: string) => `/pessoal/questionarios/${entryId}`,
   },
 
   // Authentication - Rotas de autenticação

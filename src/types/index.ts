@@ -57,3 +57,4 @@ export * from "./media";
 export * from "./push-notifications";
 export * from "./reconciliation";
 export * from "./skill";
+export * from "./questionnaire";

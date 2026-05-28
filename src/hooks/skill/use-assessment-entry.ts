@@ -21,6 +21,8 @@ import {
   updateAssessmentEntryMeta,
   submitAssessmentEntry,
   reopenAssessmentEntry,
+  getAssessmentEntryComparison,
+  type AssessmentEntryComparisonResponse,
 } from "../../api-client";
 import type {
   AssessmentEntryGetManyFormData,
@@ -109,6 +111,23 @@ export function useMyPendingAssessmentEntries(
     queryKey: assessmentEntryKeys.myPending(),
     queryFn: () => getAssessmentEntries(params),
     staleTime: 1000 * 30,
+    ...options,
+  });
+}
+
+/**
+ * The evaluatee's previous-assessment scores (by topic) for the Δ comparison
+ * on the admin detail page. Returns `data: null` when there's no prior entry.
+ */
+export function useAssessmentEntryComparison(
+  entryId: string | undefined,
+  options?: Omit<UseQueryOptions<AssessmentEntryComparisonResponse>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: [...assessmentEntryKeys.detail(entryId ?? ""), "comparison"],
+    queryFn: () => getAssessmentEntryComparison(entryId as string),
+    enabled: !!entryId,
+    staleTime: 1000 * 60,
     ...options,
   });
 }

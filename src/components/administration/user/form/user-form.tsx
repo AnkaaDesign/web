@@ -72,9 +72,9 @@ export function UserForm(props: UserFormProps) {
     pis: null,
     verified: false,
     isActive: true,
-    positionId: null,
+    positionId: null as any, // required in schema; empty until the user selects
     performanceLevel: 0,
-    sectorId: null,
+    sectorId: null as any, // required in schema; empty until the user selects
     isSectorLeader: false, // New field: indicates if user should be set as manager of selected sector
 
     // Address fields
@@ -114,6 +114,12 @@ export function UserForm(props: UserFormProps) {
 
     // Avatar
     avatarId: null,
+
+    // Default the "Criar no Secullum" switch ON so new collaborators sync to
+    // Secullum on create. The operator can still uncheck it. Note: when enabled,
+    // creation is blocked unless the chosen setor/cargo are mapped to a Secullum
+    // departamento/função (validated server-side in validateSecullumPrerequisites).
+    secullumSyncEnabled: true,
 
     ...defaultValues,
   };
@@ -414,8 +420,8 @@ export function UserForm(props: UserFormProps) {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <PositionSelector control={form.control} disabled={isSubmitting} />
-                <SectorSelector disabled={isSubmitting} required={false} />
+                <PositionSelector control={form.control} disabled={isSubmitting} required={mode === "create"} />
+                <SectorSelector disabled={isSubmitting} required={mode === "create"} />
               </div>
 
               <SectorLeaderSwitch disabled={isSubmitting} sectorPrivilege={sectorPrivilege} />

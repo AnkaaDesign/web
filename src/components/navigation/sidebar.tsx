@@ -8,6 +8,7 @@ import { useFavorites } from "@/contexts/favorites-context";
 import { MENU_ITEMS, routes } from "../../constants";
 import type { MenuItem } from "../../constants";
 import { getFilteredMenuForUser, getTablerIcon } from "../../utils";
+import { useMyPendingQuestionnaireEntries } from "@/hooks/questionnaire/use-questionnaire-entry";
 import { maskPhone, getPageIconName, isPageCadastrar } from "../../utils";
 import { fixNavigationPath } from "@/utils/route-validation";
 import { useAuth } from "@/contexts/auth-context";
@@ -483,10 +484,28 @@ export const Sidebar = memo(() => {
     });
   }, [user]);
 
+  // Self-fill questionnaires nav entry should only appear when the user
+  // actually has a pending entry to answer. While loading, default to "visible"
+  // so a flash-of-empty doesn't hide it.
+  const { data: pendingQuestionnaires } = useMyPendingQuestionnaireEntries(undefined, {
+    enabled: !!user,
+  } as any);
+  const hasOpenQuestionnaire = useMemo(() => {
+    if (!pendingQuestionnaires) return true; // unknown yet — keep visible
+    return ((pendingQuestionnaires.data ?? []) as any[]).some((e) => e.status !== "SUBMITTED");
+  }, [pendingQuestionnaires]);
+
   // Get filtered menu for current user
   const filteredMenu = useMemo(() => {
-    return getFilteredMenuForUser(MENU_ITEMS, user as any || undefined, "web");
-  }, [user]);
+    const base = getFilteredMenuForUser(MENU_ITEMS, user as any || undefined, "web");
+    if (hasOpenQuestionnaire) return base;
+    // Recursively strip the questionnaires entry when nothing's pending.
+    const stripQuestionnaires = (items: MenuItem[]): MenuItem[] =>
+      items
+        .filter((it) => it.id !== "meus-questionarios")
+        .map((it) => (it.children ? { ...it, children: stripQuestionnaires(it.children) } : it));
+    return stripQuestionnaires(base);
+  }, [user, hasOpenQuestionnaire]);
 
   // Filter menu items based on current route (hide cadastrar/editar/detalhes unless on relevant pages)
   const menuWithContextualItems = useMemo(() => {

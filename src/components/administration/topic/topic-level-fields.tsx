@@ -11,6 +11,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { ScoreBadge } from "@/components/production/skill-assessment/score-badge";
 
 /**
  * Inline sub-form rendering the 6 fixed score rows (0..5) of a Topic.
@@ -53,64 +54,64 @@ export function TopicLevelFields({ disabled }: { disabled?: boolean }) {
         {fields.map((field, idx) => (
           <div
             key={field.id}
-            className="grid grid-cols-1 md:grid-cols-[60px_240px_1fr] gap-3 items-start rounded-md border p-3"
+            className="flex items-start gap-3 rounded-md border border-border/40 p-3"
           >
-            <div className="flex items-center justify-center">
-              <span className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-muted font-bold text-lg">
-                {idx}
-              </span>
+            <div className="shrink-0 pt-1">
+              <ScoreBadge score={idx} label={String(idx)} size="md" />
             </div>
 
-            <FormField
-              control={control}
-              name={`levels.${idx}.name`}
-              render={({ field: f }) => (
-                <FormItem>
-                  <FormLabel className="text-xs">Nome do nível</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...f}
-                      value={f.value ?? ""}
-                      placeholder={`Nome (score ${idx})`}
-                      maxLength={120}
-                      disabled={disabled}
-                      transparent
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="min-w-0 flex-1 space-y-2">
+              <FormField
+                control={control}
+                name={`levels.${idx}.name`}
+                render={({ field: f }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Nome do nível</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...f}
+                        value={f.value ?? ""}
+                        placeholder={`Nome (score ${idx})`}
+                        maxLength={120}
+                        disabled={disabled}
+                        transparent
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={control}
-              name={`levels.${idx}.description`}
-              render={({ field: f }) => (
-                <FormItem>
-                  <FormLabel className="text-xs">Descrição</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...f}
-                      value={f.value ?? ""}
-                      placeholder={`O que caracteriza um colaborador neste nível?`}
-                      rows={2}
-                      maxLength={2000}
-                      disabled={disabled}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={control}
+                name={`levels.${idx}.description`}
+                render={({ field: f }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Descrição</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...f}
+                        value={f.value ?? ""}
+                        placeholder={`O que caracteriza um colaborador neste nível?`}
+                        rows={2}
+                        maxLength={2000}
+                        disabled={disabled}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Hidden score field — kept in sync with the row index */}
-            <FormField
-              control={control}
-              name={`levels.${idx}.score`}
-              render={({ field: f }) => (
-                <input type="hidden" value={idx} onChange={() => f.onChange(idx)} />
-              )}
-            />
+              {/* Hidden score field — kept in sync with the row index */}
+              <FormField
+                control={control}
+                name={`levels.${idx}.score`}
+                render={({ field: f }) => (
+                  <input type="hidden" value={idx} onChange={() => f.onChange(idx)} />
+                )}
+              />
+            </div>
           </div>
         ))}
       </CardContent>

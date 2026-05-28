@@ -591,6 +591,36 @@ export const NAVIGATION_MENU: MenuItem[] = [
           },
         ],
       },
+      {
+        id: "questionarios-admin",
+        title: "Questionários",
+        icon: "clipboardList",
+        path: "/administracao/questionarios",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
+        children: [
+          {
+            id: "questionarios-campanhas",
+            title: "Campanhas",
+            icon: "clipboardList",
+            path: "/administracao/questionarios",
+            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
+          },
+          {
+            id: "questionarios-temas",
+            title: "Temas",
+            icon: "clipboardList",
+            path: "/administracao/questionarios-temas",
+            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
+          },
+          {
+            id: "questionarios-perguntas",
+            title: "Perguntas",
+            icon: "clipboardList",
+            path: "/administracao/questionarios-perguntas",
+            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
+          },
+        ],
+      },
     ],
   },
 
@@ -1394,6 +1424,8 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE],
     children: [
       { id: "meus-feriados", title: "Feriados", icon: "holiday", path: "/pessoal/feriados" },
+      // Questionários - self-fill, visible to ALL users (no requiredPrivilege)
+      { id: "meus-questionarios", title: "Questionários", icon: "clipboardList", path: "/pessoal/questionarios" },
       {
         id: "meus-emprestimos",
         title: "Meus Empréstimos",

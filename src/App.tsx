@@ -268,6 +268,24 @@ const SkillAssessmentLeaderList = lazy(() => import("@/pages/production/skill-as
 const SkillAssessmentLeaderCampaign = lazy(() => import("@/pages/production/skill-assessment/[campaignId]").then((m) => ({ default: m.SkillAssessmentCampaignPage })));
 const SkillAssessmentLeaderFill = lazy(() => import("@/pages/production/skill-assessment/fill/[entryId]").then((m) => ({ default: m.SkillAssessmentFillPage })));
 
+// Self-fill questionnaire (all users)
+const MyQuestionnairesPage = lazy(() => import("@/pages/questionnaire/mine").then((m) => ({ default: m.MyQuestionnairesPage })));
+const QuestionnaireFillPage = lazy(() => import("@/pages/questionnaire/fill/[entryId]").then((m) => ({ default: m.QuestionnaireFillPage })));
+
+// Questionnaire admin
+const QuestionnaireAdminList = lazy(() => import("@/pages/administration/questionnaire/list").then((m) => ({ default: m.QuestionnaireListPage })));
+const QuestionnaireAdminCreate = lazy(() => import("@/pages/administration/questionnaire/create").then((m) => ({ default: m.QuestionnaireCreatePage })));
+const QuestionnaireAdminDetails = lazy(() => import("@/pages/administration/questionnaire/details/[id]").then((m) => ({ default: m.QuestionnaireDetailsPage })));
+const QuestionnaireAdminEntry = lazy(() => import("@/pages/administration/questionnaire/entry/[entryId]").then((m) => ({ default: m.QuestionnaireEntryDetailsPage })));
+const QuestionnaireTemasList = lazy(() => import("@/pages/administration/questionnaire/temas/list").then((m) => ({ default: m.QuestionnaireTemasListPage })));
+const QuestionnaireTemaCreate = lazy(() => import("@/pages/administration/questionnaire/temas/create").then((m) => ({ default: m.QuestionnaireTemaCreatePage })));
+const QuestionnaireTemaDetails = lazy(() => import("@/pages/administration/questionnaire/temas/details/[id]").then((m) => ({ default: m.QuestionnaireTemaDetailsPage })));
+const QuestionnaireTemaEdit = lazy(() => import("@/pages/administration/questionnaire/temas/edit/[id]").then((m) => ({ default: m.QuestionnaireTemaEditPage })));
+const QuestionnairePerguntasList = lazy(() => import("@/pages/administration/questionnaire/perguntas/list").then((m) => ({ default: m.QuestionnairePerguntasListPage })));
+const QuestionnairePerguntaCreate = lazy(() => import("@/pages/administration/questionnaire/perguntas/create").then((m) => ({ default: m.QuestionnairePerguntaCreatePage })));
+const QuestionnairePerguntaDetails = lazy(() => import("@/pages/administration/questionnaire/perguntas/details/[id]").then((m) => ({ default: m.QuestionnairePerguntaDetailsPage })));
+const QuestionnairePerguntaEdit = lazy(() => import("@/pages/administration/questionnaire/perguntas/edit/[id]").then((m) => ({ default: m.QuestionnairePerguntaEditPage })));
+
 // Personal
 const Personal = lazy(() => import("@/pages/personal/root").then((module) => ({ default: module.Personal })));
 const PersonalMyMessages = lazy(() => import("@/pages/personal/my-messages").then((module) => ({ default: module.MyMessagesPage })));
@@ -934,6 +952,66 @@ function App() {
                         <SkillAssessmentLeaderFill />
                       </Suspense>
                     </AutoPrivilegeRoute>
+                  }
+                />
+
+                {/* Questionnaire admin routes (specific paths before /:id) */}
+                <Route
+                  path={routes.administration.questionnaire.root}
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}><QuestionnaireAdminList /></Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path={routes.administration.questionnaire.create}
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}><QuestionnaireAdminCreate /></Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route path={routes.administration.questionnaire.temas} element={<AutoPrivilegeRoute><Suspense fallback={<PageLoader />}><QuestionnaireTemasList /></Suspense></AutoPrivilegeRoute>} />
+                <Route path={routes.administration.questionnaire.temaCreate} element={<AutoPrivilegeRoute><Suspense fallback={<PageLoader />}><QuestionnaireTemaCreate /></Suspense></AutoPrivilegeRoute>} />
+                <Route path="/administracao/questionarios-temas/:id/editar" element={<AutoPrivilegeRoute><Suspense fallback={<PageLoader />}><QuestionnaireTemaEdit /></Suspense></AutoPrivilegeRoute>} />
+                <Route path="/administracao/questionarios-temas/:id" element={<AutoPrivilegeRoute><Suspense fallback={<PageLoader />}><QuestionnaireTemaDetails /></Suspense></AutoPrivilegeRoute>} />
+                <Route path={routes.administration.questionnaire.perguntas} element={<AutoPrivilegeRoute><Suspense fallback={<PageLoader />}><QuestionnairePerguntasList /></Suspense></AutoPrivilegeRoute>} />
+                <Route path={routes.administration.questionnaire.perguntaCreate} element={<AutoPrivilegeRoute><Suspense fallback={<PageLoader />}><QuestionnairePerguntaCreate /></Suspense></AutoPrivilegeRoute>} />
+                <Route path="/administracao/questionarios-perguntas/:id/editar" element={<AutoPrivilegeRoute><Suspense fallback={<PageLoader />}><QuestionnairePerguntaEdit /></Suspense></AutoPrivilegeRoute>} />
+                <Route path="/administracao/questionarios-perguntas/:id" element={<AutoPrivilegeRoute><Suspense fallback={<PageLoader />}><QuestionnairePerguntaDetails /></Suspense></AutoPrivilegeRoute>} />
+                <Route
+                  path="/administracao/questionarios/:id/respostas/:entryId"
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}><QuestionnaireAdminEntry /></Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path="/administracao/questionarios/:id"
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}><QuestionnaireAdminDetails /></Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+
+                {/* Self-fill questionnaire routes — personal domain, ALL users */}
+                <Route
+                  path={routes.questionnaire.mine}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <MyQuestionnairesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/pessoal/questionarios/preencher/:entryId"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <QuestionnaireFillPage />
+                    </Suspense>
                   }
                 />
 

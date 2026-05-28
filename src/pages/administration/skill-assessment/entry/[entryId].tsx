@@ -1,26 +1,29 @@
 // pages/administration/skill-assessment/entry/[entryId].tsx
 //
-// Admin-side detail view for ONE AssessmentEntry. Shows the avaliado +
-// avaliador metadata, summary stats, and the full per-topic response list
-// (score + justification) grouped by Competência. Admins can reopen a
-// SUBMITTED entry from here.
+// Admin read-only review of ONE AssessmentEntry, single-user adaptation of the
+// leader MATRIX page: topic stepper + read-only NOTAS rail + averages cards +
+// Δ vs the previous campaign. The right slot is contextual — when this topic has
+// a PREVIOUS-campaign value it shows a SECOND NOTAS rail (current vs anterior,
+// two rails side by side); otherwise it shows the Descrição + Comportamentos
+// contrários in that space.
 
-import { useMemo, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  IconBriefcase,
-  IconBuilding,
-  IconCalendar,
-  IconCalendarPlus,
-  IconCalendarTime,
+  IconAlertCircle,
+  IconArrowDownRight,
+  IconArrowUpRight,
+  IconChevronLeft,
+  IconChevronRight,
   IconClipboardList,
-  IconHash,
-  IconInfoCircle,
+  IconFlag3,
+  IconLayoutGrid,
   IconLoader2,
   IconLockOpen,
+  IconMessage2,
+  IconMinus,
+  IconNotes,
   IconRefresh,
-  IconUser,
-  IconUserShield,
 } from "@tabler/icons-react";
 
 import {
@@ -28,25 +31,20 @@ import {
   SECTOR_PRIVILEGES,
   ASSESSMENT_ENTRY_STATUS,
 } from "../../../../constants";
-import { formatDate, formatDateTime } from "../../../../utils";
 import {
   useAssessment,
   useAssessmentEntry,
   useReopenAssessmentEntry,
+  useAssessmentEntryComparison,
 } from "../../../../hooks";
+import type { Topic, TopicLevel } from "../../../../types";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DetailRow } from "@/components/ui/detail-row";
-import { Separator } from "@/components/ui/separator";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,14 +56,30 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScoreBadge } from "@/components/production/skill-assessment/score-badge";
+import { ScoreLevelPicker } from "@/components/production/skill-assessment/matrix/score-level-picker";
+import { StepperProgressBar } from "@/components/production/skill-assessment/matrix/stepper-progress-bar";
+import { TopicPickerModal } from "@/components/production/skill-assessment/matrix/topic-picker-modal";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { cn } from "@/lib/utils";
-import { AssessmentEntryStatusBadge } from "@/components/production/skill-assessment/assessment-entry-status-badge";
+
+const noop = () => {};
+const round2 = (n: number) => Math.round(n * 100) / 100;
+const avg = (xs: number[]) => (xs.length ? round2(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
+
+interface ResolvedTopic {
+  topic: Topic;
+  levels: TopicLevel[];
+  score: number | null;
+  previousScore: number | null;
+  justification: string;
+}
 
 export const SkillAssessmentEntryDetailsPage = () => {
   usePageTracker({ title: "Detalhe da Avaliação", icon: "clipboard-list" });
   const { id, entryId } = useParams<{ id: string; entryId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isReopenOpen, setIsReopenOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const {
     data: entryResp,
@@ -82,100 +96,114 @@ export const SkillAssessmentEntryDetailsPage = () => {
     } as any,
   });
 
-  // The assessment's own topic catalogue — we need it to surface topics the
-  // leader hasn't yet scored ("Sem resposta") and to drive the canonical
-  // skill order.
   const { data: assessmentResp, isLoading: isLoadingAssessment } = useAssessment(
     id ?? "",
-    {
-      include: {
-        topics: { include: { topic: { include: { skill: true, levels: true } } } },
-      } as any,
-    } as any,
+    { include: { topics: { include: { topic: { include: { skill: true, levels: true } } } } } as any } as any,
   );
 
+  const { data: comparisonResp } = useAssessmentEntryComparison(entryId);
   const reopenMut = useReopenAssessmentEntry(entryId ?? "");
 
   const entry = entryResp?.data;
   const assessment = assessmentResp?.data;
+  const previousByTopic = comparisonResp?.data?.responsesByTopic ?? {};
+  const previousAssessmentName = comparisonResp?.data?.assessmentName ?? null;
 
-  // Build a unified list keyed by topicId: every topic in the assessment,
-  // with the matching response (if any), then group by skill in canonical
-  // order.
   const responsesByTopic = useMemo(() => {
     const map = new Map<string, any>();
-    for (const r of (entry?.responses ?? []) as any[]) {
-      if (r.topicId) map.set(r.topicId, r);
-    }
+    for (const r of (entry?.responses ?? []) as any[]) if (r.topicId) map.set(r.topicId, r);
     return map;
   }, [entry?.responses]);
 
-  const grouped = useMemo(() => {
+  const resolvedTopics: ResolvedTopic[] = useMemo(() => {
     const join = (assessment?.topics ?? []) as any[];
-    const sorted = [...join].sort((a, b) => {
-      const sa = a.topic?.skill?.order ?? Number.MAX_SAFE_INTEGER;
-      const sb = b.topic?.skill?.order ?? Number.MAX_SAFE_INTEGER;
-      if (sa !== sb) return sa - sb;
-      return (a.topic?.order ?? 0) - (b.topic?.order ?? 0);
-    });
-    const groups = new Map<
-      string,
-      { skillId: string; skillName: string; items: any[] }
-    >();
-    for (const at of sorted) {
-      const sid = at.topic?.skill?.id ?? "_unknown";
-      const sname = at.topic?.skill?.name ?? "Sem competência";
-      const g = groups.get(sid);
-      const row = {
-        topic: at.topic,
-        response: responsesByTopic.get(at.topicId) ?? null,
-      };
-      if (g) g.items.push(row);
-      else groups.set(sid, { skillId: sid, skillName: sname, items: [row] });
-    }
-    // Compute per-skill average (over scored topics only).
-    return Array.from(groups.values()).map((g) => {
-      const scored = g.items
-        .map((it) => it.response?.score)
-        .filter((s: any): s is number => typeof s === "number");
-      const avg =
-        scored.length > 0
-          ? scored.reduce((a: number, b: number) => a + b, 0) / scored.length
-          : null;
-      return { ...g, scoredCount: scored.length, avg };
-    });
-  }, [assessment?.topics, responsesByTopic]);
+    return [...join]
+      .map((at) => at.topic as Topic | undefined)
+      .filter((t): t is Topic => !!t)
+      .sort((a, b) => {
+        const sa = a.skill?.order ?? Number.MAX_SAFE_INTEGER;
+        const sb = b.skill?.order ?? Number.MAX_SAFE_INTEGER;
+        if (sa !== sb) return sa - sb;
+        return (a.order ?? 0) - (b.order ?? 0);
+      })
+      .map<ResolvedTopic>((topic) => {
+        const response = responsesByTopic.get(topic.id);
+        return {
+          topic,
+          levels: ((topic.levels as TopicLevel[] | undefined) ?? []).slice().sort((a, b) => a.score - b.score),
+          score: response?.score ?? null,
+          previousScore: topic.id in previousByTopic ? previousByTopic[topic.id] : null,
+          justification: response?.justification ?? "",
+        };
+      });
+  }, [assessment?.topics, responsesByTopic, previousByTopic]);
 
-  const stats = useMemo(() => {
-    let scored = 0;
-    let sum = 0;
-    let withJustif = 0;
-    const total = grouped.reduce((n, g) => n + g.items.length, 0);
-    for (const g of grouped) {
-      for (const it of g.items) {
-        if (it.response?.score != null) {
-          scored += 1;
-          sum += it.response.score;
-          if ((it.response.justification ?? "").trim()) withJustif += 1;
-        }
-      }
+  const urlTopicId = searchParams.get("t");
+  const activeTopicId =
+    urlTopicId && resolvedTopics.some((rt) => rt.topic.id === urlTopicId)
+      ? urlTopicId
+      : resolvedTopics[0]?.topic.id ?? null;
+  const activeIndex = activeTopicId ? resolvedTopics.findIndex((rt) => rt.topic.id === activeTopicId) : -1;
+  const active = activeIndex >= 0 ? resolvedTopics[activeIndex] : null;
+  const totalTopics = resolvedTopics.length;
+
+  useEffect(() => {
+    if (!urlTopicId && resolvedTopics.length > 0) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("t", resolvedTopics[0].topic.id);
+        return next;
+      }, { replace: true });
     }
-    return {
-      scored,
-      total,
-      avg: scored > 0 ? sum / scored : null,
-      withJustif,
-    };
-  }, [grouped]);
+  }, [urlTopicId, resolvedTopics, setSearchParams]);
+
+  const goToTopic = (tid: string) =>
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("t", tid);
+      return next;
+    });
+  const goToOffset = (offset: number) => {
+    if (activeIndex < 0 || totalTopics === 0) return;
+    goToTopic(resolvedTopics[(activeIndex + offset + totalTopics) % totalTopics].topic.id);
+  };
+
+  const skillSummaries = useMemo(() => {
+    const groups = new Map<string, { skillId: string; skillName: string; order: number; cur: number[]; prev: number[] }>();
+    for (const rt of resolvedTopics) {
+      const sid = rt.topic.skill?.id ?? "_";
+      const sname = rt.topic.skill?.name ?? "Sem competência";
+      const order = rt.topic.skill?.order ?? Number.MAX_SAFE_INTEGER;
+      const g = groups.get(sid) ?? { skillId: sid, skillName: sname, order, cur: [], prev: [] };
+      if (rt.score != null) g.cur.push(rt.score);
+      if (rt.previousScore != null) g.prev.push(rt.previousScore);
+      groups.set(sid, g);
+    }
+    return Array.from(groups.values())
+      .sort((a, b) => a.order - b.order)
+      .map((g) => ({ skillId: g.skillId, skillName: g.skillName, current: avg(g.cur), previous: avg(g.prev) }));
+  }, [resolvedTopics]);
+
+  const overall = useMemo(() => {
+    const cur: number[] = [];
+    const prev: number[] = [];
+    for (const rt of resolvedTopics) {
+      if (rt.score != null) cur.push(rt.score);
+      if (rt.previousScore != null) prev.push(rt.previousScore);
+    }
+    return { current: avg(cur), previous: avg(prev) };
+  }, [resolvedTopics]);
+
+  const progressByTopic = useMemo(() => {
+    const map = new Map<string, { scored: number; total: number }>();
+    for (const rt of resolvedTopics) map.set(rt.topic.id, { scored: rt.score != null ? 1 : 0, total: 1 });
+    return map;
+  }, [resolvedTopics]);
 
   const isLoading = isLoadingEntry || isLoadingAssessment;
 
-  if (!id || !entryId) {
-    return <Navigate to={routes.administration.skillAssessment.root} replace />;
-  }
-  if (entryError) {
-    return <Navigate to={routes.administration.skillAssessment.details(id)} replace />;
-  }
+  if (!id || !entryId) return <Navigate to={routes.administration.skillAssessment.root} replace />;
+  if (entryError) return <Navigate to={routes.administration.skillAssessment.details(id)} replace />;
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -183,33 +211,57 @@ export const SkillAssessmentEntryDetailsPage = () => {
       </div>
     );
   }
-  if (!entry) {
-    return <Navigate to={routes.administration.skillAssessment.details(id)} replace />;
-  }
+  if (!entry) return <Navigate to={routes.administration.skillAssessment.details(id)} replace />;
 
   const status = entry.status as ASSESSMENT_ENTRY_STATUS;
   const canReopen = status === ASSESSMENT_ENTRY_STATUS.SUBMITTED;
+  const hasTopicHistory = active != null && active.previousScore != null;
 
   const handleReopen = async () => {
     try {
       await reopenMut.mutateAsync();
-      // Success/error toasts handled by the axios interceptor.
       setIsReopenOpen(false);
     } catch (err) {
-      // Error toast handled by the axios interceptor.
       if (import.meta.env.DEV) console.error(err);
     }
   };
 
+  const descricaoCard = active && (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <IconNotes className="h-4 w-4 text-muted-foreground" />
+          Descrição
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm leading-relaxed whitespace-pre-line text-foreground/90">
+          {active.topic.description || <span className="italic text-muted-foreground">Sem descrição.</span>}
+        </p>
+      </CardContent>
+    </Card>
+  );
+  const comportamentosCard = active && (
+    <Card className="border-amber-500/30 bg-amber-50/30 dark:bg-amber-950/10">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
+          <IconFlag3 className="h-4 w-4" />
+          Comportamentos contrários
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm leading-relaxed whitespace-pre-line text-amber-900 dark:text-amber-200">
+          {active.topic.counterBehaviors || <span className="italic opacity-70">Sem comportamentos contrários cadastrados.</span>}
+        </p>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <PrivilegeRoute
-      requiredPrivilege={[
-        SECTOR_PRIVILEGES.ADMIN,
-        SECTOR_PRIVILEGES.HUMAN_RESOURCES,
-        SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
-      ]}
+      requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}
     >
-      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <div className="flex flex-col gap-4 bg-background px-4 pt-4 pb-6">
         <PageHeader
           variant="detail"
           title={entry.evaluatee?.name ?? "Avaliação"}
@@ -217,329 +269,198 @@ export const SkillAssessmentEntryDetailsPage = () => {
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Administração" },
-            {
-              label: "Avaliação de Competências",
-              href: routes.administration.skillAssessment.root,
-            },
-            {
-              label: assessment?.name ?? "Campanha",
-              href: routes.administration.skillAssessment.details(id),
-            },
+            { label: "Avaliação de Competências", href: routes.administration.skillAssessment.root },
+            { label: assessment?.name ?? "Campanha", href: routes.administration.skillAssessment.details(id) },
             { label: entry.evaluatee?.name ?? "Avaliação" },
           ]}
           actions={[
-            {
-              key: "refresh",
-              label: "Atualizar",
-              icon: IconRefresh,
-              onClick: () => refetch(),
-              loading: isRefetching,
-            },
+            { key: "refresh", label: "Atualizar", icon: IconRefresh, onClick: () => refetch(), loading: isRefetching },
             ...(canReopen
-              ? [
-                  {
-                    key: "reopen",
-                    label: "Reabrir",
-                    icon: IconLockOpen,
-                    variant: "outline" as const,
-                    onClick: () => setIsReopenOpen(true),
-                    disabled: reopenMut.isPending,
-                  },
-                ]
+              ? [{ key: "reopen", label: "Reabrir", icon: IconLockOpen, variant: "outline" as const, onClick: () => setIsReopenOpen(true), disabled: reopenMut.isPending }]
               : []),
           ]}
-          className="flex-shrink-0"
         />
 
-        <div className="flex-1 overflow-y-auto pb-6">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
-                    Informações
-                  </CardTitle>
-                  <AssessmentEntryStatusBadge
-                    status={status}
-                    fullyScored={stats.total > 0 && stats.scored >= stats.total}
-                  />
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <DetailRow
-                      icon={IconUser}
-                      label="Avaliado"
-                      value={<span>{entry.evaluatee?.name ?? "—"}</span>}
-                    />
-                    {entry.evaluatee?.position?.name && (
-                      <DetailRow
-                        icon={IconBriefcase}
-                        label="Cargo"
-                        value={<span>{entry.evaluatee.position.name}</span>}
-                      />
-                    )}
-                    {entry.evaluatee?.sector?.name && (
-                      <DetailRow
-                        icon={IconBuilding}
-                        label="Setor"
-                        value={<span>{entry.evaluatee.sector.name}</span>}
-                      />
-                    )}
-                    <DetailRow
-                      icon={IconUserShield}
-                      label="Avaliador"
-                      value={<span>{entry.evaluator?.name ?? "—"}</span>}
-                    />
-                    {assessment && (
-                      <DetailRow
-                        icon={IconCalendar}
-                        label="Período"
-                        value={
-                          <span>
-                            {formatDate(assessment.periodStart)} –{" "}
-                            {formatDate(assessment.periodEnd)}
-                          </span>
-                        }
-                      />
-                    )}
-                    <DetailRow
-                      icon={IconCalendarPlus}
-                      label="Criada em"
-                      value={
-                        <span className="text-sm">
-                          {entry.createdAt ? formatDateTime(entry.createdAt) : "—"}
-                        </span>
-                      }
-                    />
-                    <DetailRow
-                      icon={IconCalendarTime}
-                      label="Atualizada em"
-                      value={
-                        <span className="text-sm">
-                          {entry.updatedAt ? formatDateTime(entry.updatedAt) : "—"}
-                        </span>
-                      }
-                    />
-                  </div>
-
-                  {grouped.length > 0 && (
-                    <>
-                      <Separator />
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {grouped.map((g) => (
-                          <ScoreSummaryCard
-                            key={g.skillId}
-                            label={g.skillName}
-                            avg={g.avg}
-                          />
-                        ))}
-                        <ScoreSummaryCard label="Nota geral" avg={stats.avg} highlight />
-                      </div>
-                    </>
-                  )}
-
-                  {entry.notes && (
-                    <>
-                      <Separator />
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Observações do avaliador
-                        </div>
-                        <p className="text-sm whitespace-pre-wrap text-foreground/90">
-                          {entry.notes}
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <IconHash className="h-5 w-5 text-muted-foreground" />
-                    Respostas por competência
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {grouped.length === 0 ? (
-                    <span className="text-sm text-muted-foreground">
-                      Nenhum tópico nesta avaliação.
-                    </span>
-                  ) : (
-                    <>
-                    <Accordion
-                      type="multiple"
-                      defaultValue={grouped[0] ? [grouped[0].skillId] : []}
-                      className="w-full"
-                    >
-                      {grouped.map((group, idx) => {
-                        return (
-                          <AccordionItem
-                            key={group.skillId}
-                            value={group.skillId}
-                            className={cn(
-                              "border-border/40",
-                              idx === grouped.length - 1 && "border-b-0",
-                            )}
-                          >
-                            <AccordionTrigger className="py-3 hover:no-underline">
-                              <div className="flex flex-1 items-center justify-between gap-3 pr-3">
-                                <span className="font-medium">{group.skillName}</span>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {group.scoredCount}/{group.items.length}
-                                  </Badge>
-                                  {group.avg != null ? (
-                                    <ScoreBadge
-                                      score={Math.round(group.avg)}
-                                      label={group.avg.toFixed(2)}
-                                      size="md"
-                                    />
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">—</span>
-                                  )}
-                                </div>
-                              </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                              <div className="space-y-2">
-                                {group.items.map(({ topic, response }) => {
-                                  const level = response?.score != null
-                                    ? (topic?.levels as any[] | undefined)?.find((l: any) => l.score === response.score)
-                                    : undefined;
-                                  return (
-                                  <div
-                                    key={topic?.id}
-                                    className="rounded-md border border-border/40 bg-muted/30 px-3 py-2.5 text-sm"
-                                  >
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="flex flex-col gap-1 min-w-0">
-                                        <span className="font-medium leading-tight">
-                                          {topic?.title ?? "—"}
-                                        </span>
-                                        {level?.description && (
-                                          <p className="text-xs text-muted-foreground/80 leading-snug">
-                                            {level.description}
-                                          </p>
-                                        )}
-                                      </div>
-                                      {response?.score != null ? (
-                                        <div className="flex flex-col items-end gap-0.5 shrink-0">
-                                          <ScoreBadge
-                                            score={response.score}
-                                            size="md"
-                                          />
-                                          {level?.name && (
-                                            <span className="text-[10px] text-muted-foreground font-medium">
-                                              {level.name}
-                                            </span>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <Badge
-                                          variant="outline"
-                                          className="text-[10px]"
-                                        >
-                                          Sem resposta
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    {response?.justification && (
-                                      <p className="mt-2 whitespace-pre-line text-xs text-muted-foreground">
-                                        <span className="font-semibold uppercase tracking-wide">
-                                          Justificativa:
-                                        </span>{" "}
-                                        {response.justification}
-                                      </p>
-                                    )}
-                                  </div>
-                                  );
-                                })}
-                              </div>
-                            </AccordionContent>
-                          </AccordionItem>
-                        );
-                      })}
-                    </Accordion>
-
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+        {/* Topic stepper bar — above the summary cards. */}
+        <Card className="overflow-hidden p-0">
+          <div className="flex items-center gap-2 p-2">
+            <Button size="icon" variant="default" onClick={() => goToOffset(-1)} aria-label="Tópico anterior" className="h-12 w-12 shrink-0" disabled={totalTopics === 0}>
+              <IconChevronLeft className="h-5 w-5" />
+            </Button>
+            <button type="button" onClick={() => setPickerOpen(true)} className="group flex min-w-0 flex-1 flex-col gap-2 rounded-md px-3 py-2 text-left hover:bg-muted/40">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="truncate text-sm font-semibold leading-tight">{active?.topic.title ?? "—"}</span>
+                <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Tópico {activeIndex + 1} de {totalTopics}
+                  {active?.topic.skill?.name ? ` · ${active.topic.skill.name}` : ""}
+                </span>
+                <IconLayoutGrid className="h-4 w-4 shrink-0 text-muted-foreground opacity-60 group-hover:opacity-100" />
+              </div>
+              <StepperProgressBar
+                total={totalTopics}
+                currentIndex={activeIndex}
+                isScored={(i) => resolvedTopics[i]?.score != null}
+                className="w-full"
+              />
+            </button>
+            <Button size="icon" variant="default" onClick={() => goToOffset(1)} aria-label="Próximo tópico" className="h-12 w-12 shrink-0" disabled={totalTopics === 0}>
+              <IconChevronRight className="h-5 w-5" />
+            </Button>
           </div>
+        </Card>
+
+        {/* Averages — bare cards (no title / card wrapper). */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {skillSummaries.map((s) => (
+            <AverageCard key={s.skillId} label={s.skillName} current={s.current} previous={s.previous} />
+          ))}
+          <AverageCard label="Nota geral" current={overall.current} previous={overall.previous} highlight />
         </div>
 
-        <AlertDialog open={isReopenOpen} onOpenChange={setIsReopenOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <IconLockOpen className="h-5 w-5 text-amber-500" />
-                Reabrir avaliação?
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                A avaliação voltará ao status "Em progresso" e o líder poderá
-                ajustar as respostas. O histórico não será apagado.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleReopen}
-                disabled={reopenMut.isPending}
-              >
-                Reabrir
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {active && (
+          <>
+            {hasTopicHistory ? (
+              <>
+                {/* With comparison: Descrição + Comportamentos contrários ABOVE the two rails. */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {descricaoCard}
+                  {comportamentosCard}
+                </div>
+                {/* Anterior (left) + Esta avaliação (right, always). */}
+                <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
+                  <RailColumn label={`Anterior${previousAssessmentName ? ` · ${previousAssessmentName}` : ""}`}>
+                    <ScoreLevelPicker topic={active.topic} currentScore={active.previousScore} readOnly onPickScore={noop} />
+                  </RailColumn>
+                  <RailColumn label="Esta avaliação">
+                    <ScoreLevelPicker topic={active.topic} currentScore={active.score} readOnly onPickScore={noop} selectedAction={active.justification?.trim() ? <JustificationButton value={active.justification} /> : undefined} />
+                  </RailColumn>
+                </div>
+              </>
+            ) : (
+              /* No comparison: description on the left, the current rail on the right (no label). */
+              <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
+                <div className="flex flex-col gap-4">
+                  {descricaoCard}
+                  {comportamentosCard}
+                </div>
+                <div className="flex flex-col">
+                  <ScoreLevelPicker topic={active.topic} currentScore={active.score} readOnly onPickScore={noop} selectedAction={active.justification?.trim() ? <JustificationButton value={active.justification} /> : undefined} />
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
+
+      <TopicPickerModal
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        topics={resolvedTopics.map((rt) => rt.topic)}
+        activeTopicId={activeTopicId}
+        progressByTopic={progressByTopic}
+        onSelect={(tid) => { goToTopic(tid); setPickerOpen(false); }}
+      />
+
+      <AlertDialog open={isReopenOpen} onOpenChange={setIsReopenOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <IconLockOpen className="h-5 w-5 text-amber-500" />
+              Reabrir avaliação?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              A avaliação voltará ao status "Em progresso" e o líder poderá ajustar as respostas. O
+              histórico não será apagado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReopen} disabled={reopenMut.isPending}>Reabrir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PrivilegeRoute>
   );
 };
 
-/**
- * Compact card showing a competência's name with its average score below.
- * Used in the Informações card's Resumo row.
- */
-function ScoreSummaryCard({
-  label,
-  avg,
-  highlight,
-}: {
-  label: string;
-  avg: number | null;
-  highlight?: boolean;
-}) {
+/** Labelled column wrapping a NOTAS rail (so two rails can be told apart). */
+function RailColumn({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div
+    <div className="flex flex-col gap-2">
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+      <div className="flex flex-1 flex-col">{children}</div>
+    </div>
+  );
+}
+
+// Badge sizing shared by all three summary badges so they're the same height.
+const SUMMARY_BADGE = "px-3 py-1 text-sm";
+
+function AverageCard({ label, current, previous, highlight }: { label: string; current: number | null; previous: number | null; highlight?: boolean }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
+      <span className={cn("truncate text-xs leading-tight", highlight ? "font-semibold text-foreground" : "text-muted-foreground")}>{label}</span>
+      {/* Sequence: old (if any) · new · difference — left-aligned, equal sizes. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {previous != null && <Badge variant="secondary" className={cn(SUMMARY_BADGE, "tabular-nums")}>{previous.toFixed(2)}</Badge>}
+        {current != null ? <ScoreBadge score={Math.round(current)} label={current.toFixed(2)} size="lg" /> : <Badge variant="secondary" className={SUMMARY_BADGE}>—</Badge>}
+        <TendencyBadge current={current} previous={previous} />
+      </div>
+    </div>
+  );
+}
+
+/** Tendency shown as a colored % badge — direction conveyed by the icon (no +/- sign). */
+function TendencyBadge({ current, previous }: { current: number | null; previous: number | null }) {
+  if (current == null || previous == null) return null;
+  const diff = current - previous;
+  const pct = previous !== 0 ? (diff / previous) * 100 : diff !== 0 ? 100 : 0;
+  const up = diff > 0;
+  const down = diff < 0;
+  return (
+    <Badge
       className={cn(
-        "rounded-md border px-3 py-2.5 flex flex-col items-center gap-1.5 text-center",
-        highlight
-          ? "border-primary/40 bg-primary/5"
-          : "border-border/40 bg-muted/30",
+        "gap-0.5 border-transparent tabular-nums text-white",
+        SUMMARY_BADGE,
+        up ? "bg-emerald-600 hover:bg-emerald-600" : down ? "bg-red-700 hover:bg-red-700" : "bg-neutral-500 hover:bg-neutral-500",
       )}
     >
-      <span
-        className={cn(
-          "text-xs leading-tight line-clamp-2",
-          highlight ? "font-semibold text-foreground" : "text-muted-foreground",
+      {up ? <IconArrowUpRight className="h-4 w-4" /> : down ? <IconArrowDownRight className="h-4 w-4" /> : <IconMinus className="h-4 w-4" />}
+      {Math.abs(Math.round(pct))}%
+    </Badge>
+  );
+}
+
+/** Justification shown as a visible pill on the selected score card; opens a modal. */
+function JustificationButton({ value }: { value: string }) {
+  const has = !!value?.trim();
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          size="sm"
+          aria-label="Ver justificativa"
+          className="h-7 gap-1 border border-white/30 bg-white/20 px-2 text-xs font-medium text-white shadow-sm hover:bg-white/30"
+        >
+          <IconAlertCircle className="h-4 w-4" />
+          Justificativa
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <IconMessage2 className="h-5 w-5 text-muted-foreground" />
+            Justificativa
+          </DialogTitle>
+        </DialogHeader>
+        {has ? (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">{value}</p>
+        ) : (
+          <p className="text-sm italic text-muted-foreground">Nenhuma justificativa registrada.</p>
         )}
-      >
-        {label}
-      </span>
-      {avg != null ? (
-        <ScoreBadge
-          score={Math.round(avg)}
-          label={avg.toFixed(2)}
-          size={highlight ? "md" : "sm"}
-        />
-      ) : (
-        <span className="text-xs text-muted-foreground">—</span>
-      )}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

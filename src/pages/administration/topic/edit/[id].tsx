@@ -154,7 +154,7 @@ export const TopicEditPage = () => {
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <div className="container mx-auto max-w-5xl flex-shrink-0">
           <PageHeader
             variant="form"
             title="Editar Tópico"
@@ -190,7 +190,7 @@ export const TopicEditPage = () => {
             <form
               id="topic-edit-form"
               onSubmit={form.handleSubmit(handleSubmit)}
-              className="container mx-auto max-w-4xl space-y-4"
+              className="container mx-auto max-w-5xl space-y-4"
             >
               <button id="topic-edit-submit" type="submit" className="hidden" disabled={isSubmitting} />
 
