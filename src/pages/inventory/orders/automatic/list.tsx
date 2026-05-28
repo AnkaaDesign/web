@@ -119,12 +119,30 @@ export const AutomaticOrderListPage = () => {
     }
   };
 
-  const getUrgencyBadge = (urgency: string) => {
-    switch (urgency) {
+  // Single source of truth for the URGÊNCIA column. Emergency override is the
+  // top of the hierarchy: the item will run out BEFORE its next scheduled order
+  // arrives, so it must be reordered now. The backend already forces such items
+  // to urgency='critical', which is why stacking a separate "EMERGENCIAL" badge
+  // next to "CRÍTICO" was redundant. We collapse to a single badge and give the
+  // emergency tier the most alarming treatment (pulsing red + warning icon).
+  const getUrgencyBadge = (item: AutoOrderRecommendation) => {
+    if (item.isEmergencyOverride) {
+      return (
+        <Badge
+          variant="red"
+          className="gap-1 ring-2 ring-red-500/40 animate-pulse dark:ring-red-400/40"
+        >
+          <IconAlertTriangle className="h-3 w-3" />
+          EMERGENCIAL
+        </Badge>
+      );
+    }
+
+    switch (item.urgency) {
       case 'critical':
         return <Badge variant="destructive">CRÍTICO</Badge>;
       case 'high':
-        return <Badge variant="default" className="bg-orange-500 text-white">ALTO</Badge>;
+        return <Badge variant="orange">ALTO</Badge>;
       case 'medium':
         return <Badge variant="secondary">MÉDIO</Badge>;
       default:
@@ -670,19 +688,7 @@ export const AutomaticOrderListPage = () => {
                                             {formatCurrency(getExpectedPrice(item))}
                                           </TableCell>
                                         )}
-                                        <TableCell className="py-2">
-                                          <div className="flex flex-col items-start gap-1">
-                                            {getUrgencyBadge(item.urgency)}
-                                            {item.isEmergencyOverride && (
-                                              <Badge
-                                                variant="outline"
-                                                className="border-orange-500 text-orange-500 text-[10px] font-medium"
-                                              >
-                                                EMERGENCIAL
-                                              </Badge>
-                                            )}
-                                          </div>
-                                        </TableCell>
+                                        <TableCell className="py-2">{getUrgencyBadge(item)}</TableCell>
                                         <TableCell
                                           className="text-sm text-muted-foreground truncate py-2"
                                           title={item.reason}
