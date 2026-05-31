@@ -1,14 +1,20 @@
 import { Badge } from "@/components/ui/badge";
 import type { BadgeProps } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type {
-  ReconciliationCategory,
+  BankTransactionCategoryTag,
   ReconciliationSource,
   ReconciliationStatus,
 } from "@/types/reconciliation";
 
 export const STATUS_LABEL: Record<ReconciliationStatus, string> = {
   PENDING: "Pendente",
-  RECONCILED: "Conciliado",
+  RECONCILED: "Resolvido",
   PARTIAL: "Parcial",
   IGNORED: "Ignorado",
   DISPUTED: "Em disputa",
@@ -25,23 +31,8 @@ const STATUS_VARIANT: Record<
   DISPUTED: "cancelled",
 };
 
-export const CATEGORY_LABEL: Record<ReconciliationCategory, string> = {
-  NF: "NF",
-  TRIBUTO: "Tributo",
-  FOLHA: "Folha",
-  TRANSFERENCIA: "Transferência",
-  TARIFA_BANCARIA: "Tarifa Bancária",
-  CONVENIO: "Convênio",
-  PRO_LABORE: "Pró-Labore",
-  ALUGUEL: "Aluguel",
-  ESTORNO: "Estorno",
-  OUTROS: "Outros",
-  UNCLASSIFIED: "Não classificado",
-};
-
-// Only MANUAL is annotated — AUTO is the default state and would just add
-// visual noise. The filter sheet still exposes both sources for querying.
-const SOURCE_LABEL: Partial<Record<ReconciliationSource, string>> = {
+const SOURCE_LABEL: Record<ReconciliationSource, string> = {
+  AUTO: "automática",
   MANUAL: "manual",
 };
 
@@ -61,50 +52,109 @@ export function getConfidenceBadgeVariant(confidence: number): BadgeProps["varia
   return "cancelled";
 }
 
-interface Props {
-  status: ReconciliationStatus;
-  category?: ReconciliationCategory;
-  source?: ReconciliationSource | null;
-  // NF confidence score, only displayed when the row is RECONCILED via NF auto-match.
-  confidence?: number | null;
+/**
+ * Picks black or white text for a `#RRGGBB` chip background using perceived
+ * luminance (0.299r+0.587g+0.114b). Light backgrounds (luminance > 0.6) get
+ * black text; darker ones get white. Returns null for unparseable colors so the
+ * caller can fall back to its default styling.
+ */
+export function getCategoryTextColor(color: string | null | undefined): string | null {
+  if (!color) return null;
+  const hex = color.trim().replace(/^#/, "");
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#000" : "#fff";
+}
+
+interface CategoryChipsProps {
+  categories: BankTransactionCategoryTag[];
+  /** Max chips before collapsing the rest into a "+N" overflow chip. */
+  maxVisible?: number;
   className?: string;
 }
 
 /**
- * Renders the reconciliation state as a two-part chip:
- *
- *   [Status] · [Category] (source) [· confidence%]
- *
- * Example: "Conciliado · Tarifa Bancária (auto)"
- * Example: "Conciliado · NF (auto) · 92%"
- * Example: "Pendente · NF"
- *
- * Skips the category chip when UNCLASSIFIED — only the status appears.
+ * Renders one chip per category tag. Chip color comes from the category's
+ * `color` (falling back to a neutral badge); the tooltip surfaces the tag's
+ * source (automática/manual) and confidence%. Beyond `maxVisible` tags a
+ * "+N" overflow chip is shown whose tooltip lists the remaining names.
  */
-export function MatchStatusBadge({
-  status,
-  category,
-  source,
-  confidence,
+export function CategoryChips({
+  categories,
+  maxVisible = 3,
   className,
-}: Props) {
-  const cfg = STATUS_VARIANT[status];
-  const showCategory = category && category !== "UNCLASSIFIED";
-  const showConfidence =
-    status === "RECONCILED" &&
-    category === "NF" &&
-    source === "AUTO" &&
-    typeof confidence === "number";
+}: CategoryChipsProps) {
+  if (!categories || categories.length === 0) {
+    return <span className="text-muted-foreground text-xs">—</span>;
+  }
 
-  const parts: string[] = [STATUS_LABEL[status]];
-  if (showCategory) parts.push(`· ${CATEGORY_LABEL[category!]}`);
-  const sourceTag = source && status === "RECONCILED" ? SOURCE_LABEL[source] : undefined;
-  if (sourceTag) parts.push(`(${sourceTag})`);
-  if (showConfidence) parts.push(`· ${confidence}%`);
+  const visible = categories.slice(0, maxVisible);
+  const overflow = categories.slice(maxVisible);
 
   return (
-    <Badge variant={cfg} className={`whitespace-nowrap ${className ?? ""}`}>
-      {parts.join(" ")}
-    </Badge>
+    <TooltipProvider delayDuration={150}>
+      <div className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
+        {visible.map(tag => {
+          const color = tag.category.color;
+          const confidenceText =
+            typeof tag.confidence === "number" ? ` · ${Math.round(tag.confidence)}%` : "";
+          const tooltip = `${tag.category.name} (${SOURCE_LABEL[tag.source]}${confidenceText})`;
+          return (
+            <Tooltip key={tag.id}>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant={color ? undefined : "secondary"}
+                  size="sm"
+                  className="whitespace-nowrap border-transparent"
+                  style={
+                    color
+                      ? { backgroundColor: color, color: getCategoryTextColor(color) ?? "#fff" }
+                      : undefined
+                  }
+                >
+                  {tag.category.name}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>{tooltip}</TooltipContent>
+            </Tooltip>
+          );
+        })}
+        {overflow.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="secondary" size="sm" className="whitespace-nowrap">
+                +{overflow.length}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              {overflow.map(t => t.category.name).join(", ")}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </TooltipProvider>
+  );
+}
+
+interface Props {
+  status: ReconciliationStatus;
+  className?: string;
+}
+
+/**
+ * Renders the reconciliation state as a status chip. Category tags live in
+ * their own dedicated column (see CategoryChips) — this badge is status-only.
+ */
+export function MatchStatusBadge({ status, className }: Props) {
+  const cfg = STATUS_VARIANT[status];
+  return (
+    <div className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
+      <Badge variant={cfg} className="whitespace-nowrap">
+        {STATUS_LABEL[status]}
+      </Badge>
+    </div>
   );
 }

@@ -212,6 +212,23 @@ export function FiscalDocumentDetailSheet({ doc, open, onOpenChange }: Props) {
                           </td>
                           <td className="px-3 py-2">
                             <p className="whitespace-pre-wrap break-words">{item.description}</p>
+                            {item.category?.name && (
+                              <Badge
+                                variant="secondary"
+                                size="sm"
+                                className="mt-1 whitespace-nowrap"
+                                style={
+                                  item.category.color
+                                    ? { backgroundColor: item.category.color, color: "#fff", borderColor: "transparent" }
+                                    : undefined
+                                }
+                              >
+                                {item.category.name}
+                                {typeof item.categoryConfidence === "number"
+                                  ? ` · ${Math.round(item.categoryConfidence)}%`
+                                  : ""}
+                              </Badge>
+                            )}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
                             {qty !== null && qty > 0 ? (

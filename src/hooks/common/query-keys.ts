@@ -924,6 +924,12 @@ export const reconciliationKeys = {
     filters
       ? (["reconciliation", "stats", filters] as const)
       : (["reconciliation", "stats"] as const),
+  categories: (params?: Record<string, unknown>) =>
+    params
+      ? (["reconciliation", "categories", params] as const)
+      : (["reconciliation", "categories"] as const),
+  recurringForecast: (from: string, to: string) =>
+    ["reconciliation", "recurringForecast", from, to] as const,
   siegStatus: () => ["reconciliation", "siegStatus"] as const,
 };
 

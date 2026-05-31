@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { CATEGORY_LABEL, MatchStatusBadge } from "./match-status-badge";
+import { CategoryChips, MatchStatusBadge } from "./match-status-badge";
 import { routes } from "@/constants";
 import {
   formatAccountNumber,
@@ -161,15 +161,8 @@ export function BankTransactionTable({
         const firstDoc = t.matches?.find(m => m.fiscalDocument)?.fiscalDocument;
         const extraCount = (t.matches?.filter(m => m.fiscalDocument).length ?? 0) - 1;
         if (!firstDoc?.id) {
-          // For non-NF categories we surface the category label here so the
-          // column carries meaningful info instead of an em-dash.
-          if (t.category && t.category !== "UNCLASSIFIED" && t.category !== "NF") {
-            return (
-              <span className="text-muted-foreground text-xs italic">
-                {CATEGORY_LABEL[t.category]}
-              </span>
-            );
-          }
+          // No linked fiscal doc — plain dash. Category tags live in the
+          // dedicated "Categoria" column, never leaking into this NF column.
           return <span className="text-muted-foreground text-xs">—</span>;
         }
         const emitDisplay = firstDoc.emitName
@@ -194,21 +187,17 @@ export function BankTransactionTable({
       },
     },
     {
+      key: "category",
+      header: "Categoria",
+      width: "220px",
+      render: t => <CategoryChips categories={t.categories} />,
+    },
+    {
       key: "reconciliationStatus",
       header: "Status",
-      width: "240px",
+      width: "120px",
       className: "whitespace-nowrap",
-      render: t => {
-        const conf = t.matches?.[0]?.confidenceScore;
-        return (
-          <MatchStatusBadge
-            status={t.reconciliationStatus}
-            category={t.category}
-            source={t.reconciliationSource}
-            confidence={conf}
-          />
-        );
-      },
+      render: t => <MatchStatusBadge status={t.reconciliationStatus} />,
     },
   ];
 

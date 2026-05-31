@@ -8,20 +8,41 @@ export type ReconciliationStatus =
 
 export type ReconciliationSource = "AUTO" | "MANUAL";
 
-// What kind of payment. Drives whether NF matching applies. Non-NF categories
-// are self-justifying — reconciled by virtue of being classified.
-export type ReconciliationCategory =
-  | "NF"
-  | "TRIBUTO"
-  | "FOLHA"
-  | "TRANSFERENCIA"
-  | "TARIFA_BANCARIA"
-  | "CONVENIO"
-  | "PRO_LABORE"
-  | "ALUGUEL"
-  | "ESTORNO"
-  | "OUTROS"
-  | "UNCLASSIFIED";
+// Dynamic, DB-backed taxonomy. A category is either mirrored from an inventory
+// ItemCategory (ITEM_DERIVED), a fiscal-service category (SERVICE), or a
+// user-created transaction-only bucket like "Aluguel" (TRANSACTION_ONLY).
+export type TransactionCategoryKind = "ITEM_DERIVED" | "SERVICE" | "TRANSACTION_ONLY";
+
+export interface TransactionCategory {
+  id: string;
+  name: string;
+  slug: string;
+  kind: TransactionCategoryKind;
+  itemCategoryId: string | null;
+  // A "resolving" category self-justifies an NF-less transaction (reconciled by
+  // virtue of being classified).
+  isResolving: boolean;
+  // Surfaced in the monthly payables / recurrence forecast view.
+  isRecurring: boolean;
+  color: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+// A transaction carries multiple category tags, each with its own source +
+// confidence + allocated amount (for split NFs).
+export interface BankTransactionCategoryTag {
+  id: string;
+  categoryId: string;
+  source: ReconciliationSource;
+  confidence: number | null;
+  allocatedAmount: number | null;
+  derivedFromFiscalItemId: string | null;
+  category: Pick<
+    TransactionCategory,
+    "id" | "name" | "slug" | "kind" | "color" | "isResolving" | "isRecurring"
+  >;
+}
 
 export type MatchType = "EXACT" | "VALUE_DATE" | "FUZZY" | "MANUAL" | "BANK_SLIP_BRIDGE";
 
@@ -66,7 +87,10 @@ export interface BankTransaction {
   runningBalance: number | null;
   reconciliationStatus: ReconciliationStatus;
   reconciliationSource: ReconciliationSource | null;
-  category: ReconciliationCategory;
+  // Whether this transaction is expected to be backed by a fiscal document
+  // (the old `category === 'NF'` concept).
+  expectsFiscalDocument: boolean;
+  categories: BankTransactionCategoryTag[];
   categorySource: ReconciliationSource | null;
   classifiedAt: string | null;
   ignoredReason: string | null;
@@ -104,6 +128,10 @@ export interface FiscalDocumentItem {
   unit: string | null;
   unitValue: number | string | null;
   totalValue: number | string;
+  categoryId?: string | null;
+  categoryConfidence?: number | null;
+  categorySource?: ReconciliationSource | null;
+  category?: { id: string; name: string; slug: string; color: string | null } | null;
 }
 
 export interface FiscalDocument {
@@ -200,6 +228,15 @@ export interface XmlImportResult {
   failedFiles: string[];
 }
 
+export interface CategoryDistributionEntry {
+  categoryId: string;
+  name: string;
+  slug: string;
+  kind: string;
+  count: number;
+  amount: number;
+}
+
 export interface ReconciliationStatistics {
   totalConciliadoMes: number;
   pendenteConciliacao: number;
@@ -209,7 +246,7 @@ export interface ReconciliationStatistics {
   topUnmatchedByCounterparty: Array<{ counterparty: string; amount: number; count: number }>;
   matchTypeDistribution: Record<MatchType, number>;
   statusDistribution: Record<ReconciliationStatus, number>;
-  categoryDistribution: Record<ReconciliationCategory, number>;
+  categoryDistribution: CategoryDistributionEntry[];
 }
 
 export interface ReconciliationPaginationMeta {
@@ -228,7 +265,10 @@ export interface TransactionFilters {
   page?: number;
   pageSize?: number;
   reconciliationStatus?: ReconciliationStatus | ReconciliationStatus[];
-  category?: ReconciliationCategory | ReconciliationCategory[];
+  categoryIds?: string[];
+  categoryMatch?: "any" | "all";
+  categorySource?: ReconciliationSource;
+  expectsFiscalDocument?: boolean;
   reconciliationSource?: ReconciliationSource;
   matchType?: MatchType;
   type?: TransactionType;
@@ -244,7 +284,9 @@ export interface TransactionFilters {
 }
 
 export interface ChangeCategoryPayload {
-  category: ReconciliationCategory;
+  categoryIds: string[];
+  /** Per-category amount split (sent when >1 category is selected). */
+  allocations?: { categoryId: string; allocatedAmount: number }[];
   saveAlias?: boolean;
   notes?: string;
 }
@@ -252,9 +294,60 @@ export interface ChangeCategoryPayload {
 export interface ClassifyBatchPayload {
   transactionIds?: string[];
   reconciliationStatus?: ReconciliationStatus;
-  category?: ReconciliationCategory;
   dateFrom?: string;
   dateTo?: string;
+}
+
+// Category CRUD payloads (base path /financial/reconciliation/categories).
+export interface CreateTransactionCategoryPayload {
+  name: string;
+  kind: "TRANSACTION_ONLY" | "SERVICE";
+  isResolving?: boolean;
+  isRecurring?: boolean;
+  color?: string | null;
+  sortOrder?: number;
+}
+
+export interface UpdateTransactionCategoryPayload {
+  name?: string;
+  isResolving?: boolean;
+  isRecurring?: boolean;
+  color?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+}
+
+export interface TransactionCategoryListParams {
+  kind?: TransactionCategoryKind;
+  isRecurring?: boolean;
+  includeInactive?: boolean;
+}
+
+// POST /categorize — auto-tags transactions.
+export interface CategorizePayload {
+  transactionIds?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface CategorizeResult {
+  processed: number;
+  categorized: number;
+}
+
+// GET /recurring/forecast — monthly payables view.
+export interface RecurringForecastItem {
+  category: TransactionCategory;
+  paidAmount: number;
+  transactionCount: number;
+  status: "PAID" | "PENDING";
+}
+
+export interface RecurringForecast {
+  from: string;
+  to: string;
+  totalPaid: number;
+  items: RecurringForecastItem[];
 }
 
 export interface ClassifyBatchResult {

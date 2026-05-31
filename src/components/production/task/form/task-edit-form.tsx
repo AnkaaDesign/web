@@ -3102,7 +3102,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
                 {/* Quote is now accessed via context menu - removed from edit form */}
 
-                {/* Medidas do Caminhão - Only visible to ADMIN, LOGISTIC, and PRODUCTION team leaders */}
+                {/* Layout do Caminhão - Only visible to ADMIN, LOGISTIC, and PRODUCTION team leaders */}
                 {canViewLayout && (
           <AccordionItem
             value="layout"
@@ -3114,7 +3114,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
                         <IconRuler className="h-5 w-5" />
-                        Medidas do Caminhão
+                        Layout do Caminhão
                       </CardTitle>
                     </CardHeader>
                   </AccordionTrigger>

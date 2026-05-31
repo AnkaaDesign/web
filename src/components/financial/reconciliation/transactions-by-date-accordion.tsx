@@ -26,7 +26,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { CATEGORY_LABEL, MatchStatusBadge } from "./match-status-badge";
+import { CategoryChips, MatchStatusBadge } from "./match-status-badge";
 import { cn } from "@/lib/utils";
 import { routes } from "@/constants";
 import {
@@ -45,6 +45,10 @@ interface Props {
   isLoading?: boolean;
   /** Whether to show the bank account column (only on global view). */
   showAccountColumn?: boolean;
+  /** User-controlled column visibility (column key set). When provided, a
+   *  column is rendered only if it's both structurally enabled (`show`) and
+   *  present in this set. The DATA column is always kept (see RECONCILIATION_LOCKED_COLUMNS). */
+  visibleColumns?: Set<string>;
   onMatch?: (tx: BankTransaction) => void;
   onUnmatch?: (tx: BankTransaction) => void;
   onIgnore?: (tx: BankTransaction) => void;
@@ -67,6 +71,39 @@ interface ColumnSpec {
   width?: string;
   align?: "left" | "center" | "right";
   show: boolean;
+}
+
+/** Column keys that can never be hidden (anchor the day banner + indent). */
+export const RECONCILIATION_LOCKED_COLUMNS = new Set<string>(["postedAt"]);
+
+/** {key, header} list for the column-visibility manager. `account` is only
+ *  offered when the global account column is in play. */
+export function getReconciliationColumnsMeta(
+  showAccountColumn?: boolean,
+): { key: string; header: string }[] {
+  return [
+    { key: "postedAt", header: "Data" },
+    ...(showAccountColumn ? [{ key: "account", header: "Conta" }] : []),
+    { key: "type", header: "Tipo" },
+    { key: "subtype", header: "Forma" },
+    { key: "amount", header: "Valor" },
+    { key: "counterparty", header: "Contraparte / Descrição" },
+    { key: "linkedNf", header: "NF vinculada" },
+    { key: "category", header: "Categoria" },
+    { key: "reconciliationStatus", header: "Status" },
+  ];
+}
+
+/** Columns visible by default. TIPO and FORMA are intentionally hidden — they
+ *  add little signal day-to-day, so users opt back in via the manager. */
+export function getDefaultVisibleReconciliationColumns(
+  showAccountColumn?: boolean,
+): Set<string> {
+  return new Set(
+    getReconciliationColumnsMeta(showAccountColumn)
+      .map(c => c.key)
+      .filter(key => key !== "type" && key !== "subtype"),
+  );
 }
 
 function toLocalDateKey(input: string | Date): string {
@@ -94,6 +131,7 @@ export function TransactionsByDateAccordion({
   dates,
   isLoading,
   showAccountColumn,
+  visibleColumns: visibleColumnKeys,
   onMatch,
   onUnmatch,
   onIgnore,
@@ -158,24 +196,32 @@ export function TransactionsByDateAccordion({
     return out;
   }, [txByDate]);
 
-  const columns = useMemo<ColumnSpec[]>(
-    () => [
+  const columns = useMemo<ColumnSpec[]>(() => {
+    // A column shows when it's structurally enabled AND (no visibility set is
+    // supplied OR the user kept it visible). Locked columns (DATA) ignore the
+    // user's set so the day banner + indent never lose their anchor.
+    const isVisible = (key: string, structural: boolean) => {
+      if (!structural) return false;
+      if (RECONCILIATION_LOCKED_COLUMNS.has(key)) return true;
+      return visibleColumnKeys ? visibleColumnKeys.has(key) : true;
+    };
+    return [
       // Date column is wide enough to host the group header's chevron + date
       // (e.g. "26/04/26 Dom.") so the date label stays inside the DATA column
       // space — keeping CONTA cleanly separated from the date visually.
-      { key: "postedAt", header: "Data", width: `${DATE_COLUMN_WIDTH}px`, show: true },
-      { key: "account", header: "Conta", width: "240px", show: !!showAccountColumn },
-      { key: "type", header: "Tipo", width: "110px", align: "center", show: true },
-      { key: "subtype", header: "Forma", width: "120px", align: "center", show: true },
-      { key: "amount", header: "Valor", width: "140px", align: "right", show: true },
-      { key: "counterparty", header: "Contraparte / Descrição", show: true },
+      { key: "postedAt", header: "Data", width: `${DATE_COLUMN_WIDTH}px`, show: isVisible("postedAt", true) },
+      { key: "account", header: "Conta", width: "240px", show: isVisible("account", !!showAccountColumn) },
+      { key: "type", header: "Tipo", width: "110px", align: "center", show: isVisible("type", true) },
+      { key: "subtype", header: "Forma", width: "120px", align: "center", show: isVisible("subtype", true) },
+      { key: "amount", header: "Valor", width: "140px", align: "right", show: isVisible("amount", true) },
+      { key: "counterparty", header: "Contraparte / Descrição", show: isVisible("counterparty", true) },
       // Wider so longer emitter names ("FARBEN S/A INDUSTRIA QUIMICA") fit
       // without truncation. The freed space comes from Contraparte (flex).
-      { key: "linkedNf", header: "NF vinculada", width: "300px", show: true },
-      { key: "reconciliationStatus", header: "Status", width: "260px", show: true },
-    ],
-    [showAccountColumn],
-  );
+      { key: "linkedNf", header: "NF vinculada", width: "220px", show: isVisible("linkedNf", true) },
+      { key: "category", header: "Categoria", width: "240px", show: isVisible("category", true) },
+      { key: "reconciliationStatus", header: "Status", width: "180px", show: isVisible("reconciliationStatus", true) },
+    ];
+  }, [showAccountColumn, visibleColumnKeys]);
   const visibleColumns = useMemo(() => columns.filter(c => c.show), [columns]);
   const colSpan = visibleColumns.length;
 
@@ -532,8 +578,8 @@ function DayGroup({
               </TableCell>
             );
           }
-          // Account / type / subtype / counterparty / linkedNf — intentionally
-          // blank so the banner reads as a sub-header, not as data.
+          // Account / type / subtype / counterparty / linkedNf / category —
+          // intentionally blank so the banner reads as a sub-header, not data.
           return <TableCell key={c.key} className="p-0 !border-r-0" />;
         })}
       </TableRow>
@@ -619,15 +665,8 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
       const extraCount =
         (t.matches?.filter(m => m.fiscalDocument).length ?? 0) - 1;
       if (!firstDoc?.id) {
-        // For self-justifying categories surface the category label so the
-        // column carries real info instead of a dash.
-        if (t.category && t.category !== "UNCLASSIFIED" && t.category !== "NF") {
-          return (
-            <span className="text-muted-foreground text-xs italic">
-              {CATEGORY_LABEL[t.category]}
-            </span>
-          );
-        }
+        // No linked fiscal doc — show a plain dash. Category tags live in the
+        // dedicated "Categoria" column, never leaking into this NF column.
         return <span className="text-muted-foreground text-xs">—</span>;
       }
       const emitDisplay = firstDoc.emitName
@@ -650,16 +689,10 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
         </Link>
       );
     }
+    case "category":
+      return <CategoryChips categories={t.categories} maxVisible={2} />;
     case "reconciliationStatus": {
-      const conf = t.matches?.[0]?.confidenceScore;
-      return (
-        <MatchStatusBadge
-          status={t.reconciliationStatus}
-          category={t.category}
-          source={t.reconciliationSource}
-          confidence={conf}
-        />
-      );
+      return <MatchStatusBadge status={t.reconciliationStatus} />;
     }
     default:
       return null;

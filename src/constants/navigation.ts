@@ -681,6 +681,8 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [
           { id: "conciliacao-transacoes", title: "Transações", icon: "list", path: "/financeiro/conciliacao/transacoes" },
           { id: "conciliacao-notas", title: "Notas Fiscais", icon: "receipt", path: "/financeiro/conciliacao/notas" },
+          { id: "conciliacao-categorias", title: "Categorias", icon: "tags", path: "/financeiro/conciliacao/categorias" },
+          { id: "conciliacao-recorrentes", title: "Recorrentes", icon: "repeat", path: "/financeiro/conciliacao/recorrentes" },
         ],
       },
     ],

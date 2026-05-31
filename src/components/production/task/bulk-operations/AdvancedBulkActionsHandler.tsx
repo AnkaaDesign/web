@@ -1187,7 +1187,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       baseFiles: "Arquivos Base",
       paints: "Adicionar Tintas",
       cuttingPlans: "Adicionar Plano de Corte",
-      layout: "Aplicar Medidas do Caminhão",
+      layout: "Aplicar Layout do Caminhão",
       serviceOrder: "Ordem de Servico",
     };
     return titles[operationType];
@@ -1435,7 +1435,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
               layoutStates.back?.layoutSections?.length > 0) && (
               <Alert className="mt-2">
                 <AlertDescription>
-                  As medidas configuradas serão aplicadas a todos os caminhões das {currentTaskIds.length} tarefas selecionadas.
+                  Os layouts configurados serão aplicados a todos os caminhões das {currentTaskIds.length} tarefas selecionadas.
                 </AlertDescription>
               </Alert>
             )}

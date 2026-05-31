@@ -81,6 +81,8 @@ const FinancialNfseList = lazy(() => import("@/pages/financial/nfse/list").then(
 const FinancialNfseDetail = lazy(() => import("@/pages/financial/nfse/detail").then((module) => ({ default: module.NfseDetailPage })));
 const ReconciliationTransactionsList = lazy(() => import("@/pages/financial/reconciliation/transactions-list").then((module) => ({ default: module.ReconciliationTransactionsListPage })));
 const ReconciliationFiscalDocumentsList = lazy(() => import("@/pages/financial/reconciliation/fiscal-documents-list").then((module) => ({ default: module.ReconciliationFiscalDocumentsListPage })));
+const ReconciliationCategoriesList = lazy(() => import("@/pages/financial/reconciliation/categories-list").then((module) => ({ default: module.ReconciliationCategoriesListPage })));
+const ReconciliationRecurringForecast = lazy(() => import("@/pages/financial/reconciliation/recurring-forecast").then((module) => ({ default: module.ReconciliationRecurringForecastPage })));
 const ReconciliationStatistics = lazy(() => import("@/pages/financial/statistics/reconciliation").then((module) => ({ default: module.ReconciliationStatisticsPage })));
 const FinancialCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
 const FinancialCustomersBatchEdit = lazy(() => import("@/pages/administration/customers/batch-edit").then((module) => ({ default: module.CustomerBatchEditPage })));
@@ -1431,6 +1433,22 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ReconciliationFiscalDocumentsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.reconciliation.categories}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationCategoriesList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.reconciliation.recurring}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationRecurringForecast />
                     </Suspense>
                   }
                 />

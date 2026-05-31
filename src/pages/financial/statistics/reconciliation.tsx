@@ -24,6 +24,7 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { FAVORITE_PAGES, routes } from "@/constants";
 import { formatCurrency, formatDate } from "@/utils";
 import type {
+  CategoryDistributionEntry,
   MatchType,
   ReconciliationStatistics,
 } from "@/types/reconciliation";
@@ -171,10 +172,80 @@ export const ReconciliationStatisticsPage = () => {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Distribuição por categoria</CardTitle>
+            <CardDescription>
+              Valor e quantidade por categoria no período. Notas multi-categoria
+              são divididas pelo valor alocado a cada categoria.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-72 w-full" />
+            ) : (
+              <CategoryDistributionList
+                data={data?.categoryDistribution ?? []}
+                onRowClick={categoryId =>
+                  navigate(
+                    `${routes.financial.reconciliation.transactions}?categoryIds=${categoryId}`,
+                  )
+                }
+              />
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 };
+
+function CategoryDistributionList({
+  data,
+  onRowClick,
+}: {
+  data: CategoryDistributionEntry[];
+  onRowClick?: (categoryId: string) => void;
+}) {
+  if (data.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-8 text-center">
+        Nenhuma categoria com movimentação no período.
+      </p>
+    );
+  }
+  const sorted = [...data].sort((a, b) => b.amount - a.amount);
+  const max = Math.max(...sorted.map(d => d.amount), 1);
+  return (
+    <div className="space-y-2">
+      {sorted.map(entry => (
+        <button
+          key={entry.categoryId}
+          type="button"
+          onClick={() => onRowClick?.(entry.categoryId)}
+          className="w-full text-left group focus:outline-none"
+        >
+          <div className="flex items-center justify-between gap-3 text-sm mb-1">
+            <span className="font-medium truncate group-hover:text-primary transition-colors">
+              {entry.name}
+            </span>
+            <span className="flex items-center gap-2 whitespace-nowrap tabular-nums">
+              <span className="font-semibold">{formatCurrency(entry.amount)}</span>
+              <span className="text-xs text-muted-foreground">({entry.count})</span>
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full bg-primary/70 group-hover:bg-primary transition-all"
+              style={{ width: `${Math.max((entry.amount / max) * 100, 2)}%` }}
+            />
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function SummaryGrid({
   stats,

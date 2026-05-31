@@ -36,10 +36,14 @@ interface PaymentConfig {
 function generatePaymentTextFromConfig(pc: PaymentConfig, total: number): string {
   if (pc.type === 'CASH') {
     if (pc.specificDate) {
-      // Parse as local date to avoid timezone shifts
-      const [y, m, d] = pc.specificDate.split('-').map(Number);
+      // Parse as local date to avoid timezone shifts. Defensively slice to
+      // the YYYY-MM-DD portion in case a full ISO string slips through.
+      const [y, m, d] = pc.specificDate.slice(0, 10).split('-').map(Number);
       const date = new Date(y, m - 1, d);
-      return `Pagamento à vista no valor de ${formatCurrency(total)}, com vencimento em ${formatDate(date)}.`;
+      if (y && m && d && !isNaN(date.getTime())) {
+        return `Pagamento à vista no valor de ${formatCurrency(total)}, com vencimento em ${formatDate(date)}.`;
+      }
+      // Fall through to the days-based wording when the date is invalid/missing.
     }
     const days = pc.cashDays ?? 5;
     return `Pagamento à vista no valor de ${formatCurrency(total)}, para ${days} dias a partir da finalização do serviço.`;
@@ -52,13 +56,14 @@ function generatePaymentTextFromConfig(pc: PaymentConfig, total: number): string
     const installmentValue = Math.round((total / count) * 100) / 100;
     const word = numberToWord(count);
 
-    let entryText: string;
+    let entryText = `com entrada para ${entryDays} dias a partir da finalização do serviço`;
     if (pc.specificDate) {
-      const [y, m, d] = pc.specificDate.split('-').map(Number);
+      const [y, m, d] = pc.specificDate.slice(0, 10).split('-').map(Number);
       const date = new Date(y, m - 1, d);
-      entryText = `com entrada em ${formatDate(date)}`;
-    } else {
-      entryText = `com entrada para ${entryDays} dias a partir da finalização do serviço`;
+      if (y && m && d && !isNaN(date.getTime())) {
+        entryText = `com entrada em ${formatDate(date)}`;
+      }
+      // Otherwise keep the days-based wording above.
     }
 
     return `Fica acertado o pagamento em ${count} (${word}) parcelas de ${formatCurrency(installmentValue)}, ${entryText} e as demais a cada ${step} dias.`;

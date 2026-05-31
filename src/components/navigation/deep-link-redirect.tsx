@@ -30,6 +30,26 @@ const DEEP_LINK_ROUTES: Record<string, (id: string) => string> = {
   maintenance: (id) => routes.inventory.maintenance.details(id),
   // Financial
   financial: (id) => routes.financial.customers.details(id),
+  // Messages (personal inbox - list route, id ignored)
+  message: () => routes.personal.myMessages.root,
+  // Questionnaire (admin detail; id is the questionnaire id)
+  questionnaire: (id) => routes.administration.questionnaire.details(id),
+  // Assessment / competency evaluation (admin detail; id is the assessment id)
+  assessment: (id) => routes.administration.skillAssessment.details(id),
+  // Reconciliation run (financial reconciliation root, id ignored)
+  reconciliationrun: () => routes.financial.reconciliation.root,
+  // Order schedule (recurring order schedule detail)
+  orderschedule: (id) => routes.inventory.orders.schedules.details(id),
+  // PPE delivery detail (id is the PpeDelivery id)
+  ppedelivery: (id) => routes.inventory.ppe.deliveries.details(id),
+  // Task quote / budget (id is the taskId)
+  taskquote: (id) => routes.financial.budget.details(id),
+  // Bank slip / billing detail (id is the taskId)
+  bankslip: (id) => routes.financial.billing.details(id),
+  // Payroll (HR payroll root, id ignored)
+  payroll: () => routes.humanResources.payroll.root,
+  // Secullum solicitation (HR integration root, id ignored)
+  secullumsolicitacao: () => routes.humanResources.integrations.secullum.root,
 };
 
 /**

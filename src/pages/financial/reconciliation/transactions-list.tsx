@@ -12,7 +12,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
-import { TransactionsByDateAccordion } from "@/components/financial/reconciliation/transactions-by-date-accordion";
+import {
+  TransactionsByDateAccordion,
+  getReconciliationColumnsMeta,
+  getDefaultVisibleReconciliationColumns,
+} from "@/components/financial/reconciliation/transactions-by-date-accordion";
+import { ColumnVisibilityManager } from "@/components/financial/reconciliation/transactions-column-visibility-manager";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { OfxImportDialog } from "@/components/financial/reconciliation/ofx-import-dialog";
 import { ManualMatchDialog } from "@/components/financial/reconciliation/manual-match-dialog";
 import { ScoringWorkflowDialog } from "@/components/financial/reconciliation/scoring-workflow-dialog";
@@ -41,7 +47,6 @@ import type {
   BankTransaction,
   BankTransactionSubtype,
   MatchType,
-  ReconciliationCategory,
 } from "@/types/reconciliation";
 
 // Upper bound passed to the API when the user is in period mode. Matches the
@@ -67,37 +72,137 @@ function parseMonthsParam(raw: string | null): string[] | undefined {
   return undefined;
 }
 
+/**
+ * Parse a `YYYY-MM-DD` (or ISO) date string into { year, month } with month as
+ * a zero-padded "01".."12". Returns null for anything we can't read so callers
+ * fall back to defaults instead of producing a NaN period.
+ */
+function parseYmd(raw: string | null): { year: number; month: string } | null {
+  if (!raw) return null;
+  const m = /^(\d{4})-(\d{2})/.exec(raw.trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const monthNum = Number(m[2]);
+  if (!year || monthNum < 1 || monthNum > 12) return null;
+  return { year, month: String(monthNum).padStart(2, "0") };
+}
+
+/**
+ * Map URL `dateFrom`/`dateTo` (sent by the Recurring/Statistics drill-downs as
+ * `YYYY-MM-DD`) onto this page's period model (year + months). The list always
+ * drives both the API range and the accordion's day enumeration off year+months,
+ * so collapsing a raw date range into the months it spans keeps a single source
+ * of truth instead of bolting on parallel date plumbing.
+ *
+ * Only handles ranges inside a single calendar year (which is all the referrers
+ * emit). When `dateTo` is absent we span from `dateFrom`'s month to December so
+ * the linked rows after that date still appear.
+ */
+function periodFromDateParams(
+  params: URLSearchParams,
+): { year: number; months: string[] } | null {
+  const from = parseYmd(params.get("dateFrom"));
+  const to = parseYmd(params.get("dateTo"));
+  if (!from && !to) return null;
+  // Anchor on whichever bound we have; prefer `from`.
+  const anchor = from ?? to!;
+  const year = anchor.year;
+  const startMonth = from ? parseInt(from.month, 10) : 1;
+  // No explicit end → run to December so post-anchor rows remain visible.
+  const endMonth = to && to.year === year ? parseInt(to.month, 10) : 12;
+  const lo = Math.min(startMonth, endMonth);
+  const hi = Math.max(startMonth, endMonth);
+  const months: string[] = [];
+  for (let m = lo; m <= hi; m++) months.push(String(m).padStart(2, "0"));
+  return { year, months };
+}
+
+/**
+ * Build the filter state from the URL.
+ *
+ * Two entry modes:
+ *  - "Clean" entry (no narrowing param) → apply the page defaults: type=DEBIT
+ *    and the current month, so the accordion opens on a sensible recent view.
+ *  - Deep link (any narrowing param present: categoryIds, counterparty,
+ *    matchType, reconciliationStatus, reconciliationSource, subtype, amount
+ *    bounds, dateFrom/dateTo, or search) → honor the URL verbatim. We must NOT
+ *    force type=DEBIT (the linked row may be a CREDIT) nor clamp to the current
+ *    month (it may be older), or the deep-linked rows get filtered out of view.
+ */
 function parseFiltersFromUrl(params: URLSearchParams): ReconciliationFilters {
   const def = getDefaultReconciliationFilters();
   const yearParam = params.get("year");
   const monthsParam = parseMonthsParam(params.get("months"));
-  const categoryParam = params.get("category");
-  // Comma-separated category multi-select: `?category=NF,TARIFA_BANCARIA`.
-  const categories: ReconciliationCategory[] = categoryParam
-    ? (categoryParam.split(",").filter(Boolean) as ReconciliationCategory[])
+  const datePeriod = periodFromDateParams(params);
+  const categoryIdsParam = params.get("categoryIds");
+  // Comma-separated category-id multi-select: `?categoryIds=<id1>,<id2>`.
+  const categoryIds = categoryIdsParam
+    ? categoryIdsParam.split(",").filter(Boolean)
     : [];
+  const reconciliationStatus =
+    (params.get("reconciliationStatus") as ReconciliationFilters["reconciliationStatus"]) ||
+    undefined;
+  const reconciliationSource =
+    (params.get("reconciliationSource") as ReconciliationFilters["reconciliationSource"]) ||
+    undefined;
+  const matchType = (params.get("matchType") as MatchType | null) || undefined;
+  const subtype = (params.get("subtype") as BankTransactionSubtype | null) || undefined;
+  const amountMin = params.get("amountMin") ? Number(params.get("amountMin")) : undefined;
+  const amountMax = params.get("amountMax") ? Number(params.get("amountMax")) : undefined;
+  const counterparty = params.get("counterparty") || undefined;
+  const search = params.get("search") || undefined;
+  const typeParam = params.get("type") as ReconciliationFilters["type"] | null;
+
+  // A deep link is any param that narrows the result set below the defaults.
+  // When one is present we must not silently re-apply the DEBIT + current-month
+  // defaults, or the linked rows can fall outside the visible window.
+  const isDeepLink =
+    categoryIds.length > 0 ||
+    !!reconciliationStatus ||
+    !!reconciliationSource ||
+    !!matchType ||
+    !!subtype ||
+    amountMin !== undefined ||
+    amountMax !== undefined ||
+    !!counterparty ||
+    !!search ||
+    !!datePeriod ||
+    !!typeParam ||
+    !!yearParam ||
+    !!monthsParam;
+
+  // Period precedence: explicit year/months win, then a dateFrom/dateTo range,
+  // then (clean entry) the current-month default. On a deep link that carries
+  // no period at all, fall back to the full current year so an older linked row
+  // is not clamped out by the single-month default.
+  const year = yearParam
+    ? Number(yearParam)
+    : datePeriod?.year ?? def.year;
+  const months =
+    monthsParam ??
+    datePeriod?.months ??
+    (isDeepLink && !typeParam && !yearParam
+      ? Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"))
+      : def.months);
+
   return {
-    reconciliationStatus:
-      (params.get("reconciliationStatus") as ReconciliationFilters["reconciliationStatus"]) ||
-      undefined,
-    category:
-      categories.length > 1
-        ? categories
-        : categories.length === 1
-          ? categories[0]
-          : undefined,
-    reconciliationSource:
-      (params.get("reconciliationSource") as ReconciliationFilters["reconciliationSource"]) ||
-      undefined,
-    matchType: (params.get("matchType") as MatchType | null) || undefined,
-    type: (params.get("type") as ReconciliationFilters["type"]) || def.type,
-    subtype: (params.get("subtype") as BankTransactionSubtype | null) || undefined,
-    year: yearParam ? Number(yearParam) : def.year,
-    months: monthsParam ?? def.months,
-    amountMin: params.get("amountMin") ? Number(params.get("amountMin")) : undefined,
-    amountMax: params.get("amountMax") ? Number(params.get("amountMax")) : undefined,
-    counterparty: params.get("counterparty") || undefined,
+    reconciliationStatus,
+    categoryIds: categoryIds.length > 0 ? categoryIds : undefined,
+    reconciliationSource,
+    matchType,
+    // Honor an explicit ?type=; on a deep link without one, leave undefined
+    // ("Todos") so CREDIT rows aren't hidden. Only a clean entry gets DEBIT.
+    type: typeParam ?? (isDeepLink ? undefined : def.type),
+    subtype,
+    year,
+    months,
+    amountMin,
+    amountMax,
   };
+  // NOTE: `counterparty` is intentionally NOT carried in the filter model. A URL
+  // `?counterparty=` is folded into the visible search box on mount (server
+  // `search` already matches the counterparty), so it surfaces as a real,
+  // clearable control instead of an invisible phantom filter.
 }
 
 /**
@@ -160,12 +265,31 @@ export const ReconciliationTransactionsListPage = () => {
   usePageTracker({ title: "Transações - Conciliação", icon: "list" });
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchText, setSearchText] = useState(searchParams.get("search") || "");
+  // Seed the visible search box from `?search=` or a deep-linked `?counterparty=`.
+  // The server `search` already matches against the counterparty, so surfacing
+  // a counterparty deep link in the search input makes the active filter visible
+  // (instead of a phantom, invisible narrowing) while keeping results correct.
+  const [searchText, setSearchText] = useState(
+    () => searchParams.get("search") || searchParams.get("counterparty") || "",
+  );
   const [showFilters, setShowFilters] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [scoringHelpOpen, setScoringHelpOpen] = useState(false);
   const [filters, setFilters] = useState<ReconciliationFilters>(() =>
     parseFiltersFromUrl(searchParams),
+  );
+
+  // Column visibility (persisted in localStorage). This view always renders the
+  // global account column, so the manager is built for showAccountColumn=true.
+  // TIPO and FORMA are hidden by default; DATA is locked (see manager).
+  const reconciliationColumns = useMemo(() => getReconciliationColumnsMeta(true), []);
+  const defaultVisibleColumns = useMemo(
+    () => getDefaultVisibleReconciliationColumns(true),
+    [],
+  );
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility(
+    "reconciliation-transactions-columns",
+    defaultVisibleColumns,
   );
 
   const dateRange = useMemo(() => {
@@ -185,14 +309,13 @@ export const ReconciliationTransactionsListPage = () => {
     sortDir: "desc",
     search: searchText || undefined,
     reconciliationStatus: filters.reconciliationStatus,
-    category: filters.category,
+    categoryIds: filters.categoryIds,
     reconciliationSource: filters.reconciliationSource,
     matchType: filters.matchType,
     type: filters.type,
     subtype: filters.subtype,
     amountMin: filters.amountMin,
     amountMax: filters.amountMax,
-    counterparty: filters.counterparty,
     dateFrom: dateRange?.dateFrom,
     dateTo: dateRange?.dateTo,
   });
@@ -265,6 +388,9 @@ export const ReconciliationTransactionsListPage = () => {
     const params = new URLSearchParams(searchParams);
     if (searchText) params.set("search", searchText);
     else params.delete("search");
+    // A deep-linked `?counterparty=` is folded into the search box on mount, so
+    // drop the now-redundant param to avoid a stale, invisible duplicate filter.
+    params.delete("counterparty");
     if (params.toString() !== searchParams.toString()) {
       setSearchParams(params, { replace: true });
     }
@@ -275,10 +401,14 @@ export const ReconciliationTransactionsListPage = () => {
     (next: ReconciliationFilters) => {
       setFilters(next);
       const params = new URLSearchParams(searchParams);
-      // Strip prior filter keys, preserve modal/search params.
+      // Strip prior filter keys, preserve modal/search params. Also drop the
+      // deep-link-only date params (dateFrom/dateTo, counterparty): once the
+      // user applies the sheet, year/months + the search box are the canonical
+      // period/counterparty controls, so leaving stale date params would let
+      // them silently re-narrow the list on the next URL parse.
       [
         "reconciliationStatus",
-        "category",
+        "categoryIds",
         "reconciliationSource",
         "matchType",
         "type",
@@ -288,14 +418,13 @@ export const ReconciliationTransactionsListPage = () => {
         "amountMin",
         "amountMax",
         "counterparty",
+        "dateFrom",
+        "dateTo",
       ].forEach(k => params.delete(k));
       // Serialize back: months is JSON-encoded; everything else is a plain string.
       if (next.reconciliationStatus) params.set("reconciliationStatus", next.reconciliationStatus);
-      if (next.category) {
-        params.set(
-          "category",
-          Array.isArray(next.category) ? next.category.join(",") : next.category,
-        );
+      if (next.categoryIds && next.categoryIds.length > 0) {
+        params.set("categoryIds", next.categoryIds.join(","));
       }
       if (next.reconciliationSource) params.set("reconciliationSource", next.reconciliationSource);
       if (next.matchType) params.set("matchType", next.matchType);
@@ -306,7 +435,6 @@ export const ReconciliationTransactionsListPage = () => {
         params.set("months", JSON.stringify(next.months));
       if (next.amountMin !== undefined) params.set("amountMin", String(next.amountMin));
       if (next.amountMax !== undefined) params.set("amountMax", String(next.amountMax));
-      if (next.counterparty) params.set("counterparty", next.counterparty);
       setSearchParams(params);
     },
     [searchParams, setSearchParams],
@@ -316,7 +444,7 @@ export const ReconciliationTransactionsListPage = () => {
     const def = getDefaultReconciliationFilters();
     let count = 0;
     if (filters.reconciliationStatus) count++;
-    if (filters.category) count++;
+    if (filters.categoryIds && filters.categoryIds.length > 0) count++;
     if (filters.reconciliationSource) count++;
     if (filters.matchType) count++;
     if (filters.type !== def.type) count++;
@@ -329,7 +457,6 @@ export const ReconciliationTransactionsListPage = () => {
       count++;
     if (filters.amountMin !== undefined) count++;
     if (filters.amountMax !== undefined) count++;
-    if (filters.counterparty) count++;
     return count;
   }, [filters]);
 
@@ -360,21 +487,21 @@ export const ReconciliationTransactionsListPage = () => {
           ]}
           actions={[
             {
-              key: "rematch",
-              label: "Re-executar Conciliação",
+              key: "verify",
+              label: "Verificar",
               icon: IconRefresh,
               onClick: () => {
                 runMut.mutate(
                   {},
                   {
                     onSuccess: r => {
-                      // Pipeline result: classifier ran first, then NF matcher.
-                      // Surface the totals from both stages so the user sees
-                      // exactly what happened.
-                      const classified = r.classified?.reconciled ?? 0;
+                      // POST /run is a single pipeline: classify → match → categorize.
+                      // Summarize all three stages so the user sees exactly what
+                      // happened in one verification pass.
+                      const classified = r.classified?.processed ?? 0;
                       toast({
-                        title: "Conciliação concluída",
-                        description: `${classified} auto-classificada(s) · ${r.matched} NF(s) conciliada(s)`,
+                        title: "Verificação concluída",
+                        description: `${classified} classificadas · ${r.matched} conciliadas · ${r.categorized} categorizadas`,
                         variant: "success",
                       });
                       refetch();
@@ -423,6 +550,12 @@ export const ReconciliationTransactionsListPage = () => {
                     Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
                   </span>
                 </Button>
+                <ColumnVisibilityManager
+                  columns={reconciliationColumns}
+                  visibleColumns={visibleColumns}
+                  onVisibilityChange={setVisibleColumns}
+                  defaultColumns={defaultVisibleColumns}
+                />
               </div>
 
               <div className="flex-1 min-h-0 overflow-auto">
@@ -431,6 +564,7 @@ export const ReconciliationTransactionsListPage = () => {
                   dates={dates}
                   isLoading={isLoading}
                   showAccountColumn
+                  visibleColumns={visibleColumns}
                   onMatch={tx => txDialog.set(tx.id)}
                   onUnmatch={tx => unmatchDialog.set(tx.id)}
                   onIgnore={tx => ignoreDialog.set(tx.id)}

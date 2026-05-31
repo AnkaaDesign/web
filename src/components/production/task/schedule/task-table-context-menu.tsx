@@ -165,7 +165,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleAction("bulkLayout")}>
                 <IconLayout className="mr-2 h-4 w-4" />
-                Medidas do Caminhão
+                Layout do Caminhão
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleAction("copyFromTask")}>

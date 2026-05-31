@@ -71,8 +71,9 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   // PPE (Personal Protective Equipment) routes
   PPE: "/estoque/epi/entregas",
   Ppe: "/estoque/epi/entregas",
-  PPE_DELIVERY: "/estoque/epi/entregas",
-  PpeDelivery: "/estoque/epi/entregas",
+  // PPE delivery detail (entityId is the PpeDelivery id)
+  PPE_DELIVERY: "/estoque/epi/entregas/detalhes",
+  PpeDelivery: "/estoque/epi/entregas/detalhes",
 
   // Cut routes (navigate to task since cuts are part of tasks)
   CUT: "/producao/recorte/detalhes",
@@ -89,7 +90,58 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   // Borrow routes
   BORROW: "/estoque/emprestimos/detalhes",
   Borrow: "/estoque/emprestimos/detalhes",
+
+  // Message routes (personal inbox)
+  MESSAGE: "/pessoal/mensagens",
+  Message: "/pessoal/mensagens",
+
+  // Questionnaire routes (admin detail; entityId is the questionnaire id)
+  QUESTIONNAIRE: "/administracao/questionarios",
+  Questionnaire: "/administracao/questionarios",
+
+  // Assessment / competency evaluation routes (admin detail; entityId is the assessment id)
+  ASSESSMENT: "/administracao/avaliacao-competencias",
+  Assessment: "/administracao/avaliacao-competencias",
+
+  // Reconciliation run routes
+  RECONCILIATION_RUN: "/financeiro/conciliacao",
+  ReconciliationRun: "/financeiro/conciliacao",
+
+  // PPE delivery schedule routes
+  ORDER_SCHEDULE: "/estoque/pedidos/agendamentos/detalhes",
+  OrderSchedule: "/estoque/pedidos/agendamentos/detalhes",
+
+  // Task quote / budget routes (entityId is the taskId)
+  TASK_QUOTE: "/financeiro/orcamento/detalhes",
+  TaskQuote: "/financeiro/orcamento/detalhes",
+
+  // Secullum solicitation routes (HR integration)
+  SECULLUM_SOLICITACAO: "/recursos-humanos/integracoes/secullum",
+  SecullumSolicitacao: "/recursos-humanos/integracoes/secullum",
+
+  // Bank slip / billing routes (entityId is the taskId)
+  BANK_SLIP: "/financeiro/faturamento/detalhes",
+  BankSlip: "/financeiro/faturamento/detalhes",
+
+  // Payroll routes (list/root page)
+  PAYROLL: "/recursos-humanos/folha-de-pagamento",
+  Payroll: "/recursos-humanos/folha-de-pagamento",
 };
+
+/**
+ * Entity types whose routes are list/root pages and do NOT take an entity ID.
+ * For these, we navigate to the base route without appending the entityId.
+ */
+const ID_LESS_ENTITY_TYPES = new Set<string>([
+  "MESSAGE",
+  "Message",
+  "RECONCILIATION_RUN",
+  "ReconciliationRun",
+  "SECULLUM_SOLICITACAO",
+  "SecullumSolicitacao",
+  "PAYROLL",
+  "Payroll",
+]);
 
 /**
  * Get the route for a given entity type and ID
@@ -97,8 +149,14 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
 function getRouteForEntity(entityType: string, entityId: string): string | null {
   const basePath = ENTITY_ROUTE_MAP[entityType];
   if (basePath) {
+    // Some entity types map to list/root pages that don't accept an ID segment.
+    if (ID_LESS_ENTITY_TYPES.has(entityType)) {
+      return basePath;
+    }
     return `${basePath}/${entityId}`;
   }
+  // Unknown entity type: fall back gracefully to the notification list
+  // instead of crashing or returning a broken route.
   return null;
 }
 
@@ -186,6 +244,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
       } else {
         targetUrl = getRouteForEntity(notification.relatedEntityType, notification.relatedEntityId);
       }
+    }
+
+    // Priority 4 (graceful fallback): if the notification referenced an entity but
+    // we could not resolve a route (e.g. an unknown/new entity type the client map
+    // doesn't know yet and the API didn't supply metadata.webUrl), send the user to
+    // the notifications list instead of doing nothing.
+    if (!targetUrl && notification.relatedEntityType) {
+      targetUrl = "/administracao/notificacoes";
     }
 
     if (targetUrl) {

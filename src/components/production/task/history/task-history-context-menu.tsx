@@ -732,7 +732,7 @@ export function TaskHistoryContextMenu({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleBulkLayout}>
                   <IconLayout className="mr-2 h-4 w-4" />
-                  <span className="truncate">Medidas do Caminhão</span>
+                  <span className="truncate">Layout do Caminhão</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleCopyFromTask}>

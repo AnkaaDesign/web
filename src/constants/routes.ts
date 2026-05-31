@@ -190,6 +190,8 @@ export const routes = {
       root: "/financeiro/conciliacao",
       transactions: "/financeiro/conciliacao/transacoes",
       fiscalDocuments: "/financeiro/conciliacao/notas",
+      categories: "/financeiro/conciliacao/categorias",
+      recurring: "/financeiro/conciliacao/recorrentes",
     },
     root: "/financeiro",
   },

@@ -2,16 +2,23 @@ import type { AxiosProgressEvent } from "axios";
 import { apiClient } from "./axiosClient";
 import type {
   BankTransaction,
+  CategorizePayload,
+  CategorizeResult,
   ChangeCategoryPayload,
   ClassifyBatchPayload,
   ClassifyBatchResult,
+  CreateTransactionCategoryPayload,
   FiscalDocument,
   FiscalDocumentFilters,
   ImportSummary,
   MatchCandidate,
   ReconciliationPaginatedResponse,
   ReconciliationStatistics,
+  RecurringForecast,
+  TransactionCategory,
+  TransactionCategoryListParams,
   TransactionFilters,
+  UpdateTransactionCategoryPayload,
   XmlImportResult,
 } from "@/types/reconciliation";
 import type {
@@ -94,9 +101,12 @@ export const reconciliationService = {
     apiClient.post<ClassifyBatchResult>("/financial/reconciliation/classify", payload),
 
   runAutoMatch: (payload: RerunMatchingPayload) =>
-    apiClient.post<{ classified: ClassifyBatchResult; matched: number }>(
+    apiClient.post<{ classified: ClassifyBatchResult; matched: number; categorized: number }>(
       "/financial/reconciliation/run",
       payload,
+      // Suppress the generic interceptor toast — the "Verificar" handler shows
+      // its own detailed summary (classificadas · conciliadas · categorizadas).
+      { metadata: { suppressToast: true } } as never,
     ),
 
   getStatistics: (params: { from?: string; to?: string; months?: number }) =>
@@ -110,5 +120,33 @@ export const reconciliationService = {
   getFiscalDocumentXml: (accessKey: string) =>
     apiClient.get<Blob>(`/financial/reconciliation/fiscal-documents/${accessKey}/xml`, {
       responseType: "blob",
+    }),
+
+  listCategories: (params?: TransactionCategoryListParams) =>
+    apiClient.get<TransactionCategory[]>("/financial/reconciliation/categories", {
+      params,
+    }),
+
+  createCategory: (body: CreateTransactionCategoryPayload) =>
+    apiClient.post<TransactionCategory>("/financial/reconciliation/categories", body),
+
+  // Controller exposes update via POST (not PATCH) — matches the backend.
+  updateCategory: (id: string, body: UpdateTransactionCategoryPayload) =>
+    apiClient.post<TransactionCategory>(
+      `/financial/reconciliation/categories/${id}`,
+      body,
+    ),
+
+  deleteCategory: (id: string) =>
+    apiClient.post<TransactionCategory>(
+      `/financial/reconciliation/categories/${id}/delete`,
+    ),
+
+  categorize: (body: CategorizePayload) =>
+    apiClient.post<CategorizeResult>("/financial/reconciliation/categorize", body),
+
+  getRecurringForecast: (params: { from: string; to: string }) =>
+    apiClient.get<RecurringForecast>("/financial/reconciliation/recurring/forecast", {
+      params,
     }),
 };

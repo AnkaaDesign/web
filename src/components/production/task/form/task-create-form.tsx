@@ -847,7 +847,7 @@ export const TaskCreateForm = () => {
                   </Card>
                 </AccordionItem>
 
-                {/* Medidas do Caminhão - LOGISTIC/ADMIN */}
+                {/* Layout do Caminhão - LOGISTIC/ADMIN */}
                 {showLayout && (
                   <AccordionItem
                     value="layout"
@@ -859,7 +859,7 @@ export const TaskCreateForm = () => {
                         <CardHeader className="flex-1 py-4">
                           <CardTitle className="flex items-center gap-2">
                             <IconRuler className="h-5 w-5" />
-                            Medidas do Caminhão
+                            Layout do Caminhão
                           </CardTitle>
                         </CardHeader>
                       </AccordionTrigger>

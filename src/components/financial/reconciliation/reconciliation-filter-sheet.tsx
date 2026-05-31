@@ -12,19 +12,18 @@ import { Badge } from "@/components/ui/badge";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { IconFilter, IconX, IconCalendar, IconCash } from "@tabler/icons-react";
+import { useReconciliationCategories } from "@/hooks/financial/use-reconciliation";
 import type {
   BankTransactionSubtype,
   MatchType,
-  ReconciliationCategory,
   ReconciliationSource,
   ReconciliationStatus,
   TransactionType,
 } from "@/types/reconciliation";
-import { CATEGORY_LABEL } from "./match-status-badge";
 
 export interface ReconciliationFilters {
   reconciliationStatus?: ReconciliationStatus;
-  category?: ReconciliationCategory | ReconciliationCategory[];
+  categoryIds?: string[];
   reconciliationSource?: ReconciliationSource;
   matchType?: MatchType;
   type?: TransactionType;
@@ -34,9 +33,6 @@ export interface ReconciliationFilters {
   months?: string[];
   amountMin?: number;
   amountMax?: number;
-  /** Kept as a URL/query option for deep links but no longer surfaced in the
-   *  filter sheet — the page-level search input already covers it. */
-  counterparty?: string;
 }
 
 /**
@@ -57,7 +53,7 @@ export const defaultReconciliationFilters: ReconciliationFilters = getDefaultRec
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos" },
   { value: "PENDING", label: "Pendente" },
-  { value: "RECONCILED", label: "Conciliado" },
+  { value: "RECONCILED", label: "Resolvido" },
   { value: "PARTIAL", label: "Parcial" },
   { value: "IGNORED", label: "Ignorado" },
   { value: "DISPUTED", label: "Em disputa" },
@@ -68,25 +64,6 @@ const SOURCE_OPTIONS = [
   { value: "AUTO", label: "Automático" },
   { value: "MANUAL", label: "Manual" },
 ];
-
-// All ReconciliationCategory values except UNCLASSIFIED, which is the default
-// state (filtering by it surfaces only un-processed rows — useful as its own
-// "Pendente de classificação" filter on the page).
-const CATEGORY_OPTIONS: Array<{ value: ReconciliationCategory; label: string }> = (
-  [
-    "NF",
-    "TRIBUTO",
-    "FOLHA",
-    "TRANSFERENCIA",
-    "TARIFA_BANCARIA",
-    "CONVENIO",
-    "PRO_LABORE",
-    "ALUGUEL",
-    "ESTORNO",
-    "OUTROS",
-    "UNCLASSIFIED",
-  ] as ReconciliationCategory[]
-).map(c => ({ value: c, label: CATEGORY_LABEL[c] }));
 
 const TYPE_OPTIONS = [
   { value: "all", label: "Todos" },
@@ -142,6 +119,22 @@ interface Props {
 
 export function ReconciliationFilterSheet({ open, onOpenChange, filters, onApply }: Props) {
   const [local, setLocal] = useState<ReconciliationFilters>(filters);
+  const { data: categories } = useReconciliationCategories();
+
+  const categoryOptions = useMemo<ComboboxOption[]>(() => {
+    const active = (categories ?? []).filter(c => c.isActive);
+    const sorted = [...active].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+    );
+    return sorted.map(c => ({
+      value: c.id,
+      label: c.name,
+      category:
+        c.kind === "TRANSACTION_ONLY"
+          ? "Categorias de transação"
+          : "Categorias de item/serviço",
+    }));
+  }, [categories]);
 
   useEffect(() => {
     if (open) setLocal(filters);
@@ -161,7 +154,7 @@ export function ReconciliationFilterSheet({ open, onOpenChange, filters, onApply
     const def = getDefaultReconciliationFilters();
     let c = 0;
     if (local.reconciliationStatus) c++;
-    if (local.category) c++;
+    if (local.categoryIds && local.categoryIds.length > 0) c++;
     if (local.reconciliationSource) c++;
     if (local.matchType) c++;
     if (local.type && local.type !== def.type) c++;
@@ -174,7 +167,6 @@ export function ReconciliationFilterSheet({ open, onOpenChange, filters, onApply
       c++;
     if (local.amountMin !== undefined) c++;
     if (local.amountMax !== undefined) c++;
-    if (local.counterparty) c++;
     return c;
   }, [local]);
 
@@ -283,29 +275,21 @@ export function ReconciliationFilterSheet({ open, onOpenChange, filters, onApply
             <Label className="text-sm font-medium">Categoria</Label>
             <Combobox
               mode="multiple"
-              value={
-                Array.isArray(local.category)
-                  ? local.category
-                  : local.category
-                    ? [local.category]
-                    : []
-              }
+              value={local.categoryIds ?? []}
               onValueChange={v => {
                 const arr = Array.isArray(v) ? v : v ? [v] : [];
                 setLocal(s => ({
                   ...s,
-                  category:
-                    arr.length === 0
-                      ? undefined
-                      : arr.length === 1
-                        ? (arr[0] as ReconciliationCategory)
-                        : (arr as ReconciliationCategory[]),
+                  categoryIds: arr.length === 0 ? undefined : arr,
                 }));
               }}
-              options={CATEGORY_OPTIONS}
+              options={categoryOptions}
               placeholder="Todas as categorias"
+              searchPlaceholder="Buscar categoria..."
+              emptyText="Nenhuma categoria encontrada"
               searchable={true}
               clearable={true}
+              formatDisplay="category"
             />
           </div>
 

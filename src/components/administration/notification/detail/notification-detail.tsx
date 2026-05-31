@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { NOTIFICATION_IMPORTANCE_LABELS, NOTIFICATION_CHANNEL_LABELS, NOTIFICATION_TYPE_LABELS } from "../../../../constants";
+import { NOTIFICATION_IMPORTANCE_LABELS, NOTIFICATION_CHANNEL_LABELS, NOTIFICATION_TYPE_LABELS, NOTIFICATION_ACTION_TYPE_LABELS } from "../../../../constants";
 import type { Notification } from "../../../../types";
 import { formatDateTime } from "../../../../utils";
 import { IconEdit, IconTrash, IconSend, IconCheck, IconCalendar, IconUser, IconBell } from "@tabler/icons-react";
@@ -95,7 +95,14 @@ export function NotificationDetail({ notification, onEdit, onDelete, onSend, onM
                           Ver Ação
                         </a>
                       </Button>
-                      {notification.actionType && <p className="text-sm text-gray-500 mt-1">Tipo: {notification.actionType}</p>}
+                      {notification.actionType && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          Tipo:{" "}
+                          {NOTIFICATION_ACTION_TYPE_LABELS[
+                            notification.actionType as keyof typeof NOTIFICATION_ACTION_TYPE_LABELS
+                          ] ?? notification.actionType}
+                        </p>
+                      )}
                     </div>
                   </>
                 )}

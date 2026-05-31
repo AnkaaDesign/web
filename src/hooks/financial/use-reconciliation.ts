@@ -5,10 +5,14 @@ import { reconciliationService } from "@/api-client/reconciliation";
 import { siegService } from "@/api-client/sieg";
 import { reconciliationKeys } from "@/hooks/common/query-keys";
 import type {
+  CategorizePayload,
   ChangeCategoryPayload,
   ClassifyBatchPayload,
+  CreateTransactionCategoryPayload,
   FiscalDocumentFilters,
+  TransactionCategoryListParams,
   TransactionFilters,
+  UpdateTransactionCategoryPayload,
 } from "@/types/reconciliation";
 import type {
   IgnoreReasonPayload,
@@ -229,6 +233,79 @@ export function useReconciliationStatistics(params: {
     queryKey: reconciliationKeys.stats(params as Record<string, unknown>),
     queryFn: () => reconciliationService.getStatistics(params).then(r => r.data),
     staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Dynamic, DB-backed category taxonomy. Cached 5min — it changes rarely (only
+ * when a user creates/edits a TRANSACTION_ONLY category or inventory mirrors a
+ * new ItemCategory).
+ */
+export function useReconciliationCategories(params?: TransactionCategoryListParams) {
+  return useQuery({
+    queryKey: reconciliationKeys.categories(params as Record<string, unknown> | undefined),
+    queryFn: () => reconciliationService.listCategories(params).then(r => r.data),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useCreateReconciliationCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateTransactionCategoryPayload) =>
+      reconciliationService.createCategory(body).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reconciliationKeys.categories() });
+    },
+  });
+}
+
+export function useUpdateReconciliationCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: UpdateTransactionCategoryPayload;
+    }) => reconciliationService.updateCategory(id, body).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reconciliationKeys.categories() });
+    },
+  });
+}
+
+export function useDeleteReconciliationCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      reconciliationService.deleteCategory(id).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reconciliationKeys.categories() });
+    },
+  });
+}
+
+/** Auto-tags transactions in scope. Invalidates the whole namespace since both
+ *  the transaction list and the stats shift. */
+export function useCategorize() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CategorizePayload) =>
+      reconciliationService.categorize(payload).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reconciliationKeys.all });
+    },
+  });
+}
+
+export function useRecurringForecast(from: string, to: string) {
+  return useQuery({
+    queryKey: reconciliationKeys.recurringForecast(from, to),
+    queryFn: () =>
+      reconciliationService.getRecurringForecast({ from, to }).then(r => r.data),
+    staleTime: 60_000,
   });
 }
 
