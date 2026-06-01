@@ -36,7 +36,7 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
 
   if (!invoice) return null;
 
-  const canCancel = invoice.status === 'DRAFT' || invoice.status === 'ACTIVE';
+  const canCancel = ['DRAFT', 'ACTIVE', 'PARTIALLY_PAID'].includes(invoice.status);
 
   const handleCancel = () => {
     cancelInvoice.mutate(
@@ -174,6 +174,11 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
             <DialogTitle>Cancelar Fatura</DialogTitle>
             <DialogDescription>
               Tem certeza que deseja cancelar esta fatura? Todos os boletos pendentes serao cancelados.
+              {invoice.status === 'PARTIALLY_PAID' && (
+                <span className="block mt-2 text-amber-600 font-medium">
+                  Atenção: esta fatura possui pagamentos parciais registrados.
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 pt-4">

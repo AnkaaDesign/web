@@ -201,23 +201,46 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   const revertableStatuses = ["BILLING_APPROVED", "UPCOMING", "DUE", "PARTIAL"];
   const canRevertBilling = canChangeStatus && revertableStatuses.includes(currentStatus);
 
-  // Check if all bank slips and NFS-e are cancelled (condition to show the revert button)
+  // The revert now handles bank slip cancellation at Sicredi and NFS-e cancellation at
+  // Elotech automatically (best-effort). The only hard blocks are:
+  //   • NFS-e in PROCESSING or PENDING (may still become AUTHORIZED — wait or cancel first)
+  //   • Paid installments (money already received — can't undo)
   const allCancelledForRevert = useMemo(() => {
     if (!canRevertBilling) return false;
     for (const inv of filteredInvoices) {
+      // Paid installments block
       const insts = (inv as any).installments || [];
       for (const inst of insts) {
-        if (inst.status === 'CANCELLED') continue;
-        const bs = inst.bankSlip;
-        if (bs && bs.status !== 'CANCELLED') return false;
+        if (inst.status === 'PAID') return false;
       }
+      // NFS-e still being processed block
       const nfses = (inv as any).nfseDocuments || [];
       for (const n of nfses) {
-        if (!['CANCELLED', 'ERROR'].includes(n.status)) return false;
+        if (['PROCESSING', 'PENDING'].includes(n.status)) return false;
       }
     }
     return true;
   }, [canRevertBilling, filteredInvoices]);
+
+  // Compute what is blocking the revert for the user-facing hint.
+  const revertBlockers = useMemo(() => {
+    if (!canRevertBilling || allCancelledForRevert) return null;
+    const paidInstallments: string[] = [];
+    const pendingNfse: string[] = [];
+    for (const inv of filteredInvoices) {
+      const insts = (inv as any).installments || [];
+      for (const inst of insts) {
+        if (inst.status === 'PAID') paidInstallments.push(`Parcela #${inst.number}`);
+      }
+      const nfses = (inv as any).nfseDocuments || [];
+      for (const n of nfses) {
+        if (['PROCESSING', 'PENDING'].includes(n.status)) {
+          pendingNfse.push(`NFS-e em ${n.status}`);
+        }
+      }
+    }
+    return { paidInstallments, pendingNfse };
+  }, [canRevertBilling, allCancelledForRevert, filteredInvoices]);
 
   const handleRevertBilling = useCallback(async () => {
     if (!task?.quoteId) return;
@@ -328,6 +351,12 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 <IconExternalLink className="h-3.5 w-3.5" />
                 Ver Tarefa
               </Button>
+            )}
+            {canRevertBilling && !allCancelledForRevert && revertBlockers && (revertBlockers.paidInstallments.length > 0 || revertBlockers.pendingNfse.length > 0) && (
+              <div className="text-xs text-muted-foreground max-w-xs text-right">
+                {revertBlockers.paidInstallments.length > 0 && `Não é possível reverter: ${revertBlockers.paidInstallments.join(', ')} já paga(s).`}
+                {revertBlockers.pendingNfse.length > 0 && ` Aguarde ou cancele: ${revertBlockers.pendingNfse.join(', ')}.`}
+              </div>
             )}
             {allCancelledForRevert && (
               <Button
@@ -1004,6 +1033,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             <AlertDialogDescription>
               Esta ação irá remover as faturas, parcelas e boletos (já cancelados) e reverter o orçamento
               para <strong>Aprovado pelo Comercial</strong>. O orçamento poderá ser editado e aprovado novamente.
+              {" "}NFS-e autorizadas que não puderam ser canceladas no Elotech deverão ser canceladas manualmente no portal.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

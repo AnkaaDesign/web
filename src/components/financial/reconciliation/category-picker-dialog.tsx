@@ -66,9 +66,9 @@ export function CategoryPickerDialog({
         <DialogHeader>
           <DialogTitle>Alterar categorias</DialogTitle>
           <DialogDescription>
-            Atribua uma ou mais categorias a esta transação. Uma categoria de
-            transação "auto-conciliante" (ex.: Aluguel, Tarifa) dispensa a nota
-            fiscal — a transação é conciliada por estar classificada.
+            Atribua uma ou mais categorias a esta transação. Categorias de
+            transação (ex.: Aluguel, Tarifa) dispensam nota fiscal — a transação
+            é conciliada por estar classificada.
           </DialogDescription>
         </DialogHeader>
 

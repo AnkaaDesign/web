@@ -152,7 +152,7 @@ export function CategoryEditor({
         )}
         {anyResolvingSelected && (
           <p className="text-xs text-muted-foreground">
-            Uma categoria auto-conciliante foi selecionada — a transação será
+            Uma categoria de transação foi selecionada — a transação será
             conciliada sem exigir nota fiscal.
           </p>
         )}

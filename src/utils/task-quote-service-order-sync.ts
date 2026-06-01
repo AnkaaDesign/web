@@ -62,9 +62,10 @@ export function getQuoteServicesToAddFromServiceOrders(
   existingQuoteServices: SyncQuoteService[],
 ): SyncQuoteService[] {
   const servicesToAdd: SyncQuoteService[] = [];
-  // Match based on description only (not combined with observation)
-  const existingDescriptions = new Set(
-    existingQuoteServices.map(item => normalizeDescription(item.description))
+  const makeKey = (desc: string | null | undefined, obs: string | null | undefined): string =>
+    `${normalizeDescription(desc)}|${normalizeDescription(obs)}`;
+  const existingKeys = new Set(
+    existingQuoteServices.map(item => makeKey(item.description, item.observation))
   );
 
   for (const so of serviceOrders) {
@@ -72,17 +73,15 @@ export function getQuoteServicesToAddFromServiceOrders(
     if (so.type !== SERVICE_ORDER_TYPE.PRODUCTION) continue;
     if (!so.description || so.description.trim().length < 3) continue;
 
-    const normalizedDesc = normalizeDescription(so.description);
+    const key = makeKey(so.description, so.observation);
 
-    // Check if this quote service already exists (by description only)
-    if (!existingDescriptions.has(normalizedDesc)) {
+    if (!existingKeys.has(key)) {
       servicesToAdd.push({
         description: so.description.trim(),
-        observation: so.observation || null, // Sync observation separately
+        observation: so.observation || null,
         amount: 0,
       });
-      // Add to set to prevent duplicates in the same batch
-      existingDescriptions.add(normalizedDesc);
+      existingKeys.add(key);
     }
   }
 
@@ -108,33 +107,32 @@ export function getServiceOrdersToAddFromQuoteServices(
 ): SyncServiceOrder[] {
   const ordersToAdd: SyncServiceOrder[] = [];
 
-  // Match based on description only (not combined with observation)
-  const existingDescriptions = new Set(
+  const makeKey = (desc: string | null | undefined, obs: string | null | undefined): string =>
+    `${normalizeDescription(desc)}|${normalizeDescription(obs)}`;
+  const existingKeys = new Set(
     existingServiceOrders
       .filter(so => so.type === SERVICE_ORDER_TYPE.PRODUCTION)
-      .map(so => normalizeDescription(so.description))
+      .map(so => makeKey(so.description, so.observation))
   );
 
   for (const item of quoteServices) {
     if (!item.description || item.description.trim().length < 3) continue;
 
-    const normalizedItemDesc = normalizeDescription(item.description);
+    const key = makeKey(item.description, item.observation);
 
-    // Check if a matching service order already exists (by description only)
-    if (existingDescriptions.has(normalizedItemDesc)) {
+    if (existingKeys.has(key)) {
       continue;
     }
 
     ordersToAdd.push({
       description: item.description.trim(),
-      observation: item.observation || null, // Sync observation separately
+      observation: item.observation || null,
       type: SERVICE_ORDER_TYPE.PRODUCTION,
       status: SERVICE_ORDER_STATUS.PENDING,
       statusOrder: 1,
     });
 
-    // Add to set to prevent duplicates
-    existingDescriptions.add(normalizedItemDesc);
+    existingKeys.add(key);
   }
 
   return ordersToAdd;
@@ -152,7 +150,10 @@ export function isServiceOrderMatchingQuoteService(
     return false;
   }
 
-  return areDescriptionsEqual(serviceOrder.description, quoteService.description);
+  return (
+    areDescriptionsEqual(serviceOrder.description, quoteService.description) &&
+    areDescriptionsEqual(serviceOrder.observation || '', quoteService.observation || '')
+  );
 }
 
 /**
@@ -166,29 +167,50 @@ export function syncObservationsFromServiceOrdersToQuote(
   serviceOrders: SyncServiceOrder[],
   quoteServices: SyncQuoteService[],
 ): SyncQuoteService[] {
-  // Create a map of normalized description -> observation from service orders
-  // Include ALL matched descriptions, even with empty observations
-  const soObservationMap = new Map<string, string | null>();
-  for (const so of serviceOrders) {
-    if (so.type !== SERVICE_ORDER_TYPE.PRODUCTION) continue;
-    if (!so.description || so.description.trim().length < 3) continue;
-    const normalizedDesc = normalizeDescription(so.description);
-    // Store the observation value (or null if empty)
-    const observationValue = so.observation && so.observation.trim() ? so.observation : null;
-    soObservationMap.set(normalizedDesc, observationValue);
+  const productionSOs = serviceOrders.filter(
+    so => so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.description && so.description.trim().length >= 3,
+  );
+
+  // Count occurrences of each normalized description to detect duplicates
+  const descCount = new Map<string, number>();
+  for (const so of productionSOs) {
+    const key = normalizeDescription(so.description);
+    descCount.set(key, (descCount.get(key) ?? 0) + 1);
   }
 
-  // Update quote services with matching observations
+  // Build observation map:
+  // - Unique description: descKey → observation (enables propagation by description)
+  // - Duplicate descriptions: descKey|obsKey → observation (identity — no cross-propagation)
+  const observationMap = new Map<string, string | null>();
+  for (const so of productionSOs) {
+    const descKey = normalizeDescription(so.description);
+    const obsValue = so.observation && so.observation.trim() ? so.observation : null;
+    if (descCount.get(descKey) === 1) {
+      observationMap.set(descKey, obsValue);
+    } else {
+      observationMap.set(`${descKey}|${normalizeDescription(obsValue)}`, obsValue);
+    }
+  }
+
   return quoteServices.map(item => {
     if (!item.description || item.description.trim().length < 3) return item;
-    const normalizedDesc = normalizeDescription(item.description);
-    if (soObservationMap.has(normalizedDesc)) {
-      const soObservation = soObservationMap.get(normalizedDesc);
-      // Only update if observation differs (including clearing)
+    const descKey = normalizeDescription(item.description);
+    const count = descCount.get(descKey) ?? 0;
+
+    let lookupKey: string;
+    if (count === 1) {
+      lookupKey = descKey;
+    } else {
       const currentObs = item.observation && item.observation.trim() ? item.observation : null;
-      if (currentObs !== soObservation) {
-        return { ...item, observation: soObservation };
-      }
+      lookupKey = `${descKey}|${normalizeDescription(currentObs)}`;
+    }
+
+    if (!observationMap.has(lookupKey)) return item;
+
+    const soObservation = observationMap.get(lookupKey) ?? null;
+    const currentObs = item.observation && item.observation.trim() ? item.observation : null;
+    if (currentObs !== soObservation) {
+      return { ...item, observation: soObservation };
     }
     return item;
   });
@@ -205,29 +227,51 @@ export function syncObservationsFromQuoteToServiceOrders(
   quoteServices: SyncQuoteService[],
   serviceOrders: SyncServiceOrder[],
 ): SyncServiceOrder[] {
-  // Create a map of normalized description -> observation from quote services
-  // Include ALL matched descriptions, even with empty observations
-  const quoteObservationMap = new Map<string, string | null>();
-  for (const item of quoteServices) {
-    if (!item.description || item.description.trim().length < 3) continue;
-    const normalizedDesc = normalizeDescription(item.description);
-    // Store the observation value (or null if empty)
-    const observationValue = item.observation && item.observation.trim() ? item.observation : null;
-    quoteObservationMap.set(normalizedDesc, observationValue);
+  const validQuoteServices = quoteServices.filter(
+    item => item.description && item.description.trim().length >= 3,
+  );
+
+  // Count occurrences of each normalized description to detect duplicates
+  const descCount = new Map<string, number>();
+  for (const item of validQuoteServices) {
+    const key = normalizeDescription(item.description);
+    descCount.set(key, (descCount.get(key) ?? 0) + 1);
   }
 
-  // Update service orders with matching observations
+  // Build observation map:
+  // - Unique description: descKey → observation
+  // - Duplicate descriptions: descKey|obsKey → observation (identity)
+  const observationMap = new Map<string, string | null>();
+  for (const item of validQuoteServices) {
+    const descKey = normalizeDescription(item.description);
+    const obsValue = item.observation && item.observation.trim() ? item.observation : null;
+    if (descCount.get(descKey) === 1) {
+      observationMap.set(descKey, obsValue);
+    } else {
+      observationMap.set(`${descKey}|${normalizeDescription(obsValue)}`, obsValue);
+    }
+  }
+
   return serviceOrders.map(so => {
     if (so.type !== SERVICE_ORDER_TYPE.PRODUCTION) return so;
     if (!so.description || so.description.trim().length < 3) return so;
-    const normalizedDesc = normalizeDescription(so.description);
-    if (quoteObservationMap.has(normalizedDesc)) {
-      const quoteObservation = quoteObservationMap.get(normalizedDesc);
-      // Only update if observation differs (including clearing)
+    const descKey = normalizeDescription(so.description);
+    const count = descCount.get(descKey) ?? 0;
+
+    let lookupKey: string;
+    if (count === 1) {
+      lookupKey = descKey;
+    } else {
       const currentObs = so.observation && so.observation.trim() ? so.observation : null;
-      if (currentObs !== quoteObservation) {
-        return { ...so, observation: quoteObservation };
-      }
+      lookupKey = `${descKey}|${normalizeDescription(currentObs)}`;
+    }
+
+    if (!observationMap.has(lookupKey)) return so;
+
+    const quoteObservation = observationMap.get(lookupKey) ?? null;
+    const currentObs = so.observation && so.observation.trim() ? so.observation : null;
+    if (currentObs !== quoteObservation) {
+      return { ...so, observation: quoteObservation };
     }
     return so;
   });

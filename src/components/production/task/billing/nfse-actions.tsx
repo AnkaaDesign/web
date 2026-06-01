@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { IconSend, IconX } from '@tabler/icons-react';
+import { IconSend, IconX, IconAlertTriangle } from '@tabler/icons-react';
 import { toast } from '@/components/ui/sonner';
 import { useEmitNfse, useCancelNfse } from '@/hooks/production/use-invoice';
 import type { NfseDocument } from '@/types/invoice';
@@ -36,6 +36,7 @@ export function NfseActions({ invoiceId, nfseDocuments }: NfseActionsProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelReasonCode, setCancelReasonCode] = useState('1');
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const emitNfse = useEmitNfse();
   const cancelNfse = useCancelNfse();
 
@@ -60,7 +61,7 @@ export function NfseActions({ invoiceId, nfseDocuments }: NfseActionsProps) {
     emitNfse.mutate(invoiceId);
   };
 
-  const handleCancel = () => {
+  const handleCancel = (force = false) => {
     if (!cancelReason.trim() || cancelReason.trim().length < 15) {
       toast.error('Motivo do cancelamento é obrigatório e deve ter no mínimo 15 caracteres.');
       return;
@@ -70,16 +71,36 @@ export function NfseActions({ invoiceId, nfseDocuments }: NfseActionsProps) {
       {
         invoiceId,
         nfseDocumentId: authorizedNfse.id,
-        data: { reason: cancelReason, reasonCode: Number(cancelReasonCode) },
+        data: { reason: cancelReason, reasonCode: Number(cancelReasonCode), ...(force && { force: true }) },
       },
       {
-        onSuccess: () => {
+        onSuccess: (data: any) => {
           setShowCancelDialog(false);
           setCancelReason('');
           setCancelReasonCode('1');
+          setCancelError(null);
+          if (data?.forceCancel) {
+            toast.warning(data.message ?? 'NFS-e cancelada localmente. Cancele manualmente no Elotech OXY.');
+          }
+        },
+        onError: (err: any) => {
+          const msg: string =
+            err?.response?.data?.message ||
+            err?.message ||
+            'Erro ao cancelar NFS-e.';
+          setCancelError(msg);
         },
       }
     );
+  };
+
+  const resetCancelDialog = (open: boolean) => {
+    setShowCancelDialog(open);
+    if (!open) {
+      setCancelReason('');
+      setCancelReasonCode('1');
+      setCancelError(null);
+    }
   };
 
   if (!canEmit && !canCancel) return null;
@@ -113,7 +134,7 @@ export function NfseActions({ invoiceId, nfseDocuments }: NfseActionsProps) {
         )}
       </div>
 
-      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+      <Dialog open={showCancelDialog} onOpenChange={resetCancelDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cancelar NFS-e</DialogTitle>
@@ -145,18 +166,45 @@ export function NfseActions({ invoiceId, nfseDocuments }: NfseActionsProps) {
                 placeholder="Descreva o motivo do cancelamento..."
               />
             </div>
+
+            {cancelError && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
+                <div className="flex items-start gap-2">
+                  <IconAlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="text-sm text-amber-800">
+                    <p className="font-medium">Elotech recusou o cancelamento:</p>
+                    <p className="text-xs mt-0.5 text-amber-700">{cancelError}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-amber-700 pl-6">
+                  Isso pode ocorrer para NFS-e emitidas há mais de 30 dias. Você pode forçar o cancelamento local — a NFS-e permanecerá válida no Elotech e deverá ser cancelada manualmente no portal.
+                </p>
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => resetCancelDialog(false)}>
               Voltar
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleCancel}
-              disabled={cancelNfse.isPending}
-            >
-              {cancelNfse.isPending ? 'Cancelando...' : 'Confirmar Cancelamento'}
-            </Button>
+            {cancelError && (
+              <Button
+                variant="outline"
+                className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                onClick={() => handleCancel(true)}
+                disabled={cancelNfse.isPending}
+              >
+                {cancelNfse.isPending ? 'Cancelando...' : 'Forçar Cancelamento Local'}
+              </Button>
+            )}
+            {!cancelError && (
+              <Button
+                variant="destructive"
+                onClick={() => handleCancel(false)}
+                disabled={cancelNfse.isPending}
+              >
+                {cancelNfse.isPending ? 'Cancelando...' : 'Confirmar Cancelamento'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

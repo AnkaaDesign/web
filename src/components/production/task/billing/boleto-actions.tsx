@@ -205,9 +205,17 @@ export function BoletoActions({
         newDueDate: newDueDate.toLocaleDateString('en-CA'),
       },
       {
-        onSuccess: () => {
-          setShowDueDateDialog(false);
-          setNewDueDate(null);
+        onSuccess: (response) => {
+          const body = response?.data;
+          if (body?.fallback === 'CANCELLED') {
+            toast.warning(
+              body.message ||
+                'O boleto foi cancelado pois o Sicredi não aceitou a alteração de vencimento. Gere um novo boleto.',
+            );
+          } else {
+            setShowDueDateDialog(false);
+            setNewDueDate(null);
+          }
         },
       },
     );

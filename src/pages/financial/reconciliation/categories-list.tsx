@@ -79,9 +79,9 @@ const KIND_VARIANT: Record<
   TRANSACTION_ONLY: "secondary",
 };
 
-// Only TRANSACTION_ONLY categories are editable — item-derived & service
-// categories are mirrored/managed elsewhere and shown read-only here.
-const isEditable = (c: TransactionCategory) => c.kind === "TRANSACTION_ONLY";
+// ITEM_DERIVED categories are read-only (managed via inventory). SERVICE and
+// TRANSACTION_ONLY categories are user-editable.
+const isEditable = (c: TransactionCategory) => c.kind !== "ITEM_DERIVED";
 
 export const ReconciliationCategoriesListPage = () => {
   usePageTracker({ title: "Categorias - Conciliação", icon: "tags" });
@@ -420,7 +420,7 @@ export const ReconciliationCategoriesListPage = () => {
 };
 
 const KIND_OPTIONS = [
-  { value: "TRANSACTION_ONLY", label: "Transação (auto-conciliante)" },
+  { value: "TRANSACTION_ONLY", label: "Transação" },
   { value: "SERVICE", label: "Serviço" },
 ];
 
@@ -496,8 +496,8 @@ function CategoryEditorDialog({
             {isEdit ? "Editar categoria" : "Nova categoria"}
           </DialogTitle>
           <DialogDescription>
-            Categorias de transação auto-conciliantes dispensam nota fiscal —
-            uma transação é conciliada por estar classificada.
+            Categorias de transação dispensam nota fiscal — uma transação é
+            conciliada por estar classificada.
           </DialogDescription>
         </DialogHeader>
 
