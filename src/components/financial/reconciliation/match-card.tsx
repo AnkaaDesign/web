@@ -26,8 +26,9 @@ interface Props {
  * - same "Abrir … ↗" cue in the footer-left
  * - same slot for an optional action button on the footer-right
  *
- * Both ManualMatchDialog (TX → NF) and FiscalDocumentDetailSheet (NF → TX)
- * render this. If you tweak the visual treatment, both sides update together.
+ * Both the transaction detail page (TX → NF, via TransactionMatchSection) and
+ * the fiscal-document detail page (NF → TX) render this. If you tweak the
+ * visual treatment, both sides update together.
  */
 export function MatchCard({
   to,

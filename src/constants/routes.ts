@@ -189,7 +189,9 @@ export const routes = {
     reconciliation: {
       root: "/financeiro/conciliacao",
       transactions: "/financeiro/conciliacao/transacoes",
+      transactionDetail: (id: string) => `/financeiro/conciliacao/transacoes/${id}`,
       fiscalDocuments: "/financeiro/conciliacao/notas",
+      fiscalDocumentDetail: (id: string) => `/financeiro/conciliacao/notas/${id}`,
       categories: "/financeiro/conciliacao/categorias",
       recurring: "/financeiro/conciliacao/recorrentes",
     },

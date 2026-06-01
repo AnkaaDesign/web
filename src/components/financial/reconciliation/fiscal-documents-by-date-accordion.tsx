@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   IconChevronRight,
@@ -28,16 +28,19 @@ import { routes } from "@/constants";
 import { formatCNPJ, formatCnpjCpf, formatCurrency } from "@/utils";
 import type { FiscalDocument } from "@/types/reconciliation";
 import { docTypeLabel, docTypeVariant } from "./fiscal-doc-badge";
+import { formatDayHeader, toLocalDateKey } from "./date-utils";
 
-const WEEKDAYS_SHORT = ["Dom.", "Seg.", "Ter.", "Qua.", "Qui.", "Sex.", "Sáb."];
 const DATE_COLUMN_WIDTH = 170;
 
 interface Props {
   data: FiscalDocument[];
   /** Every date in the selected period (YYYY-MM-DD), newest first. Days with
-   *  no documents still render (collapsed). */
+   *  no documents still render (collapsed). When a search is active the list
+   *  page passes only the matching days. */
   dates: string[];
   isLoading?: boolean;
+  /** When true (search active), all rendered day-groups start expanded. */
+  autoExpand?: boolean;
   onViewDetails?: (doc: FiscalDocument) => void;
 }
 
@@ -54,23 +57,6 @@ interface DaySummary {
   saidaTotal: number;
   linked: number;
   unlinked: number;
-}
-
-function toLocalDateKey(input: string | Date): string {
-  const d = typeof input === "string" ? new Date(input) : input;
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function formatDayHeader(dateStr: string): { dayLabel: string; weekday: string } {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  const yy = String(y).slice(-2);
-  const dayLabel = `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${yy}`;
-  const weekday = WEEKDAYS_SHORT[date.getDay()];
-  return { dayLabel, weekday };
 }
 
 /**
@@ -110,6 +96,7 @@ export function FiscalDocumentsByDateAccordion({
   data,
   dates,
   isLoading,
+  autoExpand,
   onViewDetails,
 }: Props) {
   const { toast } = useToast();
@@ -119,6 +106,12 @@ export function FiscalDocumentsByDateAccordion({
     doc: FiscalDocument;
   } | null>(null);
   const [openDates, setOpenDates] = useState<Set<string>>(new Set());
+
+  // While a search is active, expand every matching day so results are visible
+  // without clicking each banner; collapse back to all-closed when it clears.
+  useEffect(() => {
+    setOpenDates(autoExpand ? new Set(dates) : new Set());
+  }, [autoExpand, dates]);
 
   const docsByDate = useMemo(() => {
     const map = new Map<string, FiscalDocument[]>();
@@ -570,7 +563,7 @@ function renderCell(
       if (onlyTxId) {
         return (
           <Link
-            to={`${routes.financial.reconciliation.transactions}?txId=${onlyTxId}`}
+            to={routes.financial.reconciliation.transactionDetail(onlyTxId)}
             onClick={e => e.stopPropagation()}
             className="hover:opacity-80 transition-opacity"
           >

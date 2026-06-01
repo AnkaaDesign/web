@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconArrowsExchange2,
   IconFilter,
@@ -17,12 +17,15 @@ import {
   getReconciliationColumnsMeta,
   getDefaultVisibleReconciliationColumns,
 } from "@/components/financial/reconciliation/transactions-by-date-accordion";
+import {
+  buildDatesForPeriod,
+  deriveDateRange,
+  effectivePeriodDates,
+} from "@/components/financial/reconciliation/date-utils";
 import { ColumnVisibilityManager } from "@/components/financial/reconciliation/transactions-column-visibility-manager";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { OfxImportDialog } from "@/components/financial/reconciliation/ofx-import-dialog";
-import { ManualMatchDialog } from "@/components/financial/reconciliation/manual-match-dialog";
 import { ScoringWorkflowDialog } from "@/components/financial/reconciliation/scoring-workflow-dialog";
-import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";
 import { IgnoreTransactionDialog } from "@/components/financial/reconciliation/ignore-transaction-dialog";
 import { CategoryPickerDialog } from "@/components/financial/reconciliation/category-picker-dialog";
 import {
@@ -35,11 +38,10 @@ import {
   useBankTransactions,
   useChangeCategory,
   useIgnoreTransaction,
-  useMatchTransaction,
   useRunAutoMatch,
-  useUnmatchTransaction,
 } from "@/hooks/financial/use-reconciliation";
 import { useUrlDialog } from "@/hooks/common/use-url-dialog";
+import { useDebouncedValue } from "@/hooks/common/use-debounced-value";
 import { useToast } from "@/hooks/common/use-toast";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { SECTOR_PRIVILEGES, FAVORITE_PAGES, routes } from "@/constants";
@@ -205,65 +207,10 @@ function parseFiltersFromUrl(params: URLSearchParams): ReconciliationFilters {
   // clearable control instead of an invisible phantom filter.
 }
 
-/**
- * Build the inclusive list of YYYY-MM-DD strings for every day in every
- * selected month. The accordion uses this to render *all* days in the period,
- * not only those that contain transactions.
- *
- * For the current month, the list stops at today — future days carry no
- * transactions and just create empty noise above the meaningful rows.
- */
-function buildDatesForPeriod(year: number, months: string[]): string[] {
-  const dates: string[] = [];
-  const today = new Date();
-  const todayYear = today.getFullYear();
-  const todayMonth = today.getMonth() + 1;
-  const todayDay = today.getDate();
-  const sortedMonths = [...months].sort();
-  for (const m of sortedMonths) {
-    const monthNum = parseInt(m, 10);
-    if (!monthNum || monthNum < 1 || monthNum > 12) continue;
-    // new Date(y, m, 0) = last day of month `m-1`. Used to enumerate days.
-    let lastDay = new Date(year, monthNum, 0).getDate();
-    // Cap at today when iterating the current month so we don't render an
-    // empty stack of future days above the latest real activity.
-    if (year === todayYear && monthNum === todayMonth) {
-      lastDay = Math.min(lastDay, todayDay);
-    } else if (year > todayYear || (year === todayYear && monthNum > todayMonth)) {
-      // Future month: skip entirely.
-      continue;
-    }
-    for (let d = 1; d <= lastDay; d++) {
-      const dd = String(d).padStart(2, "0");
-      const mm = String(monthNum).padStart(2, "0");
-      dates.push(`${year}-${mm}-${dd}`);
-    }
-  }
-  // Newest-first to match how the accordion has always rendered.
-  return dates.reverse();
-}
-
-/**
- * Derive an inclusive [dateFrom, dateTo] range from the selected year+months
- * so the API can filter transactions. Server `postedAt` is a timestamp, so we
- * set dateFrom to the first millisecond and dateTo to the last millisecond of
- * the day to avoid losing the last day in the range.
- */
-function deriveDateRange(year: number, months: string[]): { dateFrom: string; dateTo: string } | null {
-  if (!months.length) return null;
-  const sorted = [...months].map(m => parseInt(m, 10)).filter(n => n >= 1 && n <= 12).sort((a, b) => a - b);
-  if (!sorted.length) return null;
-  const firstMonth = sorted[0];
-  const lastMonth = sorted[sorted.length - 1];
-  const dateFrom = new Date(year, firstMonth - 1, 1, 0, 0, 0, 0).toISOString();
-  // Day 0 of the next month = last day of `lastMonth`.
-  const dateTo = new Date(year, lastMonth, 0, 23, 59, 59, 999).toISOString();
-  return { dateFrom, dateTo };
-}
-
 export const ReconciliationTransactionsListPage = () => {
   usePageTracker({ title: "Transações - Conciliação", icon: "list" });
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   // Seed the visible search box from `?search=` or a deep-linked `?counterparty=`.
   // The server `search` already matches against the counterparty, so surfacing
@@ -272,6 +219,9 @@ export const ReconciliationTransactionsListPage = () => {
   const [searchText, setSearchText] = useState(
     () => searchParams.get("search") || searchParams.get("counterparty") || "",
   );
+  // Debounced value drives the server query + matching-dates collapse so we
+  // don't refetch (pageSize=1000) on every keystroke.
+  const debouncedSearch = useDebouncedValue(searchText.trim(), 300);
   const [showFilters, setShowFilters] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [scoringHelpOpen, setScoringHelpOpen] = useState(false);
@@ -297,7 +247,7 @@ export const ReconciliationTransactionsListPage = () => {
     return deriveDateRange(filters.year, filters.months);
   }, [filters.year, filters.months]);
 
-  const dates = useMemo(() => {
+  const periodDates = useMemo(() => {
     if (!filters.year || !filters.months?.length) return [];
     return buildDatesForPeriod(filters.year, filters.months);
   }, [filters.year, filters.months]);
@@ -307,7 +257,7 @@ export const ReconciliationTransactionsListPage = () => {
     pageSize: PERIOD_PAGE_SIZE,
     sortBy: "postedAt",
     sortDir: "desc",
-    search: searchText || undefined,
+    search: debouncedSearch || undefined,
     reconciliationStatus: filters.reconciliationStatus,
     categoryIds: filters.categoryIds,
     reconciliationSource: filters.reconciliationSource,
@@ -320,41 +270,43 @@ export const ReconciliationTransactionsListPage = () => {
     dateTo: dateRange?.dateTo,
   });
 
-  // Modal state is driven by URL params so cross-links and refreshes work.
-  // ?txId=… opens the match/details dialog; ?unmatch=… and ?ignore=… open
-  // their respective confirm dialogs. A single value at a time keeps things
-  // unambiguous.
-  const txDialog = useUrlDialog("txId");
-  const unmatchDialog = useUrlDialog("unmatch");
+  // Collapse the calendar to only the days that contain a matching transaction
+  // (and auto-expand them) whenever a search OR any content filter narrows the
+  // result set; the default browse view (no search, default filters) keeps the
+  // full period calendar.
+  const narrowing = useMemo(() => {
+    const def = getDefaultReconciliationFilters();
+    return (
+      debouncedSearch.length > 0 ||
+      !!filters.reconciliationStatus ||
+      (filters.categoryIds?.length ?? 0) > 0 ||
+      !!filters.reconciliationSource ||
+      !!filters.matchType ||
+      !!filters.subtype ||
+      filters.amountMin !== undefined ||
+      filters.amountMax !== undefined ||
+      filters.type !== def.type
+    );
+  }, [debouncedSearch, filters]);
+  const dates = useMemo(
+    () => effectivePeriodDates(periodDates, (data?.data ?? []).map(t => t.postedAt), narrowing),
+    [periodDates, data, narrowing],
+  );
+
+  // Backward-compat: a legacy `?txId=` deeplink (old match dialog) now routes to
+  // the standalone transaction detail page.
+  useEffect(() => {
+    const txId = asUuid(searchParams.get("txId"));
+    if (txId) navigate(routes.financial.reconciliation.transactionDetail(txId), { replace: true });
+  }, [searchParams, navigate]);
+
+  // Quick-action dialogs from the row context menu (URL-driven for shareability).
   const ignoreDialog = useUrlDialog("ignore");
   // Distinct from the ?category= FILTER URL key. If both shared the same key,
   // filtering by category would also open the category-edit dialog with the
   // category enum value (e.g. "TRIBUTO") interpreted as a transaction ID,
   // triggering a phantom GET /transactions/TRIBUTO → 404.
   const categoryDialog = useUrlDialog("editCategory");
-
-  // Prefer the already-loaded list row; fall back to fetching the single tx
-  // by id when the deep link arrives before the list contains it (e.g., the
-  // user shared a link to a tx that's on a different page).
-  const txDialogId = asUuid(txDialog.value);
-  const txFromList = useMemo<BankTransaction | null>(() => {
-    if (!txDialogId || !data) return null;
-    return data.data.find(t => t.id === txDialogId) ?? null;
-  }, [txDialogId, data]);
-  const { data: fetchedTx } = useBankTransaction(
-    txDialogId && !txFromList ? txDialogId : undefined,
-  );
-  const matchTx = txFromList ?? fetchedTx ?? null;
-
-  const unmatchDialogId = asUuid(unmatchDialog.value);
-  const unmatchTxFromList = useMemo<BankTransaction | null>(() => {
-    if (!unmatchDialogId || !data) return null;
-    return data.data.find(t => t.id === unmatchDialogId) ?? null;
-  }, [unmatchDialogId, data]);
-  const { data: fetchedUnmatchTx } = useBankTransaction(
-    unmatchDialogId && !unmatchTxFromList ? unmatchDialogId : undefined,
-  );
-  const unmatchTx = unmatchTxFromList ?? fetchedUnmatchTx ?? null;
 
   const ignoreDialogId = asUuid(ignoreDialog.value);
   const ignoreTxFromList = useMemo<BankTransaction | null>(() => {
@@ -366,8 +318,6 @@ export const ReconciliationTransactionsListPage = () => {
   );
   const ignoreTx = ignoreTxFromList ?? fetchedIgnoreTx ?? null;
 
-  const matchMut = useMatchTransaction();
-  const unmatchMut = useUnmatchTransaction();
   const ignoreMut = useIgnoreTransaction();
   const runMut = useRunAutoMatch();
   const categoryMut = useChangeCategory();
@@ -545,10 +495,14 @@ export const ReconciliationTransactionsListPage = () => {
                   onClick={() => setShowFilters(true)}
                   className="group"
                 >
-                  <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                  <span className="text-foreground">
-                    Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-                  </span>
+                  <IconFilter
+                    className={
+                      activeFilterCount > 0
+                        ? "h-4 w-4"
+                        : "h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors"
+                    }
+                  />
+                  <span>Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}</span>
                 </Button>
                 <ColumnVisibilityManager
                   columns={reconciliationColumns}
@@ -563,13 +517,14 @@ export const ReconciliationTransactionsListPage = () => {
                   data={data?.data ?? []}
                   dates={dates}
                   isLoading={isLoading}
+                  autoExpand={narrowing}
                   showAccountColumn
                   visibleColumns={visibleColumns}
-                  onMatch={tx => txDialog.set(tx.id)}
-                  onUnmatch={tx => unmatchDialog.set(tx.id)}
                   onIgnore={tx => ignoreDialog.set(tx.id)}
                   onChangeCategory={tx => categoryDialog.set(tx.id)}
-                  onViewDetails={tx => txDialog.set(tx.id)}
+                  onViewDetails={tx =>
+                    navigate(routes.financial.reconciliation.transactionDetail(tx.id))
+                  }
                 />
               </div>
             </CardContent>
@@ -593,46 +548,6 @@ export const ReconciliationTransactionsListPage = () => {
       <ScoringWorkflowDialog
         open={scoringHelpOpen}
         onOpenChange={setScoringHelpOpen}
-      />
-
-      <ManualMatchDialog
-        open={txDialog.open}
-        onOpenChange={open => !open && txDialog.clear()}
-        transaction={matchTx}
-        isLoading={matchMut.isPending}
-        onRequestUnmatch={() => {
-          if (!matchTx) return;
-          unmatchDialog.set(matchTx.id);
-          txDialog.clear();
-        }}
-        onConfirm={payload => {
-          if (!matchTx) return;
-          matchMut.mutate(
-            { transactionId: matchTx.id, payload },
-            {
-              // Success/error toasts are emitted by the axios interceptors.
-              onSuccess: () => {
-                txDialog.clear();
-              },
-            },
-          );
-        }}
-      />
-
-      <UnmatchConfirmDialog
-        open={unmatchDialog.open}
-        onOpenChange={open => !open && unmatchDialog.clear()}
-        matchCount={unmatchTx?.matches?.length ?? 0}
-        isLoading={unmatchMut.isPending}
-        onConfirm={() => {
-          if (!unmatchTx) return;
-          unmatchMut.mutate(unmatchTx.id, {
-            // Success/error toasts are emitted by the axios interceptors.
-            onSuccess: () => {
-              unmatchDialog.clear();
-            },
-          });
-        }}
       />
 
       <IgnoreTransactionDialog

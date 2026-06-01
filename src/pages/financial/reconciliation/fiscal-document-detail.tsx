@@ -1,0 +1,576 @@
+import { useEffect, useMemo, useState } from "react";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
+import {
+  IconAlertCircle,
+  IconAlertTriangle,
+  IconBuildingStore,
+  IconCopy,
+  IconDownload,
+  IconExternalLink,
+  IconFileInvoice,
+  IconLinkOff,
+  IconListDetails,
+  IconLoader2,
+  IconReceipt2,
+  IconReceiptTax,
+  IconRefresh,
+  IconUser,
+} from "@tabler/icons-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { PrivilegeRoute } from "@/components/navigation/privilege-route";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import {
+  useFiscalDocument,
+  useFiscalDocumentXml,
+  useSetFiscalItemCategory,
+  useUnmatchTransaction,
+} from "@/hooks/financial/use-reconciliation";
+import { FiscalItemsTable } from "@/components/financial/reconciliation/fiscal-items-table";
+import { useToast } from "@/hooks/common/use-toast";
+import { formatCNPJ, formatCnpjCpf, formatCurrency, formatDate } from "@/utils";
+import { cn } from "@/lib/utils";
+import { SECTOR_PRIVILEGES, routes } from "@/constants";
+import type { FiscalAddress, FiscalDocumentStatus } from "@/types/reconciliation";
+import { docTypeLabel, docTypeVariant } from "@/components/financial/reconciliation/fiscal-doc-badge";
+import { getConfidenceBadgeVariant } from "@/components/financial/reconciliation/match-status-badge";
+import { MatchCard } from "@/components/financial/reconciliation/match-card";
+import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";
+
+const SEFAZ_CONSULTA_URL =
+  "https://www.nfe.fazenda.gov.br/portal/consultaResumo.aspx?tipoConteudo=7PhJ+gAVw2g=";
+const SEFAZ_DOC_TYPES = new Set(["NFE", "NFCE", "CTE"]);
+
+const STATUS_LABELS: Record<FiscalDocumentStatus, string> = {
+  AUTHORIZED: "Autorizada",
+  CANCELLED: "Cancelada",
+  DENIED: "Denegada",
+  PENDING: "Pendente",
+};
+const STATUS_VARIANTS: Record<FiscalDocumentStatus, "completed" | "cancelled" | "pending"> = {
+  AUTHORIZED: "completed",
+  CANCELLED: "cancelled",
+  DENIED: "cancelled",
+  PENDING: "pending",
+};
+
+// NFe `pag.detPag.tPag` payment-form codes → human labels.
+const PAYMENT_FORMS: Record<string, string> = {
+  "01": "Dinheiro",
+  "02": "Cheque",
+  "03": "Cartão de crédito",
+  "04": "Cartão de débito",
+  "05": "Crédito loja",
+  "10": "Vale alimentação",
+  "11": "Vale refeição",
+  "12": "Vale presente",
+  "13": "Vale combustível",
+  "15": "Boleto bancário",
+  "16": "Depósito bancário",
+  "17": "PIX",
+  "18": "Transferência bancária",
+  "19": "Programa de fidelidade",
+  "90": "Sem pagamento",
+  "99": "Outros",
+};
+
+function toNum(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatAddress(a: FiscalAddress | null | undefined): string | null {
+  if (!a) return null;
+  const line = [
+    [a.logradouro, a.numero].filter(Boolean).join(", "),
+    a.complemento,
+    a.bairro,
+    [a.municipio, a.uf].filter(Boolean).join(" - "),
+    a.cep,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return line || null;
+}
+
+// Module-scoped so it isn't redefined on every render (avoids remounting the
+// whole subtree).
+function Frame({ children }: { children: React.ReactNode }) {
+  return (
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">{children}</div>
+    </PrivilegeRoute>
+  );
+}
+
+export function ReconciliationFiscalDocumentDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  usePageTracker({ title: "Detalhe da Nota Fiscal", icon: "receipt" });
+
+  const { data: doc, isLoading, error, refetch, isRefetching } = useFiscalDocument(id);
+
+  // XML download (lazy — only fetched once the user clicks).
+  const [requestXml, setRequestXml] = useState(false);
+  const { data: blobUrl } = useFiscalDocumentXml(requestXml && doc ? doc.accessKey : undefined);
+  useEffect(() => {
+    if (!requestXml || !blobUrl || !doc) return;
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `${doc.accessKey}.xml`;
+    a.click();
+    URL.revokeObjectURL(blobUrl);
+    setRequestXml(false);
+  }, [blobUrl, doc, requestXml]);
+
+  const unmatchMut = useUnmatchTransaction();
+  const setItemCategory = useSetFiscalItemCategory();
+  const [unmatchTarget, setUnmatchTarget] = useState<{ txId: string; matchCount: number } | null>(
+    null,
+  );
+  const runUnmatch = (txId: string) =>
+    unmatchMut.mutate(txId, { onSuccess: () => setUnmatchTarget(null) });
+  const handleUnmatchRequest = (txId: string, totalForTx: number) => {
+    if (totalForTx > 1) setUnmatchTarget({ txId, matchCount: totalForTx });
+    else runUnmatch(txId);
+  };
+
+  const isNfse = doc?.docType === "NFSE";
+  const synthKey = doc?.accessKey?.startsWith("NFSE_") ?? false;
+
+  const handleCopyKey = async () => {
+    if (!doc) return;
+    try {
+      await navigator.clipboard.writeText(doc.accessKey);
+      toast({ title: "Chave copiada", variant: "success" });
+    } catch {
+      toast({ title: "Não foi possível copiar", variant: "error" });
+    }
+  };
+  const handleOpenSefaz = async () => {
+    await handleCopyKey();
+    window.open(SEFAZ_CONSULTA_URL, "_blank", "noopener,noreferrer");
+  };
+
+  const payments = useMemo(() => normalizePayments(doc?.paymentMethods), [doc?.paymentMethods]);
+
+  if (!id) return <Navigate to={routes.financial.reconciliation.fiscalDocuments} replace />;
+
+  if (isLoading) {
+    return (
+      <Frame>
+        <div className="flex flex-1 items-center justify-center">
+          <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </Frame>
+    );
+  }
+
+  if (error || !doc) {
+    return (
+      <Frame>
+        <Alert variant="destructive" className="mt-4">
+          <IconAlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between gap-4">
+            <span>Não foi possível carregar a nota fiscal.</span>
+            <button
+              className="text-sm underline hover:text-foreground"
+              onClick={() => navigate(routes.financial.reconciliation.fiscalDocuments)}
+            >
+              Voltar para a lista
+            </button>
+          </AlertDescription>
+        </Alert>
+      </Frame>
+    );
+  }
+
+  const title = `${docTypeLabel(doc.docType)} ${doc.nfNumber ? `#${doc.nfNumber}` : ""}`.trim();
+
+  return (
+    <Frame>
+      <PageHeader
+        variant="detail"
+        title={
+          <span className="flex items-center gap-2">
+            {title}
+            <Badge variant={docTypeVariant(doc.docType)} size="sm">
+              {docTypeLabel(doc.docType)}
+            </Badge>
+            <Badge variant={doc.operationType === "ENTRADA" ? "completed" : "cancelled"} size="sm">
+              {doc.operationType === "ENTRADA" ? "Entrada" : "Saída"}
+            </Badge>
+          </span>
+        }
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Financeiro", href: routes.financial.root },
+          { label: "Conciliação Bancária", href: routes.financial.reconciliation.root },
+          { label: "Notas Fiscais", href: routes.financial.reconciliation.fiscalDocuments },
+          { label: title },
+        ]}
+        actions={[
+          {
+            key: "refresh",
+            label: "Atualizar",
+            icon: IconRefresh,
+            onClick: () => refetch(),
+            loading: isRefetching,
+            variant: "outline" as const,
+          },
+          ...(SEFAZ_DOC_TYPES.has(doc.docType)
+            ? [
+                {
+                  key: "sefaz",
+                  label: "Ver no SEFAZ",
+                  icon: IconExternalLink,
+                  onClick: handleOpenSefaz,
+                  variant: "outline" as const,
+                },
+              ]
+            : []),
+          {
+            key: "xml",
+            label: "Baixar XML",
+            icon: IconDownload,
+            onClick: () => setRequestXml(true),
+            disabled: !doc.rawXmlFileId,
+            variant: "default" as const,
+          },
+        ]}
+        className="flex-shrink-0"
+      />
+
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="space-y-4">
+          {doc.dateInferred && (
+            <Alert>
+              <IconAlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                A data de emissão não pôde ser lida do XML e foi inferida — confira no documento
+                original.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Identificação */}
+            <SectionCard title="Identificação" icon={IconFileInvoice}>
+              <InfoRow
+                label="Status"
+                value={
+                  <Badge variant={STATUS_VARIANTS[doc.status]} size="sm">
+                    {STATUS_LABELS[doc.status] || doc.status}
+                  </Badge>
+                }
+              />
+              <InfoRow label="Número" value={doc.nfNumber} />
+              <InfoRow label="Série" value={doc.series} />
+              <InfoRow label="Modelo" value={doc.model} />
+              <InfoRow label="Natureza da operação" value={doc.naturezaOperacao} />
+              <InfoRow label="Emissão" value={formatDate(doc.issueDate)} />
+              <InfoRow
+                label="Origem"
+                value={doc.source === "SIEG_API" ? "SIEG (automático)" : "Upload manual"}
+              />
+              {doc.status === "CANCELLED" && doc.cancelledAt && (
+                <InfoRow label="Cancelada em" value={formatDate(doc.cancelledAt)} />
+              )}
+              <InfoRow
+                label={synthKey ? "Identificador" : "Chave de acesso"}
+                value={
+                  <button
+                    type="button"
+                    onClick={handleCopyKey}
+                    className="font-mono text-xs inline-flex items-center gap-1.5 hover:underline break-all text-right"
+                    title={doc.accessKey}
+                  >
+                    {synthKey ? doc.accessKey : `…${doc.accessKey.slice(-16)}`}
+                    <IconCopy className="h-3 w-3 flex-shrink-0" />
+                  </button>
+                }
+              />
+            </SectionCard>
+
+            {/* Valores / Impostos */}
+            <SectionCard title="Valores e impostos" icon={IconReceiptTax}>
+              {isNfse ? (
+                <>
+                  <InfoRow label="Valor dos serviços" value={fmtMoney(doc.valorServicos)} />
+                  <InfoRow label="Base de cálculo ISS" value={fmtMoney(doc.baseCalculo)} />
+                  <InfoRow label="Valor do ISS" value={fmtMoney(doc.issValue)} />
+                  <InfoRow
+                    label="Alíquota ISS"
+                    value={toNum(doc.issRate) != null ? `${toNum(doc.issRate)}%` : null}
+                  />
+                  {doc.issRetained != null && (
+                    <InfoRow label="ISS retido" value={doc.issRetained ? "Sim" : "Não"} />
+                  )}
+                  <InfoRow label="Valor líquido" value={fmtMoney(doc.valorLiquido)} />
+                  <InfoRow label="Cód. trib. município" value={doc.codigoTributacaoMunicipio} />
+                  <InfoRow label="Município prestação" value={doc.municipioPrestacao} />
+                </>
+              ) : (
+                <>
+                  <InfoRow label="Produtos" value={fmtMoney(doc.totals?.vProd)} />
+                  <InfoRow label="Frete" value={fmtMoney(doc.totals?.vFrete)} />
+                  <InfoRow label="Seguro" value={fmtMoney(doc.totals?.vSeg)} />
+                  <InfoRow label="Desconto" value={fmtMoney(doc.totals?.vDesc)} />
+                  <InfoRow label="Outras despesas" value={fmtMoney(doc.totals?.vOutro)} />
+                  <InfoRow label="Base ICMS" value={fmtMoney(doc.totals?.vBC)} />
+                  <InfoRow label="Valor ICMS" value={fmtMoney(doc.totals?.vICMS)} />
+                  <InfoRow label="Valor ST" value={fmtMoney(doc.totals?.vST)} />
+                  <InfoRow label="IPI" value={fmtMoney(doc.totals?.vIPI)} />
+                  <InfoRow label="PIS" value={fmtMoney(doc.totals?.vPIS)} />
+                  <InfoRow label="COFINS" value={fmtMoney(doc.totals?.vCOFINS)} />
+                  <InfoRow label="Tributos aprox." value={fmtMoney(doc.totals?.vTotTrib)} />
+                </>
+              )}
+              <div className="flex justify-between items-center bg-primary/10 rounded-lg px-4 py-3 border border-primary/20">
+                <span className="text-sm font-semibold text-foreground">Total da nota</span>
+                <span className="text-base font-bold text-foreground tabular-nums">
+                  {formatCurrency(doc.totalValue)}
+                </span>
+              </div>
+            </SectionCard>
+          </div>
+
+          {/* Protocolo de autorização */}
+          {(doc.protocolNumber || doc.authorizationDate || doc.cStat) && (
+            <SectionCard title="Protocolo de autorização" icon={IconReceipt2}>
+              <InfoRow label="Protocolo" value={doc.protocolNumber} />
+              <InfoRow
+                label="Autorizada em"
+                value={doc.authorizationDate ? formatDate(doc.authorizationDate) : null}
+              />
+              <InfoRow
+                label="Situação (cStat)"
+                value={doc.cStat ? `${doc.cStat}${doc.xMotivo ? ` — ${doc.xMotivo}` : ""}` : null}
+              />
+            </SectionCard>
+          )}
+
+          {/* Emitente / Destinatário (Prestador / Tomador for NFSe) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <SectionCard title={isNfse ? "Prestador" : "Emitente"} icon={IconBuildingStore}>
+              <InfoRow label="Nome / Razão social" value={doc.emitName} />
+              <InfoRow label="CNPJ" value={doc.emitCnpj ? formatCNPJ(doc.emitCnpj) : null} />
+              <InfoRow label="Inscrição estadual" value={doc.emitIE} />
+              <InfoRow label="Endereço" value={formatAddress(doc.emitAddress)} />
+            </SectionCard>
+
+            <SectionCard title={isNfse ? "Tomador" : "Destinatário"} icon={IconUser}>
+              <InfoRow label="Nome / Razão social" value={doc.destName} />
+              <InfoRow
+                label="CNPJ / CPF"
+                value={
+                  doc.destCnpj
+                    ? formatCNPJ(doc.destCnpj)
+                    : doc.destCpf
+                      ? formatCnpjCpf(doc.destCpf)
+                      : null
+                }
+              />
+              <InfoRow label="Inscrição estadual" value={doc.destIE} />
+              <InfoRow label="E-mail" value={doc.destEmail} />
+              <InfoRow label="Endereço" value={formatAddress(doc.destAddress)} />
+            </SectionCard>
+          </div>
+
+          {/* Serviços (NFSe) or Itens (NFe) — editable per-line category */}
+          {doc.items && doc.items.length > 0 && (
+            <SectionCard
+              title={isNfse ? "Serviços" : "Itens / produtos"}
+              icon={IconListDetails}
+            >
+              <FiscalItemsTable
+                items={doc.items}
+                docType={doc.docType}
+                totalValue={doc.totalValue}
+                editable
+                onItemCategoryChange={(fiscalItemId, categoryId) =>
+                  setItemCategory.mutate({ fiscalItemId, categoryId })
+                }
+              />
+            </SectionCard>
+          )}
+
+          {/* Pagamento (NFe) */}
+          {payments.length > 0 && (
+            <SectionCard title="Pagamento" icon={IconReceipt2}>
+              {payments.map((p, i) => (
+                <InfoRow
+                  key={i}
+                  label={PAYMENT_FORMS[p.form ?? ""] || p.form || "Forma de pagamento"}
+                  value={p.value != null ? formatCurrency(p.value) : "—"}
+                />
+              ))}
+            </SectionCard>
+          )}
+
+          {/* Conciliado com */}
+          {doc.matches && doc.matches.length > 0 && (
+            <Card className="shadow-sm border border-emerald-500/40 bg-emerald-50/40 dark:bg-emerald-500/10">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
+                  <IconReceipt2 className="h-5 w-5" />
+                  Transações vinculadas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-2">
+                {doc.matches.map(m => {
+                  const tx = m.transaction;
+                  if (!tx) {
+                    return (
+                      <p key={m.id} className="text-xs text-muted-foreground">
+                        Transação removida
+                      </p>
+                    );
+                  }
+                  const txMatchCount =
+                    doc.matches?.filter(x => x.transaction?.id === tx.id).length ?? 1;
+                  return (
+                    <MatchCard
+                      key={m.id}
+                      to={routes.financial.reconciliation.transactionDetail(tx.id)}
+                      linkLabel="transação"
+                      action={
+                        <button
+                          type="button"
+                          disabled={unmatchMut.isPending}
+                          aria-label="Desvincular nota desta transação"
+                          onClick={e => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleUnmatchRequest(tx.id, txMatchCount);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/80 px-2 py-1 text-xs font-medium hover:bg-destructive/10 hover:border-destructive/40 hover:text-destructive transition-colors disabled:opacity-50"
+                        >
+                          <IconLinkOff className="h-3 w-3" />
+                          Desvincular
+                        </button>
+                      }
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <span className="font-medium">{formatDate(tx.postedAt)}</span>
+                          {tx.type && (
+                            <Badge size="sm" variant={tx.type === "CREDIT" ? "completed" : "cancelled"}>
+                              {tx.type === "CREDIT" ? "Crédito" : "Débito"}
+                            </Badge>
+                          )}
+                          {m.confidenceScore !== undefined && (
+                            <Badge size="sm" variant={getConfidenceBadgeVariant(m.confidenceScore)}>
+                              {m.confidenceScore}%
+                            </Badge>
+                          )}
+                          {m.allocatedAmount != null && (
+                            <span className="text-xs text-muted-foreground">
+                              Alocado {formatCurrency(m.allocatedAmount)}
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-semibold tabular-nums">{formatCurrency(tx.amount)}</span>
+                      </div>
+                      {(tx.counterpartyName || tx.counterpartyCnpjCpf) && (
+                        <p className="text-xs text-muted-foreground mt-1 truncate">
+                          {tx.counterpartyName ||
+                            (tx.counterpartyCnpjCpf ? formatCnpjCpf(tx.counterpartyCnpjCpf) : "")}
+                        </p>
+                      )}
+                      {tx.memo && (
+                        <p className="text-[10px] font-mono text-muted-foreground/80 mt-0.5 truncate">
+                          {tx.memo}
+                        </p>
+                      )}
+                    </MatchCard>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      <UnmatchConfirmDialog
+        open={unmatchTarget !== null}
+        onOpenChange={open => !open && setUnmatchTarget(null)}
+        matchCount={unmatchTarget?.matchCount ?? 0}
+        isLoading={unmatchMut.isPending}
+        onConfirm={() => unmatchTarget && runUnmatch(unmatchTarget.txId)}
+      />
+    </Frame>
+  );
+}
+
+function SectionCard({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: (props: { className?: string }) => React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="shadow-sm border border-border">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2">
+          <Icon className="h-5 w-5 text-muted-foreground" />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="space-y-3">{children}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: React.ReactNode;
+  className?: string;
+}) {
+  if (value == null || value === "" || value === "—") return null;
+  return (
+    <div className={cn("flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3", className)}>
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      <span className="text-sm font-semibold text-foreground text-right">{value}</span>
+    </div>
+  );
+}
+
+function fmtMoney(v: number | string | null | undefined): string | null {
+  const n = toNum(v);
+  return n != null ? formatCurrency(n) : null;
+}
+
+interface NormalizedPayment {
+  form?: string;
+  value?: number | null;
+}
+function normalizePayments(raw: unknown): NormalizedPayment[] {
+  if (!raw) return [];
+  const list = Array.isArray(raw) ? raw : [raw];
+  return list
+    .map((p): NormalizedPayment | null => {
+      if (!p || typeof p !== "object") return null;
+      const rec = p as Record<string, unknown>;
+      const form = rec.tPag != null ? String(rec.tPag) : undefined;
+      const value = toNum(rec.vPag as string | number | null | undefined);
+      if (form === undefined && value == null) return null;
+      return { form, value };
+    })
+    .filter((p): p is NormalizedPayment => p !== null);
+}
+
+export default ReconciliationFiscalDocumentDetailPage;

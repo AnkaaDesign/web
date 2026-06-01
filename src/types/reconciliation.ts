@@ -94,6 +94,8 @@ export interface BankTransaction {
   categorySource: ReconciliationSource | null;
   classifiedAt: string | null;
   ignoredReason: string | null;
+  /** Best candidate confidence (0-100) when no auto-match succeeded. */
+  topMatchScore?: number | null;
   bankSlipId: string | null;
   rawFileId: string | null;
   uploadedById: string | null;
@@ -120,6 +122,27 @@ export interface ReconciliationMatch {
   bankSlip?: { id: string; nossoNumero: string; paidAmount: number | null } | null;
 }
 
+/** Per-item tax group extracted from the NFe XML (`det.imposto`). */
+export interface FiscalItemTaxGroup {
+  vBC?: number | null;
+  pICMS?: number | null;
+  vICMS?: number | null;
+  pIPI?: number | null;
+  vIPI?: number | null;
+  pPIS?: number | null;
+  vPIS?: number | null;
+  pCOFINS?: number | null;
+  vCOFINS?: number | null;
+  cst?: string | null;
+}
+
+export interface FiscalItemTaxes {
+  icms?: FiscalItemTaxGroup | null;
+  ipi?: FiscalItemTaxGroup | null;
+  pis?: FiscalItemTaxGroup | null;
+  cofins?: FiscalItemTaxGroup | null;
+}
+
 export interface FiscalDocumentItem {
   id: string;
   code: string | null;
@@ -128,10 +151,49 @@ export interface FiscalDocumentItem {
   unit: string | null;
   unitValue: number | string | null;
   totalValue: number | string;
+  // Fiscal classification (NFe only — null for NFSe service lines).
+  ncm?: string | null;
+  cfop?: string | null;
+  cest?: string | null;
+  ean?: string | null;
+  cst?: string | null;
+  discount?: number | string | null;
+  freight?: number | string | null;
+  taxes?: FiscalItemTaxes | null;
   categoryId?: string | null;
   categoryConfidence?: number | null;
   categorySource?: ReconciliationSource | null;
   category?: { id: string; name: string; slug: string; color: string | null } | null;
+}
+
+/** Address blob extracted from the NFe XML (emit/dest). */
+export interface FiscalAddress {
+  logradouro?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
+  municipio?: string | null;
+  uf?: string | null;
+  cep?: string | null;
+  fone?: string | null;
+}
+
+/** NFe ICMSTot totals breakdown. */
+export interface FiscalTotals {
+  vBC?: number;
+  vICMS?: number;
+  vICMSDeson?: number;
+  vProd?: number;
+  vFrete?: number;
+  vSeg?: number;
+  vDesc?: number;
+  vOutro?: number;
+  vST?: number;
+  vIPI?: number;
+  vPIS?: number;
+  vCOFINS?: number;
+  vNF?: number;
+  vTotTrib?: number;
 }
 
 export interface FiscalDocument {
@@ -156,6 +218,31 @@ export interface FiscalDocument {
   cancelledAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // --- Rich XML-derived fields (backfilled) ---
+  series?: string | null;
+  model?: string | null;
+  naturezaOperacao?: string | null;
+  protocolNumber?: string | null;
+  authorizationDate?: string | null;
+  cStat?: string | null;
+  xMotivo?: string | null;
+  dateInferred?: boolean;
+  emitIE?: string | null;
+  emitAddress?: FiscalAddress | null;
+  destIE?: string | null;
+  destEmail?: string | null;
+  destAddress?: FiscalAddress | null;
+  totals?: FiscalTotals | null;
+  // NFSe-specific
+  issValue?: number | string | null;
+  issRetained?: boolean | null;
+  issRate?: number | string | null;
+  baseCalculo?: number | string | null;
+  valorLiquido?: number | string | null;
+  valorServicos?: number | string | null;
+  codigoTributacaoMunicipio?: string | null;
+  municipioPrestacao?: string | null;
+  itemListaServico?: string | null;
   items?: FiscalDocumentItem[];
   matches?: Array<{
     id: string;
@@ -178,19 +265,43 @@ export interface FiscalDocument {
   }>;
 }
 
+export interface MatchCandidateItem {
+  id: string;
+  code: string | null;
+  description: string;
+  totalValue: number;
+  quantity: number | null;
+  unit: string | null;
+  unitValue: number | null;
+  categoryId: string | null;
+  category: { id: string; name: string; slug: string; color: string | null } | null;
+}
+
+export interface SetFiscalItemCategoryPayload {
+  categoryId: string | null;
+  saveAlias?: boolean;
+}
+
 export interface MatchCandidate {
   fiscalDocumentId: string;
   accessKey: string;
   docType: FiscalDocType;
+  operationType: OperationType;
   issueDate: string;
   totalValue: number;
   emitCnpj: string;
   emitName: string | null;
   destCnpj: string | null;
+  destCpf: string | null;
   destName: string | null;
+  nfNumber: string | null;
   confidence: number;
   matchType: MatchType;
   rationale: string;
+  amountDelta: number;
+  daysDelta: number;
+  aliasAssisted: boolean;
+  items: MatchCandidateItem[];
 }
 
 export interface OfxImportFileResult {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   IconArrowUpRight,
@@ -6,9 +6,6 @@ import {
   IconCash,
   IconCategory,
   IconChevronRight,
-  IconEye,
-  IconLink,
-  IconLinkOff,
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,11 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import {
-  DropdownMenu,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { CategoryChips, MatchStatusBadge } from "./match-status-badge";
 import { cn } from "@/lib/utils";
@@ -36,27 +29,27 @@ import {
   formatCurrency,
 } from "@/utils";
 import type { BankTransaction } from "@/types/reconciliation";
+import { formatDayHeader, toLocalDateKey } from "./date-utils";
 
 interface Props {
   data: BankTransaction[];
   /** Every date in the selected period (YYYY-MM-DD), in display order.
-   *  Days with no transactions still get rendered (collapsed, with hint). */
+   *  Days with no transactions still get rendered (collapsed, with hint). When
+   *  a search is active the list page passes only the matching days. */
   dates: string[];
   isLoading?: boolean;
+  /** When true (search active), all rendered day-groups start expanded. */
+  autoExpand?: boolean;
   /** Whether to show the bank account column (only on global view). */
   showAccountColumn?: boolean;
   /** User-controlled column visibility (column key set). When provided, a
    *  column is rendered only if it's both structurally enabled (`show`) and
    *  present in this set. The DATA column is always kept (see RECONCILIATION_LOCKED_COLUMNS). */
   visibleColumns?: Set<string>;
-  onMatch?: (tx: BankTransaction) => void;
-  onUnmatch?: (tx: BankTransaction) => void;
   onIgnore?: (tx: BankTransaction) => void;
   onViewDetails?: (tx: BankTransaction) => void;
   onChangeCategory?: (tx: BankTransaction) => void;
 }
-
-const WEEKDAYS_SHORT = ["Dom.", "Seg.", "Ter.", "Qua.", "Qui.", "Sex.", "Sáb."];
 
 // Width assigned to the leading column. The day banner reserves the same width
 // for the chevron + date so the date label sits *inside* the DATA column space
@@ -106,34 +99,13 @@ export function getDefaultVisibleReconciliationColumns(
   );
 }
 
-function toLocalDateKey(input: string | Date): string {
-  // Bank transactions arrive as ISO strings. Group by the day they fall on in
-  // the user's local timezone — that's what `formatDate` shows in the UI.
-  const d = typeof input === "string" ? new Date(input) : input;
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function formatDayHeader(dateStr: string): { dayLabel: string; weekday: string } {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  // Compact form: "26/04/26" (2-digit year) and abbreviated weekday like "Dom.".
-  const yy = String(y).slice(-2);
-  const dayLabel = `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${yy}`;
-  const weekday = WEEKDAYS_SHORT[date.getDay()];
-  return { dayLabel, weekday };
-}
-
 export function TransactionsByDateAccordion({
   data,
   dates,
   isLoading,
+  autoExpand,
   showAccountColumn,
   visibleColumns: visibleColumnKeys,
-  onMatch,
-  onUnmatch,
   onIgnore,
   onViewDetails,
   onChangeCategory,
@@ -146,6 +118,12 @@ export function TransactionsByDateAccordion({
   // Tracks which date rows are expanded. Defaults to all collapsed —
   // opening 30+ days at once is loud and slows the first paint.
   const [openDates, setOpenDates] = useState<Set<string>>(new Set());
+
+  // While a search is active, expand every matching day so results are visible
+  // without clicking each banner; collapse back to all-closed when it clears.
+  useEffect(() => {
+    setOpenDates(autoExpand ? new Set(dates) : new Set());
+  }, [autoExpand, dates]);
 
   const txByDate = useMemo(() => {
     const map = new Map<string, BankTransaction[]>();
@@ -258,7 +236,6 @@ export function TransactionsByDateAccordion({
   }
 
   const ctxTx = contextMenu?.tx;
-  const ctxHasMatches = (ctxTx?.matches?.length ?? 0) > 0;
 
   return (
     <>
@@ -337,28 +314,6 @@ export function TransactionsByDateAccordion({
             className="w-56"
             onCloseAutoFocus={e => e.preventDefault()}
           >
-            {onViewDetails && (
-              <DropdownMenuItem
-                onClick={() => {
-                  onViewDetails(ctxTx);
-                  closeContextMenu();
-                }}
-              >
-                <IconEye className="h-4 w-4 mr-2" />
-                Ver detalhes
-              </DropdownMenuItem>
-            )}
-            {onMatch && !(ctxTx.reconciliationStatus === "RECONCILED" && ctxTx.reconciliationSource === "MANUAL") && (
-              <DropdownMenuItem
-                onClick={() => {
-                  onMatch(ctxTx);
-                  closeContextMenu();
-                }}
-              >
-                <IconLink className="h-4 w-4 mr-2" />
-                Conciliar manualmente
-              </DropdownMenuItem>
-            )}
             {onChangeCategory && (
               <DropdownMenuItem
                 onClick={() => {
@@ -369,21 +324,6 @@ export function TransactionsByDateAccordion({
                 <IconCategory className="h-4 w-4 mr-2" />
                 Alterar categoria
               </DropdownMenuItem>
-            )}
-            {onUnmatch && ctxHasMatches && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    onUnmatch(ctxTx);
-                    closeContextMenu();
-                  }}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <IconLinkOff className="h-4 w-4 mr-2" />
-                  Desfazer conciliação
-                </DropdownMenuItem>
-              </>
             )}
             {onIgnore && ctxTx.reconciliationStatus !== "IGNORED" && (
               <DropdownMenuItem
@@ -676,7 +616,7 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
           : "NF";
       return (
         <Link
-          to={`${routes.financial.reconciliation.fiscalDocuments}?nfId=${firstDoc.id}`}
+          to={routes.financial.reconciliation.fiscalDocumentDetail(firstDoc.id)}
           onClick={e => e.stopPropagation()}
           className="inline-flex items-center gap-1 text-xs text-foreground hover:text-foreground hover:underline max-w-[17rem] truncate"
           title={emitDisplay}
@@ -692,7 +632,7 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
     case "category":
       return <CategoryChips categories={t.categories} maxVisible={2} />;
     case "reconciliationStatus": {
-      return <MatchStatusBadge status={t.reconciliationStatus} />;
+      return <MatchStatusBadge status={t.reconciliationStatus} topMatchScore={t.topMatchScore} />;
     }
     default:
       return null;

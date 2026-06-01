@@ -75,6 +75,30 @@ export function useBankTransaction(id: string | undefined) {
   });
 }
 
+/**
+ * Sets (or clears) the category of a single NF line item. Broad namespace
+ * invalidation refetches both the NF detail and the candidate subtree so the
+ * NF detail page and the transaction match section both update in place.
+ */
+export function useSetFiscalItemCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      fiscalItemId,
+      categoryId,
+    }: {
+      fiscalItemId: string;
+      categoryId: string | null;
+    }) =>
+      reconciliationService
+        .setFiscalItemCategory(fiscalItemId, { categoryId })
+        .then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reconciliationKeys.all });
+    },
+  });
+}
+
 /** Single-NF fetch with linked transactions included. See useBankTransaction. */
 export function useFiscalDocument(id: string | undefined) {
   return useQuery({

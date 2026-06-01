@@ -80,7 +80,9 @@ const FinancialBudgetDetail = lazy(() => import("@/pages/financial/budget/detail
 const FinancialNfseList = lazy(() => import("@/pages/financial/nfse/list").then((module) => ({ default: module.NfseListPage })));
 const FinancialNfseDetail = lazy(() => import("@/pages/financial/nfse/detail").then((module) => ({ default: module.NfseDetailPage })));
 const ReconciliationTransactionsList = lazy(() => import("@/pages/financial/reconciliation/transactions-list").then((module) => ({ default: module.ReconciliationTransactionsListPage })));
+const ReconciliationTransactionDetail = lazy(() => import("@/pages/financial/reconciliation/transaction-detail").then((module) => ({ default: module.ReconciliationTransactionDetailPage })));
 const ReconciliationFiscalDocumentsList = lazy(() => import("@/pages/financial/reconciliation/fiscal-documents-list").then((module) => ({ default: module.ReconciliationFiscalDocumentsListPage })));
+const ReconciliationFiscalDocumentDetail = lazy(() => import("@/pages/financial/reconciliation/fiscal-document-detail").then((module) => ({ default: module.ReconciliationFiscalDocumentDetailPage })));
 const ReconciliationCategoriesList = lazy(() => import("@/pages/financial/reconciliation/categories-list").then((module) => ({ default: module.ReconciliationCategoriesListPage })));
 const ReconciliationRecurringForecast = lazy(() => import("@/pages/financial/reconciliation/recurring-forecast").then((module) => ({ default: module.ReconciliationRecurringForecastPage })));
 const ReconciliationStatistics = lazy(() => import("@/pages/financial/statistics/reconciliation").then((module) => ({ default: module.ReconciliationStatisticsPage })));
@@ -1429,10 +1431,26 @@ function App() {
                   }
                 />
                 <Route
+                  path="/financeiro/conciliacao/transacoes/:id"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationTransactionDetail />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path={routes.financial.reconciliation.fiscalDocuments}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ReconciliationFiscalDocumentsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/financeiro/conciliacao/notas/:id"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationFiscalDocumentDetail />
                     </Suspense>
                   }
                 />

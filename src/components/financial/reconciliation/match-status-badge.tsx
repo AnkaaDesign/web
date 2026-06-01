@@ -141,20 +141,38 @@ export function CategoryChips({
 
 interface Props {
   status: ReconciliationStatus;
+  /** Best candidate confidence (0-100). When provided on a PENDING/PARTIAL row,
+   *  a colored "40%" chip is shown next to the status for quick triage. */
+  topMatchScore?: number | null;
   className?: string;
 }
 
 /**
  * Renders the reconciliation state as a status chip. Category tags live in
  * their own dedicated column (see CategoryChips) — this badge is status-only.
+ * For unresolved rows it can also surface the best candidate's confidence.
  */
-export function MatchStatusBadge({ status, className }: Props) {
+export function MatchStatusBadge({ status, topMatchScore, className }: Props) {
   const cfg = STATUS_VARIANT[status];
+  const showScore =
+    (status === "PENDING" || status === "PARTIAL") &&
+    typeof topMatchScore === "number" &&
+    topMatchScore > 0;
   return (
     <div className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
       <Badge variant={cfg} className="whitespace-nowrap">
         {STATUS_LABEL[status]}
       </Badge>
+      {showScore && (
+        <Badge
+          variant={getConfidenceBadgeVariant(topMatchScore!)}
+          size="sm"
+          className="whitespace-nowrap"
+          title="Confiança da melhor nota candidata"
+        >
+          {Math.round(topMatchScore!)}%
+        </Badge>
+      )}
     </div>
   );
 }

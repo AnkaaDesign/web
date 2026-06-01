@@ -15,6 +15,7 @@ import type {
   ReconciliationPaginatedResponse,
   ReconciliationStatistics,
   RecurringForecast,
+  SetFiscalItemCategoryPayload,
   TransactionCategory,
   TransactionCategoryListParams,
   TransactionFilters,
@@ -73,6 +74,12 @@ export const reconciliationService = {
 
   getFiscalDocument: (id: string) =>
     apiClient.get<FiscalDocument>(`/financial/reconciliation/fiscal-documents/${id}`),
+
+  setFiscalItemCategory: (fiscalItemId: string, payload: SetFiscalItemCategoryPayload) =>
+    apiClient.post<FiscalDocument>(
+      `/financial/reconciliation/fiscal-documents/items/${fiscalItemId}/category`,
+      payload,
+    ),
 
   matchTransaction: (transactionId: string, payload: ManualMatchPayload) =>
     apiClient.post<BankTransaction>(

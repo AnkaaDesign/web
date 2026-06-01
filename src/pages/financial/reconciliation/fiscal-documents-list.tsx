@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconCloudDownload,
   IconFilter,
@@ -13,20 +13,23 @@ import {
   type FiscalDocumentsFiltersUi,
 } from "@/components/financial/reconciliation/fiscal-documents-filter-sheet";
 import { FiscalDocumentsByDateAccordion } from "@/components/financial/reconciliation/fiscal-documents-by-date-accordion";
+import {
+  buildDatesForPeriod,
+  deriveDateRange,
+  effectivePeriodDates,
+} from "@/components/financial/reconciliation/date-utils";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
-import { FiscalDocumentDetailSheet } from "@/components/financial/reconciliation/fiscal-document-detail-sheet";
 import { XmlImportDialog } from "@/components/financial/reconciliation/xml-import-dialog";
 import {
-  useFiscalDocument,
   useFiscalDocuments,
   useSiegFetch,
   useSiegStatus,
 } from "@/hooks/financial/use-reconciliation";
-import { useUrlDialog } from "@/hooks/common/use-url-dialog";
+import { useDebouncedValue } from "@/hooks/common/use-debounced-value";
 import { useToast } from "@/hooks/common/use-toast";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { SECTOR_PRIVILEGES, FAVORITE_PAGES, routes } from "@/constants";
@@ -70,70 +73,34 @@ function parseFiltersFromUrl(params: URLSearchParams): FiscalDocumentsFiltersUi 
   };
 }
 
-/**
- * Build the inclusive list of YYYY-MM-DD strings for every day in every
- * selected month, capped at today for the current month. Mirrors the
- * transactions list helper so both pages render identically.
- */
-function buildDatesForPeriod(year: number, months: string[]): string[] {
-  const dates: string[] = [];
-  const today = new Date();
-  const todayYear = today.getFullYear();
-  const todayMonth = today.getMonth() + 1;
-  const todayDay = today.getDate();
-  const sortedMonths = [...months].sort();
-  for (const m of sortedMonths) {
-    const monthNum = parseInt(m, 10);
-    if (!monthNum || monthNum < 1 || monthNum > 12) continue;
-    let lastDay = new Date(year, monthNum, 0).getDate();
-    if (year === todayYear && monthNum === todayMonth) {
-      lastDay = Math.min(lastDay, todayDay);
-    } else if (year > todayYear || (year === todayYear && monthNum > todayMonth)) {
-      continue;
-    }
-    for (let d = 1; d <= lastDay; d++) {
-      const dd = String(d).padStart(2, "0");
-      const mm = String(monthNum).padStart(2, "0");
-      dates.push(`${year}-${mm}-${dd}`);
-    }
-  }
-  return dates.reverse();
-}
-
-function deriveDateRange(
-  year: number,
-  months: string[],
-): { dateFrom: string; dateTo: string } | null {
-  if (!months.length) return null;
-  const sorted = [...months]
-    .map(m => parseInt(m, 10))
-    .filter(n => n >= 1 && n <= 12)
-    .sort((a, b) => a - b);
-  if (!sorted.length) return null;
-  const firstMonth = sorted[0];
-  const lastMonth = sorted[sorted.length - 1];
-  const dateFrom = new Date(year, firstMonth - 1, 1, 0, 0, 0, 0).toISOString();
-  const dateTo = new Date(year, lastMonth, 0, 23, 59, 59, 999).toISOString();
-  return { dateFrom, dateTo };
-}
-
 export const ReconciliationFiscalDocumentsListPage = () => {
   usePageTracker({ title: "Notas Fiscais", icon: "receipt" });
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchText, setSearchText] = useState(searchParams.get("search") || "");
+  // Debounced value drives the server query + the matching-dates collapse so we
+  // don't refetch (pageSize=1000) on every keystroke.
+  const debouncedSearch = useDebouncedValue(searchText.trim(), 300);
   const [showFilters, setShowFilters] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [filters, setFilters] = useState<FiscalDocumentsFiltersUi>(() =>
     parseFiltersFromUrl(searchParams),
   );
 
+  // Backward-compat: a legacy `?nfId=` deeplink (old detail sheet) now routes to
+  // the standalone detail page.
+  useEffect(() => {
+    const nfId = searchParams.get("nfId");
+    if (nfId) navigate(routes.financial.reconciliation.fiscalDocumentDetail(nfId), { replace: true });
+  }, [searchParams, navigate]);
+
   const dateRange = useMemo(() => {
     if (!filters.year || !filters.months?.length) return null;
     return deriveDateRange(filters.year, filters.months);
   }, [filters.year, filters.months]);
 
-  const dates = useMemo(() => {
+  const periodDates = useMemo(() => {
     if (!filters.year || !filters.months?.length) return [];
     return buildDatesForPeriod(filters.year, filters.months);
   }, [filters.year, filters.months]);
@@ -143,7 +110,7 @@ export const ReconciliationFiscalDocumentsListPage = () => {
     pageSize: PERIOD_PAGE_SIZE,
     sortBy: "issueDate",
     sortDir: "desc",
-    search: searchText || undefined,
+    search: debouncedSearch || undefined,
     docType: filters.docType,
     operationType: filters.operationType,
     status: filters.status,
@@ -156,14 +123,26 @@ export const ReconciliationFiscalDocumentsListPage = () => {
     hasMatch: filters.hasMatch,
   });
 
-  const nfDialog = useUrlDialog("nfId");
-
-  const selectedFromList = useMemo(() => {
-    if (!nfDialog.value || !data) return null;
-    return data.data.find(d => d.id === nfDialog.value) ?? null;
-  }, [nfDialog.value, data]);
-  const { data: fetchedDoc } = useFiscalDocument(nfDialog.value ?? undefined);
-  const selectedDoc = fetchedDoc ?? selectedFromList ?? null;
+  // Collapse the calendar to only the days that contain a matching document
+  // (and auto-expand them) whenever a search OR any content filter narrows the
+  // result set; the default browse view keeps the full period calendar.
+  const narrowing = useMemo(
+    () =>
+      debouncedSearch.length > 0 ||
+      !!filters.docType ||
+      !!filters.operationType ||
+      !!filters.status ||
+      filters.valueMin !== undefined ||
+      filters.valueMax !== undefined ||
+      !!filters.emitCnpj ||
+      !!filters.destCnpj ||
+      filters.hasMatch !== undefined,
+    [debouncedSearch, filters],
+  );
+  const dates = useMemo(
+    () => effectivePeriodDates(periodDates, (data?.data ?? []).map(d => d.issueDate), narrowing),
+    [periodDates, data, narrowing],
+  );
 
   const siegStatus = useSiegStatus();
   const siegFetch = useSiegFetch();
@@ -320,10 +299,14 @@ export const ReconciliationFiscalDocumentsListPage = () => {
                   onClick={() => setShowFilters(true)}
                   className="group"
                 >
-                  <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                  <span className="text-foreground">
-                    Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-                  </span>
+                  <IconFilter
+                    className={
+                      activeFilterCount > 0
+                        ? "h-4 w-4"
+                        : "h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors"
+                    }
+                  />
+                  <span>Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}</span>
                 </Button>
               </div>
 
@@ -332,7 +315,10 @@ export const ReconciliationFiscalDocumentsListPage = () => {
                   data={data?.data ?? []}
                   dates={dates}
                   isLoading={isLoading}
-                  onViewDetails={doc => nfDialog.set(doc.id)}
+                  autoExpand={narrowing}
+                  onViewDetails={doc =>
+                    navigate(routes.financial.reconciliation.fiscalDocumentDetail(doc.id))
+                  }
                 />
               </div>
             </CardContent>
@@ -345,12 +331,6 @@ export const ReconciliationFiscalDocumentsListPage = () => {
         onOpenChange={setShowFilters}
         filters={filters}
         onApply={handleFilterApply}
-      />
-
-      <FiscalDocumentDetailSheet
-        doc={selectedDoc}
-        open={nfDialog.open}
-        onOpenChange={open => !open && nfDialog.clear()}
       />
 
       <XmlImportDialog open={importOpen} onOpenChange={setImportOpen} />
