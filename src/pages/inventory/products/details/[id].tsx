@@ -1,5 +1,6 @@
+import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useItem } from "../../../../hooks";
+import { useItem, useOrderSchedules, useOrderScheduleProjection } from "../../../../hooks";
 import { routes, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { Button } from "@/components/ui/button";
 import { IconAlertTriangle, IconRefresh, IconEdit } from "@tabler/icons-react";
@@ -95,6 +96,41 @@ const ProductDetailsPage = () => {
   });
 
   const item = response?.data;
+
+  // This item's purchasing is governed by any active order schedule that lists it.
+  // The schedule's projected "expected" quantity (gap + one cycle) is what actually
+  // gets ordered — so surface that on the detail page instead of the standalone
+  // restock-to-max suggestion, which is never used for scheduled items.
+  const { data: schedulesResponse } = useOrderSchedules({
+    where: { isActive: true },
+    limit: 100,
+    enabled: !!item,
+  });
+
+  const targetSchedule = useMemo(() => {
+    if (!item) return null;
+    const matches = (schedulesResponse?.data || []).filter((s) => Array.isArray(s.items) && s.items.includes(item.id));
+    // Prefer the schedule that fires soonest — that's the next order this item will be in.
+    return (
+      matches.sort((a, b) => new Date(a.nextRun || 0).getTime() - new Date(b.nextRun || 0).getTime())[0] || null
+    );
+  }, [schedulesResponse, item]);
+
+  const { data: scheduleProjectionResponse } = useOrderScheduleProjection(targetSchedule?.id || "", {
+    enabled: !!targetSchedule?.id,
+  });
+
+  const scheduledNextOrder = useMemo(() => {
+    if (!item || !targetSchedule) return null;
+    const projItem = scheduleProjectionResponse?.data?.items?.find((p) => p.itemId === item.id);
+    if (!projItem) return null;
+    return {
+      quantity: projItem.quantityGapPlusCycle,
+      scheduleName: targetSchedule.name,
+      scheduleId: targetSchedule.id,
+      nextRun: scheduleProjectionResponse?.data?.meta?.nextRun ?? targetSchedule.nextRun ?? null,
+    };
+  }, [item, targetSchedule, scheduleProjectionResponse]);
 
   if (isLoading) {
     return (
@@ -210,7 +246,7 @@ const ProductDetailsPage = () => {
             <MetricsCard item={item} />
 
             {/* Stock calculation breakdown — read-only, computed by the API */}
-            <CalculationBreakdownCard item={item} />
+            <CalculationBreakdownCard item={item} scheduledNextOrder={scheduledNextOrder} />
 
             {/* PPE Information - Show only if item is a PPE */}
             {item.ppeType && (

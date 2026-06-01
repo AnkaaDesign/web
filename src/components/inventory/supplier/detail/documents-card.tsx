@@ -1,9 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconFileText, IconBuilding, IconFileTypePdf, IconCertificate } from "@tabler/icons-react";
+import { IconFileText, IconFileTypePdf, IconCertificate } from "@tabler/icons-react";
 import type { Supplier } from "../../../../types";
 import type { File as AnkaaFile } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { maskCNPJ } from "../../../../utils";
 import { FileItem } from "@/components/common/file";
 
 interface DocumentsCardProps {
@@ -23,7 +22,7 @@ export function DocumentsCard({
   otherDocuments = []
 }: DocumentsCardProps) {
   const allDocuments = [...contracts, ...certificates, ...otherDocuments];
-  const hasDocuments = supplier.cnpj || allDocuments.length > 0;
+  const hasDocuments = allDocuments.length > 0;
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
@@ -37,22 +36,6 @@ export function DocumentsCard({
         <div className="space-y-6">
           {hasDocuments ? (
             <>
-              {/* CNPJ Information */}
-              {supplier.cnpj && (
-                <div>
-                  <h3 className="text-base font-semibold mb-4 text-foreground">Documentação Legal</h3>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <IconBuilding className="h-4 w-4" />
-                        CNPJ
-                      </span>
-                      <span className="text-sm font-semibold text-foreground">{maskCNPJ(supplier.cnpj)}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Contracts Section */}
               {contracts.length > 0 && (
                 <div>

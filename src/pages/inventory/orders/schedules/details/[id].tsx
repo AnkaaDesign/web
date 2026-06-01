@@ -6,7 +6,6 @@ import {
   IconCalendar,
   IconEdit,
   IconTrash,
-  IconPackage,
   IconCircleCheck,
   IconCalendarCheck,
   IconCalendarClock,
@@ -19,8 +18,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDate, formatDateTime, formatNumber, formatCurrency } from "../../../../../utils";
+import { formatDate, formatDateTime, formatCurrency } from "../../../../../utils";
 import { useOrderSchedule, useOrderScheduleMutations, useItems, useOrderScheduleProjection, useTriggerOrderSchedule } from "../../../../../hooks";
 import { routes, getDynamicFrequencyLabel, CHANGE_LOG_ENTITY_TYPE, WEEK_DAY_LABELS, MONTH_LABELS, MONTH_OCCURRENCE_LABELS } from "../../../../../constants";
 import type { WEEK_DAY, MONTH, MONTH_OCCURRENCE } from "../../../../../constants";
@@ -44,8 +42,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { MeasureDisplayCompact } from "@/components/inventory/item/common/measure-display";
+import { ScheduleItemsCard } from "@/components/inventory/order-schedule/detail/schedule-items-card";
 import { toast } from "@/components/ui/sonner";
 import type { OrderScheduleCascadeMode } from "../../../../../types";
 import { cn } from "@/lib/utils";
@@ -88,6 +85,9 @@ export function OrderScheduleDetailsPage() {
       category: true,
       measures: true,
     },
+    // Fetch every scheduled item — without an explicit limit the list query
+    // falls back to the default page size (20) and silently drops the rest.
+    limit: itemIds.length || 1,
     enabled: itemIds.length > 0,
   });
 
@@ -102,7 +102,6 @@ export function OrderScheduleDetailsPage() {
 
   const projection = projectionResponse?.data;
   const projectionMeta = projection?.meta;
-  const projectionByItem = new Map((projection?.items || []).map((p) => [p.itemId, p]));
 
   if (isLoading) {
     return (
@@ -275,25 +274,6 @@ export function OrderScheduleDetailsPage() {
       return `Data específica: ${formatDate(new Date(schedule.specificDate))}`;
     }
     return null;
-  };
-
-  // Skipped/zero projection cells show "—". When the API explains why (reasonGapOnly/
-  // reasonGapPlusCycle), surface it as a tooltip instead of a bare dash.
-  const renderSkippableCell = (value: string | null, reason?: string | null) => {
-    if (value !== null) return value;
-    if (!reason) return "—";
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-help text-muted-foreground underline decoration-dotted underline-offset-2">—</span>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p className="max-w-xs text-xs">{reason}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
   };
 
   return (
@@ -475,111 +455,12 @@ export function OrderScheduleDetailsPage() {
 
           {/* Items Card — full width, after the changelog */}
           <div className="animate-in fade-in-50 duration-1000">
-            <Card className="shadow-sm border border-border flex flex-col">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2">
-                  <IconPackage className="h-5 w-5 text-muted-foreground" />
-                  Itens do Agendamento
-                  {items.length > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {items.length}
-                    </Badge>
-                  )}
-                </CardTitle>
-                {items.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    As colunas mostram o que cada opção de <span className="font-medium">Executar agora</span> vai pedir — o total de cada coluna é igual ao botão correspondente.
-                    {projectionMeta && projectionMeta.scheduledTotal > 0 && (
-                      <>
-                        {" "}Estimativa do próximo pedido automático
-                        {projectionMeta.scheduledDate ? ` (${formatDate(new Date(projectionMeta.scheduledDate))})` : ""}:{" "}
-                        <span className="font-medium text-foreground">{formatCurrency(projectionMeta.scheduledTotal)}</span>.
-                      </>
-                    )}
-                  </p>
-                )}
-              </CardHeader>
-              <CardContent className="pt-0 flex-1">
-                {items.length > 0 ? (
-                  <>
-                    <div className="border rounded-lg overflow-hidden dark:border-border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="font-semibold">Código</TableHead>
-                          <TableHead className="font-semibold">Nome</TableHead>
-                          <TableHead className="font-semibold">Marca</TableHead>
-                          <TableHead className="font-semibold">Categoria</TableHead>
-                          <TableHead className="font-semibold text-right">Estoque</TableHead>
-                          <TableHead className="font-semibold">Medidas</TableHead>
-                          {hasGapOption && (
-                            <>
-                              <TableHead className="font-semibold text-right">Qtd. até a próxima</TableHead>
-                              <TableHead className="font-semibold text-right">Preço até a próxima</TableHead>
-                            </>
-                          )}
-                          <TableHead className="font-semibold text-right">Quantidade esperada</TableHead>
-                          <TableHead className="font-semibold text-right">Preço esperado</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {items.map((item) => {
-                          const p = projectionByItem.get(item.id);
-                          const gapOnlyQty = p && p.quantityGapOnly > 0;
-                          const gpcQty = p && p.quantityGapPlusCycle > 0;
-                          return (
-                          <TableRow
-                            key={item.id}
-                            className="cursor-pointer hover:bg-muted/30"
-                            onClick={() => navigate(routes.inventory.products.details(item.id))}
-                          >
-                            <TableCell className="font-mono text-sm">{item.uniCode || "-"}</TableCell>
-                            <TableCell className="font-medium">{item.name}</TableCell>
-                            <TableCell>{item.brand?.name || "-"}</TableCell>
-                            <TableCell>{item.category?.name || "-"}</TableCell>
-                            <TableCell className="text-right tabular-nums">{formatNumber(item.quantity)}</TableCell>
-                            <TableCell><MeasureDisplayCompact item={item} /></TableCell>
-                            {hasGapOption && (
-                              <>
-                                <TableCell className="text-right tabular-nums">{renderSkippableCell(gapOnlyQty ? formatNumber(p!.quantityGapOnly) : null, p?.reasonGapOnly)}</TableCell>
-                                <TableCell className="text-right tabular-nums">{renderSkippableCell(gapOnlyQty ? formatCurrency(p!.totalGapOnly) : null, p?.reasonGapOnly)}</TableCell>
-                              </>
-                            )}
-                            <TableCell className="text-right tabular-nums">{renderSkippableCell(gpcQty ? formatNumber(p!.quantityGapPlusCycle) : null, p?.reasonGapPlusCycle)}</TableCell>
-                            <TableCell className="text-right tabular-nums">{renderSkippableCell(gpcQty ? formatCurrency(p!.totalGapPlusCycle) : null, p?.reasonGapPlusCycle)}</TableCell>
-                          </TableRow>
-                          );
-                        })}
-                        {projectionMeta && (
-                          <TableRow className="bg-muted/50 font-semibold">
-                            <TableCell colSpan={6} className="text-right">Total</TableCell>
-                            {hasGapOption && (
-                              <>
-                                <TableCell />
-                                <TableCell className="text-right tabular-nums">{formatCurrency(projectionMeta.gapOnlyTotal)}</TableCell>
-                              </>
-                            )}
-                            <TableCell />
-                            <TableCell className="text-right tabular-nums">{formatCurrency(projectionMeta.gapPlusCycleTotal)}</TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="p-4 bg-muted/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                      <IconPackage className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-semibold mb-2 text-foreground">Nenhum item configurado</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Este agendamento não possui itens configurados.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <ScheduleItemsCard
+              items={items}
+              projection={projection?.items}
+              projectionMeta={projectionMeta}
+              hasGapOption={hasGapOption}
+            />
           </div>
         </div>
       </div>

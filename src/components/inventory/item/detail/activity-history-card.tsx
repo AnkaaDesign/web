@@ -16,6 +16,9 @@ interface ActivityHistoryCardProps {
   maxHeight?: string;
 }
 
+// Round movement quantities for display — integers stay clean, fractions cap at 2 decimals.
+const fmtQty = (value: number) => (value ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+
 const ACTIVITY_TYPE_COLORS: Record<string, { bg: string; icon: string; text: string }> = {
   [ACTIVITY_REASON.ORDER_RECEIVED]: { bg: "bg-muted/50", icon: "text-muted-foreground", text: "text-foreground" },
   [ACTIVITY_REASON.PRODUCTION_USAGE]: { bg: "bg-primary/10", icon: "text-primary", text: "text-foreground" },
@@ -132,27 +135,27 @@ export function ActivityHistoryCard({ item, className, maxHeight = "500px" }: Ac
               </div>
             </div>
 
-            <div className="bg-green-50/80 dark:bg-green-900/20 rounded-lg p-4 border border-green-200/40 dark:border-green-700/40">
+            <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
               <div className="flex flex-col justify-between h-full">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 rounded-lg bg-green-200/50 dark:bg-green-800/50">
-                    <IconTrendingUp className="h-4 w-4 text-green-700 dark:text-green-300" />
+                  <div className="p-2 rounded-lg bg-primary/15">
+                    <IconTrendingUp className="h-4 w-4 text-primary" />
                   </div>
-                  <span className="text-xs font-medium text-green-800 dark:text-green-200 line-clamp-2">Total de Entradas</span>
+                  <span className="text-xs font-medium text-primary line-clamp-2">Total de Entradas</span>
                 </div>
-                <p className="text-2xl font-bold text-green-800 dark:text-green-200">+{statistics.totalIn}</p>
+                <p className="text-2xl font-bold text-primary">+{fmtQty(statistics.totalIn)}</p>
               </div>
             </div>
 
-            <div className="bg-red-50/80 dark:bg-red-900/20 rounded-lg p-4 border border-red-200/40 dark:border-red-700/40">
+            <div className="bg-destructive/10 rounded-lg p-4 border border-destructive/20">
               <div className="flex flex-col justify-between h-full">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 rounded-lg bg-red-200/50 dark:bg-red-800/50">
-                    <IconTrendingDown className="h-4 w-4 text-red-700 dark:text-red-300" />
+                  <div className="p-2 rounded-lg bg-destructive/15">
+                    <IconTrendingDown className="h-4 w-4 text-destructive" />
                   </div>
-                  <span className="text-xs font-medium text-red-800 dark:text-red-200 line-clamp-2">Total de Saídas</span>
+                  <span className="text-xs font-medium text-destructive line-clamp-2">Total de Saídas</span>
                 </div>
-                <p className="text-2xl font-bold text-red-800 dark:text-red-200">-{statistics.totalOut}</p>
+                <p className="text-2xl font-bold text-destructive">-{fmtQty(statistics.totalOut)}</p>
               </div>
             </div>
           </div>
@@ -217,14 +220,14 @@ export function ActivityHistoryCard({ item, className, maxHeight = "500px" }: Ac
                                     </Badge>
                                     <Badge
                                       className={cn(
-                                        "font-medium border text-white",
+                                        "font-medium border",
                                         activity.operation === ACTIVITY_OPERATION.INBOUND
-                                          ? "bg-green-700 hover:bg-green-800 border-green-700"
-                                          : "bg-red-700 hover:bg-red-800 border-red-700",
+                                          ? "bg-primary hover:bg-primary/90 border-primary text-primary-foreground"
+                                          : "bg-destructive hover:bg-destructive/90 border-destructive text-destructive-foreground",
                                       )}
                                     >
                                       <span className="font-enhanced-unicode sort-arrow">{activity.operation === ACTIVITY_OPERATION.INBOUND ? "↑" : "↓"}</span>{" "}
-                                      {Math.abs(activity.quantity)}
+                                      {fmtQty(Math.abs(activity.quantity))}
                                     </Badge>
                                   </div>
                                   <div className="text-sm text-muted-foreground">{formatRelativeTime(activity.createdAt)}</div>

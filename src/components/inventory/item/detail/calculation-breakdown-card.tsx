@@ -1,11 +1,5 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   Tooltip,
   TooltipContent,
@@ -14,7 +8,6 @@ import {
 } from "@/components/ui/tooltip";
 import {
   IconCalculator,
-  IconChevronDown,
   IconClipboardList,
   IconHelpCircle,
   IconTrendingUp,
@@ -24,11 +17,23 @@ import {
 } from "@tabler/icons-react";
 import type { Item } from "../../../../types";
 import { ABC_CATEGORY_LABELS, XYZ_CATEGORY_LABELS } from "../../../../constants";
+import { formatDate } from "../../../../utils";
 import { cn } from "@/lib/utils";
+
+interface ScheduledNextOrder {
+  quantity: number;
+  scheduleName?: string | null;
+  scheduleId?: string;
+  nextRun?: string | null;
+}
 
 interface CalculationBreakdownCardProps {
   item: Item;
   className?: string;
+  // When the item belongs to an active order schedule, this is the quantity that
+  // schedule will actually order next (gap + one cycle). It replaces the standalone
+  // restock-to-max suggestion, which is never used for scheduled items.
+  scheduledNextOrder?: ScheduledNextOrder | null;
 }
 
 // Plain Portuguese explanations for ABC/XYZ pairs (algorithm-spec §15)
@@ -118,8 +123,7 @@ function formatTrend(trend: number | null | undefined) {
   };
 }
 
-export function CalculationBreakdownCard({ item, className }: CalculationBreakdownCardProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function CalculationBreakdownCard({ item, className, scheduledNextOrder }: CalculationBreakdownCardProps) {
   const trend = formatTrend(item.monthlyConsumptionTrendPercent);
   const TrendIcon = trend.icon;
 
@@ -152,44 +156,24 @@ export function CalculationBreakdownCard({ item, className }: CalculationBreakdo
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-t-lg"
-            aria-expanded={isOpen}
-          >
-            <CardHeader className="pb-4 hover:bg-muted/30 transition-colors rounded-t-lg">
-              <div className="flex items-start justify-between gap-2 flex-wrap">
-                <CardTitle className="flex items-center gap-2">
-                  <IconCalculator className="h-5 w-5 text-muted-foreground" />
-                  Cálculo de Estoque
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  {item.hasActiveOrder && (
-                    <Badge variant="info" className="flex items-center gap-1">
-                      <IconShoppingCart className="h-3 w-3" />
-                      Pedido em aberto
-                    </Badge>
-                  )}
-                  <IconChevronDown
-                    className={cn(
-                      "h-5 w-5 text-muted-foreground transition-transform duration-200",
-                      isOpen && "rotate-180",
-                    )}
-                  />
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                Valores calculados automaticamente a partir do consumo e do tempo de entrega.
-                Clique para ver os detalhes.
-              </p>
-            </CardHeader>
-          </button>
-        </CollapsibleTrigger>
-
-        <CollapsibleContent>
-          <CardContent className="pt-0 flex-1 space-y-6">
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <CardTitle className="flex items-center gap-2">
+            <IconCalculator className="h-5 w-5 text-muted-foreground" />
+            Cálculo de Estoque
+          </CardTitle>
+          {item.hasActiveOrder && (
+            <Badge variant="info" className="flex items-center gap-1">
+              <IconShoppingCart className="h-3 w-3" />
+              Pedido em aberto
+            </Badge>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground mt-1">
+          Valores calculados automaticamente a partir do consumo e do tempo de entrega.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-0 flex-1 space-y-6">
             {/* Inputs do cálculo */}
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
@@ -351,19 +335,32 @@ export function CalculationBreakdownCard({ item, className }: CalculationBreakdo
                     {maxFormulaText}
                   </div>
                 </div>
-                <div className="flex items-center justify-between bg-primary/5 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    Quantidade sugerida para o próximo pedido
-                  </span>
-                  <span className="font-semibold text-base text-primary">
-                    {formatNumber(item.reorderQuantity)}
-                  </span>
-                </div>
+                {scheduledNextOrder ? (
+                  <div className="flex items-center justify-between gap-4 bg-primary/5 rounded-lg px-4 py-3">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-foreground">Próximo pedido (agendamento)</span>
+                      <span className="text-xs text-muted-foreground">
+                        {scheduledNextOrder.scheduleName ? `${scheduledNextOrder.scheduleName}` : "Agendamento ativo"}
+                        {scheduledNextOrder.nextRun ? ` · ${formatDate(new Date(scheduledNextOrder.nextRun))}` : ""}
+                      </span>
+                    </div>
+                    <span className="font-semibold text-base text-primary whitespace-nowrap">
+                      {formatNumber(scheduledNextOrder.quantity)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between bg-primary/5 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Quantidade sugerida para o próximo pedido
+                    </span>
+                    <span className="font-semibold text-base text-primary">
+                      {formatNumber(item.reorderQuantity)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
-          </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
+      </CardContent>
     </Card>
   );
 }
