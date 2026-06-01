@@ -884,7 +884,7 @@ export default function BonusListPage() {
             return "Bônus";
           })()}
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_BONUS_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }, { label: "Bônus" }]}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.humanResources.root }, { label: "Bônus" }]}
           actions={[
             {
               key: "rules",

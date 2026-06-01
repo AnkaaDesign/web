@@ -18,7 +18,7 @@ export const PositionListPage = () => {
         <PageHeader
           title="Cargos"
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }, { label: "Cargos" }]}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.humanResources.root }, { label: "Cargos" }]}
           actions={[
             {
               key: "hierarchy",

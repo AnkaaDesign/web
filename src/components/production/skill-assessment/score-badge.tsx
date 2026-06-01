@@ -62,6 +62,24 @@ const SCORE_CLASSES: Record<number, string> = {
 const FALLBACK_CLASS =
   "border-transparent bg-neutral-200 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-200";
 
+// Hex equivalents of the SCORE_CLASSES palette above — the single source of
+// truth for colouring score values in canvas charts (ECharts), where Tailwind
+// classes can't be used. Keep in lockstep with SCORE_CLASSES.
+export const SCORE_HEX: Record<number, string> = {
+  0: "#7e22ce", // purple-700
+  1: "#b91c1c", // red-700
+  2: "#ea580c", // orange-600
+  3: "#0f766e", // teal-700
+  4: "#1d4ed8", // blue-700
+  5: "#15803d", // green-700
+};
+
+/** Score (0..5, rounded) → palette hex, with a neutral fallback. */
+export function getScoreHex(score: number | null | undefined, fallback = "#71717a"): string {
+  if (score == null || !Number.isFinite(score)) return fallback;
+  return SCORE_HEX[Math.round(score) as 0 | 1 | 2 | 3 | 4 | 5] ?? fallback;
+}
+
 /**
  * Returns the raw Tailwind class string for a given score. Useful when you
  * need to colour a non-Badge element (e.g. a radio card swatch) with the

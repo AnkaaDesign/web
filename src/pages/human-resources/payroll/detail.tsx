@@ -358,7 +358,7 @@ export default function PayrollDetailPage() {
 
   const breadcrumbs = [
     { label: "Início", href: routes.home },
-    { label: "Recursos Humanos" },
+    { label: "Recursos Humanos", href: routes.humanResources.root },
     { label: "Folha de Pagamento", href: routes.humanResources.payroll.root },
     { label: title },
   ];

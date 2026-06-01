@@ -78,7 +78,7 @@ export const SectorBatchEditPage = () => {
             icon={IconBuildingSkyscraper}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Administração" },
+              { label: "Administração", href: routes.administration.root },
               { label: "Setores", href: routes.administration.sectors.root },
               { label: "Edição em Lote" },
             ]}
@@ -109,7 +109,7 @@ export const SectorBatchEditPage = () => {
             icon={IconBuildingSkyscraper}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Administração" },
+              { label: "Administração", href: routes.administration.root },
               { label: "Setores", href: routes.administration.sectors.root },
               { label: "Edição em Lote" },
             ]}
@@ -146,7 +146,7 @@ export const SectorBatchEditPage = () => {
           icon={IconBuildingSkyscraper}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Administração" },
+            { label: "Administração", href: routes.administration.root },
             { label: "Setores", href: routes.administration.sectors.root },
             { label: "Edição em Lote" },
           ]}

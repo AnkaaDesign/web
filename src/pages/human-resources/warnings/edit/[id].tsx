@@ -60,7 +60,7 @@ export const WarningEditPage = () => {
           icon={IconAlertTriangle}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos" },
+            { label: "Recursos Humanos", href: routes.humanResources.root },
             { label: "Advertências", href: routes.humanResources.warnings.root },
             { label: warning.data.collaborator?.name || "Advertência", href: routes.humanResources.warnings.details(id) },
             { label: "Editar" },

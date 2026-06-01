@@ -93,7 +93,7 @@ const CollaboratorDetailsPage = () => {
           title={user.name}
           breadcrumbs={[
             { label: "Início", href: "/" },
-            { label: "Administração" },
+            { label: "Administração", href: routes.administration.root },
             { label: "Colaboradores", href: routes.administration.collaborators.root },
             { label: user.name },
           ]}

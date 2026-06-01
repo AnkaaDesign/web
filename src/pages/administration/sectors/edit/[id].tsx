@@ -56,7 +56,7 @@ export const SectorEditPage = () => {
             icon={IconBuildingSkyscraper}
             breadcrumbs={[
               { label: "Início", href: "/" },
-              { label: "Administração" },
+              { label: "Administração", href: routes.administration.root },
               { label: "Setores", href: routes.administration.sectors.root },
               { label: sector.data.name || "Carregando...", href: routes.administration.sectors.details(id) },
               { label: "Editar" },

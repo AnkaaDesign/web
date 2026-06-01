@@ -161,7 +161,7 @@ export const TopicEditPage = () => {
             icon={IconClipboardList}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Administração" },
+              { label: "Administração", href: routes.administration.root },
               { label: "Tópicos", href: routes.administration.topic.root },
               { label: topic.title, href: routes.administration.topic.details(id) },
               { label: "Editar" },

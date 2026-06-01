@@ -164,7 +164,7 @@ export const ReconciliationRecurringForecastPage = () => {
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Financeiro", href: routes.financial.root },
-            { label: "Conciliação Bancária" },
+            { label: "Conciliação Bancária", href: routes.financial.reconciliation.root },
             { label: "Recorrentes" },
           ]}
           className="flex-shrink-0"

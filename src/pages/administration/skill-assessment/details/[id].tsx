@@ -228,7 +228,7 @@ export const SkillAssessmentDetailsPage = () => {
           icon={IconClipboardList}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Administração" },
+            { label: "Administração", href: routes.administration.root },
             { label: "Avaliação de Competências", href: routes.administration.skillAssessment.root },
             { label: assessment.name },
           ]}

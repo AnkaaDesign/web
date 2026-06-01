@@ -62,12 +62,42 @@ import type {
   UpdateTransactionCategoryPayload,
 } from "@/types/reconciliation";
 
-const DEFAULT_PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 40;
 
 const KIND_LABEL: Record<TransactionCategoryKind, string> = {
   ITEM_DERIVED: "Item",
   SERVICE: "Serviço",
   TRANSACTION_ONLY: "Transação",
+};
+
+// Grouping order for the list: editable transaction categories first, then
+// services, then item-derived (read-only mirrors). Drives the primary sort.
+const KIND_ORDER: Record<TransactionCategoryKind, number> = {
+  TRANSACTION_ONLY: 0,
+  SERVICE: 1,
+  ITEM_DERIVED: 2,
+};
+
+// Default multi-column sort applied on first load (no sort in the URL):
+// type (Transação → Serviço → Item) → recurring first → name A→Z. Matches the
+// interactive sort headers below so clicking a column refines from here.
+// Module-level constant keeps a stable reference for useTableState/useMemo.
+const DEFAULT_SORT: Array<{ column: string; direction: "asc" | "desc" }> = [
+  { column: "kind", direction: "asc" },
+  { column: "isRecurring", direction: "desc" },
+  { column: "name", direction: "asc" },
+];
+
+// Per-column sort key extractors. Returns a comparable primitive so the same
+// comparator handles every sortable column (enums map to their group order).
+const SORT_ACCESSORS: Record<
+  string,
+  (c: TransactionCategory) => number | string
+> = {
+  name: c => c.name,
+  kind: c => KIND_ORDER[c.kind],
+  isRecurring: c => (c.isRecurring ? 1 : 0),
+  isActive: c => (c.isActive ? 1 : 0),
 };
 
 const KIND_VARIANT: Record<
@@ -113,17 +143,41 @@ export const ReconciliationCategoriesListPage = () => {
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
-  // Client-side pagination state (0-based page).
-  const { page, pageSize, setPage, setPageSize } = useTableState({
+  // Client-side pagination + interactive sort state (0-based page). Sort lives
+  // in the URL with a multi-column default; clicking a header refines it, just
+  // like the server-side tables elsewhere in the app.
+  const {
+    page,
+    pageSize,
+    setPage,
+    setPageSize,
+    sortConfigs,
+    toggleSort,
+    getSortDirection,
+    getSortOrder,
+  } = useTableState({
     defaultPageSize: DEFAULT_PAGE_SIZE,
+    defaultSort: DEFAULT_SORT,
   });
 
-  // Full sorted list.
+  // Full sorted list. Applies the active sort configs in priority order, with a
+  // stable name tiebreak so equal rows keep a deterministic order.
   const sorted = useMemo(() => {
-    return [...(categories ?? [])].sort(
-      (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
-    );
-  }, [categories]);
+    return [...(categories ?? [])].sort((a, b) => {
+      for (const { column, direction } of sortConfigs) {
+        const accessor = SORT_ACCESSORS[column];
+        if (!accessor) continue;
+        const av = accessor(a);
+        const bv = accessor(b);
+        const cmp =
+          typeof av === "string" && typeof bv === "string"
+            ? av.localeCompare(bv, "pt-BR")
+            : Number(av) - Number(bv);
+        if (cmp !== 0) return direction === "asc" ? cmp : -cmp;
+      }
+      return a.name.localeCompare(b.name, "pt-BR");
+    });
+  }, [categories, sortConfigs]);
 
   // Apply text filter.
   const filtered = useMemo(() => {
@@ -185,6 +239,7 @@ export const ReconciliationCategoriesListPage = () => {
     {
       key: "name",
       header: "Nome",
+      sortable: true,
       render: c => (
         <div
           className={`flex items-center gap-2 min-w-0 ${c.isActive ? "" : "opacity-50"}`}
@@ -202,7 +257,8 @@ export const ReconciliationCategoriesListPage = () => {
     {
       key: "kind",
       header: "Tipo",
-      width: "140px",
+      width: "180px",
+      sortable: true,
       render: c => (
         <span className={c.isActive ? "" : "opacity-50"}>
           <Badge variant={KIND_VARIANT[c.kind]} size="sm">
@@ -214,8 +270,9 @@ export const ReconciliationCategoriesListPage = () => {
     {
       key: "isRecurring",
       header: "Recorrente",
-      width: "130px",
+      width: "170px",
       align: "center",
+      sortable: true,
       render: c =>
         c.isRecurring ? (
           <Badge variant="inProgress" size="sm">
@@ -228,8 +285,9 @@ export const ReconciliationCategoriesListPage = () => {
     {
       key: "isActive",
       header: "Status",
-      width: "130px",
+      width: "170px",
       align: "center",
+      sortable: true,
       render: c =>
         c.isActive ? (
           <Badge variant="completed" size="sm">
@@ -255,7 +313,7 @@ export const ReconciliationCategoriesListPage = () => {
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Financeiro", href: routes.financial.root },
-            { label: "Conciliação Bancária" },
+            { label: "Conciliação Bancária", href: routes.financial.reconciliation.root },
             { label: "Categorias" },
           ]}
           actions={[
@@ -289,10 +347,18 @@ export const ReconciliationCategoriesListPage = () => {
 
               <div className="flex-1 min-h-0 overflow-auto">
                 <StandardizedTable
+                  className="h-full"
                   columns={columns}
                   data={pageItems}
                   getItemKey={c => c.id}
                   onContextMenu={handleContextMenu}
+                  onSort={toggleSort}
+                  getSortDirection={getSortDirection}
+                  getSortOrder={getSortOrder}
+                  sortConfigs={sortConfigs.map(s => ({
+                    field: s.column,
+                    direction: s.direction,
+                  }))}
                   isLoading={isLoading}
                   emptyMessage="Nenhuma categoria cadastrada"
                   emptyIcon={IconCategory}
@@ -305,7 +371,7 @@ export const ReconciliationCategoriesListPage = () => {
                     setPageSize(size);
                     setPage(0);
                   }}
-                  pageSizeOptions={[20, 50]}
+                  pageSizeOptions={[40, 60, 100]}
                   showPageSizeSelector
                   showGoToPage
                   showPageInfo

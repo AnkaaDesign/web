@@ -92,7 +92,7 @@ export const QuestionnaireEntryDetailsPage = () => {
           icon={IconClipboardList}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Administração" },
+            { label: "Administração", href: routes.administration.root },
             { label: "Questionários", href: routes.administration.questionnaire.root },
             { label: entry.questionnaire?.name ?? "Questionário", href: routes.administration.questionnaire.details(id) },
             { label: entry.respondent?.name ?? "Resposta" },

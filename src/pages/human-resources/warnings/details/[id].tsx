@@ -98,7 +98,7 @@ export const WarningDetailPage = () => {
           title="Detalhes da Advertência"
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos" },
+            { label: "Recursos Humanos", href: routes.humanResources.root },
             { label: "Advertências", href: routes.humanResources.warnings.root },
             { label: warning.data?.collaborator?.name || "Advertência" },
           ]}

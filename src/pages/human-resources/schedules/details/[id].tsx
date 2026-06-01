@@ -82,7 +82,7 @@ export const ScheduleDetailsPage = () => {
           title={schedule.Descricao || schedule.Codigo || "Horário"}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos" },
+            { label: "Recursos Humanos", href: routes.humanResources.root },
             { label: "Horários", href: routes.humanResources.horarios.root },
             { label: schedule.Descricao || schedule.Codigo || "Detalhes" },
           ]}

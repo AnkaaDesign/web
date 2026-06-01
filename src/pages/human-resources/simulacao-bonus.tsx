@@ -21,7 +21,7 @@ export default function BonusSimulationPage() {
           icon={IconCalculator}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Administração" },
+            { label: "Administração", href: routes.administration.root },
             { label: "Simulação de Bônus" }
           ]}
           actions={[]}

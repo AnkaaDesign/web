@@ -17,7 +17,7 @@ export const SectorListPage = () => {
         <PageHeader
           title="Setores"
           favoritePage={FAVORITE_PAGES.ADMINISTRACAO_SETORES_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }, { label: "Setores" }]}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração", href: routes.administration.root }, { label: "Setores" }]}
           actions={[
             {
               key: "new",

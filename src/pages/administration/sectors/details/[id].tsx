@@ -115,7 +115,7 @@ export const SectorDetailPage = () => {
           variant="detail"
           entity={sector}
           title={sector.name}
-          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Administração" }, { label: "Setores", href: routes.administration.sectors.root }, { label: sector.name }]}
+          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Administração", href: routes.administration.root }, { label: "Setores", href: routes.administration.sectors.root }, { label: sector.name }]}
           actions={[
             {
               key: "refresh",

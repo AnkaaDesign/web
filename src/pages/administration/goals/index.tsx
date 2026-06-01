@@ -93,7 +93,7 @@ export function GoalListPage() {
           favoritePage={FAVORITE_PAGES.ADMINISTRACAO_METAS_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Administração" },
+            { label: "Administração", href: routes.administration.root },
             { label: "Metas" },
           ]}
           actions={[

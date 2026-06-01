@@ -9,6 +9,7 @@
 // All charts use ECharts via the shared StatisticsChart / StatisticsRadarChart.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import {
@@ -72,6 +73,9 @@ import {
   SkillStatsEntriesModal,
   type SkillStatsClickContext,
 } from '@/components/human-resources/statistics/skill-stats-entries-modal';
+import { SkillTopicsModal } from '@/components/human-resources/statistics/skill-topics-modal';
+import { SkillInfoModal } from '@/components/human-resources/statistics/skill-info-modal';
+import { getScoreHex, SCORE_HEX } from '@/components/production/skill-assessment/score-badge';
 
 import { CHART_COLORS, formatNumber, formatPercentage } from '@/types/statistics-common';
 import type { StatisticsChartType, TrendLineType, YAxisMode } from '@/types/statistics-common';
@@ -98,7 +102,7 @@ import { getSectors } from '@/api-client/sector';
 import { getSkills } from '@/api-client/skill';
 import { getTopics } from '@/api-client/topic';
 import { getUsers } from '@/api-client/user';
-import { FAVORITE_PAGES, routes, SECTOR_PRIVILEGES } from '@/constants';
+import { ASSESSMENT_STATUS, ASSESSMENT_STATUS_LABELS, FAVORITE_PAGES, routes, SECTOR_PRIVILEGES } from '@/constants';
 import { cn } from '@/lib/utils';
 
 // =====================
@@ -164,8 +168,16 @@ const CHART_TYPE_CATALOG: Record<SkillStatsChartType, ChartTypeOption> = {
   'line-smooth': { value: 'line-smooth', label: 'Linha Suave',      icon: IconChartLine, description: 'Linhas suavizadas' },
   'area':        { value: 'area',        label: 'Área Reta',        icon: IconChartArea, description: 'Área preenchida' },
   'area-smooth': { value: 'area-smooth', label: 'Área Suave',       icon: IconChartArea, description: 'Área suavizada' },
-  'radar':       { value: 'radar',       label: 'Radar',            icon: IconChartPie,  description: 'Radar multidimensional' },
+  'radar-polygon': { value: 'radar-polygon', label: 'Radar Polígono', icon: IconRadar,     description: 'Radar com grade poligonal' },
+  'radar-circle':  { value: 'radar-circle',  label: 'Radar Círculo',  icon: IconChartPie,  description: 'Radar com grade circular' },
 };
+
+// Both radar variants share the StatisticsRadarChart render path; only the
+// grid `shape` differs. Centralised so every branch agrees.
+const isRadarType = (t: SkillStatsChartType): boolean =>
+  t === 'radar-polygon' || t === 'radar-circle';
+const radarShapeOf = (t: SkillStatsChartType): 'polygon' | 'circle' =>
+  t === 'radar-circle' ? 'circle' : 'polygon';
 
 const TREND_LABELS: Record<TrendLineType, string> = {
   linear: 'Linear', sma3: 'Média 3 pts', sma6: 'Média 6 pts', sma12: 'Média 12 pts',
@@ -215,15 +227,23 @@ function availableChartTypesFor(
   y: SkillStatsYAxisMode,
   c: SkillStatsCompareMode,
 ): SkillStatsChartType[] {
-  if (y === 'distribution') return ['bar-stacked'];
+  // Distribution of the 6 score levels: stacked is the default, but offer the
+  // grouped variant too (some users prefer side-by-side level bars).
+  if (y === 'distribution') return ['bar-stacked', 'bar'];
   if (x === 'campaign') {
     return c === 'none'
       ? ['line', 'line-smooth', 'area', 'area-smooth', 'bar']
       : ['line', 'line-smooth'];
   }
   if (x === 'skill' || x === 'topic') {
-    if (c === 'none') return ['bar', 'radar'];
-    return ['bar', 'bar-stacked', 'radar'];
+    // Radar only renders the averageScore composition (radarView early-exits
+    // otherwise) and can't draw the FE-derived position comparison — so gate it
+    // out of those combos instead of offering a dead button.
+    if (y !== 'averageScore') return c === 'none' ? ['bar'] : ['bar', 'bar-stacked'];
+    if (c === 'position') return ['bar', 'bar-stacked'];
+    // Radar first so it stays the preferred default for the skill composition.
+    if (c === 'none') return ['radar-polygon', 'radar-circle', 'bar'];
+    return ['radar-polygon', 'radar-circle', 'bar', 'bar-stacked'];
   }
   // sector / user
   if (c === 'none') return ['bar'];
@@ -287,11 +307,17 @@ function SkillStatsFilterSheet({
       orderBy: [{ periodEnd: 'desc' }],
     } as any);
     return {
-      data: (res.data ?? []).map((a: any) => ({
-        value: a.id,
-        label: a.name,
-        description: a.periodEnd ? format(new Date(a.periodEnd), 'dd/MM/yyyy') : undefined,
-      })),
+      data: (res.data ?? []).map((a: any) => {
+        const dateStr = a.periodEnd ? format(new Date(a.periodEnd), 'dd/MM/yyyy') : null;
+        const statusStr = a.status ? (ASSESSMENT_STATUS_LABELS as any)[a.status] : null;
+        return {
+          value: a.id,
+          label: a.name,
+          // Surface the campaign state (Aberta / Encerrada …) so users know
+          // what they're selecting — open campaigns carry partial data.
+          description: [dateStr, statusStr].filter(Boolean).join(' · ') || undefined,
+        };
+      }),
       hasMore: res.meta?.hasNextPage ?? false,
     };
   }, []);
@@ -653,14 +679,17 @@ function SkillStatsFilterSheet({
                 }}
                 placeholder="Todos os cargos"
               />
-              {nPositions === 1 && (
+              {nPositions >= 2 && localEffX === 'campaign' ? (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                  Cargo não é comparável no eixo Tempo. Use Colaborador ou Setor, ou troque o eixo X.
+                </p>
+              ) : nPositions === 1 ? (
                 <p className="text-[11px] text-muted-foreground">
                   Filtrando colaboradores deste cargo (escopo client-side).
                 </p>
-              )}
-              {nPositions >= 2 && (
+              ) : nPositions >= 2 ? (
                 <p className="text-[11px] text-muted-foreground">{noteCompare('position', nPositions)}</p>
-              )}
+              ) : null}
             </div>
 
             {/* Users — cascades from sectorIds AND positionIds. */}
@@ -784,9 +813,24 @@ export const HRSkillAssessmentStatisticsPage = () => {
   const [xAxisModeRaw, setXAxisMode]  = useState<SkillStatsXAxisMode>('skill');
   const [yAxisMode, setYAxisMode]     = useState<SkillStatsYAxisMode>('averageScore');
   const [filters, setFilters]         = useState<SkillStatsBaseFilters>({});
-  const [chartType, setChartType]     = useState<SkillStatsChartType>('bar');
+  // Radar is the most informative default for the skill × average composition.
+  const [chartType, setChartType]     = useState<SkillStatsChartType>('radar-polygon');
   const [trendLine, setTrendLine]     = useState<TrendLineType | null>(null);
-  const [radarShape, setRadarShape]   = useState<'polygon' | 'circle'>('polygon');
+
+  // Legend hide/colors are lifted here (keyed by series NAME) so they persist
+  // when the chart is remounted on a chart-type switch (bar ↔ radar ↔ stacked).
+  const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
+  const [seriesColors, setSeriesColors] = useState<Record<string, string>>({});
+  const toggleHiddenSeries = useCallback((name: string) => {
+    setHiddenSeries(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }, []);
+  const setSeriesColor = useCallback((name: string, color: string) => {
+    setSeriesColors(prev => ({ ...prev, [name]: color }));
+  }, []);
   const [showFilters, setShowFilters] = useState(false);
 
   // Smart-X default: when the user is on the default 'skill' axis and picks
@@ -796,6 +840,48 @@ export const HRSkillAssessmentStatisticsPage = () => {
     if (xAxisModeRaw === 'skill' && (filters.topicIds?.length ?? 0) >= 2) return 'topic';
     return xAxisModeRaw;
   }, [xAxisModeRaw, filters.topicIds]);
+
+  // --- Campaign metadata (drives default selection + open-campaign flag) ---
+  //
+  // The filter sheet lazily paginates campaigns for its picker; the page needs
+  // a lightweight, eagerly-loaded list (ordered newest-first) so it can (a)
+  // pre-select the most recent campaign on first load and (b) know which of the
+  // selected campaigns are still OPEN — open campaigns hold IN_PROGRESS entries
+  // that are excluded by the default SUBMITTED-only scoring.
+  const { data: assessmentsMeta } = useQuery({
+    queryKey: ['skill-stats-assessments-meta'],
+    queryFn: () => getAssessments({ orderBy: [{ periodEnd: 'desc' }], limit: 50 } as any),
+    staleTime: 5 * 60 * 1000,
+  });
+  const assessmentList = useMemo<any[]>(() => assessmentsMeta?.data ?? [], [assessmentsMeta]);
+
+  // Pre-select the latest campaign once, and only if the user hasn't already
+  // picked one (e.g. via a restored/persisted filter).
+  const didInitDefaultCampaign = useRef(false);
+  useEffect(() => {
+    if (didInitDefaultCampaign.current) return;
+    if (!assessmentList.length) return;
+    didInitDefaultCampaign.current = true;
+    setFilters(prev =>
+      prev.assessmentIds?.length ? prev : { ...prev, assessmentIds: [assessmentList[0].id] },
+    );
+  }, [assessmentList]);
+
+  const assessmentStatusById = useMemo(() => {
+    const m = new Map<string, ASSESSMENT_STATUS>();
+    assessmentList.forEach(a => { if (a?.id) m.set(a.id, a.status); });
+    return m;
+  }, [assessmentList]);
+
+  // Open campaigns currently in scope (only meaningful when specific campaigns
+  // are selected). Drives the in-progress data inclusion + the warning flag.
+  const openCampaignsInScope = useMemo(() => {
+    const ids = filters.assessmentIds ?? [];
+    return ids
+      .filter(id => assessmentStatusById.get(id) === ASSESSMENT_STATUS.OPEN)
+      .map(id => ({ id, name: assessmentList.find(a => a.id === id)?.name ?? '' }));
+  }, [filters.assessmentIds, assessmentStatusById, assessmentList]);
+  const hasOpenCampaignInScope = openCampaignsInScope.length > 0;
 
   // Derive comparison entirely from selection counts. Most-specific wins on
   // the WHO axis (user > position > sector); skill comparison drives the WHAT
@@ -854,6 +940,27 @@ export const HRSkillAssessmentStatisticsPage = () => {
     setModalOpen(true);
   }, []);
 
+  // Two skill drill-downs, distinguished by WHERE the user clicked:
+  //   • DATA modal  — clicking inside the chart (a vertex/polygon tip or a bar).
+  //     Shows scores/distribution and drills into the evaluations themselves.
+  //   • INFO modal  — clicking the OUTER name label. Explains what the skill /
+  //     topic is (description + contrary behaviour), no scores.
+  const [topicsModalOpen, setTopicsModalOpen] = useState(false);
+  const [topicsModalSkill, setTopicsModalSkill] = useState<{ id: string; name: string } | null>(null);
+  const openSkillData = useCallback((skill: { id: string; name: string }) => {
+    setTopicsModalSkill(skill);
+    setTopicsModalOpen(true);
+  }, []);
+
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
+  const [infoModalSkill, setInfoModalSkill] = useState<{ id: string; name: string } | null>(null);
+  const [infoModalTopicId, setInfoModalTopicId] = useState<string | null>(null);
+  const openSkillInfo = useCallback((skill: { id: string; name: string }, topicId?: string | null) => {
+    setInfoModalSkill(skill);
+    setInfoModalTopicId(topicId ?? null);
+    setInfoModalOpen(true);
+  }, []);
+
   // --- Derived flags ---
   const useEvolution  = xAxisMode === 'campaign';
   const useComparison =
@@ -890,7 +997,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
 
   // Trend line only makes sense for time/cartesian. Drop when switching off.
   useEffect(() => {
-    if (xAxisMode !== 'campaign' || chartType === 'radar') {
+    if (xAxisMode !== 'campaign' || isRadarType(chartType)) {
       if (trendLine !== null) setTrendLine(null);
     }
   }, [xAxisMode, chartType, trendLine]);
@@ -905,12 +1012,19 @@ export const HRSkillAssessmentStatisticsPage = () => {
   const apiFilters = useMemo<SkillStatsBaseFilters>(() => {
     // positionIds is FE-only (no server support yet) — strip before serializing.
     const { positionIds: _positions, ...withoutPositions } = filters;
-    if (withoutPositions.topicIds && withoutPositions.topicIds.length > 0) {
-      const { skillIds: _skillIds, ...rest } = withoutPositions;
-      return rest;
+    let next: SkillStatsBaseFilters = withoutPositions;
+    if (next.topicIds && next.topicIds.length > 0) {
+      const { skillIds: _skillIds, ...rest } = next;
+      next = rest;
     }
-    return withoutPositions;
-  }, [filters]);
+    // When an OPEN campaign is in scope, surface its in-progress data too —
+    // otherwise the page reads "Nenhum dado encontrado" until every entry is
+    // submitted. The user can still override this explicitly via the filters.
+    if (hasOpenCampaignInScope && next.includeInProgress === undefined) {
+      next = { ...next, includeInProgress: true };
+    }
+    return next;
+  }, [filters, hasOpenCampaignInScope]);
 
   // --- Queries ---
   //
@@ -975,7 +1089,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
   // Compute the radar view: indicators + series. Returns null when chartType
   // isn't radar or the source data isn't a fit.
   const radarView = useMemo(() => {
-    if (chartType !== 'radar') return null;
+    if (!isRadarType(chartType)) return null;
     if (yAxisMode !== 'averageScore') return null;
     if (xAxisMode !== 'skill' && xAxisMode !== 'topic') return null;
 
@@ -1031,7 +1145,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
   // For multi-series we use `comparisons[]`; for distribution we encode the
   // 6 score levels as comparisons[].
   const cartesianView = useMemo(() => {
-    if (chartType === 'radar') return null;
+    if (isRadarType(chartType)) return null;
 
     type Comp = { entityName: string; value: number; entityId?: string };
     // __primaryType / __primaryId / __secondaryType are click-context
@@ -1349,7 +1463,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
 
   // Map our SkillStatsChartType to StatisticsChartType used by StatisticsChart.
   const effectiveChartType: StatisticsChartType = useMemo(() => {
-    if (chartType === 'radar') return 'bar'; // unused — radar branch renders elsewhere
+    if (isRadarType(chartType)) return 'bar'; // unused — radar branch renders elsewhere
     return chartType as StatisticsChartType;
   }, [chartType]);
 
@@ -1369,7 +1483,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
   // We resolve dataIndex → items[i] (which carries __primary metadata) and
   // map seriesName back to a comparison entry by entityName, picking up its
   // entityId / entityType.
-  const handleChartClick = useCallback((dataIndex: number, _name: string, seriesName: string) => {
+  const handleChartClick = useCallback((dataIndex: number, _name: string, seriesName: string, region?: 'plot' | 'label') => {
     if (!cartesianView) return;
     const item = cartesianView.items[dataIndex] as any;
     if (!item?.__primaryType || !item?.__primaryId) return;
@@ -1381,6 +1495,26 @@ export const HRSkillAssessmentStatisticsPage = () => {
       id: item.__primaryId,
       name: item.name,
     } as SkillStatsClickContext['primary'];
+
+    // Clicking the x-axis LABEL text (the name) → INFO ("what is this"); the bar
+    // body → DATA. Mirrors the radar's outer-label vs inner-tip split.
+    if (region === 'label' && (primary?.type === 'skill' || primary?.type === 'topic')) {
+      if (primary.type === 'skill') {
+        openSkillInfo({ id: primary.id, name: primary.name });
+      } else {
+        const t = overview?.byTopic.find(x => x.topicId === primary.id);
+        if (t) openSkillInfo({ id: t.skillId, name: t.skillName }, t.topicId);
+        else openModalWithContext({ primary });
+      }
+      return;
+    }
+
+    // A click on a skill bar (single-series view) drills into that skill's data
+    // (scores) rather than the raw entries list.
+    if (primary?.type === 'skill' && !item.__secondaryType) {
+      openSkillData({ id: primary.id, name: primary.name });
+      return;
+    }
 
     let secondary: SkillStatsClickContext['secondary'] = undefined;
     const secondaryType = item.__secondaryType;
@@ -1401,7 +1535,34 @@ export const HRSkillAssessmentStatisticsPage = () => {
     }
 
     openModalWithContext({ primary, secondary });
-  }, [cartesianView, openModalWithContext]);
+  }, [cartesianView, openModalWithContext, openSkillData, openSkillInfo, overview]);
+
+  // Radar clicks. The indicator name is a skill name (X='skill') or a topic
+  // title (X='topic'); resolve it back to an id via the overview data. `region`
+  // distinguishes the outer skill-name label from the inner data vertex — both
+  // open the same rich skill modal (which now shows descriptions, contrary
+  // behaviour and scores), so the label is the more discoverable target.
+  const handleIndicatorClick = useCallback((name: string, _index: number, region: 'vertex' | 'label') => {
+    if (!overview) return;
+    if (xAxisMode === 'skill') {
+      const skill = overview.bySkill.find(s => s.skillName === name);
+      if (!skill) return;
+      const target = { id: skill.skillId, name: skill.skillName };
+      // Outer label → "what is this skill" (INFO); inner tip → the data (DATA).
+      if (region === 'label') openSkillInfo(target);
+      else openSkillData(target);
+      return;
+    }
+    if (xAxisMode === 'topic') {
+      const topic = overview.byTopic.find(t => t.topicTitle === name);
+      if (!topic) return;
+      if (region === 'label') {
+        openSkillInfo({ id: topic.skillId, name: topic.skillName }, topic.topicId);
+      } else {
+        openModalWithContext({ primary: { type: 'topic', id: topic.topicId, name: topic.topicTitle } });
+      }
+    }
+  }, [overview, xAxisMode, openSkillData, openSkillInfo, openModalWithContext]);
 
   // ============================================================
   // Exports
@@ -1409,13 +1570,13 @@ export const HRSkillAssessmentStatisticsPage = () => {
 
   const handleExportCSV = useCallback(() => {
     try {
-      if (chartType === 'radar' ? !radarView?.indicators.length : !cartesianView?.items.length) {
+      if (isRadarType(chartType) ? !radarView?.indicators.length : !cartesianView?.items.length) {
         toast.error('Sem dados para exportar');
         return;
       }
       const rows: string[][] = [];
 
-      if (chartType === 'radar' && radarView) {
+      if (isRadarType(chartType) && radarView) {
         const header = ['Dimensão', ...radarView.series.map(s => s.name)];
         rows.push(header);
         radarView.indicators.forEach((ind, i) => {
@@ -1459,7 +1620,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
     try {
       const wb = XLSX.utils.book_new();
       let aoa: (string | number | null)[][] = [];
-      if (chartType === 'radar' && radarView) {
+      if (isRadarType(chartType) && radarView) {
         aoa.push(['Dimensão', ...radarView.series.map(s => s.name)]);
         radarView.indicators.forEach((ind, i) => {
           aoa.push([ind.name, ...radarView.series.map(s => s.values[i] ?? null)]);
@@ -1495,7 +1656,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
   const handleExportPDF = useCallback(async () => {
     try {
       const chartOption =
-        chartType === 'radar'
+        isRadarType(chartType)
           ? radarRef.current?.getOption()
           : chartRef.current?.getOption();
       if (!chartOption) {
@@ -1640,7 +1801,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
     }
 
     // Radar branch
-    if (chartType === 'radar') {
+    if (isRadarType(chartType)) {
       if (!radarView || !radarView.indicators.length || !radarView.series.length) {
         return renderEmpty('Ajuste os filtros ou aguarde a primeira campanha ser finalizada.');
       }
@@ -1650,8 +1811,13 @@ export const HRSkillAssessmentStatisticsPage = () => {
             ref={radarRef}
             indicators={radarView.indicators}
             series={radarView.series}
-            shape={radarShape}
+            shape={radarShapeOf(chartType)}
             height="100%"
+            onIndicatorClick={(xAxisMode === 'skill' || xAxisMode === 'topic') ? handleIndicatorClick : undefined}
+            hiddenSeries={hiddenSeries}
+            onToggleSeries={toggleHiddenSeries}
+            seriesColors={seriesColors}
+            onSeriesColorChange={setSeriesColor}
           />
         </div>
       );
@@ -1661,6 +1827,28 @@ export const HRSkillAssessmentStatisticsPage = () => {
     if (!cartesianView || !cartesianView.items.length) {
       return renderEmpty('Nenhum dado para a composição atual. Ajuste os filtros.');
     }
+    // Single-series skill/topic averages ARE the company-wide average across
+    // the scope — name the series "Média da empresa" so the bar matches the
+    // radar (which already labels it that way). Other views keep the metric
+    // label. (yAxisLabel here only drives the legend/series name.)
+    const seriesLabel =
+      !cartesianView.isComparison && yAxisMode === 'averageScore' && (xAxisMode === 'skill' || xAxisMode === 'topic')
+        ? 'Média da empresa'
+        : cartesianView.axisLabel;
+
+    // Colour score values with the canonical 0–5 palette so the chart matches
+    // the ScoreBadge / distribution colours elsewhere:
+    //  • averageScore single-series → colour each bar by its score band.
+    //  • distribution → colour the 6 score-level series (0=roxo … 5=verde),
+    //    user overrides still win.
+    const valueColor =
+      yAxisMode === 'averageScore' && !cartesianView.isComparison
+        ? (v: number) => getScoreHex(v)
+        : undefined;
+    const chartSeriesColors =
+      yAxisMode === 'distribution'
+        ? { ...SCORE_LEVEL_LABELS.reduce((m, lbl, i) => ({ ...m, [lbl]: SCORE_HEX[i] }), {} as Record<string, string>), ...seriesColors }
+        : seriesColors;
     return (
       <div className="flex-1 min-h-0 flex flex-col gap-2">
         {cartesianView.truncationNote && (
@@ -1677,11 +1865,21 @@ export const HRSkillAssessmentStatisticsPage = () => {
             yAxisMode={effectiveYAxisMode}
             isComparisonMode={cartesianView.isComparison}
             height="100%"
-            yAxisLabel={cartesianView.axisLabel}
-            tooltipLabels={{ primary: cartesianView.axisLabel }}
+            yAxisLabel={seriesLabel}
+            tooltipLabels={{ primary: seriesLabel }}
             valueFormatter={valueFormatter}
             trendLine={trendLine}
             onDataPointClick={handleChartClick}
+            // Grouped bars per skill → per-bar tooltip (one collaborator) and
+            // alternating bands to separate skill blocks (like productivity's
+            // year bands).
+            tooltipTrigger={cartesianView.isComparison ? 'item' : 'axis'}
+            categoryBands={xAxisMode === 'skill' || xAxisMode === 'topic'}
+            valueColor={valueColor}
+            hiddenSeries={hiddenSeries}
+            onToggleSeries={toggleHiddenSeries}
+            seriesColors={chartSeriesColors}
+            onSeriesColorChange={setSeriesColor}
           />
         </div>
       </div>
@@ -1730,6 +1928,15 @@ export const HRSkillAssessmentStatisticsPage = () => {
                 {filters.assessmentIds?.length ? (
                   <Badge variant="outline" className="text-xs">
                     {filters.assessmentIds.length} campanha(s)
+                  </Badge>
+                ) : null}
+                {hasOpenCampaignInScope ? (
+                  <Badge
+                    variant="outline"
+                    className="text-xs gap-1 border-amber-500/60 text-amber-600 dark:text-amber-400"
+                  >
+                    <IconAlertCircle className="h-3 w-3" />
+                    {openCampaignsInScope.length === 1 ? 'Campanha em andamento' : 'Campanhas em andamento'}
                   </Badge>
                 ) : null}
                 {filters.sectorIds?.length ? (
@@ -1799,7 +2006,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
               </DropdownMenu>
 
               {/* Trend line — only for X=campaign cartesian */}
-              {xAxisMode === 'campaign' && chartType !== 'radar' && (
+              {xAxisMode === 'campaign' && !isRadarType(chartType) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant={trendLine ? 'default' : 'outline'} size="sm">
@@ -1825,27 +2032,8 @@ export const HRSkillAssessmentStatisticsPage = () => {
                 </DropdownMenu>
               )}
 
-              {/* Radar shape toggle — only for radar */}
-              {chartType === 'radar' && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      {radarShape === 'polygon' ? 'Polígono' : 'Círculo'}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Formato</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuRadioGroup
-                      value={radarShape}
-                      onValueChange={v => setRadarShape(v as 'polygon' | 'circle')}
-                    >
-                      <DropdownMenuRadioItem value="polygon">Polígono</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="circle">Círculo</DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+              {/* Radar shape is now part of the chart-type selector
+                  ("Radar Polígono" / "Radar Círculo") — no separate toggle. */}
 
               {/* Filters */}
               <Button
@@ -1927,7 +2115,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
               disabled={!canDrillAverage}
             />
             <KpiCard
-              label="Taxa de Submissão"
+              label="Taxa de Conclusão"
               value={
                 overviewQuery.isLoading || !summary
                   ? <Skeleton className="h-7 w-20" />
@@ -1936,7 +2124,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
               icon={IconTrendingUp}
               subtitle={
                 summary
-                  ? `${formatNumber(summary.submittedEntries)} de ${formatNumber(summary.totalEntries)} enviadas`
+                  ? `${formatNumber(summary.completedEntries ?? summary.submittedEntries)} de ${formatNumber(summary.totalEntries)} concluídas`
                   : undefined
               }
               onClick={openSubmissionsDrilldown}
@@ -1968,6 +2156,19 @@ export const HRSkillAssessmentStatisticsPage = () => {
             />
           </div>
 
+          {/* Open-campaign notice — partial data, not yet finalized. */}
+          {hasOpenCampaignInScope && (
+            <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300 flex-shrink-0">
+              <IconAlertCircle className="h-4 w-4 flex-shrink-0" />
+              <p>
+                {openCampaignsInScope.length === 1
+                  ? <>A campanha <strong>{openCampaignsInScope[0].name}</strong> ainda está em andamento.</>
+                  : <><strong>{openCampaignsInScope.length}</strong> campanhas no escopo ainda estão em andamento.</>}{' '}
+                Os números incluem avaliações <strong>não finalizadas</strong> (em andamento) e podem mudar até o encerramento.
+              </p>
+            </div>
+          )}
+
           {/* Chart area */}
           <div className="flex-1 min-h-0 flex flex-col">{renderChart()}</div>
         </CardContent>
@@ -1993,6 +2194,25 @@ export const HRSkillAssessmentStatisticsPage = () => {
         baseFilters={baseFiltersOverride
           ? { ...apiFilters, ...baseFiltersOverride }
           : apiFilters}
+      />
+
+      <SkillTopicsModal
+        open={topicsModalOpen}
+        onOpenChange={setTopicsModalOpen}
+        skill={topicsModalSkill}
+        byTopic={overview?.byTopic ?? []}
+        topicDistribution={overview?.topicDistribution ?? []}
+        onTopicClick={topic => {
+          setTopicsModalOpen(false);
+          openModalWithContext({ primary: { type: 'topic', id: topic.id, name: topic.name } });
+        }}
+      />
+
+      <SkillInfoModal
+        open={infoModalOpen}
+        onOpenChange={setInfoModalOpen}
+        skill={infoModalSkill}
+        highlightTopicId={infoModalTopicId}
       />
     </div>
   );

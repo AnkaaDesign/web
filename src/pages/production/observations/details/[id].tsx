@@ -101,7 +101,7 @@ export const ObservationDetailsPage = () => {
           title={observation.task ? `Observação - ${observation.task.name}` : "Observação"}
           breadcrumbs={[
             { label: "Início", href: "/" },
-            { label: "Produção" },
+            { label: "Produção", href: routes.production.root },
             { label: "Observações", href: routes.production.observations.root },
             { label: observation.task ? `Observação - ${observation.task.name}` : `Observação #${observation.id.slice(-8)}` },
           ]}

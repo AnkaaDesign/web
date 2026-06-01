@@ -66,7 +66,47 @@ interface StatisticsChartProps {
    * Overrides the default 'line' for the right-axis series.
    */
   secondaryChartType?: 'bar' | 'line' | 'line-smooth' | 'area' | 'area-smooth';
-  onDataPointClick?: (dataIndex: number, name: string, seriesName: string) => void;
+  onDataPointClick?: (dataIndex: number, name: string, seriesName: string, region?: 'plot' | 'label') => void;
+  /**
+   * Tooltip scope. 'axis' (default) shows every series at the hovered category
+   * (with the shadow band); 'item' shows only the directly-hovered bar/point —
+   * use it when each bar is an independent entity (e.g. one collaborator) and
+   * the grouped-band tooltip is confusing.
+   */
+  tooltipTrigger?: 'axis' | 'item';
+  /**
+   * Draw alternating background bands behind every other x-category. Mirrors
+   * the year-band separators on the productivity page, applied per-category so
+   * grouped-bar sets (e.g. one group per skill) read as visually distinct.
+   */
+  categoryBands?: boolean;
+  /**
+   * Controlled legend state, keyed by series NAME. When provided the parent
+   * owns hide/color so they survive the chart remounting on a type switch.
+   */
+  hiddenSeries?: Set<string> | string[];
+  onToggleSeries?: (name: string) => void;
+  seriesColors?: Record<string, string>;
+  onSeriesColorChange?: (name: string, color: string) => void;
+  /**
+   * Per-value bar colour for the single-series view (e.g. colour each bar by
+   * its 0–5 score band). When it returns undefined the series colour is used.
+   */
+  valueColor?: (value: number) => string | undefined;
+}
+
+// Lighten a #rrggbb color toward white by `amt` (0..1). Used for the bar
+// hover-emphasis tint so hovering a column gives a subtle, color-aware lift.
+function lightenColor(color: string, amt = 0.22): string {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color);
+  if (!m) return color;
+  let hex = m[1];
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  const n = parseInt(hex, 16);
+  const r = Math.round(((n >> 16) & 255) + (255 - ((n >> 16) & 255)) * amt);
+  const g = Math.round(((n >> 8) & 255) + (255 - ((n >> 8) & 255)) * amt);
+  const b = Math.round((n & 255) + (255 - (n & 255)) * amt);
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 const defaultFormatter = (value: number, mode: YAxisMode): string => {
@@ -162,6 +202,13 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   primaryChartType,
   secondaryChartType,
   onDataPointClick,
+  tooltipTrigger = 'axis',
+  categoryBands = false,
+  hiddenSeries: hiddenSeriesProp,
+  onToggleSeries,
+  seriesColors: seriesColorsProp,
+  onSeriesColorChange,
+  valueColor,
 }, externalRef) {
   const smooth = chartType === 'line-smooth' || chartType === 'area-smooth';
   const baseChartType = chartType === 'line-smooth' ? 'line' : chartType === 'area-smooth' ? 'area' : chartType;
@@ -171,6 +218,9 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   useEffect(() => { onDataPointClickRef.current = onDataPointClick; }, [onDataPointClick]);
   // Tracks the currently hovered data point so clicking anywhere in the column opens the modal
   const hoveredRef = useRef<{ idx: number; name: string; series: string } | null>(null);
+  // Current category labels, available to the imperative zr click handler.
+  const categoriesRef = useRef<string[]>([]);
+  useEffect(() => { categoriesRef.current = (data ?? []).map(d => d.name); }, [data]);
 
   useImperativeHandle(externalRef, () => ({
     getOption: () => {
@@ -184,11 +234,18 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   const [isDark, setIsDark] = useState(() =>
     typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
   );
-  // Per-series color overrides — keyed by series name. Falls back to defaults.
-  const [seriesColors, setSeriesColors] = useState<Record<string, string>>({});
-  // Series the user toggled off via the legend.
-  const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
+  // Per-series color overrides + hidden set — keyed by series name. Controlled
+  // by the parent when props are supplied (so state survives a chart-type
+  // remount); otherwise managed internally.
+  const [colorsInternal, setColorsInternal] = useState<Record<string, string>>({});
+  const [hiddenInternal, setHiddenInternal] = useState<Set<string>>(new Set());
   const [openPickerFor, setOpenPickerFor] = useState<string | null>(null);
+
+  const hiddenSeries = useMemo<Set<string>>(() => {
+    if (hiddenSeriesProp) return hiddenSeriesProp instanceof Set ? hiddenSeriesProp : new Set(hiddenSeriesProp);
+    return hiddenInternal;
+  }, [hiddenSeriesProp, hiddenInternal]);
+  const seriesColors = seriesColorsProp ?? colorsInternal;
 
   const colorOf = useCallback(
     (name: string, fallback: string) => seriesColors[name] ?? fallback,
@@ -196,12 +253,18 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   );
 
   const toggleSeries = useCallback((name: string) => {
-    setHiddenSeries(prev => {
+    if (onToggleSeries) { onToggleSeries(name); return; }
+    setHiddenInternal(prev => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name); else next.add(name);
       return next;
     });
-  }, []);
+  }, [onToggleSeries]);
+
+  const setColor = useCallback((name: string, color: string) => {
+    if (onSeriesColorChange) { onSeriesColorChange(name, color); return; }
+    setColorsInternal(prev => ({ ...prev, [name]: color }));
+  }, [onSeriesColorChange]);
 
   const trendLabels: Record<TrendLineType, string> = useMemo(() => ({
     linear: 'Tendência', sma3: 'Média 3m', sma6: 'Média 6m', sma12: 'Média 12m',
@@ -461,6 +524,43 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       }
     }
 
+    // ── CATEGORY BANDS ────────────────────────────────────────────────────────
+    // Opt-in alternating background bands, one per x-category. Same renderItem
+    // technique as the year bands, but the "group" is a single category — so
+    // grouped-bar sets (e.g. one group of collaborator bars per skill) read as
+    // visually separated blocks, the way years are separated on productivity.
+    const categoryBandSeries: any[] = [];
+    if (categoryBands && xAxisData.length > 1) {
+      const bandColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.035)';
+      categoryBandSeries.push({
+        type: 'custom',
+        silent: true,
+        animation: false,
+        legendHoverLink: false,
+        tooltip: { show: false },
+        z: -6,
+        data: [[0, 0]],
+        renderItem: (params: any, api: any) => {
+          const grid = params.coordSys ?? { x: 0, y: 0, width: 0, height: 0 };
+          const yTop = grid.y;
+          const yHeight = grid.height;
+          const halfSlot = api.size([1, 0])[0] / 2;
+          const children: any[] = [];
+          for (let i = 1; i < xAxisData.length; i += 2) {
+            const c = api.coord([i, 0])[0];
+            children.push({
+              type: 'rect' as const,
+              silent: true,
+              shape: { x: c - halfSlot, y: yTop, width: halfSlot * 2, height: yHeight },
+              style: { fill: bandColor },
+            });
+          }
+          return { type: 'group' as const, children };
+        },
+        clip: true,
+      });
+    }
+
     // ── GOAL LINE ─────────────────────────────────────────────────────────────
     // perPeriodGoalLine takes precedence: renders a stepped line that follows
     // the configured goal for each period. Falls back to flat goalLine.
@@ -621,6 +721,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
               return comp ? getComparisonValue(comp) : 0;
             }),
             itemStyle: { color },
+            emphasis: { focus: 'none', itemStyle: { color: lightenColor(color) } },
             label: barLabel,
           };
         });
@@ -643,7 +744,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           legend: { show: false },
           grid: baseGrid, xAxis: xAxisBase, yAxis: buildDualYAxis(),
           color: CHART_COLORS, dataZoom,
-          series: [...yearBandSeries, ...goalLineSeries, ...secondaryGoalSeries, ...perPeriodSecondaryGoalSeries, ...barSeries, ...lineSeries],
+          series: [...categoryBandSeries, ...yearBandSeries, ...goalLineSeries, ...secondaryGoalSeries, ...perPeriodSecondaryGoalSeries, ...barSeries, ...lineSeries],
         };
       }
 
@@ -694,6 +795,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
         xAxis: xAxisBase, yAxis: buildDualYAxis(),
         color: CHART_COLORS, dataZoom,
         series: [
+          ...categoryBandSeries,
           ...yearBandSeries,
           ...goalLineSeries,
           {
@@ -709,7 +811,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
                   ...(primaryIsArea ? { areaStyle: { opacity: 0.3, color: primaryColor } } : {}),
                   label: pointLabel,
                 }
-              : { label: barLabel }),
+              : { label: barLabel, emphasis: { focus: 'none', itemStyle: { color: lightenColor(primaryColor) } } }),
           },
           {
             name: secondaryName,
@@ -754,6 +856,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
               return comp ? getComparisonValue(comp) : 0;
             }),
             itemStyle: { color },
+            ...(type === 'bar' ? { emphasis: { focus: 'none', itemStyle: { color: lightenColor(color) } } } : {}),
             ...(type === 'line' && opts.areaStyle ? { areaStyle: { ...opts.areaStyle, color } } : {}),
             ...opts,
             ...extraLineStyle,
@@ -802,9 +905,10 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       }
 
       const compTooltipFormatter = (params: any) => {
-        if (!Array.isArray(params) || !params.length) return '';
-        let html = `<strong style="color:${textColor}">${params[0].name}</strong><br/>`;
-        params.forEach((p: any) => {
+        const list = Array.isArray(params) ? params : params ? [params] : [];
+        if (!list.length) return '';
+        let html = `<strong style="color:${textColor}">${list[0].name}</strong><br/>`;
+        list.forEach((p: any) => {
           if (p.value == null || !p.seriesName) return;
           const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:5px;vertical-align:middle;"></span>`;
           html += `${dot}${p.seriesName}: ${valueFormatter(p.value, yAxisMode)}${seriesHint}<br/>`;
@@ -813,11 +917,16 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       };
 
       return {
-        tooltip: { ...tooltipBase, trigger: 'axis', axisPointer: { type: baseChartType.includes('bar') ? 'shadow' : 'line' }, formatter: compTooltipFormatter },
+        tooltip: {
+          ...tooltipBase,
+          trigger: tooltipTrigger === 'item' ? 'item' : 'axis',
+          axisPointer: { type: tooltipTrigger === 'item' ? 'none' : (baseChartType.includes('bar') ? 'shadow' : 'line') },
+          formatter: compTooltipFormatter,
+        },
         legend: { show: false },
         grid: baseGrid, xAxis: xAxisBase, yAxis: buildYAxis(),
         color: CHART_COLORS, dataZoom,
-        series: [...yearBandSeries, ...goalLineSeries, ...series, ...compTrendSeries],
+        series: [...categoryBandSeries, ...yearBandSeries, ...goalLineSeries, ...series, ...compTrendSeries],
       };
     }
 
@@ -825,14 +934,16 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
     const seriesData = data.map(item => ({ ...item, value: getItemValue(item) }));
 
     const simpleTooltip = {
-      ...tooltipBase, trigger: 'axis' as const,
-      axisPointer: { type: baseChartType.startsWith('bar') ? 'shadow' as const : 'line' as const },
+      ...tooltipBase,
+      trigger: (tooltipTrigger === 'item' ? 'item' : 'axis') as const,
+      axisPointer: { type: (tooltipTrigger === 'item' ? 'none' : (baseChartType.startsWith('bar') ? 'shadow' : 'line')) as const },
       formatter: (params: any) => {
-        if (!Array.isArray(params) || params.length === 0) return '';
-        const real = params.filter((p: any) => p.data != null && typeof p.data === 'object');
-        const p = real[0] ?? params[0];
+        const list = Array.isArray(params) ? params : params ? [params] : [];
+        if (list.length === 0) return '';
+        const real = list.filter((p: any) => p.data != null && typeof p.data === 'object');
+        const p = real[0] ?? list[0];
         let html = `<strong style="color:${textColor}">${p.name}</strong><br/>`;
-        params.forEach((par: any) => {
+        list.forEach((par: any) => {
           if (par.value == null) return;
           const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${par.color};margin-right:4px;"></span>`;
           html += `${dot}${par.seriesName}: ${valueFormatter(par.value, yAxisMode)}<br/>`;
@@ -857,17 +968,25 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       series = [{ ...baseSeriesOptions, type: 'line', smooth, lineStyle: { width: 2, color: simpleColor }, label: pointLabel }];
     else if (baseChartType === 'area')
       series = [{ ...baseSeriesOptions, type: 'line', smooth, areaStyle: { opacity: 0.45, color: simpleColor }, lineStyle: { width: 2, color: simpleColor }, label: pointLabel }];
-    else
-      series = [{ ...baseSeriesOptions, type: 'bar', label: barLabel }];
+    else if (valueColor) {
+      // Colour each bar by its own value (e.g. 0–5 score band); each bar
+      // lightens its OWN colour on hover.
+      const barData = seriesData.map((it: any) => {
+        const c = valueColor(it.value) ?? simpleColor;
+        return { ...it, itemStyle: { color: c }, emphasis: { itemStyle: { color: lightenColor(c) } } };
+      });
+      series = [{ ...baseSeriesOptions, data: barData, type: 'bar', label: barLabel, emphasis: { focus: 'none' } }];
+    } else
+      series = [{ ...baseSeriesOptions, type: 'bar', label: barLabel, emphasis: { focus: 'none', itemStyle: { color: lightenColor(simpleColor) } } }];
 
     return {
       tooltip: simpleTooltip,
       legend: { show: false },
       grid: baseGrid, xAxis: xAxisBase, yAxis: buildYAxis(),
       color: CHART_COLORS, dataZoom,
-      series: [...yearBandSeries, ...goalLineSeries, ...trendSeries, ...series],
+      series: [...categoryBandSeries, ...yearBandSeries, ...goalLineSeries, ...trendSeries, ...series],
     };
-  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType]);
+  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType, tooltipTrigger, categoryBands, valueColor]);
 
   const onEvents = useMemo((): Record<string, (params: any) => void> => {
     if (!hasClickHandler) return {};
@@ -959,16 +1078,19 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
     return items;
   }, [data, baseChartType, yAxisMode, isComparisonMode, tooltipLabels, yAxisLabel, trendLine, trendLabels, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, colorOf, usePerPeriod, usePerPeriodSecondary, primaryChartType, secondaryChartType]);
 
-  // Drop hidden entries that no longer exist (e.g. after switching modes)
+  // Drop hidden entries that no longer exist (e.g. after switching modes).
+  // Only for internal state — when the parent controls hiddenSeries it owns the
+  // lifecycle (and stale names are harmless: they just match no series).
   useEffect(() => {
-    if (!hiddenSeries.size) return;
+    if (hiddenSeriesProp) return;
+    if (!hiddenInternal.size) return;
     const valid = new Set(legendItems.map(i => i.name));
     let changed = false;
-    hiddenSeries.forEach(n => { if (!valid.has(n)) changed = true; });
+    hiddenInternal.forEach(n => { if (!valid.has(n)) changed = true; });
     if (changed) {
-      setHiddenSeries(prev => new Set([...prev].filter(n => valid.has(n))));
+      setHiddenInternal(prev => new Set([...prev].filter(n => valid.has(n))));
     }
-  }, [legendItems, hiddenSeries]);
+  }, [legendItems, hiddenInternal, hiddenSeriesProp]);
 
   // Apply hiddenSeries to ECharts via legendToggleSelect whenever it changes.
   // We use dispatchAction instead of legend.selected so notMerge=true (needed
@@ -990,6 +1112,49 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   // Legend chip height ≈ 22px → two equal gaps of (86 − 22) / 2 = 32px each
   //   • gap above legend:  124 − 92 = 32  (92 = legend top)
   //   • gap below legend:  70 − 38 = 32   (70 = legend bottom)
+  // Robust click → drill-down. ECharts' axisLabel triggerEvent is unreliable
+  // across chart types, so we bind a low-level zrender click and map the cursor
+  // x back to a category via the PUBLIC convertFromPixel API. This makes the
+  // column body, the empty space above a short bar, AND the rotated axis label
+  // all open the drill-down. We still prefer the hovered series (set by
+  // mouseover) so a click on a specific grouped bar narrows to that series.
+  const handleChartReady = useCallback((inst: any) => {
+    const zr = inst?.getZr?.();
+    if (!zr) return;
+    // Resolve a pixel to a clickable category, or null. `region` is 'label'
+    // when the click is below the axis line (on the rotated x-axis label text)
+    // vs 'plot' on the bar/plot area. Excludes the dataZoom slider far below.
+    const resolveHit = (x: number, y: number): { idx: number; region: 'plot' | 'label' } | null => {
+      let axisY: number | undefined;
+      try { axisY = inst.convertToPixel({ yAxisIndex: 0 }, 0); } catch { /* noop */ }
+      if (typeof axisY === 'number' && Number.isFinite(axisY) && y > axisY + 64) return null;
+      let dataX: any;
+      try { dataX = inst.convertFromPixel({ xAxisIndex: 0 }, x); } catch { return null; }
+      if (dataX == null || !Number.isFinite(dataX)) return null;
+      const idx = Math.round(dataX);
+      if (idx < 0 || idx >= categoriesRef.current.length) return null;
+      const region: 'plot' | 'label' =
+        typeof axisY === 'number' && Number.isFinite(axisY) && y > axisY ? 'label' : 'plot';
+      return { idx, region };
+    };
+    zr.on('click', (e: any) => {
+      if (!onDataPointClickRef.current) return;
+      const hit = resolveHit(e.offsetX, e.offsetY);
+      if (!hit) return;
+      const cats = categoriesRef.current;
+      const h = hoveredRef.current;
+      const series = (h && h.idx === hit.idx) ? (h.series || '') : '';
+      onDataPointClickRef.current(hit.idx, String(cats[hit.idx] ?? ''), series, hit.region);
+    });
+    // zrender resets the canvas cursor each frame from the hovered graphic, so
+    // CSS !cursor-pointer doesn't stick over labels / empty plot area. Set it
+    // imperatively so the whole clickable column band shows a pointer.
+    zr.on('mousemove', (e: any) => {
+      if (!onDataPointClickRef.current) return;
+      zr.setCursorStyle(resolveHit(e.offsetX, e.offsetY) ? 'pointer' : 'default');
+    });
+  }, []);
+
   const hasZoom = (data?.length ?? 0) > 8;
   const legendBottomPx = hasZoom ? 70 : 8;
 
@@ -1010,11 +1175,6 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           hasClickHandler && '[&_canvas]:!cursor-pointer [&>div]:!cursor-pointer',
         )}
         style={{ cursor: hasClickHandler ? 'pointer' : 'default' }}
-        onClick={() => {
-          if (!hasClickHandler || !hoveredRef.current) return;
-          const { idx, name, series } = hoveredRef.current;
-          onDataPointClickRef.current?.(idx, name, series);
-        }}
       >
         <ReactECharts
           ref={chartRef}
@@ -1024,6 +1184,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           style={{ height: '100%', width: '100%', cursor: hasClickHandler ? 'pointer' : 'default' }}
           opts={{ renderer: 'canvas' }}
           onEvents={onEvents}
+          onChartReady={handleChartReady}
         />
         {showCustomLegend && legendItems.length > 0 && (
           <div
@@ -1074,7 +1235,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
                             outlineOffset: '2px',
                           }}
                           onClick={() => {
-                            setSeriesColors(prev => ({ ...prev, [item.name]: color }));
+                            setColor(item.name, color);
                             setOpenPickerFor(null);
                           }}
                         />

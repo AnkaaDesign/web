@@ -40,7 +40,7 @@ export const SkillCreatePage = () => {
             icon={IconClipboardList}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Administração" },
+              { label: "Administração", href: routes.administration.root },
               { label: "Competências", href: routes.administration.skill.root },
               { label: "Nova" },
             ]}

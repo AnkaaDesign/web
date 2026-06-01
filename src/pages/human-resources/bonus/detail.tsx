@@ -323,7 +323,7 @@ export default function BonusDetailPage() {
 
   const breadcrumbs = [
     { label: "Início", href: routes.home },
-    { label: "Recursos Humanos" },
+    { label: "Recursos Humanos", href: routes.humanResources.root },
     { label: "Bônus", href: routes.humanResources.bonus.root },
     { label: activeBonus ? title : 'Detalhes' },
   ];

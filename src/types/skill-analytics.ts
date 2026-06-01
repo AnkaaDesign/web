@@ -23,7 +23,8 @@ export type SkillStatsChartType =
   | 'line-smooth'
   | 'area'
   | 'area-smooth'
-  | 'radar';
+  | 'radar-polygon'
+  | 'radar-circle';
 
 export interface SkillStatsBaseFilters {
   assessmentIds?: string[];
@@ -109,6 +110,13 @@ export interface SkillStatsOverviewSummary {
   totalEvaluated: number;
   totalEntries: number;
   submittedEntries: number;
+  /**
+   * Entries that are effectively complete — status SUBMITTED *or* every topic
+   * scored (the "Concluída" state shown on the campaign page). Lets the KPI
+   * reflect finished evaluations on still-open campaigns where evaluators
+   * answered everything but haven't pressed the final submit.
+   */
+  completedEntries: number;
   inProgressEntries: number;
   pendingEntries: number;
   submissionRate: number;

@@ -440,7 +440,7 @@ export const SkillAssessmentEntryDetailsPage = () => {
           icon={IconClipboardList}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Administração" },
+            { label: "Administração", href: routes.administration.root },
             { label: "Avaliação de Competências", href: routes.administration.skillAssessment.root },
             { label: assessment?.name ?? "Campanha", href: routes.administration.skillAssessment.details(id) },
             { label: entry.evaluatee?.name ?? "Avaliação" },

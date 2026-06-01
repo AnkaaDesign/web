@@ -11,6 +11,7 @@ import {
   useMemo,
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useCallback,
   forwardRef,
@@ -57,6 +58,22 @@ interface StatisticsRadarChartProps {
   valueFormatter?: (value: number) => string;
   /** Visual variant of the radar grid. */
   shape?: 'polygon' | 'circle';
+  /**
+   * Fired when the user clicks an axis label (indicator name) around the
+   * radar — e.g. a skill or topic name. Receives the clicked label and its
+   * index in `indicators`. When provided, the labels render as a pointer.
+   */
+  onIndicatorClick?: (name: string, index: number, region: 'vertex' | 'label') => void;
+  /**
+   * Controlled hidden-series set, keyed by series NAME. When provided, the
+   * component defers to the parent for legend toggle state (so it survives the
+   * chart being remounted on a chart-type switch). Omit for internal state.
+   */
+  hiddenSeries?: Set<string> | string[];
+  onToggleSeries?: (name: string) => void;
+  /** Controlled per-series color overrides, keyed by series NAME. */
+  seriesColors?: Record<string, string>;
+  onSeriesColorChange?: (name: string, color: string) => void;
 }
 
 const defaultFormatter = (v: number) =>
@@ -108,10 +125,20 @@ export const StatisticsRadarChart = forwardRef<
     height = '100%',
     valueFormatter = defaultFormatter,
     shape = 'polygon',
+    onIndicatorClick,
+    hiddenSeries: hiddenSeriesProp,
+    onToggleSeries,
+    seriesColors: seriesColorsProp,
+    onSeriesColorChange,
   },
   externalRef,
 ) {
   const chartRef = useRef<any>(null);
+  // Container for the DOM value-chip overlay (positioned over the canvas).
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [overlaySize, setOverlaySize] = useState<{ w: number; h: number } | null>(null);
+  // Which value chip (`${seriesName}:${indicatorIndex}`) is hovered → scaled up.
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
 
   useImperativeHandle(
     externalRef,
@@ -127,10 +154,18 @@ export const StatisticsRadarChart = forwardRef<
   const [isDark, setIsDark] = useState(() =>
     typeof document !== 'undefined' && document.documentElement.classList.contains('dark'),
   );
-  // id → color override (set via legend swatch click)
-  const [seriesColors, setSeriesColors] = useState<Record<string, string>>({});
-  const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
+  // Legend state is keyed by series NAME (stable across chart-type switches and
+  // shared with the bar chart). Controlled by the parent when props are passed;
+  // otherwise managed internally.
+  const [colorsInternal, setColorsInternal] = useState<Record<string, string>>({});
+  const [hiddenInternal, setHiddenInternal] = useState<Set<string>>(new Set());
   const [openPickerFor, setOpenPickerFor] = useState<string | null>(null);
+
+  const hiddenSeries = useMemo<Set<string>>(() => {
+    if (hiddenSeriesProp) return hiddenSeriesProp instanceof Set ? hiddenSeriesProp : new Set(hiddenSeriesProp);
+    return hiddenInternal;
+  }, [hiddenSeriesProp, hiddenInternal]);
+  const seriesColors = seriesColorsProp ?? colorsInternal;
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -144,25 +179,31 @@ export const StatisticsRadarChart = forwardRef<
   }, []);
 
   const colorOf = useCallback(
-    (id: string, fallback: string) => seriesColors[id] ?? fallback,
+    (name: string, fallback: string) => seriesColors[name] ?? fallback,
     [seriesColors],
   );
 
-  const toggleSeries = useCallback((id: string) => {
-    setHiddenSeries(prev => {
+  const toggleSeries = useCallback((name: string) => {
+    if (onToggleSeries) { onToggleSeries(name); return; }
+    setHiddenInternal(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
       return next;
     });
-  }, []);
+  }, [onToggleSeries]);
+
+  const setColor = useCallback((name: string, color: string) => {
+    if (onSeriesColorChange) { onSeriesColorChange(name, color); return; }
+    setColorsInternal(prev => ({ ...prev, [name]: color }));
+  }, [onSeriesColorChange]);
 
   // Resolve per-series colors once so the legend and the chart agree.
   const resolvedSeries = useMemo(
     () =>
       series.map((s, i) => ({
         ...s,
-        resolvedColor: colorOf(s.id, s.color ?? CHART_COLORS[i % CHART_COLORS.length]),
+        resolvedColor: colorOf(s.name, s.color ?? CHART_COLORS[i % CHART_COLORS.length]),
       })),
     [series, colorOf],
   );
@@ -172,10 +213,126 @@ export const StatisticsRadarChart = forwardRef<
   // 4 visible polygons; above that, fall back to tooltip-only readout and
   // surface a tiny hint in the legend row.
   const visibleCount = resolvedSeries.reduce(
-    (n, s) => (hiddenSeries.has(s.id) ? n : n + 1),
+    (n, s) => (hiddenSeries.has(s.name) ? n : n + 1),
     0,
   );
   const labelsEnabled = visibleCount > 0 && visibleCount <= 4;
+
+  // ── Shape- and axis-aware sizing ─────────────────────────────────────────
+  // A circle radar needs the full 2·r vertically, but a polygon's vertical
+  // extent depends on its vertices: a triangle (vertex up) only reaches
+  // cy + 0.5·r at the bottom, so the SAME radius makes a circle overflow while
+  // a triangle leaves a bottom gap. We size per shape + axis count so the drawn
+  // shape fills the height without overflowing. (Radius % is of min(w,h)/2;
+  // this page's chart area is always wider than tall, so we reason in height
+  // fractions.) Shared by the ECharts option AND the DOM chip overlay below.
+  const radarGeom = useMemo(() => {
+    const nAx = indicators.length || 3;
+    const startA = Math.PI / 2; // radar.startAngle = 90°, CCW
+    let topFrac = 1;
+    let botFrac = 1;
+    if (shape === 'polygon' && nAx >= 3) {
+      topFrac = 0;
+      botFrac = 0;
+      for (let i = 0; i < nAx; i++) {
+        const s = Math.sin(startA + (2 * Math.PI * i) / nAx);
+        topFrac = Math.max(topFrac, s);
+        botFrac = Math.max(botFrac, -s);
+      }
+    }
+    const MT = 0.10;
+    const MB = 0.12;
+    const rFrac = Math.min(0.5, (1 - MT - MB) / (topFrac + botFrac));
+    const cyFrac = MT + topFrac * rFrac;
+    return {
+      startAngle: startA,
+      radiusPct: Math.round(rFrac * 200),
+      centerYPct: Math.round(cyFrac * 100),
+    };
+  }, [indicators.length, shape]);
+
+  // Track the chart-area pixel size so the DOM value-chip overlay can position
+  // chips exactly over the canvas vertices (same geometry as radarGeom).
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => setOverlaySize({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Value chips, drawn as DOM elements (not ECharts labels) so we can place
+  // them past the tips and scale just the hovered one. One per visible series ×
+  // indicator; staggered outward per series so stacked tips don't collide.
+  const valueChips = useMemo(() => {
+    type Chip = { key: string; x: number; y: number; hw: number; hh: number; text: string; color: string };
+    if (!overlaySize || !labelsEnabled) return [] as Chip[];
+    const { w, h } = overlaySize;
+    if (!w || !h) return [];
+    const cx = w / 2;
+    const cy = (radarGeom.centerYPct / 100) * h;
+    const r = (radarGeom.radiusPct / 100) * (Math.min(w, h) / 2);
+    const n = indicators.length;
+
+    // Seed each chip just outside its tip (along the axis).
+    const out: Chip[] = [];
+    resolvedSeries.forEach(s => {
+      if (hiddenSeries.has(s.name)) return;
+      for (let i = 0; i < n; i++) {
+        const v = s.values[i];
+        if (typeof v !== 'number') continue;
+        const max = indicators[i].max || 5;
+        const th = radarGeom.startAngle + (2 * Math.PI * i) / n;
+        const rad = Math.min(1, v / max) * r;
+        const vx = cx + rad * Math.cos(th);
+        const vy = cy - rad * Math.sin(th);
+        const off = 16; // push outward, just past the tip
+        const text = valueFormatter(v);
+        out.push({
+          key: `${s.name}:${i}`,
+          x: vx + Math.cos(th) * off,
+          y: vy - Math.sin(th) * off,
+          hw: text.length * 3.4 + 9, // approx half-width of the chip
+          hh: 10,                    // approx half-height
+          text,
+          color: s.resolvedColor,
+        });
+      }
+    });
+
+    // De-overlap: iteratively separate any two chips whose boxes intersect,
+    // pushing along the axis of least penetration (a few passes converge for
+    // the handful of chips we ever draw).
+    const GAP = 3;
+    for (let iter = 0; iter < 30; iter++) {
+      let moved = false;
+      for (let a = 0; a < out.length; a++) {
+        for (let b = a + 1; b < out.length; b++) {
+          const A = out[a];
+          const B = out[b];
+          let dx = B.x - A.x;
+          let dy = B.y - A.y;
+          const ox = A.hw + B.hw + GAP - Math.abs(dx);
+          const oy = A.hh + B.hh + GAP - Math.abs(dy);
+          if (ox > 0 && oy > 0) {
+            if (dx === 0 && dy === 0) { dx = a - b; dy = 0; }
+            if (ox < oy) {
+              const push = (ox / 2) * (dx < 0 ? -1 : 1);
+              A.x -= push; B.x += push;
+            } else {
+              const push = (oy / 2) * (dy < 0 ? -1 : 1);
+              A.y -= push; B.y += push;
+            }
+            moved = true;
+          }
+        }
+      }
+      if (!moved) break;
+    }
+    return out;
+  }, [overlaySize, labelsEnabled, radarGeom, indicators, resolvedSeries, hiddenSeries, valueFormatter]);
 
   const option = useMemo((): EChartsOption => {
     if (!indicators.length || !resolvedSeries.length) return {};
@@ -188,7 +345,8 @@ export const StatisticsRadarChart = forwardRef<
       : ['rgba(244,244,245,0.6)', 'rgba(228,228,231,0.3)'];
     const tooltipBg = isDark ? 'rgba(24,24,27,0.95)' : 'rgba(255,255,255,0.97)';
     const tooltipBorder = isDark ? '#3f3f46' : '#e4e4e7';
-    const chipBg = isDark ? 'rgba(24,24,27,0.85)' : 'rgba(255,255,255,0.92)';
+    const radarRadius = `${radarGeom.radiusPct}%`;
+    const radarCenterY = `${radarGeom.centerYPct}%`;
 
     return {
       tooltip: {
@@ -216,16 +374,22 @@ export const StatisticsRadarChart = forwardRef<
       radar: {
         shape,
         indicator: indicators.map(i => ({ name: i.name, max: i.max })),
-        center: ['50%', '50%'],
-        // Sized to fill the container while leaving room for wrapped 3-line
-        // axis labels. Tested up to 5 axes with long topic names.
-        radius: '82%',
+        // Computed per shape + axis count (see above) so the polygon fills the
+        // height without the circle overflowing.
+        center: ['50%', radarCenterY],
+        radius: radarRadius,
+        // Explicit so the page-side click geometry (angle → indicator) matches
+        // ECharts' layout exactly. 90° = first indicator at top, CCW order.
+        startAngle: 90,
         splitNumber: 5,
         axisName: {
           color: textColor,
-          fontSize: 12,
-          lineHeight: 14,
-          formatter: ((name: string) => wrapAxisLabel(name, 18, 3)) as any,
+          fontSize: 13,
+          lineHeight: 16,
+          formatter: ((name: string) => wrapAxisLabel(name, 20, 3)) as any,
+          // Enables 'click' events on the indicator labels so the page can
+          // drill from a skill/topic name into its breakdown modal.
+          triggerEvent: !!onIndicatorClick,
         },
         axisLine: { lineStyle: { color: splitLineColor } },
         splitLine: { lineStyle: { color: splitLineColor } },
@@ -242,20 +406,8 @@ export const StatisticsRadarChart = forwardRef<
           // Each data row = one series (rendered as a closed polygon).
           // Hidden series get rendered with empty array so the polygon vanishes
           // but the legend slot stays stable.
-          data: resolvedSeries.map((s, seriesIdx) => {
-            const hidden = hiddenSeries.has(s.id);
-            // Keep the original (possibly-null) values in closure so the per-
-            // vertex label can render "—" for missing data — coercing nulls to
-            // 0 here is only for polygon geometry, not for what we *show*.
-            const originalValues = s.values;
-            // When 2+ polygons share a vertex, ECharts stacks all chip labels
-            // at the same anchor and they crowd. Stagger each series' label
-            // distance and position so they fan out from the vertex instead.
-            // Series 0 → 'top' (above the vertex), series 1 → 'bottom' (below),
-            // 2 → 'top' farther out, 3 → 'bottom' farther out, etc.
-            const labelPosition: 'top' | 'bottom' =
-              seriesIdx % 2 === 0 ? 'top' : 'bottom';
-            const labelDistance = 4 + Math.floor(seriesIdx / 2) * 10;
+          data: resolvedSeries.map(s => {
+            const hidden = hiddenSeries.has(s.name);
             return {
               name: s.name,
               value: hidden ? indicators.map(() => 0) : s.values.map(v => v ?? 0),
@@ -272,54 +424,160 @@ export const StatisticsRadarChart = forwardRef<
                 ? undefined
                 : { color: s.resolvedColor, opacity: hidden ? 0 : 0.18 },
               tooltip: { show: !hidden },
-              // Inline value labels at each vertex. The chip background keeps
-              // them readable when polygons overlap. We pull the *original*
-              // value (not params.value, which is the null→0 coerced array) so
-              // missing scores read as "—" rather than a misleading "0.00".
-              label: {
-                show: !hidden && labelsEnabled,
-                position: labelPosition,
-                distance: labelDistance,
-                color: textColor,
-                fontSize: 10,
-                fontWeight: 600,
-                backgroundColor: chipBg,
-                borderColor: s.resolvedColor,
-                borderWidth: 1,
-                borderRadius: 3,
-                padding: [1, 4],
-                formatter: (params: any) => {
-                  const di =
-                    typeof params.dimensionIndex === 'number'
-                      ? params.dimensionIndex
-                      : typeof params.dataIndex === 'number'
-                        ? params.dataIndex
-                        : 0;
-                  const original = originalValues[di];
-                  return original == null ? '—' : valueFormatter(original);
-                },
-              },
-              // Stable per-polygon emphasis so hover doesn't repaint the whole
-              // chart and visually drop the label chips.
-              emphasis: {
-                focus: 'self' as const,
-                label: { show: !hidden && labelsEnabled },
-              },
+              // Value chips are drawn as a DOM overlay (see below) so we can
+              // place them away from the tips and scale just the hovered one
+              // without duplicating. ECharts' own labels stay off.
+              label: { show: false },
+              emphasis: { focus: 'none' as const, scale: false, label: { show: false } },
             };
           }),
         },
       ],
     };
-  }, [indicators, resolvedSeries, hiddenSeries, isDark, valueFormatter, shape, labelsEnabled]);
+  }, [indicators, resolvedSeries, hiddenSeries, isDark, shape, radarGeom, valueFormatter, onIndicatorClick]);
+
+  // Axis-name (indicator label) clicks. With `triggerEvent` set above, ECharts
+  // dispatches a 'click' whose componentType is 'radar' (series clicks come
+  // through as 'series' and are ignored here).
+  const chartEvents = useMemo(() => {
+    if (!onIndicatorClick) return undefined;
+    return {
+      click: (params: any) => {
+        const isAxisName =
+          params?.componentType === 'radar' || params?.targetType === 'axisName';
+        if (!isAxisName) return;
+        const name: string = params?.name ?? params?.value;
+        if (!name) return;
+        const idx = indicators.findIndex(i => i.name === name);
+        onIndicatorClick(name, idx);
+      },
+    };
+  }, [onIndicatorClick, indicators]);
+
+  // ── Vertex (data-point "tip") clicks ────────────────────────────────────
+  // ECharts radar series clicks don't report which axis vertex was hit, so we
+  // bind a low-level zrender click once and hit-test the cursor against each
+  // rendered vertex via the radar coordinate system. Latest geometry/handler
+  // live in refs so the listener (bound on mount) always sees current values.
+  const indicatorsRef = useRef(indicators);
+  const seriesRef = useRef(resolvedSeries);
+  const hiddenRef = useRef(hiddenSeries);
+  const onIndicatorClickRef = useRef(onIndicatorClick);
+  const hoverKeyRef = useRef<string | null>(null);
+  useEffect(() => { indicatorsRef.current = indicators; }, [indicators]);
+  useEffect(() => { seriesRef.current = resolvedSeries; }, [resolvedSeries]);
+  useEffect(() => { hiddenRef.current = hiddenSeries; }, [hiddenSeries]);
+  useEffect(() => { onIndicatorClickRef.current = onIndicatorClick; }, [onIndicatorClick]);
+
+  // ECharts 6 makes getModel()/coordinateSystem private, so we can't read the
+  // rendered vertex pixels directly. Instead we reconstruct the radar geometry
+  // from PUBLIC APIs (getDom() size + getOption() center/radius/startAngle) and
+  // map the click to the nearest axis by angle (dot-product). This makes the
+  // whole wedge — vertex tip, polygon edge, and axis label — drill into the
+  // indicator, which is exactly the affordance the user wants.
+  const handleChartReady = useCallback((inst: any) => {
+    const zr = inst?.getZr?.();
+    if (!zr) return;
+
+    // Rebuild radar geometry from PUBLIC APIs + live values.
+    const geom = (): { inds: any[]; n: number; cx: number; cy: number; r: number; theta: (i: number) => number } | null => {
+      const inds = indicatorsRef.current;
+      const n = inds.length;
+      if (!n) return null;
+      let dom: HTMLElement | null = null;
+      let opt: any = null;
+      try { dom = inst.getDom?.(); opt = inst.getOption?.(); } catch { return null; }
+      if (!dom) return null;
+      const w = dom.clientWidth;
+      const h = dom.clientHeight;
+      const radar = Array.isArray(opt?.radar) ? opt.radar[0] : opt?.radar;
+      const pct = (v: any, base: number, fb: number) => {
+        if (v == null) return fb;
+        if (typeof v === 'number') return v;
+        if (typeof v === 'string' && v.trim().endsWith('%')) return (parseFloat(v) / 100) * base;
+        const num = parseFloat(v);
+        return Number.isFinite(num) ? num : fb;
+      };
+      const cx = pct(radar?.center?.[0], w, w / 2);
+      const cy = pct(radar?.center?.[1], h, h / 2);
+      const r = pct(radar?.radius, Math.min(w, h) / 2, (Math.min(w, h) / 2) * 0.85);
+      const startAngle = ((radar?.startAngle ?? 90) * Math.PI) / 180;
+      return { inds, n, cx, cy, r, theta: (i: number) => startAngle + (2 * Math.PI * i) / n };
+    };
+
+    // Resolve a point to the nearest DATA TIP (vertex) or, failing that, the
+    // axis-name LABEL. Only these two zones are interactive — the polygon body
+    // and the empty circular corners are inert (no stray pointer / clicks).
+    const resolve = (offsetX: number, offsetY: number) => {
+      const g = geom();
+      if (!g) return null;
+      const { inds, n, cx, cy, r, theta } = g;
+      const series = seriesRef.current.filter((s: any) => !hiddenRef.current.has(s.name));
+
+      // Nearest data tip across all visible series.
+      let bestI = -1;
+      let bestD = 28; // px tolerance (covers the dot + its value chip)
+      let seriesName = '';
+      for (const s of series) {
+        for (let i = 0; i < n; i++) {
+          const val = s.values?.[i];
+          if (typeof val !== 'number' || !(inds[i].max > 0)) continue;
+          const rad = Math.min(1, val / inds[i].max) * r;
+          const px = cx + rad * Math.cos(theta(i));
+          const py = cy - rad * Math.sin(theta(i));
+          const d = Math.hypot(px - offsetX, py - offsetY);
+          if (d < bestD) { bestD = d; bestI = i; seriesName = s.name; }
+        }
+      }
+      if (bestI >= 0) {
+        return { index: bestI, name: inds[bestI].name, region: 'vertex' as const, seriesName };
+      }
+
+      // Axis label: just beyond the radius and angularly aligned to an axis.
+      const dx = offsetX - cx;
+      const dy = -(offsetY - cy);
+      const dist = Math.hypot(dx, dy);
+      if (dist >= r * 0.92 && dist <= r * 1.6) {
+        let near = 0;
+        let bestScore = -Infinity;
+        for (let i = 0; i < n; i++) {
+          const sc = dx * Math.cos(theta(i)) + dy * Math.sin(theta(i));
+          if (sc > bestScore) { bestScore = sc; near = i; }
+        }
+        if (dist > 0 && bestScore / dist >= Math.cos((22 * Math.PI) / 180)) {
+          return { index: near, name: inds[near].name, region: 'label' as const, seriesName: '' };
+        }
+      }
+      return null;
+    };
+
+    zr.on('click', (e: any) => {
+      if (!onIndicatorClickRef.current) return;
+      const hit = resolve(e.offsetX, e.offsetY);
+      if (hit) onIndicatorClickRef.current(hit.name, hit.index, hit.region);
+    });
+
+    // Hover feedback: cursor + tell the DOM overlay which value chip to scale
+    // (keyed by series+indicator). zrender repaints the canvas cursor each
+    // frame, so we set it imperatively.
+    const setHover = (k: string | null) => { if (hoverKeyRef.current !== k) { hoverKeyRef.current = k; setHoverKey(k); } };
+    zr.on('mousemove', (e: any) => {
+      if (!onIndicatorClickRef.current) { zr.setCursorStyle('default'); setHover(null); return; }
+      const hit = resolve(e.offsetX, e.offsetY);
+      zr.setCursorStyle(hit ? 'pointer' : 'default');
+      setHover(hit && hit.region === 'vertex' ? `${hit.seriesName}:${hit.index}` : null);
+    });
+    zr.on('mouseout', () => setHover(null));
+  }, []);
 
   const resolvedHeight = typeof height === 'number' ? `${height}px` : height;
 
   return (
     <div
       className="flex flex-col"
-      style={{ height: resolvedHeight, minHeight: 380 }}
+      style={{ height: resolvedHeight, minHeight: 340 }}
     >
-      <div className="flex-1 min-h-0">
+      <div ref={containerRef} className="relative flex-1 min-h-0">
         <ReactECharts
           ref={chartRef}
           key={`radar-${shape}-${resolvedSeries.length}`}
@@ -327,10 +585,39 @@ export const StatisticsRadarChart = forwardRef<
           notMerge
           style={{ height: '100%', width: '100%' }}
           opts={{ renderer: 'canvas' }}
+          {...(chartEvents ? { onEvents: chartEvents } : {})}
+          {...(onIndicatorClick ? { onChartReady: handleChartReady } : {})}
         />
+        {/* Value chips drawn as a DOM overlay (placed past the tips). The chip
+            under the cursor scales up — the existing value grows, no duplicate.
+            pointer-events-none so hover/click pass through to the canvas. */}
+        {valueChips.map(c => {
+          const active = hoverKey === c.key;
+          return (
+            <div
+              key={c.key}
+              className="pointer-events-none absolute select-none"
+              style={{
+                left: c.x,
+                top: c.y,
+                transform: `translate(-50%, -50%) scale(${active ? 1.4 : 1})`,
+                transformOrigin: 'center',
+                transition: 'transform 120ms ease-out',
+                zIndex: active ? 30 : 20,
+              }}
+            >
+              <span
+                className="inline-block rounded-md border bg-card/95 px-1.5 py-0.5 text-[11px] font-bold leading-none tabular-nums text-foreground shadow-sm"
+                style={{ borderColor: c.color, boxShadow: active ? `0 0 0 1px ${c.color}` : undefined }}
+              >
+                {c.text}
+              </span>
+            </div>
+          );
+        })}
       </div>
       {resolvedSeries.length > 0 && (
-        <div className="shrink-0 pt-2 pb-1">
+        <div className="shrink-0 pt-1">
           {!labelsEnabled && visibleCount > 4 && (
             <p className="text-center text-[10px] text-muted-foreground mb-1">
               Rótulos numéricos ocultos com mais de 4 séries visíveis — passe o mouse para ver os valores.
@@ -338,7 +625,7 @@ export const StatisticsRadarChart = forwardRef<
           )}
           <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 px-2">
             {resolvedSeries.map(s => {
-              const hidden = hiddenSeries.has(s.id);
+              const hidden = hiddenSeries.has(s.name);
               const alpha = hidden ? 0.35 : 1;
               return (
                 <div
@@ -346,8 +633,8 @@ export const StatisticsRadarChart = forwardRef<
                   className="flex items-center gap-1.5 bg-card/60 backdrop-blur-sm px-1.5 py-0.5 rounded"
                 >
                   <Popover
-                    open={openPickerFor === s.id}
-                    onOpenChange={open => setOpenPickerFor(open ? s.id : null)}
+                    open={openPickerFor === s.name}
+                    onOpenChange={open => setOpenPickerFor(open ? s.name : null)}
                   >
                     <PopoverTrigger asChild>
                       <button
@@ -398,7 +685,7 @@ export const StatisticsRadarChart = forwardRef<
                               outlineOffset: '2px',
                             }}
                             onClick={() => {
-                              setSeriesColors(prev => ({ ...prev, [s.id]: color }));
+                              setColor(s.name, color);
                               setOpenPickerFor(null);
                             }}
                           />
@@ -407,7 +694,7 @@ export const StatisticsRadarChart = forwardRef<
                     </PopoverContent>
                   </Popover>
                   <button
-                    onClick={() => toggleSeries(s.id)}
+                    onClick={() => toggleSeries(s.name)}
                     aria-pressed={!hidden}
                     className={cn(
                       'text-sm transition-colors cursor-pointer select-none',

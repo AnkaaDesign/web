@@ -15,7 +15,7 @@ export default function TimeClockDiaPage() {
         breadcrumbs={[
           { label: "Início", href: routes.home },
           { label: "Recursos Humanos", href: routes.humanResources.root },
-          { label: "Controle de Ponto" },
+          { label: "Controle de Ponto", href: routes.humanResources.timeClock.root },
           { label: "Visualização Dia" },
         ]}
         headerExtra={<TimeClockTabs />}

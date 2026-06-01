@@ -39,7 +39,7 @@ export const QuestionnairePerguntaCreatePage = () => {
             icon={IconClipboardList}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Administração" },
+              { label: "Administração", href: routes.administration.root },
               { label: "Questionários", href: routes.administration.questionnaire.root },
               { label: "Perguntas", href: routes.administration.questionnaire.perguntas },
               { label: "Nova" },

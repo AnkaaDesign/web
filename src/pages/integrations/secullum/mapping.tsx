@@ -70,7 +70,7 @@ export default function SecullumMappingPage() {
           icon={IconUsers}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos" },
+            { label: "Recursos Humanos", href: routes.humanResources.root },
             { label: "Integração Secullum" },
           ]}
           className="flex-shrink-0"

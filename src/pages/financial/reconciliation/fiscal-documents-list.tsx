@@ -272,7 +272,7 @@ export const ReconciliationFiscalDocumentsListPage = () => {
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Financeiro", href: routes.financial.root },
-            { label: "Conciliação Bancária" },
+            { label: "Conciliação Bancária", href: routes.financial.reconciliation.root },
             { label: "Notas Fiscais" },
           ]}
           actions={[

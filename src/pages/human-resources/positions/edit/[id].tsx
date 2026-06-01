@@ -55,7 +55,7 @@ export const PositionEditPage = () => {
           icon={IconBriefcase}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos" },
+            { label: "Recursos Humanos", href: routes.humanResources.root },
             { label: "Cargos", href: routes.humanResources.positions.root },
             { label: position?.data?.name || "Cargo", href: routes.humanResources.positions.details(id) },
             { label: "Editar" },

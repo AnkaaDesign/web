@@ -96,7 +96,7 @@ const SupplierDetailsPage = () => {
           <PageHeader
             variant="detail"
             title={supplier.fantasyName}
-            breadcrumbs={[{ label: "Início", href: "/" }, { label: "Estoque" }, { label: "Fornecedores", href: routes.inventory.suppliers.root }, { label: supplier.fantasyName }]}
+            breadcrumbs={[{ label: "Início", href: "/" }, { label: "Estoque", href: routes.inventory.root }, { label: "Fornecedores", href: routes.inventory.suppliers.root }, { label: supplier.fantasyName }]}
             actions={[
               {
                 key: "refresh",

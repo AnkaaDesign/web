@@ -36,15 +36,22 @@ export interface ReconciliationFilters {
 }
 
 /**
- * Default to the current period. The accordion view always needs a period to
- * enumerate dates against — empty period defaults are meaningless here.
+ * Default to the current period plus the previous one. The accordion view always
+ * needs a period to enumerate dates against — empty period defaults are
+ * meaningless here. The period model only spans a single calendar year, so in
+ * January (no prior month in the same year) we fall back to the current month.
  */
 export function getDefaultReconciliationFilters(): ReconciliationFilters {
   const now = new Date();
+  const currentMonth = now.getMonth() + 1; // 1-12
+  const months =
+    currentMonth > 1
+      ? [String(currentMonth - 1).padStart(2, "0"), String(currentMonth).padStart(2, "0")]
+      : [String(currentMonth).padStart(2, "0")];
   return {
     type: "DEBIT",
     year: now.getFullYear(),
-    months: [String(now.getMonth() + 1).padStart(2, "0")],
+    months,
   };
 }
 

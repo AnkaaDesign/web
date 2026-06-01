@@ -58,7 +58,7 @@ export const WarningBatchEditPage = () => {
             icon={IconAlertTriangle}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Recursos Humanos" },
+              { label: "Recursos Humanos", href: routes.humanResources.root },
               { label: "Advertências", href: routes.humanResources.warnings.root },
               { label: "Edição em Lote" },
             ]}
@@ -86,7 +86,7 @@ export const WarningBatchEditPage = () => {
             icon={IconAlertTriangle}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Recursos Humanos" },
+              { label: "Recursos Humanos", href: routes.humanResources.root },
               { label: "Advertências", href: routes.humanResources.warnings.root },
               { label: "Edição em Lote" },
             ]}
@@ -140,7 +140,7 @@ export const WarningBatchEditPage = () => {
           icon={IconAlertTriangle}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos" },
+            { label: "Recursos Humanos", href: routes.humanResources.root },
             { label: "Advertências", href: routes.humanResources.warnings.root },
             { label: "Edição em Lote" },
           ]}

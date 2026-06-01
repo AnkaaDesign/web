@@ -118,7 +118,7 @@ export const PositionDetailPage = () => {
           title={position.name}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos" },
+            { label: "Recursos Humanos", href: routes.humanResources.root },
             { label: "Cargos", href: routes.humanResources.positions.root },
             { label: position.name },
           ]}

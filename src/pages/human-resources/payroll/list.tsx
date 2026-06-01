@@ -1060,7 +1060,7 @@ export default function PayrollListPage() {
           className="flex-shrink-0"
           title="Folha de Pagamento"
           favoritePage={FAVORITE_PAGES.ADMINISTRACAO_FOLHA_DE_PAGAMENTO}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }, { label: "Folha de Pagamento" }]}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração", href: routes.administration.root }, { label: "Folha de Pagamento" }]}
           subtitle={(() => {
             if (filters.year && filters.months && filters.months.length > 0) {
               if (filters.months.length === 1) {

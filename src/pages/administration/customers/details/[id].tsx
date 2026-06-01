@@ -105,7 +105,7 @@ export const CustomerDetailsPage = () => {
           title={customer.fantasyName}
           breadcrumbs={[
             { label: "Início", href: "/" },
-            { label: "Financeiro" },
+            { label: "Financeiro", href: routes.financial.root },
             { label: "Clientes", href: routes.financial.customers.root },
             { label: customer.fantasyName },
           ]}

@@ -15,7 +15,7 @@ export const WarningListPage = () => {
           variant="list"
           title="Advertências"
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }, { label: "Advertências" }]}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.humanResources.root }, { label: "Advertências" }]}
           actions={[
             {
               key: "new",

@@ -123,7 +123,7 @@ export function StandardizedTable<T>({
     <div className={cn("h-full flex flex-col", className)}>
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* Fixed Header Table */}
-        <div className="overflow-hidden">
+        <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
           <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
             <TableHeader className="[&_tr]:border-b [&_tr]:hover:bg-muted">
               <TableRow className="bg-muted hover:bg-muted even:bg-muted">
@@ -144,7 +144,7 @@ export function StandardizedTable<T>({
 
                 {/* Data columns */}
                 {columns.map((column) => (
-                  <TableHead key={column.key} style={column.width ? { width: typeof column.width === "number" ? `${column.width}px` : column.width } : undefined} className={cn("whitespace-nowrap text-foreground font-medium text-sm p-0 bg-muted !border-r-0", column.className)}>
+                  <TableHead key={column.key} style={column.width ? { width: typeof column.width === "number" ? `${column.width}px` : column.width } : undefined} className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0", column.className)}>
                     {column.sortable && onSort ? (
                       <button
                         onClick={() => onSort(column.key)}
@@ -183,7 +183,7 @@ export function StandardizedTable<T>({
         </div>
 
         {/* Scrollable Body Table */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden border-l border-r border-border">
           <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
             <TableBody>
               {!data || data.length === 0 ? (

@@ -68,8 +68,8 @@ function convertSortConfigsToTopicOrderBy(
   const items: any[] = [];
   for (const config of sortConfigs) {
     if (config.column === "skillId") {
-      // Sort by the skill's name, not the foreign-key UUID
-      items.push({ skill: { name: config.direction } });
+      // Sort by the competency's defined order, not its name or the foreign-key UUID
+      items.push({ skill: { order: config.direction } });
     } else if (
       config.column === "id" ||
       config.column === "title" ||
@@ -140,7 +140,7 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
       },
       ...(sortConfigs.length > 0
         ? { orderBy: convertSortConfigsToTopicOrderBy(sortConfigs) }
-        : { orderBy: [{ skill: { name: "asc" } }, { order: "asc" as const }] }),
+        : { orderBy: [{ skill: { order: "asc" } }, { order: "asc" as const }] }),
       ...(showSelectedOnly &&
         selectedIds.length > 0 && {
           where: { id: { in: selectedIds } },

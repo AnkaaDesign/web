@@ -43,7 +43,7 @@ export const TopicCreatePage = () => {
             icon={IconClipboardList}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Administração" },
+              { label: "Administração", href: routes.administration.root },
               { label: "Tópicos", href: routes.administration.topic.root },
               { label: "Novo" },
             ]}
