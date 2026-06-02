@@ -1,7 +1,7 @@
 // packages/api-client/src/item-category.ts
 
 import { apiClient } from "./axiosClient";
-import { ITEM_CATEGORY_TYPE } from "../constants";
+import { ITEM_CATEGORY_TYPE, ACCOUNTING_TYPE } from "../constants";
 import type {
   // Schema types (for parameters)
   ItemCategoryGetManyFormData,
@@ -97,6 +97,47 @@ export class ItemCategoryService {
     });
   }
 
+  /**
+   * Fetch the full category tree: top-level categories with nested `children`.
+   * The API resolves the `tree` flag into a nested response.
+   */
+  async getItemCategoryTree(params?: ItemCategoryGetManyFormData): Promise<ItemCategoryGetManyResponse> {
+    return this.getItemCategories({
+      ...(params || {}),
+      tree: true,
+    } as ItemCategoryGetManyFormData);
+  }
+
+  /**
+   * Fetch direct children (subcategories) of a given parent category.
+   */
+  async getChildCategories(parentId: string, params?: ItemCategoryGetManyFormData): Promise<ItemCategoryGetManyResponse> {
+    return this.getItemCategories({
+      ...(params || {}),
+      parentId,
+    } as ItemCategoryGetManyFormData);
+  }
+
+  /**
+   * Fetch only top-level categories (categoryLevel === 1).
+   */
+  async getRootCategories(params?: ItemCategoryGetManyFormData): Promise<ItemCategoryGetManyResponse> {
+    return this.getItemCategories({
+      ...(params || {}),
+      categoryLevel: 1,
+    } as ItemCategoryGetManyFormData);
+  }
+
+  /**
+   * Fetch categories filtered by accounting (DRE) classification.
+   */
+  async getCategoriesByAccountingType(accountingType: ACCOUNTING_TYPE, params?: ItemCategoryGetManyFormData): Promise<ItemCategoryGetManyResponse> {
+    return this.getItemCategories({
+      ...(params || {}),
+      accountingType,
+    } as ItemCategoryGetManyFormData);
+  }
+
   async getItemCategoryById(id: string, params?: ItemCategoryGetByIdFormData): Promise<ItemCategoryGetUniqueResponse> {
     const response = await apiClient.get<ItemCategoryGetUniqueResponse>(`${this.basePath}/${id}`, {
       params,
@@ -170,6 +211,11 @@ export const getPpeCategories = () => itemCategoryService.getPpeCategories();
 export const getRegularCategories = () => itemCategoryService.getRegularCategories();
 export const getToolCategories = () => itemCategoryService.getToolCategories();
 export const getCategoriesByType = (type: ITEM_CATEGORY_TYPE) => itemCategoryService.getCategoriesByType(type);
+export const getItemCategoryTree = (params?: ItemCategoryGetManyFormData) => itemCategoryService.getItemCategoryTree(params);
+export const getChildCategories = (parentId: string, params?: ItemCategoryGetManyFormData) => itemCategoryService.getChildCategories(parentId, params);
+export const getRootCategories = (params?: ItemCategoryGetManyFormData) => itemCategoryService.getRootCategories(params);
+export const getCategoriesByAccountingType = (accountingType: ACCOUNTING_TYPE, params?: ItemCategoryGetManyFormData) =>
+  itemCategoryService.getCategoriesByAccountingType(accountingType, params);
 export const getItemCategoryById = (id: string, params?: ItemCategoryGetByIdFormData) => itemCategoryService.getItemCategoryById(id, params);
 
 // Mutation Operations

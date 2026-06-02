@@ -7,15 +7,15 @@ import type { BaseResponse } from './common';
 // Filters (request)
 // =====================
 
-export type SkillStatsComparisonMode = 'user' | 'sector';
-export type SkillStatsEvolutionMode = 'company' | 'sector' | 'user';
+export type SkillStatsComparisonMode = 'user' | 'sector' | 'campaign';
+export type SkillStatsEvolutionMode = 'company' | 'sector' | 'user' | 'skill' | 'topic';
 
 // Composition axes for the new statistics page. The page picks one endpoint
 // (overview | comparison | evolution) based on the combination below, mirroring
 // the productivity page's xAxis/yAxis/compareMode pattern.
 export type SkillStatsXAxisMode  = 'skill' | 'topic' | 'sector' | 'user' | 'campaign';
 export type SkillStatsYAxisMode  = 'averageScore' | 'volume' | 'distribution';
-export type SkillStatsCompareMode = 'none' | 'sector' | 'user' | 'skill' | 'position';
+export type SkillStatsCompareMode = 'none' | 'sector' | 'user' | 'skill' | 'position' | 'campaign' | 'topic';
 export type SkillStatsChartType =
   | 'bar'
   | 'bar-stacked'
@@ -24,7 +24,8 @@ export type SkillStatsChartType =
   | 'area'
   | 'area-smooth'
   | 'radar-polygon'
-  | 'radar-circle';
+  | 'radar-circle'
+  | 'pie';
 
 export interface SkillStatsBaseFilters {
   assessmentIds?: string[];
@@ -153,6 +154,8 @@ export interface SkillStatsComparisonEntity {
 
 export interface SkillStatsComparisonData {
   mode: SkillStatsComparisonMode;
+  /** When mode==='campaign', `axis`/entities are keyed by campaign; the
+   *  perSkillAverage/perTopicAverage arrays carry the skill/topic breakdown. */
   axis: { skillId: string; skillName: string; skillOrder: number }[];
   topicAxis: { topicId: string; topicTitle: string; skillId: string; skillName: string }[];
   entities: SkillStatsComparisonEntity[];

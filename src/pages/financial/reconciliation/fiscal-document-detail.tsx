@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   IconAlertCircle,
   IconAlertTriangle,
+  IconArrowsExchange2,
+  IconArrowUpRight,
   IconBuildingStore,
   IconCopy,
   IconDownload,
@@ -33,10 +36,12 @@ import { useToast } from "@/hooks/common/use-toast";
 import { formatCNPJ, formatCnpjCpf, formatCurrency, formatDate } from "@/utils";
 import { cn } from "@/lib/utils";
 import { SECTOR_PRIVILEGES, routes } from "@/constants";
-import type { FiscalAddress, FiscalDocumentStatus } from "@/types/reconciliation";
+import type { FiscalAddress, FiscalDocument, FiscalDocumentStatus } from "@/types/reconciliation";
+
+/** The bank transaction embedded in a fiscal document's match record. */
+type LinkedTransaction = NonNullable<NonNullable<FiscalDocument["matches"]>[number]["transaction"]>;
 import { docTypeLabel, docTypeVariant } from "@/components/financial/reconciliation/fiscal-doc-badge";
 import { getConfidenceBadgeVariant } from "@/components/financial/reconciliation/match-status-badge";
-import { MatchCard } from "@/components/financial/reconciliation/match-card";
 import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";
 
 const SEFAZ_CONSULTA_URL =
@@ -273,6 +278,20 @@ export function ReconciliationFiscalDocumentDetailPage() {
               <InfoRow label="Modelo" value={doc.model} />
               <InfoRow label="Natureza da operação" value={doc.naturezaOperacao} />
               <InfoRow label="Emissão" value={formatDate(doc.issueDate)} />
+              {doc.orderCodes && doc.orderCodes.length > 0 && (
+                <InfoRow
+                  label={doc.orderCodes.length > 1 ? "Pedidos" : "Pedido"}
+                  value={
+                    <span className="flex flex-wrap justify-end gap-1">
+                      {doc.orderCodes.map(o => (
+                        <Badge key={o.code} variant="secondary" size="sm" className="font-mono">
+                          {o.code}
+                        </Badge>
+                      ))}
+                    </span>
+                  }
+                />
+              )}
               <InfoRow
                 label="Origem"
                 value={doc.source === "SIEG_API" ? "SIEG (automático)" : "Upload manual"}
@@ -294,65 +313,110 @@ export function ReconciliationFiscalDocumentDetailPage() {
                   </button>
                 }
               />
+              {doc.infCpl && (
+                <div className="bg-muted/50 rounded-lg px-4 py-3 space-y-1.5">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Informações complementares
+                  </span>
+                  <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
+                    {doc.infCpl}
+                  </p>
+                </div>
+              )}
             </SectionCard>
 
-            {/* Valores / Impostos */}
-            <SectionCard title="Valores e impostos" icon={IconReceiptTax}>
-              {isNfse ? (
-                <>
-                  <InfoRow label="Valor dos serviços" value={fmtMoney(doc.valorServicos)} />
-                  <InfoRow label="Base de cálculo ISS" value={fmtMoney(doc.baseCalculo)} />
-                  <InfoRow label="Valor do ISS" value={fmtMoney(doc.issValue)} />
-                  <InfoRow
-                    label="Alíquota ISS"
-                    value={toNum(doc.issRate) != null ? `${toNum(doc.issRate)}%` : null}
-                  />
-                  {doc.issRetained != null && (
-                    <InfoRow label="ISS retido" value={doc.issRetained ? "Sim" : "Não"} />
+            {/* Valores, impostos e pagamento — a single financial section sitting
+                next to Identificação: values/taxes, then the payment forms and
+                the linked bank transaction(s), so "how much" and "paid how /
+                matched to what" read together. */}
+            <SectionCard title="Valores, impostos e pagamento" icon={IconReceiptTax}>
+              <div className="space-y-5">
+                {/* Valores e impostos */}
+                <div className="space-y-3">
+                  {isNfse ? (
+                    <>
+                      <InfoRow label="Valor dos serviços" value={fmtMoney(doc.valorServicos)} />
+                      <InfoRow label="Base de cálculo ISS" value={fmtMoney(doc.baseCalculo)} />
+                      <InfoRow label="Valor do ISS" value={fmtMoney(doc.issValue)} />
+                      <InfoRow
+                        label="Alíquota ISS"
+                        value={toNum(doc.issRate) != null ? `${toNum(doc.issRate)}%` : null}
+                      />
+                      {doc.issRetained != null && (
+                        <InfoRow label="ISS retido" value={doc.issRetained ? "Sim" : "Não"} />
+                      )}
+                      <InfoRow label="Valor líquido" value={fmtMoney(doc.valorLiquido)} />
+                      <InfoRow label="Cód. trib. município" value={doc.codigoTributacaoMunicipio} />
+                      <InfoRow label="Município prestação" value={doc.municipioPrestacao} />
+                    </>
+                  ) : (
+                    <>
+                      <InfoRow label="Produtos" value={fmtMoney(doc.totals?.vProd)} />
+                      <InfoRow label="Frete" value={fmtMoney(doc.totals?.vFrete)} />
+                      <InfoRow label="Desconto" value={fmtMoney(doc.totals?.vDesc)} />
+                      <InfoRow label="Base ICMS" value={fmtMoney(doc.totals?.vBC)} />
+                      <InfoRow label="Valor ICMS" value={fmtMoney(doc.totals?.vICMS)} />
+                      <InfoRow label="IPI" value={fmtMoney(doc.totals?.vIPI)} />
+                      <InfoRow label="Tributos aprox." value={fmtMoney(doc.totals?.vTotTrib)} />
+                    </>
                   )}
-                  <InfoRow label="Valor líquido" value={fmtMoney(doc.valorLiquido)} />
-                  <InfoRow label="Cód. trib. município" value={doc.codigoTributacaoMunicipio} />
-                  <InfoRow label="Município prestação" value={doc.municipioPrestacao} />
-                </>
-              ) : (
-                <>
-                  <InfoRow label="Produtos" value={fmtMoney(doc.totals?.vProd)} />
-                  <InfoRow label="Frete" value={fmtMoney(doc.totals?.vFrete)} />
-                  <InfoRow label="Seguro" value={fmtMoney(doc.totals?.vSeg)} />
-                  <InfoRow label="Desconto" value={fmtMoney(doc.totals?.vDesc)} />
-                  <InfoRow label="Outras despesas" value={fmtMoney(doc.totals?.vOutro)} />
-                  <InfoRow label="Base ICMS" value={fmtMoney(doc.totals?.vBC)} />
-                  <InfoRow label="Valor ICMS" value={fmtMoney(doc.totals?.vICMS)} />
-                  <InfoRow label="Valor ST" value={fmtMoney(doc.totals?.vST)} />
-                  <InfoRow label="IPI" value={fmtMoney(doc.totals?.vIPI)} />
-                  <InfoRow label="PIS" value={fmtMoney(doc.totals?.vPIS)} />
-                  <InfoRow label="COFINS" value={fmtMoney(doc.totals?.vCOFINS)} />
-                  <InfoRow label="Tributos aprox." value={fmtMoney(doc.totals?.vTotTrib)} />
-                </>
-              )}
-              <div className="flex justify-between items-center bg-primary/10 rounded-lg px-4 py-3 border border-primary/20">
-                <span className="text-sm font-semibold text-foreground">Total da nota</span>
-                <span className="text-base font-bold text-foreground tabular-nums">
-                  {formatCurrency(doc.totalValue)}
-                </span>
+                  <div className="flex justify-between items-center bg-primary/10 rounded-lg px-4 py-3 border border-primary/20">
+                    <span className="text-sm font-semibold text-foreground">Total da nota</span>
+                    <span className="text-base font-bold text-foreground tabular-nums">
+                      {formatCurrency(doc.totalValue)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pagamento */}
+                {payments.length > 0 && (
+                  <div className="space-y-3">
+                    <SubHeading icon={IconReceipt2}>Pagamento</SubHeading>
+                    {payments.map((p, i) => (
+                      <InfoRow
+                        key={i}
+                        label={PAYMENT_FORMS[p.form ?? ""] || p.form || "Forma de pagamento"}
+                        value={p.value != null ? formatCurrency(p.value) : "—"}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Transações vinculadas */}
+                {doc.matches && doc.matches.length > 0 && (
+                  <div className="space-y-3">
+                    <SubHeading icon={IconArrowsExchange2}>
+                      {doc.matches.length > 1 ? "Transações vinculadas" : "Transação vinculada"}
+                    </SubHeading>
+                    <div className="space-y-2">
+                      {doc.matches.map(m => {
+                        const tx = m.transaction;
+                        if (!tx) {
+                          return (
+                            <p key={m.id} className="text-xs text-muted-foreground">
+                              Transação removida
+                            </p>
+                          );
+                        }
+                        const txMatchCount =
+                          doc.matches?.filter(x => x.transaction?.id === tx.id).length ?? 1;
+                        return (
+                          <LinkedTransactionCard
+                            key={m.id}
+                            tx={tx}
+                            confidenceScore={m.confidenceScore}
+                            allocatedAmount={m.allocatedAmount}
+                            unmatchDisabled={unmatchMut.isPending}
+                            onUnmatch={() => handleUnmatchRequest(tx.id, txMatchCount)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </SectionCard>
           </div>
-
-          {/* Protocolo de autorização */}
-          {(doc.protocolNumber || doc.authorizationDate || doc.cStat) && (
-            <SectionCard title="Protocolo de autorização" icon={IconReceipt2}>
-              <InfoRow label="Protocolo" value={doc.protocolNumber} />
-              <InfoRow
-                label="Autorizada em"
-                value={doc.authorizationDate ? formatDate(doc.authorizationDate) : null}
-              />
-              <InfoRow
-                label="Situação (cStat)"
-                value={doc.cStat ? `${doc.cStat}${doc.xMotivo ? ` — ${doc.xMotivo}` : ""}` : null}
-              />
-            </SectionCard>
-          )}
 
           {/* Emitente / Destinatário (Prestador / Tomador for NFSe) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -392,6 +456,7 @@ export function ReconciliationFiscalDocumentDetailPage() {
                 docType={doc.docType}
                 totalValue={doc.totalValue}
                 editable
+                hideLineMeta
                 onItemCategoryChange={(fiscalItemId, categoryId) =>
                   setItemCategory.mutate({ fiscalItemId, categoryId })
                 }
@@ -399,100 +464,6 @@ export function ReconciliationFiscalDocumentDetailPage() {
             </SectionCard>
           )}
 
-          {/* Pagamento (NFe) */}
-          {payments.length > 0 && (
-            <SectionCard title="Pagamento" icon={IconReceipt2}>
-              {payments.map((p, i) => (
-                <InfoRow
-                  key={i}
-                  label={PAYMENT_FORMS[p.form ?? ""] || p.form || "Forma de pagamento"}
-                  value={p.value != null ? formatCurrency(p.value) : "—"}
-                />
-              ))}
-            </SectionCard>
-          )}
-
-          {/* Conciliado com */}
-          {doc.matches && doc.matches.length > 0 && (
-            <Card className="shadow-sm border border-emerald-500/40 bg-emerald-50/40 dark:bg-emerald-500/10">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
-                  <IconReceipt2 className="h-5 w-5" />
-                  Transações vinculadas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 space-y-2">
-                {doc.matches.map(m => {
-                  const tx = m.transaction;
-                  if (!tx) {
-                    return (
-                      <p key={m.id} className="text-xs text-muted-foreground">
-                        Transação removida
-                      </p>
-                    );
-                  }
-                  const txMatchCount =
-                    doc.matches?.filter(x => x.transaction?.id === tx.id).length ?? 1;
-                  return (
-                    <MatchCard
-                      key={m.id}
-                      to={routes.financial.reconciliation.transactionDetail(tx.id)}
-                      linkLabel="transação"
-                      action={
-                        <button
-                          type="button"
-                          disabled={unmatchMut.isPending}
-                          aria-label="Desvincular nota desta transação"
-                          onClick={e => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleUnmatchRequest(tx.id, txMatchCount);
-                          }}
-                          className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/80 px-2 py-1 text-xs font-medium hover:bg-destructive/10 hover:border-destructive/40 hover:text-destructive transition-colors disabled:opacity-50"
-                        >
-                          <IconLinkOff className="h-3 w-3" />
-                          Desvincular
-                        </button>
-                      }
-                    >
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2 flex-wrap min-w-0">
-                          <span className="font-medium">{formatDate(tx.postedAt)}</span>
-                          {tx.type && (
-                            <Badge size="sm" variant={tx.type === "CREDIT" ? "completed" : "cancelled"}>
-                              {tx.type === "CREDIT" ? "Crédito" : "Débito"}
-                            </Badge>
-                          )}
-                          {m.confidenceScore !== undefined && (
-                            <Badge size="sm" variant={getConfidenceBadgeVariant(m.confidenceScore)}>
-                              {m.confidenceScore}%
-                            </Badge>
-                          )}
-                          {m.allocatedAmount != null && (
-                            <span className="text-xs text-muted-foreground">
-                              Alocado {formatCurrency(m.allocatedAmount)}
-                            </span>
-                          )}
-                        </div>
-                        <span className="font-semibold tabular-nums">{formatCurrency(tx.amount)}</span>
-                      </div>
-                      {(tx.counterpartyName || tx.counterpartyCnpjCpf) && (
-                        <p className="text-xs text-muted-foreground mt-1 truncate">
-                          {tx.counterpartyName ||
-                            (tx.counterpartyCnpjCpf ? formatCnpjCpf(tx.counterpartyCnpjCpf) : "")}
-                        </p>
-                      )}
-                      {tx.memo && (
-                        <p className="text-[10px] font-mono text-muted-foreground/80 mt-0.5 truncate">
-                          {tx.memo}
-                        </p>
-                      )}
-                    </MatchCard>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
 
@@ -528,6 +499,102 @@ function SectionCard({
         <div className="space-y-3">{children}</div>
       </CardContent>
     </Card>
+  );
+}
+
+/** Small section sub-header used to label blocks nested inside a SectionCard
+ *  (e.g. "Pagamento" / "Transação vinculada" inside the financial section). */
+function SubHeading({
+  icon: Icon,
+  children,
+}: {
+  icon: (props: { className?: string }) => React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <Icon className="h-3.5 w-3.5" />
+      {children}
+    </div>
+  );
+}
+
+/** Neutral, link-styled card for a bank transaction matched to this note.
+ *  Replaces the old emerald-tinted MatchCard treatment on this page. */
+function LinkedTransactionCard({
+  tx,
+  confidenceScore,
+  allocatedAmount,
+  unmatchDisabled,
+  onUnmatch,
+}: {
+  tx: LinkedTransaction | undefined;
+  confidenceScore?: number;
+  allocatedAmount?: number | null;
+  unmatchDisabled?: boolean;
+  onUnmatch: () => void;
+}) {
+  if (!tx) return null;
+  return (
+    <Link
+      to={routes.financial.reconciliation.transactionDetail(tx.id)}
+      className="group block rounded-lg border border-border bg-card p-3 hover:border-primary/40 hover:bg-muted/40 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-sm">{formatDate(tx.postedAt)}</span>
+            {tx.type && (
+              <Badge size="sm" variant={tx.type === "CREDIT" ? "completed" : "cancelled"}>
+                {tx.type === "CREDIT" ? "Crédito" : "Débito"}
+              </Badge>
+            )}
+            {confidenceScore !== undefined && (
+              <Badge size="sm" variant={getConfidenceBadgeVariant(confidenceScore)}>
+                {confidenceScore}%
+              </Badge>
+            )}
+          </div>
+          {(tx.counterpartyName || tx.counterpartyCnpjCpf) && (
+            <p className="text-xs text-muted-foreground truncate">
+              {tx.counterpartyName ||
+                (tx.counterpartyCnpjCpf ? formatCnpjCpf(tx.counterpartyCnpjCpf) : "")}
+            </p>
+          )}
+          {tx.memo && (
+            <p className="text-[10px] font-mono text-muted-foreground/70 truncate">{tx.memo}</p>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <span className="font-semibold tabular-nums text-sm">{formatCurrency(tx.amount)}</span>
+          {allocatedAmount != null && (
+            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+              Alocado {formatCurrency(allocatedAmount)}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/60 pt-2">
+        <span className="text-xs font-medium text-primary inline-flex items-center gap-1 transition-opacity group-hover:opacity-80">
+          Abrir transação
+          <IconArrowUpRight className="h-3 w-3" />
+        </span>
+        <button
+          type="button"
+          disabled={unmatchDisabled}
+          aria-label="Desvincular nota desta transação"
+          onClick={e => {
+            e.preventDefault();
+            e.stopPropagation();
+            onUnmatch();
+          }}
+          className="inline-flex items-center gap-1 rounded-md border border-destructive/40 bg-background/80 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 hover:border-destructive/60 transition-colors disabled:opacity-50"
+        >
+          <IconLinkOff className="h-3 w-3" />
+          Desvincular
+        </button>
+      </div>
+    </Link>
   );
 }
 

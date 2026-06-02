@@ -1,7 +1,7 @@
 // packages/interfaces/src/item.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, BaseMergeResponse } from "./common";
-import type { MEASURE_UNIT, ORDER_BY_DIRECTION, ABC_CATEGORY, XYZ_CATEGORY, PPE_TYPE, PPE_SIZE, PPE_DELIVERY_MODE, ITEM_CATEGORY_TYPE, STOCK_LEVEL } from "../constants";
+import type { MEASURE_UNIT, ORDER_BY_DIRECTION, ABC_CATEGORY, XYZ_CATEGORY, PPE_TYPE, PPE_SIZE, PPE_DELIVERY_MODE, ITEM_CATEGORY_TYPE, ACCOUNTING_TYPE, STOCK_LEVEL } from "../constants";
 import type { Supplier, SupplierIncludes, SupplierOrderBy } from "./supplier";
 import type { Activity, ActivityIncludes } from "./activity";
 import type { Borrow, BorrowIncludes } from "./borrow";
@@ -30,8 +30,15 @@ export interface ItemCategory extends BaseEntity {
   type: ITEM_CATEGORY_TYPE;
   typeOrder: number;
 
+  // Hierarchy (3-level tree: category -> subcategory)
+  parentId: string | null;
+  categoryLevel: number; // 1 = category, 2 = subcategory
+  accountingType: ACCOUNTING_TYPE | null;
+
   // Relations
   items?: Item[];
+  parent?: ItemCategory | null;
+  children?: ItemCategory[];
 }
 
 // DEPRECATED: Use MonetaryValue instead
@@ -64,6 +71,7 @@ export interface Item extends BaseEntity {
   supplierId: string | null;
   estimatedLeadTime: number | null;
   isActive: boolean;
+  categoryReviewNeeded: boolean;
   abcCategory: ABC_CATEGORY | null;
   abcCategoryOrder: number | null;
   xyzCategory: XYZ_CATEGORY | null;
@@ -121,6 +129,16 @@ export interface ItemCategoryIncludes {
     | boolean
     | {
         include?: ItemIncludes;
+      };
+  parent?:
+    | boolean
+    | {
+        include?: ItemCategoryIncludes;
+      };
+  children?:
+    | boolean
+    | {
+        include?: ItemCategoryIncludes;
       };
 }
 
@@ -296,6 +314,14 @@ export interface ItemCategoryWhere {
   type?: ITEM_CATEGORY_TYPE | { equals?: ITEM_CATEGORY_TYPE; not?: ITEM_CATEGORY_TYPE; in?: ITEM_CATEGORY_TYPE[]; notIn?: ITEM_CATEGORY_TYPE[] };
   typeOrder?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] };
 
+  // Hierarchy fields
+  parentId?: string | null | { equals?: string | null; not?: string | null; in?: string[]; notIn?: string[] };
+  categoryLevel?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] };
+  accountingType?:
+    | ACCOUNTING_TYPE
+    | null
+    | { equals?: ACCOUNTING_TYPE | null; not?: ACCOUNTING_TYPE | null; in?: ACCOUNTING_TYPE[]; notIn?: ACCOUNTING_TYPE[] };
+
   // Date fields
   createdAt?: Date | { equals?: Date; not?: Date; lt?: Date; lte?: Date; gt?: Date; gte?: Date; in?: Date[]; notIn?: Date[] };
   updatedAt?: Date | { equals?: Date; not?: Date; lt?: Date; lte?: Date; gt?: Date; gte?: Date; in?: Date[]; notIn?: Date[] };
@@ -336,6 +362,9 @@ export interface ItemCategoryOrderBy {
   name?: ORDER_BY_DIRECTION;
   type?: ORDER_BY_DIRECTION;
   typeOrder?: ORDER_BY_DIRECTION;
+  parentId?: ORDER_BY_DIRECTION;
+  categoryLevel?: ORDER_BY_DIRECTION;
+  accountingType?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
 }

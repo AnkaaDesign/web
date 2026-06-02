@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, nullableString, createNameSchema, optionalNonNegativeNumber } from "./common";
 import type { Item, ItemBrand, ItemCategory, Price } from "../types";
-import { MEASURE_UNIT, MEASURE_TYPE, ABC_CATEGORY, XYZ_CATEGORY, PPE_TYPE, PPE_SIZE, PPE_DELIVERY_MODE, STOCK_LEVEL, ITEM_CATEGORY_TYPE } from "../constants";
+import { MEASURE_UNIT, MEASURE_TYPE, ABC_CATEGORY, XYZ_CATEGORY, PPE_TYPE, PPE_SIZE, PPE_DELIVERY_MODE, STOCK_LEVEL, ITEM_CATEGORY_TYPE, ACCOUNTING_TYPE } from "../constants";
 import { activityIncludeSchema, activityWhereSchema, activityOrderBySchema } from "./activity";
 import { borrowIncludeSchema, borrowWhereSchema, borrowOrderBySchema } from "./borrow";
 import { ppeDeliveryIncludeSchema, ppeDeliveryWhereSchema, ppeDeliveryOrderBySchema } from "./epi";
@@ -192,7 +192,7 @@ export const itemBrandWhereSchema: z.ZodSchema = z.lazy(() =>
 // ItemCategory Schemas
 // =====================
 
-export const itemCategoryIncludeSchema = z
+export const itemCategoryIncludeSchema: z.ZodTypeAny = z
   .object({
     items: z
       .union([
@@ -236,6 +236,27 @@ export const itemCategoryIncludeSchema = z
         }),
       ])
       .optional(),
+    // Hierarchy relations (3-level tree)
+    parent: z
+      .union([
+        z.boolean(),
+        z.object({
+          include: z.lazy(() => itemCategoryIncludeSchema).optional(),
+        }),
+      ])
+      .optional(),
+    children: z
+      .union([
+        z.boolean(),
+        z.object({
+          include: z.lazy(() => itemCategoryIncludeSchema).optional(),
+          where: z.lazy(() => itemCategoryWhereSchema).optional(),
+          orderBy: z.lazy(() => itemCategoryOrderBySchema).optional(),
+          take: z.coerce.number().optional(),
+          skip: z.coerce.number().optional(),
+        }),
+      ])
+      .optional(),
     orderSchedule: z.boolean().optional(),
     ppeSchedules: z.boolean().optional(),
     _count: z
@@ -245,6 +266,7 @@ export const itemCategoryIncludeSchema = z
           select: z
             .object({
               items: z.boolean().optional(),
+              children: z.boolean().optional(),
               orderSchedule: z.boolean().optional(),
               ppeSchedules: z.boolean().optional(),
             })
@@ -263,6 +285,9 @@ export const itemCategoryOrderBySchema = z
         name: orderByDirectionSchema.optional(),
         type: orderByDirectionSchema.optional(),
         typeOrder: orderByDirectionSchema.optional(),
+        parentId: orderByDirectionSchema.optional(),
+        categoryLevel: orderByDirectionSchema.optional(),
+        accountingType: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
         // Aggregated fields for sorting by items count
@@ -280,6 +305,9 @@ export const itemCategoryOrderBySchema = z
           name: orderByDirectionSchema.optional(),
           type: orderByDirectionSchema.optional(),
           typeOrder: orderByDirectionSchema.optional(),
+          parentId: orderByDirectionSchema.optional(),
+          categoryLevel: orderByDirectionSchema.optional(),
+          accountingType: orderByDirectionSchema.optional(),
           createdAt: orderByDirectionSchema.optional(),
           updatedAt: orderByDirectionSchema.optional(),
           // Aggregated fields for sorting by items count
@@ -357,6 +385,49 @@ export const itemCategoryWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
+      // Hierarchy fields
+      parentId: z
+        .union([
+          z.string(),
+          z.null(),
+          z.object({
+            equals: z.string().nullable().optional(),
+            not: z.string().nullable().optional(),
+            in: z.array(z.string()).optional(),
+            notIn: z.array(z.string()).optional(),
+          }),
+        ])
+        .optional(),
+
+      categoryLevel: z
+        .union([
+          z.number(),
+          z.object({
+            equals: z.number().optional(),
+            not: z.number().optional(),
+            gt: z.number().optional(),
+            gte: z.number().optional(),
+            lt: z.number().optional(),
+            lte: z.number().optional(),
+            in: z.array(z.number()).optional(),
+            notIn: z.array(z.number()).optional(),
+          }),
+        ])
+        .optional(),
+
+      accountingType: z
+        .union([
+          z.nativeEnum(ACCOUNTING_TYPE),
+          z.null(),
+          z.object({
+            equals: z.nativeEnum(ACCOUNTING_TYPE).nullable().optional(),
+            not: z.nativeEnum(ACCOUNTING_TYPE).nullable().optional(),
+            in: z.array(z.nativeEnum(ACCOUNTING_TYPE)).optional(),
+            notIn: z.array(z.nativeEnum(ACCOUNTING_TYPE)).optional(),
+          }),
+        ])
+        .optional(),
+
       createdAt: z
         .union([
           z.date(),
@@ -387,6 +458,14 @@ export const itemCategoryWhereSchema: z.ZodSchema = z.lazy(() =>
 
       // Relations
       items: z
+        .object({
+          some: z.any().optional(),
+          every: z.any().optional(),
+          none: z.any().optional(),
+        })
+        .optional(),
+      parent: z.lazy(() => itemCategoryWhereSchema).optional(),
+      children: z
         .object({
           some: z.any().optional(),
           every: z.any().optional(),
@@ -1097,6 +1176,16 @@ export const itemWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
+      categoryReviewNeeded: z
+        .union([
+          z.boolean(),
+          z.object({
+            equals: z.boolean().optional(),
+            not: z.boolean().optional(),
+          }),
+        ])
+        .optional(),
+
       // PPE Type field
       ppeType: z
         .union([
@@ -1318,6 +1407,7 @@ const itemFilters = {
 
   // Boolean filters
   isActive: z.boolean().optional(),
+  categoryReviewNeeded: z.boolean().optional(),
   isPpe: z.boolean().optional(), // Backwards compatibility
   shouldAssignToUser: z.boolean().optional(),
 
@@ -1404,6 +1494,12 @@ const itemCategoryFilters = {
   isPpe: z.boolean().optional(), // Backwards compatibility
   type: z.nativeEnum(ITEM_CATEGORY_TYPE).optional(),
   hasItems: z.boolean().optional(),
+  // Hierarchy convenience filters
+  parentId: z.string().nullable().optional(),
+  categoryLevel: z.number().int().min(1).max(2).optional(),
+  accountingType: z.nativeEnum(ACCOUNTING_TYPE).optional(),
+  // Tree mode: when true the API returns top-level categories with nested children.
+  tree: z.boolean().optional(),
 };
 
 const priceFilters = {
@@ -1454,6 +1550,15 @@ const itemTransform = (data: any) => {
   } else if (data.where && typeof data.where.isActive === "boolean") {
     andConditions.push({ isActive: data.where.isActive });
     delete data.where.isActive;
+  }
+
+  // categoryReviewNeeded can be at root or in where
+  if (typeof data.categoryReviewNeeded === "boolean") {
+    andConditions.push({ categoryReviewNeeded: data.categoryReviewNeeded });
+    delete data.categoryReviewNeeded;
+  } else if (data.where && typeof data.where.categoryReviewNeeded === "boolean") {
+    andConditions.push({ categoryReviewNeeded: data.where.categoryReviewNeeded });
+    delete data.where.categoryReviewNeeded;
   }
 
   // isPpe filter (backwards compatibility - converts to type filter)
@@ -1906,6 +2011,25 @@ const itemCategoryTransform = (data: any) => {
     delete data.type;
   }
 
+  // Hierarchy convenience filters
+  if (data.parentId !== undefined) {
+    andConditions.push({ parentId: data.parentId });
+    delete data.parentId;
+  }
+
+  if (typeof data.categoryLevel === "number") {
+    andConditions.push({ categoryLevel: data.categoryLevel });
+    delete data.categoryLevel;
+  }
+
+  if (data.accountingType && typeof data.accountingType === "string") {
+    andConditions.push({ accountingType: data.accountingType });
+    delete data.accountingType;
+  }
+
+  // `tree` is a passthrough flag consumed by the API (returns nested children);
+  // it is not a where-clause condition, so leave it on the payload.
+
   if (data.hasItems === true) {
     andConditions.push({ items: { some: {} } });
     delete data.hasItems;
@@ -2147,6 +2271,7 @@ export const itemCreateSchemaBase = z.object({
   supplierId: z.string().uuid({ message: "Fornecedor inválido" }).nullable().optional(),
   estimatedLeadTime: z.number().int().nullable().default(30).optional(),
   isActive: z.boolean().default(true),
+  categoryReviewNeeded: z.boolean().optional(),
   price: optionalNonNegativeNumber,
 
   // Measures array (new multiple measures support)
@@ -2219,6 +2344,7 @@ export const itemUpdateSchemaBase = z.object({
   supplierId: z.string().uuid({ message: "Fornecedor inválido" }).nullable().optional(),
   estimatedLeadTime: z.number().int().nullable().optional(),
   isActive: z.boolean().optional(),
+  categoryReviewNeeded: z.boolean().optional(),
   abcCategoryOrder: z.number().int().nullable().optional(),
   xyzCategoryOrder: z.number().int().nullable().optional(),
   price: optionalNonNegativeNumber,
@@ -2306,6 +2432,10 @@ export const itemCategoryCreateSchema = z
   .object({
     name: createNameSchema(1, 255, "Nome da categoria"),
     type: z.nativeEnum(ITEM_CATEGORY_TYPE).default(ITEM_CATEGORY_TYPE.REGULAR),
+    // Hierarchy (3-level tree)
+    parentId: z.string().uuid({ message: "Categoria pai inválida" }).nullable().optional(),
+    categoryLevel: z.number().int().min(1).max(2).optional(),
+    accountingType: z.nativeEnum(ACCOUNTING_TYPE).nullable().optional(),
     itemIds: z
       .array(z.string().uuid({ message: "Item inválido" }))
       .refine((arr) => new Set(arr).size === arr.length, {
@@ -2319,6 +2449,10 @@ export const itemCategoryUpdateSchema = z
   .object({
     name: z.string().min(1).max(255).optional(),
     type: z.nativeEnum(ITEM_CATEGORY_TYPE).optional(),
+    // Hierarchy (3-level tree)
+    parentId: z.string().uuid({ message: "Categoria pai inválida" }).nullable().optional(),
+    categoryLevel: z.number().int().min(1).max(2).optional(),
+    accountingType: z.nativeEnum(ACCOUNTING_TYPE).nullable().optional(),
     itemIds: z
       .array(z.string().uuid({ message: "Item inválido" }))
       .refine((arr) => new Set(arr).size === arr.length, {
@@ -2559,6 +2693,7 @@ export const mapItemToFormData = createMapToFormDataHelper<Item, ItemUpdateFormD
   supplierId: item.supplierId || undefined,
   estimatedLeadTime: item.estimatedLeadTime || undefined,
   isActive: item.isActive,
+  categoryReviewNeeded: item.categoryReviewNeeded,
   abcCategory: item.abcCategory,
   abcCategoryOrder: item.abcCategoryOrder,
   xyzCategory: item.xyzCategory,
@@ -2585,6 +2720,9 @@ export const mapItemBrandToFormData = createMapToFormDataHelper<ItemBrand, ItemB
 export const mapItemCategoryToFormData = createMapToFormDataHelper<ItemCategory, ItemCategoryUpdateFormData>((category) => ({
   name: category.name,
   type: category.type,
+  parentId: category.parentId ?? undefined,
+  categoryLevel: category.categoryLevel,
+  accountingType: category.accountingType ?? undefined,
 }));
 
 export const mapPriceToFormData = createMapToFormDataHelper<Price, PriceUpdateFormData>((price) => ({

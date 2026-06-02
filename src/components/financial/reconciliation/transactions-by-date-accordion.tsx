@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   IconArrowUpRight,
@@ -49,6 +49,57 @@ interface Props {
   onIgnore?: (tx: BankTransaction) => void;
   onViewDetails?: (tx: BankTransaction) => void;
   onChangeCategory?: (tx: BankTransaction) => void;
+  /** When set, the open day-groups and the scroll offset are persisted to
+   *  sessionStorage under this key, so navigating to a transaction detail and
+   *  back restores the exact accordion + scroll state the user left behind.
+   *  Omit it to keep the accordion stateless across mounts. */
+  persistKey?: string;
+}
+
+// --- Navigation-state persistence (sessionStorage) ---------------------------
+// The list→detail→back round-trip remounts the list, so the open day-groups and
+// scroll offset (both in-memory) would otherwise reset. We mirror them into
+// sessionStorage keyed by `persistKey` and restore on mount. sessionStorage (not
+// localStorage) so the restore is scoped to the browsing session/tab.
+
+const OPEN_DATES_SUFFIX = ":openDates";
+const SCROLL_SUFFIX = ":scroll";
+
+function readOpenDates(key: string | undefined): Set<string> {
+  if (!key || typeof window === "undefined") return new Set();
+  try {
+    const raw = window.sessionStorage.getItem(`${key}${OPEN_DATES_SUFFIX}`);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? new Set(arr.map(String)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function writeOpenDates(key: string | undefined, set: Set<string>) {
+  if (!key || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(`${key}${OPEN_DATES_SUFFIX}`, JSON.stringify([...set]));
+  } catch {
+    // sessionStorage may be unavailable (private mode / quota) — non-fatal.
+  }
+}
+
+function readScroll(key: string | undefined): number {
+  if (!key || typeof window === "undefined") return 0;
+  const raw = window.sessionStorage.getItem(`${key}${SCROLL_SUFFIX}`);
+  const n = raw ? Number(raw) : 0;
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function writeScroll(key: string | undefined, top: number) {
+  if (!key || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(`${key}${SCROLL_SUFFIX}`, String(top));
+  } catch {
+    // non-fatal
+  }
 }
 
 // Width assigned to the leading column. The day banner reserves the same width
@@ -109,6 +160,7 @@ export function TransactionsByDateAccordion({
   onIgnore,
   onViewDetails,
   onChangeCategory,
+  persistKey,
 }: Props) {
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -116,14 +168,73 @@ export function TransactionsByDateAccordion({
     tx: BankTransaction;
   } | null>(null);
   // Tracks which date rows are expanded. Defaults to all collapsed —
-  // opening 30+ days at once is loud and slows the first paint.
-  const [openDates, setOpenDates] = useState<Set<string>>(new Set());
+  // opening 30+ days at once is loud and slows the first paint. When a
+  // persistKey is set, seed from the last persisted set so a back-navigation
+  // restores the open day-groups.
+  const [openDates, setOpenDates] = useState<Set<string>>(() => readOpenDates(persistKey));
 
-  // While a search is active, expand every matching day so results are visible
-  // without clicking each banner; collapse back to all-closed when it clears.
+  // Drives the auto-expand reset off *transitions* of `autoExpand`, not the
+  // raw `dates` identity. This matters for restore: when `autoExpand` is false
+  // and `dates` merely repopulates (async fetch settles) we must NOT wipe the
+  // restored/manual open set. We only force-collapse when search is actively
+  // cleared (true → false), and force-expand while search stays active.
+  const prevAutoExpand = useRef<boolean>(autoExpand);
   useEffect(() => {
-    setOpenDates(autoExpand ? new Set(dates) : new Set());
+    if (autoExpand) {
+      // Search active: keep every currently-matching day expanded.
+      setOpenDates(new Set(dates));
+    } else if (prevAutoExpand.current) {
+      // Search just cleared: collapse back to all-closed.
+      setOpenDates(new Set());
+    }
+    // else: not searching and wasn't searching → leave the restored/manual set.
+    prevAutoExpand.current = autoExpand;
   }, [autoExpand, dates]);
+
+  // Persist the open set on every change so it survives the next remount.
+  useEffect(() => {
+    writeOpenDates(persistKey, openDates);
+  }, [persistKey, openDates]);
+
+  // --- Scroll persistence --------------------------------------------------
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Persist the scroll offset (rAF-throttled) and flush it on unmount.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !persistKey) return;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        writeScroll(persistKey, el.scrollTop);
+      });
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      writeScroll(persistKey, el.scrollTop);
+    };
+  }, [persistKey]);
+
+  // Restore the scroll offset once, after the first non-loading render so the
+  // rows (and their height) exist. Double rAF lets layout settle before we set
+  // scrollTop, otherwise the container may not yet be tall enough to scroll.
+  const didRestoreScroll = useRef(false);
+  useEffect(() => {
+    if (didRestoreScroll.current || isLoading || !persistKey) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    didRestoreScroll.current = true;
+    const saved = readScroll(persistKey);
+    if (saved <= 0) return;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (scrollRef.current) scrollRef.current.scrollTop = saved;
+      }),
+    );
+  }, [isLoading, persistKey]);
 
   const txByDate = useMemo(() => {
     const map = new Map<string, BankTransaction[]>();
@@ -243,7 +354,7 @@ export function TransactionsByDateAccordion({
           two-table split caused (different effective widths once the body got
           a scrollbar). The parent already provides the scroll container. */}
       <div className="h-full border border-border rounded-lg overflow-hidden bg-card">
-        <div className="h-full overflow-auto">
+        <div ref={scrollRef} className="h-full overflow-auto">
           <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
             <colgroup>
               {visibleColumns.map(c => (

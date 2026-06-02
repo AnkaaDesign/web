@@ -74,6 +74,24 @@ export const SCORE_HEX: Record<number, string> = {
   5: "#15803d", // green-700
 };
 
+// Canonical 0–5 score-level labels (index = score). Single source of truth for
+// the distribution legend, the per-level pie/radar, and drill-down titles.
+export const SCORE_LEVEL_LABELS = [
+  "Não atende",
+  "Crítico",
+  "Insuficiente",
+  "Atende parcialmente",
+  "Atende",
+  "Referência",
+] as const;
+
+/** Score (0..5, rounded) → its level label, or null when out of range. */
+export function getScoreLevelLabel(score: number | null | undefined): string | null {
+  if (score == null || !Number.isFinite(score)) return null;
+  const i = Math.min(Math.max(Math.round(score), 0), 5);
+  return SCORE_LEVEL_LABELS[i] ?? null;
+}
+
 /** Score (0..5, rounded) → palette hex, with a neutral fallback. */
 export function getScoreHex(score: number | null | undefined, fallback = "#71717a"): string {
   if (score == null || !Number.isFinite(score)) return fallback;

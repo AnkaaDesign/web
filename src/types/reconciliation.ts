@@ -1,3 +1,5 @@
+import type { ACCOUNTING_TYPE } from "../constants";
+
 // Lifecycle (independent from how it got there and what category it is).
 export type ReconciliationStatus =
   | "PENDING"
@@ -19,6 +21,8 @@ export interface TransactionCategory {
   slug: string;
   kind: TransactionCategoryKind;
   itemCategoryId: string | null;
+  // Accounting (DRE) classification mirrored onto the transaction category.
+  accountingType: ACCOUNTING_TYPE | null;
   // A "resolving" category self-justifies an NF-less transaction (reconciled by
   // virtue of being classified).
   isResolving: boolean;
@@ -222,6 +226,10 @@ export interface FiscalDocument {
   series?: string | null;
   model?: string | null;
   naturezaOperacao?: string | null;
+  /** infNFe/infAdic/infCpl — complementary free-text info of taxpayer interest. */
+  infCpl?: string | null;
+  /** Purchase-order codes parsed from infCpl `#Ped:` (NFe/NFCe). */
+  orderCodes?: { code: string }[];
   protocolNumber?: string | null;
   authorizationDate?: string | null;
   cStat?: string | null;
@@ -302,6 +310,21 @@ export interface MatchCandidate {
   daysDelta: number;
   aliasAssisted: boolean;
   items: MatchCandidateItem[];
+  // --- Order-group candidates (several NFs of one purchase order summed) ---
+  /** True when this candidate is a synthetic group of NFs sharing one order
+   *  code (`#Ped:` in infCpl), summed into a single matchable unit. */
+  isOrderGroup?: boolean;
+  /** The shared purchase-order code, when isOrderGroup. */
+  orderCode?: string;
+  /** The fiscal-document ids of every NF in the group (sent on accept). */
+  memberFiscalDocumentIds?: string[];
+  /** Per-member NF id + value, so the UI can send accurate per-NF allocations. */
+  members?: { fiscalDocumentId: string; nfNumber: string | null; totalValue: number }[];
+  /** Number of NFs in the group. */
+  memberCount?: number;
+  /** True when no member NF belongs to more than one order; unclean groups are
+   *  surfaced for manual review only (summing double-counts a shared NF). */
+  cleanGroup?: boolean;
 }
 
 export interface OfxImportFileResult {

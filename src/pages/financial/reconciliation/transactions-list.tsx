@@ -518,6 +518,7 @@ export const ReconciliationTransactionsListPage = () => {
                   dates={dates}
                   isLoading={isLoading}
                   autoExpand={narrowing}
+                  persistKey="reconciliation-transactions"
                   showAccountColumn
                   visibleColumns={visibleColumns}
                   onIgnore={tx => ignoreDialog.set(tx.id)}

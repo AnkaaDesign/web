@@ -1,13 +1,13 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import { IconCategory } from "@tabler/icons-react";
+import { Badge } from "@/components/ui/badge";
+import { IconCategory, IconCalculator } from "@tabler/icons-react";
 import { useFormContext } from "react-hook-form";
-import { useItemCategoryMutations } from "../../../../hooks";
-import { getItemCategories } from "../../../../api-client";
+import { useItemCategoryMutations, useItemCategoryTree } from "../../../../hooks";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
 import type { ItemCategory } from "../../../../types";
-import { ITEM_CATEGORY_TYPE } from "../../../../constants";
+import { ITEM_CATEGORY_TYPE, ACCOUNTING_TYPE_LABELS } from "../../../../constants";
 
 type FormData = ItemCreateFormData | ItemUpdateFormData;
 
@@ -18,94 +18,120 @@ interface CategorySelectorProps {
   initialCategory?: ItemCategory;
 }
 
+// Flatten the tree to a lookup so we can resolve any node (parent or leaf) by id.
+function indexTree(nodes: ItemCategory[], acc: Map<string, ItemCategory> = new Map()): Map<string, ItemCategory> {
+  for (const node of nodes) {
+    acc.set(node.id, node);
+    if (node.children && node.children.length > 0) {
+      indexTree(node.children, acc);
+    }
+  }
+  return acc;
+}
+
 export function CategorySelector({ disabled, required, onCategoryChange, initialCategory }: CategorySelectorProps) {
   const form = useFormContext<FormData>();
   const [isCreating, setIsCreating] = useState(false);
   const { createMutation } = useItemCategoryMutations();
 
-  // Create memoized initialOptions with stable dependency
-  const initialOptions = useMemo(
+  // Operational tree: top-level Categorias (level 1) each with their Subcategorias (level 2).
+  const { data: tree = [], isLoading } = useItemCategoryTree();
+
+  const byId = useMemo(() => indexTree(tree), [tree]);
+
+  // The form's canonical value: the chosen LEAF (subcategory) id, or a top-level id when
+  // that top-level category has no subcategories.
+  const categoryId = form.watch("categoryId") as string | undefined;
+
+  // Derive the currently-selected parent (top Categoria) from the form value.
+  // If the selected node is a subcategory, its parent is the top selection; otherwise the node itself.
+  const selectedNode = categoryId ? byId.get(categoryId) : undefined;
+  const initialParentId = useMemo(() => {
+    if (selectedNode) {
+      return selectedNode.categoryLevel === 2 ? selectedNode.parentId ?? undefined : selectedNode.id;
+    }
+    // Fall back to the eagerly-provided category (edit mode before tree loads).
+    if (initialCategory) {
+      return initialCategory.categoryLevel === 2 ? initialCategory.parentId ?? undefined : initialCategory.id;
+    }
+    return undefined;
+  }, [selectedNode, initialCategory]);
+
+  const [parentId, setParentId] = useState<string | undefined>(initialParentId);
+
+  // Keep local parent selection in sync when the resolved parent changes (e.g. tree finished loading).
+  useEffect(() => {
+    if (initialParentId && initialParentId !== parentId) {
+      setParentId(initialParentId);
+    }
+  }, [initialParentId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const parentNode = parentId ? byId.get(parentId) : undefined;
+  const subcategories = parentNode?.children ?? [];
+  const hasSubcategories = subcategories.length > 0;
+
+  // Rolled-up accounting type (read-only): from the leaf if chosen, else from the parent.
+  const rollupNode = selectedNode ?? parentNode ?? initialCategory;
+  const accountingType = rollupNode?.accountingType;
+
+  const parentOptions = useMemo(
     () =>
-      initialCategory
-        ? [
-            {
-              value: initialCategory.id,
-              label: initialCategory.name,
-            },
-          ]
-        : [],
-    [initialCategory?.id]
+      tree
+        .filter((c) => c.categoryLevel === 1)
+        .map((c) => ({ value: c.id, label: c.name })),
+    [tree],
   );
 
-  // Initialize cache with initial category
-  const cacheRef = useRef<Map<string, ItemCategory>>(new Map());
+  const subcategoryOptions = useMemo(
+    () => subcategories.map((c) => ({ value: c.id, label: c.name })),
+    [subcategories],
+  );
 
-  // Add initial category to cache on mount or when it changes
-  useMemo(() => {
-    if (initialCategory) {
-      cacheRef.current.set(initialCategory.id, initialCategory);
-    }
-  }, [initialCategory?.id]);
+  const handleParentChange = (value: string | string[] | null | undefined) => {
+    const newParentId = typeof value === "string" && value ? value : undefined;
+    setParentId(newParentId);
 
-  const fetchCategories = useCallback(async (searchTerm: string, page = 1) => {
-    try {
-      const response = await getItemCategories({
-        page: page,
-        take: 50,
-        orderBy: { name: "asc" },
-        where: searchTerm && searchTerm.trim()
-          ? {
-              name: { contains: searchTerm.trim(), mode: "insensitive" },
-            }
-          : undefined,
-      });
+    const node = newParentId ? byId.get(newParentId) : undefined;
+    const children = node?.children ?? [];
 
-      const categories = response.data || [];
-      const hasMore = response.meta?.hasNextPage || false;
+    // When the chosen Categoria has no Subcategoria, the item points at the top node itself.
+    // Otherwise clear the leaf until the user picks a Subcategoria.
+    const nextLeaf = children.length === 0 ? newParentId : undefined;
+    form.setValue("categoryId", nextLeaf as any, { shouldDirty: true, shouldValidate: true });
+    onCategoryChange?.(nextLeaf);
+  };
 
-      // Add fetched categories to cache
-      const options = categories.map((category: ItemCategory) => {
-        const option = {
-          value: category.id,
-          label: category.name,
-        };
-        cacheRef.current.set(category.id, category);
-        return option;
-      });
+  const handleSubcategoryChange = (value: string | string[] | null | undefined) => {
+    const leafId = typeof value === "string" && value ? value : undefined;
+    form.setValue("categoryId", leafId as any, { shouldDirty: true, shouldValidate: true });
+    onCategoryChange?.(leafId);
+  };
 
-      return {
-        data: options,
-        hasMore: hasMore,
-      };
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Error fetching categories:", error);
-      }
-      return {
-        data: [],
-        hasMore: false,
-      };
-    }
-  }, []);
-
-  const handleCreateCategory = async (name: string) => {
+  // Inline create: create a Subcategoria under the chosen parent, inheriting its accountingType.
+  const handleCreateSubcategory = async (name: string) => {
+    if (!parentId) return undefined;
     setIsCreating(true);
     try {
       const result = await createMutation.mutateAsync({
         data: {
           name,
-          type: ITEM_CATEGORY_TYPE.REGULAR,
-        },
+          type: parentNode?.type ?? ITEM_CATEGORY_TYPE.REGULAR,
+          parentId,
+          categoryLevel: 2,
+          accountingType: parentNode?.accountingType,
+        } as any,
       });
 
       if (result.success && result.data) {
-        // Set the newly created category as selected
-        const newCategoryId = result.data.id;
-        return newCategoryId;
+        const newId = result.data.id;
+        form.setValue("categoryId", newId as any, { shouldDirty: true, shouldValidate: true });
+        onCategoryChange?.(newId);
+        return newId;
       }
+      return undefined;
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Error creating category:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error creating subcategory:", error);
       }
       throw error;
     } finally {
@@ -117,42 +143,58 @@ export function CategorySelector({ disabled, required, onCategoryChange, initial
     <FormField
       control={form.control}
       name="categoryId"
-      render={({ field }) => (
+      render={() => (
         <FormItem>
           <FormLabel className="flex items-center gap-2">
             <IconCategory className="h-4 w-4" />
             Categoria {required && <span className="text-destructive">*</span>}
           </FormLabel>
-          <FormControl>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Top-level Categoria */}
+            <FormControl>
+              <Combobox
+                options={parentOptions}
+                value={parentId || ""}
+                onValueChange={handleParentChange}
+                placeholder="Selecione a categoria..."
+                emptyText={isLoading ? "Carregando..." : "Nenhuma categoria encontrada"}
+                searchPlaceholder="Buscar categoria..."
+                disabled={disabled || isCreating || isLoading}
+                minSearchLength={0}
+              />
+            </FormControl>
+
+            {/* Subcategoria (children of the chosen Categoria) */}
             <Combobox
-              value={field.value || ""}
-              onValueChange={(value) => {
-                field.onChange(value);
-                onCategoryChange?.((typeof value === 'string' ? value : undefined) || undefined);
-              }}
-              async={true}
-              queryKey={["item-categories", "selector"]}
-              queryFn={fetchCategories}
-              initialOptions={initialOptions}
+              options={subcategoryOptions}
+              value={(selectedNode?.categoryLevel === 2 ? selectedNode.id : undefined) || ""}
+              onValueChange={handleSubcategoryChange}
+              placeholder={parentId ? "Selecione a subcategoria..." : "Escolha uma categoria primeiro"}
+              emptyText="Nenhuma subcategoria"
+              searchPlaceholder="Buscar subcategoria..."
+              disabled={disabled || isCreating || !parentId || !hasSubcategories}
               minSearchLength={0}
-              pageSize={50}
-              debounceMs={300}
-              placeholder="Pesquisar categoria..."
-              emptyText="Nenhuma categoria encontrada"
-              searchPlaceholder="Digite o nome da categoria..."
-              disabled={disabled || isCreating}
-              allowCreate={true}
-              createLabel={(value) => `Criar categoria "${value}"`}
-              onCreate={async (name) => {
-                const newCategoryId = await handleCreateCategory(name);
-                if (newCategoryId) {
-                  field.onChange(newCategoryId);
-                  onCategoryChange?.(newCategoryId);
-                }
-              }}
+              allowCreate={!!parentId}
+              createLabel={(value) => `Criar subcategoria "${value}"`}
+              onCreate={handleCreateSubcategory}
               isCreating={isCreating}
             />
-          </FormControl>
+          </div>
+
+          {/* Read-only rolled-up accounting type */}
+          {accountingType && (
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <IconCalculator className="h-3.5 w-3.5" />
+                Tipo contábil
+              </span>
+              <Badge variant="secondary" className="text-xs">
+                {ACCOUNTING_TYPE_LABELS[accountingType] ?? accountingType}
+              </Badge>
+            </div>
+          )}
+
           <FormMessage />
         </FormItem>
       )}

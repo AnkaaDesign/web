@@ -2,8 +2,8 @@ import React from "react";
 import type { ItemCategory } from "../../../../../types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { IconPackage } from "@tabler/icons-react";
-import { ITEM_CATEGORY_TYPE, ITEM_CATEGORY_TYPE_LABELS } from "../../../../../constants";
+import { IconPackage, IconCornerDownRight } from "@tabler/icons-react";
+import { ITEM_CATEGORY_TYPE, ITEM_CATEGORY_TYPE_LABELS, ACCOUNTING_TYPE_LABELS } from "../../../../../constants";
 import { useNavigate } from "react-router-dom";
 import { routes } from "../../../../../constants";
 
@@ -18,7 +18,7 @@ export interface CategoryColumn {
 
 // Function to get default visible columns for categories
 export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["name", "type", "_count.items", "createdAt"]);
+  return new Set(["name", "type", "accountingType", "_count.items", "createdAt"]);
 }
 
 // Hook to get all available columns for categories
@@ -30,7 +30,28 @@ export function useCategoryTableColumns(): CategoryColumn[] {
       {
         key: "name",
         header: "NOME",
-        accessor: (category: ItemCategory) => <div className="font-medium truncate">{category.name}</div>,
+        // Subcategorias (level 2) are indented under their parent Categoria to show the tree.
+        accessor: (category: ItemCategory) => (
+          <div className={`font-medium truncate flex items-center gap-1 ${category.categoryLevel === 2 ? "pl-5 text-muted-foreground" : ""}`}>
+            {category.categoryLevel === 2 && <IconCornerDownRight className="h-3.5 w-3.5 shrink-0 opacity-60" />}
+            {category.name}
+          </div>
+        ),
+        sortable: true,
+        className: "flex-1",
+        align: "left",
+      },
+      {
+        key: "accountingType",
+        header: "TIPO CONTÁBIL",
+        accessor: (category: ItemCategory) =>
+          category.accountingType ? (
+            <Badge variant="secondary" className="text-xs">
+              {ACCOUNTING_TYPE_LABELS[category.accountingType] || category.accountingType}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          ),
         sortable: true,
         className: "flex-1",
         align: "left",

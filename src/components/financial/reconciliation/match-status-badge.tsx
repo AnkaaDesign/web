@@ -6,11 +6,28 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ACCOUNTING_TYPE_LABELS } from "@/constants";
 import type {
   BankTransactionCategoryTag,
   ReconciliationSource,
   ReconciliationStatus,
 } from "@/types/reconciliation";
+
+/**
+ * The chart-of-accounts rollup ("cost group") a category belongs to lives on
+ * `TransactionCategory.accountingType` (foundation track). This accepts any
+ * object that may carry the field — both the full `TransactionCategory` and the
+ * trimmed `category` Picks embedded in tags / fiscal lines — and resolves its
+ * human label via the foundation's `ACCOUNTING_TYPE_LABELS`. Returns null when
+ * absent so callers can simply skip rendering the muted cost-group label.
+ */
+export function getAccountingTypeLabel(
+  category: { accountingType?: string | null } | null | undefined,
+): string | null {
+  const key = category?.accountingType;
+  if (!key) return null;
+  return (ACCOUNTING_TYPE_LABELS as Record<string, string>)[key] ?? key;
+}
 
 export const STATUS_LABEL: Record<ReconciliationStatus, string> = {
   PENDING: "Pendente",
@@ -73,18 +90,24 @@ interface CategoryChipsProps {
   categories: BankTransactionCategoryTag[];
   /** Max chips before collapsing the rest into a "+N" overflow chip. */
   maxVisible?: number;
+  /** When true, render each category's accounting type (cost group) as a small
+   *  muted label beneath its chip so users see the chart-of-accounts rollup. */
+  showAccountingType?: boolean;
   className?: string;
 }
 
 /**
  * Renders one chip per category tag. Chip color comes from the category's
  * `color` (falling back to a neutral badge); the tooltip surfaces the tag's
- * source (automática/manual) and confidence%. Beyond `maxVisible` tags a
- * "+N" overflow chip is shown whose tooltip lists the remaining names.
+ * source (automática/manual), confidence% and the accounting type (cost group).
+ * With `showAccountingType`, the cost group is also rendered inline as a small
+ * muted label. Beyond `maxVisible` tags a "+N" overflow chip is shown whose
+ * tooltip lists the remaining names.
  */
 export function CategoryChips({
   categories,
   maxVisible = 3,
+  showAccountingType = false,
   className,
 }: CategoryChipsProps) {
   if (!categories || categories.length === 0) {
@@ -101,22 +124,31 @@ export function CategoryChips({
           const color = tag.category.color;
           const confidenceText =
             typeof tag.confidence === "number" ? ` · ${Math.round(tag.confidence)}%` : "";
-          const tooltip = `${tag.category.name} (${SOURCE_LABEL[tag.source]}${confidenceText})`;
+          const accountingLabel = getAccountingTypeLabel(tag.category);
+          const accountingText = accountingLabel ? ` · ${accountingLabel}` : "";
+          const tooltip = `${tag.category.name} (${SOURCE_LABEL[tag.source]}${confidenceText})${accountingText}`;
           return (
             <Tooltip key={tag.id}>
               <TooltipTrigger asChild>
-                <Badge
-                  variant={color ? undefined : "secondary"}
-                  size="sm"
-                  className="whitespace-nowrap border-transparent"
-                  style={
-                    color
-                      ? { backgroundColor: color, color: getCategoryTextColor(color) ?? "#fff" }
-                      : undefined
-                  }
-                >
-                  {tag.category.name}
-                </Badge>
+                <span className="inline-flex flex-col items-start gap-0.5">
+                  <Badge
+                    variant={color ? undefined : "secondary"}
+                    size="sm"
+                    className="whitespace-nowrap border-transparent"
+                    style={
+                      color
+                        ? { backgroundColor: color, color: getCategoryTextColor(color) ?? "#fff" }
+                        : undefined
+                    }
+                  >
+                    {tag.category.name}
+                  </Badge>
+                  {showAccountingType && accountingLabel && (
+                    <span className="text-[10px] leading-none text-muted-foreground">
+                      {accountingLabel}
+                    </span>
+                  )}
+                </span>
               </TooltipTrigger>
               <TooltipContent>{tooltip}</TooltipContent>
             </Tooltip>
@@ -159,20 +191,15 @@ export function MatchStatusBadge({ status, topMatchScore, className }: Props) {
     typeof topMatchScore === "number" &&
     topMatchScore > 0;
   return (
-    <div className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
-      <Badge variant={cfg} className="whitespace-nowrap">
-        {STATUS_LABEL[status]}
-      </Badge>
+    <Badge
+      variant={cfg}
+      className={`whitespace-nowrap ${className ?? ""}`}
+      title={showScore ? "Confiança da melhor nota candidata" : undefined}
+    >
+      {STATUS_LABEL[status]}
       {showScore && (
-        <Badge
-          variant={getConfidenceBadgeVariant(topMatchScore!)}
-          size="sm"
-          className="whitespace-nowrap"
-          title="Confiança da melhor nota candidata"
-        >
-          {Math.round(topMatchScore!)}%
-        </Badge>
+        <span className="ml-1 opacity-80">· {Math.round(topMatchScore!)}%</span>
       )}
-    </div>
+    </Badge>
   );
 }

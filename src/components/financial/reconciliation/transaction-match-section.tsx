@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { IconBrain, IconCircleCheck, IconLinkOff } from "@tabler/icons-react";
+import {
+  IconAlertTriangle,
+  IconBrain,
+  IconCircleCheck,
+  IconExternalLink,
+  IconLinkOff,
+  IconStack2,
+} from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +75,13 @@ export function TransactionMatchSection({
 
   const { data: candidates, isLoading: candidatesLoading } = useMatchCandidates(txId, true);
 
+  // Lookup so save/validation can expand an order-group selection into its
+  // member NFs and read each candidate's group metadata.
+  const candById = useMemo(
+    () => new Map((candidates ?? []).map(c => [c.fiscalDocumentId, c])),
+    [candidates],
+  );
+
   // Reset NF selection when the transaction identity changes (post-save).
   useEffect(() => {
     setSelectedIds([]);
@@ -109,7 +123,12 @@ export function TransactionMatchSection({
   );
   const totalAllocated = existingAllocated + newlyAllocated;
   const diff = totalAllocated - txAmount;
-  const isValidAllocation = Math.abs(diff) <= 0.05;
+  // Order-group selections sum several NFs, so accumulated rounding can drift a
+  // couple reais from the payment; widen the tolerance when one is selected
+  // (the save step still residual-adjusts allocations to hit the exact amount).
+  const hasOrderGroupSelected = selectedIds.some(id => candById.get(id)?.isOrderGroup);
+  const allocationTolerance = hasOrderGroupSelected ? 2.0 : 0.05;
+  const isValidAllocation = Math.abs(diff) <= allocationTolerance;
 
   const isFullyReconciled =
     transaction.reconciliationStatus === "RECONCILED" &&
@@ -125,12 +144,41 @@ export function TransactionMatchSection({
 
   const handleSave = () => {
     if (!hasMatchChanges || !isValidAllocation) return;
+
+    // Expand any selected order group into its member NFs (a group's
+    // `fiscalDocumentId` is a synthetic "order-group:<code>" sentinel, never a
+    // real doc). Each member is allocated its own NF value.
+    const expanded: { fiscalDocumentId: string; amount: number }[] = [];
+    for (const id of selectedIds) {
+      const c = candById.get(id);
+      if (c?.isOrderGroup && c.members?.length) {
+        for (const m of c.members) {
+          expanded.push({ fiscalDocumentId: m.fiscalDocumentId, amount: m.totalValue });
+        }
+      } else {
+        expanded.push({ fiscalDocumentId: id, amount: allocations[id] ?? c?.totalValue ?? 0 });
+      }
+    }
+
+    // Absorb the rounding residual onto the largest member so allocations sum
+    // EXACTLY to the remaining payment (backend enforces ±0.05).
+    const target = txAmount - existingAllocated;
+    const sum = expanded.reduce((s, a) => s + a.amount, 0);
+    const residual = Number((sum - target).toFixed(2));
+    if (expanded.length > 0 && Math.abs(residual) >= 0.01) {
+      let li = 0;
+      for (let i = 1; i < expanded.length; i++) {
+        if (expanded[i].amount > expanded[li].amount) li = i;
+      }
+      expanded[li] = {
+        ...expanded[li],
+        amount: Number((expanded[li].amount - residual).toFixed(2)),
+      };
+    }
+
     const payload: ManualMatchPayload = {
-      fiscalDocumentIds: selectedIds,
-      allocations: selectedIds.map(id => ({
-        fiscalDocumentId: id,
-        amount: allocations[id] || 0,
-      })),
+      fiscalDocumentIds: expanded.map(e => e.fiscalDocumentId),
+      allocations: expanded,
       notes: notes || undefined,
     };
     // Mutation success invalidates reconciliationKeys.all → detail refetches.
@@ -351,38 +399,63 @@ function CandidateRow({
   onItemCategoryChange: (itemId: string, categoryId: string | null) => void;
 }) {
   return (
+    // The ENTIRE card is the toggle target — clicking anywhere selects/deselects
+    // the candidate (green border = selected). The category combobox cell stops
+    // propagation (see FiscalItemsTable) so categorizing never flips selection,
+    // and the "Ver Notas" link stops propagation so it opens the NF instead.
     <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={checked}
+      onClick={onToggle}
+      onKeyDown={e => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
       className={cn(
-        // Neutral card; a green border wraps the whole card when selected.
-        "rounded-lg overflow-hidden transition-colors",
+        "rounded-lg overflow-hidden transition-colors cursor-pointer w-full text-left",
+        "hover:bg-muted/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         checked ? "border-2 border-green-500" : "border border-border",
       )}
     >
-      {/* Clicking the header toggles selection — the whole row is the toggle
-          target and the green card border signals the selected state. */}
-      <div
-        role="button"
-        tabIndex={0}
-        aria-pressed={checked}
-        onClick={onToggle}
-        onKeyDown={e => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onToggle();
-          }
-        }}
-        className="cursor-pointer px-3 py-3 hover:bg-muted/30 transition-colors"
-      >
+      <div className="px-3 py-3">
         <div className="flex items-center gap-2.5">
-          <Badge size="sm" variant={docTypeVariant(c.docType)}>
-            {docTypeLabel(c.docType)}
-          </Badge>
-          {c.nfNumber && (
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Nº {c.nfNumber}</span>
+          {c.isOrderGroup ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-md bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide shrink-0"
+              title="Pedido — várias notas somadas em um único pagamento"
+            >
+              <IconStack2 className="h-3.5 w-3.5" />
+              Pedido {c.orderCode}
+            </span>
+          ) : (
+            <Badge size="sm" variant={docTypeVariant(c.docType)}>
+              {docTypeLabel(c.docType)}
+            </Badge>
+          )}
+          {c.isOrderGroup ? (
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {c.memberCount} notas{c.nfNumber ? ` · Nº ${c.nfNumber}` : ""}
+            </span>
+          ) : (
+            c.nfNumber && (
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Nº {c.nfNumber}</span>
+            )
           )}
           <span className="font-medium truncate min-w-0">
             {c.emitName || (c.emitCnpj ? formatCNPJ(c.emitCnpj) : "—")}
           </span>
+          {c.isOrderGroup && c.cleanGroup === false && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-300/60 dark:border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide shrink-0"
+              title="Contém nota que pertence a mais de um pedido — revisar antes de conciliar"
+            >
+              <IconAlertTriangle className="h-3 w-3" />
+              Revisar
+            </span>
+          )}
           {c.aliasAssisted && (
             <span
               className="inline-flex items-center gap-1 rounded-full bg-violet-100 dark:bg-violet-500/20 text-violet-800 dark:text-violet-200 border border-violet-300/60 dark:border-violet-500/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide shrink-0"
@@ -392,7 +465,10 @@ function CandidateRow({
               Aprendido
             </span>
           )}
-          {/* Top-right cluster: date (prominent) + proximity day gap + confidence. */}
+          {/* Top-right cluster: date (prominent) + proximity day gap + confidence
+              + a "Ver Notas" link (single NF only — a group has no single doc to
+              open). The link stops propagation so it opens the NF detail instead
+              of toggling the candidate selection. */}
           <div className="ml-auto flex items-center gap-2.5 shrink-0">
             <span className="text-sm font-medium text-foreground whitespace-nowrap">
               {formatDate(c.issueDate)}
@@ -403,6 +479,17 @@ function CandidateRow({
             <Badge size="sm" variant={getConfidenceBadgeVariant(c.confidence)}>
               {c.confidence}%
             </Badge>
+            {!c.isOrderGroup && (
+              <Link
+                to={routes.financial.reconciliation.fiscalDocumentDetail(c.fiscalDocumentId)}
+                onClick={e => e.stopPropagation()}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                title="Ver notas"
+              >
+                <IconExternalLink className="h-3.5 w-3.5" />
+                Ver Notas
+              </Link>
+            )}
           </div>
         </div>
       </div>

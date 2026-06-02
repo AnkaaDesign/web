@@ -1,11 +1,11 @@
 import { formatCurrency } from "../../../../utils";
-import { PPE_TYPE_LABELS } from "../../../../constants";
+import { PPE_TYPE_LABELS, ACCOUNTING_TYPE_LABELS } from "../../../../constants";
 import type { Item } from "../../../../types";
 import { Badge } from "../../../ui/badge";
 import { StockStatusIndicator } from "./stock-status-indicator";
 import { MeasureDisplayCompact } from "../common/measure-display";
 import type { ItemColumn } from "./types";
-import { IconTrendingUp, IconTrendingDown, IconMinus } from "@tabler/icons-react";
+import { IconTrendingUp, IconTrendingDown, IconMinus, IconAlertTriangle } from "@tabler/icons-react";
 
 // Helper function to render monthly consumption with trend
 const renderMonthlyConsumptionWithTrend = (item: Item) => {
@@ -73,9 +73,50 @@ export const createItemColumns = (): ItemColumn[] => [
   {
     key: "category.name",
     header: "CATEGORIA",
-    accessor: (item: Item) => <div className="truncate">{item.category?.name || "-"}</div>,
+    accessor: (item: Item) => (
+      <div className="flex items-center gap-1.5 truncate">
+        <span className="truncate">{item.category?.name || "-"}</span>
+        {item.categoryReviewNeeded && (
+          <span title="Categoria a revisar">
+            <IconAlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          </span>
+        )}
+      </div>
+    ),
     sortable: true,
     className: "w-40",
+    align: "left",
+  },
+  {
+    key: "category.accountingType",
+    header: "TIPO CONTÁBIL",
+    // Rolled up from the item's category (read-only display).
+    accessor: (item: Item) =>
+      item.category?.accountingType ? (
+        <Badge variant="secondary" className="text-xs">
+          {ACCOUNTING_TYPE_LABELS[item.category.accountingType] || item.category.accountingType}
+        </Badge>
+      ) : (
+        <div className="truncate text-muted-foreground">-</div>
+      ),
+    sortable: false,
+    className: "w-36",
+    align: "left",
+  },
+  {
+    key: "categoryReviewNeeded",
+    header: "A REVISAR",
+    accessor: (item: Item) =>
+      item.categoryReviewNeeded ? (
+        <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
+          <IconAlertTriangle className="h-3 w-3 mr-1" />
+          A revisar
+        </Badge>
+      ) : (
+        <div className="truncate text-muted-foreground">-</div>
+      ),
+    sortable: true,
+    className: "w-28",
     align: "left",
   },
   {

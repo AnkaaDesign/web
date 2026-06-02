@@ -10,12 +10,16 @@ import {
   getRegularCategories,
   getToolCategories,
   getCategoriesByType,
+  getItemCategoryTree,
+  getChildCategories,
+  getRootCategories,
+  getCategoriesByAccountingType,
   updateItemCategory,
   batchCreateItemCategories,
   batchUpdateItemCategories,
   batchDeleteItemCategories,
 } from "../../api-client";
-import { ITEM_CATEGORY_TYPE } from "../../constants";
+import { ITEM_CATEGORY_TYPE, ACCOUNTING_TYPE } from "../../constants";
 import type {
   ItemCategoryCreateFormData,
   ItemCategoryUpdateFormData,
@@ -164,6 +168,86 @@ export const useCategoriesByType = (
   return useQuery({
     queryKey: itemCategoryKeys.byType(type),
     queryFn: () => getCategoriesByType(type),
+    staleTime: options?.staleTime ?? 1000 * 60 * 10, // 10 minutes
+    enabled: options?.enabled,
+  });
+};
+
+// =====================================================
+// Hierarchy / Tree Hooks
+// =====================================================
+
+/**
+ * Hook to fetch the full category tree (top-level categories with nested
+ * `children`). Pass `include: { children: { include: { children: true } } }`
+ * (or rely on the API's `tree` mode) to hydrate subcategories.
+ */
+export const useItemCategoryTree = (
+  params?: Partial<ItemCategoryGetManyFormData>,
+  options?: {
+    enabled?: boolean;
+    staleTime?: number;
+  },
+) => {
+  return useQuery({
+    queryKey: [...itemCategoryKeys.all, "tree", params ?? {}] as const,
+    queryFn: () => getItemCategoryTree(params as ItemCategoryGetManyFormData),
+    staleTime: options?.staleTime ?? 1000 * 60 * 10, // 10 minutes
+    enabled: options?.enabled,
+  });
+};
+
+/**
+ * Hook to fetch direct children (subcategories) of a given parent category.
+ */
+export const useChildCategories = (
+  parentId: string,
+  params?: Partial<ItemCategoryGetManyFormData>,
+  options?: {
+    enabled?: boolean;
+    staleTime?: number;
+  },
+) => {
+  return useQuery({
+    queryKey: [...itemCategoryKeys.all, "children", parentId, params ?? {}] as const,
+    queryFn: () => getChildCategories(parentId, params as ItemCategoryGetManyFormData),
+    staleTime: options?.staleTime ?? 1000 * 60 * 10, // 10 minutes
+    enabled: options?.enabled ?? !!parentId,
+  });
+};
+
+/**
+ * Hook to fetch only top-level categories (categoryLevel === 1).
+ */
+export const useRootCategories = (
+  params?: Partial<ItemCategoryGetManyFormData>,
+  options?: {
+    enabled?: boolean;
+    staleTime?: number;
+  },
+) => {
+  return useQuery({
+    queryKey: [...itemCategoryKeys.all, "root", params ?? {}] as const,
+    queryFn: () => getRootCategories(params as ItemCategoryGetManyFormData),
+    staleTime: options?.staleTime ?? 1000 * 60 * 10, // 10 minutes
+    enabled: options?.enabled,
+  });
+};
+
+/**
+ * Hook to fetch categories filtered by accounting (DRE) classification.
+ */
+export const useCategoriesByAccountingType = (
+  accountingType: ACCOUNTING_TYPE,
+  params?: Partial<ItemCategoryGetManyFormData>,
+  options?: {
+    enabled?: boolean;
+    staleTime?: number;
+  },
+) => {
+  return useQuery({
+    queryKey: [...itemCategoryKeys.all, "accountingType", accountingType, params ?? {}] as const,
+    queryFn: () => getCategoriesByAccountingType(accountingType, params as ItemCategoryGetManyFormData),
     staleTime: options?.staleTime ?? 1000 * 60 * 10, // 10 minutes
     enabled: options?.enabled,
   });

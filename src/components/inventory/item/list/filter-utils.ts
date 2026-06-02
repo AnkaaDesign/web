@@ -1,6 +1,6 @@
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { formatDate } from "../../../../utils";
-import { STOCK_LEVEL, STOCK_LEVEL_LABELS, ITEM_CATEGORY_TYPE, ITEM_CATEGORY_TYPE_LABELS } from "../../../../constants";
+import { STOCK_LEVEL, STOCK_LEVEL_LABELS, ITEM_CATEGORY_TYPE, ITEM_CATEGORY_TYPE_LABELS, ACCOUNTING_TYPE_LABELS } from "../../../../constants";
 
 export interface FilterIndicator {
   key: string;
@@ -173,6 +173,32 @@ export function extractActiveFilters(
         onRemove: () => onRemoveFilter("categoryId"),
       });
     }
+  }
+
+  // Accounting type filter (one badge per selected type)
+  const accountingTypeIn = (filters.where?.category as any)?.accountingType?.in as string[] | undefined;
+  if (Array.isArray(accountingTypeIn) && accountingTypeIn.length > 0) {
+    accountingTypeIn.forEach((type) => {
+      activeFilters.push({
+        key: `accountingType-${type}`,
+        label: "Tipo contábil",
+        value: (ACCOUNTING_TYPE_LABELS as Record<string, string>)[type] || type,
+        iconType: "currency-dollar",
+        itemId: type,
+        onRemove: () => onRemoveFilter("accountingType", type),
+      });
+    });
+  }
+
+  // "A revisar" flag filter
+  if (filters.where?.categoryReviewNeeded === true) {
+    activeFilters.push({
+      key: "categoryReviewNeeded",
+      label: "Categoria",
+      value: "A revisar",
+      iconType: "alert-triangle",
+      onRemove: () => onRemoveFilter("categoryReviewNeeded"),
+    });
   }
 
   // Entity filters - Brands (individual badges for each brand)
@@ -441,14 +467,38 @@ export function createFilterRemover(currentFilters: Partial<ItemGetManyFormData>
             newFilters.categoryIds = filteredCategories;
           } else {
             delete newFilters.categoryIds;
+            delete (newFilters as any).includeSubcategories;
           }
         } else {
           // Remove all categories
           delete newFilters.categoryIds;
+          delete (newFilters as any).includeSubcategories;
         }
         break;
       case "categoryId":
         delete newWhere.categoryId;
+        break;
+      case "accountingType": {
+        const cat = (newWhere.category as any) || {};
+        const current = cat.accountingType?.in as string[] | undefined;
+        if (itemId && Array.isArray(current)) {
+          const remaining = current.filter((t) => t !== itemId);
+          if (remaining.length > 0) {
+            newWhere.category = { ...cat, accountingType: { in: remaining } };
+          } else {
+            const { accountingType, ...restCat } = cat;
+            if (Object.keys(restCat).length > 0) newWhere.category = restCat;
+            else delete newWhere.category;
+          }
+        } else {
+          const { accountingType, ...restCat } = cat;
+          if (Object.keys(restCat).length > 0) newWhere.category = restCat;
+          else delete newWhere.category;
+        }
+        break;
+      }
+      case "categoryReviewNeeded":
+        delete newWhere.categoryReviewNeeded;
         break;
       case "brandIds":
         if (itemId && Array.isArray(newFilters.brandIds)) {

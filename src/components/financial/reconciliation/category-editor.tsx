@@ -5,9 +5,15 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { IconX } from "@tabler/icons-react";
 import { useReconciliationCategories } from "@/hooks/financial/use-reconciliation";
-import { getCategoryTextColor } from "./match-status-badge";
+import { getCategoryTextColor, getAccountingTypeLabel } from "./match-status-badge";
 import { formatCurrency } from "@/utils";
 import type { BankTransaction, TransactionCategory } from "@/types/reconciliation";
+
+// Fallback group label for categories that have no accounting type yet (e.g.
+// freshly created TRANSACTION_ONLY buckets before they're assigned a cost
+// group). Keeps them visible at the bottom of the picker rather than dropping
+// them.
+const NO_ACCOUNTING_GROUP = "Sem grupo contábil";
 
 interface Props {
   /** The transaction being categorized (subject of the editor). */
@@ -48,18 +54,31 @@ export function CategoryEditor({
     return map;
   }, [categories]);
 
+  // Options are grouped by accounting type (the chart-of-accounts cost group,
+  // up to 13 buckets) instead of the 2 coarse `kind` buckets. Sorting keeps
+  // groups together (by their label), then respects each category's sortOrder /
+  // name within a group. Categories without an accounting type fall into a
+  // trailing "Sem grupo contábil" group.
   const options = useMemo<ComboboxOption[]>(() => {
     const active = (categories ?? []).filter(c => c.isActive);
-    const sorted = [...active].sort(
-      (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
-    );
+    const groupOf = (c: TransactionCategory) =>
+      getAccountingTypeLabel(c) ?? NO_ACCOUNTING_GROUP;
+    const sorted = [...active].sort((a, b) => {
+      const ga = groupOf(a);
+      const gb = groupOf(b);
+      // Push the fallback group to the end; otherwise sort groups alphabetically.
+      if (ga !== gb) {
+        if (ga === NO_ACCOUNTING_GROUP) return 1;
+        if (gb === NO_ACCOUNTING_GROUP) return -1;
+        return ga.localeCompare(gb, "pt-BR");
+      }
+      return a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "pt-BR");
+    });
     return sorted.map(c => ({
       value: c.id,
       label: c.name,
-      category:
-        c.kind === "TRANSACTION_ONLY"
-          ? "Categorias de transação"
-          : "Categorias de item/serviço",
+      // The Combobox groups options by `category`; we feed it the cost group.
+      category: groupOf(c),
     }));
   }, [categories]);
 
@@ -120,32 +139,39 @@ export function CategoryEditor({
             {value.map(id => {
               const cat = byId.get(id);
               if (!cat) return null;
+              const accountingLabel = getAccountingTypeLabel(cat);
               return (
-                <Badge
-                  key={id}
-                  variant="secondary"
-                  size="sm"
-                  className="whitespace-nowrap gap-1 pr-1"
-                  style={
-                    cat.color
-                      ? {
-                          backgroundColor: cat.color,
-                          color: getCategoryTextColor(cat.color) ?? "#fff",
-                          borderColor: "transparent",
-                        }
-                      : undefined
-                  }
-                >
-                  {cat.name}
-                  <button
-                    type="button"
-                    onClick={() => removeId(id)}
-                    className="rounded-full hover:bg-black/20 p-0.5"
-                    aria-label={`Remover ${cat.name}`}
+                <span key={id} className="inline-flex flex-col items-start gap-0.5">
+                  <Badge
+                    variant="secondary"
+                    size="sm"
+                    className="whitespace-nowrap gap-1 pr-1"
+                    style={
+                      cat.color
+                        ? {
+                            backgroundColor: cat.color,
+                            color: getCategoryTextColor(cat.color) ?? "#fff",
+                            borderColor: "transparent",
+                          }
+                        : undefined
+                    }
                   >
-                    <IconX className="h-3 w-3" />
-                  </button>
-                </Badge>
+                    {cat.name}
+                    <button
+                      type="button"
+                      onClick={() => removeId(id)}
+                      className="rounded-full hover:bg-black/20 p-0.5"
+                      aria-label={`Remover ${cat.name}`}
+                    >
+                      <IconX className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                  {accountingLabel && (
+                    <span className="text-[10px] leading-none text-muted-foreground">
+                      {accountingLabel}
+                    </span>
+                  )}
+                </span>
               );
             })}
           </div>

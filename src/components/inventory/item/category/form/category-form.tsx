@@ -4,17 +4,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router-dom";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { itemCategoryCreateSchema, itemCategoryUpdateSchema, type ItemCategoryCreateFormData, type ItemCategoryUpdateFormData } from "../../../../../schemas";
 import { ITEM_CATEGORY_TYPE } from "../../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
 import { apiClient } from "../../../../../api-client";
 import { FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { serializeItemCategoryFormToUrlParams, debounce } from "@/utils/url-form-state";
-import type { Item } from "../../../../../types";
+import type { Item, ItemCategory } from "../../../../../types";
 
 // Import form components
 import { NameInput } from "./name-input";
 import { TypeSelector } from "./type-selector";
+import { ParentCategorySelector } from "./parent-category-selector";
+import { AccountingTypeSelector } from "./accounting-type-selector";
 
 interface BaseCategoryFormProps {
   isSubmitting?: boolean;
@@ -38,15 +41,18 @@ type CategoryFormProps = CreateCategoryFormProps | UpdateCategoryFormProps;
 
 export function CategoryForm(props: CategoryFormProps) {
   const { isSubmitting, defaultValues, mode, initialItems } = props;
+  const editingCategoryId = props.mode === "update" ? props.categoryId : undefined;
   const [searchParams, setSearchParams] = useSearchParams();
 
   // For create mode, merge URL params with provided defaults
   const createDefaults: ItemCategoryCreateFormData & { itemIds?: string[] } = {
     name: "",
     type: ITEM_CATEGORY_TYPE.REGULAR,
+    categoryLevel: 1,
+    parentId: null,
     itemIds: [],
     ...defaultValues,
-  };
+  } as ItemCategoryCreateFormData & { itemIds?: string[] };
 
   // Create a unified form that works for both modes
   const form = useForm<ItemCategoryCreateFormData | ItemCategoryUpdateFormData>({
@@ -55,6 +61,27 @@ export function CategoryForm(props: CategoryFormProps) {
     mode: "onChange", // Validate on change for immediate feedback
     reValidateMode: "onChange", // Re-validate on change
   });
+
+  // A category with a parent is a Subcategoria (level 2); otherwise a top-level Categoria (level 1).
+  const watchedParentId = form.watch("parentId" as any) as string | undefined;
+  const isSubcategory = !!watchedParentId;
+
+  // Keep categoryLevel in sync with the presence of a parent so the API stores the right level.
+  useEffect(() => {
+    const nextLevel = isSubcategory ? 2 : 1;
+    if ((form.getValues("categoryLevel" as any) as number | undefined) !== nextLevel) {
+      form.setValue("categoryLevel" as any, nextLevel, { shouldDirty: true });
+    }
+    // Top-level categories own their accountingType; subcategories roll up the parent's, so we
+    // clear the local value when switching back to top-level is not needed — rollup is applied on parent change.
+  }, [isSubcategory, form]);
+
+  // When a parent is chosen, roll up its accountingType onto this subcategory (read-only in the UI).
+  const handleParentChange = (parent: ItemCategory | undefined) => {
+    if (parent?.accountingType) {
+      form.setValue("accountingType" as any, parent.accountingType, { shouldDirty: true, shouldValidate: true });
+    }
+  };
 
   // Debounced function to update URL parameters
   const debouncedUpdateUrl = useMemo(
@@ -180,7 +207,12 @@ export function CategoryForm(props: CategoryFormProps) {
         {/* Basic Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Informações da Categoria</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Informações da Categoria
+              <Badge variant={isSubcategory ? "secondary" : "default"} className="text-xs">
+                {isSubcategory ? "Nível 2 · Subcategoria" : "Nível 1 · Categoria"}
+              </Badge>
+            </CardTitle>
             <CardDescription>{mode === "create" ? "Preencha os dados para criar uma nova categoria" : "Atualize os dados da categoria"}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -188,6 +220,13 @@ export function CategoryForm(props: CategoryFormProps) {
               <NameInput control={form.control} disabled={isSubmitting} required={isRequired} />
 
               <TypeSelector control={form.control} disabled={isSubmitting} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ParentCategorySelector control={form.control} disabled={isSubmitting} excludeId={editingCategoryId} onParentChange={handleParentChange} />
+
+              {/* Top-level categories pick their accounting type; subcategories roll up the parent's (read-only). */}
+              <AccountingTypeSelector control={form.control} disabled={isSubmitting} readOnlyRollup={isSubcategory} />
             </div>
 
             <FormField

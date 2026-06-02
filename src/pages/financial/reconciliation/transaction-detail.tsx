@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
   useBankTransaction,
+  useMatchCandidates,
   useUnmatchTransaction,
 } from "@/hooks/financial/use-reconciliation";
 import {
@@ -47,6 +48,12 @@ export function ReconciliationTransactionDetailPage() {
   usePageTracker({ title: "Detalhe da Transação", icon: "list" });
 
   const { data: tx, isLoading, error } = useBankTransaction(id);
+  // Drive the status badge's "%" off the LIVE best candidate (deduped with the
+  // match section's query) instead of the stored topMatchScore, which can go
+  // stale and show a confidence even when no candidate currently exists.
+  const { data: liveCandidates } = useMatchCandidates(id, true);
+  const liveTopScore =
+    liveCandidates && liveCandidates.length > 0 ? liveCandidates[0].confidence : null;
   const unmatchMut = useUnmatchTransaction();
   const [unmatchOpen, setUnmatchOpen] = useState(false);
   // The match section reports its save-ability + allocation totals up so the
@@ -145,7 +152,7 @@ export function ReconciliationTransactionDetailPage() {
                   </CardTitle>
                   <MatchStatusBadge
                     status={tx.reconciliationStatus}
-                    topMatchScore={tx.topMatchScore}
+                    topMatchScore={liveTopScore}
                   />
                 </div>
               </CardHeader>

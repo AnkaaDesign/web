@@ -1899,6 +1899,29 @@ export enum ITEM_CATEGORY_TYPE {
   PPE = "PPE",
 }
 
+// Accounting classification (DRE bucket) for item/transaction categories.
+export enum ACCOUNTING_TYPE {
+  SALARIOS = "SALARIOS",
+  DESPESAS_FIXAS = "DESPESAS_FIXAS",
+  PRODUTIVO = "PRODUTIVO",
+  IMPOSTO_TARIFAS = "IMPOSTO_TARIFAS",
+  MATERIA_PRIMA = "MATERIA_PRIMA",
+  INVESTIMENTO = "INVESTIMENTO",
+  MANUTENCAO = "MANUTENCAO",
+  COZINHA_ALIMENTACAO = "COZINHA_ALIMENTACAO",
+  EPI = "EPI",
+  ESCRITORIO = "ESCRITORIO",
+  APLICACAO_FINANCEIRA = "APLICACAO_FINANCEIRA",
+  ESTORNO = "ESTORNO",
+  LUCRO_DISTRIBUIDO = "LUCRO_DISTRIBUIDO",
+}
+
+// Category hierarchy depth: 1 = top-level category, 2 = subcategory.
+export enum ITEM_CATEGORY_LEVEL {
+  CATEGORY = 1,
+  SUBCATEGORY = 2,
+}
+
 // =====================
 // Financial - Expense Management
 // =====================

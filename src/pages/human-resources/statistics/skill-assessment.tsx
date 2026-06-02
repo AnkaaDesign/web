@@ -70,11 +70,12 @@ import {
   type StatisticsRadarChartHandle,
 } from '@/components/statistics/statistics-radar-chart';
 import {
-  SkillStatsEntriesModal,
   type SkillStatsClickContext,
 } from '@/components/human-resources/statistics/skill-stats-entries-modal';
-import { SkillTopicsModal } from '@/components/human-resources/statistics/skill-topics-modal';
-import { SkillInfoModal } from '@/components/human-resources/statistics/skill-info-modal';
+import {
+  SkillDrilldownModal,
+  type SkillDrilldownView,
+} from '@/components/human-resources/statistics/skill-drilldown-modal';
 import { getScoreHex, SCORE_HEX } from '@/components/production/skill-assessment/score-badge';
 
 import { CHART_COLORS, formatNumber, formatPercentage } from '@/types/statistics-common';
@@ -102,7 +103,7 @@ import { getSectors } from '@/api-client/sector';
 import { getSkills } from '@/api-client/skill';
 import { getTopics } from '@/api-client/topic';
 import { getUsers } from '@/api-client/user';
-import { ASSESSMENT_STATUS, ASSESSMENT_STATUS_LABELS, FAVORITE_PAGES, routes, SECTOR_PRIVILEGES } from '@/constants';
+import { ASSESSMENT_STATUS, ASSESSMENT_STATUS_LABELS, FAVORITE_PAGES, routes, SECTOR_PRIVILEGES, USER_STATUS } from '@/constants';
 import { cn } from '@/lib/utils';
 
 // =====================
@@ -152,7 +153,25 @@ const COMPARE_MODE_OPTIONS: CompareOption[] = [
   { value: 'position', label: 'Cargo',          description: 'Uma série por cargo selecionado' },
   { value: 'user',     label: 'Colaborador',    description: 'Uma série por colaborador selecionado' },
   { value: 'skill',    label: 'Competência',    description: 'Médias por competência como séries' },
+  { value: 'topic',    label: 'Tópico',         description: 'Médias por tópico como séries' },
+  { value: 'campaign', label: 'Campanha',       description: 'Uma série por campanha selecionada' },
 ];
+
+// Which dimensions can become the comparison SERIES for a given X axis, in
+// global priority order (user > position > sector > skill > topic > campaign),
+// filtered to the pairs the data pipeline actually supports. The first such
+// dimension with ≥2 explicit selections wins (1 selection = scope filter).
+// This is the single "smart override" rule — see SKILL_ASSESSMENT_DECISION_ENGINE.md.
+const SERIES_PRIORITY_BY_X: Record<SkillStatsXAxisMode, Array<'user' | 'position' | 'sector' | 'skill' | 'topic' | 'campaign'>> = {
+  // X = skill/topic → comparison endpoint (user/sector/campaign) + client-derived position (skill only).
+  skill:    ['user', 'position', 'sector', 'campaign'],
+  topic:    ['user', 'sector', 'campaign'],
+  // X = campaign → evolution endpoint (user/sector/skill/topic series over time).
+  campaign: ['user', 'sector', 'skill', 'topic'],
+  // X = sector/user → client-derived skill series from overview.
+  sector:   ['skill'],
+  user:     ['skill'],
+};
 
 type ChartTypeOption = {
   value: SkillStatsChartType;
@@ -170,7 +189,11 @@ const CHART_TYPE_CATALOG: Record<SkillStatsChartType, ChartTypeOption> = {
   'area-smooth': { value: 'area-smooth', label: 'Área Suave',       icon: IconChartArea, description: 'Área suavizada' },
   'radar-polygon': { value: 'radar-polygon', label: 'Radar Polígono', icon: IconRadar,     description: 'Radar com grade poligonal' },
   'radar-circle':  { value: 'radar-circle',  label: 'Radar Círculo',  icon: IconChartPie,  description: 'Radar com grade circular' },
+  'pie':           { value: 'pie',           label: 'Pizza',          icon: IconChartPie,  description: 'Distribuição como pizza' },
 };
+
+// Pie is its own render path (single 6-slice distribution), distinct from radar.
+const isPieType = (t: SkillStatsChartType): boolean => t === 'pie';
 
 // Both radar variants share the StatisticsRadarChart render path; only the
 // grid `shape` differs. Centralised so every branch agrees.
@@ -185,6 +208,15 @@ const TREND_LABELS: Record<TrendLineType, string> = {
 
 const formatAvg = (v: number | null | undefined): string =>
   v == null ? '—' : v.toFixed(2);
+
+// Brazilian-name shortener for legends: first two NAME tokens, skipping
+// particles (de/da/do/dos/das/e). "José Antônio de Almeida Júnior" → "José
+// Antônio"; "Pedro Antônio de Oliveira" → "Pedro Antônio".
+const NAME_PARTICLES = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+function shortPersonName(full: string): string {
+  const tokens = (full || '').trim().split(/\s+/).filter(t => !NAME_PARTICLES.has(t.toLowerCase()));
+  return tokens.slice(0, 2).join(' ') || full;
+}
 
 // Cascade-prune helper: drop child ids whose parent is no longer in the
 // allowed set. Conservative — if the parent is unknown (not yet hydrated in
@@ -222,18 +254,27 @@ function availableYsFor(x: SkillStatsXAxisMode): SkillStatsYAxisMode[] {
 }
 
 // Which chart types are valid for each (X, Y, compare) combination.
+//
+// `categoryCount` is the number of X categories the current data resolves to.
+// A radar polygon needs ≥3 spokes to read as a shape — with 1–2 categories it
+// degenerates into a line/segment (see Image 2: a single topic). So radar is
+// only offered once we have ≥3 categories; below that it auto-snaps to bar.
 function availableChartTypesFor(
   x: SkillStatsXAxisMode,
   y: SkillStatsYAxisMode,
   c: SkillStatsCompareMode,
+  categoryCount = Infinity,
 ): SkillStatsChartType[] {
-  // Distribution of the 6 score levels: stacked is the default, but offer the
-  // grouped variant too (some users prefer side-by-side level bars).
-  if (y === 'distribution') return ['bar-stacked', 'bar'];
+  // Distribution of the 6 score levels: stacked is the default. Also offer the
+  // grouped bars, an aggregate pizza, and a per-level radar (6 spokes — always
+  // ≥3, so the radar is always well-formed here).
+  if (y === 'distribution') return ['bar-stacked', 'bar', 'pie', 'radar-polygon', 'radar-circle'];
   if (x === 'campaign') {
+    // Grouped bars are valid for multi-series too (e.g. 2 campaigns × N skills),
+    // not just lines — so offer bar alongside the temporal line/area variants.
     return c === 'none'
       ? ['line', 'line-smooth', 'area', 'area-smooth', 'bar']
-      : ['line', 'line-smooth'];
+      : ['bar', 'line', 'line-smooth'];
   }
   if (x === 'skill' || x === 'topic') {
     // Radar only renders the averageScore composition (radarView early-exits
@@ -241,11 +282,18 @@ function availableChartTypesFor(
     // out of those combos instead of offering a dead button.
     if (y !== 'averageScore') return c === 'none' ? ['bar'] : ['bar', 'bar-stacked'];
     if (c === 'position') return ['bar', 'bar-stacked'];
+    const radar: SkillStatsChartType[] = categoryCount >= 3 ? ['radar-polygon', 'radar-circle'] : [];
     // Radar first so it stays the preferred default for the skill composition.
-    if (c === 'none') return ['radar-polygon', 'radar-circle', 'bar'];
-    return ['radar-polygon', 'radar-circle', 'bar', 'bar-stacked'];
+    if (c === 'none') return [...radar, 'bar'];
+    return [...radar, 'bar', 'bar-stacked'];
   }
   // sector / user
+  if (y === 'averageScore' && c === 'none') {
+    // Single-series people ranking: bars, plus an optional radar (≥3 entities)
+    // and a pizza of the share of average across entities.
+    const radar: SkillStatsChartType[] = categoryCount >= 3 ? ['radar-polygon', 'radar-circle'] : [];
+    return [...radar, 'bar', 'pie'];
+  }
   if (c === 'none') return ['bar'];
   return ['bar', 'bar-stacked'];
 }
@@ -406,12 +454,24 @@ function SkillStatsFilterSheet({
   // (or both) restricts the options to users matching the intersection.
   const narrowSectorIds = local.sectorIds && local.sectorIds.length > 0 ? local.sectorIds : undefined;
   const narrowPositionIds = local.positionIds && local.positionIds.length > 0 ? local.positionIds : undefined;
+  // Scope the collaborator options to ACTUAL participants of the selected
+  // campaign(s) — a user with no AssessmentEntry in scope can never produce a
+  // data point, so listing them is misleading.
+  const narrowAssessmentIds = local.assessmentIds && local.assessmentIds.length > 0 ? local.assessmentIds : undefined;
   const fetchUsers = useCallback(async (search: string, page = 1) => {
     const res = await getUsers({
       where: {
+        // `isActive` is the account-enabled flag, NOT employment status — a
+        // dismissed user can still be isActive. Exclude DISMISSED explicitly so
+        // demitidos never appear in HR stats filters (same rule as every other
+        // HR-derived screen).
         isActive: true,
+        status: { not: USER_STATUS.DISMISSED },
         ...(narrowSectorIds ? { sectorId: { in: narrowSectorIds } } : {}),
         ...(narrowPositionIds ? { positionId: { in: narrowPositionIds } } : {}),
+        ...(narrowAssessmentIds
+          ? { assessmentEntriesAsEvaluatee: { some: { assessmentId: { in: narrowAssessmentIds } } } }
+          : {}),
       },
       search: search || undefined,
       page,
@@ -429,7 +489,7 @@ function SkillStatsFilterSheet({
       })),
       hasMore: res.meta?.hasNextPage ?? false,
     };
-  }, [narrowSectorIds, narrowPositionIds]);
+  }, [narrowSectorIds, narrowPositionIds, narrowAssessmentIds]);
 
   // Hydrate maps on sheet-open for pre-selected children whose parent we
   // don't know yet (state restored from URL / persisted filter, etc.). This
@@ -598,14 +658,6 @@ function SkillStatsFilterSheet({
               </p>
             </div>
 
-            <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-              Selecione 1 entidade para <strong>filtrar</strong> o escopo (ela
-                também restringe as opções dos filtros filhos). Selecione 2+
-              entidades de um mesmo tipo para <strong>compará-las</strong> como
-              séries no gráfico. Prioridade da comparação:
-              colaborador &gt; cargo &gt; setor.
-            </div>
-
             {/* Campaigns — pure scope, no comparison axis. */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">Campanhas</Label>
@@ -698,7 +750,7 @@ function SkillStatsFilterSheet({
               <Combobox
                 mode="multiple"
                 async
-                queryKey={['skill-stats-users', narrowSectorIds, narrowPositionIds]}
+                queryKey={['skill-stats-users', narrowSectorIds, narrowPositionIds, narrowAssessmentIds]}
                 queryFn={fetchUsers}
                 minSearchLength={0}
                 value={local.userIds ?? []}
@@ -883,96 +935,99 @@ export const HRSkillAssessmentStatisticsPage = () => {
   }, [filters.assessmentIds, assessmentStatusById, assessmentList]);
   const hasOpenCampaignInScope = openCampaignsInScope.length > 0;
 
-  // Derive comparison entirely from selection counts. Most-specific wins on
-  // the WHO axis (user > position > sector); skill comparison drives the WHAT
-  // axis when X is a person dimension.
+  // THE smart override: the multi-selected dimension that ISN'T the X axis
+  // becomes the comparison series. 1 selection = scope filter; ≥2 = "compare
+  // these". When several qualify, SERIES_PRIORITY_BY_X picks the most
+  // deliberate one (user > position > sector > skill > topic > campaign),
+  // filtered to the pairs the data pipeline supports. Distribution/volume use
+  // a fixed series channel (levels / single count) so they never compare.
   const { compareMode, compareEntityIds } = useMemo<{
     compareMode: SkillStatsCompareMode;
     compareEntityIds: string[];
   }>(() => {
-    // Distribution / volume render single-value bars — no comparison series.
     if (yAxisMode !== 'averageScore') return { compareMode: 'none', compareEntityIds: [] };
 
-    const isContent  = xAxisMode === 'skill' || xAxisMode === 'topic';
-    const isCampaign = xAxisMode === 'campaign';
-    const isPerson   = xAxisMode === 'sector' || xAxisMode === 'user';
+    const selectionOf: Record<'user' | 'position' | 'sector' | 'skill' | 'topic' | 'campaign', string[]> = {
+      user:     filters.userIds ?? [],
+      position: filters.positionIds ?? [],
+      sector:   filters.sectorIds ?? [],
+      skill:    filters.skillIds ?? [],
+      topic:    filters.topicIds ?? [],
+      campaign: filters.assessmentIds ?? [],
+    };
 
-    if (isContent || isCampaign) {
-      if ((filters.userIds?.length ?? 0) >= 2)
-        return { compareMode: 'user', compareEntityIds: filters.userIds! };
-      // Position comparison is client-derived from overview.byUser.perSkillAverage —
-      // only supported on X='skill'. byUser has no perTopicAverage, and evolution
-      // has no per-position breakdown, so X='topic' and X='campaign' fall through.
-      if (xAxisMode === 'skill' && (filters.positionIds?.length ?? 0) >= 2)
-        return { compareMode: 'position', compareEntityIds: filters.positionIds! };
-      if ((filters.sectorIds?.length ?? 0) >= 2)
-        return { compareMode: 'sector', compareEntityIds: filters.sectorIds! };
-      return { compareMode: 'none', compareEntityIds: [] };
-    }
-
-    if (isPerson) {
-      // Skill comparison is client-derived from overview.bySector|byUser; the
-      // server doesn't support compare-by-skill.
-      if ((filters.skillIds?.length ?? 0) >= 2)
-        return { compareMode: 'skill', compareEntityIds: filters.skillIds! };
-      return { compareMode: 'none', compareEntityIds: [] };
+    for (const dim of SERIES_PRIORITY_BY_X[xAxisMode]) {
+      if (selectionOf[dim].length >= 2) {
+        // compareMode names mirror the dimension key 1:1.
+        return { compareMode: dim, compareEntityIds: selectionOf[dim] };
+      }
     }
     return { compareMode: 'none', compareEntityIds: [] };
-  }, [xAxisMode, yAxisMode, filters.userIds, filters.positionIds, filters.sectorIds, filters.skillIds]);
+  }, [
+    xAxisMode, yAxisMode,
+    filters.userIds, filters.positionIds, filters.sectorIds,
+    filters.skillIds, filters.topicIds, filters.assessmentIds,
+  ]);
 
   const chartRef = useRef<StatisticsChartHandle>(null);
   const radarRef = useRef<StatisticsRadarChartHandle>(null);
 
-  // Drill-down modal — opens when the user clicks a chart bar or a KPI card.
-  // `baseFiltersOverride` is a *partial* merged on top of apiFilters at render
-  // time, so callers can widen scope without re-stating the global filters.
-  // The "Taxa de Submissão" card needs this to flip `includeInProgress: true`,
-  // since PENDING/IN_PROGRESS entries are excluded from the default view.
-  const [modalOpen, setModalOpen] = useState(false);
-  const [clickContext, setClickContext] = useState<SkillStatsClickContext | null>(null);
-  const [baseFiltersOverride, setBaseFiltersOverride] = useState<Partial<SkillStatsBaseFilters> | null>(null);
+  // Unified drill-down modal with a navigation stack. Every entry point (chart
+  // mark, axis label, KPI card) opens a FRESH stack with a single view; the
+  // modal then pushes deeper views (Sobre → Dados → Avaliações) with a back
+  // button. This replaces the three former sibling modals.
+  //   • rubric  — "what is this" (description + contrary behaviour).
+  //   • stats   — the NUMBERS (per-topic averages + distribution).
+  //   • scores  — the raw evaluations behind a scope.
+  const [drillStack, setDrillStack] = useState<SkillDrilldownView[]>([]);
+  const pushDrillView = useCallback((view: SkillDrilldownView) => setDrillStack(s => [...s, view]), []);
+  const jumpDrillView = useCallback((index: number) => setDrillStack(s => s.slice(0, index + 1)), []);
+  const closeDrill = useCallback(() => setDrillStack([]), []);
+
+  // `override` is a *partial* merged on top of apiFilters at render time, so
+  // callers can widen scope without re-stating the global filters (e.g. the
+  // "Taxa de Submissão" card flips `includeInProgress: true`).
   const openModalWithContext = useCallback((
     ctx: SkillStatsClickContext | null,
     override?: Partial<SkillStatsBaseFilters>,
   ) => {
-    setClickContext(ctx);
-    setBaseFiltersOverride(override ?? null);
-    setModalOpen(true);
+    setDrillStack([{ kind: 'scores', context: ctx ?? {}, override: override ?? null }]);
   }, []);
 
-  // Two skill drill-downs, distinguished by WHERE the user clicked:
-  //   • DATA modal  — clicking inside the chart (a vertex/polygon tip or a bar).
-  //     Shows scores/distribution and drills into the evaluations themselves.
-  //   • INFO modal  — clicking the OUTER name label. Explains what the skill /
-  //     topic is (description + contrary behaviour), no scores.
-  const [topicsModalOpen, setTopicsModalOpen] = useState(false);
-  const [topicsModalSkill, setTopicsModalSkill] = useState<{ id: string; name: string } | null>(null);
+  // Both the chart mark AND the outer name label open the single SKILL DETAIL
+  // view — it now combines the description, contrary behaviour AND the live
+  // stats (distribution/responses/average) per topic. (topicId is no longer used
+  // for a separate rubric level; the topic's info lives in the skill detail.)
   const openSkillData = useCallback((skill: { id: string; name: string }) => {
-    setTopicsModalSkill(skill);
-    setTopicsModalOpen(true);
+    setDrillStack([{ kind: 'skill', skill }]);
   }, []);
-
-  const [infoModalOpen, setInfoModalOpen] = useState(false);
-  const [infoModalSkill, setInfoModalSkill] = useState<{ id: string; name: string } | null>(null);
-  const [infoModalTopicId, setInfoModalTopicId] = useState<string | null>(null);
-  const openSkillInfo = useCallback((skill: { id: string; name: string }, topicId?: string | null) => {
-    setInfoModalSkill(skill);
-    setInfoModalTopicId(topicId ?? null);
-    setInfoModalOpen(true);
+  const openSkillInfo = useCallback((skill: { id: string; name: string }, _topicId?: string | null) => {
+    setDrillStack([{ kind: 'skill', skill }]);
   }, []);
 
   // --- Derived flags ---
   const useEvolution  = xAxisMode === 'campaign';
   const useComparison =
-    (compareMode === 'sector' || compareMode === 'user') &&
-    (xAxisMode === 'skill' || xAxisMode === 'topic');
+    (xAxisMode === 'skill' || xAxisMode === 'topic') &&
+    (compareMode === 'sector' || compareMode === 'user' || compareMode === 'campaign');
   const useOverview = !useEvolution && !useComparison;
 
+  // X=campaign uses the evolution endpoint; sector/user/skill/topic become the
+  // per-line series, 'company' is the single-line fallback.
   const evolutionMode: SkillStatsEvolutionMode =
-    compareMode === 'sector' ? 'sector' : compareMode === 'user' ? 'user' : 'company';
+    compareMode === 'sector' ? 'sector'
+    : compareMode === 'user' ? 'user'
+    : compareMode === 'skill' ? 'skill'
+    : compareMode === 'topic' ? 'topic'
+    : 'company';
 
+  // X=skill/topic uses the comparison endpoint; sector/user/campaign map to the
+  // backend mode (position is client-derived via overview, so it routes through
+  // useOverview, not here).
   const comparisonMode: SkillStatsComparisonMode =
-    compareMode === 'sector' ? 'sector' : 'user';
+    compareMode === 'sector' ? 'sector'
+    : compareMode === 'campaign' ? 'campaign'
+    : 'user';
 
   // Position-compare is derived client-side from Overview's byUser, so it
   // routes through useOverview rather than useComparison. useComparison is
@@ -980,7 +1035,6 @@ export const HRSkillAssessmentStatisticsPage = () => {
 
   // --- Available options (derived from composition) ---
   const availableYs    = useMemo(() => availableYsFor(xAxisMode), [xAxisMode]);
-  const availableTypes = useMemo(() => availableChartTypesFor(xAxisMode, yAxisMode, compareMode), [xAxisMode, yAxisMode, compareMode]);
 
   // --- Auto-correct composition when an upstream axis changes ---
   useEffect(() => {
@@ -988,12 +1042,8 @@ export const HRSkillAssessmentStatisticsPage = () => {
   }, [availableYs, yAxisMode]);
 
   // compareMode is fully derived now — no auto-correct effect needed.
-
-  useEffect(() => {
-    if (!availableTypes.includes(chartType)) {
-      setChartType(availableTypes[0] ?? 'bar');
-    }
-  }, [availableTypes, chartType]);
+  // (availableTypes + its auto-snap live after the query data is resolved,
+  // since the radar ≥3 guard depends on the loaded category count.)
 
   // Trend line only makes sense for time/cartesian. Drop when switching off.
   useEffect(() => {
@@ -1060,6 +1110,34 @@ export const HRSkillAssessmentStatisticsPage = () => {
 
   const activeQuery = useComparison ? comparisonQuery : useEvolution ? evolutionQuery : overviewQuery;
 
+  // How many X categories (radar spokes) the current data resolves to — drives
+  // the radar ≥3 guard so a single skill/topic doesn't render a broken polygon
+  // (Image 2). Computed here because it depends on the loaded query data.
+  const categoryCount = useMemo(() => {
+    if (useComparison && comparison)
+      return xAxisMode === 'topic' ? comparison.topicAxis.length : comparison.axis.length;
+    if (overview) {
+      if (xAxisMode === 'skill') return overview.bySkill.length;
+      if (xAxisMode === 'topic') return overview.byTopic.length;
+      if (xAxisMode === 'sector') return overview.bySector.filter(s => s.overallAverage != null).length;
+      if (xAxisMode === 'user') return overview.byUser.filter(u => u.overallAverage != null).length;
+    }
+    return Infinity; // unknown (pre-load) — don't prematurely drop radar
+  }, [xAxisMode, useComparison, comparison, overview]);
+
+  const availableTypes = useMemo(
+    () => availableChartTypesFor(xAxisMode, yAxisMode, compareMode, categoryCount),
+    [xAxisMode, yAxisMode, compareMode, categoryCount],
+  );
+
+  // Snap to the first valid chart type whenever the current one becomes invalid
+  // (e.g. radar dropped because the data fell below 3 categories).
+  useEffect(() => {
+    if (!availableTypes.includes(chartType)) {
+      setChartType(availableTypes[0] ?? 'bar');
+    }
+  }, [availableTypes, chartType]);
+
   // --- KPI cards (always derived from Overview; comparison/evolution
   // still report the same overall counts since the backend returns the
   // same summary block on Overview).
@@ -1082,6 +1160,43 @@ export const HRSkillAssessmentStatisticsPage = () => {
     return c;
   }, [filters, xAxisModeRaw, yAxisMode]);
 
+  // ── Scope-aware "company average" label ──────────────────────────────────
+  // The single/benchmark series is the average over the ACTIVE scope, not
+  // necessarily the whole company. When the scope is narrowed to a single
+  // sector / position / collaborator, "Média da empresa" is misleading — relabel
+  // it "Média · <scope>". Names are resolved on demand only when exactly one of
+  // each is selected (a comparison would have ≥2, handled elsewhere).
+  const singleSectorId = filters.sectorIds?.length === 1 ? filters.sectorIds[0] : null;
+  const singlePositionId = filters.positionIds?.length === 1 ? filters.positionIds[0] : null;
+  const singleUserId = filters.userIds?.length === 1 ? filters.userIds[0] : null;
+
+  const { data: scopeSectorResp } = useQuery({
+    queryKey: ['skill-stats-scope-sector', singleSectorId],
+    queryFn: () => getSectors({ where: { id: singleSectorId }, limit: 1 } as any),
+    enabled: !!singleSectorId, staleTime: 5 * 60 * 1000,
+  });
+  const { data: scopePositionResp } = useQuery({
+    queryKey: ['skill-stats-scope-position', singlePositionId],
+    queryFn: () => getPositions({ where: { id: singlePositionId }, limit: 1 } as any),
+    enabled: !!singlePositionId, staleTime: 5 * 60 * 1000,
+  });
+  const { data: scopeUserResp } = useQuery({
+    queryKey: ['skill-stats-scope-user', singleUserId],
+    queryFn: () => getUsers({ where: { id: singleUserId }, limit: 1 } as any),
+    enabled: !!singleUserId, staleTime: 5 * 60 * 1000,
+  });
+
+  const companyLabel = useMemo(() => {
+    const parts: string[] = [];
+    const sectorName = singleSectorId ? (scopeSectorResp as any)?.data?.[0]?.name : null;
+    const positionName = singlePositionId ? (scopePositionResp as any)?.data?.[0]?.name : null;
+    const userName = singleUserId ? (scopeUserResp as any)?.data?.[0]?.name : null;
+    if (sectorName) parts.push(sectorName);
+    if (positionName) parts.push(positionName);
+    if (userName) parts.push(userName);
+    return parts.length ? `Média · ${parts.join(' · ')}` : 'Média da empresa';
+  }, [singleSectorId, singlePositionId, singleUserId, scopeSectorResp, scopePositionResp, scopeUserResp]);
+
   // ============================================================
   // Chart data builders — one per (X, Y, compare) family
   // ============================================================
@@ -1091,19 +1206,27 @@ export const HRSkillAssessmentStatisticsPage = () => {
   const radarView = useMemo(() => {
     if (!isRadarType(chartType)) return null;
     if (yAxisMode !== 'averageScore') return null;
-    if (xAxisMode !== 'skill' && xAxisMode !== 'topic') return null;
+    if (!['skill', 'topic', 'sector', 'user'].includes(xAxisMode)) return null;
 
     if (useOverview && overview) {
-      const points = xAxisMode === 'skill'
-        ? overview.bySkill.map(p => ({ name: p.skillName, value: p.average }))
-        : overview.byTopic.map(p => ({ name: p.topicTitle, value: p.average }));
+      // Spokes = the X categories. For people axes the spoke is the entity's
+      // overall average (short name for collaborators); for content axes it's
+      // the per-skill/topic average.
+      const points =
+        xAxisMode === 'skill' ? overview.bySkill.map(p => ({ name: p.skillName, value: p.average }))
+        : xAxisMode === 'topic' ? overview.byTopic.map(p => ({ name: p.topicTitle, value: p.average }))
+        : xAxisMode === 'sector' ? overview.bySector.filter(s => s.overallAverage != null).map(p => ({ name: p.sectorName, value: p.overallAverage }))
+        : [...overview.byUser].filter(u => u.overallAverage != null)
+            .sort((a, b) => (b.overallAverage ?? 0) - (a.overallAverage ?? 0))
+            .slice(0, TOP_N_USERS_DEFAULT)
+            .map(p => ({ name: shortPersonName(p.userName), value: p.overallAverage }));
       if (!points.length) return { indicators: [], series: [] };
       return {
         indicators: points.map(p => ({ name: p.name, max: 5 })),
         series: [
           {
             id: 'company',
-            name: 'Média da empresa',
+            name: companyLabel,
             values: points.map(p => p.value),
             color: CHART_COLORS[4],
           },
@@ -1127,7 +1250,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
       const overlay = comparison.companyAverage
         ? [{
             id: 'company-benchmark',
-            name: 'Média da empresa',
+            name: companyLabel,
             values: useTopic
               ? comparison.companyAverage.perTopicAverage.map(p => p.average)
               : comparison.companyAverage.perSkillAverage.map(p => p.average),
@@ -1139,7 +1262,37 @@ export const HRSkillAssessmentStatisticsPage = () => {
     }
 
     return { indicators: [], series: [] };
-  }, [chartType, yAxisMode, xAxisMode, useOverview, useComparison, overview, comparison]);
+  }, [chartType, yAxisMode, xAxisMode, useOverview, useComparison, overview, comparison, companyLabel]);
+
+  // Distribution as a single aggregate over the whole scope: the 6 score levels
+  // become pie slices / radar spokes. Counts are summed across every in-scope
+  // topic (the X grouping doesn't change the overall distribution). Powers the
+  // "Pizza" and per-level "Radar" options for Y=distribution.
+  const distributionView = useMemo(() => {
+    if (yAxisMode !== 'distribution' || !overview) return null;
+    const agg = [0, 0, 0, 0, 0, 0];
+    overview.topicDistribution.forEach(d => {
+      for (let i = 0; i < 6; i++) agg[i] += d.counts[i] ?? 0;
+    });
+    const total = agg.reduce((a, b) => a + b, 0);
+    if (total <= 0) return null;
+    const pieData = SCORE_LEVEL_LABELS.map((name, i) => ({ name, value: agg[i] }));
+    const maxCount = Math.max(...agg, 1);
+    return {
+      total,
+      pieData,
+      radar: {
+        indicators: SCORE_LEVEL_LABELS.map(name => ({ name, max: maxCount })),
+        series: [{ id: 'dist', name: 'Distribuição de notas', values: agg, color: CHART_COLORS[4] }],
+      },
+    };
+  }, [yAxisMode, overview]);
+
+  // Level → canonical 0–5 color map, used to paint the distribution pie slices.
+  const levelColorMap = useMemo(
+    () => SCORE_LEVEL_LABELS.reduce((m, lbl, i) => ({ ...m, [lbl]: SCORE_HEX[i] }), {} as Record<string, string>),
+    [],
+  );
 
   // Cartesian (bar/line/area/stacked) data. Each item is one X-category.
   // For multi-series we use `comparisons[]`; for distribution we encode the
@@ -1158,7 +1311,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
       comparisons?: Comp[];
       __primaryType?: 'skill' | 'topic' | 'sector' | 'user' | 'campaign';
       __primaryId?: string;
-      __secondaryType?: 'sector' | 'user' | 'position' | 'skill';
+      __secondaryType?: 'sector' | 'user' | 'position' | 'skill' | 'topic' | 'campaign';
     };
 
     // 1. Distribution — only X∈{topic, skill}, Y=distribution, compare=none.
@@ -1232,9 +1385,10 @@ export const HRSkillAssessmentStatisticsPage = () => {
       const series = evolution.series;
       const isMulti = series.length > 1;
       const seriesIsCompany = evolution.mode === 'company';
-      const secondaryType: 'sector' | 'user' | undefined = isMulti && !seriesIsCompany
-        ? (evolution.mode as 'sector' | 'user')
-        : undefined;
+      const secondaryType: 'sector' | 'user' | 'skill' | 'topic' | undefined =
+        isMulti && !seriesIsCompany
+          ? (evolution.mode as 'sector' | 'user' | 'skill' | 'topic')
+          : undefined;
       const items: Item[] = evolution.points.map(p => {
         const baseName = format(new Date(p.periodEnd), 'MMM/yy');
         const label = `${baseName} · ${p.assessmentName.slice(0, 22)}`;
@@ -1268,7 +1422,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
       const categories = useTopic
         ? comparison.topicAxis.map(t => ({ id: t.topicId, name: t.topicTitle }))
         : comparison.axis.map(s => ({ id: s.skillId, name: s.skillName }));
-      const secondaryType: 'sector' | 'user' = comparison.mode;
+      const secondaryType: 'sector' | 'user' | 'campaign' = comparison.mode;
       const items: Item[] = categories.map((cat, i) => ({
         name: cat.name,
         value: 0,
@@ -1282,7 +1436,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
           })),
           ...(comparison.companyAverage
             ? [{
-                entityName: 'Média da empresa',
+                entityName: companyLabel,
                 value: useTopic
                   ? +(comparison.companyAverage.perTopicAverage[i]?.average ?? 0).toFixed(2)
                   : +(comparison.companyAverage.perSkillAverage[i]?.average ?? 0).toFixed(2),
@@ -1405,7 +1559,8 @@ export const HRSkillAssessmentStatisticsPage = () => {
         .sort((a, b) => (b.overallAverage ?? 0) - (a.overallAverage ?? 0));
       const limit = filters.userIds?.length ? sorted.length : TOP_N_USERS_DEFAULT;
       const items: Item[] = sorted.slice(0, limit).map(u => ({
-        name: u.userName + (u.sectorName ? ` · ${u.sectorName}` : ''),
+        // No position/sector suffix on the X-axis label — just the name.
+        name: u.userName,
         value: +(u.overallAverage ?? 0).toFixed(2),
         __primaryType: 'user', __primaryId: u.userId,
       }));
@@ -1459,6 +1614,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
   }, [
     chartType, xAxisMode, yAxisMode, compareMode, useComparison, useOverview,
     overview, comparison, evolution, filters.skillIds, filters.topicIds, filters.userIds,
+    companyLabel,
   ]);
 
   // Map our SkillStatsChartType to StatisticsChartType used by StatisticsChart.
@@ -1476,6 +1632,29 @@ export const HRSkillAssessmentStatisticsPage = () => {
     // volume / distribution → integer counts
     return formatNumber(Math.round(value));
   }, [yAxisMode]);
+
+  // Open the per-RESPONSE list behind a score band (pie slice / distribution
+  // radar spoke / stacked segment). Scoped to a single selected skill/topic when
+  // present, so the list shows exactly the collaborators × topics with that score.
+  // Declared before the click handlers that depend on it (avoids a TDZ error in
+  // their useCallback dependency arrays).
+  const openScoreBand = useCallback((level: number) => {
+    if (level < 0 || level > 5) return;
+    let primary: SkillStatsClickContext['primary'] | undefined;
+    if (filters.topicIds?.length === 1) {
+      const t = overview?.byTopic.find(x => x.topicId === filters.topicIds![0]);
+      if (t) primary = { type: 'topic', id: t.topicId, name: t.topicTitle };
+    } else if (filters.skillIds?.length === 1) {
+      const s = overview?.bySkill.find(x => x.skillId === filters.skillIds![0]);
+      if (s) primary = { type: 'skill', id: s.skillId, name: s.skillName };
+    }
+    openModalWithContext({ ...(primary ? { primary } : {}), score: level });
+  }, [openModalWithContext, filters.skillIds, filters.topicIds, overview]);
+
+  const handlePieClick = useCallback(
+    (_dataIndex: number, name: string) => openScoreBand(SCORE_LEVEL_LABELS.indexOf(name)),
+    [openScoreBand],
+  );
 
   // Chart click → drill-down modal.
   //
@@ -1509,6 +1688,14 @@ export const HRSkillAssessmentStatisticsPage = () => {
       return;
     }
 
+    // Distribution: clicking a single colored band ("Atende: 4") opens the
+    // scores list filtered to exactly that 0–5 score for the clicked skill/topic.
+    if (yAxisMode === 'distribution') {
+      const level = SCORE_LEVEL_LABELS.indexOf(seriesName);
+      openModalWithContext(level >= 0 ? { primary, score: level } : { primary });
+      return;
+    }
+
     // A click on a skill bar (single-series view) drills into that skill's data
     // (scores) rather than the raw entries list.
     if (primary?.type === 'skill' && !item.__secondaryType) {
@@ -1520,8 +1707,8 @@ export const HRSkillAssessmentStatisticsPage = () => {
     const secondaryType = item.__secondaryType;
     if (secondaryType && seriesName && Array.isArray(item.comparisons)) {
       const comp = item.comparisons.find((c: any) => c.entityName === seriesName);
-      // The "Média da empresa" overlay has no entityId — skip narrowing for it.
-      if (comp && comp.entityName !== 'Média da empresa') {
+      // The scope-average overlay has no entityId — skip narrowing for it.
+      if (comp && comp.entityName !== companyLabel) {
         if (secondaryType === 'position') {
           secondary = { type: 'position', name: comp.entityName };
         } else if (comp.entityId) {
@@ -1535,7 +1722,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
     }
 
     openModalWithContext({ primary, secondary });
-  }, [cartesianView, openModalWithContext, openSkillData, openSkillInfo, overview]);
+  }, [cartesianView, openModalWithContext, openSkillData, openSkillInfo, overview, yAxisMode, companyLabel]);
 
   // Radar clicks. The indicator name is a skill name (X='skill') or a topic
   // title (X='topic'); resolve it back to an id via the overview data. `region`
@@ -1544,6 +1731,11 @@ export const HRSkillAssessmentStatisticsPage = () => {
   // behaviour and scores), so the label is the more discoverable target.
   const handleIndicatorClick = useCallback((name: string, _index: number, region: 'vertex' | 'label') => {
     if (!overview) return;
+    // Distribution radar: the spokes are the 6 score levels → drill the band.
+    if (yAxisMode === 'distribution') {
+      openScoreBand(SCORE_LEVEL_LABELS.indexOf(name));
+      return;
+    }
     if (xAxisMode === 'skill') {
       const skill = overview.bySkill.find(s => s.skillName === name);
       if (!skill) return;
@@ -1561,8 +1753,20 @@ export const HRSkillAssessmentStatisticsPage = () => {
       } else {
         openModalWithContext({ primary: { type: 'topic', id: topic.topicId, name: topic.topicTitle } });
       }
+      return;
     }
-  }, [overview, xAxisMode, openSkillData, openSkillInfo, openModalWithContext]);
+    if (xAxisMode === 'sector') {
+      const s = overview.bySector.find(x => x.sectorName === name);
+      if (s) openModalWithContext({ primary: { type: 'sector', id: s.sectorId, name: s.sectorName } });
+      return;
+    }
+    if (xAxisMode === 'user') {
+      // Radar spokes use the short name; match it back to the full user.
+      const u = overview.byUser.find(x => shortPersonName(x.userName) === name);
+      if (u) openModalWithContext({ primary: { type: 'user', id: u.userId, name: u.userName } });
+      return;
+    }
+  }, [overview, xAxisMode, yAxisMode, openSkillData, openSkillInfo, openModalWithContext, openScoreBand]);
 
   // ============================================================
   // Exports
@@ -1800,20 +2004,70 @@ export const HRSkillAssessmentStatisticsPage = () => {
       );
     }
 
-    // Radar branch
+    // Pie branch. Y=distribution → aggregate 6-level pizza (slice = score band).
+    // averageScore (setor/colaborador) → one slice per entity (share of average).
+    if (isPieType(chartType)) {
+      if (yAxisMode === 'distribution') {
+        if (!distributionView) return renderEmpty('Sem respostas no escopo atual para a distribuição.');
+        return (
+          <div className="flex-1 min-h-0">
+            <StatisticsChart
+              ref={chartRef}
+              data={distributionView.pieData}
+              chartType="pie"
+              yAxisMode="count"
+              isComparisonMode={false}
+              height="100%"
+              valueFormatter={valueFormatter}
+              seriesColors={{ ...levelColorMap, ...seriesColors }}
+              onDataPointClick={handlePieClick}
+            />
+          </div>
+        );
+      }
+      if (!cartesianView || !cartesianView.items.length) {
+        return renderEmpty('Nenhum dado para a composição atual. Ajuste os filtros.');
+      }
+      const piePalette = cartesianView.items.reduce(
+        (m, it, i) => ({ ...m, [it.name]: CHART_COLORS[i % CHART_COLORS.length] }),
+        {} as Record<string, string>,
+      );
+      return (
+        <div className="flex-1 min-h-0">
+          <StatisticsChart
+            ref={chartRef}
+            data={cartesianView.items.map(it => ({ name: it.name, value: it.value }))}
+            chartType="pie"
+            yAxisMode="count"
+            isComparisonMode={false}
+            height="100%"
+            valueFormatter={(v: number) => v.toFixed(2)}
+            seriesColors={{ ...piePalette, ...seriesColors }}
+            onDataPointClick={handleChartClick}
+          />
+        </div>
+      );
+    }
+
+    // Radar branch. For Y=distribution the spokes are the 6 score levels (a
+    // single aggregate polygon); otherwise it's the per-entity averageScore.
     if (isRadarType(chartType)) {
-      if (!radarView || !radarView.indicators.length || !radarView.series.length) {
+      const rv = yAxisMode === 'distribution' ? distributionView?.radar ?? null : radarView;
+      if (!rv || !rv.indicators.length || !rv.series.length) {
         return renderEmpty('Ajuste os filtros ou aguarde a primeira campanha ser finalizada.');
       }
+      const radarClickable =
+        (yAxisMode === 'averageScore' && ['skill', 'topic', 'sector', 'user'].includes(xAxisMode)) ||
+        yAxisMode === 'distribution';
       return (
         <div className="flex-1 min-h-0">
           <StatisticsRadarChart
             ref={radarRef}
-            indicators={radarView.indicators}
-            series={radarView.series}
+            indicators={rv.indicators}
+            series={rv.series}
             shape={radarShapeOf(chartType)}
             height="100%"
-            onIndicatorClick={(xAxisMode === 'skill' || xAxisMode === 'topic') ? handleIndicatorClick : undefined}
+            onIndicatorClick={radarClickable ? handleIndicatorClick : undefined}
             hiddenSeries={hiddenSeries}
             onToggleSeries={toggleHiddenSeries}
             seriesColors={seriesColors}
@@ -1827,22 +2081,44 @@ export const HRSkillAssessmentStatisticsPage = () => {
     if (!cartesianView || !cartesianView.items.length) {
       return renderEmpty('Nenhum dado para a composição atual. Ajuste os filtros.');
     }
-    // Single-series skill/topic averages ARE the company-wide average across
-    // the scope — name the series "Média da empresa" so the bar matches the
-    // radar (which already labels it that way). Other views keep the metric
-    // label. (yAxisLabel here only drives the legend/series name.)
+    // Single-series skill/topic averages ARE the average across the active
+    // scope — label it with the scope-aware companyLabel (e.g. "Média · <Setor>"
+    // when a sector is selected) so the bar matches the radar. Other views keep
+    // the metric label. (yAxisLabel here only drives the legend/series name.)
     const seriesLabel =
       !cartesianView.isComparison && yAxisMode === 'averageScore' && (xAxisMode === 'skill' || xAxisMode === 'topic')
-        ? 'Média da empresa'
+        ? companyLabel
         : cartesianView.axisLabel;
 
-    // Colour score values with the canonical 0–5 palette so the chart matches
-    // the ScoreBadge / distribution colours elsewhere:
-    //  • averageScore single-series → colour each bar by its score band.
-    //  • distribution → colour the 6 score-level series (0=roxo … 5=verde),
-    //    user overrides still win.
+    // Single-series average over a categorical X (competência/tópico/setor/
+    // colaborador): give each bar its own color + a composite legend entry
+    // "Média <Escopo> - <Categoria>" (e.g. "Média da empresa - Produtividade").
+    // Time (campaign) stays a single line, so it's excluded.
+    const isSingleAverage =
+      !cartesianView.isComparison && yAxisMode === 'averageScore' && xAxisMode !== 'campaign';
+    const legendPrefix = companyLabel.replace('· ', ''); // "Média · João" → "Média João"
+    const categoryLegend = isSingleAverage
+      ? cartesianView.items.map((it, i) => {
+          // People axes (colaborador/setor): the bar IS that entity's average,
+          // so label "Média <entidade>" — short first+second name for people, no
+          // position suffix. Content axes (competência/tópico): "<escopo> - <cat>".
+          let label: string;
+          if (xAxisMode === 'user') {
+            label = `Média ${shortPersonName(it.name.split(' · ')[0])}`;
+          } else if (xAxisMode === 'sector') {
+            label = `Média ${it.name}`;
+          } else {
+            label = `${legendPrefix} - ${it.name}`;
+          }
+          return { label, color: CHART_COLORS[i % CHART_COLORS.length] };
+        })
+      : undefined;
+    const primaryLabel = categoryLegend ? 'Média' : seriesLabel;
+
+    // Score-band per-bar coloring only when we're NOT using the composite
+    // per-category legend (which supplies its own distinct colors).
     const valueColor =
-      yAxisMode === 'averageScore' && !cartesianView.isComparison
+      yAxisMode === 'averageScore' && !cartesianView.isComparison && !categoryLegend
         ? (v: number) => getScoreHex(v)
         : undefined;
     const chartSeriesColors =
@@ -1865,8 +2141,8 @@ export const HRSkillAssessmentStatisticsPage = () => {
             yAxisMode={effectiveYAxisMode}
             isComparisonMode={cartesianView.isComparison}
             height="100%"
-            yAxisLabel={seriesLabel}
-            tooltipLabels={{ primary: seriesLabel }}
+            yAxisLabel={primaryLabel}
+            tooltipLabels={{ primary: primaryLabel }}
             valueFormatter={valueFormatter}
             trendLine={trendLine}
             onDataPointClick={handleChartClick}
@@ -1876,6 +2152,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
             tooltipTrigger={cartesianView.isComparison ? 'item' : 'axis'}
             categoryBands={xAxisMode === 'skill' || xAxisMode === 'topic'}
             valueColor={valueColor}
+            categoryLegend={categoryLegend}
             hiddenSeries={hiddenSeries}
             onToggleSeries={toggleHiddenSeries}
             seriesColors={chartSeriesColors}
@@ -2110,7 +2387,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
                   : formatAvg(summary.overallAverage)
               }
               icon={IconStar}
-              subtitle="escala 0–5"
+              subtitle={companyLabel === 'Média da empresa' ? 'escala 0–5' : `0–5 · ${companyLabel.replace(/^Média · /, '')}`}
               onClick={openAverageDrilldown}
               disabled={!canDrillAverage}
             />
@@ -2187,32 +2464,14 @@ export const HRSkillAssessmentStatisticsPage = () => {
         }}
       />
 
-      <SkillStatsEntriesModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        context={clickContext}
-        baseFilters={baseFiltersOverride
-          ? { ...apiFilters, ...baseFiltersOverride }
-          : apiFilters}
-      />
-
-      <SkillTopicsModal
-        open={topicsModalOpen}
-        onOpenChange={setTopicsModalOpen}
-        skill={topicsModalSkill}
+      <SkillDrilldownModal
+        stack={drillStack}
         byTopic={overview?.byTopic ?? []}
         topicDistribution={overview?.topicDistribution ?? []}
-        onTopicClick={topic => {
-          setTopicsModalOpen(false);
-          openModalWithContext({ primary: { type: 'topic', id: topic.id, name: topic.name } });
-        }}
-      />
-
-      <SkillInfoModal
-        open={infoModalOpen}
-        onOpenChange={setInfoModalOpen}
-        skill={infoModalSkill}
-        highlightTopicId={infoModalTopicId}
+        baseFilters={apiFilters}
+        onPush={pushDrillView}
+        onJump={jumpDrillView}
+        onClose={closeDrill}
       />
     </div>
   );

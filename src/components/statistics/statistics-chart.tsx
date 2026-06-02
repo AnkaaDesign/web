@@ -93,6 +93,14 @@ interface StatisticsChartProps {
    * its 0–5 score band). When it returns undefined the series colour is used.
    */
   valueColor?: (value: number) => string | undefined;
+  /**
+   * Single-series only: give EACH bar (one per category) its own color and a
+   * composite legend entry. Parallel to `data` by index. When set, it takes
+   * precedence over `valueColor` and replaces the lone series legend with one
+   * display-only entry per bar. Used by the skill-assessment page to render
+   * "Média <Escopo> - <Categoria>" legends with distinct colors per bar.
+   */
+  categoryLegend?: Array<{ label: string; color: string }>;
 }
 
 // Lighten a #rrggbb color toward white by `amt` (0..1). Used for the bar
@@ -209,6 +217,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   seriesColors: seriesColorsProp,
   onSeriesColorChange,
   valueColor,
+  categoryLegend,
 }, externalRef) {
   const smooth = chartType === 'line-smooth' || chartType === 'area-smooth';
   const baseChartType = chartType === 'line-smooth' ? 'line' : chartType === 'area-smooth' ? 'area' : chartType;
@@ -699,7 +708,14 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
         color: CHART_COLORS,
         series: [{
           type: 'pie', radius: '60%',
-          data: data.map(item => ({ name: item.name, value: getItemValue(item) })),
+          // Per-slice color via colorOf so callers can pin a palette (e.g. the
+          // 0–5 score-band colors for a distribution pie); falls back to the
+          // default rotating palette, matching prior behaviour when unset.
+          data: data.map((item, i) => ({
+            name: item.name,
+            value: getItemValue(item),
+            itemStyle: { color: colorOf(item.name, CHART_COLORS[i % CHART_COLORS.length]) },
+          })),
           emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } },
           label: { formatter: (params: any) => `${params.name}: ${valueFormatter(params.value, yAxisMode)}`, color: textColor },
         }],
@@ -968,7 +984,24 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       series = [{ ...baseSeriesOptions, type: 'line', smooth, lineStyle: { width: 2, color: simpleColor }, label: pointLabel }];
     else if (baseChartType === 'area')
       series = [{ ...baseSeriesOptions, type: 'line', smooth, areaStyle: { opacity: 0.45, color: simpleColor }, lineStyle: { width: 2, color: simpleColor }, label: pointLabel }];
-    else if (valueColor) {
+    else if (categoryLegend) {
+      // One distinct color per bar (one bar = one category). colorOf lets the
+      // legend's color picker override per bar; hiding a legend entry blanks its
+      // bar (value → null) just like toggling a series elsewhere.
+      const barData = seriesData.map((it: any, i: number) => {
+        const entry = categoryLegend[i];
+        const label = entry?.label ?? '';
+        const c = colorOf(label, entry?.color ?? simpleColor);
+        const hidden = hiddenSeries.has(label);
+        return {
+          ...it,
+          value: hidden ? null : it.value,
+          itemStyle: { color: c },
+          emphasis: { itemStyle: { color: lightenColor(c) } },
+        };
+      });
+      series = [{ ...baseSeriesOptions, data: barData, type: 'bar', label: barLabel, emphasis: { focus: 'none' } }];
+    } else if (valueColor) {
       // Colour each bar by its own value (e.g. 0–5 score band); each bar
       // lightens its OWN colour on hover.
       const barData = seriesData.map((it: any) => {
@@ -986,7 +1019,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       color: CHART_COLORS, dataZoom,
       series: [...categoryBandSeries, ...yearBandSeries, ...goalLineSeries, ...trendSeries, ...series],
     };
-  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType, tooltipTrigger, categoryBands, valueColor]);
+  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType, tooltipTrigger, categoryBands, valueColor, categoryLegend]);
 
   const onEvents = useMemo((): Record<string, (params: any) => void> => {
     if (!hasClickHandler) return {};
@@ -1006,13 +1039,50 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
         }
         const idx = typeof val === 'number' ? val : categories.indexOf(String(val));
         if (idx >= 0 && idx < categories.length) {
-          hoveredRef.current = { idx, name: String(categories[idx] ?? ''), series: '' };
+          // Preserve the series set by `mouseover` while the pointer stays in
+          // the SAME category — otherwise the constant axis-pointer updates wipe
+          // it and a click on a specific grouped bar collapses to category-level
+          // (which broke per-series drill-downs, e.g. clicking one collaborator's
+          // column). Series is reset only when the category changes.
+          const prev = hoveredRef.current;
+          hoveredRef.current = {
+            idx,
+            name: String(categories[idx] ?? ''),
+            series: prev && prev.idx === idx ? prev.series : '',
+          };
         } else {
           hoveredRef.current = null;
         }
       },
       mouseover: (params: any) => {
         if (params.componentType === 'series' && params.dataIndex != null) {
+          hoveredRef.current = {
+            idx: params.dataIndex,
+            name: params.name ?? hoveredRef.current?.name ?? '',
+            series: params.seriesName ?? '',
+          };
+        }
+      },
+      // Leaving a specific bar drops back to category-level (so the empty band /
+      // axis label opens the broad modal), while staying inside the bar keeps the
+      // series for a precise drill-down.
+      mouseout: (params: any) => {
+        if (params.componentType === 'series' && hoveredRef.current) {
+          hoveredRef.current = { ...hoveredRef.current, series: '' };
+        }
+      },
+      // Pie has no cartesian axis, so the zrender pixel→category resolver can't
+      // fire for it — wire a direct series click so a slice opens its drill-down.
+      click: (params: any) => {
+        if (params.componentType === 'series' && params.seriesType === 'pie') {
+          onDataPointClickRef.current?.(params.dataIndex ?? 0, String(params.name ?? ''), String(params.name ?? ''), 'plot');
+          return;
+        }
+        // For grouped bars/lines, ECharts' series click fires just BEFORE the
+        // zrender click below — record the exact clicked series so the drill-down
+        // resolves the right one (e.g. WHICH campaign in a 2-campaign comparison),
+        // instead of collapsing to the category.
+        if (params.componentType === 'series' && typeof params.dataIndex === 'number') {
           hoveredRef.current = {
             idx: params.dataIndex,
             name: params.name ?? hoveredRef.current?.name ?? '',
@@ -1029,12 +1099,19 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   // Pie has its own built-in legend. Every other mode uses the unified custom
   // legend below — series name + color swatch (click → color picker) + label
   // click toggles visibility.
+  // Category-legend mode: one entry per bar (single series only). It flows
+  // through the SAME interactive legend below (color picker + visibility toggle).
+  const useCategoryLegend = !!categoryLegend && !isComparisonMode && baseChartType !== 'pie';
   const showCustomLegend = baseChartType !== 'pie';
 
   // Build the list of legend items mirroring the series the option actually
   // adds, in the same order they appear.
   const legendItems = useMemo(() => {
     if (!data?.length || baseChartType === 'pie') return [] as Array<{ name: string; color: string; seriesType: 'bar' | 'line' | 'dashed' }>;
+    if (useCategoryLegend && categoryLegend) {
+      // One entry per bar; colorOf lets the picker override the default color.
+      return categoryLegend.map(it => ({ name: it.label, color: colorOf(it.label, it.color), seriesType: 'bar' as const }));
+    }
     const items: Array<{ name: string; color: string; seriesType: 'bar' | 'line' | 'dashed' }> = [];
     const push = (name: string, fallback: string, seriesType: 'bar' | 'line' | 'dashed' = 'bar') =>
       items.push({ name, color: colorOf(name, fallback), seriesType });
@@ -1076,7 +1153,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       push(effectiveGoalLabel, '#10b981', 'dashed');
     }
     return items;
-  }, [data, baseChartType, yAxisMode, isComparisonMode, tooltipLabels, yAxisLabel, trendLine, trendLabels, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, colorOf, usePerPeriod, usePerPeriodSecondary, primaryChartType, secondaryChartType]);
+  }, [data, baseChartType, yAxisMode, isComparisonMode, tooltipLabels, yAxisLabel, trendLine, trendLabels, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, colorOf, usePerPeriod, usePerPeriodSecondary, primaryChartType, secondaryChartType, useCategoryLegend, categoryLegend]);
 
   // Drop hidden entries that no longer exist (e.g. after switching modes).
   // Only for internal state — when the parent controls hiddenSeries it owns the
@@ -1207,16 +1284,16 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
                       style={{ opacity: alpha }}
                     >
                       {item.seriesType === 'bar' ? (
-                        <svg width="14" height="14" viewBox="0 0 14 14">
-                          <rect x="1" y="3" width="12" height="11" rx="1" fill={item.color} />
+                        <svg width="14" height="14" viewBox="0 0 14 14" className="block">
+                          <rect x="1" y="1" width="12" height="12" rx="2" fill={item.color} />
                         </svg>
                       ) : item.seriesType === 'line' ? (
-                        <svg width="22" height="12" viewBox="0 0 22 12">
+                        <svg width="22" height="12" viewBox="0 0 22 12" className="block">
                           <line x1="0" y1="6" x2="22" y2="6" stroke={item.color} strokeWidth="2" />
                           <circle cx="11" cy="6" r="3.5" fill={item.color} />
                         </svg>
                       ) : (
-                        <svg width="22" height="12" viewBox="0 0 22 12">
+                        <svg width="22" height="12" viewBox="0 0 22 12" className="block">
                           <line x1="0" y1="6" x2="22" y2="6" stroke={item.color} strokeWidth="2" strokeDasharray="5 3" />
                         </svg>
                       )}

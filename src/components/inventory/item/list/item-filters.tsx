@@ -12,8 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Combobox } from "@/components/ui/combobox";
-import { STOCK_LEVEL, STOCK_LEVEL_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
+import { STOCK_LEVEL, STOCK_LEVEL_LABELS, ITEM_CATEGORY_TYPE, ACCOUNTING_TYPE, ACCOUNTING_TYPE_LABELS } from "../../../../constants";
 import { getStockLevelTextColor } from "../../../../utils";
 import { getItemCategories, getItemBrands, getSuppliers } from "../../../../api-client";
 
@@ -37,6 +38,10 @@ interface FilterState {
   categoryIds?: string[];
   brandIds?: string[];
   supplierIds?: string[];
+
+  // Accounting / review filters
+  accountingTypes?: string[];
+  categoryReviewNeeded?: boolean;
 
   // Range filters
   quantityRange?: { min?: number; max?: number };
@@ -80,6 +85,16 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
       measureTypes: filters.measureTypes || [],
       quantityRange: filters.quantityRange,
       totalPriceRange: filters.totalPriceRange,
+      accountingTypes: (filters as any).accountingTypes
+        ? (Array.isArray((filters as any).accountingTypes) ? (filters as any).accountingTypes : [(filters as any).accountingTypes])
+        : where.category?.accountingType?.in
+        ? (where.category.accountingType.in as string[])
+        : [],
+      categoryReviewNeeded: typeof (filters as any).categoryReviewNeeded === "boolean"
+        ? (filters as any).categoryReviewNeeded
+        : typeof where.categoryReviewNeeded === "boolean"
+        ? where.categoryReviewNeeded
+        : undefined,
     });
   }, [open, filters]); // Depend on filters to reinitialize when they change
 
@@ -231,6 +246,10 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
     // Entity filters - these go at the root level, not in where clause
     if (localState.categoryIds && localState.categoryIds.length > 0) {
       newFilters.categoryIds = localState.categoryIds;
+      // Include the whole subtree (a top Categoria selection should also match its Subcategorias).
+      (newFilters as any).includeSubcategories = true;
+    } else {
+      delete (newFilters as any).includeSubcategories;
     }
     if (localState.brandIds && localState.brandIds.length > 0) {
       newFilters.brandIds = localState.brandIds;
@@ -245,6 +264,16 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
     }
     if (localState.measureTypes && localState.measureTypes.length > 0) {
       newFilters.measureTypes = localState.measureTypes;
+    }
+
+    // Accounting type filter (rolled up from the item's category).
+    if (localState.accountingTypes && localState.accountingTypes.length > 0) {
+      where.category = { ...(where.category || {}), accountingType: { in: localState.accountingTypes } };
+    }
+
+    // "A revisar" flag filter.
+    if (localState.categoryReviewNeeded) {
+      where.categoryReviewNeeded = true;
     }
 
     if (Object.keys(where).length > 0) {
@@ -281,6 +310,8 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
     if (localState.categoryIds?.length) count++;
     if (localState.brandIds?.length) count++;
     if (localState.supplierIds?.length) count++;
+    if (localState.accountingTypes?.length) count++;
+    if (localState.categoryReviewNeeded) count++;
     if (localState.measureUnits?.length) count++;
     if (localState.measureTypes?.length) count++;
     if (localState.quantityRange?.min || localState.quantityRange?.max) count++;
@@ -457,9 +488,48 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
             />
             {localState.categoryIds && localState.categoryIds.length > 0 && (
               <div className="text-xs text-muted-foreground">
-                {localState.categoryIds.length} categoria{localState.categoryIds.length !== 1 ? "s" : ""} selecionada{localState.categoryIds.length !== 1 ? "s" : ""}
+                {localState.categoryIds.length} categoria{localState.categoryIds.length !== 1 ? "s" : ""} selecionada{localState.categoryIds.length !== 1 ? "s" : ""} (inclui subcategorias)
               </div>
             )}
+          </div>
+
+          {/* Accounting Type Filter */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <IconCurrencyDollar className="h-4 w-4" />
+              Tipo Contábil
+            </Label>
+            <Combobox
+              options={Object.values(ACCOUNTING_TYPE).map((type) => ({ value: type, label: ACCOUNTING_TYPE_LABELS[type] }))}
+              value={localState.accountingTypes || []}
+              onValueChange={(value) => {
+                const arr = (value as string[]) || [];
+                setLocalState((prev) => ({ ...prev, accountingTypes: arr.length > 0 ? arr : undefined }));
+              }}
+              placeholder="Selecione tipos contábeis..."
+              emptyText="Nenhum tipo contábil"
+              searchPlaceholder="Buscar tipo contábil..."
+              mode="multiple"
+              minSearchLength={0}
+            />
+            {localState.accountingTypes && localState.accountingTypes.length > 0 && (
+              <div className="text-xs text-muted-foreground">
+                {localState.accountingTypes.length} tipo{localState.accountingTypes.length !== 1 ? "s" : ""} selecionado{localState.accountingTypes.length !== 1 ? "s" : ""}
+              </div>
+            )}
+          </div>
+
+          {/* Category review-needed Filter */}
+          <div className="flex items-center justify-between">
+            <Label htmlFor="categoryReviewNeeded" className="text-sm font-normal text-amber-600 dark:text-amber-400 flex items-center gap-2">
+              <IconAlertTriangleFilled className="h-4 w-4" />
+              Categoria a revisar
+            </Label>
+            <Switch
+              id="categoryReviewNeeded"
+              checked={localState.categoryReviewNeeded ?? false}
+              onCheckedChange={(checked) => setLocalState((prev) => ({ ...prev, categoryReviewNeeded: checked || undefined }))}
+            />
           </div>
 
           {/* Brand Filter */}

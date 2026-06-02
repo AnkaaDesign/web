@@ -54,7 +54,12 @@ import {
   useDeleteReconciliationCategory,
 } from "@/hooks/financial/use-reconciliation";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { SECTOR_PRIVILEGES, routes } from "@/constants";
+import { getAccountingTypeLabel } from "@/components/financial/reconciliation/match-status-badge";
+import {
+  SECTOR_PRIVILEGES,
+  routes,
+  ACCOUNTING_TYPE_LABELS,
+} from "@/constants";
 import type {
   CreateTransactionCategoryPayload,
   TransactionCategory,
@@ -70,6 +75,15 @@ const KIND_LABEL: Record<TransactionCategoryKind, string> = {
   TRANSACTION_ONLY: "Transação",
 };
 
+// Trailing group label for categories with no accounting type assigned yet.
+const NO_ACCOUNTING_GROUP = "Sem grupo contábil";
+
+// Select options for the accounting type (cost group) picker in the editor,
+// derived from the foundation's label map so the 13 groups stay in sync.
+const ACCOUNTING_TYPE_OPTIONS = Object.entries(
+  ACCOUNTING_TYPE_LABELS as Record<string, string>,
+).map(([value, label]) => ({ value, label }));
+
 // Grouping order for the list: editable transaction categories first, then
 // services, then item-derived (read-only mirrors). Drives the primary sort.
 const KIND_ORDER: Record<TransactionCategoryKind, number> = {
@@ -78,11 +92,18 @@ const KIND_ORDER: Record<TransactionCategoryKind, number> = {
   ITEM_DERIVED: 2,
 };
 
+// Resolves a category's accounting-type group label (the chart-of-accounts
+// cost group), falling back to a trailing "no group" bucket.
+const accountingGroupOf = (c: TransactionCategory) =>
+  getAccountingTypeLabel(c) ?? NO_ACCOUNTING_GROUP;
+
 // Default multi-column sort applied on first load (no sort in the URL):
-// type (Transação → Serviço → Item) → recurring first → name A→Z. Matches the
-// interactive sort headers below so clicking a column refines from here.
-// Module-level constant keeps a stable reference for useTableState/useMemo.
+// accounting type (cost group A→Z, ungrouped last) → kind → recurring first →
+// name A→Z. Matches the interactive sort headers below so clicking a column
+// refines from here. Module-level constant keeps a stable reference for
+// useTableState/useMemo.
 const DEFAULT_SORT: Array<{ column: string; direction: "asc" | "desc" }> = [
+  { column: "accountingType", direction: "asc" },
   { column: "kind", direction: "asc" },
   { column: "isRecurring", direction: "desc" },
   { column: "name", direction: "asc" },
@@ -90,12 +111,17 @@ const DEFAULT_SORT: Array<{ column: string; direction: "asc" | "desc" }> = [
 
 // Per-column sort key extractors. Returns a comparable primitive so the same
 // comparator handles every sortable column (enums map to their group order).
+// Ungrouped categories sort after grouped ones via a high-codepoint sentinel.
 const SORT_ACCESSORS: Record<
   string,
   (c: TransactionCategory) => number | string
 > = {
   name: c => c.name,
   kind: c => KIND_ORDER[c.kind],
+  accountingType: c => {
+    const g = accountingGroupOf(c);
+    return g === NO_ACCOUNTING_GROUP ? "￿" : g;
+  },
   isRecurring: c => (c.isRecurring ? 1 : 0),
   isActive: c => (c.isActive ? 1 : 0),
 };
@@ -186,7 +212,8 @@ export const ReconciliationCategoriesListPage = () => {
     return sorted.filter(
       c =>
         c.name.toLowerCase().includes(q) ||
-        KIND_LABEL[c.kind].toLowerCase().includes(q),
+        KIND_LABEL[c.kind].toLowerCase().includes(q) ||
+        accountingGroupOf(c).toLowerCase().includes(q),
     );
   }, [sorted, searchText]);
 
@@ -257,7 +284,7 @@ export const ReconciliationCategoriesListPage = () => {
     {
       key: "kind",
       header: "Tipo",
-      width: "180px",
+      width: "150px",
       sortable: true,
       render: c => (
         <span className={c.isActive ? "" : "opacity-50"}>
@@ -266,6 +293,22 @@ export const ReconciliationCategoriesListPage = () => {
           </Badge>
         </span>
       ),
+    },
+    {
+      key: "accountingType",
+      header: "Grupo contábil",
+      width: "200px",
+      sortable: true,
+      render: c => {
+        const label = getAccountingTypeLabel(c);
+        return label ? (
+          <span className={`text-sm ${c.isActive ? "" : "opacity-50"}`}>
+            {label}
+          </span>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        );
+      },
     },
     {
       key: "isRecurring",
@@ -513,6 +556,8 @@ function CategoryEditorDialog({
   );
   const [isRecurring, setIsRecurring] = useState(false);
   const [color, setColor] = useState("");
+  // Accounting type (chart-of-accounts cost group). Empty string = unset.
+  const [accountingType, setAccountingType] = useState("");
   const colorInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -522,17 +567,25 @@ function CategoryEditorDialog({
       setKind(category.kind === "SERVICE" ? "SERVICE" : "TRANSACTION_ONLY");
       setIsRecurring(category.isRecurring);
       setColor(category.color ?? "");
+      setAccountingType(
+        (category as { accountingType?: string | null }).accountingType ?? "",
+      );
     } else {
       setName("");
       setKind("TRANSACTION_ONLY");
       setIsRecurring(false);
       setColor("");
+      setAccountingType("");
     }
   }, [open, category]);
 
   const handleSubmit = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
+    // accountingType is sent alongside the documented fields; the foundation
+    // track owns the payload types, so it's attached via a cast until those
+    // land. null clears the cost group.
+    const accountingField = { accountingType: accountingType || null };
     // isResolving is intentionally omitted — the backend defaults it by kind
     // (TRANSACTION_ONLY ⇒ resolves) when not provided.
     if (isEdit && category) {
@@ -541,7 +594,8 @@ function CategoryEditorDialog({
           name: trimmed,
           isRecurring,
           color: color || null,
-        },
+          ...accountingField,
+        } as UpdateTransactionCategoryPayload,
         category.id,
       );
     } else {
@@ -550,7 +604,8 @@ function CategoryEditorDialog({
         kind,
         isRecurring,
         color: color || null,
-      });
+        ...accountingField,
+      } as CreateTransactionCategoryPayload);
     }
   };
 
@@ -596,6 +651,25 @@ function CategoryEditorDialog({
               />
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label>Grupo contábil</Label>
+            <Combobox
+              value={accountingType || undefined}
+              onValueChange={v =>
+                setAccountingType(typeof v === "string" ? v : "")
+              }
+              options={ACCOUNTING_TYPE_OPTIONS}
+              placeholder="Selecione o grupo contábil..."
+              searchPlaceholder="Buscar grupo..."
+              emptyText="Nenhum grupo encontrado"
+              searchable
+              clearable
+            />
+            <p className="text-xs text-muted-foreground">
+              Define a qual grupo do plano de contas esta categoria pertence.
+            </p>
+          </div>
 
           {/* The preview chip IS the color picker: click it to open the native
               color input. Shows a live preview of the category badge. */}

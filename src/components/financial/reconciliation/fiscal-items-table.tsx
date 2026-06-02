@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
 import { useReconciliationCategories } from "@/hooks/financial/use-reconciliation";
+import { getAccountingTypeLabel } from "./match-status-badge";
 import { formatCurrency } from "@/utils";
 import { cn } from "@/lib/utils";
 import type { FiscalDocType, FiscalItemTaxes } from "@/types/reconciliation";
@@ -33,6 +34,9 @@ interface Props {
   onItemCategoryChange?: (itemId: string, categoryId: string | null) => void;
   /** Visually denser variant for embedding inside candidate cards. */
   dense?: boolean;
+  /** Hide the secondary line under the description (NCM/CFOP + per-item taxes),
+   *  leaving only the product/service description. */
+  hideLineMeta?: boolean;
   className?: string;
 }
 
@@ -60,6 +64,7 @@ export function FiscalItemsTable({
   totalValue,
   onItemCategoryChange,
   dense,
+  hideLineMeta,
   className,
 }: Props) {
   const isNfse = docType === "NFSE";
@@ -116,16 +121,25 @@ export function FiscalItemsTable({
                 <td className={cn("text-muted-foreground truncate", cell)}>{item.code || "—"}</td>
                 <td className={cell}>
                   <p className="truncate" title={item.description}>{item.description}</p>
-                  {(item.ncm || item.cfop) && (
+                  {!hideLineMeta && (item.ncm || item.cfop) && (
                     <p className="truncate text-[10px] text-muted-foreground mt-0.5">
                       {item.ncm ? `NCM ${item.ncm}` : ""}
                       {item.ncm && item.cfop ? " · " : ""}
                       {item.cfop ? `CFOP ${item.cfop}` : ""}
                     </p>
                   )}
-                  <ItemTaxes taxes={item.taxes} />
+                  {!hideLineMeta && <ItemTaxes taxes={item.taxes} />}
                 </td>
-                <td className={cell}>
+                <td
+                  className={cell}
+                  // When the table is embedded in a clickable candidate card,
+                  // stop click/keydown from bubbling so interacting with the
+                  // category combobox never toggles the card's selection.
+                  onClick={editable && onItemCategoryChange ? e => e.stopPropagation() : undefined}
+                  onKeyDown={
+                    editable && onItemCategoryChange ? e => e.stopPropagation() : undefined
+                  }
+                >
                   {editable && onItemCategoryChange ? (
                     <Combobox
                       value={item.categoryId ?? undefined}
@@ -213,20 +227,30 @@ function renderCategoryValue(o: ComboboxOption | ComboboxOption[]) {
 
 function CategoryChip({ item }: { item: FiscalItemRow }) {
   if (!item.category?.name) return <span className="text-muted-foreground text-xs">—</span>;
+  // Cost group (chart-of-accounts rollup) shown as a small muted label beneath
+  // the colored chip when the category carries an accounting type.
+  const accountingLabel = getAccountingTypeLabel(item.category);
   return (
-    <Badge
-      variant="secondary"
-      size="sm"
-      className="whitespace-nowrap"
-      style={
-        item.category.color
-          ? { backgroundColor: item.category.color, color: "#fff", borderColor: "transparent" }
-          : undefined
-      }
-    >
-      {item.category.name}
-      {typeof item.categoryConfidence === "number" ? ` · ${Math.round(item.categoryConfidence)}%` : ""}
-    </Badge>
+    <span className="inline-flex flex-col items-start gap-0.5">
+      <Badge
+        variant="secondary"
+        size="sm"
+        className="whitespace-nowrap"
+        style={
+          item.category.color
+            ? { backgroundColor: item.category.color, color: "#fff", borderColor: "transparent" }
+            : undefined
+        }
+      >
+        {item.category.name}
+        {typeof item.categoryConfidence === "number" ? ` · ${Math.round(item.categoryConfidence)}%` : ""}
+      </Badge>
+      {accountingLabel && (
+        <span className="text-[10px] leading-none text-muted-foreground">
+          {accountingLabel}
+        </span>
+      )}
+    </span>
   );
 }
 
