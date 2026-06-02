@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   IconAlertCircle,
@@ -6,6 +6,7 @@ import {
   IconBuildingBank,
   IconDeviceFloppy,
   IconLoader2,
+  IconTag,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -14,9 +15,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
   useBankTransaction,
+  useChangeCategory,
   useMatchCandidates,
   useUnmatchTransaction,
 } from "@/hooks/financial/use-reconciliation";
+import { CategoryEditor } from "@/components/financial/reconciliation/category-editor";
 import {
   formatAccountNumber,
   formatCnpjCpf,
@@ -55,7 +58,14 @@ export function ReconciliationTransactionDetailPage() {
   const liveTopScore =
     liveCandidates && liveCandidates.length > 0 ? liveCandidates[0].confidence : null;
   const unmatchMut = useUnmatchTransaction();
+  const changeCategoryMut = useChangeCategory();
   const [unmatchOpen, setUnmatchOpen] = useState(false);
+  // Inline category selection (no-NF case). Seeded from the transaction's tags
+  // and resynced whenever it refetches.
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  useEffect(() => {
+    setCategoryIds([...new Set(tx?.categories?.map(c => c.categoryId) ?? [])]);
+  }, [tx?.id, tx?.categories]);
   // The match section reports its save-ability + allocation totals up so the
   // Salvar button and running "Alocado / Faltam" summary live in the header.
   const [matchState, setMatchState] = useState<MatchSaveState | null>(null);
@@ -93,7 +103,18 @@ export function ReconciliationTransactionDetailPage() {
 
   const isCredit = tx.type === "CREDIT";
   const activeMatches = (tx.matches ?? []).filter(m => !m.reversedAt);
+  const hasNf = activeMatches.length > 0;
   const title = `Transação ${formatDate(tx.postedAt)}`;
+
+  // No-NF: picking categories saves immediately (no modal, no value split). The
+  // full id set is authoritative; a resolving category auto-conciliates.
+  const commitCategories = (ids: string[]) => {
+    setCategoryIds(ids);
+    changeCategoryMut.mutate({
+      transactionId: tx.id,
+      payload: { categoryIds: ids, saveAlias: true },
+    });
+  };
 
   return (
     <Frame>
@@ -141,56 +162,107 @@ export function ReconciliationTransactionDetailPage() {
 
       <div className="flex-1 overflow-y-auto pb-6">
         <div className="space-y-4">
-          {/* Resumo da transação */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card className="shadow-sm border border-border">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="flex items-center gap-2">
-                    <IconArrowsExchange2 className="h-5 w-5 text-muted-foreground" />
-                    Resumo da transação
-                  </CardTitle>
-                  <MatchStatusBadge
-                    status={tx.reconciliationStatus}
-                    topMatchScore={liveTopScore}
-                  />
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground">Valor</span>
-                    <span
-                      className={cn(
-                        "text-base font-bold tabular-nums",
-                        isCredit ? "text-emerald-700" : "text-red-700",
-                      )}
-                    >
-                      {formatCurrency(tx.amount)}
-                    </span>
+          {/* Resumo da transação + Categoria (left column) / Conta bancária (right, full height) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            <div className="flex flex-col gap-4">
+              <Card className="shadow-sm border border-border">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="flex items-center gap-2">
+                      <IconArrowsExchange2 className="h-5 w-5 text-muted-foreground" />
+                      Resumo da transação
+                    </CardTitle>
+                    <MatchStatusBadge
+                      status={tx.reconciliationStatus}
+                      topMatchScore={liveTopScore}
+                    />
                   </div>
-                  <InfoRow label="Data" value={formatDate(tx.postedAt)} />
-                  <InfoRow label="Forma" value={tx.subtype} />
-                  <InfoRow
-                    label="Contraparte"
-                    value={
-                      tx.counterpartyName ||
-                      (tx.counterpartyCnpjCpf ? formatCnpjCpf(tx.counterpartyCnpjCpf) : null)
-                    }
-                  />
-                  {tx.counterpartyName && tx.counterpartyCnpjCpf && (
-                    <InfoRow label="CNPJ / CPF" value={formatCnpjCpf(tx.counterpartyCnpjCpf)} />
-                  )}
-                  {tx.ignoredReason && <InfoRow label="Motivo ignorado" value={tx.ignoredReason} />}
-                  <InfoRow
-                    label="Histórico"
-                    value={tx.memo ? <span className="font-mono text-xs">{tx.memo}</span> : null}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                      <span className="text-sm font-medium text-muted-foreground">Valor</span>
+                      <span
+                        className={cn(
+                          "text-base font-bold tabular-nums",
+                          isCredit ? "text-emerald-700" : "text-red-700",
+                        )}
+                      >
+                        {formatCurrency(tx.amount)}
+                      </span>
+                    </div>
+                    <InfoRow label="Data" value={formatDate(tx.postedAt)} />
+                    <InfoRow label="Forma" value={tx.subtype} />
+                    <InfoRow
+                      label="Contraparte"
+                      value={
+                        tx.counterpartyName ||
+                        (tx.counterpartyCnpjCpf ? formatCnpjCpf(tx.counterpartyCnpjCpf) : null)
+                      }
+                    />
+                    {tx.counterpartyName && tx.counterpartyCnpjCpf && (
+                      <InfoRow label="CNPJ / CPF" value={formatCnpjCpf(tx.counterpartyCnpjCpf)} />
+                    )}
+                    {tx.ignoredReason && <InfoRow label="Motivo ignorado" value={tx.ignoredReason} />}
+                    <InfoRow
+                      label="Histórico"
+                      value={tx.memo ? <span className="font-mono text-xs">{tx.memo}</span> : null}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card className="shadow-sm border border-border">
+              {/* Categoria — when an NF is linked the categories come from the
+                  note's items (read-only here); otherwise it's set inline. */}
+              <Card className="shadow-sm border border-border">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2">
+                    <IconTag className="h-5 w-5 text-muted-foreground" />
+                    Categoria
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {hasNf ? (
+                    tx.categories && tx.categories.length > 0 ? (
+                      <div className="space-y-3">
+                        {tx.categories.map(t => (
+                          <div
+                            key={t.id}
+                            className="flex items-center gap-2 bg-muted/50 rounded-lg px-4 py-3"
+                          >
+                            {t.category?.color && (
+                              <span
+                                className="h-2 w-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: t.category.color }}
+                              />
+                            )}
+                            <span className="text-sm font-semibold text-foreground">
+                              {t.category?.name ?? "—"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-muted/50 rounded-lg px-4 py-3">
+                        <p className="text-sm text-muted-foreground">
+                          Definida pelas notas vinculadas.
+                        </p>
+                      </div>
+                    )
+                  ) : (
+                    <CategoryEditor
+                      transaction={tx}
+                      value={categoryIds}
+                      onChange={commitCategories}
+                      enableSplit={false}
+                      enableNotes={false}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="shadow-sm border border-border h-full">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2">
                   <IconBuildingBank className="h-5 w-5 text-muted-foreground" />
@@ -224,7 +296,7 @@ export function ReconciliationTransactionDetailPage() {
             </Card>
           </div>
 
-          {/* Categoria + Notas vinculadas + Candidatas */}
+          {/* Notas vinculadas + Candidatas */}
           <TransactionMatchSection
             transaction={tx}
             onRequestUnmatch={activeMatches.length > 0 ? () => setUnmatchOpen(true) : undefined}

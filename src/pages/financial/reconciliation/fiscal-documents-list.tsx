@@ -92,7 +92,11 @@ export const ReconciliationFiscalDocumentsListPage = () => {
   // the standalone detail page.
   useEffect(() => {
     const nfId = searchParams.get("nfId");
-    if (nfId) navigate(routes.financial.reconciliation.fiscalDocumentDetail(nfId), { replace: true });
+    // Guard the raw param: a malformed ?nfId= would navigate to a bad detail
+    // route and trigger an error fetch. Only redirect on a valid UUID.
+    if (nfId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nfId)) {
+      navigate(routes.financial.reconciliation.fiscalDocumentDetail(nfId), { replace: true });
+    }
   }, [searchParams, navigate]);
 
   const dateRange = useMemo(() => {

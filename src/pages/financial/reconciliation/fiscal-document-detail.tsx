@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
@@ -200,17 +201,7 @@ export function ReconciliationFiscalDocumentDetailPage() {
     <Frame>
       <PageHeader
         variant="detail"
-        title={
-          <span className="flex items-center gap-2">
-            {title}
-            <Badge variant={docTypeVariant(doc.docType)} size="sm">
-              {docTypeLabel(doc.docType)}
-            </Badge>
-            <Badge variant={doc.operationType === "ENTRADA" ? "completed" : "cancelled"} size="sm">
-              {doc.operationType === "ENTRADA" ? "Entrada" : "Saída"}
-            </Badge>
-          </span>
-        }
+        title={title}
         breadcrumbs={[
           { label: "Início", href: routes.home },
           { label: "Financeiro", href: routes.financial.root },
@@ -519,8 +510,7 @@ function SubHeading({
   );
 }
 
-/** Neutral, link-styled card for a bank transaction matched to this note.
- *  Replaces the old emerald-tinted MatchCard treatment on this page. */
+/** Neutral, link-styled card for a bank transaction matched to this note. */
 function LinkedTransactionCard({
   tx,
   confidenceScore,
@@ -536,10 +526,7 @@ function LinkedTransactionCard({
 }) {
   if (!tx) return null;
   return (
-    <Link
-      to={routes.financial.reconciliation.transactionDetail(tx.id)}
-      className="group block rounded-lg border border-border bg-card p-3 hover:border-primary/40 hover:bg-muted/40 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
-    >
+    <div className="rounded-lg border border-border bg-card p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -575,26 +562,25 @@ function LinkedTransactionCard({
         </div>
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/60 pt-2">
-        <span className="text-xs font-medium text-primary inline-flex items-center gap-1 transition-opacity group-hover:opacity-80">
-          Abrir transação
-          <IconArrowUpRight className="h-3 w-3" />
-        </span>
-        <button
-          type="button"
+        <Button asChild variant="default" size="sm" className="h-8">
+          <Link to={routes.financial.reconciliation.transactionDetail(tx.id)}>
+            Abrir transação
+            <IconArrowUpRight className="h-3.5 w-3.5 ml-1" />
+          </Link>
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          className="h-8"
           disabled={unmatchDisabled}
           aria-label="Desvincular nota desta transação"
-          onClick={e => {
-            e.preventDefault();
-            e.stopPropagation();
-            onUnmatch();
-          }}
-          className="inline-flex items-center gap-1 rounded-md border border-destructive/40 bg-background/80 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 hover:border-destructive/60 transition-colors disabled:opacity-50"
+          onClick={onUnmatch}
         >
-          <IconLinkOff className="h-3 w-3" />
+          <IconLinkOff className="h-3.5 w-3.5 mr-1" />
           Desvincular
-        </button>
+        </Button>
       </div>
-    </Link>
+    </div>
   );
 }
 

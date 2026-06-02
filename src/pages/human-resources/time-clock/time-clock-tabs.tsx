@@ -21,7 +21,7 @@ const TABS: TabDef[] = [
   { label: "Colaborador", menuTitle: "Visualização Colaborador", path: routes.humanResources.timeClock.colaborador, hrOnly: false },
   { label: "Dia", menuTitle: "Visualização Dia", path: routes.humanResources.timeClock.dia, hrOnly: false },
   { label: "Edição", menuTitle: "Edição", path: routes.humanResources.timeClock.edicao, hrOnly: true },
-  { label: "Ausências", menuTitle: "Ausências", path: routes.humanResources.timeClock.ausencias, hrOnly: true },
+  { label: "Ausências", menuTitle: "Ausências", path: routes.humanResources.timeClock.ausencias, hrOnly: false },
   { label: "Fechamento", menuTitle: "Fechamento", path: routes.humanResources.timeClock.fechamento.list, hrOnly: true },
 ].sort((a, b) => a.menuTitle.localeCompare(b.menuTitle, "pt-BR", { sensitivity: "base" }));
 

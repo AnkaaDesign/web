@@ -8,6 +8,7 @@ import {
   IconClock,
   IconCalendarDollar,
   IconFlask,
+  IconRecycle,
 } from "@tabler/icons-react";
 import type { Icon as TablerIcon } from "@tabler/icons-react";
 
@@ -38,6 +39,12 @@ const toolGroups: ToolGroup[] = [
         description: "QR codes vetoriais para sites, telefones, Wi-Fi e contatos",
         route: routes.tools.qrCode.root,
         icon: IconQrcode,
+      },
+      {
+        label: "Certificado de Resíduos",
+        description: "Gere, compartilhe e arquive certificados de destinação de resíduos",
+        route: routes.tools.wasteCertificate.root,
+        icon: IconRecycle,
       },
     ],
   },

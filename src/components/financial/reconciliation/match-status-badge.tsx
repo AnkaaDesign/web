@@ -22,10 +22,17 @@ import type {
  * absent so callers can simply skip rendering the muted cost-group label.
  */
 export function getAccountingTypeLabel(
-  category: { accountingType?: string | null } | null | undefined,
+  // Accepts any category-ish object. `accountingType` is only present on the
+  // full `TransactionCategory`; the trimmed `category` Picks embedded in tags /
+  // fiscal lines omit it, so we type the param loosely (Record lookup) instead
+  // of `{ accountingType?: ... }` — the latter has "no properties in common"
+  // with those Picks and trips TS2559 at every call site. Returns null when the
+  // field is absent so callers simply skip the muted cost-group label.
+  category: object | null | undefined,
 ): string | null {
-  const key = category?.accountingType;
-  if (!key) return null;
+  const key = (category as { accountingType?: unknown } | null | undefined)
+    ?.accountingType;
+  if (typeof key !== "string" || !key) return null;
   return (ACCOUNTING_TYPE_LABELS as Record<string, string>)[key] ?? key;
 }
 

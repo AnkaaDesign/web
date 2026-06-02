@@ -1,11 +1,10 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { IconX } from "@tabler/icons-react";
+import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { useReconciliationCategories } from "@/hooks/financial/use-reconciliation";
-import { getCategoryTextColor, getAccountingTypeLabel } from "./match-status-badge";
+import { getAccountingTypeLabel } from "./match-status-badge";
 import { formatCurrency } from "@/utils";
 import type { BankTransaction, TransactionCategory } from "@/types/reconciliation";
 
@@ -21,30 +20,37 @@ interface Props {
   /** Selected category ids (controlled by the parent). */
   value: string[];
   onChange: (ids: string[]) => void;
-  notes: string;
-  onNotesChange: (s: string) => void;
+  notes?: string;
+  onNotesChange?: (s: string) => void;
   /** Per-category amount split (categoryId → amount), controlled by the parent. */
-  allocations: Record<string, number>;
-  onAllocationsChange: (next: Record<string, number>) => void;
+  allocations?: Record<string, number>;
+  onAllocationsChange?: (next: Record<string, number>) => void;
+  /** Show the per-category value split when >1 selected (default true). */
+  enableSplit?: boolean;
+  /** Show the observation input (default true). */
+  enableNotes?: boolean;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * Controlled category editor: a grouped multi-select Combobox + a single row of
- * removable selected chips (the Combobox's own badges are hidden to avoid
- * duplication). When more than one category is selected, a per-category amount
- * split appears so the user can say how much of the transaction goes to each.
- * Aliases are always learned on save. State lives in the parent.
+ * Controlled category editor: one single-select Combobox per chosen category,
+ * with a trash button to drop a row and an "add" button to append another —
+ * letting the user pick several categories. When more than one is selected, a
+ * per-category amount split appears so the user can say how much of the
+ * transaction goes to each. Aliases are always learned on save. The selected
+ * ids (deduped) live in the parent via `value`/`onChange`.
  */
 export function CategoryEditor({
   transaction,
   value,
   onChange,
-  notes,
+  notes = "",
   onNotesChange,
-  allocations,
+  allocations = {},
   onAllocationsChange,
+  enableSplit = true,
+  enableNotes = true,
 }: Props) {
   const { data: categories } = useReconciliationCategories();
 
@@ -83,7 +89,7 @@ export function CategoryEditor({
   }, [categories]);
 
   const txAmount = Math.abs(Number(transaction?.amount ?? 0));
-  const showSplit = value.length > 1 && txAmount > 0;
+  const showSplit = enableSplit && value.length > 1 && txAmount > 0;
 
   // Keep the allocation map in sync with the selected set: prune deselected
   // categories and default newcomers to an even split. Runs only when the
@@ -105,83 +111,88 @@ export function CategoryEditor({
         changed = true;
       }
     }
-    if (changed) onAllocationsChange(next);
+    if (changed) onAllocationsChange?.(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, txAmount, showSplit]);
-
-  const removeId = (id: string) => onChange(value.filter(x => x !== id));
-  const anyResolvingSelected = value.some(id => byId.get(id)?.isResolving);
 
   const allocated = value.reduce((sum, id) => sum + (allocations[id] ?? 0), 0);
   const splitOk = Math.abs(allocated - txAmount) < 0.01;
 
+  // One single-select Combobox per chosen category. A row may briefly hold ""
+  // while the user is picking; only non-empty, de-duplicated ids reach the
+  // parent. We resync from `value` whenever it changes externally (e.g. an NF
+  // gets linked, or after a save/refetch) and no longer matches the rows.
+  const [rows, setRows] = useState<string[]>(value.length ? value : [""]);
+  const valueKey = value.join(",");
+  useEffect(() => {
+    const selected = rows.filter(Boolean);
+    const sameSet =
+      selected.length === value.length && selected.every(id => value.includes(id));
+    if (!sameSet) setRows(value.length ? value : [""]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valueKey]);
+
+  const emitRows = (next: string[]) => {
+    setRows(next);
+    onChange(Array.from(new Set(next.filter(Boolean))));
+  };
+  const setRowAt = (i: number, id: string | undefined) =>
+    emitRows(rows.map((r, idx) => (idx === i ? id ?? "" : r)));
+  const addRow = () => setRows(prev => [...prev, ""]);
+  const removeRow = (i: number) => {
+    const next = rows.filter((_, idx) => idx !== i);
+    emitRows(next.length ? next : [""]);
+  };
+  // Hide ids already chosen in other rows so the same category can't be picked twice.
+  const optionsForRow = (i: number) => {
+    const taken = new Set(rows.filter((_, idx) => idx !== i).filter(Boolean));
+    return options.filter(o => !taken.has(o.value));
+  };
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Categorias</Label>
-        <Combobox
-          mode="multiple"
-          value={value}
-          onValueChange={v => {
-            const arr = Array.isArray(v) ? v : v ? [v] : [];
-            onChange(arr);
-          }}
-          options={options}
-          placeholder="Selecione as categorias..."
-          searchPlaceholder="Buscar categoria..."
-          emptyText="Nenhuma categoria encontrada"
-          searchable={true}
-          clearable={true}
-          hideDefaultBadges
-        />
-        {value.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {value.map(id => {
-              const cat = byId.get(id);
-              if (!cat) return null;
-              const accountingLabel = getAccountingTypeLabel(cat);
-              return (
-                <span key={id} className="inline-flex flex-col items-start gap-0.5">
-                  <Badge
-                    variant="secondary"
-                    size="sm"
-                    className="whitespace-nowrap gap-1 pr-1"
-                    style={
-                      cat.color
-                        ? {
-                            backgroundColor: cat.color,
-                            color: getCategoryTextColor(cat.color) ?? "#fff",
-                            borderColor: "transparent",
-                          }
-                        : undefined
-                    }
-                  >
-                    {cat.name}
-                    <button
-                      type="button"
-                      onClick={() => removeId(id)}
-                      className="rounded-full hover:bg-black/20 p-0.5"
-                      aria-label={`Remover ${cat.name}`}
-                    >
-                      <IconX className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                  {accountingLabel && (
-                    <span className="text-[10px] leading-none text-muted-foreground">
-                      {accountingLabel}
-                    </span>
-                  )}
-                </span>
-              );
-            })}
+        {rows.map((rowId, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2"
+          >
+            <div className="flex-1">
+              <Combobox
+                mode="single"
+                value={rowId || undefined}
+                onValueChange={v =>
+                  setRowAt(i, typeof v === "string" ? v : Array.isArray(v) ? v[0] : undefined)
+                }
+                options={optionsForRow(i)}
+                placeholder="Selecione a categoria..."
+                searchPlaceholder="Buscar categoria..."
+                emptyText="Nenhuma categoria encontrada"
+                searchable={true}
+                clearable={true}
+                triggerClassName="bg-background border-border"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => removeRow(i)}
+              className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+              aria-label="Remover categoria"
+            >
+              <IconTrash className="h-4 w-4" />
+            </button>
+            {i === rows.length - 1 && (
+              <button
+                type="button"
+                onClick={addRow}
+                className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Adicionar categoria"
+              >
+                <IconPlus className="h-4 w-4" />
+              </button>
+            )}
           </div>
-        )}
-        {anyResolvingSelected && (
-          <p className="text-xs text-muted-foreground">
-            Uma categoria auto-conciliante foi selecionada — a transação será
-            conciliada sem exigir nota fiscal.
-          </p>
-        )}
+        ))}
       </div>
 
       {showSplit && (
@@ -205,7 +216,7 @@ export function CategoryEditor({
                       onChange={v => {
                         const raw = typeof v === "string" ? v : v == null ? "" : String(v);
                         const n = parseFloat(raw.replace(",", ".")) || 0;
-                        onAllocationsChange({ ...allocations, [id]: n });
+                        onAllocationsChange?.({ ...allocations, [id]: n });
                       }}
                     />
                   </div>
@@ -220,15 +231,17 @@ export function CategoryEditor({
         </div>
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="category-notes">Observação (opcional)</Label>
-        <Input
-          id="category-notes"
-          value={notes}
-          onChange={v => onNotesChange(typeof v === "string" ? v : v == null ? "" : String(v))}
-          placeholder="Contexto para auditoria futura"
-        />
-      </div>
+      {enableNotes && (
+        <div className="space-y-2">
+          <Label htmlFor="category-notes">Observação (opcional)</Label>
+          <Input
+            id="category-notes"
+            value={notes}
+            onChange={v => onNotesChange?.(typeof v === "string" ? v : v == null ? "" : String(v))}
+            placeholder="Contexto para auditoria futura"
+          />
+        </div>
+      )}
     </div>
   );
 }

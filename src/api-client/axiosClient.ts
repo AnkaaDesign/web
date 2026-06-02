@@ -425,7 +425,14 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
                 !(v instanceof Date),
             );
 
-            if (hasNestedObjects) {
+            // Check if it carries a null/undefined leaf at this level. qs.stringify
+            // with skipNulls drops these (e.g. where: { isResolving: null }), so we
+            // must JSON-stringify the object to preserve them — matching mobile.
+            const hasNullLeaf = Object.values(value).some(
+              (v) => v === null || v === undefined,
+            );
+
+            if (hasNestedObjects || hasNullLeaf) {
               // JSON-stringify complex nested objects to preserve null values
               // and avoid issues with deep dot notation parsing
               processedParams[key] = JSON.stringify(value);

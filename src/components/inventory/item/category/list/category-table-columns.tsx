@@ -16,9 +16,11 @@ export interface CategoryColumn {
   align?: "left" | "center" | "right";
 }
 
-// Function to get default visible columns for categories
+// Function to get default visible columns for categories.
+// The user-facing "Tipo" is the accounting/contábil group (accountingType). The
+// physical ItemCategoryType ("Tipo Físico") is an internal flag, hidden by default.
 export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["name", "type", "accountingType", "_count.items", "createdAt"]);
+  return new Set(["name", "accountingType", "_count.items", "createdAt"]);
 }
 
 // Hook to get all available columns for categories
@@ -42,8 +44,9 @@ export function useCategoryTableColumns(): CategoryColumn[] {
         align: "left",
       },
       {
+        // Primary "Tipo": the accounting/contábil group (the headline type users care about).
         key: "accountingType",
-        header: "TIPO CONTÁBIL",
+        header: "TIPO",
         accessor: (category: ItemCategory) =>
           category.accountingType ? (
             <Badge variant="secondary" className="text-xs">
@@ -57,8 +60,10 @@ export function useCategoryTableColumns(): CategoryColumn[] {
         align: "left",
       },
       {
+        // Demoted: the physical ItemCategoryType (REGULAR/TOOL/PPE/...) is an internal
+        // flag, shown as a secondary "Tipo Físico" column (hidden by default).
         key: "type",
-        header: "Tipo",
+        header: "TIPO FÍSICO",
         accessor: (category: ItemCategory) => (
           <div className="truncate">
             <Badge variant={category.type === ITEM_CATEGORY_TYPE.PPE ? "default" : category.type === ITEM_CATEGORY_TYPE.TOOL ? "destructive" : "secondary"} className="text-xs">

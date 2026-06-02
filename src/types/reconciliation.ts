@@ -436,6 +436,9 @@ export interface ClassifyBatchPayload {
 export interface CreateTransactionCategoryPayload {
   name: string;
   kind: "TRANSACTION_ONLY" | "SERVICE";
+  // Accounting (DRE) rollup. ITEM_DERIVED categories inherit it from the mirror;
+  // SERVICE/TRANSACTION_ONLY categories set it explicitly.
+  accountingType?: ACCOUNTING_TYPE | null;
   isResolving?: boolean;
   isRecurring?: boolean;
   color?: string | null;
@@ -444,6 +447,8 @@ export interface CreateTransactionCategoryPayload {
 
 export interface UpdateTransactionCategoryPayload {
   name?: string;
+  kind?: "TRANSACTION_ONLY" | "SERVICE";
+  accountingType?: ACCOUNTING_TYPE | null;
   isResolving?: boolean;
   isRecurring?: boolean;
   color?: string | null;

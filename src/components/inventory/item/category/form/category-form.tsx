@@ -219,14 +219,16 @@ export function CategoryForm(props: CategoryFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <NameInput control={form.control} disabled={isSubmitting} required={isRequired} />
 
-              <TypeSelector control={form.control} disabled={isSubmitting} />
+              {/* Primary "Tipo": the accounting/contábil group. Top-level categories pick it;
+                  subcategories roll up the parent's value (read-only). */}
+              <AccountingTypeSelector control={form.control} disabled={isSubmitting} readOnlyRollup={isSubcategory} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ParentCategorySelector control={form.control} disabled={isSubmitting} excludeId={editingCategoryId} onParentChange={handleParentChange} />
 
-              {/* Top-level categories pick their accounting type; subcategories roll up the parent's (read-only). */}
-              <AccountingTypeSelector control={form.control} disabled={isSubmitting} readOnlyRollup={isSubcategory} />
+              {/* Demoted: the physical ItemCategoryType is an internal flag (e.g. PPE detection). */}
+              <TypeSelector control={form.control} disabled={isSubmitting} />
             </div>
 
             <FormField

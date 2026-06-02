@@ -192,6 +192,10 @@ export const useItemCategoryTree = (
   return useQuery({
     queryKey: [...itemCategoryKeys.all, "tree", params ?? {}] as const,
     queryFn: () => getItemCategoryTree(params as ItemCategoryGetManyFormData),
+    // The API returns the paginated envelope ({ data, meta }); consumers want the
+    // category array directly (they call .filter/.map on it). Select it here so
+    // a single source of truth unwraps it and `= []` defaults work at runtime.
+    select: res => res?.data ?? [],
     staleTime: options?.staleTime ?? 1000 * 60 * 10, // 10 minutes
     enabled: options?.enabled,
   });

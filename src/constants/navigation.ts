@@ -1149,10 +1149,36 @@ export const NAVIGATION_MENU: MenuItem[] = [
         path: "/administracao/colaboradores",
       },
       {
+        // Production manager gets the view-only tabs (Colaborador, Dia, Ausências).
+        // Edição and Fechamento are intentionally omitted — they remain HR/ADMIN only.
         id: "controle-de-ponto-production-manager",
         title: "Controle de Ponto",
         icon: "fingerprint",
         path: "/recursos-humanos/controle-ponto",
+        requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+        children: [
+          {
+            id: "controle-ponto-colaborador-production-manager",
+            title: "Visualização Colaborador",
+            icon: "user",
+            path: "/recursos-humanos/controle-ponto/colaborador",
+            requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+          },
+          {
+            id: "controle-ponto-dia-production-manager",
+            title: "Visualização Dia",
+            icon: "calendar",
+            path: "/recursos-humanos/controle-ponto/dia",
+            requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+          },
+          {
+            id: "controle-ponto-ausencias-production-manager",
+            title: "Ausências",
+            icon: "list",
+            path: "/recursos-humanos/controle-ponto/ausencias",
+            requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+          },
+        ],
       },
     ],
   },
@@ -1210,6 +1236,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
       { id: "ferramentas-calculadora-de-horas-pm", title: "Calculadora de Horas", icon: "clock", path: "/ferramentas/calculadora-de-horas" },
       { id: "ferramentas-custo-horas-extras-pm", title: "Custo de Horas Extras", icon: "calendarDollar", path: "/ferramentas/custo-horas-extras" },
       { id: "ferramentas-calculadora-de-mistura-pm", title: "Calculadora de Mistura", icon: "flask", path: "/ferramentas/calculadora-de-mistura" },
+      { id: "ferramentas-certificado-residuos-pm", title: "Certificado de Resíduos", icon: "recycle", path: "/ferramentas/certificado-residuos" },
     ],
   },
   {
@@ -1283,6 +1310,38 @@ export const NAVIGATION_MENU: MenuItem[] = [
     icon: "calendarStats",
     path: "/producao/calendario",
     requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+  },
+  {
+    // Commercial gets the view-only tabs (Colaborador, Dia, Ausências). Edição and
+    // Fechamento are intentionally omitted — they remain HR/ADMIN only.
+    id: "controle-ponto-commercial",
+    title: "Controle de Ponto",
+    icon: "fingerprint",
+    path: "/recursos-humanos/controle-ponto",
+    requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+    children: [
+      {
+        id: "controle-ponto-colaborador-commercial",
+        title: "Visualização Colaborador",
+        icon: "user",
+        path: "/recursos-humanos/controle-ponto/colaborador",
+        requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+      },
+      {
+        id: "controle-ponto-dia-commercial",
+        title: "Visualização Dia",
+        icon: "calendar",
+        path: "/recursos-humanos/controle-ponto/dia",
+        requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+      },
+      {
+        id: "controle-ponto-ausencias-commercial",
+        title: "Ausências",
+        icon: "list",
+        path: "/recursos-humanos/controle-ponto/ausencias",
+        requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+      },
+    ],
   },
   {
     id: "gerenciador-de-arquivos",
@@ -1807,6 +1866,12 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Calculadora de Mistura",
         icon: "flask",
         path: "/ferramentas/calculadora-de-mistura",
+      },
+      {
+        id: "ferramentas-certificado-residuos",
+        title: "Certificado de Resíduos",
+        icon: "recycle",
+        path: "/ferramentas/certificado-residuos",
       },
     ],
   },

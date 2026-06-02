@@ -98,14 +98,20 @@ export class ItemCategoryService {
   }
 
   /**
-   * Fetch the full category tree: top-level categories with nested `children`.
-   * The API resolves the `tree` flag into a nested response.
+   * Fetch the full category tree: top-level (level 1) categories with their
+   * nested `children`. Hits the dedicated `/tree` endpoint (`findTree`), which
+   * enforces top-level scoping, nests two levels of children, and returns the
+   * whole tree in one page (limit 1000) — NOT the flat list route. A previous
+   * version passed a `tree: true` flag to the flat `GET /items/categories`
+   * route, but that flag is not in the GetMany schema so Zod silently stripped
+   * it; the request fell back to a flat, page-clamped list whose shape broke
+   * `tree.filter(...)` in consumers. Always use the real tree route here.
    */
   async getItemCategoryTree(params?: ItemCategoryGetManyFormData): Promise<ItemCategoryGetManyResponse> {
-    return this.getItemCategories({
-      ...(params || {}),
-      tree: true,
-    } as ItemCategoryGetManyFormData);
+    const response = await apiClient.get<ItemCategoryGetManyResponse>(`${this.basePath}/tree`, {
+      params,
+    });
+    return response.data;
   }
 
   /**

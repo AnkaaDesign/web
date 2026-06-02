@@ -65,6 +65,7 @@ export const TABLER_ICONS = {
   tool: "IconTool", // Single tool icon (for favorites)
   tools: "IconTools", // Multiple tools icon (for favorites)
   qrcode: "IconQrcode",
+  recycle: "IconRecycle",
   serviceWrench: "IconTool",
   maintenance: "IconTools",
   brush: "IconBrush", // Paint brush (for favorites)

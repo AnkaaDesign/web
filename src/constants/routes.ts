@@ -712,6 +712,9 @@ export const routes = {
     paintMix: {
       root: "/ferramentas/calculadora-de-mistura",
     },
+    wasteCertificate: {
+      root: "/ferramentas/certificado-residuos",
+    },
   },
 
   // Users - Alias for administration users (collaborators) for backward compatibility
@@ -733,6 +736,9 @@ export const routes = {
     serviceReport: (customerId: string, quoteId: string) => `/cliente/${customerId}/dossie/${quoteId}`,
     root: "/cliente",
   },
+
+  // Public certificate route (no authentication required)
+  publicWasteCertificate: (id: string) => `/certificado-residuos/${id}`,
 } as const;
 
 // Export types for type safety

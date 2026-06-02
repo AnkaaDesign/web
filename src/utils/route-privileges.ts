@@ -214,10 +214,16 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/recursos-humanos/setores/cadastrar": "ADMIN", // Department creation requires admin
   "/recursos-humanos/cargos": "HUMAN_RESOURCES",
   "/recursos-humanos/cargos/cadastrar": "ADMIN", // Position creation requires admin
-  // Unified Controle de Ponto (3 view modes: colaborador-unico, multiplos-colaboradores, edit).
-  // Read access matches the previous /recursos-humanos/calculos surface; the
-  // edit tab is gated client-side to HR + ADMIN.
-  "/recursos-humanos/controle-ponto": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL"],
+  // Unified Controle de Ponto. View tabs (colaborador, dia, ausências) are open to
+  // this audience; the edit tabs (edição, fechamento) are gated client-side to HR + ADMIN
+  // via PrivilegeRoute on each page + the hrOnly tab filter.
+  "/recursos-humanos/controle-ponto": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "COMMERCIAL"],
+  // View tabs are explicitly listed so they win over the "/recursos-humanos/*" HR-only
+  // wildcard below. Edição and Fechamento intentionally have NO entry here — they fall
+  // through to the wildcard (HR/ADMIN) and are further guarded per-page via PrivilegeRoute.
+  "/recursos-humanos/controle-ponto/colaborador": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "COMMERCIAL"],
+  "/recursos-humanos/controle-ponto/dia": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "COMMERCIAL"],
+  "/recursos-humanos/controle-ponto/ausencias": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "COMMERCIAL"],
   "/recursos-humanos/ferias": "HUMAN_RESOURCES",
   "/recursos-humanos/calendario": "HUMAN_RESOURCES",
   "/recursos-humanos/feriados": "HUMAN_RESOURCES",

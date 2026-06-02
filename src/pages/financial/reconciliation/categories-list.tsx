@@ -69,12 +69,6 @@ import type {
 
 const DEFAULT_PAGE_SIZE = 40;
 
-const KIND_LABEL: Record<TransactionCategoryKind, string> = {
-  ITEM_DERIVED: "Item",
-  SERVICE: "Serviço",
-  TRANSACTION_ONLY: "Transação",
-};
-
 // Trailing group label for categories with no accounting type assigned yet.
 const NO_ACCOUNTING_GROUP = "Sem grupo contábil";
 
@@ -126,18 +120,15 @@ const SORT_ACCESSORS: Record<
   isActive: c => (c.isActive ? 1 : 0),
 };
 
-const KIND_VARIANT: Record<
-  TransactionCategoryKind,
-  "completed" | "inProgress" | "secondary"
-> = {
-  ITEM_DERIVED: "inProgress",
-  SERVICE: "completed",
-  TRANSACTION_ONLY: "secondary",
-};
-
-// Only TRANSACTION_ONLY categories are editable — item-derived & service
-// categories are mirrored/managed elsewhere and shown read-only here.
-const isEditable = (c: TransactionCategory) => c.kind === "TRANSACTION_ONLY";
+// Item-derived categories are MIRRORS of the inventory item taxonomy — they are
+// auto-synced and managed in the estoque module, never created/edited/deleted
+// here. Only TRANSACTION_ONLY (and SERVICE, via create) categories are owned by
+// this admin.
+const isMirrored = (c: TransactionCategory) => c.kind === "ITEM_DERIVED";
+// Both transaction-only buckets AND fiscal-service categories are owned here, so
+// both can be edited (e.g. to set their grupo contábil / recurrence). Only
+// inventory mirrors are read-only (managed in the estoque module).
+const isEditable = (c: TransactionCategory) => c.kind !== "ITEM_DERIVED";
 
 export const ReconciliationCategoriesListPage = () => {
   usePageTracker({ title: "Categorias - Conciliação", icon: "tags" });
@@ -205,14 +196,14 @@ export const ReconciliationCategoriesListPage = () => {
     });
   }, [categories, sortConfigs]);
 
-  // Apply text filter.
+  // Text filter over name + grupo contábil. All categories are shown in one
+  // unified list (no origin split, no hide toggle).
   const filtered = useMemo(() => {
     const q = searchText.trim().toLowerCase();
     if (!q) return sorted;
     return sorted.filter(
       c =>
         c.name.toLowerCase().includes(q) ||
-        KIND_LABEL[c.kind].toLowerCase().includes(q) ||
         accountingGroupOf(c).toLowerCase().includes(q),
     );
   }, [sorted, searchText]);
@@ -282,22 +273,9 @@ export const ReconciliationCategoriesListPage = () => {
       ),
     },
     {
-      key: "kind",
-      header: "Tipo",
-      width: "150px",
-      sortable: true,
-      render: c => (
-        <span className={c.isActive ? "" : "opacity-50"}>
-          <Badge variant={KIND_VARIANT[c.kind]} size="sm">
-            {KIND_LABEL[c.kind]}
-          </Badge>
-        </span>
-      ),
-    },
-    {
       key: "accountingType",
-      header: "Grupo contábil",
-      width: "200px",
+      header: "Tipo (Grupo contábil)",
+      width: "220px",
       sortable: true,
       render: c => {
         const label = getAccountingTypeLabel(c);
@@ -380,11 +358,11 @@ export const ReconciliationCategoriesListPage = () => {
               {/* Wrap in a flex row so TableSearchInput's `flex-1` grows
                   horizontally, not vertically (a direct flex-col child would
                   stretch into a tall box). */}
-              <div className="flex flex-shrink-0">
+              <div className="flex flex-shrink-0 items-center gap-4">
                 <TableSearchInput
                   value={searchText}
                   onChange={handleSearch}
-                  placeholder="Buscar por nome ou tipo..."
+                  placeholder="Buscar por nome ou grupo contábil..."
                 />
               </div>
 
@@ -447,6 +425,7 @@ export const ReconciliationCategoriesListPage = () => {
           )}
 
           {contextMenu &&
+            !isMirrored(contextMenu.item) &&
             (contextMenu.item.isActive ? (
               <DropdownMenuItem onClick={() => toggleActive(contextMenu.item)}>
                 <IconArchive className="mr-2 h-4 w-4" />
@@ -528,11 +507,6 @@ export const ReconciliationCategoriesListPage = () => {
   );
 };
 
-const KIND_OPTIONS = [
-  { value: "TRANSACTION_ONLY", label: "Transação (auto-conciliante)" },
-  { value: "SERVICE", label: "Serviço" },
-];
-
 function CategoryEditorDialog({
   open,
   onOpenChange,
@@ -582,9 +556,7 @@ function CategoryEditorDialog({
   const handleSubmit = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    // accountingType is sent alongside the documented fields; the foundation
-    // track owns the payload types, so it's attached via a cast until those
-    // land. null clears the cost group.
+    // accountingType is the DRE rollup; null clears the cost group.
     const accountingField = { accountingType: accountingType || null };
     // isResolving is intentionally omitted — the backend defaults it by kind
     // (TRANSACTION_ONLY ⇒ resolves) when not provided.
@@ -595,7 +567,7 @@ function CategoryEditorDialog({
           isRecurring,
           color: color || null,
           ...accountingField,
-        } as UpdateTransactionCategoryPayload,
+        },
         category.id,
       );
     } else {
@@ -605,7 +577,7 @@ function CategoryEditorDialog({
         isRecurring,
         color: color || null,
         ...accountingField,
-      } as CreateTransactionCategoryPayload);
+      });
     }
   };
 
@@ -634,23 +606,6 @@ function CategoryEditorDialog({
               placeholder="Ex.: Aluguel, Tarifa bancária..."
             />
           </div>
-
-          {!isEdit && (
-            <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Combobox
-                value={kind}
-                onValueChange={v =>
-                  setKind(
-                    (v as "TRANSACTION_ONLY" | "SERVICE") ?? "TRANSACTION_ONLY",
-                  )
-                }
-                options={KIND_OPTIONS}
-                searchable={false}
-                clearable={false}
-              />
-            </div>
-          )}
 
           <div className="space-y-2">
             <Label>Grupo contábil</Label>

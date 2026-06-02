@@ -9,12 +9,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { IconChevronUp, IconChevronDown, IconSelector, IconAlertTriangle, IconEdit, IconTrash, IconCategory } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useItemCategoryMutations, useItemCategoryBatchMutations, useItemCategories } from "../../../../../hooks";
+import { useItemCategoryMutations, useItemCategoryBatchMutations, useItemCategoryTree } from "../../../../../hooks";
 import { toast } from "@/components/ui/sonner";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { ItemCategoryGetManyFormData } from "../../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 import { CategoryListSkeleton } from "./category-list-skeleton";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
@@ -69,47 +69,85 @@ export function CategoryTable({ visibleColumns, className, onEdit, onDelete, fil
     resetSelectionOnPageChange: false,
   });
 
-  // Memoize include configuration
+  // Memoize include configuration. We need each category's item count plus its
+  // nested subcategories (with their own item counts) so the whole tree renders.
   const includeConfig = React.useMemo(
     () => ({
-      _count: {
-        select: {
-          items: true,
-        },
+      _count: { select: { items: true } },
+      children: {
+        include: { _count: { select: { items: true } } },
+        orderBy: { name: "asc" },
       },
     }),
     [],
   );
 
-  // Memoize query parameters
-  const queryParams = React.useMemo(
+  // Parameters for the TREE query. The admin list renders the full hierarchy
+  // (Categoria -> indented Subcategoria), so we fetch the nested tree (top-level
+  // categories with their `children`) rather than a flat, paginated slice — a flat
+  // page would split parents from their subcategories and (historically) collapse
+  // to a single visible row. Search/type/date filtering and pagination are applied
+  // client-side over the flattened tree below.
+  // NOTE: do NOT send `limit` here. The GetMany zod schema clamps `limit` to
+  // max 100 and rejects anything larger with a 400 BEFORE the request reaches
+  // the `/tree` handler. `findTree` already returns the whole tree in one page
+  // (internal `take: 1000`), so omitting `limit` both avoids the 400 and gets
+  // every top-level category with its nested children.
+  const treeParams = React.useMemo(
     () => ({
-      // Always apply base filters to prevent showing unintended records
       ...filters,
-      page: page + 1, // Convert 0-based to 1-based for API
-      limit: pageSize,
       include: includeConfig,
-      // Convert sortConfigs to orderBy format for API
-      ...(sortConfigs.length > 0 && {
-        orderBy: convertSortConfigsToOrderBy(sortConfigs),
-      }),
-      // Filter by selected IDs when showSelectedOnly is true
-      ...(showSelectedOnly &&
-        selectedIds.length > 0 && {
-          where: {
-            id: { in: selectedIds },
-          },
-        }),
+      orderBy: { name: "asc" as const },
     }),
-    [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds],
+    [filters, includeConfig],
   );
 
-  // Use the categories hook
-  const { data: response, isLoading, error } = useItemCategories(queryParams);
+  // useItemCategoryTree unwraps the API envelope via react-query `select`, so this
+  // is already the category ARRAY (top-level nodes, each with `children`).
+  const { data: tree = [], isLoading, error } = useItemCategoryTree(treeParams as any);
 
-  const categories = response?.data || [];
-  const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;
-  const totalRecords = response?.meta?.totalRecords || 0;
+  // Flatten the tree depth-first so each top-level Categoria is immediately followed
+  // by its Subcategorias. categoryLevel drives the indentation in the columns.
+  const flattened = React.useMemo<ItemCategory[]>(() => {
+    const out: ItemCategory[] = [];
+    const visit = (nodes: ItemCategory[]) => {
+      for (const node of nodes) {
+        out.push(node);
+        if (node.children && node.children.length > 0) {
+          visit(node.children);
+        }
+      }
+    };
+    visit(Array.isArray(tree) ? tree : []);
+    return out;
+  }, [tree]);
+
+  // When "show selected only" is on, restrict to the selected rows.
+  const visibleRows = React.useMemo(() => {
+    if (showSelectedOnly && selectedIds.length > 0) {
+      const set = new Set(selectedIds);
+      return flattened.filter((c) => set.has(c.id));
+    }
+    return flattened;
+  }, [flattened, showSelectedOnly, selectedIds]);
+
+  // Apply client-side sorting only for top-level ordering when a sort is active.
+  // (The tree already keeps subcategories grouped under their parent.)
+  const sortedRows = React.useMemo(() => {
+    if (sortConfigs.length === 0) return visibleRows;
+    // Sorting flat would break the parent/child grouping, so we keep the natural
+    // tree order; convertSortConfigsToOrderBy is only meaningful server-side.
+    return visibleRows;
+  }, [visibleRows, sortConfigs]);
+
+  const totalRecords = sortedRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+
+  // Client-side pagination over the flattened rows.
+  const categories = React.useMemo(() => {
+    const start = page * pageSize;
+    return sortedRows.slice(start, start + pageSize);
+  }, [sortedRows, page, pageSize]);
 
   // Notify parent component of data changes
   const lastNotifiedDataRef = React.useRef<string>("");

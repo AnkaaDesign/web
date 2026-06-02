@@ -82,12 +82,14 @@ export function TransactionMatchSection({
     [candidates],
   );
 
-  // Reset NF selection when the transaction identity changes (post-save).
+  // Reset NF selection when the transaction identity changes (post-save). Keyed
+  // on the id, NOT the object — a background refetch yields a new `transaction`
+  // reference for the same tx and must not wipe an in-progress selection.
   useEffect(() => {
     setSelectedIds([]);
     setAllocations({});
     setNotes("");
-  }, [transaction]);
+  }, [transaction.id]);
 
   const handleItemCategory = (fiscalItemId: string, categoryId: string | null) =>
     setItemCategory.mutate({ fiscalItemId, categoryId });
@@ -145,10 +147,23 @@ export function TransactionMatchSection({
   const handleSave = () => {
     if (!hasMatchChanges || !isValidAllocation) return;
 
+    // The backend treats the payload as the COMPLETE match set: it deletes any
+    // match whose fiscalDocumentId is NOT in the payload, then validates the
+    // payload sum against the FULL transaction amount. So when adding to an
+    // already-partially-matched transaction, re-send the existing non-reversed
+    // fiscal matches alongside the new ones — otherwise they'd be dropped and the
+    // payload could no longer cover the payment (the old `txAmount −
+    // existingAllocated` target made partial re-matches fail validation).
+    const expanded: { fiscalDocumentId: string; amount: number }[] = [];
+    for (const m of existingMatches) {
+      if (m.fiscalDocumentId) {
+        expanded.push({ fiscalDocumentId: m.fiscalDocumentId, amount: m.allocatedAmount || 0 });
+      }
+    }
+
     // Expand any selected order group into its member NFs (a group's
     // `fiscalDocumentId` is a synthetic "order-group:<code>" sentinel, never a
     // real doc). Each member is allocated its own NF value.
-    const expanded: { fiscalDocumentId: string; amount: number }[] = [];
     for (const id of selectedIds) {
       const c = candById.get(id);
       if (c?.isOrderGroup && c.members?.length) {
@@ -161,8 +176,8 @@ export function TransactionMatchSection({
     }
 
     // Absorb the rounding residual onto the largest member so allocations sum
-    // EXACTLY to the remaining payment (backend enforces ±0.05).
-    const target = txAmount - existingAllocated;
+    // EXACTLY to the payment (backend enforces ±0.05 against the full amount).
+    const target = txAmount;
     const sum = expanded.reduce((s, a) => s + a.amount, 0);
     const residual = Number((sum - target).toFixed(2));
     if (expanded.length > 0 && Math.abs(residual) >= 0.01) {
@@ -243,20 +258,14 @@ export function TransactionMatchSection({
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between gap-3">
               <CardTitle className="text-base leading-none">Notas vinculadas</CardTitle>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 {isFullyReconciled && (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                    <IconCircleCheck className="h-4 w-4" />
-                    Conciliação completa
-                  </span>
+                  <Button variant="default" size="sm" disabled className="h-8">
+                    <IconCircleCheck className="h-4 w-4 mr-1.5" /> Conciliação completa
+                  </Button>
                 )}
                 {onRequestUnmatch && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={onRequestUnmatch}
-                    className="h-8 text-destructive hover:text-destructive"
-                  >
+                  <Button variant="destructive" size="sm" onClick={onRequestUnmatch} className="h-8">
                     <IconLinkOff className="h-4 w-4 mr-1.5" /> Desvincular
                   </Button>
                 )}

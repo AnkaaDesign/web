@@ -135,6 +135,7 @@ const UnderConstruction = lazy(() => import("@/pages/under-construction"));
 // Public Pages (no authentication required)
 const PublicBudgetPage = lazy(() => import("@/pages/public/budget/[id]").then((module) => ({ default: module.PublicBudgetPage })));
 const PublicServiceReportPage = lazy(() => import("@/pages/public/service-report/[id]").then((module) => ({ default: module.PublicServiceReportPage })));
+const PublicWasteCertificatePage = lazy(() => import("@/pages/public/waste-certificate/[id]").then((module) => ({ default: module.PublicWasteCertificatePage })));
 
 // Inventory
 const Inventory = lazy(() => import("@/pages/inventory/root").then((module) => ({ default: module.InventoryRootPage })));
@@ -441,6 +442,7 @@ const QrCodeToolPage = lazy(() => import("@/pages/tools/qr-code").then((module) 
 const TimeCalculatorPage = lazy(() => import("@/pages/tools/time-calculator"));
 const OvertimeCostCalculatorPage = lazy(() => import("@/pages/tools/overtime-cost-calculator"));
 const PaintMixCalculatorPage = lazy(() => import("@/pages/tools/paint-mix-calculator"));
+const WasteCertificateToolPage = lazy(() => import("@/pages/tools/waste-certificate").then((module) => ({ default: module.WasteCertificateToolPage })));
 
 function App() {
   // Initialize web notifications
@@ -467,6 +469,14 @@ function App() {
               element={
                 <Suspense fallback={<PageLoader />}>
                   <PublicServiceReportPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path={routes.publicWasteCertificate(":id")}
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PublicWasteCertificatePage />
                 </Suspense>
               }
             />
@@ -3021,6 +3031,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PaintMixCalculatorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.tools.wasteCertificate.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <WasteCertificateToolPage />
                     </Suspense>
                   }
                 />

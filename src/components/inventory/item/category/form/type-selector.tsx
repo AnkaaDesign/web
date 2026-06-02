@@ -22,7 +22,7 @@ export function TypeSelector({ control, disabled }: TypeSelectorProps) {
       name="type"
       render={({ field }) => (
         <FormItem className="space-y-2">
-          <FormLabel className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Tipo de Categoria</FormLabel>
+          <FormLabel className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Tipo Físico (interno)</FormLabel>
           <FormControl>
             <Combobox
               options={options}

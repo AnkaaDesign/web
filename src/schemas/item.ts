@@ -1496,10 +1496,13 @@ const itemCategoryFilters = {
   hasItems: z.boolean().optional(),
   // Hierarchy convenience filters
   parentId: z.string().nullable().optional(),
+  parentIds: z.array(z.string()).optional(),
   categoryLevel: z.number().int().min(1).max(2).optional(),
   accountingType: z.nativeEnum(ACCOUNTING_TYPE).optional(),
-  // Tree mode: when true the API returns top-level categories with nested children.
-  tree: z.boolean().optional(),
+  accountingTypes: z.array(z.nativeEnum(ACCOUNTING_TYPE)).optional(),
+  // When true (and no parentId/parentIds), restrict to top-level (level 1)
+  // categories. Consumed directly by the API as a passthrough filter.
+  topLevelOnly: z.boolean().optional(),
 };
 
 const priceFilters = {
@@ -2017,6 +2020,11 @@ const itemCategoryTransform = (data: any) => {
     delete data.parentId;
   }
 
+  if (Array.isArray(data.parentIds) && data.parentIds.length > 0) {
+    andConditions.push({ parentId: { in: data.parentIds } });
+    delete data.parentIds;
+  }
+
   if (typeof data.categoryLevel === "number") {
     andConditions.push({ categoryLevel: data.categoryLevel });
     delete data.categoryLevel;
@@ -2027,8 +2035,13 @@ const itemCategoryTransform = (data: any) => {
     delete data.accountingType;
   }
 
-  // `tree` is a passthrough flag consumed by the API (returns nested children);
-  // it is not a where-clause condition, so leave it on the payload.
+  if (Array.isArray(data.accountingTypes) && data.accountingTypes.length > 0) {
+    andConditions.push({ accountingType: { in: data.accountingTypes } });
+    delete data.accountingTypes;
+  }
+
+  // `topLevelOnly` is a passthrough flag consumed by the API (restricts to
+  // level-1 categories); it is not a where-clause condition, so leave it on the payload.
 
   if (data.hasItems === true) {
     andConditions.push({ items: { some: {} } });
