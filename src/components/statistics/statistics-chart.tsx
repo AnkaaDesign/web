@@ -101,6 +101,11 @@ interface StatisticsChartProps {
    * "Média <Escopo> - <Categoria>" legends with distinct colors per bar.
    */
   categoryLegend?: Array<{ label: string; color: string }>;
+  /**
+   * Show the interactive custom legend (color swatches + color picker) below
+   * the chart. Defaults to true; the parent can toggle it off to reclaim space.
+   */
+  showLegend?: boolean;
 }
 
 // Lighten a #rrggbb color toward white by `amt` (0..1). Used for the bar
@@ -218,6 +223,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   onSeriesColorChange,
   valueColor,
   categoryLegend,
+  showLegend = true,
 }, externalRef) {
   const smooth = chartType === 'line-smooth' || chartType === 'area-smooth';
   const baseChartType = chartType === 'line-smooth' ? 'line' : chartType === 'area-smooth' ? 'area' : chartType;
@@ -291,6 +297,13 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   const usePerPeriod = !!(perPeriodGoalLine?.values && perPeriodGoalLine.values.some(v => v != null));
   const usePerPeriodSecondary = !!(perPeriodSecondaryGoalLine?.values?.some(v => v != null));
 
+  // Legend overlay geometry (measured below). Declared here so the chart
+  // option's grid.bottom can reserve vertical room for it above the dataZoom.
+  const hasZoom = (data?.length ?? 0) > 8;
+  const legendBottomPx = hasZoom ? 60 : 12;
+  const legendRef = useRef<HTMLDivElement>(null);
+  const [legendHeight, setLegendHeight] = useState(0);
+
   const option = useMemo((): EChartsOption => {
     if (!data || data.length === 0) return {};
 
@@ -323,10 +336,12 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
         }]
       : [];
 
-    // Fixed-pixel bottom margin: leaves room for rotated x-axis labels (~40px),
-    // the custom legend strip (~22px), the dataZoom slider when present
-    // (8 + 30 = 38px), and equal gaps above and below the legend (~12px each).
-    const gridBottom = needsScroll ? 124 : 80;
+    // Bottom margin (below the rotated x-axis labels, which containLabel keeps
+    // above it). It must clear the dataZoom slider (8 + 30 = 38px) and reserve
+    // the measured legend overlay band [legendBottomPx, legendBottomPx + height]
+    // so a tall, multi-row legend never overlaps the column labels.
+    const legendReserve = legendHeight > 0 ? legendBottomPx + legendHeight + 20 : 0;
+    const gridBottom = Math.max(needsScroll ? 78 : 36, legendReserve);
     const baseGrid = { left: '3%', right: '4%', bottom: gridBottom, containLabel: true };
 
     const isLineLike = baseChartType === 'line' || baseChartType === 'line-stacked' || baseChartType === 'area';
@@ -1019,7 +1034,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       color: CHART_COLORS, dataZoom,
       series: [...categoryBandSeries, ...yearBandSeries, ...goalLineSeries, ...trendSeries, ...series],
     };
-  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType, tooltipTrigger, categoryBands, valueColor, categoryLegend]);
+  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType, tooltipTrigger, categoryBands, valueColor, categoryLegend, legendHeight, legendBottomPx]);
 
   const onEvents = useMemo((): Record<string, (params: any) => void> => {
     if (!hasClickHandler) return {};
@@ -1102,7 +1117,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   // Category-legend mode: one entry per bar (single series only). It flows
   // through the SAME interactive legend below (color picker + visibility toggle).
   const useCategoryLegend = !!categoryLegend && !isComparisonMode && baseChartType !== 'pie';
-  const showCustomLegend = baseChartType !== 'pie';
+  const showCustomLegend = showLegend && baseChartType !== 'pie';
 
   // Build the list of legend items mirroring the series the option actually
   // adds, in the same order they appear.
@@ -1232,8 +1247,20 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
     });
   }, []);
 
-  const hasZoom = (data?.length ?? 0) > 8;
-  const legendBottomPx = hasZoom ? 70 : 8;
+  // Measuring effect for the legend overlay height (declared near the legend
+  // render below). grid.bottom reserves room for it above the zoom slider.
+  useEffect(() => {
+    const el = legendRef.current;
+    if (!showCustomLegend || legendItems.length === 0 || !el) {
+      setLegendHeight(0);
+      return;
+    }
+    const measure = () => setLegendHeight(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [showCustomLegend, legendItems]);
 
   // `height` from the page can be a fixed CSS string ('600px'), '100%' to fill
   // the parent (most common — see collection/revenue-quotes/nfse pages), or a
@@ -1263,8 +1290,12 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           onEvents={onEvents}
           onChartReady={handleChartReady}
         />
+        {/* Legend overlay sits in the band above the dataZoom slider. Its
+            measured height feeds grid.bottom so the rotated x-axis labels are
+            pushed up clear of it (no overlap), however many rows it wraps to. */}
         {showCustomLegend && legendItems.length > 0 && (
           <div
+            ref={legendRef}
             className="pointer-events-none absolute left-0 right-0 flex flex-wrap justify-center gap-x-4 gap-y-1 px-2"
             style={{ bottom: legendBottomPx }}
           >

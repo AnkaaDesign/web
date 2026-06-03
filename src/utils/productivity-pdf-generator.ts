@@ -126,6 +126,32 @@ function makePrintOption(opt: EChartsOption): EChartsOption {
       legendData.push(s.name);
     }
   }
+  // A legend with a single entry is noise (the title already says what the
+  // bars are), so only show it when there are ≥2 series to disambiguate.
+  const showLegend = legendData.length > 1;
+
+  // Left/right gutters. ECharts' containLabel reserves space for the Y-axis
+  // labels on the left and the X-axis label HEIGHT at the bottom, but it does
+  // NOT account for the horizontal overhang of 45°-rotated category labels —
+  // so the first/last (longest) labels get clipped at the canvas edge. Size
+  // the gutter to the longest label when the X labels are rotated.
+  const xAxisArr = Array.isArray(opt.xAxis) ? opt.xAxis : opt.xAxis ? [opt.xAxis] : [];
+  let maxLabelLen = 0;
+  let xRotated = false;
+  for (const a of xAxisArr as any[]) {
+    if (a?.axisLabel?.rotate) xRotated = true;
+    for (const d of (a?.data ?? []) as any[]) {
+      const s = d && typeof d === 'object' ? String(d.value ?? '') : String(d ?? '');
+      if (s.length > maxLabelLen) maxLabelLen = s.length;
+    }
+  }
+  // ~4.2px horizontal reach per character at the print font size (22px), with
+  // a floor for normal charts and a cap so a single huge label can't eat the plot.
+  const wideLabels = xRotated && maxLabelLen > 24;
+  const sideGutter = wideLabels ? Math.min(240, Math.max(120, Math.round(maxLabelLen * 4.2))) : 70;
+  const gridLeft = sideGutter;
+  const gridRight = wideLabels ? Math.round(sideGutter * 0.72) : 50;
+  const gridBottom = showLegend ? 120 : 70;
 
   return {
     ...opt,
@@ -133,7 +159,7 @@ function makePrintOption(opt: EChartsOption): EChartsOption {
     animation: false,
     dataZoom: [],
     legend: {
-      show: legendData.length > 0,
+      show: showLegend,
       data: legendData,
       bottom: 14,
       itemWidth: 28,
@@ -141,7 +167,7 @@ function makePrintOption(opt: EChartsOption): EChartsOption {
       itemGap: 36,
       textStyle: { color: '#111827', fontSize: 24, fontWeight: 600 },
     },
-    grid: { left: 70, right: 50, top: 48, bottom: 110, containLabel: true },
+    grid: { left: gridLeft, right: gridRight, top: 44, bottom: gridBottom, containLabel: true },
     xAxis,
     yAxis,
     series: (series as any[]).map(s => ({
@@ -154,10 +180,13 @@ function makePrintOption(opt: EChartsOption): EChartsOption {
   };
 }
 
+// Canvas aspect ratio is tuned so the embedded image fills the full content
+// width of the A4 page (CW ≈ 762pt) without being scaled down to fit the
+// available height — otherwise it gets centered with large empty side margins.
 async function renderChartToPng(
   option: EChartsOption,
-  pxWidth = 1800,
-  pxHeight = 880,
+  pxWidth = 2000,
+  pxHeight = 780,
 ): Promise<Uint8Array> {
   const container = document.createElement('div');
   container.style.cssText =
@@ -297,7 +326,13 @@ export async function exportProductivityPdf(opts: ProductivityPdfOptions): Promi
     const statsText = opts.summaryStats
       .map(s => `${s.label}: ${s.value}`)
       .join('      |      ');
-    const size = 11;
+    // Shrink the font so the (possibly long) metrics line stays on one row
+    // inside the page margins.
+    let size = 11;
+    const minSize = 7;
+    while (size > minSize && fontBold.widthOfTextAtSize(statsText, size) + 36 > CW) {
+      size -= 0.5;
+    }
     const statsW = fontBold.widthOfTextAtSize(statsText, size);
     const padX = 18;
     const padY = 9;
