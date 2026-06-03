@@ -74,6 +74,8 @@ interface StatisticsRadarChartProps {
   /** Controlled per-series color overrides, keyed by series NAME. */
   seriesColors?: Record<string, string>;
   onSeriesColorChange?: (name: string, color: string) => void;
+  /** Show the interactive legend (color swatches) below the radar. Default true. */
+  showLegend?: boolean;
 }
 
 const defaultFormatter = (v: number) =>
@@ -130,6 +132,7 @@ export const StatisticsRadarChart = forwardRef<
     onToggleSeries,
     seriesColors: seriesColorsProp,
     onSeriesColorChange,
+    showLegend = true,
   },
   externalRef,
 ) {
@@ -616,7 +619,7 @@ export const StatisticsRadarChart = forwardRef<
           );
         })}
       </div>
-      {resolvedSeries.length > 0 && (
+      {showLegend && resolvedSeries.length > 0 && (
         <div className="shrink-0 pt-1">
           {!labelsEnabled && visibleCount > 4 && (
             <p className="text-center text-[10px] text-muted-foreground mb-1">

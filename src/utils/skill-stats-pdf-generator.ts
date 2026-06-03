@@ -53,7 +53,19 @@ const fmt = (n: number | null | undefined, decimals = 2) =>
         maximumFractionDigits: decimals,
       }).format(n);
 
-function buildFilterLines(filters: SkillStatsBaseFilters): string[] {
+// Resolved display names for the single-selection scopes. When exactly one
+// campaign/sector/collaborator is selected we print its NAME (no count label);
+// for two or more we fall back to a "<n> <plural>" count.
+export interface SkillStatsScopeNames {
+  campaign?: string | null;
+  sector?: string | null;
+  user?: string | null;
+}
+
+function buildFilterLines(
+  filters: SkillStatsBaseFilters,
+  names?: SkillStatsScopeNames,
+): string[] {
   const lines: string[] = [];
   if (filters.periodStart || filters.periodEnd) {
     const a = filters.periodStart
@@ -64,21 +76,23 @@ function buildFilterLines(filters: SkillStatsBaseFilters): string[] {
       : '…';
     lines.push(`Período: ${a} → ${b}`);
   }
-  if (filters.assessmentIds?.length) {
-    lines.push(`${filters.assessmentIds.length} campanha(s) selecionada(s)`);
-  }
-  if (filters.sectorIds?.length) {
-    lines.push(`${filters.sectorIds.length} setor(es)`);
-  }
+  // For campaign/sector/collaborator: a single selection shows the entity's
+  // name directly; multiple selections show the quantity instead.
+  const scope = (ids: string[] | undefined, name: string | null | undefined, plural: string) => {
+    const n = ids?.length ?? 0;
+    if (!n) return;
+    if (n === 1 && name) lines.push(name);
+    else lines.push(`${n} ${plural}`);
+  };
+  scope(filters.assessmentIds, names?.campaign, 'campanhas');
+  scope(filters.sectorIds, names?.sector, 'setores');
   if (filters.skillIds?.length) {
     lines.push(`${filters.skillIds.length} competência(s)`);
   }
   if (filters.topicIds?.length) {
     lines.push(`${filters.topicIds.length} tópico(s)`);
   }
-  if (filters.userIds?.length) {
-    lines.push(`${filters.userIds.length} colaborador(es)`);
-  }
+  scope(filters.userIds, names?.user, 'colaboradores');
   if (filters.includeInProgress) lines.push('Inclui avaliações em andamento');
   return lines;
 }
@@ -93,6 +107,8 @@ export interface SkillStatsPdfOptions {
   chartType: SkillStatsChartType;
   chartOption: EChartsOption | null;
   filters: SkillStatsBaseFilters;
+  /** Names for single-selection scopes; counts are used when 2+ are selected. */
+  scopeNames?: SkillStatsScopeNames;
 }
 
 export async function exportSkillStatsPdf(opts: SkillStatsPdfOptions): Promise<void> {
@@ -110,19 +126,34 @@ export async function exportSkillStatsPdf(opts: SkillStatsPdfOptions): Promise<v
 
   // Build a summary block from whichever endpoint payload happens to be loaded.
   // Overview is the most common, comparison/evolution have a couple of extras.
+  const singleUser = opts.filters.userIds?.length === 1;
+  const singleCampaign = opts.filters.assessmentIds?.length === 1;
+
   const summary: ProductivityPdfOptions['summaryStats'] = (() => {
     const s = opts.overview?.summary;
     const base: ProductivityPdfOptions['summaryStats'] = [];
     if (s) {
+      // "Colaboradores avaliados" / "Campanhas" are redundant when a single
+      // collaborator/campaign is already named in the subtitle, so drop them then.
+      if (!singleUser) {
+        base.push({ label: 'Colaboradores avaliados', value: String(s.totalEvaluated) });
+      }
       base.push(
-        { label: 'Colaboradores avaliados', value: String(s.totalEvaluated) },
         { label: 'Média geral', value: fmt(s.overallAverage) },
         {
-          label: 'Submissão',
+          label: 'Taxa de avaliação',
           value: `${((s.submissionRate ?? 0) * 100).toFixed(1)}%`,
         },
-        { label: 'Campanhas', value: String(s.assessmentsCount) },
       );
+      // Per-competência averages, inline alongside the headline metrics:
+      // "Média <Competência>: <valor>".
+      for (const p of opts.overview?.bySkill ?? []) {
+        if (p.average == null) continue;
+        base.push({ label: `Média ${p.skillName}`, value: fmt(p.average) });
+      }
+      if (!singleCampaign) {
+        base.push({ label: 'Campanhas', value: String(s.assessmentsCount) });
+      }
     }
 
     if (opts.comparison) {
@@ -142,7 +173,7 @@ export async function exportSkillStatsPdf(opts: SkillStatsPdfOptions): Promise<v
   await exportProductivityPdf({
     title,
     subtitle,
-    filterLines: buildFilterLines(opts.filters),
+    filterLines: buildFilterLines(opts.filters, opts.scopeNames),
     chartOption: opts.chartOption,
     summaryStats: summary,
     fileSuffix,

@@ -25,6 +25,7 @@ import {
   IconFileTypePdf,
   IconFileTypeXls,
   IconFilter,
+  IconList,
   IconRadar,
   IconRefresh,
   IconStack2,
@@ -868,6 +869,8 @@ export const HRSkillAssessmentStatisticsPage = () => {
   // Radar is the most informative default for the skill × average composition.
   const [chartType, setChartType]     = useState<SkillStatsChartType>('radar-polygon');
   const [trendLine, setTrendLine]     = useState<TrendLineType | null>(null);
+  // Show/hide the interactive legend (color swatches) below the chart.
+  const [showLegend, setShowLegend]   = useState(true);
 
   // Legend hide/colors are lifted here (keyed by series NAME) so they persist
   // when the chart is remounted on a chart-type switch (bar ↔ radar ↔ stacked).
@@ -1869,6 +1872,12 @@ export const HRSkillAssessmentStatisticsPage = () => {
       }
       const { exportSkillStatsPdf } = await import('@/utils/skill-stats-pdf-generator');
       toast.loading('Gerando PDF...', { id: 'skill-pdf' });
+      // Resolve names for the single-selection scopes so the PDF prints the
+      // entity name instead of "1 selecionado"; 2+ selections fall back to a count.
+      const singleCampaignName =
+        filters.assessmentIds?.length === 1
+          ? (assessmentList.find(a => a.id === filters.assessmentIds![0])?.name ?? null)
+          : null;
       await exportSkillStatsPdf({
         overview: overview ?? null,
         comparison: comparison ?? null,
@@ -1879,13 +1888,19 @@ export const HRSkillAssessmentStatisticsPage = () => {
         chartType,
         chartOption,
         filters,
+        scopeNames: {
+          campaign: singleCampaignName,
+          sector: singleSectorId ? ((scopeSectorResp as any)?.data?.[0]?.name ?? null) : null,
+          user: singleUserId ? ((scopeUserResp as any)?.data?.[0]?.name ?? null) : null,
+        },
       });
       toast.success('PDF exportado!', { id: 'skill-pdf' });
     } catch (err) {
       console.error(err);
       toast.error('Erro ao exportar PDF', { id: 'skill-pdf' });
     }
-  }, [chartType, overview, comparison, evolution, xAxisMode, yAxisMode, compareMode, filters]);
+  }, [chartType, overview, comparison, evolution, xAxisMode, yAxisMode, compareMode, filters,
+      assessmentList, singleSectorId, singleUserId, scopeSectorResp, scopeUserResp]);
 
   // ============================================================
   // KPI card click handlers
@@ -2072,6 +2087,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
             onToggleSeries={toggleHiddenSeries}
             seriesColors={seriesColors}
             onSeriesColorChange={setSeriesColor}
+            showLegend={showLegend}
           />
         </div>
       );
@@ -2157,6 +2173,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
             onToggleSeries={toggleHiddenSeries}
             seriesColors={chartSeriesColors}
             onSeriesColorChange={setSeriesColor}
+            showLegend={showLegend}
           />
         </div>
       </div>
@@ -2311,6 +2328,17 @@ export const HRSkillAssessmentStatisticsPage = () => {
 
               {/* Radar shape is now part of the chart-type selector
                   ("Radar Polígono" / "Radar Círculo") — no separate toggle. */}
+
+              {/* Legend visibility toggle */}
+              <Button
+                variant={showLegend ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowLegend(v => !v)}
+                title={showLegend ? 'Ocultar legenda' : 'Exibir legenda'}
+              >
+                <IconList className="h-4 w-4 mr-2" />
+                Legenda
+              </Button>
 
               {/* Filters */}
               <Button
