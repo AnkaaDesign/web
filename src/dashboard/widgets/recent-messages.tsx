@@ -465,7 +465,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
       >
         {(messages) =>
           messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-sm text-muted-foreground">
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-sm text-muted-foreground">
               <IconMessageOff className="h-6 w-6 mb-2 opacity-40" />
               Nenhuma mensagem recente.
             </div>
