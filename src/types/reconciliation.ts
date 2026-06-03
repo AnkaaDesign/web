@@ -303,6 +303,7 @@ export interface MatchCandidate {
   destCpf: string | null;
   destName: string | null;
   nfNumber: string | null;
+  orderCodes?: { code: string }[];
   confidence: number;
   matchType: MatchType;
   rationale: string;

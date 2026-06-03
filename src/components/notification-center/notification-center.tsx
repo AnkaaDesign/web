@@ -23,9 +23,9 @@ import { toast } from "@/components/ui/sonner";
  * Maps API entity types (uppercase) to web application routes
  */
 const ENTITY_ROUTE_MAP: Record<string, string> = {
-  // Task routes (default to agenda, user can navigate from there)
-  TASK: "/producao/agenda/detalhes",
-  Task: "/producao/agenda/detalhes",
+  // Task routes
+  TASK: "/producao/cronograma/detalhes",
+  Task: "/producao/cronograma/detalhes",
 
   // Order routes
   ORDER: "/estoque/pedidos/detalhes",
@@ -41,12 +41,12 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   SERVICEORDER: "/producao/ordens-de-servico/detalhes",
 
   // User routes
-  USER: "/administracao/usuarios/detalhes",
-  User: "/administracao/usuarios/detalhes",
+  USER: "/administracao/colaboradores/detalhes",
+  User: "/administracao/colaboradores/detalhes",
 
   // Employee routes
-  EMPLOYEE: "/recursos-humanos/funcionarios/detalhes",
-  Employee: "/recursos-humanos/funcionarios/detalhes",
+  EMPLOYEE: "/administracao/colaboradores/detalhes",
+  Employee: "/administracao/colaboradores/detalhes",
 
   // Customer routes
   CUSTOMER: "/financeiro/clientes/detalhes",
@@ -255,18 +255,22 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     }
 
     if (targetUrl) {
-      // Handle legacy /tasks/:id URLs - convert to new /producao/agenda/detalhes/:id
-      // This handles old notifications that were created before the URL fix
+      // Handle legacy /tasks/:id URLs
       if (targetUrl.startsWith("/tasks/")) {
         const taskId = targetUrl.replace("/tasks/", "");
-        // Default to agenda for old URLs (user can navigate to correct page from there)
-        targetUrl = `/producao/agenda/detalhes/${taskId}`;
+        targetUrl = `/producao/cronograma/detalhes/${taskId}`;
       }
 
       // Handle legacy /tarefas/:id URLs (from old DeepLinkService)
       if (targetUrl.startsWith("/tarefas/")) {
         const taskId = targetUrl.replace("/tarefas/", "");
-        targetUrl = `/producao/agenda/detalhes/${taskId}`;
+        targetUrl = `/producao/cronograma/detalhes/${taskId}`;
+      }
+
+      // Handle legacy /producao/agenda/detalhes/:id URLs
+      if (targetUrl.startsWith("/producao/agenda/detalhes/")) {
+        const taskId = targetUrl.replace("/producao/agenda/detalhes/", "");
+        targetUrl = `/producao/cronograma/detalhes/${taskId}`;
       }
 
       // Handle legacy /pedidos/:id URLs (from old DeepLinkService)

@@ -28,8 +28,8 @@ const DEEP_LINK_ROUTES: Record<string, (id: string) => string> = {
   borrow: (id) => routes.inventory.loans.details(id),
   // Maintenance
   maintenance: (id) => routes.inventory.maintenance.details(id),
-  // Financial
-  financial: (id) => routes.financial.customers.details(id),
+  // Financial (billing/invoice detail)
+  financial: (id) => routes.financial.billing.details(id),
   // Messages (personal inbox - list route, id ignored)
   message: () => routes.personal.myMessages.root,
   // Questionnaire (admin detail; id is the questionnaire id)

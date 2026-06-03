@@ -136,16 +136,26 @@ export function TransactionMatchSection({
     transaction.reconciliationStatus === "RECONCILED" &&
     hasExistingMatch &&
     existingAllocated + 0.05 >= txAmount;
+  // Show candidates when pending/partial, OR when the transaction was expecting
+  // an NF but no NF has been linked yet — so that assigning a category (which
+  // may flip status to RECONCILED) does not hide the match section.
   const showCandidates =
-    transaction.reconciliationStatus === "PENDING" ||
-    transaction.reconciliationStatus === "PARTIAL";
+    !hasExistingMatch && (
+      transaction.reconciliationStatus === "PENDING" ||
+      transaction.reconciliationStatus === "PARTIAL" ||
+      transaction.expectsFiscalDocument === true
+    );
 
   const hasMatchChanges = selectedIds.length > 0;
-  const canSave = hasMatchChanges && isValidAllocation;
+  // Allow saving even when the allocated amount differs from the transaction —
+  // handleSave absorbs the residual onto the largest NF so the backend receives
+  // an allocation that sums exactly to the payment. isValidAllocation is kept
+  // as a visual signal only (amber "Faltam" label) but no longer blocks saving.
+  const canSave = hasMatchChanges;
   const saving = matchMut.isPending;
 
   const handleSave = () => {
-    if (!hasMatchChanges || !isValidAllocation) return;
+    if (!hasMatchChanges) return;
 
     // The backend treats the payload as the COMPLETE match set: it deletes any
     // match whose fiscalDocumentId is NOT in the payload, then validates the
@@ -289,12 +299,14 @@ export function TransactionMatchSection({
               const header = (
                 <div className="flex items-center gap-3 flex-wrap min-w-0">
                   {doc?.docType && (
-                    <Badge size="sm" variant={docTypeVariant(doc.docType)}>
+                    <Badge variant={docTypeVariant(doc.docType)}>
                       {docTypeLabel(doc.docType)}
                     </Badge>
                   )}
                   {doc?.nfNumber && (
-                    <span className="text-xs text-muted-foreground">Nº {doc.nfNumber}</span>
+                    <Badge variant="outline" className="whitespace-nowrap font-mono">
+                      Nº {doc.nfNumber}
+                    </Badge>
                   )}
                   <span className="font-medium truncate flex-1 min-w-0">{title}</span>
                   {doc?.issueDate && (
@@ -440,7 +452,7 @@ function CandidateRow({
               Pedido {c.orderCode}
             </span>
           ) : (
-            <Badge size="sm" variant={docTypeVariant(c.docType)}>
+            <Badge variant={docTypeVariant(c.docType)}>
               {docTypeLabel(c.docType)}
             </Badge>
           )}
@@ -449,9 +461,19 @@ function CandidateRow({
               {c.memberCount} notas{c.nfNumber ? ` · Nº ${c.nfNumber}` : ""}
             </span>
           ) : (
-            c.nfNumber && (
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Nº {c.nfNumber}</span>
-            )
+            <>
+              {c.nfNumber && (
+                <Badge variant="secondary" className="whitespace-nowrap font-mono">
+                  Nº {c.nfNumber}
+                </Badge>
+              )}
+              {(c.orderCodes ?? []).map(oc => (
+                <Badge key={oc.code} variant="secondary" className="whitespace-nowrap font-mono gap-1">
+                  <IconStack2 className="h-3 w-3" />
+                  {oc.code}
+                </Badge>
+              ))}
+            </>
           )}
           <span className="font-medium truncate min-w-0">
             {c.emitName || (c.emitCnpj ? formatCNPJ(c.emitCnpj) : "—")}
@@ -482,10 +504,10 @@ function CandidateRow({
             <span className="text-sm font-medium text-foreground whitespace-nowrap">
               {formatDate(c.issueDate)}
             </span>
-            <Badge size="sm" variant="secondary" title="Diferença de dias para a transação">
+            <Badge variant="secondary" title="Diferença de dias para a transação">
               {c.daysDelta === 0 ? "mesmo dia" : `${c.daysDelta}d`}
             </Badge>
-            <Badge size="sm" variant={getConfidenceBadgeVariant(c.confidence)}>
+            <Badge variant={getConfidenceBadgeVariant(c.confidence)}>
               {c.confidence}%
             </Badge>
             {!c.isOrderGroup && (

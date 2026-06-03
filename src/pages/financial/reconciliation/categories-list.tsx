@@ -92,14 +92,12 @@ const accountingGroupOf = (c: TransactionCategory) =>
   getAccountingTypeLabel(c) ?? NO_ACCOUNTING_GROUP;
 
 // Default multi-column sort applied on first load (no sort in the URL):
-// accounting type (cost group A→Z, ungrouped last) → kind → recurring first →
-// name A→Z. Matches the interactive sort headers below so clicking a column
-// refines from here. Module-level constant keeps a stable reference for
-// useTableState/useMemo.
+// recurring first → kind (TRANSACTION_ONLY → SERVICE → ITEM_DERIVED) → name A→Z.
+// Matches the interactive sort headers below so clicking a column refines from here.
+// Module-level constant keeps a stable reference for useTableState/useMemo.
 const DEFAULT_SORT: Array<{ column: string; direction: "asc" | "desc" }> = [
-  { column: "accountingType", direction: "asc" },
-  { column: "kind", direction: "asc" },
   { column: "isRecurring", direction: "desc" },
+  { column: "kind", direction: "asc" },
   { column: "name", direction: "asc" },
 ];
 

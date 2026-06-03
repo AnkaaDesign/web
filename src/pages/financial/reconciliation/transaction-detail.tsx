@@ -222,34 +222,7 @@ export function ReconciliationTransactionDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  {hasNf ? (
-                    tx.categories && tx.categories.length > 0 ? (
-                      <div className="space-y-3">
-                        {tx.categories.map(t => (
-                          <div
-                            key={t.id}
-                            className="flex items-center gap-2 bg-muted/50 rounded-lg px-4 py-3"
-                          >
-                            {t.category?.color && (
-                              <span
-                                className="h-2 w-2 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: t.category.color }}
-                              />
-                            )}
-                            <span className="text-sm font-semibold text-foreground">
-                              {t.category?.name ?? "—"}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="bg-muted/50 rounded-lg px-4 py-3">
-                        <p className="text-sm text-muted-foreground">
-                          Definida pelas notas vinculadas.
-                        </p>
-                      </div>
-                    )
-                  ) : (
+                  {!hasNf && !tx.expectsFiscalDocument ? (
                     <CategoryEditor
                       transaction={tx}
                       value={categoryIds}
@@ -257,6 +230,31 @@ export function ReconciliationTransactionDetailPage() {
                       enableSplit={false}
                       enableNotes={false}
                     />
+                  ) : tx.categories && tx.categories.length > 0 ? (
+                    <div className="space-y-3">
+                      {tx.categories.map(t => (
+                        <div
+                          key={t.id}
+                          className="flex items-center gap-2 bg-muted/50 rounded-lg px-4 py-3"
+                        >
+                          {t.category?.color && (
+                            <span
+                              className="h-2 w-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: t.category.color }}
+                            />
+                          )}
+                          <span className="text-sm font-semibold text-foreground">
+                            {t.category?.name ?? "—"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-muted/50 rounded-lg px-4 py-3">
+                      <p className="text-sm text-muted-foreground">
+                        Definida pelas notas vinculadas.
+                      </p>
+                    </div>
                   )}
                 </CardContent>
               </Card>

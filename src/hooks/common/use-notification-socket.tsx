@@ -14,6 +14,7 @@ import type { Notification } from '@/types';
  * Returns the internal webPath for navigation, or extracts path from web URL.
  */
 function parseActionUrl(actionUrl: string): string | null {
+  if (!actionUrl || actionUrl === 'null' || actionUrl === 'undefined') return null;
   if (actionUrl.startsWith('{')) {
     try {
       const parsed = JSON.parse(actionUrl);
@@ -31,6 +32,7 @@ function parseActionUrl(actionUrl: string): string | null {
     } catch {
       // Not valid JSON, fall through
     }
+    return null;
   }
   return actionUrl;
 }

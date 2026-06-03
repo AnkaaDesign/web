@@ -96,10 +96,10 @@ export function FiscalItemsTable({
         <colgroup>
           <col style={{ width: "120px" }} />
           <col />
-          <col style={{ width: "240px" }} />
-          {showQtyCols && <col style={{ width: "90px" }} />}
-          {showQtyCols && <col style={{ width: "120px" }} />}
-          <col style={{ width: "130px" }} />
+          <col style={{ width: "320px" }} />
+          {showQtyCols && <col style={{ width: "110px" }} />}
+          {showQtyCols && <col style={{ width: "140px" }} />}
+          <col style={{ width: "150px" }} />
         </colgroup>
         <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
