@@ -77,6 +77,7 @@ export {
 export * from "./paint";
 export * from "./position";
 export * from "./preferences";
+export * from "./statistics-preferences";
 export * from "./responsible";
 export * from "./secullum";
 export * from "./warning";

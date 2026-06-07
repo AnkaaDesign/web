@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Combobox } from '@/components/ui/combobox';
-import { routes } from '@/constants';
+import { routes, SECTOR_PRIVILEGES } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useProductionBottlenecks } from '@/hooks/production/use-production-analytics';
 import type { ProductionAnalyticsFilters } from '@/types/production-analytics';
@@ -49,12 +49,40 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 
 // =====================
 // Constants
 // =====================
 
 const COMBOBOX_PAGE_SIZE = 20;
+
+// =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of every user-configurable knob on this page. Dates are
+// ISO strings (revived in applyPageConfig); per-field `.catch()` keeps stale
+// stored configs from ever breaking the page.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  startDate: z.string().catch(''),
+  endDate: z.string().catch(''),
+  sortBy: z.enum(['count', 'avgDays']).catch('count'),
+  sortOrder: z.enum(['asc', 'desc']).catch('desc'),
+  limit: z.number().int().min(1).max(200).catch(50),
+  sectorIds: z.array(z.string()).catch([]),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
+
+function parseIsoDate(iso: string, fallback: Date): Date {
+  if (!iso) return fallback;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? fallback : d;
+}
 
 // =====================
 // Filter Sheet Component (inline)
@@ -90,6 +118,8 @@ function BottleneckFilters({
       searchingFor: search || undefined,
       page,
       limit: COMBOBOX_PAGE_SIZE,
+      // Production sectors only — matches performance/productivity/bonus-value.
+      privilege: SECTOR_PRIVILEGES.PRODUCTION,
     });
     return {
       data: (response.data || []).map((sector) => ({
@@ -281,6 +311,44 @@ const BottlenecksPage = () => {
     return count;
   }, [filters]);
 
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    startDate: filters.startDate ? filters.startDate.toISOString() : '',
+    endDate: filters.endDate ? filters.endDate.toISOString() : '',
+    sortBy: (filters.sortBy ?? 'count') as PageConfig['sortBy'],
+    sortOrder: (filters.sortOrder ?? 'desc') as PageConfig['sortOrder'],
+    limit: filters.limit ?? 50,
+    sectorIds: filters.sectorIds ?? [],
+  }), [filters]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    setFilters({
+      startDate: parseIsoDate(config.startDate, startOfDay(subMonths(new Date(), 1))),
+      endDate: parseIsoDate(config.endDate, endOfDay(new Date())),
+      sortBy: config.sortBy,
+      sortOrder: config.sortOrder,
+      limit: config.limit,
+      sectorIds: config.sectorIds.length ? config.sectorIds : undefined,
+    });
+  }, []);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.production.bottlenecks,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
+
   // Fetch data
   const { data, isLoading, isError, error, refetch } = useProductionBottlenecks(filters);
 
@@ -439,6 +507,37 @@ const BottlenecksPage = () => {
             { label: 'Produção', href: routes.statistics.production.root },
             { label: 'Gargalos' },
           ]}
+          headerExtra={
+            <>
+              <StatisticsPresetsMenu
+                presets={presets}
+                activePreset={activePreset}
+                onSave={savePreset}
+                onApply={applyPreset}
+                onOverwrite={overwritePreset}
+                onRename={renamePreset}
+                onDelete={deletePreset}
+                isSaving={isSavingPreset}
+              />
+
+              {/* Export */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={isLoading || !stageDistribution.length}>
+                    <IconDownload className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <IconDownload className="h-4 w-4 mr-2" /> CSV dos Dados
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          }
         />
       </div>
 
@@ -449,9 +548,6 @@ const BottlenecksPage = () => {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <CardTitle>Análise de Gargalos</CardTitle>
-                  <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                    <span>Gargalos de produção, utilização de barracões e recortes</span>
-                  </CardDescription>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -500,22 +596,6 @@ const BottlenecksPage = () => {
                     )}
                   </Button>
 
-                  {/* Export */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" disabled={isLoading || !stageDistribution.length}>
-                        <IconDownload className="h-4 w-4 mr-2" />
-                        Exportar
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleExportCSV}>
-                        <IconDownload className="h-4 w-4 mr-2" /> CSV dos Dados
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
               </div>
             </CardHeader>
@@ -579,6 +659,8 @@ const BottlenecksPage = () => {
                       chartType="bar"
                       yAxisMode="count"
                       isComparisonMode={false}
+                      // Each bar is a different production stage → per-stage colors.
+                      xAxisKind="categorical"
                       height="400px"
                       yAxisLabel="Quantidade"
                       valueFormatter={countFormatter}

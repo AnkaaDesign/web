@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
+import { z } from "zod";
 import {
   IconArrowsExchange2,
   IconCheck,
@@ -22,7 +23,10 @@ import { useChartTheme } from "@/hooks/common/use-chart-theme";
 import { useReconciliationStatistics } from "@/hooks/financial/use-reconciliation";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { FAVORITE_PAGES, routes } from "@/constants";
+import { useStatisticsPagePersistence } from "@/hooks/common/use-statistics-page-persistence";
+import { StatisticsPresetsMenu } from "@/components/statistics/statistics-presets-menu";
 import { formatCurrency, formatDate } from "@/utils";
+import { chartColorAt } from "@/types/statistics-common";
 import type {
   CategoryDistributionEntry,
   MatchType,
@@ -52,11 +56,50 @@ const MATCH_TYPE_LABELS: Record<MatchType, string> = {
   BANK_SLIP_BRIDGE: "Boleto",
 };
 
+// =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of the page's single knob (the period window). Per-field
+// `.catch()` keeps stale stored configs from ever breaking the page.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  months: z.number().int().min(1).max(24).catch(6),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
+
 export const ReconciliationStatisticsPage = () => {
   usePageTracker({ title: "Conciliação - Estatísticas", icon: "arrows-exchange" });
   const navigate = useNavigate();
   const [months, setMonths] = useState(6);
   const { data, isLoading } = useReconciliationStatistics({ months });
+
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    months,
+  }), [months]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    setMonths(config.months);
+  }, []);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.financial.reconciliation,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
 
   // dateFrom param shared by the period-scoped KPI drill-downs. Always passes
   // the start of the selected period; statement-period filter on the list page
@@ -80,6 +123,18 @@ export const ReconciliationStatisticsPage = () => {
             { label: "Financeiro", href: routes.statistics.financial.root },
             { label: "Conciliação Bancária" },
           ]}
+          headerExtra={
+            <StatisticsPresetsMenu
+              presets={presets}
+              activePreset={activePreset}
+              onSave={savePreset}
+              onApply={applyPreset}
+              onOverwrite={overwritePreset}
+              onRename={renamePreset}
+              onDelete={deletePreset}
+              isSaving={isSavingPreset}
+            />
+          }
         />
       </div>
 
@@ -104,9 +159,6 @@ export const ReconciliationStatisticsPage = () => {
         <Card>
           <CardHeader>
             <CardTitle>Conciliação ao longo do tempo</CardTitle>
-            <CardDescription>
-              Volume conciliado vs pendente por mês.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -376,7 +428,8 @@ function MatchProgressChart({
           type: "value",
           axisLine: { lineStyle: { color: theme.axisLineColor } },
           axisLabel: { color: theme.subTextColor },
-          splitLine: { lineStyle: { color: theme.gridLineColor, type: "dashed" } },
+          // Solid gridlines — matches the shared StatisticsChart styling.
+          splitLine: { lineStyle: { color: theme.gridLineColor } },
         },
         series: [
           {
@@ -437,7 +490,8 @@ function UnmatchedByCounterpartyChart({
           type: "value",
           axisLine: { lineStyle: { color: theme.axisLineColor } },
           axisLabel: { color: theme.subTextColor },
-          splitLine: { lineStyle: { color: theme.gridLineColor, type: "dashed" } },
+          // Solid gridlines — matches the shared StatisticsChart styling.
+          splitLine: { lineStyle: { color: theme.gridLineColor } },
         },
         yAxis: {
           type: "category",
@@ -448,8 +502,9 @@ function UnmatchedByCounterpartyChart({
         series: [
           {
             type: "bar",
-            data: data.map(d => d.amount),
-            itemStyle: { color: "#f43f5e" },
+            // Each bar is a different counterparty — give each its own palette
+            // color (same convention as the shared StatisticsChart categorical mode).
+            data: data.map((d, i) => ({ value: d.amount, itemStyle: { color: chartColorAt(i) } })),
           },
         ],
       }}

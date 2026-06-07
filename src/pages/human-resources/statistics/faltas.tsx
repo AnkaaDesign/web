@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -48,6 +48,9 @@ import {
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { toast } from '@/components/ui/sonner';
 import * as XLSX from 'xlsx';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -87,13 +90,6 @@ const Y_AXIS_OPTIONS: Array<{ value: AbsenteeismYMode; label: string }> = [
   { value: 'faltas',  label: 'Faltas (dias)' },
   { value: 'atrasos', label: 'Atrasos (minutos)' },
 ];
-
-const Y_AXIS_LABEL_BY_MODE: Record<AbsenteeismYMode, string> = {
-  rate:    'Taxa de faltas',
-  hours:   'Horas de ausência',
-  faltas:  'Faltas',
-  atrasos: 'Atrasos',
-};
 
 const CHART_TYPE_OPTIONS: Array<{ value: HrChartType; label: string; icon: typeof IconChartBar; description: string }> = [
   { value: 'line', label: 'Linhas', icon: IconChartLine, description: 'Linha simples' },
@@ -177,6 +173,29 @@ function formatMinutesToHm(min: number): string {
   if (m === 0) return `${h}h`;
   return `${h}h${m}min`;
 }
+
+// =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of every user-configurable knob on this page. The filter
+// date range and `periods` are intentionally NOT persisted — they are derived
+// from selectedYears/selectedMonths and rebuilt in applyPageConfig exactly as
+// the filter sheet does. Per-field `.catch()` keeps stale stored configs from
+// ever breaking the page. `goalOverride` and drill-down state are session-only.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  selectedYears: z.array(z.string()).catch([]),
+  selectedMonths: z.array(z.string()).catch([]),
+  yAxisMode: z.enum(['rate', 'hours', 'faltas', 'atrasos']).catch('rate'),
+  chartType: z.enum(['line', 'bar', 'area']).catch('line'),
+  trendLine: z.enum(['linear', 'sma3', 'sma6', 'sma12']).nullable().catch(null),
+  sectorIds: z.array(z.string()).catch([]),
+  absenceType: z.enum(['all', 'justified', 'unjustified', 'medical']).catch('all'),
+  topN: z.number().int().min(1).catch(50),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
 
 // =====================
 // Filter Sheet
@@ -598,7 +617,7 @@ const FaltasStatisticsPage = () => {
     label: string;
   } | null>(null);
 
-  const { data, isLoading, isFetching, isError, error, refetch } = useAbsenteeismAnalytics(filters);
+  const { data, isLoading, isError, error, refetch } = useAbsenteeismAnalytics(filters);
   const summary = data?.data?.summary;
   const items = data?.data?.items ?? [];
   const topAbsentees = data?.data?.topAbsentees ?? [];
@@ -709,6 +728,60 @@ const FaltasStatisticsPage = () => {
     setSelectedMonths(next.selectedMonths);
     setYAxisMode(next.yAxisMode);
   }, []);
+
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    selectedYears,
+    selectedMonths,
+    yAxisMode,
+    chartType,
+    trendLine,
+    sectorIds: filters.sectorIds ?? [],
+    absenceType: (filters.absenceType ?? 'all') as PageConfig['absenceType'],
+    topN: filters.topN ?? 50,
+  }), [selectedYears, selectedMonths, yAxisMode, chartType, trendLine, filters]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    // selectedYears defaults to [currentYear] — never leave it empty.
+    const years = config.selectedYears.length
+      ? config.selectedYears
+      : [new Date().getFullYear().toString()];
+    const months = config.selectedMonths;
+    // Rebuild the derived date range + business-period buckets the same way
+    // the filter sheet's handleApply does.
+    const { startDate, endDate } = computeDateRange(years, months);
+    setFilters(f => ({
+      ...f,
+      startDate: startDate ?? f.startDate,
+      endDate:   endDate   ?? f.endDate,
+      periods:   buildBusinessPeriods(years, months),
+      sectorIds: config.sectorIds.length ? config.sectorIds : undefined,
+      absenceType: config.absenceType,
+      topN: config.topN,
+    }));
+    setSelectedYears(years);
+    setSelectedMonths(months);
+    setYAxisMode(config.yAxisMode);
+    setChartType(config.chartType);
+    setTrendLine(config.trendLine);
+  }, []);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.humanResources.absenteeism,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
 
   const handleExportCSV = useCallback(() => {
     if (!items.length) { toast.error('Nenhum dado para exportar'); return; }
@@ -840,6 +913,37 @@ const FaltasStatisticsPage = () => {
               { label: 'Recursos Humanos', href: routes.statistics.humanResources.root },
               { label: 'Faltas' },
             ]}
+            headerExtra={
+              <>
+                <StatisticsPresetsMenu
+                  presets={presets}
+                  activePreset={activePreset}
+                  onSave={savePreset}
+                  onApply={applyPreset}
+                  onOverwrite={overwritePreset}
+                  onRename={renamePreset}
+                  onDelete={deletePreset}
+                  isSaving={isSavingPreset}
+                />
+
+                {/* Export */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={isLoading || !items.length}>
+                      <IconDownload className="h-4 w-4 mr-2" />Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleExportCSV}>
+                      <IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportXLSX}>
+                      <IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            }
           />
         </div>
 
@@ -851,24 +955,6 @@ const FaltasStatisticsPage = () => {
                     <IconCalendarOff className="h-5 w-5 text-primary" />
                     {periodSummaryLabel}
                   </CardTitle>
-                  <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                    <span>Ausências, faltas e atrasos por período.</span>
-                    <Badge variant="outline" className="text-xs">{Y_AXIS_LABEL_BY_MODE[yAxisMode]}</Badge>
-                    {filters.absenceType && filters.absenceType !== 'all' && (
-                      <Badge variant="secondary" className="text-xs">
-                        {ABSENCE_TYPE_OPTIONS.find(o => o.value === filters.absenceType)?.label}
-                      </Badge>
-                    )}
-                    {trendLine && (
-                      <Badge variant="outline" className="text-xs">{TREND_LABELS[trendLine]}</Badge>
-                    )}
-                    {isFetching && !isLoading && (
-                      <Badge variant="outline" className="text-xs">
-                        <IconLoader2 className="h-3 w-3 mr-1 animate-spin" />
-                        Atualizando
-                      </Badge>
-                    )}
-                  </CardDescription>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -941,23 +1027,6 @@ const FaltasStatisticsPage = () => {
                     <IconFilter className="h-4 w-4 mr-2" />Filtros
                     {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>}
                   </Button>
-
-                  {/* Export */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" disabled={isLoading || !items.length}>
-                        <IconDownload className="h-4 w-4 mr-2" />Exportar
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={handleExportCSV}>
-                        <IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleExportXLSX}>
-                        <IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
               </div>
             </CardHeader>

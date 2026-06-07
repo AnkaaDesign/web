@@ -75,6 +75,7 @@ export * from "./use-media-viewer";
 
 // Preferences & Dashboard
 export * from "./use-preferences";
+export * from "./use-statistics-page-persistence";
 export * from "./use-dashboard";
 export * from "./use-page-tracker";
 

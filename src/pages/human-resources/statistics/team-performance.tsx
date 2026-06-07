@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -60,6 +60,9 @@ import { format, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from '@/components/ui/sonner';
 import * as XLSX from 'xlsx';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -104,13 +107,6 @@ const Y_AXIS_OPTIONS: Array<{ value: EquipeYAxisMode; label: string }> = [
   { value: 'dismissals', label: 'Desligamentos' },
   { value: 'netChange', label: 'Variação líquida' },
 ];
-
-const Y_AXIS_LABEL_BY_MODE: Record<EquipeYAxisMode, string> = {
-  headcount: 'Efetivo total',
-  newHires: 'Admissões',
-  dismissals: 'Desligamentos',
-  netChange: 'Variação líquida',
-};
 
 type EquipeCompareMode = 'combined' | 'separated' | 'separatedWithTotal';
 
@@ -171,6 +167,34 @@ const DEFAULT_FILTERS_BASE = {
   includeUnassigned: true,
   useBusinessPeriod: true,
 } as const;
+
+// =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of every user-configurable knob on this page. The filter
+// date range is intentionally NOT persisted — it's derived from
+// selectedYear/selectedMonths and rebuilt in applyPageConfig exactly as the
+// filter sheet does. `selectedYear` (number | undefined) is encoded as null.
+// Per-field `.catch()` keeps stale stored configs from ever breaking the page.
+// Goal override/input/popover state is session-only.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  selectedYear: z.number().int().nullable().catch(null),
+  selectedMonths: z.array(z.string()).catch([]),
+  yAxisMode: z.enum(['headcount', 'newHires', 'dismissals', 'netChange']).catch('headcount'),
+  compareMode: z.enum(['combined', 'separated', 'separatedWithTotal']).catch('combined'),
+  chartType: z.enum(['bar', 'pie', 'area', 'line', 'bar-stacked']).catch('area'),
+  trendLine: z.enum(['linear', 'sma3', 'sma6', 'sma12']).nullable().catch(null),
+  includeExperienceFailures: z.boolean().catch(false),
+  sectorIds: z.array(z.string()).catch([]),
+  positionIds: z.array(z.string()).catch([]),
+  includeInactive: z.boolean().catch(false),
+  useBusinessPeriod: z.boolean().catch(true),
+  includeUnassigned: z.boolean().catch(true),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
 
 // =====================
 // Filter Sheet
@@ -1249,6 +1273,76 @@ const EquipePage = () => {
     setIncludeExperienceFailures(next.includeExperienceFailures);
   }, []);
 
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    selectedYear: selectedYear ?? null,
+    selectedMonths,
+    yAxisMode,
+    compareMode,
+    chartType,
+    trendLine,
+    includeExperienceFailures,
+    sectorIds: filters.sectorIds ?? [],
+    positionIds: filters.positionIds ?? [],
+    includeInactive: filters.includeInactive ?? false,
+    useBusinessPeriod: filters.useBusinessPeriod ?? true,
+    includeUnassigned: filters.includeUnassigned ?? true,
+  }), [selectedYear, selectedMonths, yAxisMode, compareMode, chartType, trendLine, includeExperienceFailures, filters]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    const year = config.selectedYear ?? undefined;
+    const months = config.selectedMonths;
+    // Rebuild the derived date range the same way the filter sheet's handleApply
+    // does (business-period 26→25 buckets).
+    let startDate: Date;
+    let endDate: Date;
+    if (year && months.length > 0) {
+      const monthNums = months.map(m => parseInt(m, 10));
+      startDate = businessPeriodStartDate(year, Math.min(...monthNums));
+      endDate = businessPeriodEndDate(year, Math.max(...monthNums));
+    } else if (year) {
+      startDate = businessPeriodStartDate(year, 1);
+      endDate = businessPeriodEndDate(year, 12);
+    } else {
+      const def = defaultBusinessPeriodRange();
+      startDate = def.startDate;
+      endDate = def.endDate;
+    }
+    setFilters({
+      startDate,
+      endDate,
+      sectorIds: config.sectorIds.length ? config.sectorIds : undefined,
+      positionIds: config.positionIds.length ? config.positionIds : undefined,
+      includeInactive: config.includeInactive,
+      useBusinessPeriod: config.useBusinessPeriod,
+      includeUnassigned: config.includeUnassigned,
+    });
+    setSelectedYear(year);
+    setSelectedMonths(months);
+    setYAxisMode(config.yAxisMode);
+    setCompareMode(config.compareMode);
+    setChartType(config.chartType);
+    setTrendLine(config.trendLine);
+    setIncludeExperienceFailures(config.includeExperienceFailures);
+  }, []);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.humanResources.teamPerformance,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
+
   const handleExportCSV = useCallback(() => {
     if (!timeseries.length) { toast.error('Nenhum dado para exportar'); return; }
     try {
@@ -1363,6 +1457,37 @@ const EquipePage = () => {
               { label: 'Recursos Humanos', href: routes.statistics.humanResources.root },
               { label: 'Equipe' },
             ]}
+            headerExtra={
+              <>
+                <StatisticsPresetsMenu
+                  presets={presets}
+                  activePreset={activePreset}
+                  onSave={savePreset}
+                  onApply={applyPreset}
+                  onOverwrite={overwritePreset}
+                  onRename={renamePreset}
+                  onDelete={deletePreset}
+                  isSaving={isSavingPreset}
+                />
+
+                {/* Export */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={isLoading || !timeseries.length}>
+                      <IconDownload className="h-4 w-4 mr-2" />Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleExportCSV}>
+                      <IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportXLSX}>
+                      <IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            }
           />
         </div>
 
@@ -1375,19 +1500,6 @@ const EquipePage = () => {
                     <IconUsers className="h-5 w-5 text-primary" />
                     {periodSummaryLabel}
                   </CardTitle>
-                  <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                    <span>Evolução do efetivo por período.</span>
-                    <Badge variant="outline" className="text-xs">{Y_AXIS_LABEL_BY_MODE[yAxisMode]}</Badge>
-                    {isComparisonMode && (
-                      <Badge variant="secondary" className="text-xs">
-                        {compareDimension === 'sector' ? 'Comparação: Setores' : 'Comparação: Cargos'}
-                        {compareMode === 'separatedWithTotal' ? ' + Total' : ''}
-                      </Badge>
-                    )}
-                    {trendLine && (
-                      <Badge variant="outline" className="text-xs">{TREND_LABELS[trendLine]}</Badge>
-                    )}
-                  </CardDescription>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1519,23 +1631,6 @@ const EquipePage = () => {
                     <IconFilter className="h-4 w-4 mr-2" />Filtros
                     {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>}
                   </Button>
-
-                  {/* Export */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" disabled={isLoading || !timeseries.length}>
-                        <IconDownload className="h-4 w-4 mr-2" />Exportar
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={handleExportCSV}>
-                        <IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleExportXLSX}>
-                        <IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
               </div>
             </CardHeader>

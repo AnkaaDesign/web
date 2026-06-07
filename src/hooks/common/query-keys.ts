@@ -647,6 +647,16 @@ export const preferencesKeys = {
 // export const notificationPreferenceKeys = createQueryKeyStore<NotificationPreferenceGetManyFormData>("notificationPreferences"); // TODO: Add when NotificationPreference is implemented
 
 // =====================================================
+// Statistics Preferences Query Keys
+// =====================================================
+
+export const statisticsPreferencesKeys = {
+  all: ["statistics-preferences"] as const,
+  me: () => ["statistics-preferences", "me"] as const,
+  byPage: (pageKey: string) => ["statistics-preferences", "me", pageKey] as const,
+};
+
+// =====================================================
 // Warning Query Keys
 // =====================================================
 

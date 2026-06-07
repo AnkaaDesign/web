@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
-import { CHART_COLORS, formatCurrency, type StatisticsChartType, type YAxisMode, type TrendLineType } from '@/types/statistics-common';
+import { CHART_COLORS, chartColorAt, formatCurrency, type StatisticsChartType, type YAxisMode, type TrendLineType } from '@/types/statistics-common';
+import { useChartTheme } from '@/hooks/common/use-chart-theme';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
@@ -80,6 +81,21 @@ interface StatisticsChartProps {
    * grouped-bar sets (e.g. one group per skill) read as visually distinct.
    */
   categoryBands?: boolean;
+  /**
+   * Alternating year-separator background bands, auto-detected from 4-digit
+   * years in the category labels. On by default (the historical behavior);
+   * pages can opt out for a flat background.
+   */
+  yearBands?: boolean;
+  /**
+   * What one x-slot represents. 'categorical' = each bar is a DIFFERENT entity
+   * (an item, a stage, a counterparty) — single-series bar charts then color
+   * each bar individually and emit one legend entry per bar, exactly like
+   * passing `categoryLegend` by hand. 'temporal' (or unset) = one metric over
+   * time, which keeps the classic single-color series. Explicit `categoryLegend`
+   * / `valueColor` still take precedence.
+   */
+  xAxisKind?: 'categorical' | 'temporal';
   /**
    * Controlled legend state, keyed by series NAME. When provided the parent
    * owns hide/color so they survive the chart remounting on a type switch.
@@ -217,6 +233,8 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   onDataPointClick,
   tooltipTrigger = 'axis',
   categoryBands = false,
+  yearBands = true,
+  xAxisKind,
   hiddenSeries: hiddenSeriesProp,
   onToggleSeries,
   seriesColors: seriesColorsProp,
@@ -246,9 +264,10 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
 
   const hasClickHandler = !!onDataPointClick;
 
-  const [isDark, setIsDark] = useState(() =>
-    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-  );
+  // Shared theme tokens (watches the `dark` class) — same source the inline
+  // ReactECharts pages use, so axis/grid/tooltip colors can't drift.
+  const theme = useChartTheme();
+  const { isDark } = theme;
   // Per-series color overrides + hidden set — keyed by series name. Controlled
   // by the parent when props are supplied (so state survives a chart-type
   // remount); otherwise managed internally.
@@ -285,14 +304,6 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
     linear: 'Tendência', sma3: 'Média 3m', sma6: 'Média 6m', sma12: 'Média 12m',
   }), []);
 
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
   // Computed outside both useMemos so legendItems can reference them too.
   const usePerPeriod = !!(perPeriodGoalLine?.values && perPeriodGoalLine.values.some(v => v != null));
   const usePerPeriodSecondary = !!(perPeriodSecondaryGoalLine?.values?.some(v => v != null));
@@ -304,15 +315,26 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   const legendRef = useRef<HTMLDivElement>(null);
   const [legendHeight, setLegendHeight] = useState(0);
 
+  // Auto per-bar coloring for categorical single-series bar charts: when the
+  // page declares `xAxisKind="categorical"` (each bar = a different entity,
+  // e.g. top items or production stages), synthesize a `categoryLegend` so
+  // every bar gets its own palette color + legend entry — instead of the whole
+  // chart collapsing into one blue series. Temporal charts (one metric over
+  // time) are untouched, and explicit categoryLegend/valueColor still win.
+  const effectiveCategoryLegend = useMemo(() => {
+    if (categoryLegend) return categoryLegend;
+    const barLike = baseChartType === 'bar' || baseChartType === 'bar-stacked';
+    if (
+      xAxisKind !== 'categorical' || isComparisonMode || yAxisMode === 'both' ||
+      !barLike || valueColor || !data || data.length < 2
+    ) return undefined;
+    return data.map((d, i) => ({ label: d.name, color: chartColorAt(i) }));
+  }, [categoryLegend, xAxisKind, isComparisonMode, yAxisMode, baseChartType, valueColor, data]);
+
   const option = useMemo((): EChartsOption => {
     if (!data || data.length === 0) return {};
 
-    const textColor     = isDark ? '#f4f4f5' : '#3f3f46';
-    const subTextColor  = isDark ? '#a1a1aa' : '#71717a';
-    const gridLineColor = isDark ? '#27272a' : '#e4e4e7';
-    const axisLineColor = isDark ? '#3f3f46' : '#d4d4d8';
-    const tooltipBg     = isDark ? 'rgba(24,24,27,0.95)' : 'rgba(255,255,255,0.97)';
-    const tooltipBorder = isDark ? '#3f3f46' : '#e4e4e7';
+    const { textColor, subTextColor, gridLineColor, axisLineColor, tooltipBg, tooltipBorder } = theme;
 
     const chartLimit = data.length;
     const needsScroll = chartLimit > 8;
@@ -350,7 +372,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       type: 'category' as const,
       data: xAxisData,
       boundaryGap: !isLineLike,
-      axisLabel: { color: subTextColor, rotate: 45, interval: 0, fontSize: 11 },
+      axisLabel: { color: subTextColor, rotate: 45, interval: 0, fontSize: 12 },
       axisLine: { lineStyle: { color: axisLineColor } },
       axisTick: { lineStyle: { color: axisLineColor } },
     };
@@ -393,7 +415,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
 
     const buildYAxis = () => {
       const base = {
-        axisLabel: { color: subTextColor, fontSize: 11 },
+        axisLabel: { color: subTextColor, fontSize: 12 },
         axisLine: { show: true, lineStyle: { color: axisLineColor } },
         axisTick: { show: true, lineStyle: { color: axisLineColor } },
         splitLine: { lineStyle: { color: gridLineColor } },
@@ -420,7 +442,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
 
     const buildDualYAxis = () => {
       const base = {
-        axisLabel: { color: subTextColor, fontSize: 11 },
+        axisLabel: { color: subTextColor, fontSize: 12 },
         axisLine: { show: true, lineStyle: { color: axisLineColor } },
         axisTick: { show: true, lineStyle: { color: axisLineColor } },
         splitLine: { lineStyle: { color: gridLineColor } },
@@ -476,8 +498,12 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
     // which converts fractional data values to exact pixels and re-runs on
     // every dataZoom event, so the band stays aligned with slot edges at any
     // zoom level.
+    // One shared fill for BOTH band systems (year + category) so pages that
+    // mix them never show two different stripe intensities.
+    const bandFill = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+
     const yearBandSeries: any[] = [];
-    {
+    if (yearBands) {
       const groups: { startIdx: number; endIdx: number; idx: number }[] = [];
       let cur: string | null = null;
       let groupStart = 0;
@@ -498,7 +524,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       // Only render bands when there's actually >1 year on the axis.
       const oddGroups = groups.filter(g => g.idx % 2 === 1);
       if (groups.length >= 2 && oddGroups.length > 0) {
-        const bandColor = isDark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.04)';
+        const bandColor = bandFill;
         yearBandSeries.push({
           type: 'custom',
           silent: true,
@@ -555,7 +581,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
     // visually separated blocks, the way years are separated on productivity.
     const categoryBandSeries: any[] = [];
     if (categoryBands && xAxisData.length > 1) {
-      const bandColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.035)';
+      const bandColor = bandFill;
       categoryBandSeries.push({
         type: 'custom',
         silent: true,
@@ -729,7 +755,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           data: data.map((item, i) => ({
             name: item.name,
             value: getItemValue(item),
-            itemStyle: { color: colorOf(item.name, CHART_COLORS[i % CHART_COLORS.length]) },
+            itemStyle: { color: colorOf(item.name, chartColorAt(i)) },
           })),
           emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } },
           label: { formatter: (params: any) => `${params.name}: ${valueFormatter(params.value, yAxisMode)}`, color: textColor },
@@ -744,7 +770,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       if (isComparisonMode && data.length > 0 && data[0].comparisons) {
         const entities = data[0].comparisons.map(c => c.entityName);
         const barSeries = entities.map((entity, index) => {
-          const color = colorOf(entity, CHART_COLORS[index % CHART_COLORS.length]);
+          const color = colorOf(entity, chartColorAt(index));
           return {
             name: entity, type: 'bar' as const, yAxisIndex: 0,
             data: data.map(item => {
@@ -758,7 +784,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
         });
         const lineSeries = entities.map((entity, index) => {
           const avgName = `${entity} (Média)`;
-          const color = colorOf(avgName, CHART_COLORS[index % CHART_COLORS.length]);
+          const color = colorOf(avgName, chartColorAt(index));
           return {
             name: avgName, type: 'line' as const, yAxisIndex: 1,
             data: data.map(item => {
@@ -876,7 +902,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
 
       const buildSeries = (type: 'bar' | 'line', opts: Record<string, any> = {}) =>
         entities.map((entity, index) => {
-          const color = colorOf(entity, CHART_COLORS[index % CHART_COLORS.length]);
+          const color = colorOf(entity, chartColorAt(index));
           const extraLineStyle = type === 'line'
             ? { lineStyle: { ...(opts.lineStyle ?? {}), color } }
             : {};
@@ -919,7 +945,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           });
           const trendData = computeTrend(values, trendLine);
           const trendName = `${entity} · ${trendLabels[trendLine]}`;
-          const color = colorOf(trendName, CHART_COLORS[index % CHART_COLORS.length]);
+          const color = colorOf(trendName, chartColorAt(index));
           compTrendSeries.push({
             name: trendName,
             type: 'line' as const,
@@ -999,12 +1025,12 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       series = [{ ...baseSeriesOptions, type: 'line', smooth, lineStyle: { width: 2, color: simpleColor }, label: pointLabel }];
     else if (baseChartType === 'area')
       series = [{ ...baseSeriesOptions, type: 'line', smooth, areaStyle: { opacity: 0.45, color: simpleColor }, lineStyle: { width: 2, color: simpleColor }, label: pointLabel }];
-    else if (categoryLegend) {
+    else if (effectiveCategoryLegend) {
       // One distinct color per bar (one bar = one category). colorOf lets the
       // legend's color picker override per bar; hiding a legend entry blanks its
       // bar (value → null) just like toggling a series elsewhere.
       const barData = seriesData.map((it: any, i: number) => {
-        const entry = categoryLegend[i];
+        const entry = effectiveCategoryLegend[i];
         const label = entry?.label ?? '';
         const c = colorOf(label, entry?.color ?? simpleColor);
         const hidden = hiddenSeries.has(label);
@@ -1034,7 +1060,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       color: CHART_COLORS, dataZoom,
       series: [...categoryBandSeries, ...yearBandSeries, ...goalLineSeries, ...trendSeries, ...series],
     };
-  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType, tooltipTrigger, categoryBands, valueColor, categoryLegend, legendHeight, legendBottomPx]);
+  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, theme, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType, tooltipTrigger, categoryBands, yearBands, valueColor, effectiveCategoryLegend, legendHeight, legendBottomPx]);
 
   const onEvents = useMemo((): Record<string, (params: any) => void> => {
     if (!hasClickHandler) return {};
@@ -1093,10 +1119,11 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           onDataPointClickRef.current?.(params.dataIndex ?? 0, String(params.name ?? ''), String(params.name ?? ''), 'plot');
           return;
         }
-        // For grouped bars/lines, ECharts' series click fires just BEFORE the
-        // zrender click below — record the exact clicked series so the drill-down
-        // resolves the right one (e.g. WHICH campaign in a 2-campaign comparison),
-        // instead of collapsing to the category.
+        // For grouped bars/lines, ECharts' series click fires AFTER the zrender
+        // click (which therefore defers its dispatch one tick) — record the
+        // exact clicked series so the drill-down resolves the right one (e.g.
+        // WHICH campaign in a 2-campaign comparison), instead of collapsing to
+        // the category.
         if (params.componentType === 'series' && typeof params.dataIndex === 'number') {
           hoveredRef.current = {
             idx: params.dataIndex,
@@ -1116,16 +1143,16 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   // click toggles visibility.
   // Category-legend mode: one entry per bar (single series only). It flows
   // through the SAME interactive legend below (color picker + visibility toggle).
-  const useCategoryLegend = !!categoryLegend && !isComparisonMode && baseChartType !== 'pie';
+  const useCategoryLegend = !!effectiveCategoryLegend && !isComparisonMode && baseChartType !== 'pie';
   const showCustomLegend = showLegend && baseChartType !== 'pie';
 
   // Build the list of legend items mirroring the series the option actually
   // adds, in the same order they appear.
   const legendItems = useMemo(() => {
     if (!data?.length || baseChartType === 'pie') return [] as Array<{ name: string; color: string; seriesType: 'bar' | 'line' | 'dashed' }>;
-    if (useCategoryLegend && categoryLegend) {
+    if (useCategoryLegend && effectiveCategoryLegend) {
       // One entry per bar; colorOf lets the picker override the default color.
-      return categoryLegend.map(it => ({ name: it.label, color: colorOf(it.label, it.color), seriesType: 'bar' as const }));
+      return effectiveCategoryLegend.map(it => ({ name: it.label, color: colorOf(it.label, it.color), seriesType: 'bar' as const }));
     }
     const items: Array<{ name: string; color: string; seriesType: 'bar' | 'line' | 'dashed' }> = [];
     const push = (name: string, fallback: string, seriesType: 'bar' | 'line' | 'dashed' = 'bar') =>
@@ -1135,8 +1162,8 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
 
     if (yAxisMode === 'both') {
       if (isComparisonMode && data[0]?.comparisons) {
-        data[0].comparisons.forEach((c, i) => push(c.entityName, CHART_COLORS[i % CHART_COLORS.length], 'bar'));
-        data[0].comparisons.forEach((c, i) => push(`${c.entityName} (Média)`, CHART_COLORS[i % CHART_COLORS.length], 'line'));
+        data[0].comparisons.forEach((c, i) => push(c.entityName, chartColorAt(i), 'bar'));
+        data[0].comparisons.forEach((c, i) => push(`${c.entityName} (Média)`, chartColorAt(i), 'line'));
       } else {
         const effPrim = primaryChartType ?? primaryType;
         const effSec = secondaryChartType ?? 'line';
@@ -1151,10 +1178,10 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
         push(secondaryGoalLine.label || 'Meta Média', '#f59e0b', 'dashed');
       }
     } else if (isComparisonMode && data[0]?.comparisons) {
-      data[0].comparisons.forEach((c, i) => push(c.entityName, CHART_COLORS[i % CHART_COLORS.length], primaryType));
+      data[0].comparisons.forEach((c, i) => push(c.entityName, chartColorAt(i), primaryType));
       if (trendLine && baseChartType !== 'bar-stacked' && baseChartType !== 'line-stacked') {
         data[0].comparisons.forEach((c, i) =>
-          push(`${c.entityName} · ${trendLabels[trendLine]}`, CHART_COLORS[i % CHART_COLORS.length], 'dashed')
+          push(`${c.entityName} · ${trendLabels[trendLine]}`, chartColorAt(i), 'dashed')
         );
       }
     } else {
@@ -1168,7 +1195,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       push(effectiveGoalLabel, '#10b981', 'dashed');
     }
     return items;
-  }, [data, baseChartType, yAxisMode, isComparisonMode, tooltipLabels, yAxisLabel, trendLine, trendLabels, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, colorOf, usePerPeriod, usePerPeriodSecondary, primaryChartType, secondaryChartType, useCategoryLegend, categoryLegend]);
+  }, [data, baseChartType, yAxisMode, isComparisonMode, tooltipLabels, yAxisLabel, trendLine, trendLabels, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, colorOf, usePerPeriod, usePerPeriodSecondary, primaryChartType, secondaryChartType, useCategoryLegend, effectiveCategoryLegend]);
 
   // Drop hidden entries that no longer exist (e.g. after switching modes).
   // Only for internal state — when the parent controls hiddenSeries it owns the
@@ -1233,10 +1260,20 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       if (!onDataPointClickRef.current) return;
       const hit = resolveHit(e.offsetX, e.offsetY);
       if (!hit) return;
-      const cats = categoriesRef.current;
-      const h = hoveredRef.current;
-      const series = (h && h.idx === hit.idx) ? (h.series || '') : '';
-      onDataPointClickRef.current(hit.idx, String(cats[hit.idx] ?? ''), series, hit.region);
+      // ECharts' series-level click (the `click` handler in onEvents, which
+      // records the exact clicked series into hoveredRef) fires AFTER this
+      // zrender-level handler — and the axis-pointer churn right before a
+      // click often leaves hoveredRef null. Defer one tick so the series
+      // info is in place before dispatching; otherwise a click on a grouped
+      // bar loses its series and the drill-down collapses to category level
+      // (e.g. a position-comparison column listing ALL collaborators).
+      setTimeout(() => {
+        if (!onDataPointClickRef.current) return;
+        const cats = categoriesRef.current;
+        const h = hoveredRef.current;
+        const series = (h && h.idx === hit.idx) ? (h.series || '') : '';
+        onDataPointClickRef.current(hit.idx, String(cats[hit.idx] ?? ''), series, hit.region);
+      }, 0);
     });
     // zrender resets the canvas cursor each frame from the hovered graphic, so
     // CSS !cursor-pointer doesn't stick over labels / empty plot area. Set it

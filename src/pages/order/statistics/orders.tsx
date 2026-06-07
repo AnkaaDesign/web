@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -53,6 +53,9 @@ import {
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from '@/components/ui/sonner';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,6 +120,45 @@ const CHART_TYPE_OPTIONS: Array<{
   { value: 'area',        label: 'Área Reta',   icon: IconChartArea, description: 'Área preenchida com linhas retas' },
   { value: 'area-smooth', label: 'Área Suave',  icon: IconChartArea, description: 'Área preenchida suavizada' },
 ];
+
+// =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of every user-configurable knob on this page. Dates are
+// ISO strings; per-field `.catch()` keeps stale stored configs from ever
+// breaking the page. Modal (showFilters) and drill-down state plus the
+// goal override are session-only by design.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  startDate: z.string().catch(''),
+  endDate: z.string().catch(''),
+  supplierIds: z.array(z.string()).catch([]),
+  itemIds: z.array(z.string()).catch([]),
+  brandIds: z.array(z.string()).catch([]),
+  categoryIds: z.array(z.string()).catch([]),
+  sortBy: z.enum(['quantity', 'value', 'name']).catch('quantity'),
+  sortOrder: z.enum(['asc', 'desc']).catch('desc'),
+  limit: z.number().int().min(1).catch(50),
+  topSuppliersLimit: z.number().int().min(1).catch(10),
+  topItemsLimit: z.number().int().min(1).catch(10),
+  trendGroupBy: z.enum(['day', 'week', 'month']).catch('month'),
+  xMode: z.enum(['month', 'year']).catch('month'),
+  yMode: z.enum(['quantity', 'value']).catch('quantity'),
+  yearCompareMode: z.boolean().catch(false),
+  selectedYears: z.array(z.string()).catch([]),
+  selectedMonths: z.array(z.string()).catch([]),
+  chartType: z.enum(['bar', 'line', 'line-smooth', 'area', 'area-smooth']).catch('bar'),
+  trendLine: z.enum(['linear', 'sma3', 'sma6', 'sma12']).nullable().catch(null),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
+
+function parseIsoDate(iso: string, fallback: Date): Date {
+  if (!iso) return fallback;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? fallback : d;
+}
 
 // =====================
 // Date range helpers — calendar months (orders are grouped by createdAt).
@@ -664,6 +706,73 @@ const OrderPage = () => {
     supplierId?: string;
   } | null>(null);
 
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    startDate: filters.startDate ? filters.startDate.toISOString() : '',
+    endDate: filters.endDate ? filters.endDate.toISOString() : '',
+    supplierIds: filters.supplierIds ?? [],
+    itemIds: filters.itemIds ?? [],
+    brandIds: filters.brandIds ?? [],
+    categoryIds: filters.categoryIds ?? [],
+    sortBy: (filters.sortBy ?? 'quantity') as PageConfig['sortBy'],
+    sortOrder: (filters.sortOrder ?? 'desc') as PageConfig['sortOrder'],
+    limit: filters.limit ?? 50,
+    topSuppliersLimit: filters.topSuppliersLimit ?? 10,
+    topItemsLimit: filters.topItemsLimit ?? 10,
+    trendGroupBy: (filters.trendGroupBy ?? 'month') as PageConfig['trendGroupBy'],
+    xMode,
+    yMode,
+    yearCompareMode,
+    selectedYears,
+    selectedMonths,
+    chartType,
+    trendLine,
+  }), [filters, xMode, yMode, yearCompareMode, selectedYears, selectedMonths, chartType, trendLine]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    const { startDate, endDate } = computeDateRange([initialYear], []);
+    setFilters({
+      startDate: parseIsoDate(config.startDate, startDate ?? startOfDay(new Date(parseInt(initialYear), 0, 1))),
+      endDate: parseIsoDate(config.endDate, endDate ?? endOfDay(new Date(parseInt(initialYear), 11, 31))),
+      sortBy: config.sortBy,
+      sortOrder: config.sortOrder,
+      limit: config.limit,
+      topSuppliersLimit: config.topSuppliersLimit,
+      topItemsLimit: config.topItemsLimit,
+      trendGroupBy: config.trendGroupBy,
+      supplierIds: config.supplierIds.length ? config.supplierIds : undefined,
+      itemIds: config.itemIds.length ? config.itemIds : undefined,
+      brandIds: config.brandIds.length ? config.brandIds : undefined,
+      categoryIds: config.categoryIds.length ? config.categoryIds : undefined,
+    });
+    setXMode(config.xMode);
+    // yMode is corrected for unprivileged users by the canViewPrices guard effect.
+    setYMode(config.yMode);
+    setYearCompareMode(config.yearCompareMode);
+    // selectedYears default is [currentYear]; an empty stored value falls back to it.
+    setSelectedYears(config.selectedYears.length ? config.selectedYears : [initialYear]);
+    setSelectedMonths(config.selectedMonths);
+    setChartType(config.chartType);
+    setTrendLine(config.trendLine);
+  }, [initialYear]);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.inventory.orders,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
+
   const { data, isLoading, isError, error, refetch } = useOrderAnalytics(filters);
   const summary = data?.data?.summary;
   const trends = data?.data?.trends || [];
@@ -997,6 +1106,38 @@ const OrderPage = () => {
             { label: 'Estoque', href: routes.statistics.inventory.root },
             { label: 'Pedidos' },
           ]}
+          headerExtra={
+            <>
+              <StatisticsPresetsMenu
+                presets={presets}
+                activePreset={activePreset}
+                onSave={savePreset}
+                onApply={applyPreset}
+                onOverwrite={overwritePreset}
+                onRename={renamePreset}
+                onDelete={deletePreset}
+                isSaving={isSavingPreset}
+              />
+
+              {/* Export */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={isLoading || !displayBuckets.length}>
+                    <IconDownload className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={handleExportCSV}>
+                    <IconFileTypeCsv className="h-4 w-4 mr-2" />
+                    CSV dos Dados
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          }
         />
       </div>
 
@@ -1008,21 +1149,6 @@ const OrderPage = () => {
                   <IconClipboardList className="h-5 w-5 text-primary" />
                   {periodSummaryLabel || 'Análise de Pedidos'}
                 </CardTitle>
-                <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                  <span>Pedidos por fornecedor e período.</span>
-                  <Badge variant="outline" className="text-xs">
-                    {xMode === 'year' ? 'Agrupamento: Anos' : 'Agrupamento: Meses'}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {yMode === 'value' ? 'Valor (R$)' : 'Quantidade'}
-                  </Badge>
-                  {trendLine && (
-                    <Badge variant="outline" className="text-xs">Tendência: {TREND_LABELS[trendLine]}</Badge>
-                  )}
-                  {yearCompareMode && (
-                    <Badge variant="outline" className="text-xs">Comparação Ano a Ano</Badge>
-                  )}
-                </CardDescription>
               </div>
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1104,23 +1230,6 @@ const OrderPage = () => {
                   )}
                 </Button>
 
-                {/* Export */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={isLoading || !displayBuckets.length}>
-                      <IconDownload className="h-4 w-4 mr-2" />
-                      Exportar
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={handleExportCSV}>
-                      <IconFileTypeCsv className="h-4 w-4 mr-2" />
-                      CSV dos Dados
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
             </div>
           </CardHeader>

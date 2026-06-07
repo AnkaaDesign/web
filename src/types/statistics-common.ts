@@ -86,6 +86,30 @@ export const CHART_COLORS = [
   '#e879f9', // fuchsia-400
 ];
 
+// Stable color for the Nth series/bar. Indexes into CHART_COLORS and, past the
+// palette end, derives lighter/darker variants instead of wrapping into exact
+// duplicates — so series 13+ remain distinguishable from series 1+.
+export const chartColorAt = (index: number): string => {
+  const base = CHART_COLORS[index % CHART_COLORS.length];
+  const cycle = Math.floor(index / CHART_COLORS.length);
+  if (cycle === 0) return base;
+  const n = parseInt(base.slice(1), 16);
+  const amt = Math.min(0.5, 0.28 * cycle);
+  // Lighten on odd wrap cycles, darken on even ones.
+  const ch = (v: number) =>
+    cycle % 2 === 1 ? Math.round(v + (255 - v) * amt) : Math.round(v * (1 - amt));
+  const r = ch((n >> 16) & 255);
+  const g = ch((n >> 8) & 255);
+  const b = ch(n & 255);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+};
+
+// Funnel stage progression (indigo → red). Shared by every funnel chart so the
+// invoice and quote funnels read with the same visual language.
+export const FUNNEL_STAGE_COLORS = [
+  '#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#84cc16', '#eab308', '#f97316', '#ef4444',
+];
+
 // Format currency helper
 export const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {

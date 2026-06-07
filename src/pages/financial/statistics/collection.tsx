@@ -30,6 +30,7 @@ import type {
 import { StatisticsChart } from '@/components/statistics/statistics-chart';
 import {
   CHART_COLORS,
+  FUNNEL_STAGE_COLORS,
   formatCurrency,
   formatNumber,
   formatPercentage,
@@ -43,6 +44,9 @@ import ReactECharts from 'echarts-for-react';
 import { format } from 'date-fns';
 import { toast } from '@/components/ui/sonner';
 import * as XLSX from 'xlsx';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 import {
   IconChartBar,
   IconChartLine,
@@ -331,6 +335,43 @@ interface CardSpec {
   onClick?: () => void;
   tone?: 'default' | 'success' | 'danger';
 }
+
+// =====================================================================
+// Page config persistence (last-seen config + named presets)
+// =====================================================================
+//
+// Plain-JSON snapshot of every user-configurable knob on this page. Per-field
+// `.catch()` keeps stale stored configs from ever breaking the page; derived
+// values (date ranges, periods, goals) are never persisted — they're re-derived
+// from selectedYears/selectedMonths on apply. `goalOverride`, `openBucket` and
+// modal/sheet state are session-only by design.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  selectedYears: z.array(z.string()).catch([]),
+  selectedMonths: z.array(z.string()).catch([]),
+  customerIds: z.array(z.string()).catch([]),
+  sectorIds: z.array(z.string()).catch([]),
+  invoiceStatus: z.array(z.string()).catch([]),
+  quoteStatus: z.array(z.string()).catch([]),
+  dimension: z
+    .enum(['periodo', 'status-fatura', 'status-orcamento', 'cliente', 'setor'])
+    .catch('periodo'),
+  metric: z
+    .enum([
+      'faturado', 'recebido', 'em-atraso', 'qtd-parcelas', 'taxa-recebimento', 'dso',
+      'liquidado', 'backlog', 'qtd-orcamentos', 'taxa-conversao', 'ticket-medio', 'ciclo',
+    ])
+    .catch('faturado'),
+  chartType: z
+    .enum(['bar', 'bar-stacked', 'line', 'line-smooth', 'area', 'funnel', 'pie', 'donut', 'hbar'])
+    .catch('bar-stacked'),
+  xMode: z.enum(['month', 'year']).catch('month'),
+  compareMode: z.enum(['combined', 'separated', 'separatedWithTotal']).catch('combined'),
+  yearCompareMode: z.boolean().catch(false),
+  trendLine: z.enum(['linear', 'sma3', 'sma6', 'sma12']).nullable().catch(null),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
 
 // =====================================================================
 // FilterSheet
@@ -836,6 +877,67 @@ const FinancialOverviewPage = () => {
     setGoalOverride(null);
   }, [analysis.metric, xMode]);
 
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    selectedYears,
+    selectedMonths,
+    customerIds: scope.customerIds ?? [],
+    sectorIds: scope.sectorIds ?? [],
+    invoiceStatus: scope.invoiceStatus ?? [],
+    quoteStatus: scope.quoteStatus ?? [],
+    dimension: analysis.dimension,
+    metric: analysis.metric,
+    chartType: analysis.chartType,
+    xMode,
+    compareMode,
+    yearCompareMode,
+    trendLine,
+  }), [selectedYears, selectedMonths, scope, analysis, xMode, compareMode, yearCompareMode, trendLine]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    // Years drive the date range — an empty list would blank the page, so fall
+    // back to the page's default (current year) when none were persisted.
+    setSelectedYears(config.selectedYears.length ? config.selectedYears : [initialYear]);
+    setSelectedMonths(config.selectedMonths);
+    setScope({
+      customerIds: config.customerIds.length ? config.customerIds : undefined,
+      sectorIds: config.sectorIds.length ? config.sectorIds : undefined,
+      invoiceStatus: config.invoiceStatus.length ? config.invoiceStatus : undefined,
+      quoteStatus: config.quoteStatus.length ? config.quoteStatus : undefined,
+    });
+    // Metric validity depends on the dimension — if a stale (dimension, metric)
+    // pair is invalid, fall back to the dimension's first valid metric.
+    const metric = isMetricValidForDim(config.metric, config.dimension)
+      ? config.metric
+      : (METRIC_OPTIONS.find(m => m.validDims.includes(config.dimension))?.value ?? config.metric);
+    // Chart type must fit the dimension too.
+    const chartType = availableChartTypes(config.dimension).some(c => c.value === config.chartType)
+      ? config.chartType
+      : defaultChartTypeFor(config.dimension);
+    setAnalysis({ dimension: config.dimension, metric, chartType });
+    setXMode(config.xMode);
+    setCompareMode(config.compareMode);
+    setYearCompareMode(config.yearCompareMode);
+    setTrendLine(config.trendLine);
+  }, [initialYear]);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.financial.collection,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
+
   const { startDate, endDate } = useMemo(
     () => computeDateRange(selectedYears, selectedMonths),
     [selectedYears, selectedMonths],
@@ -1226,7 +1328,8 @@ const FinancialOverviewPage = () => {
         textStyle: { color: theme.textColor },
         formatter: (p: { name: string; value: number }) => `<strong>${p.name}</strong><br/>${formatCurrency(p.value)}`,
       },
-      color: CHART_COLORS,
+      // Shared funnel progression so both funnels read with the same language.
+      color: FUNNEL_STAGE_COLORS,
       series: [{
         type: 'funnel' as const,
         left: '5%', right: '5%', top: 20, bottom: 30,
@@ -1263,7 +1366,7 @@ const FinancialOverviewPage = () => {
             % do total: ${formatPercentage(stage.conversionFromTop)}`;
         },
       },
-      color: ['#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#84cc16', '#eab308', '#f97316', '#ef4444'],
+      color: FUNNEL_STAGE_COLORS,
       series: [{
         type: 'funnel' as const,
         left: '5%', right: '5%', top: 20, bottom: 30,
@@ -1304,7 +1407,7 @@ const FinancialOverviewPage = () => {
       orient: 'vertical' as const,
       right: 8,
       top: 'middle' as const,
-      fontSize: 10,
+      fontSize: 12,
       textStyle: { color: theme.textColor },
     },
     series: [{
@@ -1344,7 +1447,7 @@ const FinancialOverviewPage = () => {
       type: 'value' as const,
       axisLabel: {
         formatter: (v: number) => valueFmt(v).replace('R$', '').trim(),
-        fontSize: 10,
+        fontSize: 12,
         color: theme.subTextColor,
       },
       axisLine: { lineStyle: { color: theme.axisLineColor } },
@@ -1354,17 +1457,19 @@ const FinancialOverviewPage = () => {
       type: 'category' as const,
       inverse: true,
       data: categories.map(c => c.length > 30 ? c.slice(0, 28) + '…' : c),
-      axisLabel: { fontSize: 10, color: theme.textColor },
+      axisLabel: { fontSize: 12, color: theme.textColor },
       axisLine: { lineStyle: { color: theme.axisLineColor } },
     },
-    color: ['#3b82f6', '#10b981'],
+    // First/third palette entries (blue/emerald) — same hues as before, but
+    // sourced from the shared palette instead of hardcoded.
+    color: [CHART_COLORS[0], CHART_COLORS[2]],
     series: series.map(s => ({
       name: s.name,
       type: 'bar' as const,
       data: s.data,
       itemStyle: { borderRadius: [0, 4, 4, 0] as [number, number, number, number] },
     })),
-    legend: { top: 0, fontSize: 10, textStyle: { color: theme.textColor } },
+    legend: { top: 0, fontSize: 12, textStyle: { color: theme.textColor } },
   }), [theme]);
 
   // -------- Top customers chart options (Por Cliente) --------
@@ -1908,6 +2013,32 @@ const FinancialOverviewPage = () => {
               { label: 'Financeiro', href: routes.statistics.financial.root },
               { label: 'Visão Geral' },
             ]}
+            headerExtra={
+              <>
+                <StatisticsPresetsMenu
+                  presets={presets}
+                  activePreset={activePreset}
+                  onSave={savePreset}
+                  onApply={applyPreset}
+                  onOverwrite={overwritePreset}
+                  onRename={renamePreset}
+                  onDelete={deletePreset}
+                  isSaving={isSavingPreset}
+                />
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2" disabled={isLoading || (!items.length && !quoteItems.length)}>
+                      <IconDownload className="h-4 w-4" /> Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={handleExportCSV}><IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV dos Dados</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={handleExportXLSX}><IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            }
           />
         </div>
 
@@ -1920,22 +2051,6 @@ const FinancialOverviewPage = () => {
                     <IconCash className="h-5 w-5 text-primary" />
                     {periodSummaryLabel || 'Visão Financeira'}
                   </CardTitle>
-                  <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1 text-foreground/75">
-                    Cobranças, receita, funil de vendas e previsão de caixa em uma única tela.
-                    <Badge variant="secondary" className="text-xs">{DIMENSION_OPTIONS.find(d => d.value === analysis.dimension)?.label}</Badge>
-                    <Badge variant="secondary" className="text-xs">{currentMetricDef.label}</Badge>
-                    {analysis.dimension === 'periodo' && (
-                      <Badge variant="outline" className="text-xs">
-                        {xMode === 'year' ? 'Agrupamento: Anos' : 'Agrupamento: Meses'}
-                      </Badge>
-                    )}
-                    {showTrendControl && trendLine && (
-                      <Badge variant="outline" className="text-xs">Tendência: {TREND_LABELS[trendLine]}</Badge>
-                    )}
-                    {yearCompareMode && analysis.dimension === 'periodo' && (
-                      <Badge variant="outline" className="text-xs">Comparação Ano a Ano</Badge>
-                    )}
-                  </CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Chart type — options filtered by dimensão */}
@@ -2005,18 +2120,6 @@ const FinancialOverviewPage = () => {
                     <IconFilter className="h-4 w-4" /> Filtros
                     {activeFilterCount > 0 && <Badge variant="secondary" className="ml-1">{activeFilterCount}</Badge>}
                   </Button>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2" disabled={isLoading || (!items.length && !quoteItems.length)}>
-                        <IconDownload className="h-4 w-4" /> Exportar
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={handleExportCSV}><IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV dos Dados</DropdownMenuItem>
-                      <DropdownMenuItem onSelect={handleExportXLSX}><IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
               </div>
             </CardHeader>

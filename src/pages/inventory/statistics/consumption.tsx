@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -71,6 +71,9 @@ import {
 } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { toast } from '@/components/ui/sonner';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 
 // =====================
 // Constants
@@ -133,6 +136,44 @@ const YEAR_OPTIONS = generateYearOptions(4);
 const TREND_LABELS: Record<TrendLineType, string> = {
   linear: 'Linear', sma3: 'Média 3m', sma6: 'Média 6m', sma12: 'Média 12m',
 };
+
+// =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of every user-configurable knob on this page. Dates are
+// ISO strings; `periods` is intentionally NOT persisted (re-derived from
+// selectedYears/selectedMonths); per-field `.catch()` keeps stale stored
+// configs from ever breaking the page. `goalOverride` and modal state are
+// session-only by design.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  startDate: z.string().catch(''),
+  endDate: z.string().catch(''),
+  sectorIds: z.array(z.string()).catch([]),
+  userIds: z.array(z.string()).catch([]),
+  itemIds: z.array(z.string()).catch([]),
+  sortBy: z.enum(['quantity', 'value', 'name']).catch('quantity'),
+  sortOrder: z.enum(['asc', 'desc']).catch('desc'),
+  limit: z.number().int().min(1).max(100).catch(20),
+  xAxisMode: z.enum(['item', 'month', 'year']).catch('item'),
+  yAxisMode: z.enum(['quantity', 'value', 'both']).catch('quantity'),
+  compareMode: z.enum(['combined', 'separated', 'separatedWithTotal']).catch('combined'),
+  selectedYears: z.array(z.string()).catch([]),
+  selectedMonths: z.array(z.string()).catch([]),
+  chartType: z
+    .enum(['bar', 'line', 'line-smooth', 'area', 'area-smooth', 'bar-stacked', 'line-stacked', 'pie'])
+    .catch('bar'),
+  trendLine: z.enum(['linear', 'sma3', 'sma6', 'sma12']).nullable().catch(null),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
+
+function parseIsoDate(iso: string, fallback: Date): Date {
+  if (!iso) return fallback;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? fallback : d;
+}
 
 // =====================
 // Helpers
@@ -742,6 +783,63 @@ const ConsumptionPage = () => {
   const [selectedYears, setSelectedYears]   = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
 
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    startDate: filters.startDate ? filters.startDate.toISOString() : '',
+    endDate: filters.endDate ? filters.endDate.toISOString() : '',
+    sectorIds: filters.sectorIds ?? [],
+    userIds: filters.userIds ?? [],
+    itemIds: filters.itemIds ?? [],
+    sortBy: (filters.sortBy ?? 'quantity') as PageConfig['sortBy'],
+    sortOrder: (filters.sortOrder ?? 'desc') as PageConfig['sortOrder'],
+    limit: filters.limit ?? 20,
+    xAxisMode,
+    yAxisMode,
+    compareMode,
+    selectedYears,
+    selectedMonths,
+    chartType,
+    trendLine,
+  }), [filters, xAxisMode, yAxisMode, compareMode, selectedYears, selectedMonths, chartType, trendLine]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    setFilters({
+      startDate: parseIsoDate(config.startDate, startOfDay(subMonths(new Date(), 1))),
+      endDate: parseIsoDate(config.endDate, endOfDay(new Date())),
+      operation: ACTIVITY_OPERATION.OUTBOUND,
+      sortBy: config.sortBy,
+      sortOrder: config.sortOrder,
+      limit: config.limit,
+      sectorIds: config.sectorIds.length ? config.sectorIds : undefined,
+      userIds: config.userIds.length ? config.userIds : undefined,
+      itemIds: config.itemIds.length ? config.itemIds : undefined,
+    });
+    setXAxisMode(config.xAxisMode);
+    setYAxisMode(config.yAxisMode);
+    setCompareMode(config.compareMode);
+    setSelectedYears(config.selectedYears);
+    setSelectedMonths(config.selectedMonths);
+    setChartType(config.chartType);
+    setTrendLine(config.trendLine);
+  }, []);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.inventory.consumption,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
+
   // Warehouse users must never use the monetary Y-axis modes.
   useEffect(() => {
     if (!canViewPrices && yAxisMode !== 'quantity') {
@@ -1342,6 +1440,9 @@ const ConsumptionPage = () => {
         chartType={chartType as StatisticsChartType}
         yAxisMode={chartYAxisMode}
         isComparisonMode={isChartComparisonMode}
+        // Item mode = categorical (each bar is a different item → per-bar
+        // colors + per-item legend); month/year modes stay temporal.
+        xAxisKind={xAxisMode === 'item' ? 'categorical' : 'temporal'}
         height="100%"
         yAxisLabel={yAxisLabel}
         valueFormatter={valueFormatter}
@@ -1396,6 +1497,47 @@ const ConsumptionPage = () => {
             { label: 'Estoque',      href: routes.statistics.inventory.root },
             { label: 'Consumo' },
           ]}
+          headerExtra={
+            <>
+              <StatisticsPresetsMenu
+                presets={presets}
+                activePreset={activePreset}
+                onSave={savePreset}
+                onApply={applyPreset}
+                onOverwrite={overwritePreset}
+                onRename={renamePreset}
+                onDelete={deletePreset}
+                isSaving={isSavingPreset}
+              />
+
+              {/* Export */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={isLoading || !chartData.length}>
+                    <IconDownload className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExportPDF}>
+                    <IconFileTypePdf className="h-4 w-4 mr-2" />
+                    PDF do Gráfico
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <IconFileTypeCsv className="h-4 w-4 mr-2" />
+                    CSV dos Dados
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportXLSX}>
+                    <IconFileTypeXls className="h-4 w-4 mr-2" />
+                    Excel (XLSX) dos Dados
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          }
         />
       </div>
 
@@ -1404,38 +1546,6 @@ const ConsumptionPage = () => {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <CardTitle>{cardTitle[xAxisMode]}</CardTitle>
-                  <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                    <span>Saídas do estoque no período selecionado</span>
-                    {isBothMode && <Badge variant="outline" className="text-xs">Qtde + Valor</Badge>}
-                    {isEntityComparisonMode && (
-                      <Badge variant="secondary" className="text-xs">
-                        {compareMode === 'separatedWithTotal' ? 'Comparação + Total' : 'Comparação'}
-                      </Badge>
-                    )}
-                    {isPeriodComparisonMode && (
-                      <Badge variant="secondary" className="text-xs">Comparação por Períodos</Badge>
-                    )}
-                    {isTemporalMode && <Badge variant="secondary" className="text-xs">Modo Temporal</Badge>}
-                    {isMultiSectorTemporal && (
-                      <Badge variant="secondary" className="text-xs">
-                        {multiEntityIds.length} setores × períodos
-                      </Badge>
-                    )}
-                    {isMultiUserTemporal && (
-                      <Badge variant="secondary" className="text-xs">
-                        {multiEntityIds.length} usuários × períodos
-                      </Badge>
-                    )}
-                    {trendLine && <Badge variant="outline" className="text-xs">{TREND_LABELS[trendLine]}</Badge>}
-                    {selectedYears.length > 0 && (
-                      <Badge variant="outline" className="text-xs">{[...selectedYears].sort().join(', ')}</Badge>
-                    )}
-                    {selectedMonths.length > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        {selectedMonths.length} {selectedMonths.length === 1 ? 'mês' : 'meses'}
-                      </Badge>
-                    )}
-                  </CardDescription>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1512,33 +1622,6 @@ const ConsumptionPage = () => {
                     Filtros
                     {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>}
                   </Button>
-
-                  {/* Export */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" disabled={isLoading || !chartData.length}>
-                        <IconDownload className="h-4 w-4 mr-2" />
-                        Exportar
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleExportPDF}>
-                        <IconFileTypePdf className="h-4 w-4 mr-2" />
-                        PDF do Gráfico
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleExportCSV}>
-                        <IconFileTypeCsv className="h-4 w-4 mr-2" />
-                        CSV dos Dados
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleExportXLSX}>
-                        <IconFileTypeXls className="h-4 w-4 mr-2" />
-                        Excel (XLSX) dos Dados
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
 
                 </div>
               </div>

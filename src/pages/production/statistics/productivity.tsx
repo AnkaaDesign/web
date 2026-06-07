@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -71,6 +71,9 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 
 // =====================
 // Constants
@@ -237,6 +240,38 @@ function aggregateComparisons(
     };
   });
 }
+
+// =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of every user-configurable knob on this page. Dates and
+// the derived startDate/endDate/bonusPeriod* fields are intentionally NOT
+// persisted — only the source inputs (selectedYears/Months/Days, axis modes)
+// are stored, and applyPageConfig rebuilds `filters` exactly the way the
+// sheet's Apply handler does. Per-field `.catch()` keeps stale stored configs
+// from ever breaking the page; goal/modal state is session-only by design.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  chartType: z
+    .enum(['bar', 'bar-stacked', 'line', 'line-smooth', 'line-stacked', 'area', 'area-smooth'])
+    .catch('bar'),
+  primaryChartType: z.enum(['bar', 'line', 'line-smooth', 'area', 'area-smooth']).catch('bar'),
+  secondaryChartType: z.enum(['bar', 'line', 'line-smooth', 'area', 'area-smooth']).catch('line'),
+  trendLine: z.enum(['linear', 'sma3', 'sma6', 'sma12']).nullable().catch(null),
+  yearCompareMode: z.boolean().catch(false),
+  selectedYears: z.array(z.string()).catch([]),
+  selectedMonths: z.array(z.string()).catch([]),
+  selectedDays: z.array(z.string()).catch([]),
+  xAxisMode: z.enum(['day', 'month', 'year']).catch('month'),
+  yAxisMode: z.enum(['count', 'avgPerUser', 'both']).catch('count'),
+  compareMode: z.enum(['combined', 'separated', 'separatedWithTotal']).catch('combined'),
+  sectorIds: z.array(z.string()).catch([]),
+  commissionStatuses: z.array(z.string()).catch([]),
+  userIds: z.array(z.string()).catch([]),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
 
 // =====================
 // Filter Sheet
@@ -689,6 +724,80 @@ const TaskProductionPage = () => {
   const [selectedYears, setSelectedYears]   = useState<string[]>(() => [new Date().getFullYear().toString()]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [selectedDays, setSelectedDays]     = useState<string[]>([]);
+
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  //
+  // We persist only the SOURCE inputs (axis modes, year/month/day selections,
+  // entity filters). The derived startDate/endDate/bonusPeriod* are rebuilt in
+  // applyPageConfig the same way the sheet's handleApply does.
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    chartType,
+    primaryChartType,
+    secondaryChartType,
+    trendLine,
+    yearCompareMode,
+    selectedYears,
+    selectedMonths,
+    selectedDays,
+    xAxisMode: (filters.xAxisMode ?? 'month') as PageConfig['xAxisMode'],
+    yAxisMode: (filters.yAxisMode ?? 'count') as PageConfig['yAxisMode'],
+    compareMode: (filters.compareMode ?? 'combined') as PageConfig['compareMode'],
+    sectorIds: filters.sectorIds ?? [],
+    commissionStatuses: filters.commissionStatuses ?? [],
+    userIds: filters.userIds ?? [],
+  }), [chartType, primaryChartType, secondaryChartType, trendLine, yearCompareMode, selectedYears, selectedMonths, selectedDays, filters]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    // An empty selectedYears would drop the page to the "últimos 12 períodos"
+    // default; restore the page default (current year) instead.
+    const years = config.selectedYears.length ? config.selectedYears : [new Date().getFullYear().toString()];
+    const months = config.selectedMonths;
+    const days = config.xAxisMode === 'day' ? config.selectedDays : [];
+
+    // Rebuild filters exactly like the sheet's handleApply.
+    const { startDate, endDate } = computeDateRange(years, months, config.xAxisMode);
+    const singleYear = years.length === 1 ? Number(years[0]) : undefined;
+    const bonusPeriodMonths = singleYear !== undefined && months.length > 0
+      ? months.map(m => Number(m))
+      : undefined;
+    setFilters({
+      startDate,
+      endDate,
+      bonusPeriodYear: singleYear,
+      bonusPeriodMonths,
+      xAxisMode: config.xAxisMode,
+      yAxisMode: config.yAxisMode,
+      compareMode: config.compareMode,
+      sectorIds: config.sectorIds.length ? config.sectorIds : undefined,
+      commissionStatuses: config.commissionStatuses.length ? config.commissionStatuses : undefined,
+      userIds: config.userIds.length ? config.userIds : undefined,
+    });
+    setSelectedYears(years);
+    setSelectedMonths(months);
+    setSelectedDays(days);
+    setYearCompareMode(years.length >= 2 && config.xAxisMode === 'month' ? config.yearCompareMode : false);
+    setChartType(config.chartType);
+    setPrimaryChartType(config.primaryChartType);
+    setSecondaryChartType(config.secondaryChartType);
+    setTrendLine(config.trendLine);
+  }, []);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.production.productivity,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
 
   const isBothMode = filters.yAxisMode === 'both';
   const useAvg     = filters.yAxisMode === 'avgPerUser';
@@ -1510,6 +1619,51 @@ const TaskProductionPage = () => {
             { label: 'Produção', href: routes.statistics.production.root },
             { label: 'Produtividade' },
           ]}
+          headerExtra={
+            <>
+              <StatisticsPresetsMenu
+                presets={presets}
+                activePreset={activePreset}
+                onSave={savePreset}
+                onApply={applyPreset}
+                onOverwrite={overwritePreset}
+                onRename={renamePreset}
+                onDelete={deletePreset}
+                isSaving={isSavingPreset}
+              />
+
+              {/* Export */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoading || !items.length}
+                  >
+                    <IconDownload className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExportPDF}>
+                    <IconFileTypePdf className="h-4 w-4 mr-2" />
+                    PDF do Gráfico
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <IconFileTypeCsv className="h-4 w-4 mr-2" />
+                    CSV dos Dados
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportXLSX}>
+                    <IconFileTypeXls className="h-4 w-4 mr-2" />
+                    Excel (XLSX) dos Dados
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          }
         />
       </div>
 
@@ -1518,44 +1672,6 @@ const TaskProductionPage = () => {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <CardTitle>Produção de Tarefas por Período</CardTitle>
-                  <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                    <span>Tarefas concluídas por {
-                      filters.xAxisMode === 'year' ? 'ano' :
-                      filters.xAxisMode === 'day'  ? 'dia (período 26–25)' :
-                      'mês (período 26–25)'
-                    }</span>
-                    {isBothMode  && <Badge variant="outline"  className="text-xs">Total + Média/Colaborador</Badge>}
-                    {useAvg      && <Badge variant="outline"  className="text-xs">Média/Colaborador</Badge>}
-                    {isComparisonMode && (
-                      <Badge variant="secondary" className="text-xs">
-                        {filters.compareMode === 'separatedWithTotal' ? 'Comparação + Ambos' : 'Comparação Setores'}
-                      </Badge>
-                    )}
-                    {yearCompareMode && (
-                      <Badge variant="secondary" className="text-xs">Ano a Ano</Badge>
-                    )}
-                    {trendLine && (
-                      <Badge variant="outline" className="text-xs">{TREND_LABELS[trendLine]}</Badge>
-                    )}
-                    {goalValue != null && (
-                      <Badge variant="outline" className="text-xs">
-                        Meta{goalSource === 'default' ? ' (padrão)' : ''}: {formatNumber(goalValue, useAvg ? 2 : filters.xAxisMode === 'day' ? 1 : 0)}
-                      </Badge>
-                    )}
-                    {selectedYears.length > 0 && (
-                      <Badge variant="outline" className="text-xs">{selectedYears.sort().join(', ')}</Badge>
-                    )}
-                    {selectedMonths.length > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        {selectedMonths.length} {selectedMonths.length === 1 ? 'mês' : 'meses'}
-                      </Badge>
-                    )}
-                    {selectedDays.length > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        {selectedDays.length} {selectedDays.length === 1 ? 'dia' : 'dias'}
-                      </Badge>
-                    )}
-                  </CardDescription>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1761,36 +1877,6 @@ const TaskProductionPage = () => {
                     {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>}
                   </Button>
 
-                  {/* Export */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={isLoading || !items.length}
-                      >
-                        <IconDownload className="h-4 w-4 mr-2" />
-                        Exportar
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleExportPDF}>
-                        <IconFileTypePdf className="h-4 w-4 mr-2" />
-                        PDF do Gráfico
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleExportCSV}>
-                        <IconFileTypeCsv className="h-4 w-4 mr-2" />
-                        CSV dos Dados
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleExportXLSX}>
-                        <IconFileTypeXls className="h-4 w-4 mr-2" />
-                        Excel (XLSX) dos Dados
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
               </div>
             </CardHeader>

@@ -25,6 +25,9 @@ import ReactECharts from 'echarts-for-react';
 import { format, startOfDay, endOfDay, subMonths } from 'date-fns';
 import { toast } from '@/components/ui/sonner';
 import * as XLSX from 'xlsx';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 import {
   IconChartBar,
   IconChartLine,
@@ -89,6 +92,41 @@ const STATUS_COLORS: Record<string, string> = {
   CANCELLED: '#6b7280',
   ERROR: '#ef4444',
 };
+
+// Default colors for the monthly bar series, keyed by series name. Derived
+// from STATUS_COLORS so the bar chart and the status pie speak the same color
+// language ("Autorizadas" is the same green in both).
+const STATUS_SERIES_COLORS: Record<string, string> = {
+  Autorizadas: STATUS_COLORS.AUTHORIZED,
+  Pendentes: STATUS_COLORS.PENDING,
+  Erro: STATUS_COLORS.ERROR,
+  Canceladas: STATUS_COLORS.CANCELLED,
+};
+
+// =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of the user-configurable knobs on this page. Dates are
+// ISO strings (revived on apply with the default 12-month range as fallback);
+// per-field `.catch()` keeps stale stored configs from ever breaking the page.
+// `drillDown`, `drillDownSearch` and sheet state are session-only by design.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  startDate: z.string().catch(''),
+  endDate: z.string().catch(''),
+  status: z.array(z.string()).catch([]),
+  chartType: z.enum(['bar', 'bar-stacked', 'line', 'line-smooth', 'area']).catch('bar-stacked'),
+  trendLine: z.enum(['linear', 'sma3', 'sma6', 'sma12']).nullable().catch(null),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
+
+function parseIsoDate(iso: string, fallback: Date): Date {
+  if (!iso) return fallback;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? fallback : d;
+}
 
 // =====================
 // Filter Sheet
@@ -200,11 +238,50 @@ const NfseStatisticsPage = () => {
   });
   const [chartType, setChartType] = useState<ChartTypeKey>('bar-stacked');
   const [trendLine, setTrendLine] = useState<TrendLineType | null>(null);
+  // Seeded with the semantic status colors; the legend's color picker can
+  // still override per series.
+  const [seriesColors, setSeriesColors] = useState<Record<string, string>>(STATUS_SERIES_COLORS);
   // Drill-down modal: opens when a summary card is clicked. Per-status NFS-e
   // record listings aren't returned by the analytics endpoint yet, so this is
   // a placeholder UI with search + empty state for visual consistency.
   const [drillDown, setDrillDown] = useState<{ title: string; count: number } | null>(null);
   const [drillDownSearch, setDrillDownSearch] = useState('');
+
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    startDate: filters.startDate ? filters.startDate.toISOString() : '',
+    endDate: filters.endDate ? filters.endDate.toISOString() : '',
+    status: filters.status ?? [],
+    chartType,
+    trendLine,
+  }), [filters, chartType, trendLine]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    setFilters({
+      startDate: parseIsoDate(config.startDate, startOfDay(subMonths(new Date(), 12))),
+      endDate: parseIsoDate(config.endDate, endOfDay(new Date())),
+      status: config.status.length ? config.status : undefined,
+    });
+    setChartType(config.chartType);
+    setTrendLine(config.trendLine);
+  }, []);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.financial.nfse,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
 
   const { data, isLoading, isError, error, refetch } = useNfseAnalytics(filters);
   const summary = data?.data?.summary;
@@ -251,7 +328,7 @@ const NfseStatisticsPage = () => {
           return `<strong>${s.statusLabel}</strong><br/>Documentos: ${formatNumber(s.count, 0)}<br/>${formatPercentage(p.percent ?? 0)}`;
         },
       },
-      legend: { orient: 'vertical' as const, right: 8, top: 'middle' as const, fontSize: 10, textStyle: { color: theme.textColor } },
+      legend: { orient: 'vertical' as const, right: 8, top: 'middle' as const, fontSize: 12, textStyle: { color: theme.textColor } },
       series: [{
         type: 'pie' as const,
         radius: ['40%', '70%'],
@@ -345,6 +422,8 @@ const NfseStatisticsPage = () => {
         valueFormatter={valueFormatter}
         trendLine={trendLine}
         tooltipLabels={{ primary: 'Documentos' }}
+        seriesColors={seriesColors}
+        onSeriesColorChange={(name, color) => setSeriesColors(prev => ({ ...prev, [name]: color }))}
       />
     );
   };
@@ -364,6 +443,34 @@ const NfseStatisticsPage = () => {
             { label: 'Financeiro', href: routes.statistics.financial.root },
             { label: 'NFS-e' },
           ]}
+          headerExtra={
+            <>
+              <StatisticsPresetsMenu
+                presets={presets}
+                activePreset={activePreset}
+                onSave={savePreset}
+                onApply={applyPreset}
+                onOverwrite={overwritePreset}
+                onRename={renamePreset}
+                onDelete={deletePreset}
+                isSaving={isSavingPreset}
+              />
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2" disabled={isLoading || !items.length}>
+                    <IconDownload className="h-4 w-4" /> Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={handleExportPDF}><IconFileTypePdf className="h-4 w-4 mr-2" /> PDF do Gráfico</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={handleExportCSV}><IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV dos Dados</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={handleExportXLSX}><IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          }
         />
       </div>
 
@@ -375,16 +482,6 @@ const NfseStatisticsPage = () => {
                 <CardTitle className="flex items-center gap-2">
                   <IconReceipt2 className="h-5 w-5 text-primary" /> Emissão de Notas Fiscais
                 </CardTitle>
-                <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                  <span>Status de emissão das NFS-e e taxa de autorização.</span>
-                  <Badge variant="outline" className="text-xs">Quantidade</Badge>
-                  {trendLine && <Badge variant="outline" className="text-xs">Tendência: {TREND_LABELS[trendLine]}</Badge>}
-                  {filters.startDate && (
-                    <Badge variant="secondary" className="text-xs">
-                      {format(filters.startDate, 'dd/MM/yy')} – {format(filters.endDate, 'dd/MM/yy')}
-                    </Badge>
-                  )}
-                </CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <DropdownMenu>
@@ -437,20 +534,6 @@ const NfseStatisticsPage = () => {
                   <IconFilter className="h-4 w-4" /> Filtros
                   {activeFilterCount > 0 && <Badge variant="secondary" className="ml-1">{activeFilterCount}</Badge>}
                 </Button>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2" disabled={isLoading || !items.length}>
-                      <IconDownload className="h-4 w-4" /> Exportar
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={handleExportPDF}><IconFileTypePdf className="h-4 w-4 mr-2" /> PDF do Gráfico</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={handleExportCSV}><IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV dos Dados</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={handleExportXLSX}><IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
             </div>
           </CardHeader>

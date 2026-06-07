@@ -13,7 +13,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
 import { PrivilegeRoute } from '@/components/navigation/privilege-route';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -49,6 +49,9 @@ import {
 } from '@tabler/icons-react';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import * as XLSX from 'xlsx';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 
 // =====================
 // Local types — placeholder until a real analytics module exists
@@ -144,6 +147,35 @@ const Y_AXIS_OPTIONS: Array<{ value: StockMovementYAxisMode; label: string }> = 
 const TREND_LABELS: Record<TrendLineType, string> = {
   linear: 'Linear', sma3: 'Média 3m', sma6: 'Média 6m', sma12: 'Média 12m',
 };
+
+// =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of every user-configurable knob on this page. Dates are
+// ISO strings; per-field `.catch()` keeps stale stored configs from ever
+// breaking the page. Modal (showFilters) state is session-only by design.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  xAxisMode: z.enum(['month', 'year']).catch('month'),
+  yAxisMode: z.enum(['count', 'value']).catch('count'),
+  startDate: z.string().catch(''),
+  endDate: z.string().catch(''),
+  selectedYears: z.array(z.string()).catch([]),
+  selectedMonths: z.array(z.string()).catch([]),
+  chartType: z
+    .enum(['bar', 'bar-stacked', 'line', 'line-smooth', 'area', 'area-smooth'])
+    .catch('bar-stacked'),
+  trendLine: z.enum(['linear', 'sma3', 'sma6', 'sma12']).nullable().catch(null),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
+
+function parseIsoDate(iso: string, fallback?: Date): Date | undefined {
+  if (!iso) return fallback;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? fallback : d;
+}
 
 // =====================
 // Helpers
@@ -346,6 +378,49 @@ const StockMovementPage = () => {
   const [selectedYears, setSelectedYears] = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
 
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    xAxisMode: filters.xAxisMode,
+    yAxisMode: filters.yAxisMode,
+    startDate: filters.startDate ? filters.startDate.toISOString() : '',
+    endDate: filters.endDate ? filters.endDate.toISOString() : '',
+    selectedYears,
+    selectedMonths,
+    chartType,
+    trendLine,
+  }), [filters, selectedYears, selectedMonths, chartType, trendLine]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    setFilters({
+      xAxisMode: config.xAxisMode,
+      yAxisMode: config.yAxisMode,
+      startDate: parseIsoDate(config.startDate),
+      endDate: parseIsoDate(config.endDate),
+    });
+    setSelectedYears(config.selectedYears);
+    setSelectedMonths(config.selectedMonths);
+    setChartType(config.chartType);
+    setTrendLine(config.trendLine);
+  }, []);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    // routes.ts has no constant for this page yet — use the literal router path.
+    pageKey: '/estatisticas/estoque/movimentacao',
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
+
   const { data, isLoading, isError, error, refetch } = useStockMovementAnalytics(filters);
   const items = data?.data?.items ?? [];
   const summary = data?.data?.summary;
@@ -508,6 +583,42 @@ const StockMovementPage = () => {
               { label: 'Estoque', href: routes.statistics.inventory.root },
               { label: 'Movimentação' },
             ]}
+            headerExtra={
+              <>
+                <StatisticsPresetsMenu
+                  presets={presets}
+                  activePreset={activePreset}
+                  onSave={savePreset}
+                  onApply={applyPreset}
+                  onOverwrite={overwritePreset}
+                  onRename={renamePreset}
+                  onDelete={deletePreset}
+                  isSaving={isSavingPreset}
+                />
+
+                {/* Export */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={isLoading || !items.length}>
+                      <IconDownload className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleExportCSV}>
+                      <IconFileTypeCsv className="h-4 w-4 mr-2" />
+                      CSV dos Dados
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportXLSX}>
+                      <IconFileTypeXls className="h-4 w-4 mr-2" />
+                      Excel (XLSX) dos Dados
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            }
           />
         </div>
 
@@ -519,26 +630,6 @@ const StockMovementPage = () => {
                     <IconTrendingUp className="h-5 w-5 text-primary" />
                     {periodSummaryLabel}
                   </CardTitle>
-                  <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                    <span>Entradas e saídas do estoque por período.</span>
-                    <Badge variant="outline" className="text-xs">
-                      {filters.xAxisMode === 'year' ? 'Agrupamento: Anos' : 'Agrupamento: Meses'}
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {isValue ? 'R$' : 'Quantidade'}
-                    </Badge>
-                    {trendLine && (
-                      <Badge variant="outline" className="text-xs">{TREND_LABELS[trendLine]}</Badge>
-                    )}
-                    {selectedYears.length > 0 && (
-                      <Badge variant="outline" className="text-xs">{[...selectedYears].sort().join(', ')}</Badge>
-                    )}
-                    {selectedMonths.length > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        {selectedMonths.length} {selectedMonths.length === 1 ? 'mês' : 'meses'}
-                      </Badge>
-                    )}
-                  </CardDescription>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -611,27 +702,6 @@ const StockMovementPage = () => {
                     {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>}
                   </Button>
 
-                  {/* Export */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" disabled={isLoading || !items.length}>
-                        <IconDownload className="h-4 w-4 mr-2" />
-                        Exportar
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleExportCSV}>
-                        <IconFileTypeCsv className="h-4 w-4 mr-2" />
-                        CSV dos Dados
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleExportXLSX}>
-                        <IconFileTypeXls className="h-4 w-4 mr-2" />
-                        Excel (XLSX) dos Dados
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
               </div>
             </CardHeader>

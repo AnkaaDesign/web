@@ -101,6 +101,7 @@ export interface SkillStatsByUser {
   userName: string;
   sectorId: string | null;
   sectorName: string | null;
+  positionId: string | null;
   positionName: string | null;
   submittedAt: string | null; // ISO string from API
   overallAverage: number | null;

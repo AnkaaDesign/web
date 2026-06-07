@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -52,6 +52,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { toast } from '@/components/ui/sonner';
 import * as XLSX from 'xlsx';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -100,12 +103,6 @@ const Y_AXIS_OPTIONS: Array<{ value: PayrollYAxisMode; label: string }> = [
   { value: 'bonuses', label: 'Bônus' },
 ];
 
-const Y_AXIS_LABEL_BY_MODE: Record<PayrollYAxisMode, string> = {
-  gross:   'Salário Bruto',
-  net:     'Salário Líquido',
-  taxes:   'Descontos',
-  bonuses: 'Bônus',
-};
 
 type ChartTypeOption = {
   value: HrChartType;
@@ -159,6 +156,30 @@ function computeDateRange(
     endDate:   businessPeriodEndDate(maxY,   12),
   };
 }
+
+// =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of every user-configurable knob on this page. The filter
+// date range is intentionally NOT persisted — it's derived from
+// selectedYears/selectedMonths and rebuilt in applyPageConfig exactly as the
+// filter sheet does. Per-field `.catch()` keeps stale stored configs from ever
+// breaking the page. Goal override/input/popover state is session-only.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  selectedYears: z.array(z.string()).catch([]),
+  selectedMonths: z.array(z.string()).catch([]),
+  yAxisMode: z.enum(['gross', 'net', 'taxes', 'bonuses']).catch('gross'),
+  chartType: z.enum(['bar', 'pie', 'area', 'line', 'bar-stacked']).catch('area'),
+  trendLine: z.enum(['linear', 'sma3', 'sma6', 'sma12']).nullable().catch(null),
+  sectorIds: z.array(z.string()).catch([]),
+  sortBy: z.string().catch('grossSalary'),
+  sortOrder: z.enum(['asc', 'desc']).catch('desc'),
+  limit: z.number().int().min(1).catch(50),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
 
 // =====================
 // Filter Sheet
@@ -712,6 +733,59 @@ const PayrollStatisticsPage = () => {
     setYAxisMode(next.yAxisMode);
   }, []);
 
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    selectedYears,
+    selectedMonths,
+    yAxisMode,
+    chartType,
+    trendLine,
+    sectorIds: filters.sectorIds ?? [],
+    sortBy: filters.sortBy ?? 'grossSalary',
+    sortOrder: (filters.sortOrder ?? 'desc') as PageConfig['sortOrder'],
+    limit: filters.limit ?? 50,
+  }), [selectedYears, selectedMonths, yAxisMode, chartType, trendLine, filters]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    const years = config.selectedYears;
+    const months = config.selectedMonths;
+    // Rebuild the derived date range the same way the filter sheet's handleApply
+    // does (periods cleared — this page groups by calendar 26→25 internally).
+    const { startDate, endDate } = computeDateRange(years, months);
+    setFilters(f => ({
+      ...f,
+      startDate: startDate ?? f.startDate,
+      endDate:   endDate   ?? f.endDate,
+      periods:   undefined,
+      sectorIds: config.sectorIds.length ? config.sectorIds : undefined,
+      sortBy: config.sortBy,
+      sortOrder: config.sortOrder,
+      limit: config.limit,
+    }));
+    setSelectedYears(years);
+    setSelectedMonths(months);
+    setYAxisMode(config.yAxisMode);
+    setChartType(config.chartType);
+    setTrendLine(config.trendLine);
+  }, []);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.humanResources.payroll,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
+
   const handleExportCSV = useCallback(() => {
     if (!rawItems.length) { toast.error('Nenhum dado para exportar'); return; }
     try {
@@ -921,6 +995,40 @@ const PayrollStatisticsPage = () => {
             { label: 'Recursos Humanos', href: routes.statistics.humanResources.root },
             { label: 'Folha de Pagamento' },
           ]}
+          headerExtra={
+            <>
+              <StatisticsPresetsMenu
+                presets={presets}
+                activePreset={activePreset}
+                onSave={savePreset}
+                onApply={applyPreset}
+                onOverwrite={overwritePreset}
+                onRename={renamePreset}
+                onDelete={deletePreset}
+                isSaving={isSavingPreset}
+              />
+
+              {/* Export */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={isLoading || !rawItems.length}>
+                    <IconDownload className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Formato</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV dos Dados
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportXLSX}>
+                    <IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          }
         />
       </div>
 
@@ -932,18 +1040,6 @@ const PayrollStatisticsPage = () => {
                   <IconCash className="h-5 w-5 text-primary" />
                   {periodSummaryLabel}
                 </CardTitle>
-                <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                  <span>Evolução da folha por período (26→25).</span>
-                  <Badge variant="outline" className="text-xs">{Y_AXIS_LABEL_BY_MODE[yAxisMode]}</Badge>
-                  {isComparisonMode && (
-                    <Badge variant="secondary" className="text-xs">
-                      {comparisonType === 'sectors' ? 'Comparação por setor' : 'Comparação de períodos'}
-                    </Badge>
-                  )}
-                  {trendLine && (
-                    <Badge variant="outline" className="text-xs">{TREND_LABELS[trendLine]}</Badge>
-                  )}
-                </CardDescription>
               </div>
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1084,26 +1180,6 @@ const PayrollStatisticsPage = () => {
                   Filtros
                   {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>}
                 </Button>
-
-                {/* Export */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={isLoading || !rawItems.length}>
-                      <IconDownload className="h-4 w-4 mr-2" />
-                      Exportar
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Formato</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleExportCSV}>
-                      <IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV dos Dados
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleExportXLSX}>
-                      <IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
             </div>
           </CardHeader>

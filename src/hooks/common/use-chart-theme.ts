@@ -13,7 +13,9 @@ export interface ChartTheme {
 const LIGHT: ChartTheme = {
   isDark: false,
   textColor: '#3f3f46',
-  subTextColor: '#71717a',
+  // zinc-600: axis ticks must stay readable at small sizes — the old zinc-500
+  // (#71717a) was the "almost invisible Y-axis numbers" complaint.
+  subTextColor: '#52525b',
   gridLineColor: '#e4e4e7',
   axisLineColor: '#d4d4d8',
   tooltipBg: 'rgba(255,255,255,0.97)',
@@ -23,7 +25,9 @@ const LIGHT: ChartTheme = {
 const DARK: ChartTheme = {
   isDark: true,
   textColor: '#f4f4f5',
-  subTextColor: '#a1a1aa',
+  // zinc-300: axis ticks must stay readable at small sizes — the old zinc-400
+  // (#a1a1aa) was the "almost invisible Y-axis numbers" complaint.
+  subTextColor: '#d4d4d8',
   gridLineColor: '#27272a',
   axisLineColor: '#3f3f46',
   tooltipBg: 'rgba(24,24,27,0.95)',

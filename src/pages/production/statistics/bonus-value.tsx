@@ -15,7 +15,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -65,6 +65,9 @@ import {
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { toast } from '@/components/ui/sonner';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 
 const COMBOBOX_PAGE_SIZE = 20;
 
@@ -703,6 +706,28 @@ function buildChartOption({ days, chartType, seriesColors }: BuildChartArgs): EC
 }
 
 // =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of every user-configurable knob on this page. year/month
+// are the business-period inputs; their defaults are computed at runtime, so
+// `.catch()` falls back to a 0 sentinel and applyPageConfig keeps the page
+// default when the restored value is implausible. `hiddenSeries` is page state
+// of type Set<string> — serialized as a sorted array and revived as a Set.
+// Modal/picker state is session-only by design.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  year: z.number().int().catch(0),
+  month: z.number().int().catch(0),
+  sectorIds: z.array(z.string()).catch([]),
+  chartType: z.enum(['area-rect', 'area-smooth', 'line-rect', 'line-smooth']).catch('area-rect'),
+  seriesColors: z.record(z.string()).catch({}),
+  hiddenSeries: z.array(z.string()).catch([]),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
+
+// =====================
 // Page
 // =====================
 
@@ -773,6 +798,44 @@ export default function ProductionBonusValuePage() {
     },
     [],
   );
+
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    year,
+    month,
+    sectorIds,
+    chartType,
+    seriesColors,
+    hiddenSeries: Array.from(hiddenSeries).sort(),
+  }), [year, month, sectorIds, chartType, seriesColors, hiddenSeries]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    // year/month defaults are runtime-computed; a restored value below the
+    // sentinel threshold means "keep the page's current business period".
+    if (config.year >= 2000) setYear(config.year);
+    if (config.month >= 1) setMonth(config.month);
+    setSectorIds(config.sectorIds);
+    setChartType(config.chartType);
+    setSeriesColors(config.seriesColors);
+    setHiddenSeries(new Set(config.hiddenSeries));
+  }, []);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.production.bonusValue,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
 
   const result = data?.data;
   const periodLabel = useMemo(
@@ -982,6 +1045,44 @@ export default function ProductionBonusValuePage() {
             { label: 'Produção', href: routes.statistics.production.root },
             { label: 'Relação Bônus / Produção' },
           ]}
+          headerExtra={
+            <>
+              <StatisticsPresetsMenu
+                presets={presets}
+                activePreset={activePreset}
+                onSave={savePreset}
+                onApply={applyPreset}
+                onOverwrite={overwritePreset}
+                onRename={renamePreset}
+                onDelete={deletePreset}
+                isSaving={isSavingPreset}
+              />
+
+              {/* Export */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoading || !result?.days?.length}
+                  >
+                    <IconDownload className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={handleExportCSV}>
+                    <IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV dos Dados
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={handleExportXLSX}>
+                    <IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          }
         />
       </div>
 
@@ -990,21 +1091,6 @@ export default function ProductionBonusValuePage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <CardTitle>Período {periodLabel}</CardTitle>
-              <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                <span>
-                  Bônus do período acumulado proporcionalmente às tarefas concluídas, do dia 26 ao dia 25
-                </span>
-                {result?.period.isClosed ? (
-                  <Badge variant="outline" className="text-xs">Período fechado</Badge>
-                ) : (
-                  <Badge variant="secondary" className="text-xs">Período aberto · com previsão</Badge>
-                )}
-                {sectorIds.length > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    {sectorIds.length} {sectorIds.length === 1 ? 'setor' : 'setores'}
-                  </Badge>
-                )}
-              </CardDescription>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1051,29 +1137,6 @@ export default function ProductionBonusValuePage() {
                   </Badge>
                 )}
               </Button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isLoading || !result?.days?.length}
-                  >
-                    <IconDownload className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={handleExportCSV}>
-                    <IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV dos Dados
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={handleExportXLSX}>
-                    <IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
 
               <Button
                 variant="outline"

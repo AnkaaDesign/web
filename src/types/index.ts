@@ -30,6 +30,7 @@ export * from "./paint";
 export * from "./paint-brand";
 export * from "./position";
 export * from "./preferences";
+export * from "./statistics-preferences";
 export * from "./warning";
 export * from "./sector";
 export * from "./serviceOrder";

@@ -106,6 +106,9 @@ import { getTopics } from '@/api-client/topic';
 import { getUsers } from '@/api-client/user';
 import { ASSESSMENT_STATUS, ASSESSMENT_STATUS_LABELS, FAVORITE_PAGES, routes, SECTOR_PRIVILEGES, USER_STATUS } from '@/constants';
 import { cn } from '@/lib/utils';
+import { z } from 'zod';
+import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
+import { StatisticsPresetsMenu } from '@/components/statistics/statistics-presets-menu';
 
 // =====================
 // Constants
@@ -298,6 +301,37 @@ function availableChartTypesFor(
   if (c === 'none') return ['bar'];
   return ['bar', 'bar-stacked'];
 }
+
+// =====================
+// Page config persistence (last-seen config + named presets)
+// =====================
+//
+// Plain-JSON snapshot of the SOURCE composition + scope. Derived values
+// (compareMode, the smart-promoted xAxisMode) are NOT persisted — they're
+// recomputed from xAxisModeRaw + the filter selection counts. `hiddenSeries`
+// is a Set serialized as a sorted string[]. Per-field `.catch()` keeps stale
+// stored configs from ever breaking the page. Drill-down + sheet-open state
+// are session-only.
+const pageConfigSchema = z.object({
+  version: z.literal(1).catch(1),
+  xAxisModeRaw: z.enum(['skill', 'topic', 'sector', 'user', 'campaign']).catch('skill'),
+  yAxisMode: z.enum(['averageScore', 'volume', 'distribution']).catch('averageScore'),
+  chartType: z
+    .enum(['bar', 'bar-stacked', 'line', 'line-smooth', 'area', 'area-smooth', 'radar-polygon', 'radar-circle', 'pie'])
+    .catch('radar-polygon'),
+  trendLine: z.enum(['linear', 'sma3', 'sma6', 'sma12']).nullable().catch(null),
+  showLegend: z.boolean().catch(true),
+  hiddenSeries: z.array(z.string()).catch([]),
+  seriesColors: z.record(z.string()).catch({}),
+  assessmentIds: z.array(z.string()).catch([]),
+  sectorIds: z.array(z.string()).catch([]),
+  positionIds: z.array(z.string()).catch([]),
+  skillIds: z.array(z.string()).catch([]),
+  topicIds: z.array(z.string()).catch([]),
+  userIds: z.array(z.string()).catch([]),
+});
+
+type PageConfig = z.infer<typeof pageConfigSchema>;
 
 // =====================
 // Filter Sheet
@@ -922,6 +956,63 @@ export const HRSkillAssessmentStatisticsPage = () => {
     );
   }, [assessmentList]);
 
+  // ── Page config persistence (auto-restore last config + named presets) ──
+  const pageConfig = useMemo<PageConfig>(() => ({
+    version: 1,
+    xAxisModeRaw,
+    yAxisMode,
+    chartType,
+    trendLine,
+    showLegend,
+    hiddenSeries: Array.from(hiddenSeries).sort(),
+    seriesColors,
+    assessmentIds: filters.assessmentIds ?? [],
+    sectorIds: filters.sectorIds ?? [],
+    positionIds: filters.positionIds ?? [],
+    skillIds: filters.skillIds ?? [],
+    topicIds: filters.topicIds ?? [],
+    userIds: filters.userIds ?? [],
+  }), [xAxisModeRaw, yAxisMode, chartType, trendLine, showLegend, hiddenSeries, seriesColors, filters]);
+
+  const applyPageConfig = useCallback((config: PageConfig) => {
+    // Suppress the auto-default campaign effect: a restored config carries the
+    // user's own campaign selection (possibly empty on purpose), so the latest-
+    // campaign auto-pick must not overwrite it. Setting the guard ref here is
+    // safe because restore happens after the assessments meta query resolves.
+    didInitDefaultCampaign.current = true;
+    setFilters({
+      assessmentIds: config.assessmentIds.length ? config.assessmentIds : undefined,
+      sectorIds: config.sectorIds.length ? config.sectorIds : undefined,
+      positionIds: config.positionIds.length ? config.positionIds : undefined,
+      skillIds: config.skillIds.length ? config.skillIds : undefined,
+      topicIds: config.topicIds.length ? config.topicIds : undefined,
+      userIds: config.userIds.length ? config.userIds : undefined,
+    });
+    setXAxisMode(config.xAxisModeRaw);
+    setYAxisMode(config.yAxisMode);
+    setChartType(config.chartType);
+    setTrendLine(config.trendLine);
+    setShowLegend(config.showLegend);
+    setHiddenSeries(new Set(config.hiddenSeries));
+    setSeriesColors(config.seriesColors);
+  }, []);
+
+  const {
+    presets,
+    activePreset,
+    savePreset,
+    applyPreset,
+    overwritePreset,
+    renamePreset,
+    deletePreset,
+    isSavingPreset,
+  } = useStatisticsPagePersistence({
+    pageKey: routes.statistics.humanResources.skillAssessment,
+    schema: pageConfigSchema,
+    current: pageConfig,
+    apply: applyPageConfig,
+  });
+
   const assessmentStatusById = useMemo(() => {
     const m = new Map<string, ASSESSMENT_STATUS>();
     assessmentList.forEach(a => { if (a?.id) m.set(a.id, a.status); });
@@ -1453,15 +1544,21 @@ export const HRSkillAssessmentStatisticsPage = () => {
       return { items, isComparison: true, axisLabel: 'Média (0–5)', truncationNote: null };
     }
 
-    // 3b'. X=skill, compare=position → derive from byUser grouped by positionName
+    // 3b'. X=skill, compare=position → derive from byUser grouped by positionId.
+    // CRITICAL: only the SELECTED positions become series. positionIds is a
+    // client-only filter (stripped from apiFilters), so overview.byUser spans
+    // EVERY position in scope — without this restriction each one leaked in as
+    // its own series ("selected 2, chart shows 9").
     if (xAxisMode === 'skill' && compareMode === 'position' && useOverview && overview) {
-      const allUsers = overview.byUser.filter(u => u.positionName);
-      const byPosition = new Map<string, { name: string; users: typeof overview.byUser }>();
+      const selectedPositions = new Set(compareEntityIds);
+      const allUsers = overview.byUser.filter(
+        u => u.positionId && u.positionName && selectedPositions.has(u.positionId),
+      );
+      const byPosition = new Map<string, { id: string; name: string; users: typeof overview.byUser }>();
       allUsers.forEach(u => {
-        if (!u.positionName) return;
-        const cur = byPosition.get(u.positionName);
+        const cur = byPosition.get(u.positionId!);
         if (cur) cur.users.push(u);
-        else byPosition.set(u.positionName, { name: u.positionName, users: [u] });
+        else byPosition.set(u.positionId!, { id: u.positionId!, name: u.positionName!, users: [u] });
       });
       const positionGroups = Array.from(byPosition.values());
       if (!positionGroups.length) {
@@ -1478,9 +1575,9 @@ export const HRSkillAssessmentStatisticsPage = () => {
             if (p?.average != null) values.push(p.average);
           });
           const mean = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
-          // No entityId — byUser exposes positionName only. The modal joins via
-          // users.position.name when secondaryType === 'position'.
-          return { entityName: pg.name, value: +mean.toFixed(2) };
+          // The modal still joins via users.position.name when
+          // secondaryType === 'position'; entityId is informational.
+          return { entityName: pg.name, value: +mean.toFixed(2), entityId: pg.id };
         }),
         __primaryType: 'skill',
         __primaryId: skill.id,
@@ -1615,7 +1712,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
 
     return { items: [], isComparison: false, axisLabel: 'Média (0–5)', truncationNote: null };
   }, [
-    chartType, xAxisMode, yAxisMode, compareMode, useComparison, useOverview,
+    chartType, xAxisMode, yAxisMode, compareMode, compareEntityIds, useComparison, useOverview,
     overview, comparison, evolution, filters.skillIds, filters.topicIds, filters.userIds,
     companyLabel,
   ]);
@@ -1973,7 +2070,6 @@ export const HRSkillAssessmentStatisticsPage = () => {
 
   const xAxisOption    = X_AXIS_OPTIONS.find(o => o.value === xAxisMode)!;
   const yAxisLabel     = Y_AXIS_OPTIONS.find(o => o.value === yAxisMode)?.label;
-  const compareOption  = COMPARE_MODE_OPTIONS.find(o => o.value === compareMode);
   const currentTypeOpt = CHART_TYPE_CATALOG[chartType];
 
   const renderEmpty = (msg: string) => (
@@ -2193,6 +2289,50 @@ export const HRSkillAssessmentStatisticsPage = () => {
             { label: 'Recursos Humanos', href: routes.statistics.humanResources.root },
             { label: 'Competências' },
           ]}
+          headerExtra={
+            <>
+              <StatisticsPresetsMenu
+                presets={presets}
+                activePreset={activePreset}
+                onSave={savePreset}
+                onApply={applyPreset}
+                onOverwrite={overwritePreset}
+                onRename={renamePreset}
+                onDelete={deletePreset}
+                isSaving={isSavingPreset}
+              />
+
+              {/* Export */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={activeQuery.isLoading}
+                  >
+                    <IconDownload className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Exportar</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExportPDF}>
+                    <IconFileTypePdf className="h-4 w-4 mr-2" />
+                    PDF do Gráfico
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <IconFileTypeCsv className="h-4 w-4 mr-2" />
+                    CSV dos Dados
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportXLSX}>
+                    <IconFileTypeXls className="h-4 w-4 mr-2" />
+                    Excel (XLSX)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          }
         />
       </div>
 
@@ -2204,27 +2344,8 @@ export const HRSkillAssessmentStatisticsPage = () => {
                 <xAxisOption.icon className="h-5 w-5" />
                 {xAxisOption.label} × {yAxisLabel}
               </CardTitle>
-              <CardDescription className="mt-1 flex flex-wrap items-center gap-1.5">
-                <span>
-                  {compareMode === 'none'
-                    ? 'Uma série única no escopo selecionado.'
-                    : `Comparando por ${compareOption?.label?.toLowerCase()}.`}
-                </span>
-                {compareMode !== 'none' && compareEntityIds.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    {compareEntityIds.length}{' '}
-                    {compareMode === 'user'     ? 'colaborador(es)'
-                      : compareMode === 'position' ? 'cargo(s)'
-                      : compareMode === 'skill'    ? 'competência(s)'
-                      : 'setor(es)'}
-                  </Badge>
-                )}
-                {filters.assessmentIds?.length ? (
-                  <Badge variant="outline" className="text-xs">
-                    {filters.assessmentIds.length} campanha(s)
-                  </Badge>
-                ) : null}
-                {hasOpenCampaignInScope ? (
+              {hasOpenCampaignInScope ? (
+                <CardDescription className="mt-1 flex flex-wrap items-center gap-1.5">
                   <Badge
                     variant="outline"
                     className="text-xs gap-1 border-amber-500/60 text-amber-600 dark:text-amber-400"
@@ -2232,36 +2353,8 @@ export const HRSkillAssessmentStatisticsPage = () => {
                     <IconAlertCircle className="h-3 w-3" />
                     {openCampaignsInScope.length === 1 ? 'Campanha em andamento' : 'Campanhas em andamento'}
                   </Badge>
-                ) : null}
-                {filters.sectorIds?.length ? (
-                  <Badge variant="outline" className="text-xs">
-                    {filters.sectorIds.length} setor(es)
-                  </Badge>
-                ) : null}
-                {filters.positionIds?.length ? (
-                  <Badge variant="outline" className="text-xs">
-                    {filters.positionIds.length} cargo(s)
-                  </Badge>
-                ) : null}
-                {filters.skillIds?.length ? (
-                  <Badge variant="outline" className="text-xs">
-                    {filters.skillIds.length} competência(s)
-                  </Badge>
-                ) : null}
-                {filters.topicIds?.length ? (
-                  <Badge variant="outline" className="text-xs">
-                    {filters.topicIds.length} tópico(s)
-                  </Badge>
-                ) : null}
-                {filters.userIds?.length ? (
-                  <Badge variant="outline" className="text-xs">
-                    {filters.userIds.length} colaborador(es)
-                  </Badge>
-                ) : null}
-                {trendLine && (
-                  <Badge variant="outline" className="text-xs">{TREND_LABELS[trendLine]}</Badge>
-                )}
-              </CardDescription>
+                </CardDescription>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -2354,36 +2447,6 @@ export const HRSkillAssessmentStatisticsPage = () => {
                   </Badge>
                 )}
               </Button>
-
-              {/* Export */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={activeQuery.isLoading}
-                  >
-                    <IconDownload className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Exportar</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleExportPDF}>
-                    <IconFileTypePdf className="h-4 w-4 mr-2" />
-                    PDF do Gráfico
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportCSV}>
-                    <IconFileTypeCsv className="h-4 w-4 mr-2" />
-                    CSV dos Dados
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportXLSX}>
-                    <IconFileTypeXls className="h-4 w-4 mr-2" />
-                    Excel (XLSX)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           </div>
         </CardHeader>
