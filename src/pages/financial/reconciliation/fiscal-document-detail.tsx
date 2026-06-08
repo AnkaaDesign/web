@@ -31,17 +31,27 @@ import {
   useFiscalDocumentXml,
   useSetFiscalItemCategory,
   useUnmatchTransaction,
+  useUnmatchFiscalDocument,
 } from "@/hooks/financial/use-reconciliation";
 import { FiscalItemsTable } from "@/components/financial/reconciliation/fiscal-items-table";
 import { useToast } from "@/hooks/common/use-toast";
 import { formatCNPJ, formatCnpjCpf, formatCurrency, formatDate } from "@/utils";
 import { cn } from "@/lib/utils";
 import { SECTOR_PRIVILEGES, routes } from "@/constants";
-import type { FiscalAddress, FiscalDocument, FiscalDocumentStatus } from "@/types/reconciliation";
+import type {
+  FiscalAddress,
+  FiscalDocument,
+  FiscalDocumentStatus,
+} from "@/types/reconciliation";
 
 /** The bank transaction embedded in a fiscal document's match record. */
-type LinkedTransaction = NonNullable<NonNullable<FiscalDocument["matches"]>[number]["transaction"]>;
-import { docTypeLabel, docTypeVariant } from "@/components/financial/reconciliation/fiscal-doc-badge";
+type LinkedTransaction = NonNullable<
+  NonNullable<FiscalDocument["matches"]>[number]["transaction"]
+>;
+import {
+  docTypeLabel,
+  docTypeVariant,
+} from "@/components/financial/reconciliation/fiscal-doc-badge";
 import { getConfidenceBadgeVariant } from "@/components/financial/reconciliation/match-status-badge";
 import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";
 
@@ -55,7 +65,10 @@ const STATUS_LABELS: Record<FiscalDocumentStatus, string> = {
   DENIED: "Denegada",
   PENDING: "Pendente",
 };
-const STATUS_VARIANTS: Record<FiscalDocumentStatus, "completed" | "cancelled" | "pending"> = {
+const STATUS_VARIANTS: Record<
+  FiscalDocumentStatus,
+  "completed" | "cancelled" | "pending"
+> = {
   AUTHORIZED: "completed",
   CANCELLED: "cancelled",
   DENIED: "cancelled",
@@ -106,8 +119,12 @@ function formatAddress(a: FiscalAddress | null | undefined): string | null {
 // whole subtree).
 function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}>
-      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">{children}</div>
+    <PrivilegeRoute
+      requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}
+    >
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        {children}
+      </div>
     </PrivilegeRoute>
   );
 }
@@ -118,11 +135,19 @@ export function ReconciliationFiscalDocumentDetailPage() {
   const { toast } = useToast();
   usePageTracker({ title: "Detalhe da Nota Fiscal", icon: "receipt" });
 
-  const { data: doc, isLoading, error, refetch, isRefetching } = useFiscalDocument(id);
+  const {
+    data: doc,
+    isLoading,
+    error,
+    refetch,
+    isRefetching,
+  } = useFiscalDocument(id);
 
   // XML download (lazy — only fetched once the user clicks).
   const [requestXml, setRequestXml] = useState(false);
-  const { data: blobUrl } = useFiscalDocumentXml(requestXml && doc ? doc.accessKey : undefined);
+  const { data: blobUrl } = useFiscalDocumentXml(
+    requestXml && doc ? doc.accessKey : undefined,
+  );
   useEffect(() => {
     if (!requestXml || !blobUrl || !doc) return;
     const a = document.createElement("a");
@@ -134,15 +159,22 @@ export function ReconciliationFiscalDocumentDetailPage() {
   }, [blobUrl, doc, requestXml]);
 
   const unmatchMut = useUnmatchTransaction();
+  const unmatchDocMut = useUnmatchFiscalDocument();
   const setItemCategory = useSetFiscalItemCategory();
-  const [unmatchTarget, setUnmatchTarget] = useState<{ txId: string; matchCount: number } | null>(
-    null,
-  );
+  const [unmatchTarget, setUnmatchTarget] = useState<{
+    txId: string;
+    matchCount: number;
+  } | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
   const runUnmatch = (txId: string) =>
     unmatchMut.mutate(txId, { onSuccess: () => setUnmatchTarget(null) });
   const handleUnmatchRequest = (txId: string, totalForTx: number) => {
     if (totalForTx > 1) setUnmatchTarget({ txId, matchCount: totalForTx });
     else runUnmatch(txId);
+  };
+  const runResetMatches = () => {
+    if (!doc) return;
+    unmatchDocMut.mutate(doc.id, { onSuccess: () => setResetOpen(false) });
   };
 
   const isNfse = doc?.docType === "NFSE";
@@ -162,9 +194,15 @@ export function ReconciliationFiscalDocumentDetailPage() {
     window.open(SEFAZ_CONSULTA_URL, "_blank", "noopener,noreferrer");
   };
 
-  const payments = useMemo(() => normalizePayments(doc?.paymentMethods), [doc?.paymentMethods]);
+  const payments = useMemo(
+    () => normalizePayments(doc?.paymentMethods),
+    [doc?.paymentMethods],
+  );
 
-  if (!id) return <Navigate to={routes.financial.reconciliation.fiscalDocuments} replace />;
+  if (!id)
+    return (
+      <Navigate to={routes.financial.reconciliation.fiscalDocuments} replace />
+    );
 
   if (isLoading) {
     return (
@@ -185,7 +223,9 @@ export function ReconciliationFiscalDocumentDetailPage() {
             <span>Não foi possível carregar a nota fiscal.</span>
             <button
               className="text-sm underline hover:text-foreground"
-              onClick={() => navigate(routes.financial.reconciliation.fiscalDocuments)}
+              onClick={() =>
+                navigate(routes.financial.reconciliation.fiscalDocuments)
+              }
             >
               Voltar para a lista
             </button>
@@ -195,7 +235,8 @@ export function ReconciliationFiscalDocumentDetailPage() {
     );
   }
 
-  const title = `${docTypeLabel(doc.docType)} ${doc.nfNumber ? `#${doc.nfNumber}` : ""}`.trim();
+  const title =
+    `${docTypeLabel(doc.docType)} ${doc.nfNumber ? `#${doc.nfNumber}` : ""}`.trim();
 
   return (
     <Frame>
@@ -205,8 +246,14 @@ export function ReconciliationFiscalDocumentDetailPage() {
         breadcrumbs={[
           { label: "Início", href: routes.home },
           { label: "Financeiro", href: routes.financial.root },
-          { label: "Conciliação Bancária", href: routes.financial.reconciliation.root },
-          { label: "Notas Fiscais", href: routes.financial.reconciliation.fiscalDocuments },
+          {
+            label: "Conciliação Bancária",
+            href: routes.financial.reconciliation.root,
+          },
+          {
+            label: "Notas Fiscais",
+            href: routes.financial.reconciliation.fiscalDocuments,
+          },
           { label: title },
         ]}
         actions={[
@@ -247,8 +294,8 @@ export function ReconciliationFiscalDocumentDetailPage() {
             <Alert>
               <IconAlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                A data de emissão não pôde ser lida do XML e foi inferida — confira no documento
-                original.
+                A data de emissão não pôde ser lida do XML e foi inferida —
+                confira no documento original.
               </AlertDescription>
             </Alert>
           )}
@@ -267,15 +314,23 @@ export function ReconciliationFiscalDocumentDetailPage() {
               <InfoRow label="Número" value={doc.nfNumber} />
               <InfoRow label="Série" value={doc.series} />
               <InfoRow label="Modelo" value={doc.model} />
-              <InfoRow label="Natureza da operação" value={doc.naturezaOperacao} />
+              <InfoRow
+                label="Natureza da operação"
+                value={doc.naturezaOperacao}
+              />
               <InfoRow label="Emissão" value={formatDate(doc.issueDate)} />
               {doc.orderCodes && doc.orderCodes.length > 0 && (
                 <InfoRow
                   label={doc.orderCodes.length > 1 ? "Pedidos" : "Pedido"}
                   value={
                     <span className="flex flex-wrap justify-end gap-1">
-                      {doc.orderCodes.map(o => (
-                        <Badge key={o.code} variant="secondary" size="sm" className="font-mono">
+                      {doc.orderCodes.map((o) => (
+                        <Badge
+                          key={o.code}
+                          variant="secondary"
+                          size="sm"
+                          className="font-mono"
+                        >
                           {o.code}
                         </Badge>
                       ))}
@@ -285,10 +340,17 @@ export function ReconciliationFiscalDocumentDetailPage() {
               )}
               <InfoRow
                 label="Origem"
-                value={doc.source === "SIEG_API" ? "SIEG (automático)" : "Upload manual"}
+                value={
+                  doc.source === "SIEG_API"
+                    ? "SIEG (automático)"
+                    : "Upload manual"
+                }
               />
               {doc.status === "CANCELLED" && doc.cancelledAt && (
-                <InfoRow label="Cancelada em" value={formatDate(doc.cancelledAt)} />
+                <InfoRow
+                  label="Cancelada em"
+                  value={formatDate(doc.cancelledAt)}
+                />
               )}
               <InfoRow
                 label={synthKey ? "Identificador" : "Chave de acesso"}
@@ -320,39 +382,87 @@ export function ReconciliationFiscalDocumentDetailPage() {
                 next to Identificação: values/taxes, then the payment forms and
                 the linked bank transaction(s), so "how much" and "paid how /
                 matched to what" read together. */}
-            <SectionCard title="Valores, impostos e pagamento" icon={IconReceiptTax}>
+            <SectionCard
+              title="Valores, impostos e pagamento"
+              icon={IconReceiptTax}
+            >
               <div className="space-y-5">
                 {/* Valores e impostos */}
                 <div className="space-y-3">
                   {isNfse ? (
                     <>
-                      <InfoRow label="Valor dos serviços" value={fmtMoney(doc.valorServicos)} />
-                      <InfoRow label="Base de cálculo ISS" value={fmtMoney(doc.baseCalculo)} />
-                      <InfoRow label="Valor do ISS" value={fmtMoney(doc.issValue)} />
+                      <InfoRow
+                        label="Valor dos serviços"
+                        value={fmtMoney(doc.valorServicos)}
+                      />
+                      <InfoRow
+                        label="Base de cálculo ISS"
+                        value={fmtMoney(doc.baseCalculo)}
+                      />
+                      <InfoRow
+                        label="Valor do ISS"
+                        value={fmtMoney(doc.issValue)}
+                      />
                       <InfoRow
                         label="Alíquota ISS"
-                        value={toNum(doc.issRate) != null ? `${toNum(doc.issRate)}%` : null}
+                        value={
+                          toNum(doc.issRate) != null
+                            ? `${toNum(doc.issRate)}%`
+                            : null
+                        }
                       />
                       {doc.issRetained != null && (
-                        <InfoRow label="ISS retido" value={doc.issRetained ? "Sim" : "Não"} />
+                        <InfoRow
+                          label="ISS retido"
+                          value={doc.issRetained ? "Sim" : "Não"}
+                        />
                       )}
-                      <InfoRow label="Valor líquido" value={fmtMoney(doc.valorLiquido)} />
-                      <InfoRow label="Cód. trib. município" value={doc.codigoTributacaoMunicipio} />
-                      <InfoRow label="Município prestação" value={doc.municipioPrestacao} />
+                      <InfoRow
+                        label="Valor líquido"
+                        value={fmtMoney(doc.valorLiquido)}
+                      />
+                      <InfoRow
+                        label="Cód. trib. município"
+                        value={doc.codigoTributacaoMunicipio}
+                      />
+                      <InfoRow
+                        label="Município prestação"
+                        value={doc.municipioPrestacao}
+                      />
                     </>
                   ) : (
                     <>
-                      <InfoRow label="Produtos" value={fmtMoney(doc.totals?.vProd)} />
-                      <InfoRow label="Frete" value={fmtMoney(doc.totals?.vFrete)} />
-                      <InfoRow label="Desconto" value={fmtMoney(doc.totals?.vDesc)} />
-                      <InfoRow label="Base ICMS" value={fmtMoney(doc.totals?.vBC)} />
-                      <InfoRow label="Valor ICMS" value={fmtMoney(doc.totals?.vICMS)} />
+                      <InfoRow
+                        label="Produtos"
+                        value={fmtMoney(doc.totals?.vProd)}
+                      />
+                      <InfoRow
+                        label="Frete"
+                        value={fmtMoney(doc.totals?.vFrete)}
+                      />
+                      <InfoRow
+                        label="Desconto"
+                        value={fmtMoney(doc.totals?.vDesc)}
+                      />
+                      <InfoRow
+                        label="Base ICMS"
+                        value={fmtMoney(doc.totals?.vBC)}
+                      />
+                      <InfoRow
+                        label="Valor ICMS"
+                        value={fmtMoney(doc.totals?.vICMS)}
+                      />
                       <InfoRow label="IPI" value={fmtMoney(doc.totals?.vIPI)} />
-                      <InfoRow label="Tributos aprox." value={fmtMoney(doc.totals?.vTotTrib)} />
+                      <InfoRow
+                        label="Tributos aprox."
+                        value={fmtMoney(doc.totals?.vTotTrib)}
+                      />
                     </>
                   )}
                   <div className="flex justify-between items-center bg-primary/10 rounded-lg px-4 py-3 border border-primary/20">
-                    <span className="text-sm font-semibold text-foreground">Total da nota</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      Total da nota
+                    </span>
                     <span className="text-base font-bold text-foreground tabular-nums">
                       {formatCurrency(doc.totalValue)}
                     </span>
@@ -366,7 +476,11 @@ export function ReconciliationFiscalDocumentDetailPage() {
                     {payments.map((p, i) => (
                       <InfoRow
                         key={i}
-                        label={PAYMENT_FORMS[p.form ?? ""] || p.form || "Forma de pagamento"}
+                        label={
+                          PAYMENT_FORMS[p.form ?? ""] ||
+                          p.form ||
+                          "Forma de pagamento"
+                        }
                         value={p.value != null ? formatCurrency(p.value) : "—"}
                       />
                     ))}
@@ -376,21 +490,41 @@ export function ReconciliationFiscalDocumentDetailPage() {
                 {/* Transações vinculadas */}
                 {doc.matches && doc.matches.length > 0 && (
                   <div className="space-y-3">
-                    <SubHeading icon={IconArrowsExchange2}>
-                      {doc.matches.length > 1 ? "Transações vinculadas" : "Transação vinculada"}
-                    </SubHeading>
+                    <div className="flex items-center justify-between gap-2">
+                      <SubHeading icon={IconArrowsExchange2}>
+                        {doc.matches.length > 1
+                          ? "Transações vinculadas"
+                          : "Transação vinculada"}
+                      </SubHeading>
+                      {doc.matches.length > 1 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={unmatchDocMut.isPending}
+                          onClick={() => setResetOpen(true)}
+                        >
+                          <IconRefresh className="h-4 w-4" />
+                          Desfazer todas
+                        </Button>
+                      )}
+                    </div>
                     <div className="space-y-2">
-                      {doc.matches.map(m => {
+                      {doc.matches.map((m) => {
                         const tx = m.transaction;
                         if (!tx) {
                           return (
-                            <p key={m.id} className="text-xs text-muted-foreground">
+                            <p
+                              key={m.id}
+                              className="text-xs text-muted-foreground"
+                            >
                               Transação removida
                             </p>
                           );
                         }
                         const txMatchCount =
-                          doc.matches?.filter(x => x.transaction?.id === tx.id).length ?? 1;
+                          doc.matches?.filter(
+                            (x) => x.transaction?.id === tx.id,
+                          ).length ?? 1;
                         return (
                           <LinkedTransactionCard
                             key={m.id}
@@ -398,7 +532,9 @@ export function ReconciliationFiscalDocumentDetailPage() {
                             confidenceScore={m.confidenceScore}
                             allocatedAmount={m.allocatedAmount}
                             unmatchDisabled={unmatchMut.isPending}
-                            onUnmatch={() => handleUnmatchRequest(tx.id, txMatchCount)}
+                            onUnmatch={() =>
+                              handleUnmatchRequest(tx.id, txMatchCount)
+                            }
                           />
                         );
                       })}
@@ -411,14 +547,26 @@ export function ReconciliationFiscalDocumentDetailPage() {
 
           {/* Emitente / Destinatário (Prestador / Tomador for NFSe) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <SectionCard title={isNfse ? "Prestador" : "Emitente"} icon={IconBuildingStore}>
+            <SectionCard
+              title={isNfse ? "Prestador" : "Emitente"}
+              icon={IconBuildingStore}
+            >
               <InfoRow label="Nome / Razão social" value={doc.emitName} />
-              <InfoRow label="CNPJ" value={doc.emitCnpj ? formatCNPJ(doc.emitCnpj) : null} />
+              <InfoRow
+                label="CNPJ"
+                value={doc.emitCnpj ? formatCNPJ(doc.emitCnpj) : null}
+              />
               <InfoRow label="Inscrição estadual" value={doc.emitIE} />
-              <InfoRow label="Endereço" value={formatAddress(doc.emitAddress)} />
+              <InfoRow
+                label="Endereço"
+                value={formatAddress(doc.emitAddress)}
+              />
             </SectionCard>
 
-            <SectionCard title={isNfse ? "Tomador" : "Destinatário"} icon={IconUser}>
+            <SectionCard
+              title={isNfse ? "Tomador" : "Destinatário"}
+              icon={IconUser}
+            >
               <InfoRow label="Nome / Razão social" value={doc.destName} />
               <InfoRow
                 label="CNPJ / CPF"
@@ -432,7 +580,10 @@ export function ReconciliationFiscalDocumentDetailPage() {
               />
               <InfoRow label="Inscrição estadual" value={doc.destIE} />
               <InfoRow label="E-mail" value={doc.destEmail} />
-              <InfoRow label="Endereço" value={formatAddress(doc.destAddress)} />
+              <InfoRow
+                label="Endereço"
+                value={formatAddress(doc.destAddress)}
+              />
             </SectionCard>
           </div>
 
@@ -454,16 +605,25 @@ export function ReconciliationFiscalDocumentDetailPage() {
               />
             </SectionCard>
           )}
-
         </div>
       </div>
 
       <UnmatchConfirmDialog
         open={unmatchTarget !== null}
-        onOpenChange={open => !open && setUnmatchTarget(null)}
+        onOpenChange={(open) => !open && setUnmatchTarget(null)}
         matchCount={unmatchTarget?.matchCount ?? 0}
         isLoading={unmatchMut.isPending}
         onConfirm={() => unmatchTarget && runUnmatch(unmatchTarget.txId)}
+      />
+
+      <UnmatchConfirmDialog
+        open={resetOpen}
+        onOpenChange={(open) => !open && setResetOpen(false)}
+        matchCount={doc?.matches?.length ?? 0}
+        isLoading={unmatchDocMut.isPending}
+        onConfirm={runResetMatches}
+        title="Desfazer todas as conciliações da nota"
+        description="Esta ação removerá o vínculo desta nota fiscal com todas as transações conciliadas (incluindo parcelas). As transações afetadas voltarão a 'Não conciliado' e a nota poderá ser conciliada novamente."
       />
     </Frame>
   );
@@ -530,14 +690,22 @@ function LinkedTransactionCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm">{formatDate(tx.postedAt)}</span>
+            <span className="font-medium text-sm">
+              {formatDate(tx.postedAt)}
+            </span>
             {tx.type && (
-              <Badge size="sm" variant={tx.type === "CREDIT" ? "completed" : "cancelled"}>
+              <Badge
+                size="sm"
+                variant={tx.type === "CREDIT" ? "completed" : "cancelled"}
+              >
                 {tx.type === "CREDIT" ? "Crédito" : "Débito"}
               </Badge>
             )}
             {confidenceScore !== undefined && (
-              <Badge size="sm" variant={getConfidenceBadgeVariant(confidenceScore)}>
+              <Badge
+                size="sm"
+                variant={getConfidenceBadgeVariant(confidenceScore)}
+              >
                 {confidenceScore}%
               </Badge>
             )}
@@ -545,15 +713,21 @@ function LinkedTransactionCard({
           {(tx.counterpartyName || tx.counterpartyCnpjCpf) && (
             <p className="text-xs text-muted-foreground truncate">
               {tx.counterpartyName ||
-                (tx.counterpartyCnpjCpf ? formatCnpjCpf(tx.counterpartyCnpjCpf) : "")}
+                (tx.counterpartyCnpjCpf
+                  ? formatCnpjCpf(tx.counterpartyCnpjCpf)
+                  : "")}
             </p>
           )}
           {tx.memo && (
-            <p className="text-[10px] font-mono text-muted-foreground/70 truncate">{tx.memo}</p>
+            <p className="text-[10px] font-mono text-muted-foreground/70 truncate">
+              {tx.memo}
+            </p>
           )}
         </div>
         <div className="flex flex-col items-end gap-0.5 shrink-0">
-          <span className="font-semibold tabular-nums text-sm">{formatCurrency(tx.amount)}</span>
+          <span className="font-semibold tabular-nums text-sm">
+            {formatCurrency(tx.amount)}
+          </span>
           {allocatedAmount != null && (
             <span className="text-[11px] text-muted-foreground whitespace-nowrap">
               Alocado {formatCurrency(allocatedAmount)}
@@ -595,9 +769,16 @@ function InfoRow({
 }) {
   if (value == null || value === "" || value === "—") return null;
   return (
-    <div className={cn("flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3", className)}>
+    <div
+      className={cn(
+        "flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3",
+        className,
+      )}
+    >
       <span className="text-sm font-medium text-muted-foreground">{label}</span>
-      <span className="text-sm font-semibold text-foreground text-right">{value}</span>
+      <span className="text-sm font-semibold text-foreground text-right">
+        {value}
+      </span>
     </div>
   );
 }

@@ -518,7 +518,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                     </TableCell>
                     <TableCell className="text-center py-2">
                       {item.item ? (
-                        <StockStatusIndicator item={item.item} showQuantity={true} />
+                        <StockStatusIndicator item={item.item} showQuantity={true} className="justify-center" />
                       ) : !item.itemId ? (
                         <span className="text-sm text-muted-foreground">N/A</span>
                       ) : (

@@ -1080,7 +1080,7 @@ export const OrderCreateForm = () => {
                         name: 'Essencial para identificar o item sendo pedido',
                       },
                     }}
-                    defaultColumns={['uniCode', 'name', 'quantity', 'price', 'monthlyConsumption', 'orderSubtotal']}
+                    defaultColumns={['uniCode', 'name', 'quantity', 'price', 'monthlyConsumption', 'monthlyConsumptionTrendPercent', 'orderSubtotal']}
                     storageKey="order-item-selector"
                     // URL state management
                     page={page}

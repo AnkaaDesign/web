@@ -35,10 +35,14 @@ export const reconciliationService = {
   ) => {
     const formData = new FormData();
     for (const f of files) formData.append("files", f);
-    return apiClient.post<ImportSummary>("/financial/reconciliation/import", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-      onUploadProgress,
-    });
+    return apiClient.post<ImportSummary>(
+      "/financial/reconciliation/import",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress,
+      },
+    );
   },
 
   importFiscalDocuments: (
@@ -58,9 +62,12 @@ export const reconciliationService = {
   },
 
   listTransactions: (params: TransactionFilters) =>
-    apiClient.get<ReconciliationPaginatedResponse<BankTransaction>>("/financial/reconciliation/transactions", {
-      params,
-    }),
+    apiClient.get<ReconciliationPaginatedResponse<BankTransaction>>(
+      "/financial/reconciliation/transactions",
+      {
+        params,
+      },
+    ),
 
   getCandidates: (transactionId: string) =>
     apiClient.get<MatchCandidate[]>(
@@ -73,9 +80,14 @@ export const reconciliationService = {
     ),
 
   getFiscalDocument: (id: string) =>
-    apiClient.get<FiscalDocument>(`/financial/reconciliation/fiscal-documents/${id}`),
+    apiClient.get<FiscalDocument>(
+      `/financial/reconciliation/fiscal-documents/${id}`,
+    ),
 
-  setFiscalItemCategory: (fiscalItemId: string, payload: SetFiscalItemCategoryPayload) =>
+  setFiscalItemCategory: (
+    fiscalItemId: string,
+    payload: SetFiscalItemCategoryPayload,
+  ) =>
     apiClient.post<FiscalDocument>(
       `/financial/reconciliation/fiscal-documents/items/${fiscalItemId}/category`,
       payload,
@@ -92,6 +104,11 @@ export const reconciliationService = {
       `/financial/reconciliation/transactions/${transactionId}/unmatch`,
     ),
 
+  unmatchFiscalDocument: (fiscalDocumentId: string) =>
+    apiClient.post(
+      `/financial/reconciliation/fiscal-documents/${fiscalDocumentId}/unmatch`,
+    ),
+
   ignoreTransaction: (transactionId: string, payload: IgnoreReasonPayload) =>
     apiClient.post<BankTransaction>(
       `/financial/reconciliation/transactions/${transactionId}/ignore`,
@@ -105,10 +122,17 @@ export const reconciliationService = {
     ),
 
   classifyBatch: (payload: ClassifyBatchPayload) =>
-    apiClient.post<ClassifyBatchResult>("/financial/reconciliation/classify", payload),
+    apiClient.post<ClassifyBatchResult>(
+      "/financial/reconciliation/classify",
+      payload,
+    ),
 
   runAutoMatch: (payload: RerunMatchingPayload) =>
-    apiClient.post<{ classified: ClassifyBatchResult; matched: number; categorized: number }>(
+    apiClient.post<{
+      classified: ClassifyBatchResult;
+      matched: number;
+      categorized: number;
+    }>(
       "/financial/reconciliation/run",
       payload,
       // Suppress the generic interceptor toast — the "Verificar" handler shows
@@ -117,25 +141,40 @@ export const reconciliationService = {
     ),
 
   getStatistics: (params: { from?: string; to?: string; months?: number }) =>
-    apiClient.get<ReconciliationStatistics>("/financial/reconciliation/statistics", { params }),
+    apiClient.get<ReconciliationStatistics>(
+      "/financial/reconciliation/statistics",
+      { params },
+    ),
 
   listFiscalDocuments: (params: FiscalDocumentFilters) =>
-    apiClient.get<ReconciliationPaginatedResponse<FiscalDocument>>("/financial/reconciliation/fiscal-documents", {
-      params,
-    }),
+    apiClient.get<ReconciliationPaginatedResponse<FiscalDocument>>(
+      "/financial/reconciliation/fiscal-documents",
+      {
+        params,
+      },
+    ),
 
   getFiscalDocumentXml: (accessKey: string) =>
-    apiClient.get<Blob>(`/financial/reconciliation/fiscal-documents/${accessKey}/xml`, {
-      responseType: "blob",
-    }),
+    apiClient.get<Blob>(
+      `/financial/reconciliation/fiscal-documents/${accessKey}/xml`,
+      {
+        responseType: "blob",
+      },
+    ),
 
   listCategories: (params?: TransactionCategoryListParams) =>
-    apiClient.get<TransactionCategory[]>("/financial/reconciliation/categories", {
-      params,
-    }),
+    apiClient.get<TransactionCategory[]>(
+      "/financial/reconciliation/categories",
+      {
+        params,
+      },
+    ),
 
   createCategory: (body: CreateTransactionCategoryPayload) =>
-    apiClient.post<TransactionCategory>("/financial/reconciliation/categories", body),
+    apiClient.post<TransactionCategory>(
+      "/financial/reconciliation/categories",
+      body,
+    ),
 
   // Controller exposes update via POST (not PATCH) — matches the backend.
   updateCategory: (id: string, body: UpdateTransactionCategoryPayload) =>
@@ -150,10 +189,16 @@ export const reconciliationService = {
     ),
 
   categorize: (body: CategorizePayload) =>
-    apiClient.post<CategorizeResult>("/financial/reconciliation/categorize", body),
+    apiClient.post<CategorizeResult>(
+      "/financial/reconciliation/categorize",
+      body,
+    ),
 
   getRecurringForecast: (params: { from: string; to: string }) =>
-    apiClient.get<RecurringForecast>("/financial/reconciliation/recurring/forecast", {
-      params,
-    }),
+    apiClient.get<RecurringForecast>(
+      "/financial/reconciliation/recurring/forecast",
+      {
+        params,
+      },
+    ),
 };

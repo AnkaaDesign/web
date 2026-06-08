@@ -260,7 +260,7 @@ export function ItemList({ className }: ItemListProps) {
   // Visible columns state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
     "item-list-visible-columns",
-    new Set(["uniCode", "name", "brand.name", "category.name", "quantity", "monthlyConsumption", "price"])
+    new Set(["uniCode", "name", "brand.name", "category.name", "quantity", "monthlyConsumption", "monthlyConsumptionTrendPercent", "price"])
   );
 
   // Get all available columns for column visibility manager (hide price columns from warehouse users)

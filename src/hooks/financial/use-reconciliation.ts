@@ -29,7 +29,7 @@ export function useImportOfx(options?: {
     mutationFn: (files: File[]) =>
       reconciliationService
         .importOfx(files, options?.onUploadProgress)
-        .then(r => r.data),
+        .then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });
     },
@@ -44,7 +44,7 @@ export function useImportFiscalDocuments(options?: {
     mutationFn: (files: File[]) =>
       reconciliationService
         .importFiscalDocuments(files, options?.onUploadProgress)
-        .then(r => r.data),
+        .then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.fiscalDocs() });
       qc.invalidateQueries({ queryKey: reconciliationKeys.stats() });
@@ -54,9 +54,12 @@ export function useImportFiscalDocuments(options?: {
 
 export function useBankTransactions(filters: TransactionFilters) {
   return useQuery({
-    queryKey: reconciliationKeys.transactions(filters as Record<string, unknown>),
-    queryFn: () => reconciliationService.listTransactions(filters).then(r => r.data),
-    placeholderData: previous => previous,
+    queryKey: reconciliationKeys.transactions(
+      filters as Record<string, unknown>,
+    ),
+    queryFn: () =>
+      reconciliationService.listTransactions(filters).then((r) => r.data),
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -69,7 +72,9 @@ export function useBankTransaction(id: string | undefined) {
   return useQuery({
     queryKey: id ? reconciliationKeys.transaction(id) : reconciliationKeys.all,
     queryFn: () =>
-      id ? reconciliationService.getTransaction(id).then(r => r.data) : Promise.reject(),
+      id
+        ? reconciliationService.getTransaction(id).then((r) => r.data)
+        : Promise.reject(),
     enabled: !!id,
     staleTime: 30_000,
   });
@@ -92,7 +97,7 @@ export function useSetFiscalItemCategory() {
     }) =>
       reconciliationService
         .setFiscalItemCategory(fiscalItemId, { categoryId })
-        .then(r => r.data),
+        .then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });
     },
@@ -104,20 +109,25 @@ export function useFiscalDocument(id: string | undefined) {
   return useQuery({
     queryKey: id ? reconciliationKeys.fiscalDoc(id) : reconciliationKeys.all,
     queryFn: () =>
-      id ? reconciliationService.getFiscalDocument(id).then(r => r.data) : Promise.reject(),
+      id
+        ? reconciliationService.getFiscalDocument(id).then((r) => r.data)
+        : Promise.reject(),
     enabled: !!id,
     staleTime: 30_000,
   });
 }
 
-export function useMatchCandidates(transactionId: string | undefined, enabled = false) {
+export function useMatchCandidates(
+  transactionId: string | undefined,
+  enabled = false,
+) {
   return useQuery({
     queryKey: transactionId
       ? reconciliationKeys.candidates(transactionId)
       : reconciliationKeys.all,
     queryFn: () =>
       transactionId
-        ? reconciliationService.getCandidates(transactionId).then(r => r.data)
+        ? reconciliationService.getCandidates(transactionId).then((r) => r.data)
         : Promise.reject(),
     enabled: !!transactionId && enabled,
     staleTime: 30_000,
@@ -134,7 +144,9 @@ export function useMatchTransaction() {
       transactionId: string;
       payload: ManualMatchPayload;
     }) =>
-      reconciliationService.matchTransaction(transactionId, payload).then(r => r.data),
+      reconciliationService
+        .matchTransaction(transactionId, payload)
+        .then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });
     },
@@ -145,7 +157,27 @@ export function useUnmatchTransaction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (transactionId: string) =>
-      reconciliationService.unmatchTransaction(transactionId).then(r => r.data),
+      reconciliationService
+        .unmatchTransaction(transactionId)
+        .then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reconciliationKeys.all });
+    },
+  });
+}
+
+/**
+ * Unmatches a fiscal document from ALL its transactions at once ("reset this
+ * NF") — the recovery path for installments, where undoing a single transaction
+ * would leave the NF partially linked and unable to re-match.
+ */
+export function useUnmatchFiscalDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fiscalDocumentId: string) =>
+      reconciliationService
+        .unmatchFiscalDocument(fiscalDocumentId)
+        .then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });
     },
@@ -162,7 +194,9 @@ export function useIgnoreTransaction() {
       transactionId: string;
       payload: IgnoreReasonPayload;
     }) =>
-      reconciliationService.ignoreTransaction(transactionId, payload).then(r => r.data),
+      reconciliationService
+        .ignoreTransaction(transactionId, payload)
+        .then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });
     },
@@ -173,7 +207,7 @@ export function useRunAutoMatch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: RerunMatchingPayload) =>
-      reconciliationService.runAutoMatch(payload).then(r => r.data),
+      reconciliationService.runAutoMatch(payload).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });
     },
@@ -189,7 +223,10 @@ export function useChangeCategory() {
     }: {
       transactionId: string;
       payload: ChangeCategoryPayload;
-    }) => reconciliationService.changeCategory(transactionId, payload).then(r => r.data),
+    }) =>
+      reconciliationService
+        .changeCategory(transactionId, payload)
+        .then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });
     },
@@ -200,7 +237,7 @@ export function useClassifyBatch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: ClassifyBatchPayload) =>
-      reconciliationService.classifyBatch(payload).then(r => r.data),
+      reconciliationService.classifyBatch(payload).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });
     },
@@ -210,8 +247,9 @@ export function useClassifyBatch() {
 export function useFiscalDocuments(filters: FiscalDocumentFilters) {
   return useQuery({
     queryKey: reconciliationKeys.fiscalDocs(filters as Record<string, unknown>),
-    queryFn: () => reconciliationService.listFiscalDocuments(filters).then(r => r.data),
-    placeholderData: previous => previous,
+    queryFn: () =>
+      reconciliationService.listFiscalDocuments(filters).then((r) => r.data),
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -228,7 +266,8 @@ export function useFiscalDocumentXml(accessKey: string | undefined) {
       : reconciliationKeys.all,
     queryFn: async () => {
       if (!accessKey) throw new Error("no access key");
-      const response = await reconciliationService.getFiscalDocumentXml(accessKey);
+      const response =
+        await reconciliationService.getFiscalDocumentXml(accessKey);
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
       const url = URL.createObjectURL(response.data);
       blobUrlRef.current = url;
@@ -255,7 +294,8 @@ export function useReconciliationStatistics(params: {
 }) {
   return useQuery({
     queryKey: reconciliationKeys.stats(params as Record<string, unknown>),
-    queryFn: () => reconciliationService.getStatistics(params).then(r => r.data),
+    queryFn: () =>
+      reconciliationService.getStatistics(params).then((r) => r.data),
     staleTime: 5 * 60_000,
   });
 }
@@ -265,10 +305,15 @@ export function useReconciliationStatistics(params: {
  * when a user creates/edits a TRANSACTION_ONLY category or inventory mirrors a
  * new ItemCategory).
  */
-export function useReconciliationCategories(params?: TransactionCategoryListParams) {
+export function useReconciliationCategories(
+  params?: TransactionCategoryListParams,
+) {
   return useQuery({
-    queryKey: reconciliationKeys.categories(params as Record<string, unknown> | undefined),
-    queryFn: () => reconciliationService.listCategories(params).then(r => r.data),
+    queryKey: reconciliationKeys.categories(
+      params as Record<string, unknown> | undefined,
+    ),
+    queryFn: () =>
+      reconciliationService.listCategories(params).then((r) => r.data),
     staleTime: 5 * 60_000,
   });
 }
@@ -277,7 +322,7 @@ export function useCreateReconciliationCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateTransactionCategoryPayload) =>
-      reconciliationService.createCategory(body).then(r => r.data),
+      reconciliationService.createCategory(body).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.categories() });
     },
@@ -293,7 +338,7 @@ export function useUpdateReconciliationCategory() {
     }: {
       id: string;
       body: UpdateTransactionCategoryPayload;
-    }) => reconciliationService.updateCategory(id, body).then(r => r.data),
+    }) => reconciliationService.updateCategory(id, body).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.categories() });
     },
@@ -304,7 +349,7 @@ export function useDeleteReconciliationCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      reconciliationService.deleteCategory(id).then(r => r.data),
+      reconciliationService.deleteCategory(id).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.categories() });
     },
@@ -317,7 +362,7 @@ export function useCategorize() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: CategorizePayload) =>
-      reconciliationService.categorize(payload).then(r => r.data),
+      reconciliationService.categorize(payload).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });
     },
@@ -328,7 +373,9 @@ export function useRecurringForecast(from: string, to: string) {
   return useQuery({
     queryKey: reconciliationKeys.recurringForecast(from, to),
     queryFn: () =>
-      reconciliationService.getRecurringForecast({ from, to }).then(r => r.data),
+      reconciliationService
+        .getRecurringForecast({ from, to })
+        .then((r) => r.data),
     staleTime: 60_000,
   });
 }
@@ -336,7 +383,7 @@ export function useRecurringForecast(from: string, to: string) {
 export function useSiegStatus() {
   return useQuery({
     queryKey: reconciliationKeys.siegStatus(),
-    queryFn: () => siegService.getStatus().then(r => r.data),
+    queryFn: () => siegService.getStatus().then((r) => r.data),
     staleTime: 60_000,
   });
 }
@@ -345,7 +392,7 @@ export function useSiegFetch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: SiegFetchPayload) =>
-      siegService.triggerFetch(payload).then(r => r.data),
+      siegService.triggerFetch(payload).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.fiscalDocs() });
       qc.invalidateQueries({ queryKey: reconciliationKeys.stats() });

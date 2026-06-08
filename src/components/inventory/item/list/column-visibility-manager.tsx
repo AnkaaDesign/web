@@ -21,7 +21,7 @@ interface ItemColumn {
 
 // Function to get default visible columns for items
 export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["uniCode", "name", "brand.name", "category.name", "quantity", "monthlyConsumption", "price"]);
+  return new Set(["uniCode", "name", "brand.name", "category.name", "quantity", "monthlyConsumption", "monthlyConsumptionTrendPercent", "price"]);
 }
 
 interface ColumnVisibilityManagerProps {

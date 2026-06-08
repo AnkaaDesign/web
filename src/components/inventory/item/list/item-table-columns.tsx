@@ -7,39 +7,35 @@ import { MeasureDisplayCompact } from "../common/measure-display";
 import type { ItemColumn } from "./types";
 import { IconTrendingUp, IconTrendingDown, IconMinus, IconAlertTriangle } from "@tabler/icons-react";
 
-// Helper function to render monthly consumption with trend
-const renderMonthlyConsumptionWithTrend = (item: Item) => {
+// Helper function to render the monthly consumption value only
+const renderMonthlyConsumption = (item: Item) => {
   const consumption = item.monthlyConsumption;
+  if (!consumption) return <div className="truncate">-</div>;
+  const formattedConsumption = Math.round(consumption).toLocaleString("pt-BR");
+  return <div className="truncate tabular-nums">{formattedConsumption}</div>;
+};
+
+// Helper function to render the consumption trend in its own column
+const renderConsumptionTrend = (item: Item) => {
   const trend = item.monthlyConsumptionTrendPercent;
 
-  if (!consumption) return <div className="truncate">-</div>;
+  if (trend === null || trend === 0) {
+    return (
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <IconMinus size={12} />
+        <span>-</span>
+      </div>
+    );
+  }
 
-  const formattedConsumption = Math.round(consumption).toLocaleString("pt-BR");
-
-  const getTrendIcon = (trendValue: number | null) => {
-    if (trendValue === null || trendValue === 0) {
-      return <IconMinus size={12} className="text-muted-foreground" />;
-    }
-    if (trendValue > 0) {
-      return <IconTrendingUp size={12} className="text-red-700 dark:text-red-500" />; // Red for increase (bad for inventory)
-    }
-    return <IconTrendingDown size={12} className="text-green-700 dark:text-green-500" />; // Green for decrease (good for inventory)
-  };
-
-  const getTrendColor = (trendValue: number | null) => {
-    if (trendValue === null || trendValue === 0) return "text-muted-foreground";
-    return trendValue > 0 ? "text-red-700 dark:text-red-500" : "text-green-700 dark:text-green-500";
-  };
+  // Red for increase (bad for inventory), green for decrease (good for inventory)
+  const isUp = trend > 0;
+  const colorClass = isUp ? "text-red-700 dark:text-red-500" : "text-green-700 dark:text-green-500";
 
   return (
-    <div className="flex items-center justify-between w-full min-w-0">
-      <div className="truncate flex-shrink tabular-nums">{formattedConsumption}</div>
-      {trend !== null && trend !== 0 && (
-        <div className={`flex items-center gap-1 text-xs flex-shrink-0 mr-6 ${getTrendColor(trend)}`}>
-          {getTrendIcon(trend)}
-          <span className="whitespace-nowrap">{Math.abs(trend).toFixed(1)}%</span>
-        </div>
-      )}
+    <div className={`flex items-center gap-1 text-xs ${colorClass}`}>
+      {isUp ? <IconTrendingUp size={12} /> : <IconTrendingDown size={12} />}
+      <span className="whitespace-nowrap">{Math.abs(trend).toFixed(1)}%</span>
     </div>
   );
 };
@@ -142,9 +138,17 @@ export const createItemColumns = (): ItemColumn[] => [
   {
     key: "monthlyConsumption",
     header: "CONSUMO MENSAL",
-    accessor: (item: Item) => renderMonthlyConsumptionWithTrend(item),
+    accessor: (item: Item) => renderMonthlyConsumption(item),
     sortable: true,
-    className: "w-40", // Wider to accommodate consumption and trend in same row
+    className: "w-28",
+    align: "left",
+  },
+  {
+    key: "monthlyConsumptionTrendPercent",
+    header: "TENDÊNCIA",
+    accessor: (item: Item) => renderConsumptionTrend(item),
+    sortable: true,
+    className: "w-28",
     align: "left",
   },
   {
