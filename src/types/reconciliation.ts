@@ -393,6 +393,9 @@ export interface XmlImportFailure {
 
 export interface XmlImportResult {
   created: number;
+  /** Existing NFs whose status/fields changed on re-import (incl. an applied
+   *  cancellation event). */
+  updated: number;
   skipped: number;
   failed: number;
   failedFiles: XmlImportFailure[];

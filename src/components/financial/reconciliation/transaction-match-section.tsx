@@ -73,12 +73,15 @@ export function TransactionMatchSection({
   const txId = transaction.id;
   const txAmount = Math.abs(transaction.amount);
 
-  const { data: candidates, isLoading: candidatesLoading } = useMatchCandidates(txId, true);
+  const { data: candidates, isLoading: candidatesLoading } = useMatchCandidates(
+    txId,
+    true,
+  );
 
   // Lookup so save/validation can expand an order-group selection into its
   // member NFs and read each candidate's group metadata.
   const candById = useMemo(
-    () => new Map((candidates ?? []).map(c => [c.fiscalDocumentId, c])),
+    () => new Map((candidates ?? []).map((c) => [c.fiscalDocumentId, c])),
     [candidates],
   );
 
@@ -91,16 +94,20 @@ export function TransactionMatchSection({
     setNotes("");
   }, [transaction.id]);
 
-  const handleItemCategory = (fiscalItemId: string, categoryId: string | null) =>
-    setItemCategory.mutate({ fiscalItemId, categoryId });
+  const handleItemCategory = (
+    fiscalItemId: string,
+    categoryId: string | null,
+  ) => setItemCategory.mutate({ fiscalItemId, categoryId });
 
   const toggleSelect = (id: string, candidate: MatchCandidate) => {
-    setSelectedIds(prev => {
-      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+    setSelectedIds((prev) => {
+      const next = prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : [...prev, id];
       if (!prev.includes(id)) {
-        setAllocations(a => ({ ...a, [id]: candidate.totalValue }));
+        setAllocations((a) => ({ ...a, [id]: candidate.totalValue }));
       } else {
-        setAllocations(a => {
+        setAllocations((a) => {
           const copy = { ...a };
           delete copy[id];
           return copy;
@@ -111,7 +118,7 @@ export function TransactionMatchSection({
   };
 
   const existingMatches = useMemo(
-    () => (transaction.matches ?? []).filter(m => !m.reversedAt),
+    () => (transaction.matches ?? []).filter((m) => !m.reversedAt),
     [transaction],
   );
   const hasExistingMatch = existingMatches.length > 0;
@@ -128,7 +135,9 @@ export function TransactionMatchSection({
   // Order-group selections sum several NFs, so accumulated rounding can drift a
   // couple reais from the payment; widen the tolerance when one is selected
   // (the save step still residual-adjusts allocations to hit the exact amount).
-  const hasOrderGroupSelected = selectedIds.some(id => candById.get(id)?.isOrderGroup);
+  const hasOrderGroupSelected = selectedIds.some(
+    (id) => candById.get(id)?.isOrderGroup,
+  );
   const allocationTolerance = hasOrderGroupSelected ? 2.0 : 0.05;
   const isValidAllocation = Math.abs(diff) <= allocationTolerance;
 
@@ -140,11 +149,10 @@ export function TransactionMatchSection({
   // an NF but no NF has been linked yet — so that assigning a category (which
   // may flip status to RECONCILED) does not hide the match section.
   const showCandidates =
-    !hasExistingMatch && (
-      transaction.reconciliationStatus === "PENDING" ||
+    !hasExistingMatch &&
+    (transaction.reconciliationStatus === "PENDING" ||
       transaction.reconciliationStatus === "PARTIAL" ||
-      transaction.expectsFiscalDocument === true
-    );
+      transaction.expectsFiscalDocument === true);
 
   const hasMatchChanges = selectedIds.length > 0;
   // Allow saving even when the allocated amount differs from the transaction —
@@ -167,7 +175,10 @@ export function TransactionMatchSection({
     const expanded: { fiscalDocumentId: string; amount: number }[] = [];
     for (const m of existingMatches) {
       if (m.fiscalDocumentId) {
-        expanded.push({ fiscalDocumentId: m.fiscalDocumentId, amount: m.allocatedAmount || 0 });
+        expanded.push({
+          fiscalDocumentId: m.fiscalDocumentId,
+          amount: m.allocatedAmount || 0,
+        });
       }
     }
 
@@ -178,19 +189,33 @@ export function TransactionMatchSection({
       const c = candById.get(id);
       if (c?.isOrderGroup && c.members?.length) {
         for (const m of c.members) {
-          expanded.push({ fiscalDocumentId: m.fiscalDocumentId, amount: m.totalValue });
+          expanded.push({
+            fiscalDocumentId: m.fiscalDocumentId,
+            amount: m.totalValue,
+          });
         }
       } else {
-        expanded.push({ fiscalDocumentId: id, amount: allocations[id] ?? c?.totalValue ?? 0 });
+        expanded.push({
+          fiscalDocumentId: id,
+          amount: allocations[id] ?? c?.totalValue ?? 0,
+        });
       }
     }
 
-    // Absorb the rounding residual onto the largest member so allocations sum
-    // EXACTLY to the payment (backend enforces ±0.05 against the full amount).
+    // Absorb ONLY a small rounding residual (cents drift across summed
+    // order-group NFs) onto the largest member so it sums exactly. Do NOT inflate
+    // when the payment genuinely exceeds the NF(s) — e.g. a marketplace debit that
+    // bundles DIFAL/fees on top of the NF total: inflating would over-allocate an
+    // NF beyond its real value. Such cases save as a PARTIAL conciliation, with
+    // the remainder left unreconciled.
     const target = txAmount;
     const sum = expanded.reduce((s, a) => s + a.amount, 0);
     const residual = Number((sum - target).toFixed(2));
-    if (expanded.length > 0 && Math.abs(residual) >= 0.01) {
+    if (
+      expanded.length > 0 &&
+      Math.abs(residual) >= 0.01 &&
+      Math.abs(residual) <= allocationTolerance
+    ) {
       let li = 0;
       for (let i = 1; i < expanded.length; i++) {
         if (expanded[i].amount > expanded[li].amount) li = i;
@@ -202,7 +227,7 @@ export function TransactionMatchSection({
     }
 
     const payload: ManualMatchPayload = {
-      fiscalDocumentIds: expanded.map(e => e.fiscalDocumentId),
+      fiscalDocumentIds: expanded.map((e) => e.fiscalDocumentId),
       allocations: expanded,
       notes: notes || undefined,
     };
@@ -246,7 +271,9 @@ export function TransactionMatchSection({
 
   const isLikelyTax =
     !!transaction.memo &&
-    /DARF|ARRECADAC|TRIBUTO|IMPOSTO|TARIFA|TAR\.BANC|TAR BANC|\bIOF\b/i.test(transaction.memo);
+    /DARF|ARRECADAC|TRIBUTO|IMPOSTO|TARIFA|TAR\.BANC|TAR BANC|\bIOF\b/i.test(
+      transaction.memo,
+    );
 
   return (
     <>
@@ -256,8 +283,8 @@ export function TransactionMatchSection({
             Movimentação tributária ou tarifária
           </p>
           <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
-            DARF, IOF, tarifas bancárias e tributos não exigem conciliação com NFe. Sugerimos marcar
-            como "Ignorar" e descrever o motivo.
+            DARF, IOF, tarifas bancárias e tributos não têm nota fiscal. Basta
+            definir a categoria correspondente (Tarifa, Tributo, etc.).
           </p>
         </div>
       )}
@@ -267,15 +294,23 @@ export function TransactionMatchSection({
         <Card className="shadow-sm border border-border">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-base leading-none">Notas vinculadas</CardTitle>
+              <CardTitle className="text-base leading-none">
+                Notas vinculadas
+              </CardTitle>
               <div className="flex items-center gap-2">
                 {isFullyReconciled && (
                   <Button variant="default" size="sm" disabled className="h-8">
-                    <IconCircleCheck className="h-4 w-4 mr-1.5" /> Conciliação completa
+                    <IconCircleCheck className="h-4 w-4 mr-1.5" /> Conciliação
+                    completa
                   </Button>
                 )}
                 {onRequestUnmatch && (
-                  <Button variant="destructive" size="sm" onClick={onRequestUnmatch} className="h-8">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={onRequestUnmatch}
+                    className="h-8"
+                  >
                     <IconLinkOff className="h-4 w-4 mr-1.5" /> Desvincular
                   </Button>
                 )}
@@ -283,13 +318,14 @@ export function TransactionMatchSection({
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4">
-            {existingMatches.map(m => {
+            {existingMatches.map((m) => {
               const doc = m.fiscalDocument;
               const slip = m.bankSlip;
               const nfHref = doc?.id
                 ? routes.financial.reconciliation.fiscalDocumentDetail(doc.id)
                 : null;
-              const title = doc?.emitName ||
+              const title =
+                doc?.emitName ||
                 (doc?.emitCnpj
                   ? formatCNPJ(doc.emitCnpj)
                   : slip
@@ -304,11 +340,16 @@ export function TransactionMatchSection({
                     </Badge>
                   )}
                   {doc?.nfNumber && (
-                    <Badge variant="outline" className="whitespace-nowrap font-mono">
+                    <Badge
+                      variant="outline"
+                      className="whitespace-nowrap font-mono"
+                    >
                       Nº {doc.nfNumber}
                     </Badge>
                   )}
-                  <span className="font-medium truncate flex-1 min-w-0">{title}</span>
+                  <span className="font-medium truncate flex-1 min-w-0">
+                    {title}
+                  </span>
                   {doc?.issueDate && (
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {formatDate(doc.issueDate)}
@@ -317,7 +358,10 @@ export function TransactionMatchSection({
                 </div>
               );
               return (
-                <div key={m.id} className="rounded-lg border border-border overflow-hidden">
+                <div
+                  key={m.id}
+                  className="rounded-lg border border-border overflow-hidden"
+                >
                   {nfHref ? (
                     <Link
                       to={nfHref}
@@ -352,7 +396,9 @@ export function TransactionMatchSection({
         <Card className="shadow-sm border border-border">
           <CardHeader className="pb-4">
             <CardTitle className="text-base">
-              {hasExistingMatch ? "Adicionar outra nota" : "Candidatas à conciliação"}
+              {hasExistingMatch
+                ? "Adicionar outra nota"
+                : "Candidatas à conciliação"}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0 space-y-4">
@@ -369,7 +415,7 @@ export function TransactionMatchSection({
               </p>
             ) : (
               <div className="space-y-6">
-                {candidates.map(c => (
+                {candidates.map((c) => (
                   <CandidateRow
                     key={c.fiscalDocumentId}
                     candidate={c}
@@ -384,13 +430,16 @@ export function TransactionMatchSection({
             {/* Observações — the Alocado summary + Salvar button live in the
                 page header (always visible while selecting). */}
             <div className="space-y-1">
-              <Label htmlFor="match-notes" className="text-xs text-muted-foreground">
+              <Label
+                htmlFor="match-notes"
+                className="text-xs text-muted-foreground"
+              >
                 Observações (opcional)
               </Label>
               <Input
                 id="match-notes"
                 value={notes}
-                onChange={v => setNotes(typeof v === "string" ? v : "")}
+                onChange={(v) => setNotes(typeof v === "string" ? v : "")}
                 maxLength={500}
                 placeholder="Anotações para auditoria"
               />
@@ -429,7 +478,7 @@ function CandidateRow({
       tabIndex={0}
       aria-pressed={checked}
       onClick={onToggle}
-      onKeyDown={e => {
+      onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onToggle();
@@ -463,12 +512,19 @@ function CandidateRow({
           ) : (
             <>
               {c.nfNumber && (
-                <Badge variant="secondary" className="whitespace-nowrap font-mono">
+                <Badge
+                  variant="secondary"
+                  className="whitespace-nowrap font-mono"
+                >
                   Nº {c.nfNumber}
                 </Badge>
               )}
-              {(c.orderCodes ?? []).map(oc => (
-                <Badge key={oc.code} variant="secondary" className="whitespace-nowrap font-mono gap-1">
+              {(c.orderCodes ?? []).map((oc) => (
+                <Badge
+                  key={oc.code}
+                  variant="secondary"
+                  className="whitespace-nowrap font-mono gap-1"
+                >
                   <IconStack2 className="h-3 w-3" />
                   {oc.code}
                 </Badge>
@@ -504,7 +560,10 @@ function CandidateRow({
             <span className="text-sm font-medium text-foreground whitespace-nowrap">
               {formatDate(c.issueDate)}
             </span>
-            <Badge variant="secondary" title="Diferença de dias para a transação">
+            <Badge
+              variant="secondary"
+              title="Diferença de dias para a transação"
+            >
               {c.daysDelta === 0 ? "mesmo dia" : `${c.daysDelta}d`}
             </Badge>
             <Badge variant={getConfidenceBadgeVariant(c.confidence)}>
@@ -512,8 +571,10 @@ function CandidateRow({
             </Badge>
             {!c.isOrderGroup && (
               <Link
-                to={routes.financial.reconciliation.fiscalDocumentDetail(c.fiscalDocumentId)}
-                onClick={e => e.stopPropagation()}
+                to={routes.financial.reconciliation.fiscalDocumentDetail(
+                  c.fiscalDocumentId,
+                )}
+                onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
                 title="Ver notas"
               >

@@ -136,11 +136,36 @@ const CONFIDENCE_RANGES: {
   score: number;
   description: string;
 }[] = [
-  { range: "100", label: "Perfeito", score: 100, description: "Ponte de boleto confirmada" },
-  { range: "90–99", label: "Alta", score: 95, description: "Pareamento automático permitido" },
-  { range: "60–89", label: "Boa", score: 75, description: "Candidata forte — revisão recomendada" },
-  { range: "30–59", label: "Média", score: 45, description: "Possível, mas verificar manualmente" },
-  { range: "0–29", label: "Fraca", score: 15, description: "Apenas indício de proximidade" },
+  {
+    range: "100",
+    label: "Perfeito",
+    score: 100,
+    description: "Ponte de boleto confirmada",
+  },
+  {
+    range: "90–99",
+    label: "Alta",
+    score: 95,
+    description: "Pareamento automático permitido",
+  },
+  {
+    range: "60–89",
+    label: "Boa",
+    score: 75,
+    description: "Candidata forte — revisão recomendada",
+  },
+  {
+    range: "30–59",
+    label: "Média",
+    score: 45,
+    description: "Possível, mas verificar manualmente",
+  },
+  {
+    range: "0–29",
+    label: "Fraca",
+    score: 15,
+    description: "Apenas indício de proximidade",
+  },
 ];
 
 const GUARDRAILS: { icon: TablerIcon; title: string; description: string }[] = [
@@ -160,7 +185,7 @@ const GUARDRAILS: { icon: TablerIcon; title: string; description: string }[] = [
     icon: IconX,
     title: "Tributos e tarifas",
     description:
-      "DARF, IOF, tarifas e tributos não são apresentados como candidatos: a recomendação é marcar como Ignorado.",
+      "DARF, IOF, tarifas e tributos não são apresentados como candidatos a nota fiscal — eles não têm NF. Basta definir a categoria correspondente (Tarifa, Tributo, etc.): categorias desse tipo já resolvem a transação automaticamente, sem precisar marcar como Ignorado.",
   },
 ];
 
@@ -204,9 +229,12 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
               <IconBrain className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <DialogTitle className="text-xl">Como funciona a conciliação</DialogTitle>
+              <DialogTitle className="text-xl">
+                Como funciona a conciliação
+              </DialogTitle>
               <DialogDescription className="mt-0.5">
-                Cada saída bancária é confrontada com as notas fiscais recebidas em 3 etapas.
+                Cada saída bancária é confrontada com as notas fiscais recebidas
+                em 3 etapas.
               </DialogDescription>
             </div>
           </div>
@@ -214,8 +242,9 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
           <div className="flex items-start gap-2.5 rounded-md border border-blue-300/60 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-3.5 py-2.5 text-sm text-blue-900 dark:text-blue-200">
             <IconArrowDown className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <p className="leading-relaxed">
-              A conciliação considera apenas <strong>débitos</strong> — saídas de
-              dinheiro (pagamentos a fornecedores). Créditos não entram nesse fluxo.
+              A conciliação considera apenas <strong>débitos</strong> — saídas
+              de dinheiro (pagamentos a fornecedores). Créditos não entram nesse
+              fluxo.
             </p>
           </div>
         </DialogHeader>
@@ -223,13 +252,15 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
         {/* Step 1: pipeline */}
         <section className="space-y-3">
           <div className="flex items-baseline gap-2">
-            <span className="text-xs font-bold tabular-nums text-muted-foreground">1.</span>
+            <span className="text-xs font-bold tabular-nums text-muted-foreground">
+              1.
+            </span>
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Fluxo de pareamento
             </h3>
           </div>
           <div className="space-y-2">
-            {PASSES.map(pass => {
+            {PASSES.map((pass) => {
               const c = colorClasses[pass.color];
               const Icon = pass.icon;
               return (
@@ -238,7 +269,9 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
                   className={`rounded-lg border ${c.border} ${c.bg} p-4`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md ${c.badgeBg} text-white`}>
+                    <div
+                      className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md ${c.badgeBg} text-white`}
+                    >
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -246,7 +279,9 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                           {pass.step}
                         </span>
-                        <h4 className={`text-sm font-semibold ${c.text}`}>{pass.title}</h4>
+                        <h4 className={`text-sm font-semibold ${c.text}`}>
+                          {pass.title}
+                        </h4>
                       </div>
                       <p className="mt-1 text-sm text-foreground/80 leading-relaxed">
                         {pass.description}
@@ -273,18 +308,20 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
         <section className="space-y-3">
           <div className="space-y-1">
             <div className="flex items-baseline gap-2">
-              <span className="text-xs font-bold tabular-nums text-muted-foreground">2.</span>
+              <span className="text-xs font-bold tabular-nums text-muted-foreground">
+                2.
+              </span>
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Pontuação (0 a 100)
               </h3>
             </div>
             <p className="text-xs text-muted-foreground pl-5">
-              Cada candidata recebe pontos em quatro critérios. A soma define a confiança
-              exibida no badge ao lado da nota.
+              Cada candidata recebe pontos em quatro critérios. A soma define a
+              confiança exibida no badge ao lado da nota.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 mb-3">
-            {SCORE_PARTS.map(part => {
+            {SCORE_PARTS.map((part) => {
               const c = colorClasses[part.color];
               const Icon = part.icon;
               return (
@@ -294,17 +331,21 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className={`rounded-md ${c.bg} ${c.border} border p-1.5`}>
+                      <div
+                        className={`rounded-md ${c.bg} ${c.border} border p-1.5`}
+                      >
                         <Icon className={`h-4 w-4 ${c.text}`} />
                       </div>
-                      <span className="text-sm font-semibold">{part.title}</span>
+                      <span className="text-sm font-semibold">
+                        {part.title}
+                      </span>
                     </div>
                     <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
                       até {part.max} pts
                     </span>
                   </div>
                   <ul className="space-y-1">
-                    {part.bullets.map(b => (
+                    {part.bullets.map((b) => (
                       <li
                         key={b.label}
                         className="flex items-center justify-between text-xs"
@@ -332,10 +373,11 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
                 </p>
                 <p className="text-xs text-emerald-900/80 dark:text-emerald-200/80 leading-relaxed mt-1">
                   Quando <strong>valor idêntico</strong> (Δ ≤ R$ 0,50) +{" "}
-                  <strong>razão social ≥ 80%</strong> + <strong>CNPJ idêntico ou mesma raiz</strong>{" "}
-                  ocorrem juntos, a soma é elevada para no mínimo 95 pontos — a coincidência
-                  desses três sinais com uma nota diferente é praticamente nula. A data
-                  vira informativa, não decisiva.
+                  <strong>razão social ≥ 80%</strong> +{" "}
+                  <strong>CNPJ idêntico ou mesma raiz</strong> ocorrem juntos, a
+                  soma é elevada para no mínimo 95 pontos — a coincidência
+                  desses três sinais com uma nota diferente é praticamente nula.
+                  A data vira informativa, não decisiva.
                 </p>
               </div>
             </div>
@@ -352,11 +394,11 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
                   O que é "Inferido pelo histórico"
                 </p>
                 <p className="text-xs text-indigo-900/80 dark:text-indigo-200/80 leading-relaxed mt-1">
-                  Quando o extrato bancário não traz o CNPJ do fornecedor, o sistema
-                  pode reaproveitar a associação <strong>descrição → CNPJ</strong>{" "}
-                  aprendida em conciliações anteriores. Quanto mais vezes essa
-                  associação foi confirmada (e quanto mais "humana" foi a origem),
-                  mais pontos ela vale.
+                  Quando o extrato bancário não traz o CNPJ do fornecedor, o
+                  sistema pode reaproveitar a associação{" "}
+                  <strong>descrição → CNPJ</strong> aprendida em conciliações
+                  anteriores. Quanto mais vezes essa associação foi confirmada
+                  (e quanto mais "humana" foi a origem), mais pontos ela vale.
                 </p>
               </div>
             </div>
@@ -365,10 +407,19 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
                 { label: "Confirmado manualmente (3+ vezes)", pts: "30 pts" },
                 { label: "Cadastrado por administrador", pts: "~29 pts" },
                 { label: "Confirmado manualmente (1–2 vezes)", pts: "27 pts" },
-                { label: "Aprendido automaticamente (5+ vezes)", pts: "~26 pts" },
-                { label: "Aprendido automaticamente (2–4 vezes)", pts: "~23 pts" },
-                { label: "Aprendido só 1 vez por automação", pts: "0 pts (não promove)" },
-              ].map(row => (
+                {
+                  label: "Aprendido automaticamente (5+ vezes)",
+                  pts: "~26 pts",
+                },
+                {
+                  label: "Aprendido automaticamente (2–4 vezes)",
+                  pts: "~23 pts",
+                },
+                {
+                  label: "Aprendido só 1 vez por automação",
+                  pts: "0 pts (não promove)",
+                },
+              ].map((row) => (
                 <li
                   key={row.label}
                   className="flex items-center justify-between gap-3 py-1 border-b border-indigo-300/30 dark:border-indigo-500/20 last:border-0"
@@ -388,7 +439,9 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
         {/* Step 3: confidence legend */}
         <section className="space-y-3">
           <div className="flex items-baseline gap-2">
-            <span className="text-xs font-bold tabular-nums text-muted-foreground">3.</span>
+            <span className="text-xs font-bold tabular-nums text-muted-foreground">
+              3.
+            </span>
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Legenda dos badges
             </h3>
@@ -398,7 +451,9 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
               <div
                 key={r.range}
                 className={`flex items-center gap-3 px-3 py-2 text-sm ${
-                  idx !== CONFIDENCE_RANGES.length - 1 ? "border-b border-border/40" : ""
+                  idx !== CONFIDENCE_RANGES.length - 1
+                    ? "border-b border-border/40"
+                    : ""
                 }`}
               >
                 <Badge
@@ -407,7 +462,9 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
                 >
                   {r.range}
                 </Badge>
-                <span className="font-medium w-20 flex-shrink-0">{r.label}</span>
+                <span className="font-medium w-20 flex-shrink-0">
+                  {r.label}
+                </span>
                 <span className="text-xs text-muted-foreground flex-1">
                   {r.description}
                 </span>
@@ -419,13 +476,15 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
         {/* Step 4: guardrails */}
         <section className="space-y-3">
           <div className="flex items-baseline gap-2">
-            <span className="text-xs font-bold tabular-nums text-muted-foreground">4.</span>
+            <span className="text-xs font-bold tabular-nums text-muted-foreground">
+              4.
+            </span>
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Cuidados do sistema
             </h3>
           </div>
           <div className="space-y-2">
-            {GUARDRAILS.map(g => {
+            {GUARDRAILS.map((g) => {
               const Icon = g.icon;
               return (
                 <div
@@ -447,7 +506,9 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
 
         <section className="space-y-3">
           <div className="flex items-baseline gap-2">
-            <span className="text-xs font-bold tabular-nums text-muted-foreground">5.</span>
+            <span className="text-xs font-bold tabular-nums text-muted-foreground">
+              5.
+            </span>
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Como o sistema aprende com você
             </h3>
@@ -456,21 +517,23 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
             <div className="flex items-start gap-2">
               <IconBrain className="h-4 w-4 text-violet-700 dark:text-violet-300 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-violet-900 dark:text-violet-100 leading-relaxed">
-                <strong>Bancos quase nunca enviam o CNPJ do fornecedor no extrato.</strong>{" "}
+                <strong>
+                  Bancos quase nunca enviam o CNPJ do fornecedor no extrato.
+                </strong>{" "}
                 A maioria dos débitos chega só com uma descrição como{" "}
                 <code className="rounded bg-violet-200/40 dark:bg-violet-500/20 px-1 py-0.5 text-[11px]">
                   PIX FORN ACME LTDA
                 </code>
-                . Sem CNPJ, o motor não tem como pontuar a contraparte — então, na
-                primeira aparição de um fornecedor novo, a conciliação{" "}
+                . Sem CNPJ, o motor não tem como pontuar a contraparte — então,
+                na primeira aparição de um fornecedor novo, a conciliação{" "}
                 <strong>sempre será manual</strong>.
               </p>
             </div>
 
             <ol className="space-y-2 text-xs text-violet-900/90 dark:text-violet-100/90 list-decimal list-inside pl-1">
               <li>
-                <strong>1ª vez:</strong> você concilia manualmente a transação com a
-                nota correta.
+                <strong>1ª vez:</strong> você concilia manualmente a transação
+                com a nota correta.
               </li>
               <li>
                 <strong>Sistema aprende:</strong> guarda a associação{" "}
@@ -480,9 +543,10 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
                 com selo de confirmação manual.
               </li>
               <li>
-                <strong>Próximas vezes:</strong> quando a mesma descrição aparece, o
-                sistema reaplica o CNPJ aprendido e tenta auto-conciliar — incluindo
-                a regra de "valor + CNPJ perfeitos, data irrelevante".
+                <strong>Próximas vezes:</strong> quando a mesma descrição
+                aparece, o sistema reaplica o CNPJ aprendido e tenta
+                auto-conciliar — incluindo a regra de "valor + CNPJ perfeitos,
+                data irrelevante".
               </li>
             </ol>
 
@@ -490,23 +554,25 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
               <strong className="text-violet-900 dark:text-violet-100">
                 Trava de segurança:
               </strong>{" "}
-              uma associação descoberta automaticamente (sem confirmação humana) vale{" "}
-              <strong>zero pontos</strong> até ser confirmada manualmente. Isso impede
-              que o sistema reforce um erro próprio em cadeia.
+              uma associação descoberta automaticamente (sem confirmação humana)
+              vale <strong>zero pontos</strong> até ser confirmada manualmente.
+              Isso impede que o sistema reforce um erro próprio em cadeia.
             </div>
           </div>
         </section>
 
         <div className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-          <strong className="text-foreground">Resumo:</strong> são auto-conciliadas
-          apenas as saídas que combinam{" "}
-          <strong className="text-foreground">valor dentro de R$ 0,50</strong> com{" "}
-          <strong className="text-foreground">CNPJ idêntico</strong> ou{" "}
-          <strong className="text-foreground">mesma raiz + razão social compatível</strong>{" "}
+          <strong className="text-foreground">Resumo:</strong> são
+          auto-conciliadas apenas as saídas que combinam{" "}
+          <strong className="text-foreground">valor dentro de R$ 0,50</strong>{" "}
+          com <strong className="text-foreground">CNPJ idêntico</strong> ou{" "}
+          <strong className="text-foreground">
+            mesma raiz + razão social compatível
+          </strong>{" "}
           (com a nota emitida antes do pagamento), ou que somam{" "}
-          <strong className="text-foreground">score ≥ 90</strong> com vantagem clara
-          sobre alternativas. O resto vira sugestão manual — e cada confirmação sua
-          ensina o sistema para a próxima vez.
+          <strong className="text-foreground">score ≥ 90</strong> com vantagem
+          clara sobre alternativas. O resto vira sugestão manual — e cada
+          confirmação sua ensina o sistema para a próxima vez.
         </div>
       </DialogContent>
     </Dialog>

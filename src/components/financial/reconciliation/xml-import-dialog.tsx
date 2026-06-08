@@ -32,7 +32,9 @@ export function XmlImportDialog({ open, onOpenChange }: Props) {
     if (files.length === 0) return;
     importMutation.mutate(files, {
       onSuccess: (result) => {
-        const counts = `${result.created} criadas, ${result.skipped} duplicadas${
+        const counts = `${result.created} criadas${
+          result.updated > 0 ? `, ${result.updated} atualizadas` : ""
+        }, ${result.skipped} duplicadas${
           result.failed > 0 ? `, ${result.failed} com erro` : ""
         }`;
         // Surface WHY files failed (the reason was previously only in server logs).
