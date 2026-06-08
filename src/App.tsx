@@ -136,6 +136,7 @@ const UnderConstruction = lazy(() => import("@/pages/under-construction"));
 const PublicBudgetPage = lazy(() => import("@/pages/public/budget/[id]").then((module) => ({ default: module.PublicBudgetPage })));
 const PublicServiceReportPage = lazy(() => import("@/pages/public/service-report/[id]").then((module) => ({ default: module.PublicServiceReportPage })));
 const PublicWasteCertificatePage = lazy(() => import("@/pages/public/waste-certificate/[id]").then((module) => ({ default: module.PublicWasteCertificatePage })));
+const PrivacyPolicyPage = lazy(() => import("@/pages/public/privacy-policy").then((module) => ({ default: module.PrivacyPolicyPage })));
 
 // Inventory
 const Inventory = lazy(() => import("@/pages/inventory/root").then((module) => ({ default: module.InventoryRootPage })));
@@ -477,6 +478,14 @@ function App() {
               element={
                 <Suspense fallback={<PageLoader />}>
                   <PublicWasteCertificatePage />
+                </Suspense>
+              }
+            />
+            <Route
+              path={routes.privacyPolicy}
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PrivacyPolicyPage />
                 </Suspense>
               }
             />

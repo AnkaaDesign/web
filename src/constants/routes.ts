@@ -739,6 +739,9 @@ export const routes = {
 
   // Public certificate route (no authentication required)
   publicWasteCertificate: (id: string) => `/certificado-residuos/${id}`,
+
+  // Public legal pages (no authentication required)
+  privacyPolicy: "/politica-de-privacidade",
 } as const;
 
 // Export types for type safety
