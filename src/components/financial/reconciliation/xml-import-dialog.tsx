@@ -31,12 +31,21 @@ export function XmlImportDialog({ open, onOpenChange }: Props) {
   const handleUpload = () => {
     if (files.length === 0) return;
     importMutation.mutate(files, {
-      onSuccess: result => {
+      onSuccess: (result) => {
+        const counts = `${result.created} criadas, ${result.skipped} duplicadas${
+          result.failed > 0 ? `, ${result.failed} com erro` : ""
+        }`;
+        // Surface WHY files failed (the reason was previously only in server logs).
+        const firstFailure = result.failedFiles[0];
+        const reason =
+          result.failed > 0 && firstFailure
+            ? `\n${firstFailure.name}: ${firstFailure.reason}${
+                result.failed > 1 ? ` (e mais ${result.failed - 1})` : ""
+              }`
+            : "";
         toast({
           title: "Notas processadas",
-          description: `${result.created} criadas, ${result.skipped} duplicadas${
-            result.failed > 0 ? `, ${result.failed} com erro` : ""
-          }`,
+          description: counts + reason,
           variant: result.failed > 0 ? "warning" : "success",
         });
         onOpenChange(false);
@@ -51,7 +60,8 @@ export function XmlImportDialog({ open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle>Importar Notas Fiscais</DialogTitle>
           <DialogDescription>
-            Envie XMLs avulsos ou um ZIP. Notas duplicadas pela chave de acesso são ignoradas.
+            Envie XMLs avulsos ou um ZIP. Notas duplicadas pela chave de acesso
+            são ignoradas.
           </DialogDescription>
         </DialogHeader>
         <XmlUploadDropzone
@@ -72,7 +82,9 @@ export function XmlImportDialog({ open, onOpenChange }: Props) {
             disabled={files.length === 0 || importMutation.isPending}
           >
             <IconUpload className="h-4 w-4 mr-2" />
-            {importMutation.isPending ? "Enviando..." : `Enviar ${files.length} arquivo(s)`}
+            {importMutation.isPending
+              ? "Enviando..."
+              : `Enviar ${files.length} arquivo(s)`}
           </Button>
         </DialogFooter>
       </DialogContent>

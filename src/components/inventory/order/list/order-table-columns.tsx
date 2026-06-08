@@ -25,7 +25,7 @@ export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[]
     accessor: (order) => <TruncatedTextWithTooltip text={order.description || "-"} className="text-sm" />,
     sortable: true,
     align: "left",
-    className: cn("w-80", TABLE_LAYOUT.firstDataColumn.className),
+    className: cn("w-auto min-w-[28rem]", TABLE_LAYOUT.firstDataColumn.className),
   },
   {
     key: "supplier.fantasyName",
@@ -56,7 +56,7 @@ export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[]
     },
     sortable: false,
     align: "center",
-    className: "min-w-[80px]",
+    className: "w-20",
   },
   {
     key: "total",
@@ -80,7 +80,7 @@ export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[]
     },
     sortable: false,
     align: "left",
-    className: "w-36",
+    className: "w-28",
   },
   {
     key: "forecast",
@@ -88,7 +88,7 @@ export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[]
     accessor: (order) => <span className="text-sm text-muted-foreground whitespace-nowrap">{order.forecast ? formatDate(order.forecast) : "-"}</span>,
     sortable: true,
     align: "left",
-    className: "w-32",
+    className: "w-24",
   },
   {
     key: "createdAt",
@@ -96,7 +96,7 @@ export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[]
     accessor: (order) => <span className="text-sm text-muted-foreground whitespace-nowrap">{formatDate(order.createdAt)}</span>,
     sortable: true,
     align: "left",
-    className: "w-32",
+    className: "w-24",
   },
   ];
   return columns.filter((column) => canViewPrices || column.key !== "total");

@@ -13,7 +13,10 @@ export type ReconciliationSource = "AUTO" | "MANUAL";
 // Dynamic, DB-backed taxonomy. A category is either mirrored from an inventory
 // ItemCategory (ITEM_DERIVED), a fiscal-service category (SERVICE), or a
 // user-created transaction-only bucket like "Aluguel" (TRANSACTION_ONLY).
-export type TransactionCategoryKind = "ITEM_DERIVED" | "SERVICE" | "TRANSACTION_ONLY";
+export type TransactionCategoryKind =
+  | "ITEM_DERIVED"
+  | "SERVICE"
+  | "TRANSACTION_ONLY";
 
 export interface TransactionCategory {
   id: string;
@@ -48,7 +51,12 @@ export interface BankTransactionCategoryTag {
   >;
 }
 
-export type MatchType = "EXACT" | "VALUE_DATE" | "FUZZY" | "MANUAL" | "BANK_SLIP_BRIDGE";
+export type MatchType =
+  | "EXACT"
+  | "VALUE_DATE"
+  | "FUZZY"
+  | "MANUAL"
+  | "BANK_SLIP_BRIDGE";
 
 export type TransactionType = "CREDIT" | "DEBIT";
 
@@ -67,7 +75,11 @@ export type BankTransactionSubtype =
 
 export type FiscalDocType = "NFE" | "NFSE" | "CTE" | "NFCE" | "CFE";
 export type OperationType = "ENTRADA" | "SAIDA";
-export type FiscalDocumentStatus = "AUTHORIZED" | "CANCELLED" | "DENIED" | "PENDING";
+export type FiscalDocumentStatus =
+  | "AUTHORIZED"
+  | "CANCELLED"
+  | "DENIED"
+  | "PENDING";
 export type FiscalDocumentSource = "SIEG_API" | "MANUAL_UPLOAD";
 
 export interface BankTransaction {
@@ -123,7 +135,11 @@ export interface ReconciliationMatch {
   reversedAt: string | null;
   reversedById: string | null;
   fiscalDocument?: Partial<FiscalDocument> | null;
-  bankSlip?: { id: string; nossoNumero: string; paidAmount: number | null } | null;
+  bankSlip?: {
+    id: string;
+    nossoNumero: string;
+    paidAmount: number | null;
+  } | null;
 }
 
 /** Per-item tax group extracted from the NFe XML (`det.imposto`). */
@@ -167,7 +183,12 @@ export interface FiscalDocumentItem {
   categoryId?: string | null;
   categoryConfidence?: number | null;
   categorySource?: ReconciliationSource | null;
-  category?: { id: string; name: string; slug: string; color: string | null } | null;
+  category?: {
+    id: string;
+    name: string;
+    slug: string;
+    color: string | null;
+  } | null;
 }
 
 /** Address blob extracted from the NFe XML (emit/dest). */
@@ -282,7 +303,12 @@ export interface MatchCandidateItem {
   unit: string | null;
   unitValue: number | null;
   categoryId: string | null;
-  category: { id: string; name: string; slug: string; color: string | null } | null;
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    color: string | null;
+  } | null;
 }
 
 export interface SetFiscalItemCategoryPayload {
@@ -320,7 +346,11 @@ export interface MatchCandidate {
   /** The fiscal-document ids of every NF in the group (sent on accept). */
   memberFiscalDocumentIds?: string[];
   /** Per-member NF id + value, so the UI can send accurate per-NF allocations. */
-  members?: { fiscalDocumentId: string; nfNumber: string | null; totalValue: number }[];
+  members?: {
+    fiscalDocumentId: string;
+    nfNumber: string | null;
+    totalValue: number;
+  }[];
   /** Number of NFs in the group. */
   memberCount?: number;
   /** True when no member NF belongs to more than one order; unclean groups are
@@ -356,11 +386,16 @@ export interface ImportSummary {
   failedFiles: string[];
 }
 
+export interface XmlImportFailure {
+  name: string;
+  reason: string;
+}
+
 export interface XmlImportResult {
   created: number;
   skipped: number;
   failed: number;
-  failedFiles: string[];
+  failedFiles: XmlImportFailure[];
 }
 
 export interface CategoryDistributionEntry {
@@ -377,8 +412,16 @@ export interface ReconciliationStatistics {
   pendenteConciliacao: number;
   notasRecebidas: number;
   ultimaImportacao: string | null;
-  matchedOverTime: Array<{ period: string; matched: number; unmatched: number }>;
-  topUnmatchedByCounterparty: Array<{ counterparty: string; amount: number; count: number }>;
+  matchedOverTime: Array<{
+    period: string;
+    matched: number;
+    unmatched: number;
+  }>;
+  topUnmatchedByCounterparty: Array<{
+    counterparty: string;
+    amount: number;
+    count: number;
+  }>;
   matchTypeDistribution: Record<MatchType, number>;
   statusDistribution: Record<ReconciliationStatus, number>;
   categoryDistribution: CategoryDistributionEntry[];

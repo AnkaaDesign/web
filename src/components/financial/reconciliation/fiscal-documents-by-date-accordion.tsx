@@ -17,10 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import {
-  DropdownMenu,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { useToast } from "@/hooks/common/use-toast";
 import { cn } from "@/lib/utils";
@@ -60,15 +57,40 @@ interface DaySummary {
 }
 
 /**
+ * Maps a day's vinculação ratio (linked/count, 0–100) to a red→orange→yellow→
+ * green tier, identical to the transactions list progress bar, so the fill color
+ * encodes "how linked is this day" at a glance. 100% gets the strongest green;
+ * partial days warm toward red as the backlog grows.
+ */
+function reconciliationTier(pct: number): { bar: string; text: string } {
+  if (pct >= 100)
+    return { bar: "bg-green-600", text: "text-green-700 dark:text-green-400" };
+  if (pct >= 75)
+    return { bar: "bg-green-500", text: "text-green-700 dark:text-green-400" };
+  if (pct >= 50)
+    return {
+      bar: "bg-yellow-500",
+      text: "text-yellow-700 dark:text-yellow-500",
+    };
+  if (pct >= 25)
+    return {
+      bar: "bg-orange-500",
+      text: "text-orange-700 dark:text-orange-400",
+    };
+  return { bar: "bg-red-500", text: "text-red-700 dark:text-red-400" };
+}
+
+/**
  * Compact progress strip mirroring the transactions list — used in the
- * Vinculada column on each day banner. Green segment shows the share of NFs
- * that have at least one bank-transaction match.
+ * Vinculada column on each day banner. The fill and the X/Y counter are tinted
+ * by the day's vinculação tier (red→orange→yellow→green), exactly like the
+ * transactions page progress bar.
  */
 function DayProgressBar({ summary }: { summary: DaySummary }) {
   const { count, linked } = summary;
   if (count === 0) return null;
   const linkedPct = (linked / count) * 100;
-  const isComplete = linked === count;
+  const tier = reconciliationTier(linkedPct);
   return (
     <div
       className="flex items-center gap-2 w-full"
@@ -76,14 +98,14 @@ function DayProgressBar({ summary }: { summary: DaySummary }) {
     >
       <div className="relative flex-1 h-2 rounded-full overflow-hidden bg-muted">
         <div
-          className="absolute inset-y-0 left-0 bg-emerald-600 transition-all"
+          className={cn("absolute inset-y-0 left-0 transition-all", tier.bar)}
           style={{ width: `${linkedPct}%` }}
         />
       </div>
       <span
         className={cn(
           "text-[11px] font-semibold tabular-nums whitespace-nowrap",
-          isComplete ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
+          tier.text,
         )}
       >
         {linked}/{count}
@@ -151,7 +173,12 @@ export function FiscalDocumentsByDateAccordion({
     () => [
       { key: "issueDate", header: "Data", width: `${DATE_COLUMN_WIDTH}px` },
       { key: "docType", header: "Tipo", width: "90px", align: "center" },
-      { key: "operationType", header: "Operação", width: "110px", align: "center" },
+      {
+        key: "operationType",
+        header: "Operação",
+        width: "110px",
+        align: "center",
+      },
       { key: "accessKey", header: "Chave", width: "150px" },
       { key: "emitter", header: "Emitente" },
       { key: "destinatario", header: "Destinatário" },
@@ -163,7 +190,7 @@ export function FiscalDocumentsByDateAccordion({
   );
 
   const toggleDate = (date: string) => {
-    setOpenDates(prev => {
+    setOpenDates((prev) => {
       const next = new Set(prev);
       if (next.has(date)) next.delete(date);
       else next.add(date);
@@ -213,15 +240,23 @@ export function FiscalDocumentsByDateAccordion({
     <>
       <div className="h-full border border-border rounded-lg overflow-hidden bg-card">
         <div className="h-full overflow-auto">
-          <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
+          <Table
+            className={cn(
+              "w-full [&>div]:border-0 [&>div]:rounded-none",
+              TABLE_LAYOUT.tableLayout,
+            )}
+          >
             <colgroup>
-              {columns.map(c => (
-                <col key={c.key} style={c.width ? { width: c.width } : undefined} />
+              {columns.map((c) => (
+                <col
+                  key={c.key}
+                  style={c.width ? { width: c.width } : undefined}
+                />
               ))}
             </colgroup>
             <TableHeader className="sticky top-0 z-10 [&_tr]:border-b [&_tr]:hover:bg-muted">
               <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-                {columns.map(c => (
+                {columns.map((c) => (
                   <TableHead
                     key={c.key}
                     className="whitespace-nowrap text-foreground font-medium text-sm p-0 bg-muted !border-r-0"
@@ -231,7 +266,8 @@ export function FiscalDocumentsByDateAccordion({
                         "flex items-center h-full min-h-[2.5rem] px-4 py-2",
                         c.align === "right" && "justify-end text-right",
                         c.align === "center" && "justify-center text-center",
-                        (!c.align || c.align === "left") && "justify-start text-left",
+                        (!c.align || c.align === "left") &&
+                          "justify-start text-left",
                       )}
                     >
                       {c.header}
@@ -241,11 +277,15 @@ export function FiscalDocumentsByDateAccordion({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {dates.map(date => {
+              {dates.map((date) => {
                 const docs = docsByDate.get(date) ?? [];
-                const summary =
-                  summaries.get(date) ??
-                  { count: 0, entradaTotal: 0, saidaTotal: 0, linked: 0, unlinked: 0 };
+                const summary = summaries.get(date) ?? {
+                  count: 0,
+                  entradaTotal: 0,
+                  saidaTotal: 0,
+                  linked: 0,
+                  unlinked: 0,
+                };
                 const isOpen = openDates.has(date);
                 const isEmpty = summary.count === 0;
                 const { dayLabel, weekday } = formatDayHeader(date);
@@ -273,12 +313,12 @@ export function FiscalDocumentsByDateAccordion({
       </div>
 
       {contextMenu && ctxDoc && (
-        <DropdownMenu open onOpenChange={open => !open && closeContextMenu()}>
+        <DropdownMenu open onOpenChange={(open) => !open && closeContextMenu()}>
           <PositionedDropdownMenuContent
             position={contextMenu}
             isOpen
             className="w-56"
-            onCloseAutoFocus={e => e.preventDefault()}
+            onCloseAutoFocus={(e) => e.preventDefault()}
           >
             {onViewDetails && (
               <DropdownMenuItem
@@ -344,7 +384,7 @@ function DayGroup({
         )}
         onClick={onToggle}
       >
-        {columns.map(c => {
+        {columns.map((c) => {
           if (c.key === "issueDate") {
             return (
               <TableCell key={c.key} className="p-0 !border-r-0">
@@ -367,7 +407,9 @@ function DayGroup({
                   <span
                     className={cn(
                       "font-semibold tabular-nums text-sm whitespace-nowrap",
-                      isEmpty ? "text-muted-foreground/60" : "text-muted-foreground",
+                      isEmpty
+                        ? "text-muted-foreground/60"
+                        : "text-muted-foreground",
                     )}
                   >
                     {weekday}
@@ -379,12 +421,13 @@ function DayGroup({
           if (c.key === "totalValue") {
             return (
               <TableCell key={c.key} className="p-0 !border-r-0 text-right">
-                {!isEmpty && (summary.entradaTotal > 0 || summary.saidaTotal > 0) ? (
+                {!isEmpty &&
+                (summary.entradaTotal > 0 || summary.saidaTotal > 0) ? (
                   <div className="flex flex-col items-end gap-0.5 px-4 py-2.5 leading-tight">
                     {summary.entradaTotal > 0 && (
                       <span
                         className={cn(
-                          "tabular-nums whitespace-nowrap font-semibold text-emerald-700",
+                          "tabular-nums whitespace-nowrap font-semibold text-primary",
                           summary.saidaTotal > 0 ? "text-xs" : "text-sm",
                         )}
                       >
@@ -431,9 +474,9 @@ function DayGroup({
               "hover:bg-muted/30",
             )}
             onClick={() => onViewDetails?.(doc)}
-            onContextMenu={e => onContextMenu(e, doc)}
+            onContextMenu={(e) => onContextMenu(e, doc)}
           >
-            {columns.map(c => (
+            {columns.map((c) => (
               <TableCell
                 key={c.key}
                 className={cn(
@@ -484,7 +527,7 @@ function renderCell(
         <button
           type="button"
           aria-label="Copiar chave de acesso"
-          onClick={e => {
+          onClick={(e) => {
             e.stopPropagation();
             onCopyKey(d.accessKey);
           }}
@@ -564,7 +607,7 @@ function renderCell(
         return (
           <Link
             to={routes.financial.reconciliation.transactionDetail(onlyTxId)}
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
             className="hover:opacity-80 transition-opacity"
           >
             {badge}
@@ -577,4 +620,3 @@ function renderCell(
       return null;
   }
 }
-
