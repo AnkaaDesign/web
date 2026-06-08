@@ -11,7 +11,11 @@ import {
   SERVICE_ORDER_STATUS,
   SERVICE_ORDER_TYPE_LABELS,
 } from "../../../../constants";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface CollapsedGroupRowProps {
   groupId: string;
@@ -37,18 +41,18 @@ interface CollapsedGroupRowProps {
 
 // Service order type column IDs
 const SERVICE_ORDER_COLUMN_IDS = [
-  'serviceOrders.commercial',
-  'serviceOrders.logistic',
-  'serviceOrders.artwork',
-  'serviceOrders.production',
+  "serviceOrders.commercial",
+  "serviceOrders.logistic",
+  "serviceOrders.artwork",
+  "serviceOrders.production",
 ];
 
 // Map column ID to SERVICE_ORDER_TYPE
 const COLUMN_ID_TO_TYPE: Record<string, SERVICE_ORDER_TYPE> = {
-  'serviceOrders.commercial': SERVICE_ORDER_TYPE.COMMERCIAL,
-  'serviceOrders.logistic': SERVICE_ORDER_TYPE.LOGISTIC,
-  'serviceOrders.artwork': SERVICE_ORDER_TYPE.ARTWORK,
-  'serviceOrders.production': SERVICE_ORDER_TYPE.PRODUCTION,
+  "serviceOrders.commercial": SERVICE_ORDER_TYPE.COMMERCIAL,
+  "serviceOrders.logistic": SERVICE_ORDER_TYPE.LOGISTIC,
+  "serviceOrders.artwork": SERVICE_ORDER_TYPE.ARTWORK,
+  "serviceOrders.production": SERVICE_ORDER_TYPE.PRODUCTION,
 };
 
 export function CollapsedGroupRow({
@@ -72,15 +76,66 @@ export function CollapsedGroupRow({
   const [shouldRender, setShouldRender] = useState(!isExpanded);
 
   // All tasks in the group (first + collapsed)
-  const allGroupTasks = useMemo(() => [firstTask, ...collapsedTasks], [firstTask, collapsedTasks]);
+  const allGroupTasks = useMemo(
+    () => [firstTask, ...collapsedTasks],
+    [firstTask, collapsedTasks],
+  );
 
   // Calculate service order sums for each type
   const serviceOrderSums = useMemo(() => {
-    const sums: Record<SERVICE_ORDER_TYPE, { total: number; completed: number; inProgress: number; pending: number; waitingApprove: number; cancelled: number }> = {
-      [SERVICE_ORDER_TYPE.COMMERCIAL]: { total: 0, completed: 0, inProgress: 0, pending: 0, waitingApprove: 0, cancelled: 0 },
-      [SERVICE_ORDER_TYPE.LOGISTIC]: { total: 0, completed: 0, inProgress: 0, pending: 0, waitingApprove: 0, cancelled: 0 },
-      [SERVICE_ORDER_TYPE.ARTWORK]: { total: 0, completed: 0, inProgress: 0, pending: 0, waitingApprove: 0, cancelled: 0 },
-      [SERVICE_ORDER_TYPE.PRODUCTION]: { total: 0, completed: 0, inProgress: 0, pending: 0, waitingApprove: 0, cancelled: 0 },
+    const sums: Record<
+      SERVICE_ORDER_TYPE,
+      {
+        total: number;
+        completed: number;
+        inProgress: number;
+        pending: number;
+        waitingApprove: number;
+        waitingArtwork: number;
+        paused: number;
+        cancelled: number;
+      }
+    > = {
+      [SERVICE_ORDER_TYPE.COMMERCIAL]: {
+        total: 0,
+        completed: 0,
+        inProgress: 0,
+        pending: 0,
+        waitingApprove: 0,
+        waitingArtwork: 0,
+        paused: 0,
+        cancelled: 0,
+      },
+      [SERVICE_ORDER_TYPE.LOGISTIC]: {
+        total: 0,
+        completed: 0,
+        inProgress: 0,
+        pending: 0,
+        waitingApprove: 0,
+        waitingArtwork: 0,
+        paused: 0,
+        cancelled: 0,
+      },
+      [SERVICE_ORDER_TYPE.ARTWORK]: {
+        total: 0,
+        completed: 0,
+        inProgress: 0,
+        pending: 0,
+        waitingApprove: 0,
+        waitingArtwork: 0,
+        paused: 0,
+        cancelled: 0,
+      },
+      [SERVICE_ORDER_TYPE.PRODUCTION]: {
+        total: 0,
+        completed: 0,
+        inProgress: 0,
+        pending: 0,
+        waitingApprove: 0,
+        waitingArtwork: 0,
+        paused: 0,
+        cancelled: 0,
+      },
     };
 
     for (const task of allGroupTasks) {
@@ -96,6 +151,10 @@ export function CollapsedGroupRow({
             sums[so.type].pending++;
           } else if (so.status === SERVICE_ORDER_STATUS.WAITING_APPROVE) {
             sums[so.type].waitingApprove++;
+          } else if (so.status === SERVICE_ORDER_STATUS.WAITING_ARTWORK) {
+            sums[so.type].waitingArtwork++;
+          } else if (so.status === SERVICE_ORDER_STATUS.PAUSED) {
+            sums[so.type].paused++;
           } else if (so.status === SERVICE_ORDER_STATUS.CANCELLED) {
             sums[so.type].cancelled++;
           }
@@ -148,9 +207,9 @@ export function CollapsedGroupRow({
   // The first such group carries the group info content; others are empty.
   const cellGroups = useMemo(() => {
     const groups: Array<
-      | { type: 'so'; column: TaskColumn }
-      | { type: 'info'; colSpan: number }
-      | { type: 'empty'; colSpan: number }
+      | { type: "so"; column: TaskColumn }
+      | { type: "info"; colSpan: number }
+      | { type: "empty"; colSpan: number }
     > = [];
 
     let infoRendered = false;
@@ -160,18 +219,26 @@ export function CollapsedGroupRow({
       if (SERVICE_ORDER_COLUMN_IDS.includes(col.id)) {
         // Flush accumulated non-SO columns as a colSpan cell
         if (nonSOCount > 0) {
-          groups.push(infoRendered ? { type: 'empty', colSpan: nonSOCount } : { type: 'info', colSpan: nonSOCount });
+          groups.push(
+            infoRendered
+              ? { type: "empty", colSpan: nonSOCount }
+              : { type: "info", colSpan: nonSOCount },
+          );
           if (!infoRendered) infoRendered = true;
           nonSOCount = 0;
         }
-        groups.push({ type: 'so', column: col });
+        groups.push({ type: "so", column: col });
       } else {
         nonSOCount++;
       }
     }
     // Flush remaining non-SO columns
     if (nonSOCount > 0) {
-      groups.push(infoRendered ? { type: 'empty', colSpan: nonSOCount } : { type: 'info', colSpan: nonSOCount });
+      groups.push(
+        infoRendered
+          ? { type: "empty", colSpan: nonSOCount }
+          : { type: "info", colSpan: nonSOCount },
+      );
     }
 
     return groups;
@@ -187,49 +254,84 @@ export function CollapsedGroupRow({
       return <span className="text-muted-foreground">-</span>;
     }
 
-    const completedPercent = (data.completed / data.total) * 100;
-    const waitingApprovePercent = (data.waitingApprove / data.total) * 100;
-    const inProgressPercent = (data.inProgress / data.total) * 100;
-    const pendingPercent = (data.pending / data.total) * 100;
-    const cancelledPercent = (data.cancelled / data.total) * 100;
-
     const typeLabel = SERVICE_ORDER_TYPE_LABELS[type];
+
+    // Segments left-to-right, colors mirroring the status badges
+    // (WAITING_ARTWORK and WAITING_APPROVE are both purple). A running offset
+    // keeps positions contiguous and prevents any status from falling through
+    // to the gray container background.
+    const legend: {
+      key: string;
+      count: number;
+      className: string;
+      label: string;
+    }[] = [
+      {
+        key: "completed",
+        count: data.completed,
+        className: "bg-green-700",
+        label: "concluída(s)",
+      },
+      {
+        key: "waitingApprove",
+        count: data.waitingApprove,
+        className: "bg-purple-600",
+        label: "aguardando aprovação",
+      },
+      {
+        key: "waitingArtwork",
+        count: data.waitingArtwork,
+        className: "bg-purple-600",
+        label: "aguardando arte",
+      },
+      {
+        key: "inProgress",
+        count: data.inProgress,
+        className: "bg-blue-700",
+        label: "em andamento",
+      },
+      {
+        key: "paused",
+        count: data.paused,
+        className: "bg-yellow-500",
+        label: "pausada(s)",
+      },
+      {
+        key: "pending",
+        count: data.pending,
+        className: "bg-neutral-500",
+        label: "pendente(s)",
+      },
+      {
+        key: "cancelled",
+        count: data.cancelled,
+        className: "bg-red-700",
+        label: "cancelada(s)",
+      },
+    ];
+
+    let acc = 0;
 
     return (
       <Tooltip delayDuration={500}>
         <TooltipTrigger asChild>
           <div className="relative cursor-help">
             <div className="relative h-5 min-w-[90px] max-w-[140px] bg-gray-200 dark:bg-gray-700 rounded overflow-hidden shadow-sm">
-              {data.completed > 0 && (
-                <div
-                  className="absolute h-full bg-green-700 transition-all duration-300"
-                  style={{ left: '0%', width: `${completedPercent}%` }}
-                />
-              )}
-              {data.waitingApprove > 0 && (
-                <div
-                  className="absolute h-full bg-purple-600 transition-all duration-300"
-                  style={{ left: `${completedPercent}%`, width: `${waitingApprovePercent}%` }}
-                />
-              )}
-              {data.inProgress > 0 && (
-                <div
-                  className="absolute h-full bg-blue-700 transition-all duration-300"
-                  style={{ left: `${completedPercent + waitingApprovePercent}%`, width: `${inProgressPercent}%` }}
-                />
-              )}
-              {data.pending > 0 && (
-                <div
-                  className="absolute h-full bg-neutral-500 transition-all duration-300"
-                  style={{ left: `${completedPercent + waitingApprovePercent + inProgressPercent}%`, width: `${pendingPercent}%` }}
-                />
-              )}
-              {data.cancelled > 0 && (
-                <div
-                  className="absolute h-full bg-red-700 transition-all duration-300"
-                  style={{ left: `${completedPercent + waitingApprovePercent + inProgressPercent + pendingPercent}%`, width: `${cancelledPercent}%` }}
-                />
-              )}
+              {legend.map((s) => {
+                const left = acc;
+                acc += (s.count / data.total) * 100;
+                if (s.count === 0) return null;
+                return (
+                  <div
+                    key={s.key}
+                    className={`absolute h-full ${s.className} transition-all duration-300`}
+                    style={{
+                      left: `${left}%`,
+                      width: `${(s.count / data.total) * 100}%`,
+                    }}
+                  />
+                );
+              })}
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                   {data.completed}/{data.total}
@@ -241,14 +343,18 @@ export function CollapsedGroupRow({
         <TooltipContent side="top" className="max-w-md">
           <div className="text-sm space-y-2">
             <div className="font-medium mb-2">
-              Total de ordens de {typeLabel.toLowerCase()} no grupo ({data.completed}/{data.total})
+              Total de ordens de {typeLabel.toLowerCase()} no grupo (
+              {data.completed}/{data.total})
             </div>
             <div className="space-y-1 text-xs text-muted-foreground">
-              {data.completed > 0 && <div className="flex items-center gap-2"><div className="w-3 h-3 bg-green-700 rounded" />{data.completed} concluída(s)</div>}
-              {data.waitingApprove > 0 && <div className="flex items-center gap-2"><div className="w-3 h-3 bg-purple-600 rounded" />{data.waitingApprove} aguardando aprovação</div>}
-              {data.inProgress > 0 && <div className="flex items-center gap-2"><div className="w-3 h-3 bg-blue-700 rounded" />{data.inProgress} em andamento</div>}
-              {data.pending > 0 && <div className="flex items-center gap-2"><div className="w-3 h-3 bg-neutral-500 rounded" />{data.pending} pendente(s)</div>}
-              {data.cancelled > 0 && <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-700 rounded" />{data.cancelled} cancelada(s)</div>}
+              {legend.map((s) =>
+                s.count > 0 ? (
+                  <div key={s.key} className="flex items-center gap-2">
+                    <div className={`w-3 h-3 ${s.className} rounded`} />
+                    {s.count} {s.label}
+                  </div>
+                ) : null,
+              )}
             </div>
           </div>
         </TooltipContent>
@@ -263,7 +369,7 @@ export function CollapsedGroupRow({
   const totalCellCount = (canEdit ? 1 : 0) + cellGroups.length;
   const buildCollapsedCellShadow = (cellIdx: number): string | undefined => {
     if (!highlightSelection || !showSelectionBorder) return undefined;
-    const c = 'rgb(34 197 94)';
+    const c = "rgb(34 197 94)";
     const isFirstCol = cellIdx === 0;
     const isLastCol = cellIdx === totalCellCount - 1;
     const shadows: string[] = [];
@@ -271,7 +377,7 @@ export function CollapsedGroupRow({
     if (isLastCol) shadows.push(`inset -2px 0 0 ${c}`);
     if (isFirstInRun) shadows.push(`inset 0 2px 0 ${c}`);
     if (isLastInRun) shadows.push(`inset 0 -2px 0 ${c}`);
-    return shadows.length ? shadows.join(', ') : undefined;
+    return shadows.length ? shadows.join(", ") : undefined;
   };
 
   return (
@@ -284,7 +390,7 @@ export function CollapsedGroupRow({
         "group",
         "transition-all duration-200 ease-in-out",
         isAnimating && "opacity-0 scale-y-0",
-        !isAnimating && "opacity-100 scale-y-100"
+        !isAnimating && "opacity-100 scale-y-100",
       )}
       onClick={handleRowClick}
     >
@@ -314,8 +420,10 @@ export function CollapsedGroupRow({
       {cellGroups.map((group, idx) => {
         const cellIdx = (canEdit ? 1 : 0) + idx;
         const cellShadow = buildCollapsedCellShadow(cellIdx);
-        const cellShadowStyle = cellShadow ? { boxShadow: cellShadow } : undefined;
-        if (group.type === 'info') {
+        const cellShadowStyle = cellShadow
+          ? { boxShadow: cellShadow }
+          : undefined;
+        if (group.type === "info") {
           return (
             <TableCell
               key={`info-${idx}`}
@@ -328,17 +436,21 @@ export function CollapsedGroupRow({
                   <IconChevronRight
                     className={cn(
                       "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                      isExpanded && "rotate-90"
+                      isExpanded && "rotate-90",
                     )}
                   />
                 </div>
                 <div className="flex items-center gap-2 flex-1">
                   <span className="text-sm text-muted-foreground font-medium">
-                    {collapsedTaskCount} {collapsedTaskCount === 1 ? 'tarefa oculta' : 'tarefas ocultas'}
+                    {collapsedTaskCount}{" "}
+                    {collapsedTaskCount === 1
+                      ? "tarefa oculta"
+                      : "tarefas ocultas"}
                   </span>
                   {selectedCount > 0 && (
                     <Badge variant="secondary" className="text-xs">
-                      {selectedCount} selecionada{selectedCount !== 1 ? 's' : ''}
+                      {selectedCount} selecionada
+                      {selectedCount !== 1 ? "s" : ""}
                     </Badge>
                   )}
                 </div>
@@ -350,7 +462,7 @@ export function CollapsedGroupRow({
           );
         }
 
-        if (group.type === 'empty') {
+        if (group.type === "empty") {
           return (
             <TableCell
               key={`empty-${idx}`}
@@ -365,7 +477,12 @@ export function CollapsedGroupRow({
         return (
           <TableCell
             key={group.column.id}
-            className={cn("overflow-hidden", group.column.cellClassName, group.column.className, "px-4 py-1")}
+            className={cn(
+              "overflow-hidden",
+              group.column.cellClassName,
+              group.column.className,
+              "px-4 py-1",
+            )}
             style={cellShadowStyle}
           >
             <div className="truncate flex items-center">
@@ -374,7 +491,6 @@ export function CollapsedGroupRow({
           </TableCell>
         );
       })}
-
     </TableRow>
   );
 }
