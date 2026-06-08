@@ -65,7 +65,10 @@ export function canUpdateQuoteStatus(userRole: string): boolean {
 const VALID_TRANSITIONS: Record<TASK_QUOTE_STATUS, TASK_QUOTE_STATUS[]> = {
   PENDING: ['BUDGET_APPROVED'],
   BUDGET_APPROVED: ['COMMERCIAL_APPROVED', 'PENDING'],
-  COMMERCIAL_APPROVED: ['BILLING_APPROVED', 'BUDGET_APPROVED', 'PENDING'],
+  // SETTLED from COMMERCIAL_APPROVED covers "direct" quotes (orçamento direto)
+  // paid upfront with no billing/installment phase. The server's settleManually
+  // handles this safely (no installments/boletos exist yet to clean up).
+  COMMERCIAL_APPROVED: ['BILLING_APPROVED', 'BUDGET_APPROVED', 'PENDING', 'SETTLED'],
   // SETTLED from BILLING_APPROVED covers prepayment (customer pays before
   // installments are tracked) and recovery from quotes stuck at BILLING_APPROVED
   // when the auto-transition to UPCOMING failed. The server's settleManually
