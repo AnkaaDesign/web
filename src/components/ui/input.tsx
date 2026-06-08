@@ -883,8 +883,51 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         return;
       }
 
-      // Special handling for decimal numbers
-      if (type === "decimal" || type === "number") {
+      // Special handling for integer numbers with pt-BR thousands grouping.
+      // The display formats these WITH thousands separators (e.g. 2640 -> "2.640"),
+      // so the dots here are ALWAYS thousands separators, never a decimal point.
+      // Parsing must strip them — treating "2.440" as 2.44 silently corrupts the value.
+      if (type === "number") {
+        const negative = rawValue.trimStart().startsWith("-");
+        const digits = rawValue.replace(/\D/g, "");
+
+        if (!digits) {
+          setInternalValue(negative ? "-" : "");
+          setDisplayValue(negative ? "-" : "");
+          setCursorPosition(negative ? 1 : 0);
+          onChange?.(null);
+          return;
+        }
+
+        let numValue = parseInt(digits, 10);
+        if (negative) numValue = -numValue;
+
+        if (isNaN(numValue)) {
+          return;
+        }
+
+        // Don't apply min constraint during typing - let the user type freely.
+        // Only apply max to prevent obviously invalid values.
+        let constrainedValue = numValue;
+        if (max !== undefined && constrainedValue > max) {
+          constrainedValue = max;
+        }
+
+        // Show digits as typed (ungrouped); blur reformats with grouping via formatValue.
+        const displayValue = (negative ? "-" : "") + digits;
+        setInternalValue(displayValue);
+        if (!naturalTyping) {
+          setDisplayValue(displayValue);
+        }
+        setCursorPosition(isTypingAtEnd ? displayValue.length : calculateSimpleCursorPosition(rawValue, displayValue, oldCursorPos));
+
+        onChange?.(constrainedValue);
+        return;
+      }
+
+      // Special handling for decimal numbers (pt-BR: "," is the decimal separator,
+      // "." groups thousands).
+      if (type === "decimal") {
         const cleanedForNumber = rawValue.replace(/[^\d.,-]/g, "");
 
         if (!cleanedForNumber || cleanedForNumber === "," || cleanedForNumber === ".") {
@@ -895,10 +938,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           return;
         }
 
-        // Convert . to , for Brazilian format display
-        let displayValue = cleanedForNumber.replace(/\./g, ",");
-
-        // Only allow one decimal separator
+        // Strip thousands dots, then keep only the first comma as the decimal separator.
+        let displayValue = cleanedForNumber.replace(/\./g, "");
         const commaCount = (displayValue.match(/,/g) || []).length;
         if (commaCount > 1) {
           // Keep only the first comma
