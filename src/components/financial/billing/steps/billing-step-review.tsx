@@ -51,19 +51,35 @@ import { exportDossiePdf } from "@/utils/dossie-pdf-generator";
 
 const STATUSES_REQUIRING_COMPLETE_DATA = ["COMMERCIAL_APPROVED", "BILLING_APPROVED"];
 
-// All statuses — automatic ones are shown (so current value displays) but disabled
-const ALL_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "PENDING", label: "Pendente" },
-  { value: "BUDGET_APPROVED", label: "Orçamento Aprovado" },
-  { value: "COMMERCIAL_APPROVED", label: "Aprovado pelo Comercial" },
-  { value: "BILLING_APPROVED", label: "Faturamento Aprovado" },
-  { value: "UPCOMING", label: "A Vencer" },
-  { value: "DUE", label: "Vencido" },
-  { value: "PARTIAL", label: "Parcial" },
-  { value: "SETTLED", label: "Liquidado" },
-];
+// Canonical label map for every quote status (used for the trigger-render fallback).
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: "Pendente",
+  BUDGET_APPROVED: "Orçamento Aprovado",
+  COMMERCIAL_APPROVED: "Aprovado pelo Comercial",
+  BILLING_APPROVED: "Faturamento Aprovado",
+  UPCOMING: "A Vencer",
+  DUE: "Vencido",
+  PARTIAL: "Parcial",
+  SETTLED: "Liquidado",
+};
 
-// Statuses that are set automatically and cannot be manually selected
+// Synthetic combobox option that triggers the revert-billing flow instead of a status change.
+const REVERT_OPTION_VALUE = "__REVERT_BILLING__";
+
+// Statuses meaning billing has already been approved (invoice/NF/boleto exist or are generating).
+// Pre-billing (e.g. COMMERCIAL_APPROVED) → the forward action is to APPROVE faturamento, which
+// generates the documents. Post-billing → the only manual actions are revert or mark-as-settled.
+const POST_BILLING_STATUSES = ["BILLING_APPROVED", "UPCOMING", "DUE", "PARTIAL", "SETTLED"];
+
+// Action-oriented (verb) labels for selectable options, vs STATUS_LABELS (the state name shown in
+// the trigger). e.g. the BILLING_APPROVED option reads "Aprovar Faturamento", but once current it
+// reads "Faturamento Aprovado".
+const ACTION_LABELS: Record<string, string> = {
+  BILLING_APPROVED: "Aprovar Faturamento",
+  SETTLED: "Liquidado",
+};
+
+// Statuses that are set automatically and cannot be manually selected (shown disabled for context)
 const AUTOMATIC_STATUSES = ["UPCOMING", "DUE", "PARTIAL"];
 
 const getStatusTriggerClass = (status: string) => {
@@ -201,19 +217,20 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   const revertableStatuses = ["BILLING_APPROVED", "UPCOMING", "DUE", "PARTIAL"];
   const canRevertBilling = canChangeStatus && revertableStatuses.includes(currentStatus);
 
-  // Check if all bank slips and NFS-e are cancelled (condition to show the revert button)
-  const allCancelledForRevert = useMemo(() => {
+  // Whether the revert-billing option should be offered. Mirrors the backend precondition
+  // (revertBillingApproval): the revert flow itself baixa's active boletos and cancels AUTHORIZED
+  // NFS-e, so they need NOT be pre-cancelled. It is only blocked when an installment is already
+  // PAID, or an NFS-e is still PROCESSING/PENDING (might become AUTHORIZED).
+  const canRevertForBilling = useMemo(() => {
     if (!canRevertBilling) return false;
     for (const inv of filteredInvoices) {
       const insts = (inv as any).installments || [];
       for (const inst of insts) {
-        if (inst.status === 'CANCELLED') continue;
-        const bs = inst.bankSlip;
-        if (bs && bs.status !== 'CANCELLED') return false;
+        if (inst.status === 'PAID') return false;
       }
       const nfses = (inv as any).nfseDocuments || [];
       for (const n of nfses) {
-        if (!['CANCELLED', 'ERROR'].includes(n.status)) return false;
+        if (['PROCESSING', 'PENDING'].includes(n.status)) return false;
       }
     }
     return true;
@@ -329,22 +346,18 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 Ver Tarefa
               </Button>
             )}
-            {allCancelledForRevert && (
-              <Button
-                variant="outline"
-                size="default"
-                className="gap-1.5 h-9 border-orange-400 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
-                onClick={() => setRevertBillingDialogOpen(true)}
-                disabled={disabled}
-              >
-                Reverter Faturamento
-              </Button>
-            )}
             {canChangeStatus ? (
               <Combobox
                 value={currentStatus}
                 onValueChange={(v) => {
                   if (v && typeof v === "string" && v !== currentStatus) {
+                    // Revert action — selected from inside the combobox (it replaces the old
+                    // separate button). Open the confirmation dialog; this is a different endpoint
+                    // (revertBilling) and must short-circuit before any status setValue.
+                    if (v === REVERT_OPTION_VALUE) {
+                      setRevertBillingDialogOpen(true);
+                      return;
+                    }
                     if (!validateCustomerDataForStatus(v)) return;
                     // Reject/cancel: downgrading any non-PENDING status back to PENDING — collect reason
                     if (v === "PENDING" && currentStatus !== "PENDING") {
@@ -367,18 +380,47 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                     setValue("status", v, { shouldDirty: true });
                   }
                 }}
-                options={ALL_STATUS_OPTIONS.map((s) => {
-                  // Always show the current value (so the dropdown trigger renders correctly).
-                  // Disable: current status (cannot select itself), automatic statuses, and any
-                  // status not in the user's allowed transitions for the current state.
-                  const isCurrent = s.value === currentStatus;
-                  const isAutomatic = AUTOMATIC_STATUSES.includes(s.value);
-                  const isAllowed = isCurrent || allowedNextStatuses.includes(s.value as TASK_QUOTE_STATUS);
-                  return {
-                    ...s,
-                    disabled: isCurrent || isAutomatic || !isAllowed,
-                  };
-                })}
+                options={(() => {
+                  const opts: Array<{ value: string; label: string; disabled?: boolean }> = [];
+                  const isPostBilling = POST_BILLING_STATUSES.includes(currentStatus);
+
+                  // Revert action first — sits before the due-states. The revert flow cancels active
+                  // boletos/NFS-e itself, so it is offered whenever the backend would accept it
+                  // (post-billing + nothing paid + no NFS-e processing).
+                  if (canRevertForBilling) {
+                    opts.push({ value: REVERT_OPTION_VALUE, label: "Reverter Faturamento" });
+                  }
+
+                  // Candidate statuses for this step, in display order:
+                  //  - Pre-billing (e.g. COMMERCIAL_APPROVED): the forward action is to APPROVE
+                  //    faturamento (BILLING_APPROVED — generates the invoice/NF/boleto) or settle
+                  //    directly. The automatic due-states are not shown yet (no invoice exists).
+                  //  - Post-billing (UPCOMING/DUE/PARTIAL/…): show the due-states for context
+                  //    (disabled) plus the settle action; reverting is the synthetic option above.
+                  const values = isPostBilling
+                    ? [...AUTOMATIC_STATUSES, "SETTLED"]
+                    : ["BILLING_APPROVED", "SETTLED"];
+                  // Always include the current status so the trigger renders its label.
+                  if (!values.includes(currentStatus)) values.unshift(currentStatus);
+
+                  const seen = new Set<string>();
+                  for (const v of values) {
+                    if (seen.has(v)) continue;
+                    seen.add(v);
+                    // Disable: the current status (can't select itself), automatic due-states, and
+                    // anything outside the user's allowed transitions (e.g. COMMERCIAL can't approve
+                    // billing — getAvailableQuoteStatusTransitions strips BILLING_APPROVED for them).
+                    const isCurrent = v === currentStatus;
+                    const isAutomatic = AUTOMATIC_STATUSES.includes(v);
+                    const isAllowed = isCurrent || allowedNextStatuses.includes(v as TASK_QUOTE_STATUS);
+                    // Selectable options use the verb label; the current status uses its state name.
+                    const label = isCurrent
+                      ? (STATUS_LABELS[v] || v)
+                      : (ACTION_LABELS[v] || STATUS_LABELS[v] || v);
+                    opts.push({ value: v, label, disabled: isCurrent || isAutomatic || !isAllowed });
+                  }
+                  return opts;
+                })()}
                 searchable={false}
                 clearable={false}
                 disabled={disabled}
@@ -1002,8 +1044,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
           <AlertDialogHeader>
             <AlertDialogTitle>Reverter aprovação de faturamento?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação irá remover as faturas, parcelas e boletos (já cancelados) e reverter o orçamento
-              para <strong>Aprovado pelo Comercial</strong>. O orçamento poderá ser editado e aprovado novamente.
+              Esta ação irá baixar os boletos ativos no Sicredi, cancelar as NFS-e autorizadas, remover as
+              faturas e parcelas, e reverter o orçamento para <strong>Aprovado pelo Comercial</strong>.
+              O orçamento poderá ser editado e aprovado novamente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
