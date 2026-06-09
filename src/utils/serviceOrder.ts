@@ -63,23 +63,28 @@ export const canResumeServiceOrder = (serviceOrder: Pick<ServiceOrder, "status">
 };
 
 export const getServiceOrderTotalActiveTimeSeconds = (
-  serviceOrder: Pick<ServiceOrder, "status" | "lastStartedAt" | "totalActiveTimeSeconds">
+  serviceOrder: Pick<ServiceOrder, "status" | "startedAt" | "lastStartedAt" | "totalActiveTimeSeconds">
 ): number => {
-  const accumulated = serviceOrder.totalActiveTimeSeconds || 0;
-  if (serviceOrder.status === SERVICE_ORDER_STATUS.IN_PROGRESS && serviceOrder.lastStartedAt) {
-    const now = new Date();
-    const sessionSeconds = Math.floor(
-      (now.getTime() - new Date(serviceOrder.lastStartedAt).getTime()) / 1000
-    );
-    return accumulated + sessionSeconds;
+  const accumulated = serviceOrder.totalActiveTimeSeconds ?? 0;
+  // Only add a live session when the SO is actively running
+  if (serviceOrder.status === SERVICE_ORDER_STATUS.IN_PROGRESS) {
+    // Prefer lastStartedAt (most recent session start); fall back to startedAt for first sessions
+    const activeStart = serviceOrder.lastStartedAt ?? serviceOrder.startedAt;
+    if (activeStart) {
+      const now = new Date();
+      const sessionSeconds = Math.floor(
+        (now.getTime() - new Date(activeStart).getTime()) / 1000
+      );
+      return accumulated + Math.max(0, sessionSeconds);
+    }
   }
   return accumulated;
 };
 
 export const formatActiveTime = (totalSeconds: number): string => {
-  if (totalSeconds <= 0) return "0min";
+  if (totalSeconds <= 0) return "00:00";
+  if (totalSeconds < 60) return "< 1 min";
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
-  if (hours > 0) return `${hours}h ${minutes}min`;
-  return `${minutes}min`;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 };

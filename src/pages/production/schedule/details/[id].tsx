@@ -52,6 +52,7 @@ import { getTaskQuoteEditRoute } from "@/utils/task";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { getApiBaseUrl, rewriteCdnUrl } from "@/utils/file";
 import { exportDossiePdf } from "@/utils/dossie-pdf-generator";
+import { getServiceOrderTotalActiveTimeSeconds, formatActiveTime } from "@/utils/serviceOrder";
 import { SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_DISPLAY_ORDER } from "../../../../constants";
 import { RESPONSIBLE_ROLE_LABELS, ResponsibleRole } from "@/types/responsible";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -138,6 +139,7 @@ import {
   IconCameraCheck,
   IconCameraBolt,
   IconEye,
+  IconHourglass,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -3228,6 +3230,21 @@ export const TaskDetailsPage = () => {
                             <span>Finalizado: {formatDateTime(serviceOrder.finishedAt)}</span>
                           </div>
                             )}
+                            {(() => {
+                              const totalSec = getServiceOrderTotalActiveTimeSeconds({
+                                status: serviceOrder.status as any,
+                                startedAt: serviceOrder.startedAt ?? null,
+                                lastStartedAt: serviceOrder.lastStartedAt ?? null,
+                                totalActiveTimeSeconds: serviceOrder.totalActiveTimeSeconds ?? 0,
+                              });
+                              if (totalSec <= 0) return null;
+                              return (
+                                <div className="flex items-center gap-1 font-medium text-foreground">
+                                  <IconHourglass className="h-3 w-3" />
+                                  <span>Ativo: {formatActiveTime(totalSec)}</span>
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                           </div>
