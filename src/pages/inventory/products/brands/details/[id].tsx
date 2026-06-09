@@ -26,6 +26,10 @@ const BrandDetailsPage = () => {
       items: {
         include: {
           category: true,
+          prices: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
         },
         orderBy: { name: "asc" },
       },
@@ -188,12 +192,12 @@ const BrandDetailsPage = () => {
               <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.ITEM_BRAND} entityId={brand.id} entityName={brand.name} entityCreatedAt={brand.createdAt} className="h-full" />
             </div>
             </div>
+            </div>
 
             {/* Related Items - Full Width Section */}
             <div className="animate-in fade-in-50 duration-900">
               <RelatedItemsCard items={items} brandId={brand.id} brandName={brand.name} />
             </div>
-          </div>
         </div>
       </div>
     </div>

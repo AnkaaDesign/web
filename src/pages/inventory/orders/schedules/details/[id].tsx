@@ -281,7 +281,7 @@ export function OrderScheduleDetailsPage() {
           <div className="animate-in fade-in-50 duration-700">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Schedule Configuration Card */}
-              <Card className="shadow-sm border border-border flex flex-col">
+              <Card className="shadow-sm border border-border flex flex-col h-full">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2">
                     <IconCalendarEvent className="h-5 w-5 text-muted-foreground" />
@@ -398,7 +398,7 @@ export function OrderScheduleDetailsPage() {
                 entityId={schedule.id}
                 entityName={schedule.name || `Agendamento #${schedule.id.slice(-8)}`}
                 entityCreatedAt={schedule.createdAt}
-                maxHeight="500px"
+                className="h-full"
               />
             </div>
           </div>

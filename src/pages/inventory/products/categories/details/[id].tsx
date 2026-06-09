@@ -192,12 +192,12 @@ const CategoryDetailsPage = () => {
               />
             </div>
             </div>
+            </div>
 
             {/* Related Items - Full Width Section */}
             <div className="animate-in fade-in-50 duration-900">
-              <RelatedItemsCard category={category} />
+              <RelatedItemsCard items={category.items} categoryId={category.id} />
             </div>
-          </div>
         </div>
       </div>
     </div>

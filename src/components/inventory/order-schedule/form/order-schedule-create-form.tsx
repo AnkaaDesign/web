@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { ItemSelectorTable } from "../../common/item-selector/item-selector-table";
+import { ReviewItemsTable } from "./review-items-table";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 
 export const OrderScheduleCreateForm = () => {
@@ -889,13 +890,16 @@ export const OrderScheduleCreateForm = () => {
                           </div>
                         )}
 
-                        {/* Items Summary */}
-                        <div className="flex justify-between items-center bg-primary/10 rounded-lg px-4 py-3 border border-primary/20">
-                          <div className="flex items-center gap-2">
-                            <IconPackage className="h-4 w-4 text-primary" />
-                            <span className="text-sm font-medium text-muted-foreground">Itens Selecionados</span>
+                        {/* Items Summary + table of the selected items */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center bg-primary/10 rounded-lg px-4 py-3 border border-primary/20">
+                            <div className="flex items-center gap-2">
+                              <IconPackage className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-medium text-muted-foreground">Itens Selecionados</span>
+                            </div>
+                            <span className="text-sm font-bold text-primary">{watchedItems.length}</span>
                           </div>
-                          <span className="text-sm font-bold text-primary">{watchedItems.length}</span>
+                          <ReviewItemsTable itemIds={watchedItems} />
                         </div>
 
                       </CardContent>

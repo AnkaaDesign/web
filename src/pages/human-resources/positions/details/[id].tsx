@@ -2,29 +2,19 @@ import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
+import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { usePosition, usePositionMutations } from "../../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeader } from "@/components/page-header";
-import { SpecificationsCard, RemunerationHistoryCard, RelatedUsersCard } from "@/components/human-resources/position/detail";
+import { PageHeader } from "@/components/ui/page-header";
+import { SpecificationsCard, RemunerationHistoryCard, RelatedUsersCard, PositionDetailSkeleton } from "@/components/human-resources/position/detail";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const PositionDetailPage = () => {
-  usePageTracker({ title: "Page", icon: "star" });
+  usePageTracker({ title: "Detalhes do Cargo" });
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -34,6 +24,7 @@ export const PositionDetailPage = () => {
     isLoading,
     error,
     refetch,
+    isRefetching,
   } = usePosition(id || "", {
     include: {
       users: {
@@ -87,9 +78,9 @@ export const PositionDetailPage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
+        <PositionDetailSkeleton />
+      </PrivilegeRoute>
     );
   }
 
@@ -102,7 +93,7 @@ export const PositionDetailPage = () => {
       await deleteAsync(id);
       navigate(routes.humanResources.positions.root);
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
+      if (process.env.NODE_ENV !== "production") {
         console.error("Error deleting position:", error);
       }
     }
@@ -128,6 +119,7 @@ export const PositionDetailPage = () => {
               label: "Atualizar",
               icon: IconRefresh,
               onClick: () => refetch(),
+              loading: isRefetching,
             },
             {
               key: "edit",
@@ -148,13 +140,20 @@ export const PositionDetailPage = () => {
 
         <div className="flex-1 overflow-y-auto pb-6">
           <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SpecificationsCard position={position} />
-              <RemunerationHistoryCard position={position} />
+            {/* Specifications + Remuneration (left) | Changelog (right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+              <div className="flex flex-col gap-4 min-h-0">
+                <SpecificationsCard position={position} />
+                <RemunerationHistoryCard position={position} className="flex-1 min-h-0" />
+              </div>
+              <ChangelogHistory
+                entityType={CHANGE_LOG_ENTITY_TYPE.POSITION}
+                entityId={id}
+                entityName={position.name}
+                entityCreatedAt={position.createdAt}
+                className="h-full"
+              />
             </div>
-
-            {/* Changelog - Single column */}
-            <ChangelogHistory entityType={"POSITION" as any} entityId={id} entityName={position.name} entityCreatedAt={position.createdAt} maxHeight="500px" />
 
             {/* Related Users - Full width, last section */}
             <RelatedUsersCard position={position} />
@@ -162,37 +161,37 @@ export const PositionDetailPage = () => {
         </div>
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" disabled={deleteMutation.isPending} onClick={() => {}} className="hidden" id="delete-trigger">
-              Excluir
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
                 <IconAlertTriangle className="h-5 w-5 text-destructive" />
                 Confirmar Exclusão
-              </AlertDialogTitle>
-              <AlertDialogDescription>
+              </DialogTitle>
+              <DialogDescription>
                 Tem certeza que deseja excluir o cargo "{position.name}"?
                 {position._count?.users ? (
                   <span className="block mt-2 font-medium text-destructive">
                     Atenção: Este cargo possui {position._count.users} funcionário{position._count.users !== 1 ? "s" : ""} associado{position._count.users !== 1 ? "s" : ""}.
                   </span>
                 ) : null}
-                Esta ação não poderá ser desfeita.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deleteMutation.isPending}>
-                {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                {" "}Esta ação não poderá ser desfeita.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconTrash className="h-4 w-4 mr-2" />}
+                Excluir
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </PrivilegeRoute>
   );
 };
+
+export default PositionDetailPage;

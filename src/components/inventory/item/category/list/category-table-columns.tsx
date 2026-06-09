@@ -1,11 +1,9 @@
 import React from "react";
 import type { ItemCategory } from "../../../../../types";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { IconPackage, IconCornerDownRight } from "@tabler/icons-react";
+import { IconCornerDownRight } from "@tabler/icons-react";
 import { ITEM_CATEGORY_TYPE, ITEM_CATEGORY_TYPE_LABELS, ACCOUNTING_TYPE_LABELS } from "../../../../../constants";
-import { useNavigate } from "react-router-dom";
-import { routes } from "../../../../../constants";
+import { usePrivileges } from "@/hooks/common/use-privileges";
 
 export interface CategoryColumn {
   key: string;
@@ -17,18 +15,20 @@ export interface CategoryColumn {
 }
 
 // Function to get default visible columns for categories.
-// The user-facing "Tipo" is the accounting/contábil group (accountingType). The
-// physical ItemCategoryType ("Tipo Físico") is an internal flag, hidden by default.
+// "Grupo Contábil" (accountingType) is the headline type users care about; the
+// physical ItemCategoryType ("Natureza") is secondary and hidden by default.
 export function getDefaultVisibleColumns(): Set<string> {
   return new Set(["name", "accountingType", "_count.items", "createdAt"]);
 }
 
 // Hook to get all available columns for categories
 export function useCategoryTableColumns(): CategoryColumn[] {
-  const navigate = useNavigate();
+  // "Grupo Contábil" (accountingType) is the chart-of-accounts rollup — ADMIN-only.
+  // Warehouse and other non-admin sectors must not see it.
+  const { isAdmin } = usePrivileges();
 
-  return React.useMemo<CategoryColumn[]>(
-    () => [
+  return React.useMemo<CategoryColumn[]>(() => {
+    const columns: CategoryColumn[] = [
       {
         key: "name",
         header: "NOME",
@@ -40,13 +40,15 @@ export function useCategoryTableColumns(): CategoryColumn[] {
           </div>
         ),
         sortable: true,
-        className: "flex-1",
+        // Name is the dominant column (long nested subcategory names). The table is
+        // `table-fixed`, which ignores flex — so an explicit width is required to widen it.
+        className: "w-[48%] min-w-[300px]",
         align: "left",
       },
       {
-        // Primary "Tipo": the accounting/contábil group (the headline type users care about).
+        // Accounting/contábil group — the headline type users care about.
         key: "accountingType",
-        header: "TIPO",
+        header: "Grupo Contábil",
         accessor: (category: ItemCategory) =>
           category.accountingType ? (
             <Badge variant="secondary" className="text-xs">
@@ -60,10 +62,9 @@ export function useCategoryTableColumns(): CategoryColumn[] {
         align: "left",
       },
       {
-        // Demoted: the physical ItemCategoryType (REGULAR/TOOL/PPE/...) is an internal
-        // flag, shown as a secondary "Tipo Físico" column (hidden by default).
+        // The physical ItemCategoryType (REGULAR/TOOL/PPE) — the item's nature.
         key: "type",
-        header: "TIPO FÍSICO",
+        header: "Natureza",
         accessor: (category: ItemCategory) => (
           <div className="truncate">
             <Badge variant={category.type === ITEM_CATEGORY_TYPE.PPE ? "default" : category.type === ITEM_CATEGORY_TYPE.TOOL ? "destructive" : "secondary"} className="text-xs">
@@ -84,27 +85,8 @@ export function useCategoryTableColumns(): CategoryColumn[] {
           </Badge>
         ),
         sortable: true,
-        className: "flex-1",
-        align: "center",
-      },
-      {
-        key: "actions",
-        header: "Ações",
-        accessor: (category: ItemCategory) => (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`${routes.inventory.products.list}?categories=${category.id}`);
-            }}
-            className="flex items-center gap-2"
-          >
-            <IconPackage className="h-4 w-4" />
-            Ver Produtos
-          </Button>
-        ),
-        sortable: false,
+        // No explicit width → table-fixed splits the space left by NOME equally with the
+        // other non-name columns. Left-aligned like the rest.
         className: "flex-1",
         align: "left",
       },
@@ -124,7 +106,9 @@ export function useCategoryTableColumns(): CategoryColumn[] {
         className: "flex-1",
         align: "left",
       },
-    ],
-    [navigate],
-  );
+    ];
+
+    // Restrict the accounting/contábil column to admins only.
+    return isAdmin ? columns : columns.filter((column) => column.key !== "accountingType");
+  }, [isAdmin]);
 }

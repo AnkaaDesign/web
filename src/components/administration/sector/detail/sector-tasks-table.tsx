@@ -75,11 +75,11 @@ export function SectorTasksTable({ sector }: SectorTasksTableProps) {
   }, [sector.id, searchingFor]);
 
   return (
-    <Card className="w-full">
+    <Card className="w-full shadow-sm border border-border flex flex-col">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <IconClipboardList className="h-5 w-5" />
+            <IconClipboardList className="h-5 w-5 text-muted-foreground" />
             Tarefas do Setor
           </div>
           <Button

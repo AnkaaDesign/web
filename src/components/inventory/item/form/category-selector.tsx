@@ -1,13 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import { Badge } from "@/components/ui/badge";
-import { IconCategory, IconCalculator } from "@tabler/icons-react";
+import { IconCategory } from "@tabler/icons-react";
 import { useFormContext } from "react-hook-form";
 import { useItemCategoryMutations, useItemCategoryTree } from "../../../../hooks";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
 import type { ItemCategory } from "../../../../types";
-import { ITEM_CATEGORY_TYPE, ACCOUNTING_TYPE_LABELS } from "../../../../constants";
+import { ITEM_CATEGORY_TYPE } from "../../../../constants";
 
 type FormData = ItemCreateFormData | ItemUpdateFormData;
 
@@ -71,8 +70,6 @@ export function CategorySelector({ disabled, required, onCategoryChange, initial
   const hasSubcategories = subcategories.length > 0;
 
   // Rolled-up accounting type (read-only): from the leaf if chosen, else from the parent.
-  const rollupNode = selectedNode ?? parentNode ?? initialCategory;
-  const accountingType = rollupNode?.accountingType;
 
   const parentOptions = useMemo(
     () =>
@@ -181,19 +178,6 @@ export function CategorySelector({ disabled, required, onCategoryChange, initial
               isCreating={isCreating}
             />
           </div>
-
-          {/* Read-only rolled-up accounting type */}
-          {accountingType && (
-            <div className="flex items-center gap-2 pt-1">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <IconCalculator className="h-3.5 w-3.5" />
-                Tipo contábil
-              </span>
-              <Badge variant="secondary" className="text-xs">
-                {ACCOUNTING_TYPE_LABELS[accountingType] ?? accountingType}
-              </Badge>
-            </div>
-          )}
 
           <FormMessage />
         </FormItem>

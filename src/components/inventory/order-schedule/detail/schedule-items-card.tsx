@@ -302,7 +302,8 @@ export function ScheduleItemsCard({ items, projection, projectionMeta, hasGapOpt
             the vertical scroll; the header sticks to the top and the totals row
             sticks to the bottom. */}
         <div className="rounded-lg border border-border overflow-hidden flex flex-col">
-          <div className="overflow-auto" style={{ maxHeight: "600px" }}>
+          {/* min-height reserves ~5 rows so the pagination/totals never crowd a short list */}
+          <div className="overflow-auto" style={{ minHeight: "320px", maxHeight: "600px" }}>
             <Table className="[&>div]:border-0 w-full">
               <TableHeader className="sticky top-0 z-20 [&_tr]:border-b [&_tr]:border-border">
                 <TableRow className="bg-muted hover:bg-muted">

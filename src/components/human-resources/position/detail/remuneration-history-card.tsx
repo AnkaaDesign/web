@@ -6,22 +6,24 @@ import { formatCurrency, formatDateTime } from "../../../../utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface RemunerationHistoryCardProps {
   position: Position;
+  className?: string;
 }
 
-export function RemunerationHistoryCard({ position }: RemunerationHistoryCardProps) {
+export function RemunerationHistoryCard({ position, className }: RemunerationHistoryCardProps) {
   if (!position.remunerations || position.remunerations.length === 0) {
     return (
-      <Card>
-        <CardHeader>
+      <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
+        <CardHeader className="pb-6">
           <CardTitle className="flex items-center gap-2">
-            <IconHistory className="h-5 w-5" />
+            <IconHistory className="h-5 w-5 text-muted-foreground" />
             Histórico de Remunerações
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0 flex-1">
           <div className="text-center py-8">
             <IconCurrencyReal className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">Nenhum histórico de remuneração encontrado</p>
@@ -64,11 +66,11 @@ export function RemunerationHistoryCard({ position }: RemunerationHistoryCardPro
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
+      <CardHeader className="pb-6">
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <IconHistory className="h-5 w-5" />
+            <IconHistory className="h-5 w-5 text-muted-foreground" />
             Histórico de Remunerações
           </div>
           <Badge variant="secondary">
@@ -76,8 +78,8 @@ export function RemunerationHistoryCard({ position }: RemunerationHistoryCardPro
           </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-[400px] pr-4">
+      <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
+        <ScrollArea className="flex-1 min-h-[400px] pr-4">
           <div className="space-y-4">
             {sortedRemunerations.map((remuneration, index) => {
               const previous = sortedRemunerations[index + 1];
@@ -85,7 +87,7 @@ export function RemunerationHistoryCard({ position }: RemunerationHistoryCardPro
               const isLatest = index === 0;
 
               return (
-                <div key={remuneration.id} className={`border rounded-lg p-4 ${isLatest ? "border-primary bg-primary/5" : ""}`}>
+                <div key={remuneration.id} className={`rounded-lg p-4 border ${isLatest ? "border-primary/40 bg-primary/5" : "border-border bg-muted/50"}`}>
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <p className="text-lg font-semibold">{formatCurrency(remuneration.value)}</p>
@@ -110,7 +112,7 @@ export function RemunerationHistoryCard({ position }: RemunerationHistoryCardPro
                   </div>
 
                   {index === sortedRemunerations.length - 1 && (
-                    <div className="mt-2 pt-2 border-t">
+                    <div className="mt-2 pt-2 border-t border-border/40">
                       <p className="text-xs text-muted-foreground">Remuneração inicial do cargo</p>
                     </div>
                   )}

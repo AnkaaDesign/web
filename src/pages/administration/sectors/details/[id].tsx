@@ -7,24 +7,14 @@ import { useSector, useSectorMutations } from "../../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { SpecificationsCard, SectorUsersTable, SectorTasksTable } from "@/components/administration/sector/detail";
+import { SpecificationsCard, SectorUsersTable, SectorTasksTable, SectorDetailSkeleton } from "@/components/administration/sector/detail";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const SectorDetailPage = () => {
-  usePageTracker({ title: "sector-detail" });
+  usePageTracker({ title: "Detalhes do Setor" });
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -86,9 +76,9 @@ export const SectorDetailPage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
+        <SectorDetailSkeleton />
+      </PrivilegeRoute>
     );
   }
 
@@ -101,7 +91,7 @@ export const SectorDetailPage = () => {
       await deleteAsync(id);
       navigate(routes.administration.sectors.root);
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
+      if (process.env.NODE_ENV !== "production") {
         console.error("Error deleting sector:", error);
       }
     }
@@ -115,7 +105,12 @@ export const SectorDetailPage = () => {
           variant="detail"
           entity={sector}
           title={sector.name}
-          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Administração", href: routes.administration.root }, { label: "Setores", href: routes.administration.sectors.root }, { label: sector.name }]}
+          breadcrumbs={[
+            { label: "Início", href: "/" },
+            { label: "Administração", href: routes.administration.root },
+            { label: "Setores", href: routes.administration.sectors.root },
+            { label: sector.name },
+          ]}
           actions={[
             {
               key: "refresh",
@@ -142,14 +137,20 @@ export const SectorDetailPage = () => {
         />
         <div className="flex-1 overflow-y-auto pb-6">
           <div className="space-y-4">
-            {/* Info Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Specifications and Changelog Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
               <SpecificationsCard sector={sector} />
-              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.SECTOR} entityId={id} entityName={sector.name} entityCreatedAt={sector.createdAt} maxHeight="500px" />
+              <ChangelogHistory
+                entityType={CHANGE_LOG_ENTITY_TYPE.SECTOR}
+                entityId={id}
+                entityName={sector.name}
+                entityCreatedAt={sector.createdAt}
+                className="h-full"
+              />
             </div>
 
-            {/* Related Tasks */}
-            <SectorTasksTable sector={sector} />
+            {/* Related Tasks - only when the sector has at least one task */}
+            {(sector._count?.tasks ?? 0) > 0 && <SectorTasksTable sector={sector} />}
 
             {/* Related Users - Last Section */}
             <SectorUsersTable sector={sector} />
@@ -157,37 +158,37 @@ export const SectorDetailPage = () => {
         </div>
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" disabled={deleteMutation.isPending} onClick={() => {}} className="hidden" id="delete-trigger">
-              Excluir
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
                 <IconAlertTriangle className="h-5 w-5 text-destructive" />
                 Confirmar Exclusão
-              </AlertDialogTitle>
-              <AlertDialogDescription>
+              </DialogTitle>
+              <DialogDescription>
                 Tem certeza que deseja excluir o setor "{sector.name}"?
                 {sector._count?.users ? (
                   <span className="block mt-2 font-medium text-destructive">
                     Atenção: Este setor possui {sector._count.users} usuário{sector._count.users !== 1 ? "s" : ""} associado{sector._count.users !== 1 ? "s" : ""}.
                   </span>
                 ) : null}
-                Esta ação não poderá ser desfeita.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deleteMutation.isPending}>
-                {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                {" "}Esta ação não poderá ser desfeita.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconTrash className="h-4 w-4 mr-2" />}
+                Excluir
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </PrivilegeRoute>
   );
 };
+
+export default SectorDetailPage;

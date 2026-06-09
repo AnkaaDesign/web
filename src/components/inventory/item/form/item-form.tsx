@@ -295,10 +295,9 @@ export function ItemForm(props: ItemFormProps) {
                 <NameInput disabled={isSubmitting} required={isRequired} />
               </div>
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <CategorySelector disabled={isSubmitting} onCategoryChange={setSelectedCategoryId} initialCategory={initialCategory} />
-                  <ItemBrandSelector disabled={isSubmitting} initialBrands={initialBrands} />
-                </div>
+                {/* Categoria + Subcategoria share one row (CategorySelector renders both); Marcas on its own row. */}
+                <CategorySelector disabled={isSubmitting} onCategoryChange={setSelectedCategoryId} initialCategory={initialCategory} />
+                <ItemBrandSelector disabled={isSubmitting} initialBrands={initialBrands} />
                 <ItemSupplierSelector disabled={isSubmitting} initialSupplier={initialSupplier} />
               </div>
             </CardContent>
