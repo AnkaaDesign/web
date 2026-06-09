@@ -204,7 +204,7 @@ export function serializeItemFormToUrlParams(formData: Partial<ItemCreateFormDat
   if (formData.ppeDeliveryMode) params.set("ppeDeliveryMode", formData.ppeDeliveryMode);
 
   // String IDs
-  if (formData.brandId) params.set("brandId", formData.brandId);
+  if (formData.brandIds && formData.brandIds.length > 0) params.set("brandIds", formData.brandIds.join(","));
   if (formData.categoryId) params.set("categoryId", formData.categoryId);
   if (formData.supplierId) params.set("supplierId", formData.supplierId);
   if (formData.ppeCA) params.set("ppeCA", formData.ppeCA);
@@ -320,8 +320,8 @@ export function deserializeUrlParamsToItemForm(searchParams: URLSearchParams): P
   if (ppeDeliveryMode) formData.ppeDeliveryMode = ppeDeliveryMode as any;
 
   // String IDs
-  const brandId = searchParams.get("brandId");
-  if (brandId) formData.brandId = brandId;
+  const brandIds = searchParams.get("brandIds");
+  if (brandIds) formData.brandIds = brandIds.split(",");
 
   const categoryId = searchParams.get("categoryId");
   if (categoryId) formData.categoryId = categoryId;
@@ -388,7 +388,7 @@ export function getDefaultItemFormValues(searchParams: URLSearchParams, baseDefa
     shouldAssignToUser: true,
     abcCategory: null,
     xyzCategory: null,
-    brandId: undefined,
+    brandIds: [],
     categoryId: undefined,
     supplierId: null,
     estimatedLeadTime: 30,

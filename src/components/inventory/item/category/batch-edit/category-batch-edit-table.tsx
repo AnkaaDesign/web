@@ -48,7 +48,7 @@ export function CategoryBatchEditTable({ categories, onCancel }: CategoryBatchEd
       params: {
         searchingFor: searchTerm,
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
         orderBy: { name: "asc" },
@@ -61,7 +61,7 @@ export function CategoryBatchEditTable({ categories, onCancel }: CategoryBatchEd
         value: item.id,
         label: item.name,
         unicode: item.uniCode || undefined,
-        brand: item.brand?.name,
+        brand: item.brands?.map((b: any) => b.name).join(", "),
         category: item.category?.name,
       })) || []
     );
@@ -74,7 +74,7 @@ export function CategoryBatchEditTable({ categories, onCancel }: CategoryBatchEd
       value: item.id,
       label: item.name,
       unicode: item.uniCode || undefined,
-      brand: item.brand?.name,
+      brand: item.brands?.map((b: any) => b.name).join(", "),
       category: item.category?.name,
     }));
   }, [categories]);

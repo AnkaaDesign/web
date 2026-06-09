@@ -213,7 +213,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
   const { data: selectedItemsResponse } = useItems({
     where: selectedItems.size > 0 ? { id: { in: Array.from(selectedItems) } } : undefined,
     include: {
-      brand: true,
+      brands: true,
       category: true,
       prices: {
         orderBy: { createdAt: "desc" },
@@ -685,7 +685,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                     <td class="text-mono">${item.uniCode || "-"}</td>
                     <td>${item.name}</td>
                     <td>${item.category?.name || "-"}</td>
-                    <td>${item.brand?.name || "-"}</td>
+                    <td>${item.brands?.map((b) => b.name).join(", ") || "-"}</td>
                     <td class="text-right">${quantity}${item.measureUnit && MEASURE_UNIT_LABELS[item.measureUnit as keyof typeof MEASURE_UNIT_LABELS] ? ` ${MEASURE_UNIT_LABELS[item.measureUnit as keyof typeof MEASURE_UNIT_LABELS]}` : ""}</td>
                     ${canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? `<td class="text-right">${formatCurrency(price)}</td><td class="text-right font-medium">${formatCurrency(itemTotal)}</td>` : ""}
                   </tr>
@@ -1099,7 +1099,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                                     <TableCell className="font-mono">{item.uniCode || "-"}</TableCell>
                                     <TableCell>{item.name}</TableCell>
                                     <TableCell>{item.category?.name || "-"}</TableCell>
-                                    <TableCell>{item.brand?.name || "-"}</TableCell>
+                                    <TableCell>{item.brands?.map((b) => b.name).join(", ") || "-"}</TableCell>
                                     <TableCell className="text-right">
                                       {quantity}
                                       {item.measureUnit && MEASURE_UNIT_LABELS[item.measureUnit as keyof typeof MEASURE_UNIT_LABELS]

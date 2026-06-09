@@ -5,6 +5,7 @@
 // resulting card height.
 
 import { useMemo } from "react";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import {
@@ -38,8 +39,6 @@ import type {
   WidgetAccentIcon,
   WidgetAccentShade,
 } from "../components/widget-accent";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
 import type {
   WidgetConfigProps,
@@ -269,28 +268,19 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
   const accentShade = (config.accent?.shade ?? "500") as WidgetAccentShade;
   return (
     <div className="space-y-4">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={config.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Favoritos"
-        />
-      </div>
-
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
+        <WidgetTabsBar><TabsList className="self-start">
           <TabsTrigger value="appearance" className="gap-1">
             <IconAdjustments className="h-3.5 w-3.5" /> Aparência
           </TabsTrigger>
           <TabsTrigger value="behavior" className="gap-1">
             <IconLayout className="h-3.5 w-3.5" /> Comportamento
           </TabsTrigger>
-        </TabsList>
+        </TabsList></WidgetTabsBar>
 
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Acento (cor e ícone)" defaultOpen>
+            <Section title="Destaque (cor e ícone)" defaultOpen>
               <AccentPicker
                 value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
                 onChange={(next) =>
@@ -303,7 +293,7 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
               />
             </Section>
             <Section title="Cabeçalho">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="space-y-1">
                 <ToggleRow
                   label="Exibir cabeçalho"
                   checked={config.display?.showHeader ?? true}

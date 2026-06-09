@@ -19,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatCurrency, measureUtils } from "../../../../utils";
 import { exportOrderPdf } from "@/utils/order-pdf-generator";
+import { buildOrderCode } from "@/utils/order-code";
 import { OrderPdfExportButton } from "../common/order-pdf-export-button";
 import type { Order, OrderItem } from "../../../../types";
 import { ORDER_STATUS, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, MEASURE_TYPE } from "../../../../constants";
@@ -313,7 +314,8 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
     };
 
     exportOrderPdf({
-      title: includePricing ? "Pedido de Compra" : "Solicitação de Orçamento",
+      title: buildOrderCode(order),
+      documentType: includePricing ? "Pedido de Compra" : "Solicitação de Orçamento",
       includePricing,
       description: order.description || undefined,
       supplierName: order.supplier?.fantasyName || order.supplier?.corporateName || undefined,
@@ -325,7 +327,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
       items: (order.items || []).map((item) => ({
         code: item.item?.uniCode || "-",
         name: item.temporaryItemDescription || item.item?.name || "-",
-        brand: item.item?.brand?.name || "-",
+        brand: item.item?.brands?.map((b) => b.name).join(", ") || "-",
         measures: item.item ? formatMeasuresCompact(item.item.measures || []) : "-",
         quantity: item.orderedQuantity || 0,
         unitPrice: item.price ?? 0,

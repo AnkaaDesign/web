@@ -76,6 +76,12 @@ export function HomePage() {
       ? layout.items.find((it) => it.instanceId === configuringInstanceId) ?? null
       : null;
 
+  const renameWidget = (instanceId: string, title: string) => {
+    const it = layout.items.find((i) => i.instanceId === instanceId);
+    const prev = it?.config && typeof it.config === "object" ? (it.config as Record<string, unknown>) : {};
+    configureWidget(instanceId, { ...prev, title });
+  };
+
   return (
     <div className="m-4 p-4 rounded-xl flex flex-col gap-5 bg-card border border-border shadow-sm min-h-[calc(100vh-6rem)]">
       <div className="flex flex-col gap-0.5">
@@ -137,6 +143,7 @@ export function HomePage() {
           onReorder={reorderItems}
           onResize={resizeWidget}
           onConfigure={(instanceId) => setConfiguringInstanceId(instanceId)}
+          onRenameCommit={renameWidget}
           onRemove={removeWidget}
         />
       )}

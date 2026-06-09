@@ -73,7 +73,7 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
     () => ({
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
           measures: true,
         },

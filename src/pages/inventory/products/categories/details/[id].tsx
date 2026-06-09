@@ -25,7 +25,7 @@ const CategoryDetailsPage = () => {
     include: {
       items: {
         include: {
-          brand: true,
+          brands: true,
           prices: {
             orderBy: { createdAt: "desc" },
             take: 1,

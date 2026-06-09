@@ -15,13 +15,14 @@ export function BrandCell({ control, index, disabled }: BrandCellProps) {
   return (
     <FormField
       control={control}
-      name={`items.${index}.data.brandId`}
+      name={`items.${index}.data.brandIds`}
       render={({ field }) => (
         <FormItem>
           <FormControl>
             <Combobox
+              mode="multiple"
               disabled={disabled || isLoading}
-              value={field.value || ""}
+              value={Array.isArray(field.value) ? field.value : []}
               onValueChange={field.onChange}
               options={
                 brands?.map((brand) => ({

@@ -18,6 +18,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Combobox } from "@/components/ui/combobox";
+import { SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS } from "@/constants";
 import type { NotificationConfigurationQueryParams } from "@/types/notification-configuration";
 
 // =====================
@@ -43,6 +44,12 @@ const STATUS_OPTIONS = [
   { value: "true", label: "Ativo" },
   { value: "false", label: "Inativo" },
 ];
+
+// Sectors that receive the notification (targetRule.allowedSectors).
+// Derived from the enum so every privilege (including PRODUCTION_MANAGER) is always present.
+const SECTOR_OPTIONS = Object.values(SECTOR_PRIVILEGES)
+  .map((value) => ({ value, label: SECTOR_PRIVILEGES_LABELS[value] || value }))
+  .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 
 // =====================
 // Props Interface
@@ -86,25 +93,30 @@ export function NotificationConfigurationFilters({
     onOpenChange(false);
   };
 
+  const toArray = (value: string | string[] | null | undefined): string[] =>
+    Array.isArray(value) ? value : value ? [value] : [];
+
   const handleTypeChange = (value: string | string[] | null | undefined) => {
-    setLocalFilters((prev) => ({
-      ...prev,
-      notificationType: value ? (value as any) : undefined,
-    }));
+    const arr = toArray(value);
+    setLocalFilters((prev) => ({ ...prev, notificationType: arr.length ? (arr as any) : undefined }));
   };
 
   const handleImportanceChange = (value: string | string[] | null | undefined) => {
-    setLocalFilters((prev) => ({
-      ...prev,
-      importance: value ? (value as any) : undefined,
-    }));
+    const arr = toArray(value);
+    setLocalFilters((prev) => ({ ...prev, importance: arr.length ? (arr as any) : undefined }));
   };
 
   const handleStatusChange = (value: string | string[] | null | undefined) => {
+    const arr = toArray(value);
     setLocalFilters((prev) => ({
       ...prev,
-      enabled: value ? value === "true" : undefined,
+      enabled: arr.length ? (arr.map((v) => v === "true") as any) : undefined,
     }));
+  };
+
+  const handleSectorChange = (value: string | string[] | null | undefined) => {
+    const arr = toArray(value);
+    setLocalFilters((prev) => ({ ...prev, allowedSectors: arr.length ? (arr as any) : undefined }));
   };
 
   return (
@@ -122,7 +134,8 @@ export function NotificationConfigurationFilters({
           <div className="space-y-2">
             <Label>Tipo de Notificação</Label>
             <Combobox
-              value={localFilters.notificationType || undefined}
+              mode="multiple"
+              value={localFilters.notificationType || []}
               onValueChange={handleTypeChange}
               options={TYPE_OPTIONS}
               placeholder="Todos os tipos"
@@ -136,7 +149,8 @@ export function NotificationConfigurationFilters({
           <div className="space-y-2">
             <Label>Importância</Label>
             <Combobox
-              value={localFilters.importance || undefined}
+              mode="multiple"
+              value={localFilters.importance || []}
               onValueChange={handleImportanceChange}
               options={IMPORTANCE_OPTIONS}
               placeholder="Todas as importâncias"
@@ -146,15 +160,27 @@ export function NotificationConfigurationFilters({
             />
           </div>
 
+          {/* Sector Filter */}
+          <div className="space-y-2">
+            <Label>Setor</Label>
+            <Combobox
+              mode="multiple"
+              value={localFilters.allowedSectors || []}
+              onValueChange={handleSectorChange}
+              options={SECTOR_OPTIONS}
+              placeholder="Todos os setores"
+              searchPlaceholder="Buscar setor..."
+              emptyText="Nenhum setor encontrado"
+              clearable
+            />
+          </div>
+
           {/* Status Filter */}
           <div className="space-y-2">
             <Label>Status</Label>
             <Combobox
-              value={
-                localFilters.enabled === undefined
-                  ? undefined
-                  : String(localFilters.enabled)
-              }
+              mode="multiple"
+              value={(localFilters.enabled || []).map(String)}
               onValueChange={handleStatusChange}
               options={STATUS_OPTIONS}
               placeholder="Todos os status"

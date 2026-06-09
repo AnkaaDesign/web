@@ -10,7 +10,7 @@
  */
 
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   IconSettings,
   IconEdit,
@@ -33,6 +33,8 @@ import {
   IconBuilding,
   IconFileText,
   IconTemplate,
+  IconChevronLeft,
+  IconChevronRight,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -50,12 +52,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { routes, SECTOR_PRIVILEGES } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS } from "@/constants";
 import { cn } from "@/lib/utils";
 import {
   useNotificationConfiguration,
+  useNotificationConfigurations,
   useNotificationConfigurationMutations,
 } from "@/hooks/administration/use-notification-configuration";
+import { NOTIFICATION_TYPE_LABELS } from "@/types/notification-configuration";
 import type { NotificationChannelConfig } from "@/types/notification-configuration";
 
 // =====================
@@ -69,18 +73,8 @@ const IMPORTANCE_CONFIG = {
   URGENT: { label: "Urgente", variant: "red" as const },
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  TASK: "Tarefas",
-  ORDER: "Pedidos",
-  SERVICE_ORDER: "Ordens de Serviço",
-  STOCK: "Estoque",
-  PPE: "EPI",
-  VACATION: "Férias",
-  WARNING: "Advertências",
-  CUT: "Recortes",
-  SYSTEM: "Sistema",
-  GENERAL: "Geral",
-};
+// Canonical notification-type labels (SYSTEM/PRODUCTION/STOCK/USER/GENERAL).
+const TYPE_LABELS: Record<string, string> = NOTIFICATION_TYPE_LABELS;
 
 const CHANNEL_CONFIG = {
   IN_APP: {
@@ -113,20 +107,8 @@ const CHANNEL_CONFIG = {
   },
 };
 
-const SECTOR_LABELS: Record<string, string> = {
-  ADMIN: "Administração",
-  PRODUCTION: "Produção",
-  WAREHOUSE: "Almoxarifado",
-  FINANCIAL: "Financeiro",
-  COMMERCIAL: "Comercial",
-  LOGISTIC: "Logística",
-  DESIGNER: "Design",
-  HUMAN_RESOURCES: "RH",
-  PLOTTING: "Plotagem",
-  MAINTENANCE: "Manutenção",
-  BASIC: "Básico",
-  EXTERNAL: "Externo",
-};
+// Canonical sector labels (covers every privilege, including PRODUCTION_MANAGER).
+const SECTOR_LABELS: Record<string, string> = SECTOR_PRIVILEGES_LABELS;
 
 // =====================
 // Field Row Component
@@ -262,6 +244,56 @@ export function NotificationConfigurationDetailsPage() {
 
   const config = response?.data;
 
+  // Ordered list of all configuration keys (list default sort: name asc) for prev/next navigation.
+  const { data: listResponse } = useNotificationConfigurations({
+    sortBy: "name",
+    sortOrder: "asc",
+    limit: 1000,
+  });
+
+  const navigation = useMemo(() => {
+    const orderedKeys = (listResponse?.data ?? []).map((c) => c.key);
+    if (!isValidKey || !key || orderedKeys.length === 0) return null;
+    const currentIndex = orderedKeys.indexOf(key);
+    if (currentIndex === -1) return null;
+    return {
+      currentIndex,
+      total: orderedKeys.length,
+      previousKey: currentIndex > 0 ? orderedKeys[currentIndex - 1] : null,
+      nextKey: currentIndex < orderedKeys.length - 1 ? orderedKeys[currentIndex + 1] : null,
+    };
+  }, [listResponse, key, isValidKey]);
+
+  const goToPrevious = useCallback(() => {
+    if (navigation?.previousKey) {
+      navigate(routes.administration.notifications.configurations.details(navigation.previousKey));
+    }
+  }, [navigation, navigate]);
+
+  const goToNext = useCallback(() => {
+    if (navigation?.nextKey) {
+      navigate(routes.administration.notifications.configurations.details(navigation.nextKey));
+    }
+  }, [navigation, navigate]);
+
+  // Keyboard navigation (←/→), ignored while typing or interacting with overlays.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable='true'], [role='combobox'], [role='listbox'], [role='dialog'], [role='menu']",
+        )
+      ) {
+        return;
+      }
+      if (e.key === "ArrowLeft") goToPrevious();
+      else if (e.key === "ArrowRight") goToNext();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [goToPrevious, goToNext]);
+
   const handleDelete = useCallback(async () => {
     if (!config?.id) return;
 
@@ -343,6 +375,36 @@ export function NotificationConfigurationDetailsPage() {
             { label: config.name || config.key },
           ]}
           actions={[
+            ...(navigation
+              ? [
+                  {
+                    key: "previous",
+                    label: "Anterior",
+                    icon: IconChevronLeft,
+                    onClick: goToPrevious,
+                    variant: "outline" as const,
+                    group: "secondary" as const,
+                    disabled: !navigation.previousKey,
+                  },
+                  {
+                    key: "position",
+                    label: `${navigation.currentIndex + 1} / ${navigation.total}`,
+                    onClick: () => {},
+                    variant: "ghost" as const,
+                    group: "secondary" as const,
+                    className: "pointer-events-none tabular-nums",
+                  },
+                  {
+                    key: "next",
+                    label: "Próximo",
+                    icon: IconChevronRight,
+                    onClick: goToNext,
+                    variant: "outline" as const,
+                    group: "secondary" as const,
+                    disabled: !navigation.nextKey,
+                  },
+                ]
+              : []),
             {
               key: "test",
               label: "Testar",
@@ -445,12 +507,8 @@ export function NotificationConfigurationDetailsPage() {
                 </CardHeader>
                 <CardContent className="pt-0 flex-1">
                   <div className="space-y-3">
-                    <FieldRow icon={<IconClock className="h-4 w-4" />} label="Apenas horário comercial">
-                      {config.workHoursOnly ? (
-                        <IconCheck className="w-5 h-5 text-green-600" />
-                      ) : (
-                        <IconX className="w-5 h-5 text-muted-foreground" />
-                      )}
+                    <FieldRow icon={<IconClock className="h-4 w-4" />} label="Horário de envio">
+                      <span className="text-xs">07:00–18:00 · dias úteis</span>
                     </FieldRow>
 
                     <FieldRow icon={<IconSettings className="h-4 w-4" />} label="Agrupamento habilitado">
@@ -500,14 +558,6 @@ export function NotificationConfigurationDetailsPage() {
                           )}
                         </div>
                       </div>
-
-                      <FieldRow icon={<IconUsers className="h-4 w-4" />} label="Excluir inativos">
-                        {config.targetRule.excludeInactive ? (
-                          <IconCheck className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <IconX className="w-5 h-5 text-muted-foreground" />
-                        )}
-                      </FieldRow>
 
                       <FieldRow icon={<IconUsers className="h-4 w-4" />} label="Excluir em férias">
                         {config.targetRule.excludeOnVacation ? (

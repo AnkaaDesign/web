@@ -1,6 +1,7 @@
 import React from "react";
 import type { Order } from "../../../../types";
 import { formatCurrency, formatDate } from "../../../../utils";
+import { formatOrderNumber } from "@/utils/order-code";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Badge } from "@/components/ui/badge";
 import { OrderStatusBadge } from "../common/order-status-badge";
@@ -19,6 +20,18 @@ export interface OrderColumn {
 
 export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[] => {
   const columns: OrderColumn[] = [
+  {
+    key: "orderNumber",
+    header: "Nº",
+    accessor: (order) => (
+      <span className="text-sm font-medium tabular-nums">
+        {order.orderNumber != null ? formatOrderNumber(order.orderNumber) : "—"}
+      </span>
+    ),
+    sortable: true,
+    align: "left",
+    className: "w-20",
+  },
   {
     key: "description",
     header: "DESCRIÇÃO",
@@ -104,6 +117,6 @@ export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[]
 
 // Default visible columns
 export const getDefaultVisibleColumns = (canViewPrices: boolean = true): Set<string> => {
-  const base = ["description", "supplier.fantasyName", "statusOrder", "itemCount", "total", "forecast"];
+  const base = ["orderNumber", "description", "supplier.fantasyName", "statusOrder", "itemCount", "total", "forecast"];
   return new Set(base.filter((key) => canViewPrices || key !== "total"));
 };

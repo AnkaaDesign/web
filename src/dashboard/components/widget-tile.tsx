@@ -6,7 +6,7 @@
 // are an absolute-positioned floating toolbar at the top of the tile so they
 // don't double up the chrome.
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -15,10 +15,12 @@ import {
   IconTrash,
   IconAlertTriangle,
   IconLock,
+  IconPencil,
 } from "@tabler/icons-react";
 import { Button } from "../../components/ui/button";
 import { ErrorBoundary } from "../../components/ui/error-boundary";
 import { SizeSelector } from "./size-selector";
+import { WidgetChromeProvider } from "./widget-chrome-context";
 import { widgetRegistry } from "../registry";
 import type { WidgetInstance, WidgetSize } from "../types";
 
@@ -56,6 +58,8 @@ interface WidgetTileProps {
   responsiveCols: number;
   onResize: (size: WidgetSize) => void;
   onConfigure: () => void;
+  /** Persist a new title for this instance (writes config.title). */
+  onRenameCommit: (title: string) => void;
   onRemove: () => void;
 }
 
@@ -65,9 +69,11 @@ export function WidgetTile({
   responsiveCols,
   onResize,
   onConfigure,
+  onRenameCommit,
   onRemove,
 }: WidgetTileProps) {
   const def = widgetRegistry.get(instance.widgetId);
+  const [renameSignal, setRenameSignal] = useState(0);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: instance.instanceId,
@@ -127,6 +133,14 @@ export function WidgetTile({
     return result.success ? result.data : def.defaultConfig;
   }, [def.configSchema, def.defaultConfig, instance.config]);
 
+  // Title shown in the widget header (config.title), falling back to the
+  // widget's display name. Used to seed the inline rename input.
+  const currentTitle = useMemo(() => {
+    const c = parsedConfig as { title?: unknown } | null;
+    const t = c && typeof c === "object" ? c.title : undefined;
+    return typeof t === "string" && t.trim() ? t : def.name;
+  }, [parsedConfig, def.name]);
+
   return (
     <div
       ref={setNodeRef}
@@ -156,6 +170,15 @@ export function WidgetTile({
               max={def.maxSize}
               onChange={onResize}
             />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setRenameSignal((n) => n + 1)}
+              title="Renomear widget"
+            >
+              <IconPencil className="h-3.5 w-3.5" />
+            </Button>
             {hasConfigUi && (
               <Button
                 variant="ghost"
@@ -186,12 +209,21 @@ export function WidgetTile({
               <div className="h-full w-full animate-pulse rounded-lg bg-muted/30" />
             }
           >
-            <Render
-              instanceId={instance.instanceId}
-              config={parsedConfig}
-              size={instance.size}
-              isEditing={isEditing}
-            />
+            <WidgetChromeProvider
+              value={{
+                isEditing,
+                currentTitle,
+                renameSignal,
+                onRenameCommit: isEditing ? onRenameCommit : undefined,
+              }}
+            >
+              <Render
+                instanceId={instance.instanceId}
+                config={parsedConfig}
+                size={instance.size}
+                isEditing={isEditing}
+              />
+            </WidgetChromeProvider>
           </Suspense>
         </ErrorBoundary>
       </div>

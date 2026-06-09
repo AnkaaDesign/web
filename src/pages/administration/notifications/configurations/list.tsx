@@ -26,6 +26,8 @@ import {
   IconChevronDown,
   IconSelector,
   IconAlertTriangle,
+  IconCheck,
+  IconX,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -62,7 +64,12 @@ import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
-import { routes, SECTOR_PRIVILEGES } from "@/constants";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Switch } from "@/components/ui/switch";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { GenericColumnVisibilityManager } from "@/components/ui/generic-column-visibility-manager";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
+import { routes, SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS, NOTIFICATION_IMPORTANCE, NOTIFICATION_CHANNEL } from "@/constants";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -71,8 +78,9 @@ import { useTableFilters } from "@/hooks/common/use-table-filters";
 import {
   useNotificationConfigurations,
   useNotificationConfigurationMutations,
+  useChannelConfigMutation,
 } from "@/hooks/administration/use-notification-configuration";
-import type { NotificationConfiguration, NotificationConfigurationQueryParams } from "@/types/notification-configuration";
+import type { NotificationConfiguration, NotificationConfigurationQueryParams, NotificationChannelConfig } from "@/types/notification-configuration";
 import { NotificationConfigurationFilters } from "./components/configuration-filters";
 
 // =====================
@@ -127,6 +135,102 @@ const CHANNEL_CONFIG: Record<string, { icon: typeof IconBell; color: string; bor
 
 const DEFAULT_PAGE_SIZE = 20;
 
+// Inline-editable importance combobox (colored trigger, like the task-detail service-order combobox)
+const IMPORTANCE_OPTIONS: ComboboxOption[] = [
+  { value: "LOW", label: "Baixa" },
+  { value: "NORMAL", label: "Normal" },
+  { value: "HIGH", label: "Alta" },
+  { value: "URGENT", label: "Urgente" },
+];
+
+// `!` overrides the combobox's hover/open accent (green) so the trigger keeps its color.
+const IMPORTANCE_TRIGGER_CLASS: Record<string, string> = {
+  LOW: "!bg-neutral-500 !text-white !border-neutral-600",
+  NORMAL: "!bg-blue-600 !text-white !border-blue-700",
+  HIGH: "!bg-orange-500 !text-white !border-orange-600",
+  URGENT: "!bg-red-600 !text-white !border-red-700",
+};
+
+const getImportanceTriggerClass = (value?: string | null): string =>
+  (value && IMPORTANCE_TRIGGER_CLASS[value]) || "";
+
+// Sectors that receive the notification — derived from the enum so every privilege is present.
+const SECTOR_OPTIONS: ComboboxOption[] = Object.values(SECTOR_PRIVILEGES)
+  .map((value) => ({ value, label: SECTOR_PRIVILEGES_LABELS[value] || value }))
+  .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+
+// =====================
+// Channel Hover/Edit Cell
+// =====================
+
+type ChannelFlags = { enabled: boolean; mandatory: boolean; defaultOn: boolean };
+
+interface ChannelHoverItemProps {
+  channelKey: string;
+  channelData?: NotificationChannelConfig;
+  onChange: (channel: string, data: ChannelFlags) => void;
+}
+
+function ChannelHoverItem({ channelKey, channelData, onChange }: ChannelHoverItemProps) {
+  const channelConfig = CHANNEL_CONFIG[channelKey];
+  if (!channelConfig) return null;
+  const Icon = channelConfig.icon;
+  const enabled = channelData?.enabled ?? false;
+  const mandatory = channelData?.mandatory ?? false;
+  const defaultOn = channelData?.defaultOn ?? false;
+
+  const applyPatch = (patch: Partial<ChannelFlags>) => {
+    onChange(channelKey, { enabled, mandatory, defaultOn, ...patch });
+  };
+
+  return (
+    <HoverCard openDelay={100} closeDelay={150}>
+      <HoverCardTrigger asChild>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "p-2 rounded-lg border-2 transition-all flex items-center justify-center cursor-pointer",
+            enabled ? channelConfig.borderColor : "border-muted bg-muted/50 opacity-50",
+            mandatory && enabled && channelConfig.bgColor,
+          )}
+          title={channelConfig.label}
+        >
+          <Icon className={cn("h-4 w-4", enabled ? channelConfig.color : "text-muted-foreground")} />
+        </div>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-56 p-3 border-border/40" side="top" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
+          <Icon className={cn("h-4 w-4", channelConfig.color)} />
+          <span className="text-sm font-semibold">{channelConfig.label}</span>
+        </div>
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+              {enabled ? <IconCheck className="h-4 w-4 text-green-600" /> : <IconX className="h-4 w-4 text-muted-foreground" />}
+              Ativo
+            </span>
+            <Switch checked={enabled} onCheckedChange={(v) => applyPatch({ enabled: v })} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+              {mandatory ? <IconCheck className="h-4 w-4 text-green-600" /> : <IconX className="h-4 w-4 text-muted-foreground" />}
+              Obrigatório
+            </span>
+            <Switch checked={mandatory} disabled={!enabled} onCheckedChange={(v) => applyPatch({ mandatory: v })} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+              {defaultOn ? <IconCheck className="h-4 w-4 text-green-600" /> : <IconX className="h-4 w-4 text-muted-foreground" />}
+              Padrão ativo
+            </span>
+            <Switch checked={defaultOn} disabled={!enabled} onCheckedChange={(v) => applyPatch({ defaultOn: v })} />
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
 // =====================
 // Column Definitions
 // =====================
@@ -140,26 +244,31 @@ interface ConfigurationColumn {
   accessor: (config: NotificationConfiguration) => React.ReactNode;
 }
 
-function createConfigurationColumns(): ConfigurationColumn[] {
+interface ColumnHandlers {
+  onImportanceChange: (id: string, importance: string) => void;
+  onSectorsChange: (id: string, sectors: string[]) => void;
+  onChannelChange: (configId: string, channel: string, data: ChannelFlags) => void;
+}
+
+function createConfigurationColumns(handlers: ColumnHandlers): ConfigurationColumn[] {
   return [
     {
       key: "name",
       header: "Nome",
       sortable: true,
-      className: "w-[280px] min-w-[280px]",
+      className: "w-[340px] min-w-[340px]",
       accessor: (config) => (
-        <span className="text-sm font-medium">{config.name || config.key}</span>
+        <TruncatedTextWithTooltip text={config.name || config.key} className="text-sm font-medium" />
       ),
     },
     {
       key: "description",
       header: "Descrição",
       sortable: false,
-      className: "min-w-[200px]",
+      className: "w-auto min-w-[300px]",
       accessor: (config) => {
         const description = config.description || "-";
-        const truncated = description.length > 50 ? description.slice(0, 50) + "..." : description;
-        return <TruncatedTextWithTooltip text={truncated} tooltipText={description} />;
+        return <TruncatedTextWithTooltip text={description} />;
       },
     },
     {
@@ -173,54 +282,66 @@ function createConfigurationColumns(): ConfigurationColumn[] {
       },
     },
     {
+      key: "sectors",
+      header: "Setores",
+      sortable: false,
+      className: "w-[320px] min-w-[320px]",
+      accessor: (config) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Combobox
+            mode="multiple"
+            value={config.targetRule?.allowedSectors || []}
+            onValueChange={(v) =>
+              handlers.onSectorsChange(config.id, Array.isArray(v) ? v : v ? [v] : [])
+            }
+            options={SECTOR_OPTIONS}
+            searchable
+            clearable
+            hideDefaultBadges
+            placeholder="Todos os setores"
+            searchPlaceholder="Buscar setor..."
+            emptyText="Nenhum setor encontrado"
+            className="h-8 w-[260px]"
+          />
+        </div>
+      ),
+    },
+    {
       key: "importance",
       header: "Importância",
       sortable: true,
-      className: "w-[140px] min-w-[140px]",
-      accessor: (config) => {
-        const importanceConfig = IMPORTANCE_VARIANTS[config.importance] || IMPORTANCE_VARIANTS.NORMAL;
-        return (
-          <Badge variant={importanceConfig.variant as any}>
-            {importanceConfig.label}
-          </Badge>
-        );
-      },
+      className: "w-[210px] min-w-[210px]",
+      accessor: (config) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Combobox
+            value={config.importance || undefined}
+            onValueChange={(v) => handlers.onImportanceChange(config.id, v as string)}
+            options={IMPORTANCE_OPTIONS}
+            searchable={false}
+            clearable={false}
+            className="h-8 w-[160px]"
+            triggerClassName={cn("font-medium justify-center", getImportanceTriggerClass(config.importance))}
+          />
+        </div>
+      ),
     },
     {
       key: "channels",
       header: "Canais",
       sortable: false,
       className: "w-[200px] min-w-[200px]",
-      accessor: (config) => {
-        const allChannels = ["IN_APP", "PUSH", "EMAIL", "WHATSAPP"];
-        return (
-          <div className="flex items-center gap-1.5">
-            {allChannels.map((channelKey) => {
-              const channelConfig = CHANNEL_CONFIG[channelKey];
-              if (!channelConfig) return null;
-              const Icon = channelConfig.icon;
-              const channelData = config.channelConfigs?.find((c) => c.channel === channelKey);
-              const isEnabled = channelData?.enabled ?? false;
-              const isMandatory = channelData?.mandatory ?? false;
-              return (
-                <div
-                  key={channelKey}
-                  className={cn(
-                    "p-2 rounded-lg border-2 transition-all flex items-center justify-center",
-                    isEnabled
-                      ? channelConfig.borderColor
-                      : "border-muted bg-muted/50 opacity-50",
-                    isMandatory && isEnabled && channelConfig.bgColor
-                  )}
-                  title={`${channelConfig.label}${isMandatory ? " (Obrigatório)" : ""}${!isEnabled ? " (Desativado)" : ""}`}
-                >
-                  <Icon className={cn("h-4 w-4", isEnabled ? channelConfig.color : "text-muted-foreground")} />
-                </div>
-              );
-            })}
-          </div>
-        );
-      },
+      accessor: (config) => (
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          {["IN_APP", "PUSH", "EMAIL", "WHATSAPP"].map((channelKey) => (
+            <ChannelHoverItem
+              key={channelKey}
+              channelKey={channelKey}
+              channelData={config.channelConfigs?.find((c) => c.channel === channelKey)}
+              onChange={(channel, data) => handlers.onChannelChange(config.id, channel, data)}
+            />
+          ))}
+        </div>
+      ),
     },
     {
       key: "enabled",
@@ -237,6 +358,11 @@ function createConfigurationColumns(): ConfigurationColumn[] {
       ),
     },
   ];
+}
+
+// "Tipo" (notificationType) and "Status" (enabled) are hidden by default.
+function getDefaultVisibleColumns(): Set<string> {
+  return new Set(["name", "description", "sectors", "importance", "channels"]);
 }
 
 // =====================
@@ -260,7 +386,21 @@ export function NotificationConfigurationListPage() {
   } | null>(null);
 
   // Mutations
-  const { delete: deleteMutation } = useNotificationConfigurationMutations();
+  const { delete: deleteMutation, update: updateMutation } = useNotificationConfigurationMutations();
+  const channelMutation = useChannelConfigMutation();
+
+  // Inline-edit handlers (save directly from the table; cache auto-invalidates on success)
+  const handleImportanceChange = useCallback((id: string, importance: string) => {
+    updateMutation.mutateAsync({ id, data: { importance: importance as NOTIFICATION_IMPORTANCE } }).catch(() => {});
+  }, [updateMutation]);
+
+  const handleSectorsChange = useCallback((id: string, sectors: string[]) => {
+    updateMutation.mutateAsync({ id, data: { targetRule: { allowedSectors: sectors } } }).catch(() => {});
+  }, [updateMutation]);
+
+  const handleChannelChange = useCallback((configId: string, channel: string, data: ChannelFlags) => {
+    channelMutation.mutateAsync({ configId, channel: channel as NOTIFICATION_CHANNEL, data }).catch(() => {});
+  }, [channelMutation]);
 
   // URL state management for pagination, selection, and sorting
   const {
@@ -287,9 +427,10 @@ export function NotificationConfigurationListPage() {
   // Filter serialization
   const serializeFilters = useCallback((filters: Partial<NotificationConfigurationQueryParams>): Record<string, string> => {
     const params: Record<string, string> = {};
-    if (filters.notificationType) params.type = filters.notificationType;
-    if (filters.importance) params.importance = filters.importance;
-    if (typeof filters.enabled === "boolean") params.enabled = String(filters.enabled);
+    if (filters.notificationType?.length) params.type = filters.notificationType.join(",");
+    if (filters.importance?.length) params.importance = filters.importance.join(",");
+    if (filters.enabled?.length) params.enabled = filters.enabled.map(String).join(",");
+    if (filters.allowedSectors?.length) params.sectors = filters.allowedSectors.join(",");
     return params;
   }, []);
 
@@ -298,9 +439,11 @@ export function NotificationConfigurationListPage() {
     const type = params.get("type");
     const importance = params.get("importance");
     const enabled = params.get("enabled");
-    if (type) filters.notificationType = type as any;
-    if (importance) filters.importance = importance as any;
-    if (enabled !== null) filters.enabled = enabled === "true";
+    const sectors = params.get("sectors");
+    if (type) filters.notificationType = type.split(",") as any;
+    if (importance) filters.importance = importance.split(",") as any;
+    if (enabled) filters.enabled = enabled.split(",").map((v) => v === "true") as any;
+    if (sectors) filters.allowedSectors = sectors.split(",") as any;
     return filters;
   }, []);
 
@@ -315,7 +458,8 @@ export function NotificationConfigurationListPage() {
     queryFilters: baseQueryFilters,
     hasActiveFilters,
   } = useTableFilters<NotificationConfigurationQueryParams>({
-    defaultFilters: {},
+    // Hide inactive configurations by default; the Status filter can show them.
+    defaultFilters: { enabled: [true] },
     searchDebounceMs: 300,
     searchParamName: "search",
     serializeToUrl: serializeFilters,
@@ -343,7 +487,24 @@ export function NotificationConfigurationListPage() {
   const totalPages = Math.ceil(totalRecords / pageSize);
 
   // Get all columns
-  const columns = useMemo(() => createConfigurationColumns(), []);
+  const columns = useMemo(
+    () => createConfigurationColumns({
+      onImportanceChange: handleImportanceChange,
+      onSectorsChange: handleSectorsChange,
+      onChannelChange: handleChannelChange,
+    }),
+    [handleImportanceChange, handleSectorsChange, handleChannelChange],
+  );
+
+  // Column visibility (Tipo + Status hidden by default), persisted in localStorage
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility(
+    "notification-configuration-list-visible-columns",
+    getDefaultVisibleColumns(),
+  );
+  const visibleColumnsList = useMemo(
+    () => columns.filter((col) => visibleColumns.has(col.key)),
+    [columns, visibleColumns],
+  );
 
   // Current page IDs for selection
   const currentPageIds = useMemo(() => configurations.map((c) => c.id), [configurations]);
@@ -454,29 +615,38 @@ export function NotificationConfigurationListPage() {
       });
     }
 
-    if (filters.notificationType) {
+    if (filters.notificationType?.length) {
       result.push({
         key: "notificationType",
         label: "Tipo",
-        value: TYPE_LABELS[filters.notificationType] || filters.notificationType,
+        value: filters.notificationType.map((t) => TYPE_LABELS[t] || t).join(", "),
         onRemove: () => onRemoveFilter("notificationType"),
       });
     }
 
-    if (filters.importance) {
+    if (filters.importance?.length) {
       result.push({
         key: "importance",
         label: "Importância",
-        value: IMPORTANCE_VARIANTS[filters.importance]?.label || filters.importance,
+        value: filters.importance.map((i) => IMPORTANCE_VARIANTS[i]?.label || i).join(", "),
         onRemove: () => onRemoveFilter("importance"),
       });
     }
 
-    if (typeof filters.enabled === "boolean") {
+    if (filters.allowedSectors?.length) {
+      result.push({
+        key: "allowedSectors",
+        label: "Setor",
+        value: filters.allowedSectors.map((s) => SECTOR_PRIVILEGES_LABELS[s] || s).join(", "),
+        onRemove: () => onRemoveFilter("allowedSectors"),
+      });
+    }
+
+    if (filters.enabled?.length) {
       result.push({
         key: "enabled",
         label: "Status",
-        value: filters.enabled ? "Ativo" : "Inativo",
+        value: filters.enabled.map((e) => (e ? "Ativo" : "Inativo")).join(", "),
         onRemove: () => onRemoveFilter("enabled"),
       });
     }
@@ -543,6 +713,12 @@ export function NotificationConfigurationListPage() {
                   className="flex-1"
                 />
                 <div className="flex gap-2">
+                  <GenericColumnVisibilityManager
+                    columns={columns}
+                    visibleColumns={visibleColumns}
+                    onVisibilityChange={setVisibleColumns}
+                    getDefaultVisibleColumns={getDefaultVisibleColumns}
+                  />
                   <Button
                     variant={hasActiveFilters ? "default" : "outline"}
                     size="default"
@@ -599,7 +775,7 @@ export function NotificationConfigurationListPage() {
                             </TableHead>
 
                             {/* Data columns */}
-                            {columns.map((column) => (
+                            {visibleColumnsList.map((column) => (
                               <TableHead key={column.key} className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0", column.className)}>
                                 {column.sortable ? (
                                   <button
@@ -643,7 +819,7 @@ export function NotificationConfigurationListPage() {
                         <TableBody>
                           {configurations.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={columns.length + 1} className="p-0">
+                              <TableCell colSpan={visibleColumnsList.length + 1} className="p-0">
                                 <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
                                   <IconSettings className="h-12 w-12 text-muted-foreground/50 mb-4" />
                                   <div className="text-lg font-medium mb-2">Nenhuma configuração encontrada</div>
@@ -694,7 +870,7 @@ export function NotificationConfigurationListPage() {
                                   </TableCell>
 
                                   {/* Data columns */}
-                                  {columns.map((column) => (
+                                  {visibleColumnsList.map((column) => (
                                     <TableCell
                                       key={column.key}
                                       className={cn(

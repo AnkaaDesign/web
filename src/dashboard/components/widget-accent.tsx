@@ -4932,13 +4932,18 @@ function AccentIconDialog({
                               onSelect(iconKey);
                               onClose();
                             }}
-                            className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 transition-all ${
+                            className={`relative flex flex-col items-center gap-1 rounded-md border-[1.5px] px-2 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                               active
-                                ? `border-primary ring-2 ring-primary/30 ${accentClasses.icon}`
-                                : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+                                ? `border-primary ring-2 ring-primary/30 bg-primary/5 ${accentClasses.icon}`
+                                : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-accent/40"
                             }`}
                             title={ACCENT_ICON_LABELS[iconKey]}
                           >
+                            {active && (
+                              <span className="absolute right-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                <IconCheck className="h-2.5 w-2.5" strokeWidth={3} />
+                              </span>
+                            )}
                             <Cmp className="h-5 w-5" />
                             <span className="text-[10px] truncate w-full text-center">
                               {ACCENT_ICON_LABELS[iconKey]}

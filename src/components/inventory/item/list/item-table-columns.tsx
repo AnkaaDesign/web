@@ -61,8 +61,8 @@ export const createItemColumns = (): ItemColumn[] => [
   {
     key: "brand.name",
     header: "MARCA",
-    accessor: (item: Item) => <div className="truncate">{item.brand?.name || "-"}</div>,
-    sortable: true,
+    accessor: (item: Item) => <div className="truncate">{item.brands?.map((b) => b.name).join(", ") || "-"}</div>,
+    sortable: false,
     className: "w-32",
     align: "left",
   },

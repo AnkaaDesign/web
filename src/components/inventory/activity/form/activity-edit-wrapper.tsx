@@ -21,7 +21,7 @@ export const ActivityEditWrapper = () => {
     include: {
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
       },

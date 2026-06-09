@@ -34,7 +34,7 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
       shouldAssignToUser: item.shouldAssignToUser,
       abcCategory: item.abcCategory,
       xyzCategory: item.xyzCategory,
-      brandId: item.brandId,
+      brandIds: item.brands?.map((b) => b.id) ?? [],
       categoryId: item.categoryId,
       supplierId: item.supplierId,
       estimatedLeadTime: item.estimatedLeadTime,
@@ -52,7 +52,7 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
 
   // Memoize the supplier, brand, and category to pass to the form
   const initialSupplier = React.useMemo(() => item.supplier, [item.supplier]);
-  const initialBrand = React.useMemo(() => item.brand, [item.brand]);
+  const initialBrands = React.useMemo(() => item.brands, [item.brands]);
   const initialCategory = React.useMemo(() => item.category, [item.category]);
 
   // Track original values to determine what changed
@@ -116,7 +116,7 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
       onDirtyChange={onDirtyChange}
       onFormStateChange={onFormStateChange}
       initialSupplier={initialSupplier}
-      initialBrand={initialBrand}
+      initialBrands={initialBrands}
       initialCategory={initialCategory}
     />
   );

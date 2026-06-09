@@ -147,7 +147,7 @@ export function OrderFilters({
       data: (response.data || []).map((item) => ({
         value: item.id,
         label: item.name,
-        description: item.brand?.name || item.category?.name,
+        description: item.brands?.map((b) => b.name).join(", ") || item.category?.name,
       })),
       hasMore: response.meta?.hasNextPage || false,
     };

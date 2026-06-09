@@ -189,7 +189,7 @@ export function RelatedItemsCard({ category, className, maxHeight }: RelatedItem
                           </div>
                         </div>
 
-                        {item.brand && <p className="text-xs text-muted-foreground truncate">{item.brand.name}</p>}
+                        {item.brands && item.brands.length > 0 && <p className="text-xs text-muted-foreground truncate">{item.brands.map((b) => b.name).join(", ")}</p>}
 
                         {!item.isActive && (
                           <div className="flex flex-wrap items-center gap-1 mt-1">

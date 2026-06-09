@@ -204,7 +204,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   // Memoize include configuration
   const includeConfig = useMemo(
     () => ({
-      brand: true,
+      brands: true,
       category: true,
       supplier: true,
       measures: true,
@@ -255,7 +255,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
         // Then apply local filters
         ...(!localFilters.showInactive && { isActive: true }),
         ...(localFilters.categoryIds?.length && { categoryId: { in: localFilters.categoryIds } }),
-        ...(localFilters.brandIds?.length && { brandId: { in: localFilters.brandIds } }),
+        ...(localFilters.brandIds?.length && { brands: { some: { id: { in: localFilters.brandIds } } } }),
         ...(localFilters.supplierIds?.length && { supplierId: { in: localFilters.supplierIds } }),
         ...(localFilters.where || {}),
       },

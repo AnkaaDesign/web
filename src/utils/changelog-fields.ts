@@ -43,7 +43,8 @@ const commonFields: Record<string, string> = {
   // Common relationships
   supplierId: "Fornecedor",
   categoryId: "Categoria",
-  brandId: "Marca",
+  brandId: "Marca", // legacy single-brand changelog records
+  brands: "Marcas",
 
   // Audit fields
   triggeredBy: "Acionado por",
@@ -349,6 +350,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
   },
   [CHANGE_LOG_ENTITY_TYPE.SUPPLIER]: {
     // Basic information
+    sequentialNumber: "Número",
     corporateName: "Razão Social",
     fantasyName: "Nome Fantasia",
     cnpj: "CNPJ",
@@ -1136,6 +1138,12 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       if (field === "formulas") {
         return `${value.length} ${value.length === 1 ? "fórmula" : "fórmulas"}`;
       }
+    }
+
+    // Item brands (many-to-many): render the brand names instead of a bare count
+    if (field === "brands") {
+      const names = (value as any[]).map((b: any) => (typeof b === "string" ? b : b?.name)).filter(Boolean);
+      return names.length > 0 ? names.join(", ") : "Nenhuma";
     }
 
     return `${value.length} ${value.length === 1 ? "item" : "itens"}`;

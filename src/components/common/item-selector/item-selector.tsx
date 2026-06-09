@@ -161,7 +161,7 @@ export const ItemSelector = ({
   // Memoize include configuration to prevent re-renders
   const includeConfig = useMemo(
     () => ({
-      brand: true,
+      brands: true,
       category: true,
       supplier: true,
       measures: true,
@@ -190,7 +190,7 @@ export const ItemSelector = ({
           },
         }),
         ...(categoryIds.length && { categoryId: { in: categoryIds } }),
-        ...(brandIds.length && { brandId: { in: brandIds } }),
+        ...(brandIds.length && { brands: { some: { id: { in: brandIds } } } }),
         ...(supplierIds.length && { supplierId: { in: supplierIds } }),
         // Filter by selected IDs when showSelectedOnly is true
         ...(showSelectedOnly &&
@@ -715,7 +715,7 @@ export const ItemSelector = ({
                           </TableCell>
                           <TableCell className="w-20 p-0 !border-r-0">
                             <div className="px-4 py-2 h-full flex items-center">
-                              <div className="text-sm truncate">{item.brand?.name || "-"}</div>
+                              <div className="text-sm truncate">{item.brands?.map((b) => b.name).join(", ") || "-"}</div>
                             </div>
                           </TableCell>
                           <TableCell className="w-32 p-0 !border-r-0">

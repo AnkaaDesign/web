@@ -29,7 +29,11 @@ export const EditOrderPage = () => {
     include: {
       items: {
         include: {
-          item: true,
+          item: {
+            include: {
+              category: true,
+            },
+          },
         },
       },
       supplier: true,

@@ -94,7 +94,7 @@ export function MaintenanceScheduleTable({
     include: {
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
       },

@@ -32,7 +32,7 @@ export const ExternalWithdrawalEditPage = () => {
           item: {
             include: {
               category: true,
-              brand: true,
+              brands: true,
             },
           },
         },

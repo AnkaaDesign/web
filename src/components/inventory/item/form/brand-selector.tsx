@@ -13,37 +13,38 @@ type FormData = ItemCreateFormData | ItemUpdateFormData;
 interface BrandSelectorProps {
   disabled?: boolean;
   required?: boolean;
-  initialBrand?: ItemBrand;
+  initialBrands?: ItemBrand[];
 }
 
-export function ItemBrandSelector({ disabled, required, initialBrand }: BrandSelectorProps) {
+export function ItemBrandSelector({ disabled, required, initialBrands }: BrandSelectorProps) {
   const form = useFormContext<FormData>();
   const [isCreating, setIsCreating] = useState(false);
   const { createMutation } = useItemBrandMutations();
 
+  // Stable key for the initial brands dependency
+  const initialBrandsKey = (initialBrands ?? []).map((b) => b.id).join(",");
+
   // Create memoized initialOptions with stable dependency
   const initialOptions = useMemo(
     () =>
-      initialBrand
-        ? [
-            {
-              value: initialBrand.id,
-              label: initialBrand.name,
-            },
-          ]
-        : [],
-    [initialBrand?.id]
+      (initialBrands ?? []).map((brand) => ({
+        value: brand.id,
+        label: brand.name,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [initialBrandsKey]
   );
 
-  // Initialize cache with initial brand
+  // Initialize cache with initial brands
   const cacheRef = useRef<Map<string, ItemBrand>>(new Map());
 
-  // Add initial brand to cache on mount or when it changes
+  // Add initial brands to cache on mount or when they change
   useMemo(() => {
-    if (initialBrand) {
-      cacheRef.current.set(initialBrand.id, initialBrand);
-    }
-  }, [initialBrand?.id]);
+    (initialBrands ?? []).forEach((brand) => {
+      cacheRef.current.set(brand.id, brand);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialBrandsKey]);
 
   const fetchBrands = useCallback(async (searchTerm: string, page = 1) => {
     try {
@@ -111,42 +112,59 @@ export function ItemBrandSelector({ disabled, required, initialBrand }: BrandSel
   return (
     <FormField
       control={form.control}
-      name="brandId"
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel className="flex items-center gap-2">
-            <IconCertificate className="h-4 w-4" />
-            Marca {required && <span className="text-destructive">*</span>}
-          </FormLabel>
-          <FormControl>
-            <Combobox
-              value={field.value || ""}
-              onValueChange={field.onChange}
-              async={true}
-              queryKey={["item-brands", "selector"]}
-              queryFn={fetchBrands}
-              initialOptions={initialOptions}
-              minSearchLength={0}
-              pageSize={50}
-              debounceMs={300}
-              placeholder="Pesquisar marca..."
-              emptyText="Nenhuma marca encontrada"
-              searchPlaceholder="Digite o nome da marca..."
-              disabled={disabled || isCreating}
-              allowCreate={true}
-              createLabel={(value) => `Criar marca "${value}"`}
-              onCreate={async (name) => {
-                const newBrandId = await handleCreateBrand(name);
-                if (newBrandId) {
-                  field.onChange(newBrandId);
-                }
-              }}
-              isCreating={isCreating}
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
+      name="brandIds"
+      render={({ field }) => {
+        const selectedValues: string[] = Array.isArray(field.value) ? field.value : [];
+
+        // In multiple mode the combobox emits an array, but the internal
+        // create flow emits a single string — coerce both into the array.
+        const handleValueChange = (value: string | string[] | null | undefined) => {
+          if (Array.isArray(value)) {
+            field.onChange(value);
+          } else if (typeof value === "string" && value) {
+            field.onChange(selectedValues.includes(value) ? selectedValues : [...selectedValues, value]);
+          } else {
+            field.onChange([]);
+          }
+        };
+
+        return (
+          <FormItem>
+            <FormLabel className="flex items-center gap-2">
+              <IconCertificate className="h-4 w-4" />
+              Marcas {required && <span className="text-destructive">*</span>}
+            </FormLabel>
+            <FormControl>
+              <Combobox
+                mode="multiple"
+                value={selectedValues}
+                onValueChange={handleValueChange}
+                async={true}
+                queryKey={["item-brands", "selector"]}
+                queryFn={fetchBrands}
+                initialOptions={initialOptions}
+                minSearchLength={0}
+                pageSize={50}
+                debounceMs={300}
+                placeholder="Pesquisar marcas..."
+                emptyText="Nenhuma marca encontrada"
+                searchPlaceholder="Digite o nome da marca..."
+                disabled={disabled || isCreating}
+                allowCreate={true}
+                createLabel={(value) => `Criar marca "${value}"`}
+                onCreate={async (name) => {
+                  const newBrandId = await handleCreateBrand(name);
+                  if (newBrandId) {
+                    field.onChange(selectedValues.includes(newBrandId) ? selectedValues : [...selectedValues, newBrandId]);
+                  }
+                }}
+                isCreating={isCreating}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        );
+      }}
     />
   );
 }

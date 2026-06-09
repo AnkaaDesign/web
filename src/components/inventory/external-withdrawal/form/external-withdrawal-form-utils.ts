@@ -20,10 +20,10 @@ export interface ExternalWithdrawalFormItem {
     name: string;
     type?: string;
   };
-  brand?: {
+  brands?: Array<{
     id: string;
     name: string;
-  };
+  }>;
   supplier?: {
     id: string;
     fantasyName: string;
@@ -316,7 +316,7 @@ export function transformAPIDataToFormData(externalWithdrawal: ExternalWithdrawa
                 type: item.category.type,
               }
             : undefined,
-          brand: item.brand,
+          brands: item.brands,
           supplier: item.supplier,
           prices: item.prices,
           availableQuantity: item.quantity,
@@ -594,7 +594,7 @@ export function convertItemToFormItem(item: Item, quantity: number = 1, price?: 
           type: item.category.type,
         }
       : undefined,
-    brand: item.brand,
+    brands: item.brands,
     supplier: item.supplier,
     prices: item.prices,
     availableQuantity: item.quantity,
@@ -624,7 +624,7 @@ export function filterItems(
         item.name.toLowerCase().includes(search) ||
         item.uniCode?.toLowerCase().includes(search) ||
         item.category?.name.toLowerCase().includes(search) ||
-        item.brand?.name.toLowerCase().includes(search),
+        item.brands?.some((b) => b.name.toLowerCase().includes(search)),
     );
   }
 
@@ -635,7 +635,7 @@ export function filterItems(
 
   // Filter by brands
   if (filters.brandIds && filters.brandIds.length > 0) {
-    filtered = filtered.filter((item) => item.brand && filters.brandIds!.includes(item.brand.id));
+    filtered = filtered.filter((item) => item.brands?.some((b) => filters.brandIds!.includes(b.id)));
   }
 
   // Filter by suppliers

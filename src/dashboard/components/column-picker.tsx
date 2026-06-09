@@ -57,6 +57,7 @@ import {
   IconGripVertical,
   IconRotateClockwise,
 } from "@tabler/icons-react";
+import { Checkbox } from "../../components/ui/checkbox";
 
 export interface ColumnDescriptor<K extends string> {
   key: K;
@@ -304,12 +305,21 @@ function SortableRow<K extends string>({
     <li
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 px-3 py-1.5 bg-card hover:bg-accent/30 ${
-        showGroupSeparator ? "border-t-2 border-t-border/70" : ""
-      } ${isVisible ? "" : "opacity-70"}`}
+      onClick={() => {
+        // The whole row toggles visibility — except the no-op case of trying to
+        // uncheck the last remaining visible column.
+        if (isVisible && !canUncheck) return;
+        onToggle();
+      }}
+      className={`flex items-center gap-2 min-h-[44px] px-3 py-1.5 bg-card hover:bg-accent/30 ${
+        isVisible && !canUncheck ? "cursor-default" : "cursor-pointer"
+      } ${showGroupSeparator ? "border-t-2 border-t-border/70" : ""} ${
+        isVisible ? "" : "opacity-70"
+      }`}
     >
       <button
         type="button"
+        onClick={(e) => e.stopPropagation()}
         className={`text-muted-foreground hover:text-foreground shrink-0 ${
           isVisible
             ? "cursor-grab active:cursor-grabbing"
@@ -320,45 +330,61 @@ function SortableRow<K extends string>({
         {...attributes}
         {...listeners}
       >
-        <IconGripVertical className="h-3.5 w-3.5" />
+        <IconGripVertical className="h-4 w-4" />
       </button>
-      <input
-        type="checkbox"
-        checked={isVisible}
-        onChange={onToggle}
-        disabled={isVisible && !canUncheck}
-        aria-label={isVisible ? `Ocultar ${label}` : `Mostrar ${label}`}
-        className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-      />
+      {/* The checkbox reflects state; the row's onClick drives the toggle.
+          Stop propagation so a direct checkbox click doesn't double-fire. */}
+      <span onClick={(e) => e.stopPropagation()} className="shrink-0 flex">
+        <Checkbox
+          checked={isVisible}
+          onCheckedChange={() => onToggle()}
+          disabled={isVisible && !canUncheck}
+          aria-label={isVisible ? `Ocultar ${label}` : `Mostrar ${label}`}
+        />
+      </span>
       {renameEnabled ? (
         <input
           type="text"
           value={overrideValue}
           onChange={(e) => onRename(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
           placeholder={label}
           aria-label={`Renomear ${label}`}
-          className="flex-1 min-w-0 h-7 px-2 text-sm rounded bg-transparent border-0 shadow-none outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 placeholder:text-muted-foreground hover:bg-accent/40 focus:bg-accent/40 transition-colors"
+          className="flex-1 min-w-0 h-8 px-2 text-sm rounded bg-transparent border-0 shadow-none outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 placeholder:text-muted-foreground hover:bg-accent/40 focus:bg-accent/40 transition-colors"
         />
       ) : (
-        <span className="flex-1 text-sm truncate">{label}</span>
+        <span className="flex-1 min-w-0 text-sm truncate">{label}</span>
       )}
-      {sortEnabled && isVisible && (
-        <SortChip
-          info={sortInfo}
-          capReached={sortCapReached}
-          label={label}
-          onClick={onSortChipClick}
-        />
+      {/* Reserve the sort-chip slot at a fixed width even when the chip is
+          hidden, so every row is the same height and the label column lines up
+          across visible AND hidden rows (no width/height jump). */}
+      {sortEnabled && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 w-[5.5rem] flex justify-end"
+        >
+          {isVisible && (
+            <SortChip
+              info={sortInfo}
+              capReached={sortCapReached}
+              label={label}
+              onClick={onSortChipClick}
+            />
+          )}
+        </div>
       )}
       {renameEnabled && (
         <button
           type="button"
-          onClick={() => onRename("")}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRename("");
+          }}
           disabled={!hasOverride}
           aria-label={`Restaurar nome padrão de ${label}`}
           className="shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          <IconRotateClockwise className="h-3.5 w-3.5" />
+          <IconRotateClockwise className="h-4 w-4" />
         </button>
       )}
     </li>

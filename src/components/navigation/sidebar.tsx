@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
-import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/contexts/sidebar-context";
@@ -17,6 +16,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationCenter } from "@/components/notification-center";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
+import { SidebarFlyout, useFlyoutController } from "./sidebar-flyout";
 
 import {
   IconDashboard,
@@ -282,19 +282,17 @@ export const Sidebar = memo(() => {
   const [expandedMenus, setExpandedMenus] = useState<{ [key: string]: boolean }>({});
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [navigatingItemId, setNavigatingItemId] = useState<string | null>(null);
-  const [_hoveredItemId, setHoveredItemId] = useState<string | null>(null);
-  const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number; item: any } | null>(null);
-  const [isPopoverAnimating, setIsPopoverAnimating] = useState(false);
   const [showFavorites, setShowFavorites] = useState(() => {
     const stored = localStorage.getItem("ankaa-sidebar-show-favorites");
     return stored !== null ? stored === "true" : true;
   });
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: any } | null>(null);
 
+  // Collapsed-sidebar cascading hover flyout (handles full menu hierarchy).
+  const flyout = useFlyoutController();
+
   // Refs
-  const timeoutRef = useRef<number | null>(null);
   const navigationTimeoutRef = useRef<number | null>(null);
-  const mouseInPopover = useRef(false);
   const navigationSourceRef = useRef<"menu" | "favorite" | null>(null);
 
   // Clear navigation timeout
@@ -751,93 +749,32 @@ export const Sidebar = memo(() => {
 
   // Context menu positioning is now handled by PositionedDropdownMenuContent
 
-  // Handle popover mouse events
-  const handleMouseEnter = useCallback(
-    (itemId: string, item: any, element: HTMLElement) => {
-      if (isOpen) return; // Don't show popover when sidebar is expanded
-
-      // Clear any existing timeout
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
+  // Navigation + context-menu handlers shared with the collapsed flyout.
+  const handleFlyoutNavigate = useCallback(
+    (item: any, e: React.MouseEvent, opts?: { fromFavorite?: boolean }) => {
+      if (!item?.path) return;
+      const shouldOpenInNewTab = e.ctrlKey || e.metaKey || e.button === 1;
+      if (shouldOpenInNewTab) {
+        e.preventDefault();
+        window.open(fixNavigationPath(item.path), "_blank");
+        return;
       }
-
-      // Reset popover mouse state
-      mouseInPopover.current = false;
-
-      const rect = element.getBoundingClientRect();
-      setHoveredItemId(itemId);
-
-      // Calculate initial position
-      let top = rect.top;
-
-      // Add viewport boundary checking for popover
-      const minPadding = 8;
-      const viewport = {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      };
-
-      // Sidebar is on the right side - position popover to the left of the sidebar
-      // Items with children have min-w-[200px], items without are smaller (just the title)
-      const hasChildren = item.children && item.children.length > 0;
-      const childCount = item.children?.length || 0;
-      const estimatedPopoverWidth = hasChildren || item.id === "favorites" ? 200 : 80;
-
-      // Estimate height based on number of children (each item ~40px + header ~40px + padding)
-      const dynamicPopoverHeight = hasChildren ? Math.min(40 + childCount * 40 + 16, 400) : 50;
-
-      // Position popover to the left of the sidebar (sidebar is 64px wide when minimized)
-      // Use viewport width - 64px - 8px gap - popover width
-      const sidebarWidth = 64;
-      let left = viewport.width - sidebarWidth - 8 - estimatedPopoverWidth;
-
-      // Ensure left doesn't go negative
-      if (left < minPadding) {
-        left = minPadding;
-      }
-
-      // Adjust if popover would go off the bottom edge
-      if (top + dynamicPopoverHeight > viewport.height - minPadding) {
-        top = Math.max(minPadding, viewport.height - dynamicPopoverHeight - minPadding);
-      }
-
-      // Ensure minimum padding from top edge
-      top = Math.max(minPadding, top);
-
-      setPopoverPosition({
-        top,
-        left,
-        item,
-      });
-
-      // Small delay before showing animation
-      setTimeout(() => {
-        setIsPopoverAnimating(true);
-      }, 50);
+      navigationSourceRef.current = opts?.fromFavorite ? "favorite" : "menu";
+      startNavigation(item.id || item.path, fixNavigationPath(item.path), !!opts?.fromFavorite);
+      flyout.close();
     },
-    [isOpen],
+    [startNavigation, flyout],
   );
 
-  const handleMouseLeave = useCallback(() => {
-    // Set a timeout to hide the popover
-    timeoutRef.current = window.setTimeout(() => {
-      if (!mouseInPopover.current) {
-        setIsPopoverAnimating(false);
-        setTimeout(() => {
-          setHoveredItemId(null);
-          setPopoverPosition(null);
-        }, 200);
-      }
-    }, 150);
+  const handleFlyoutContextMenu = useCallback((item: any, e: React.MouseEvent) => {
+    if (!item?.path) return;
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, item });
   }, []);
 
-  // Cleanup on unmount
+  // Cleanup navigation timeout on unmount (flyout timers self-clean).
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
       }
@@ -864,35 +801,16 @@ export const Sidebar = memo(() => {
 
       e.preventDefault();
 
-      // When sidebar is minimized and item has children, show/keep popover open on click
+      // When minimized: clicking opens the flyout immediately if the item is a
+      // pure container; if it also has its own page, navigate there.
       if (!isOpen && hasChildren) {
-        // Clear any existing timeout
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
+        if (!item.path) {
+          flyout.open(item, e.currentTarget as HTMLElement);
+          return;
         }
-
-        const element = e.currentTarget as HTMLElement;
-        const rect = element.getBoundingClientRect();
-
-        // Calculate position for popover
-        const estimatedPopoverWidth = 200;
-        const estimatedPopoverHeight = 400;
-        const minPadding = 8;
-        let top = rect.top;
-        let left = rect.left - estimatedPopoverWidth - 8;
-
-        // Adjust if popover would go off the bottom edge
-        if (top + estimatedPopoverHeight > window.innerHeight - minPadding) {
-          top = Math.max(minPadding, window.innerHeight - estimatedPopoverHeight - minPadding);
-        }
-        top = Math.max(minPadding, top);
-
-        // Set popover state directly
-        setHoveredItemId(item.id);
-        setPopoverPosition({ top, left, item });
-        setIsPopoverAnimating(true);
-        mouseInPopover.current = true;
+        navigationSourceRef.current = "menu";
+        startNavigation(item.id, fixNavigationPath(item.path));
+        flyout.close();
         return;
       }
 
@@ -939,8 +857,8 @@ export const Sidebar = memo(() => {
           )}
           onClick={handleItemClick}
           onContextMenu={handleContextMenu}
-          onMouseEnter={(e) => handleMouseEnter(item.id, item, e.currentTarget)}
-          onMouseLeave={handleMouseLeave}
+          onMouseEnter={(e) => !isOpen && flyout.open(item, e.currentTarget)}
+          onMouseLeave={() => !isOpen && flyout.scheduleClose()}
         >
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className={cn("w-5 flex-shrink-0", !isOpen && "w-full flex justify-center")}>
@@ -967,125 +885,6 @@ export const Sidebar = memo(() => {
     );
   };
 
-  // Popover Portal
-  const PopoverPortal = () => {
-    if (!popoverPosition || isOpen) return null;
-
-    const { item, top, left } = popoverPosition;
-    const hasChildren = item.children && item.children.length > 0;
-
-    return createPortal(
-      <div
-        style={{
-          position: "fixed",
-          top,
-          left,
-          zIndex: 9999,
-          opacity: isPopoverAnimating ? 1 : 0,
-          transform: isPopoverAnimating ? "translateX(0)" : "translateX(8px)",
-          transition: "opacity 200ms, transform 200ms",
-          pointerEvents: isPopoverAnimating ? "auto" : "none",
-        }}
-        onMouseEnter={() => {
-          mouseInPopover.current = true;
-        }}
-        onMouseLeave={() => {
-          mouseInPopover.current = false;
-          handleMouseLeave();
-        }}
-      >
-        <div className={cn("bg-card border border-border rounded-lg shadow-sm p-2", hasChildren || item.id === "favorites" ? "min-w-[200px]" : "px-3 py-2")}>
-          {item.id === "favorites" ? (
-            <div className="space-y-1">
-              <button
-                onClick={() => {
-                  startNavigation("favorites", routes.favorites);
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setContextMenu({ x: e.clientX, y: e.clientY, item: { path: routes.favorites, title: "Favoritos" } });
-                }}
-                className={cn(
-                  "w-full px-3 py-2 text-sm font-medium border-b border-border truncate flex items-center gap-2 rounded-md transition-colors",
-                  location.pathname === routes.favorites ? "bg-primary text-primary-foreground" : "hover:bg-muted",
-                )}
-              >
-                <IconStarFilled size={16} className="text-yellow-500" />
-                <span>Favoritos</span>
-              </button>
-              {favorites.length > 0 && (
-                <div className="space-y-1">
-                  {favorites.map((fav: any) => (
-                    <button
-                      key={fav.id}
-                      onClick={(e) => {
-                        const shouldOpenInNewTab = e.ctrlKey || e.metaKey || e.button === 1;
-                        if (shouldOpenInNewTab) {
-                          e.preventDefault();
-                          window.open(fav.path, '_blank');
-                        } else {
-                          startNavigation(fav.id, fav.path, true);
-                        }
-                      }}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setContextMenu({ x: e.clientX, y: e.clientY, item: fav });
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
-                        location.pathname === fav.path ? "bg-primary text-primary-foreground" : "hover:bg-muted",
-                      )}
-                    >
-                      <div className="w-5">{renderFavoriteIcon(fav)}</div>
-                      <span className="truncate">{fav.entityName ? `${fav.title} - ${fav.entityName}` : fav.title}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : hasChildren ? (
-            <div className="space-y-1">
-              <div className="px-3 py-2 text-sm font-medium border-b border-border truncate">{item.title}</div>
-              {item.children.map((child: any) => (
-                <button
-                  key={child.id || child.path}
-                  onClick={(e) => {
-                    if (child.path) {
-                      const shouldOpenInNewTab = e.ctrlKey || e.metaKey || e.button === 1;
-                      if (shouldOpenInNewTab) {
-                        e.preventDefault();
-                        window.open(fixNavigationPath(child.path), '_blank');
-                      } else {
-                        navigationSourceRef.current = "menu";
-                        startNavigation(child.id, fixNavigationPath(child.path));
-                      }
-                    }
-                  }}
-                  onContextMenu={(e) => {
-                    if (child.path) {
-                      e.preventDefault();
-                      setContextMenu({ x: e.clientX, y: e.clientY, item: child });
-                    }
-                  }}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
-                    isItemActive(child) ? "bg-primary text-primary-foreground" : "hover:bg-muted",
-                  )}
-                >
-                  <div className="w-4">{getIconComponent(child.icon, 16)}</div>
-                  <span className="truncate">{child.title}</span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-sm font-medium whitespace-nowrap truncate">{item.title}</div>
-          )}
-        </div>
-      </div>,
-      document.body,
-    );
-  };
-
   return (
     <>
       <aside className={cn("flex flex-col bg-card border-r border-border transition-all duration-300 relative", isOpen ? "w-72" : "w-16")}>
@@ -1098,8 +897,6 @@ export const Sidebar = memo(() => {
               <div
                 className={cn("flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors flex-1 min-w-0", "hover:bg-muted/50 transition-colors")}
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                onMouseEnter={() => setHoveredItemId("user-menu")}
-                onMouseLeave={() => setHoveredItemId(null)}
               >
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-white font-bold text-lg">{user?.name?.charAt(0)?.toUpperCase() || "U"}</span>
@@ -1127,8 +924,6 @@ export const Sidebar = memo(() => {
                   showUserMenu && "scale-110 shadow-sm",
                 )}
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                onMouseEnter={() => setHoveredItemId("user-menu")}
-                onMouseLeave={() => setHoveredItemId(null)}
               >
                 <span className="text-white font-bold text-lg">{user?.name?.charAt(0)?.toUpperCase() || "U"}</span>
               </div>
@@ -1203,8 +998,8 @@ export const Sidebar = memo(() => {
                     e.preventDefault();
                     setContextMenu({ x: e.clientX, y: e.clientY, item: { path: routes.favorites, title: "Favoritos" } });
                   }}
-                  onMouseEnter={(e) => !isOpen && handleMouseEnter("favorites", { id: "favorites", title: "Favoritos", children: favorites }, e.currentTarget)}
-                  onMouseLeave={handleMouseLeave}
+                  onMouseEnter={(e) => !isOpen && flyout.open({ id: "favorites", title: "Favoritos", path: routes.favorites, children: favorites }, e.currentTarget, true)}
+                  onMouseLeave={() => !isOpen && flyout.scheduleClose()}
                 >
                   <div className={cn("w-5 flex-shrink-0", !isOpen && "w-full flex justify-center")}>
                     <IconStarFilled size={20} className="text-yellow-500" />
@@ -1273,7 +1068,18 @@ export const Sidebar = memo(() => {
         </nav>
       </aside>
 
-      <PopoverPortal />
+      {flyout.state && !isOpen && (
+        <SidebarFlyout
+          state={flyout.state}
+          isItemActive={isItemActive}
+          getIcon={getIconComponent}
+          renderFavoriteIcon={renderFavoriteIcon}
+          onNavigate={handleFlyoutNavigate}
+          onContextMenu={handleFlyoutContextMenu}
+          cancelClose={flyout.cancelClose}
+          scheduleClose={flyout.scheduleClose}
+        />
+      )}
 
       {/* Navigation Context Menu */}
       <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>

@@ -49,7 +49,7 @@ export const supplierIncludeSchema = z
         z.object({
           include: z
             .object({
-              brand: z.boolean().optional(),
+              brands: z.boolean().optional(),
               category: z.boolean().optional(),
               supplier: z.boolean().optional(),
               price: z.boolean().optional(),

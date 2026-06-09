@@ -16,7 +16,6 @@ export interface NotificationConfiguration extends BaseEntity {
   description?: string | null;
   enabled: boolean;
   importance: NOTIFICATION_IMPORTANCE;
-  workHoursOnly: boolean;
   batchingEnabled: boolean;
   maxFrequencyPerDay?: number | null;
   deduplicationWindow?: number | null;
@@ -49,7 +48,6 @@ export interface NotificationSectorOverride extends BaseEntity {
 export interface NotificationTargetRule extends BaseEntity {
   configurationId: string;
   allowedSectors: SECTOR_PRIVILEGES[];
-  excludeInactive: boolean;
   excludeOnVacation: boolean;
   customFilter?: string | null;
 }
@@ -95,7 +93,6 @@ export interface CreateNotificationConfigurationDto {
   description?: string;
   enabled?: boolean;
   importance?: NOTIFICATION_IMPORTANCE;
-  workHoursOnly?: boolean;
   batchingEnabled?: boolean;
   maxFrequencyPerDay?: number;
   deduplicationWindow?: number;
@@ -110,7 +107,6 @@ export interface CreateNotificationConfigurationDto {
   }>;
   targetRules?: {
     allowedSectors?: SECTOR_PRIVILEGES[];
-    excludeInactive?: boolean;
     excludeOnVacation?: boolean;
     customFilter?: string;
   };
@@ -124,7 +120,6 @@ export interface UpdateNotificationConfigurationDto {
   description?: string;
   enabled?: boolean;
   importance?: NOTIFICATION_IMPORTANCE;
-  workHoursOnly?: boolean;
   batchingEnabled?: boolean;
   maxFrequencyPerDay?: number;
   deduplicationWindow?: number;
@@ -132,7 +127,6 @@ export interface UpdateNotificationConfigurationDto {
   metadata?: Record<string, unknown>;
   targetRule?: {
     allowedSectors?: string[];
-    excludeInactive?: boolean;
     excludeOnVacation?: boolean;
   };
 }
@@ -178,9 +172,10 @@ export interface UpdateUserPreferenceDto {
 // =====================
 
 export interface NotificationConfigurationQueryParams {
-  notificationType?: NOTIFICATION_TYPE;
-  enabled?: boolean;
-  importance?: NOTIFICATION_IMPORTANCE;
+  notificationType?: NOTIFICATION_TYPE[];
+  enabled?: boolean[];
+  importance?: NOTIFICATION_IMPORTANCE[];
+  allowedSectors?: SECTOR_PRIVILEGES[];
   search?: string;
   page?: number;
   limit?: number;

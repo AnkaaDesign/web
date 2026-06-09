@@ -34,7 +34,7 @@ interface BaseItemFormProps {
   onDirtyChange?: (isDirty: boolean) => void;
   onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
   initialSupplier?: Supplier;
-  initialBrand?: ItemBrand;
+  initialBrands?: ItemBrand[];
   initialCategory?: ItemCategory;
 }
 
@@ -53,7 +53,7 @@ interface UpdateItemFormProps extends BaseItemFormProps {
 type ItemFormProps = CreateItemFormProps | UpdateItemFormProps;
 
 export function ItemForm(props: ItemFormProps) {
-  const { isSubmitting, defaultValues, mode, onFormStateChange, onDirtyChange, initialSupplier, initialBrand, initialCategory } = props;
+  const { isSubmitting, defaultValues, mode, onFormStateChange, onDirtyChange, initialSupplier, initialBrands, initialCategory } = props;
   const [searchParams, setSearchParams] = useSearchParams();
   const canViewPrices = useCanViewPrices();
 
@@ -76,7 +76,7 @@ export function ItemForm(props: ItemFormProps) {
     shouldAssignToUser: defaultValues?.shouldAssignToUser ?? true,
     abcCategory: defaultValues?.abcCategory ?? null,
     xyzCategory: defaultValues?.xyzCategory ?? null,
-    brandId: defaultValues?.brandId ?? undefined,
+    brandIds: defaultValues?.brandIds ?? [],
     categoryId: defaultValues?.categoryId ?? undefined,
     supplierId: defaultValues?.supplierId ?? null,
     estimatedLeadTime: defaultValues?.estimatedLeadTime ?? 30,
@@ -171,6 +171,7 @@ export function ItemForm(props: ItemFormProps) {
         const cleanValues = {
           ...values,
           barcodes: values.barcodes?.filter((barcode): barcode is string => barcode !== undefined),
+          brandIds: values.brandIds?.filter((brandId): brandId is string => brandId !== undefined),
           measures: values.measures?.filter(
             (measure): measure is { measureType: string; value?: number | null; unit?: string | null } =>
               measure !== undefined && measure.measureType !== undefined && typeof measure.measureType === "string",
@@ -296,7 +297,7 @@ export function ItemForm(props: ItemFormProps) {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <CategorySelector disabled={isSubmitting} onCategoryChange={setSelectedCategoryId} initialCategory={initialCategory} />
-                  <ItemBrandSelector disabled={isSubmitting} initialBrand={initialBrand} />
+                  <ItemBrandSelector disabled={isSubmitting} initialBrands={initialBrands} />
                 </div>
                 <ItemSupplierSelector disabled={isSubmitting} initialSupplier={initialSupplier} />
               </div>

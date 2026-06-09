@@ -28,7 +28,7 @@ import { PpeConfigSection } from "@/components/inventory/item/form/ppe-config-se
 interface BaseEpiFormProps {
   isSubmitting?: boolean;
   initialSupplier?: Supplier;
-  initialBrand?: ItemBrand;
+  initialBrands?: ItemBrand[];
   initialCategory?: ItemCategory;
 }
 
@@ -47,7 +47,7 @@ interface UpdateEpiFormProps extends BaseEpiFormProps {
 type EpiFormProps = CreateEpiFormProps | UpdateEpiFormProps;
 
 export function EpiForm(props: EpiFormProps) {
-  const { isSubmitting, defaultValues, mode, initialSupplier, initialBrand, initialCategory: _initialCategory } = props;
+  const { isSubmitting, defaultValues, mode, initialSupplier, initialBrands, initialCategory: _initialCategory } = props;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>();
@@ -85,7 +85,7 @@ export function EpiForm(props: EpiFormProps) {
     shouldAssignToUser: true,
     abcCategory: null,
     xyzCategory: null,
-    brandId: undefined,
+    brandIds: [],
     categoryId: selectedCategoryId || epiCategories?.data?.[0]?.id,
     supplierId: null,
     estimatedLeadTime: 30,
@@ -226,7 +226,7 @@ export function EpiForm(props: EpiFormProps) {
                   <NameInput disabled={isSubmitting} required={isRequired} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <ItemBrandSelector disabled={isSubmitting} initialBrand={initialBrand} />
+                  <ItemBrandSelector disabled={isSubmitting} initialBrands={initialBrands} />
                   <ItemSupplierSelector disabled={isSubmitting} initialSupplier={initialSupplier} />
                 </div>
               </CardContent>

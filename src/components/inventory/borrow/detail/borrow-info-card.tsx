@@ -41,13 +41,13 @@ export function BorrowInfoCard({ borrow, className }: BorrowInfoCardProps) {
                     {borrow.item.uniCode ? `${borrow.item.uniCode} - ${borrow.item.name}` : borrow.item.name}
                   </span>
                 </div>
-                {borrow.item.brand && (
+                {borrow.item.brands && borrow.item.brands.length > 0 && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <IconTag className="h-4 w-4" />
-                      Marca
+                      Marcas
                     </span>
-                    <span className="text-sm font-semibold text-foreground">{borrow.item.brand.name}</span>
+                    <span className="text-sm font-semibold text-foreground">{borrow.item.brands.map((b) => b.name).join(", ")}</span>
                   </div>
                 )}
                 {borrow.item.category && (

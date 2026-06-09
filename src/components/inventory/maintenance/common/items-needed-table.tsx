@@ -53,7 +53,7 @@ export function ItemsNeededTable({ itemsConfig, visibleColumns, className, filte
   // Memoize include configuration
   const includeConfig = React.useMemo(
     () => ({
-      brand: true,
+      brands: true,
       category: true,
       measures: true,
       prices: {
@@ -73,7 +73,7 @@ export function ItemsNeededTable({ itemsConfig, visibleColumns, className, filte
           OR: [
             { name: { contains: filters.searchingFor, mode: "insensitive" } },
             { uniCode: { contains: filters.searchingFor, mode: "insensitive" } },
-            { brand: { is: { name: { contains: filters.searchingFor, mode: "insensitive" } } } },
+            { brands: { some: { name: { contains: filters.searchingFor, mode: "insensitive" } } } },
             { category: { is: { name: { contains: filters.searchingFor, mode: "insensitive" } } } },
           ],
         }),

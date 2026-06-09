@@ -1,10 +1,11 @@
 // packages/hooks/src/useOrder.ts
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   // Order functions
   getOrders,
   getOrder,
+  getNextOrderNumber,
   createOrder,
   updateOrder,
   deleteOrder,
@@ -103,6 +104,18 @@ const baseOrderHooks = createEntityHooks<
 export const useOrdersInfinite = baseOrderHooks.useInfiniteList;
 export const useOrders = baseOrderHooks.useList;
 export const useOrder = baseOrderHooks.useDetail;
+
+/**
+ * Predicted next order number (highest saved + 1), for previewing the order code in
+ * the create form's PDF before saving. staleTime 0 so it reflects the latest order.
+ */
+export const useNextOrderNumber = (options?: { enabled?: boolean }) =>
+  useQuery({
+    queryKey: [...orderKeys.all, "next-number"] as const,
+    queryFn: getNextOrderNumber,
+    staleTime: 0,
+    enabled: options?.enabled ?? true,
+  });
 
 // =====================================================
 // Specialized Order Query Hooks

@@ -97,7 +97,7 @@ export function PpeScheduleTable({ visibleColumns, className, scheduleRoutes, on
     include: {
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
       },

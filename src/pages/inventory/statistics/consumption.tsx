@@ -357,13 +357,13 @@ function ConsumptionFiltersSheet({
       page,
       limit: COMBOBOX_PAGE_SIZE,
       orderBy: { name: 'asc' },
-      include: { brand: true, category: true },
+      include: { brands: true, category: true },
     });
     return {
       data: (res.data || []).map(i => ({
         value: i.id,
         label: i.uniCode ? `${i.name} (${i.uniCode})` : i.name,
-        description: i.brand?.name || i.category?.name,
+        description: i.brands?.map((b) => b.name).join(", ") || i.category?.name,
       })),
       hasMore: res.meta?.hasNextPage ?? false,
     };

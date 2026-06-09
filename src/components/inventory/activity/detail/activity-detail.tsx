@@ -21,7 +21,7 @@ const ActivityDetail = () => {
     include: {
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
           supplier: true,
           prices: {

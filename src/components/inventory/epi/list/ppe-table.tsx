@@ -89,7 +89,7 @@ export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeac
     limit: pageSize,
     orderBy: convertSortConfigsToOrderBy(sortConfigs),
     include: {
-      brand: true,
+      brands: true,
       category: true,
       measures: true,
       prices: {

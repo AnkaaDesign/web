@@ -59,8 +59,8 @@ export const createPpeDeliveryColumns = (): PpeDeliveryColumn[] => [
   {
     key: "item.brand.name",
     header: "MARCA",
-    accessor: (delivery: PpeDelivery) => <div className="truncate">{delivery.item?.brand?.name || "-"}</div>,
-    sortable: true,
+    accessor: (delivery: PpeDelivery) => <div className="truncate">{delivery.item?.brands?.map((b) => b.name).join(", ") || "-"}</div>,
+    sortable: false,
     className: "w-32",
     align: "left",
   },

@@ -9,6 +9,7 @@
 // are intentionally co-located so adding a new column means touching one file.
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import {
@@ -2530,19 +2531,7 @@ function TaskTableConfigComponent({
   return (
     <div className="space-y-3">
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        {/* Sticky header: Título input + outer tabs strip stay pinned at top.
-         * Uses bg-card to blend with the modal's DialogContent background so
-         * there's no visible color step underneath the sticky bar. */}
-        <div className="sticky top-0 z-20 bg-card -mx-1 px-1 pt-2 pb-3 space-y-3 border-b border-border mb-2">
-          {/* Title row */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Título</Label>
-            <Input
-              value={c.title}
-              onChange={(v) => set("title", typeof v === "string" ? v : "")}
-              placeholder="Tarefas"
-            />
-          </div>
+        <WidgetTabsBar>
           <TabsList className="self-start bg-muted/50 h-9">
             <TabsTrigger value="appearance" className="gap-1 px-3">
               <IconAdjustments className="h-3.5 w-3.5" /> Aparência
@@ -2560,11 +2549,11 @@ function TaskTableConfigComponent({
               <IconLayout className="h-3.5 w-3.5" /> Comportamento
             </TabsTrigger>
           </TabsList>
-        </div>
+        </WidgetTabsBar>
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor e ícone)" defaultOpen>
+          <Section title="Destaque (cor e ícone)" defaultOpen>
             <AccentPicker
               value={{
                 color: currentAccentColor,
@@ -2590,28 +2579,18 @@ function TaskTableConfigComponent({
                 value={c.display.density}
                 onChange={(d) => setDisplay("density", d)}
               />
-              <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
                 <ToggleRow
                   label="Linhas divisórias"
                   checked={c.display.gridLines}
                   onCheckedChange={(v) => setDisplay("gridLines", v)}
-                />
-                <ToggleRow
-                  label="Cabeçalho fixo"
-                  checked={c.display.stickyHeader}
-                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-                />
-                <ToggleRow
-                  label="Caixa de busca"
-                  checked={c.display.showSearchBox}
-                  onCheckedChange={(v) => setDisplay("showSearchBox", v)}
                 />
               </div>
             </div>
           </Section>
           <Section title="Renderização das células">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <Label className="text-xs">Ordens de Serviço</Label>
                 <Combobox
                   mode="single"
@@ -2628,7 +2607,7 @@ function TaskTableConfigComponent({
                   clearable={false}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <Label className="text-xs">Pintura</Label>
                 <Combobox
                   mode="single"
@@ -2648,7 +2627,7 @@ function TaskTableConfigComponent({
                   clearable={false}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <Label className="text-xs">Status</Label>
                 <Combobox
                   mode="single"
@@ -2671,21 +2650,31 @@ function TaskTableConfigComponent({
             </div>
           </Section>
           <Section title="Cabeçalho e link">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="space-y-1">
               <ToggleRow
                 label="Exibir cabeçalho"
                 checked={c.showHeader}
                 onCheckedChange={(v) => set("showHeader", v)}
               />
               <ToggleRow
-                label='Exibir "Ver todos"'
-                checked={c.display.showViewAllLink}
-                onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
+                label="Cabeçalho fixo"
+                checked={c.display.stickyHeader}
+                onCheckedChange={(v) => setDisplay("stickyHeader", v)}
               />
               <ToggleRow
                 label="Exibir contagem"
                 checked={c.display.showCount}
                 onCheckedChange={(v) => setDisplay("showCount", v)}
+              />
+              <ToggleRow
+                label="Caixa de busca"
+                checked={c.display.showSearchBox}
+                onCheckedChange={(v) => setDisplay("showSearchBox", v)}
+              />
+              <ToggleRow
+                label='Exibir "Ver todos"'
+                checked={c.display.showViewAllLink}
+                onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
               />
             </div>
           </Section>
@@ -2751,7 +2740,7 @@ function TaskTableConfigComponent({
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Status</Label>
             <Combobox
               mode="multiple"
@@ -2762,7 +2751,7 @@ function TaskTableConfigComponent({
               searchPlaceholder="Buscar status..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Setores</Label>
             <Combobox
               mode="multiple"
@@ -2773,7 +2762,7 @@ function TaskTableConfigComponent({
               searchPlaceholder="Buscar setor..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Clientes</Label>
             <Combobox
               mode="multiple"
@@ -2784,7 +2773,7 @@ function TaskTableConfigComponent({
               searchPlaceholder="Buscar cliente..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Termo de busca padrão</Label>
             <Input
               value={c.filters.defaultSearch}
@@ -2797,7 +2786,7 @@ function TaskTableConfigComponent({
               Aplicado sempre. A caixa de busca em tempo real (se ativada) prevalece.
             </p>
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Categoria do caminhão</Label>
             <Combobox
               mode="multiple"
@@ -2810,7 +2799,7 @@ function TaskTableConfigComponent({
               searchPlaceholder="Buscar categoria..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Tipo de implemento</Label>
             <Combobox
               mode="multiple"
@@ -2823,7 +2812,7 @@ function TaskTableConfigComponent({
               searchPlaceholder="Buscar implemento..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Comissão</Label>
             <Combobox
               mode="multiple"
@@ -2836,7 +2825,7 @@ function TaskTableConfigComponent({
               searchPlaceholder="Buscar..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Status do orçamento</Label>
             <Combobox
               mode="multiple"
@@ -2849,7 +2838,7 @@ function TaskTableConfigComponent({
               searchPlaceholder="Buscar status do orçamento..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Tipos de Ordem de Serviço</Label>
             <Combobox
               mode="multiple"
@@ -2862,7 +2851,7 @@ function TaskTableConfigComponent({
               searchPlaceholder="Buscar tipo..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Tem orçamento</Label>
             <Combobox
               mode="single"
@@ -2879,7 +2868,7 @@ function TaskTableConfigComponent({
               clearable={false}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Prazo</Label>
             <Combobox
               mode="single"
@@ -2899,7 +2888,7 @@ function TaskTableConfigComponent({
               clearable={false}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Previsão</Label>
             <Combobox
               mode="single"
@@ -2919,7 +2908,7 @@ function TaskTableConfigComponent({
               clearable={false}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Conclusão</Label>
             <Combobox
               mode="single"
@@ -2939,7 +2928,7 @@ function TaskTableConfigComponent({
               clearable={false}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Criação</Label>
             <Combobox
               mode="single"
@@ -2959,7 +2948,7 @@ function TaskTableConfigComponent({
               clearable={false}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Atrasada</Label>
             <Combobox
               mode="single"
@@ -2976,7 +2965,7 @@ function TaskTableConfigComponent({
               clearable={false}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Tem Ordem de Serviço aberta</Label>
             <Combobox
               mode="single"
@@ -2993,7 +2982,7 @@ function TaskTableConfigComponent({
               clearable={false}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Tem artes</Label>
             <Combobox
               mode="single"
@@ -3010,7 +2999,7 @@ function TaskTableConfigComponent({
               clearable={false}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Tem observações</Label>
             <Combobox
               mode="single"
@@ -3029,7 +3018,6 @@ function TaskTableConfigComponent({
           </div>
         </TabsContent>
 
-        {/* ---- SORT ---- */}
         {/* ---- COLORS ---- */}
         <TabsContent value="colors" className="space-y-3 mt-0">
           <Section title="Geral" defaultOpen>
@@ -3047,7 +3035,7 @@ function TaskTableConfigComponent({
           </Section>
           <Section title="Previsão (em dias)" defaultOpen>
             <div className="grid grid-cols-3 gap-2">
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs">Crítico ≤</Label>
                 <Input
                   type="number"
@@ -3058,7 +3046,7 @@ function TaskTableConfigComponent({
                   }}
                 />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs">Atenção ≤</Label>
                 <Input
                   type="number"
@@ -3069,7 +3057,7 @@ function TaskTableConfigComponent({
                   }}
                 />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs">Aviso ≤</Label>
                 <Input
                   type="number"
@@ -3081,21 +3069,21 @@ function TaskTableConfigComponent({
                 />
               </div>
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Cor crítico</Label>
               <ColorTokenPicker
                 value={c.deadlineColors.forecastCriticalColor}
                 onChange={(v) => setDeadline("forecastCriticalColor", v)}
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Cor atenção</Label>
               <ColorTokenPicker
                 value={c.deadlineColors.forecastWarningColor}
                 onChange={(v) => setDeadline("forecastWarningColor", v)}
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Cor aviso</Label>
               <ColorTokenPicker
                 value={c.deadlineColors.forecastNoticeColor}
@@ -3104,14 +3092,14 @@ function TaskTableConfigComponent({
             </div>
           </Section>
           <Section title="Prazo (em horas)" defaultOpen>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Cor vencido</Label>
               <ColorTokenPicker
                 value={c.deadlineColors.termOverdueColor}
                 onChange={(v) => setDeadline("termOverdueColor", v)}
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Crítico ≤ (horas)</Label>
               <Input
                 type="number"
@@ -3122,14 +3110,14 @@ function TaskTableConfigComponent({
                 }}
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Cor crítico</Label>
               <ColorTokenPicker
                 value={c.deadlineColors.termCriticalColor}
                 onChange={(v) => setDeadline("termCriticalColor", v)}
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Cor no prazo</Label>
               <ColorTokenPicker
                 value={c.deadlineColors.termOnTrackColor}
@@ -3142,7 +3130,7 @@ function TaskTableConfigComponent({
         {/* ---- BEHAVIOR ---- */}
         <TabsContent value="behavior" className="space-y-3 mt-0">
           <Section title="Layout" defaultOpen>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Modo de exibição</Label>
               <Combobox
                 mode="single"
@@ -3165,7 +3153,7 @@ function TaskTableConfigComponent({
             </div>
           </Section>
           <Section title="Atualização automática" defaultOpen>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Intervalo de refetch</Label>
               <Combobox
                 mode="single"
@@ -3183,7 +3171,7 @@ function TaskTableConfigComponent({
             </div>
           </Section>
           <Section title="Navegação">
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Destino ao clicar na linha</Label>
               <Combobox
                 mode="single"
@@ -3211,7 +3199,7 @@ function TaskTableConfigComponent({
                 criar tabelas dedicadas a orçamentos ou faturamento.
               </p>
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Sobrescrever rota "Ver todos"</Label>
               <Input
                 value={c.behavior.viewAllRouteOverride}

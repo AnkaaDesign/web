@@ -2,6 +2,7 @@
 // it works across refreshes without bloating Preferences with arbitrary text.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import { IconAdjustments, IconNotebook } from "@tabler/icons-react";
 import { WidgetCard } from "../components/widget-card";
@@ -12,8 +13,6 @@ import type {
   WidgetAccentIcon,
   WidgetAccentShade,
 } from "../components/widget-accent";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
 import {
   Tabs,
   TabsContent,
@@ -160,26 +159,15 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
   const accentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
   return (
     <div className="space-y-4">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={c.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Anotações"
-        />
-        <p className="text-[10px] text-muted-foreground">
-          A cor escolhida abaixo será aplicada ao título.
-        </p>
-      </div>
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
+        <WidgetTabsBar><TabsList className="self-start">
           <TabsTrigger value="appearance" className="gap-1">
             <IconAdjustments className="h-3.5 w-3.5" /> Aparência
           </TabsTrigger>
-        </TabsList>
+        </TabsList></WidgetTabsBar>
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Acento (cor e ícone)" defaultOpen>
+            <Section title="Destaque (cor e ícone)" defaultOpen>
               <AccentPicker
                 value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
                 onChange={(next) =>

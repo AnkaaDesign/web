@@ -59,7 +59,7 @@ const ExternalWithdrawalDetailsPage = () => {
           item: {
             include: {
               category: true,
-              brand: true,
+              brands: true,
               supplier: true,
               prices: { orderBy: { createdAt: "desc" }, take: 1 },
             },

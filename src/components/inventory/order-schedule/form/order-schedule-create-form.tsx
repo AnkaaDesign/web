@@ -13,10 +13,12 @@ import {
   IconEye,
   IconFileText,
   IconNotes,
+  IconTruck,
 } from "@tabler/icons-react";
 import type { OrderScheduleCreateFormData } from "../../../../schemas";
 import { orderScheduleCreateSchema } from "../../../../schemas";
-import { useOrderScheduleMutations } from "../../../../hooks";
+import { useOrderScheduleMutations, useSuppliers } from "../../../../hooks";
+import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 import { routes, FAVORITE_PAGES, SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, WEEK_DAY_LABELS, MONTH_LABELS, MONTH_OCCURRENCE_LABELS, WEEK_DAY, MONTH } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -64,6 +66,14 @@ export const OrderScheduleCreateForm = () => {
     mode: "onTouched",
     reValidateMode: "onChange",
   });
+
+  // Suppliers for the optional target-supplier selector (propagated to generated orders).
+  const { data: suppliersResponse } = useSuppliers({
+    orderBy: { fantasyName: "asc" },
+    take: 100,
+    include: { logo: true },
+  });
+  const suppliers = suppliersResponse?.data || [];
 
   // Item selection state for ItemSelectorTable (uses Set<string>)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -443,6 +453,54 @@ export const OrderScheduleCreateForm = () => {
                               )}
                             />
                           </div>
+
+                          {/* Target supplier — optional; propagated to every order this
+                              schedule generates. */}
+                          <FormField
+                            control={form.control}
+                            name="supplierId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="flex items-center gap-2">
+                                  <IconTruck className="h-4 w-4" />
+                                  Fornecedor
+                                </FormLabel>
+                                <FormControl>
+                                  <Combobox
+                                    value={field.value || ""}
+                                    onValueChange={(value) => {
+                                      const stringValue = Array.isArray(value) ? value[0] : value;
+                                      field.onChange(stringValue || null);
+                                    }}
+                                    options={suppliers.map((supplier) => ({
+                                      value: supplier.id,
+                                      label: supplier.fantasyName,
+                                      logo: supplier.logo,
+                                    }))}
+                                    placeholder="Selecione um fornecedor (opcional)"
+                                    emptyText="Nenhum fornecedor encontrado"
+                                    disabled={isSubmitting}
+                                    className="h-10 w-full"
+                                    renderOption={(option, _isSelected) => (
+                                      <div className="flex items-center gap-3 w-full">
+                                        <SupplierLogoDisplay
+                                          logo={(option as any).logo}
+                                          supplierName={option.label}
+                                          size="sm"
+                                          shape="rounded"
+                                          className="flex-shrink-0"
+                                        />
+                                        <div className="flex flex-col gap-1 min-w-0 flex-1">
+                                          <div className="font-medium truncate">{option.label}</div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
 
                           {/* Frequency Configuration — one full-width row; fields flex-fill
                               evenly on desktop and wrap only on narrow screens. */}

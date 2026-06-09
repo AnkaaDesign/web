@@ -99,10 +99,10 @@ export function BorrowPrintView({ borrow, className, showPrintButton = true }: B
                   <p className="font-semibold">{borrow.item.category.name}</p>
                 </div>
               )}
-              {borrow.item.brand && (
+              {borrow.item.brands && borrow.item.brands.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Marca</p>
-                  <p className="font-semibold">{borrow.item.brand.name}</p>
+                  <p className="text-sm font-medium text-gray-600">Marcas</p>
+                  <p className="font-semibold">{borrow.item.brands.map((b) => b.name).join(", ")}</p>
                 </div>
               )}
             </div>

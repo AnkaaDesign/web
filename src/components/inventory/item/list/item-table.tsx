@@ -79,7 +79,7 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
   // Memoize include configuration to prevent re-renders
   const includeConfig = React.useMemo(
     () => ({
-      brand: true,
+      brands: true,
       category: true,
       supplier: true,
       measures: true,
@@ -219,8 +219,8 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
     {
       key: "brand.name",
       header: "Marca",
-      accessor: (item: Item) => <div className="truncate">{item.brand?.name || "-"}</div>,
-      sortable: true,
+      accessor: (item: Item) => <div className="truncate">{item.brands?.map((b) => b.name).join(", ") || "-"}</div>,
+      sortable: false,
       className: "w-32",
       align: "left",
     },

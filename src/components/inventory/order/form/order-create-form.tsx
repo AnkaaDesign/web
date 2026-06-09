@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconTruck, IconNotes, IconClipboardList, IconCreditCard, IconPercentage } from "@tabler/icons-react";
 import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
-import { useOrderMutations, useItems, useSuppliers, useCanViewPrices } from "../../../../hooks";
+import { useOrderMutations, useItems, useSuppliers, useCanViewPrices, useNextOrderNumber } from "../../../../hooks";
 import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, SECTOR_PRIVILEGES } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
@@ -27,6 +27,7 @@ import type { ItemGetManyFormData } from "../../../../schemas";
 import { useOrderFormUrlState, composeTempItemDescription } from "@/hooks/inventory/use-order-form-url-state";
 import { formatCurrency, formatDate, measureUtils, formatPixKey } from "../../../../utils";
 import { exportOrderPdf } from "@/utils/order-pdf-generator";
+import { buildOrderCode } from "@/utils/order-code";
 import { OrderPdfExportButton } from "../common/order-pdf-export-button";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
@@ -243,6 +244,12 @@ export const OrderCreateForm = () => {
   });
 
   const suppliers = suppliersResponse?.data || [];
+
+  // Predicted next order number, so the order-form PDF shows the real code (e.g. 0003)
+  // before the order is saved instead of the 0000 placeholder.
+  const { data: nextNumberResponse } = useNextOrderNumber();
+  const nextOrderNumber = nextNumberResponse?.data?.nextOrderNumber ?? null;
+
   // Fetch selected items data for display.
   // CRITICAL: `enabled` must live in the SECOND arg (react-query options),
   // not in params — `useItems` passes the first arg straight to the API as
@@ -253,7 +260,7 @@ export const OrderCreateForm = () => {
     {
       where: { id: { in: Array.from(selectedItems) } },
       include: {
-        brand: true,
+        brands: true,
         category: true,
         measures: true,
         prices: {
@@ -723,7 +730,7 @@ export const OrderCreateForm = () => {
       const inventoryItems = selectedItemsData.map((item: any) => ({
         code: item.uniCode || "-",
         name: item.name,
-        brand: item.brand?.name || "-",
+        brand: item.brands?.map((b: any) => b.name).join(", ") || "-",
         measures: formatMeasuresCompact(item.measures || []),
         quantity: Number(quantities[item.id]) || 1,
         unitPrice: Number(prices[item.id]) || 0,
@@ -744,7 +751,14 @@ export const OrderCreateForm = () => {
         }));
 
       exportOrderPdf({
-        title: includePricing ? "Pedido de Compra" : "Solicitação de Orçamento",
+        // Order not yet persisted → preview the predicted next number; manual create → ".2".
+        title: buildOrderCode({
+          orderNumber: nextOrderNumber,
+          orderScheduleId: null,
+          supplier: selectedSupplier,
+          items: (selectedItemsData || []).map((it: any) => ({ item: it })),
+        }),
+        documentType: includePricing ? "Pedido de Compra" : "Solicitação de Orçamento",
         includePricing,
         description: form.watch("description") || undefined,
         supplierName: selectedSupplier?.fantasyName || undefined,
@@ -756,7 +770,7 @@ export const OrderCreateForm = () => {
         items: [...inventoryItems, ...tempItems],
       });
     },
-    [form, suppliers, selectedItemsData, quantities, prices, icmses, ipis, temporaryItems],
+    [form, suppliers, selectedItemsData, quantities, prices, icmses, ipis, temporaryItems, nextOrderNumber],
   );
 
   // Generate navigation actions based on current step
@@ -1425,7 +1439,7 @@ export const OrderCreateForm = () => {
                               kind: "inventory" as const,
                               code: item.uniCode || "-",
                               name: item.name,
-                              brand: item.brand?.name || "-",
+                              brand: item.brands?.map((b: any) => b.name).join(", ") || "-",
                               measures: getMeasureDisplay(item),
                               quantity, price, icms, ipi, subtotal, taxAmount,
                               total: subtotal + taxAmount,

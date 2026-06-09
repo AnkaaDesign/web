@@ -9,11 +9,10 @@
 // Anything else falls back to a JSON textarea so configs aren't blocked by an
 // unsupported shape.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { Switch } from "../../components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -21,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
+import { ToggleRow } from "../widgets/_shared";
 
 interface DynamicFormFieldProps {
   schema: z.ZodType<unknown>;
@@ -159,26 +159,29 @@ interface FieldRowProps {
 }
 
 function FieldRow({ field, value, onChange }: FieldRowProps) {
+  const fieldId = `cfg-${field.name}`;
+  const hint =
+    field.description && field.description !== field.label ? field.description : undefined;
+
   if (field.kind === "boolean") {
     return (
-      <div className="flex items-center justify-between gap-3">
-        <div className="space-y-0.5">
-          <Label className="text-sm">{field.label}</Label>
-          {field.description && field.description !== field.label && (
-            <p className="text-xs text-muted-foreground">{field.description}</p>
-          )}
-        </div>
-        <Switch checked={!!value} onCheckedChange={onChange} />
-      </div>
+      <ToggleRow
+        label={field.label}
+        hint={hint}
+        checked={!!value}
+        onCheckedChange={onChange}
+      />
     );
   }
 
   if (field.kind === "enum" && field.options) {
     return (
       <div className="space-y-1.5">
-        <Label className="text-sm">{field.label}</Label>
+        <Label htmlFor={fieldId} className="text-xs font-medium">
+          {field.label}
+        </Label>
         <Select value={value == null ? "" : String(value)} onValueChange={onChange}>
-          <SelectTrigger>
+          <SelectTrigger id={fieldId} className="h-9">
             <SelectValue placeholder="Selecione..." />
           </SelectTrigger>
           <SelectContent>
@@ -189,6 +192,7 @@ function FieldRow({ field, value, onChange }: FieldRowProps) {
             ))}
           </SelectContent>
         </Select>
+        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
       </div>
     );
   }
@@ -196,9 +200,13 @@ function FieldRow({ field, value, onChange }: FieldRowProps) {
   if (field.kind === "number") {
     return (
       <div className="space-y-1.5">
-        <Label className="text-sm">{field.label}</Label>
+        <Label htmlFor={fieldId} className="text-xs font-medium">
+          {field.label}
+        </Label>
         <Input
+          id={fieldId}
           type="number"
+          className="h-9"
           value={value == null ? "" : (typeof value === "number" ? value : Number(value))}
           onChange={(v) => {
             // The custom Input emits string | number | null
@@ -210,6 +218,7 @@ function FieldRow({ field, value, onChange }: FieldRowProps) {
             }
           }}
         />
+        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
       </div>
     );
   }
@@ -217,34 +226,91 @@ function FieldRow({ field, value, onChange }: FieldRowProps) {
   if (field.kind === "string") {
     return (
       <div className="space-y-1.5">
-        <Label className="text-sm">{field.label}</Label>
+        <Label htmlFor={fieldId} className="text-xs font-medium">
+          {field.label}
+        </Label>
         <Input
+          id={fieldId}
           type={field.inputType ?? "text"}
+          className="h-9"
           value={value == null ? "" : String(value)}
           onChange={(v) => {
             const s = v == null ? "" : typeof v === "string" ? v : String(v);
             onChange(s || (field.optional ? undefined : ""));
           }}
         />
+        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
       </div>
     );
   }
 
   // Fallback for unsupported shapes — JSON textarea so power users can still configure.
+  return <JsonField id={fieldId} label={field.label} hint={hint} value={value} onChange={onChange} />;
+}
+
+/**
+ * JSON escape-hatch editor. Keeps the user's raw keystrokes in local state so
+ * partially-typed (temporarily invalid) JSON isn't snapped back on every
+ * render — it only propagates upward once it parses, and shows an inline error
+ * meanwhile. Resyncs from the upstream value when the field isn't focused.
+ */
+function JsonField({
+  id,
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  value: unknown;
+  onChange: (next: unknown) => void;
+}) {
+  const serialized = value == null ? "" : JSON.stringify(value, null, 2);
+  const [draft, setDraft] = useState(serialized);
+  const [focused, setFocused] = useState(false);
+  const [invalid, setInvalid] = useState(false);
+
+  // While not focused, mirror the upstream value (e.g. after a reset).
+  const text = focused ? draft : serialized;
+
   return (
     <div className="space-y-1.5">
-      <Label className="text-sm">{field.label}</Label>
+      <Label htmlFor={id} className="text-xs font-medium">
+        {label}
+      </Label>
       <textarea
-        className="w-full text-xs font-mono rounded-md border border-input bg-background px-3 py-2 min-h-[80px]"
-        value={value == null ? "" : JSON.stringify(value, null, 2)}
+        id={id}
+        className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        value={text}
+        onFocus={() => {
+          setDraft(serialized);
+          setFocused(true);
+        }}
+        onBlur={() => setFocused(false)}
         onChange={(e) => {
+          const next = e.target.value;
+          setDraft(next);
+          if (!next.trim()) {
+            setInvalid(false);
+            onChange(undefined);
+            return;
+          }
           try {
-            onChange(e.target.value ? JSON.parse(e.target.value) : undefined);
+            const parsed = JSON.parse(next);
+            setInvalid(false);
+            onChange(parsed);
           } catch {
-            // Keep raw text in the textarea by not propagating; user fixes JSON.
+            setInvalid(true); // keep keystrokes; don't propagate broken JSON
           }
         }}
       />
+      {invalid ? (
+        <p className="text-[11px] text-destructive">JSON inválido — corrija para aplicar.</p>
+      ) : (
+        hint && <p className="text-[11px] text-muted-foreground">{hint}</p>
+      )}
     </div>
   );
 }

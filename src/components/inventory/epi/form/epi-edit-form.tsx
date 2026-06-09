@@ -12,7 +12,7 @@ interface EpiEditFormProps {
 export function EpiEditForm({ item, onSubmit, isSubmitting }: EpiEditFormProps) {
   // Memoize the supplier, brand, and category to pass to the form
   const initialSupplier = React.useMemo(() => item.supplier, [item.supplier]);
-  const initialBrand = React.useMemo(() => item.brand, [item.brand]);
+  const initialBrands = React.useMemo(() => item.brands, [item.brands]);
   const initialCategory = React.useMemo(() => item.category, [item.category]);
 
   // Map API data to form data
@@ -36,7 +36,7 @@ export function EpiEditForm({ item, onSubmit, isSubmitting }: EpiEditFormProps) 
       shouldAssignToUser: item.shouldAssignToUser,
       abcCategory: item.abcCategory,
       xyzCategory: item.xyzCategory,
-      brandId: item.brandId,
+      brandIds: item.brands?.map((b) => b.id) ?? [],
       categoryId: item.categoryId,
       supplierId: item.supplierId,
       estimatedLeadTime: item.estimatedLeadTime,
@@ -97,7 +97,7 @@ export function EpiEditForm({ item, onSubmit, isSubmitting }: EpiEditFormProps) 
       onSubmit={handleSubmit}
       isSubmitting={isSubmitting}
       initialSupplier={initialSupplier}
-      initialBrand={initialBrand}
+      initialBrands={initialBrands}
       initialCategory={initialCategory}
     />
   );

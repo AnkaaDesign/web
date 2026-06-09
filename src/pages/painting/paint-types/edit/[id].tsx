@@ -24,7 +24,7 @@ export function PaintTypeEditPage() {
     include: {
       componentItems: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
           measures: true,
         },

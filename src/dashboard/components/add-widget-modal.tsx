@@ -2,16 +2,9 @@
 // Filters automatically by user's sector. Search across name/description.
 
 import { useMemo, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "../../components/ui/dialog";
 import { Input } from "../../components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { ScrollArea } from "../../components/ui/scroll-area";
+import { WidgetConfigDialog } from "./config-kit";
 import { IconSearch, IconStar } from "@tabler/icons-react";
 import { usePrivileges } from "../../hooks/common/use-privileges";
 import { widgetRegistry } from "../registry";
@@ -116,76 +109,65 @@ export function AddWidgetModal({ open, onClose, onAdd }: AddWidgetModalProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => (!v ? onClose() : undefined)}>
-      {/* Fixed dimensions so the dialog never resizes when switching tabs.
-          1080×800 with viewport caps so it still fits smaller screens. */}
-      <DialogContent className="!max-w-[1080px] w-[1080px] max-w-[calc(100vw-2rem)] h-[800px] max-h-[calc(100vh-2rem)] flex flex-col gap-4 p-6">
-        <DialogHeader className="shrink-0">
-          <DialogTitle>Adicionar widget</DialogTitle>
-          <DialogDescription>
-            Escolha um widget para adicionar ao seu painel. Apenas widgets disponíveis para o
-            seu setor são exibidos.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="relative shrink-0">
-          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            value={query}
-            onChange={(v) => setQuery(typeof v === "string" ? v : "")}
-            placeholder="Buscar widgets..."
-            className="pl-9"
-            autoFocus
-          />
+    <WidgetConfigDialog
+      open={open}
+      onOpenChange={(v) => (!v ? onClose() : undefined)}
+      title="Adicionar widget"
+      description="Escolha um widget para adicionar ao seu painel. Apenas widgets disponíveis para o seu setor são exibidos."
+      headerExtra={
+        <div className="space-y-3">
+          <div className="relative">
+            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={query}
+              onChange={(v) => setQuery(typeof v === "string" ? v : "")}
+              placeholder="Buscar widgets..."
+              className="pl-9"
+              autoFocus
+            />
+          </div>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
+            {/* min-h reserves vertical space so the body below stays anchored
+                even if the wrap behavior changes between tab counts. */}
+            <TabsList className="h-auto min-h-9 flex flex-wrap justify-start gap-1 p-1 bg-muted/60 w-full">
+              <TabsTrigger value="all" className="text-xs h-8">
+                Todos
+                <span className="ml-1.5 text-[10px] tabular-nums opacity-70">
+                  {allWidgets.length}
+                </span>
+              </TabsTrigger>
+              {availableCategories.map((cat) => {
+                const count = allWidgets.filter((w) => w.category === cat).length;
+                return (
+                  <TabsTrigger key={cat} value={cat} className="text-xs h-8">
+                    {WIDGET_CATEGORY_LABELS[cat]}
+                    <span className="ml-1.5 text-[10px] tabular-nums opacity-70">{count}</span>
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </Tabs>
         </div>
-
-        <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="shrink-0">
-          {/* min-h reserves vertical space so the body below stays anchored even
-              if the wrap behavior changes between tab counts. */}
-          <TabsList className="h-auto min-h-9 flex flex-wrap justify-start gap-1 p-1 bg-muted/60 w-full">
-            <TabsTrigger value="all" className="text-xs h-8">
-              Todos
-              <span className="ml-1.5 text-[10px] tabular-nums opacity-70">
-                {allWidgets.length}
-              </span>
-            </TabsTrigger>
-            {availableCategories.map((cat) => {
-              const count = allWidgets.filter((w) => w.category === cat).length;
-              return (
-                <TabsTrigger key={cat} value={cat} className="text-xs h-8">
-                  {WIDGET_CATEGORY_LABELS[cat]}
-                  <span className="ml-1.5 text-[10px] tabular-nums opacity-70">{count}</span>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
-
-        <ScrollArea className="flex-1 min-h-0 -mr-2 pr-2">
-          {filteredWidgets.length === 0 ? (
-            <div className="h-full min-h-[200px] flex flex-col items-center justify-center text-center text-muted-foreground py-12">
-              <IconStar className="h-8 w-8 mb-3 opacity-40" />
-              <p className="text-sm">Nenhum widget encontrado.</p>
-              {query && (
-                <p className="text-xs mt-1">
-                  Tente outro termo de busca ou mude de categoria.
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-2">
-              {filteredWidgets.map((w) => (
-                <WidgetGalleryCard
-                  key={w.id}
-                  widget={w}
-                  onPick={() => handlePick(w.id)}
-                />
-              ))}
-            </div>
+      }
+    >
+      {filteredWidgets.length === 0 ? (
+        <div className="min-h-[200px] flex flex-col items-center justify-center text-center text-muted-foreground py-12">
+          <IconStar className="h-8 w-8 mb-3 opacity-40" />
+          <p className="text-sm">Nenhum widget encontrado.</p>
+          {query && (
+            <p className="text-xs mt-1">
+              Tente outro termo de busca ou mude de categoria.
+            </p>
           )}
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredWidgets.map((w) => (
+            <WidgetGalleryCard key={w.id} widget={w} onPick={() => handlePick(w.id)} />
+          ))}
+        </div>
+      )}
+    </WidgetConfigDialog>
   );
 }
 

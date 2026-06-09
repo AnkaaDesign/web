@@ -17,7 +17,7 @@ export const SupplierEditPage = () => {
     logo: true,
     items: {
       include: {
-        brand: true,
+        brands: true,
         category: true,
       },
     },

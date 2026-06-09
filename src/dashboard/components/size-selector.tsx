@@ -11,6 +11,13 @@ import { Button } from "../../components/ui/button";
 import { IconLayoutGrid, IconCheck } from "@tabler/icons-react";
 import { WIDGET_COL_VALUES, WIDGET_ROW_VALUES } from "../schemas";
 import type { WidgetSize, WidgetCols, WidgetRows } from "../types";
+import { cn } from "../../lib/utils";
+import {
+  SELECT_TILE_ACTIVE,
+  SELECT_TILE_BASE,
+  SELECT_TILE_DISABLED,
+  SELECT_TILE_INACTIVE,
+} from "./config-kit";
 
 interface SizeSelectorProps {
   value: WidgetSize;
@@ -71,13 +78,15 @@ export function SizeSelector({ value, min, max, onChange }: SizeSelectorProps) {
                   type="button"
                   disabled={disabled}
                   onClick={() => onChange({ cols: c as WidgetCols, rows: value.rows })}
-                  className={`relative h-9 rounded-md border text-xs font-medium transition-all ${
+                  className={cn(
+                    SELECT_TILE_BASE,
+                    "h-9 text-xs font-bold",
                     active
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      ? SELECT_TILE_ACTIVE
                       : disabled
-                      ? "border-border/40 opacity-30 cursor-not-allowed"
-                      : "border-border hover:bg-accent hover:border-primary/40"
-                  }`}
+                        ? SELECT_TILE_DISABLED
+                        : SELECT_TILE_INACTIVE,
+                  )}
                 >
                   {WIDTH_LABELS[c]}
                   {active && (
@@ -103,13 +112,15 @@ export function SizeSelector({ value, min, max, onChange }: SizeSelectorProps) {
                   type="button"
                   disabled={disabled}
                   onClick={() => onChange({ cols: value.cols, rows: r as WidgetRows })}
-                  className={`relative h-9 rounded-md border text-xs font-medium transition-all ${
+                  className={cn(
+                    SELECT_TILE_BASE,
+                    "h-9 text-xs font-bold",
                     active
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      ? SELECT_TILE_ACTIVE
                       : disabled
-                      ? "border-border/40 opacity-30 cursor-not-allowed"
-                      : "border-border hover:bg-accent hover:border-primary/40"
-                  }`}
+                        ? SELECT_TILE_DISABLED
+                        : SELECT_TILE_INACTIVE,
+                  )}
                 >
                   {HEIGHT_LABELS[r]}
                   {active && (

@@ -23,7 +23,7 @@ interface ItemExportProps {
 const EXPORT_COLUMNS: ExportColumn<Item>[] = [
   { id: "uniCode", label: "Código Único", getValue: (item: Item) => item.uniCode || "" },
   { id: "name", label: "Nome", getValue: (item: Item) => item.name },
-  { id: "brand.name", label: "Marca", getValue: (item: Item) => item.brand?.name || "" },
+  { id: "brand.name", label: "Marca", getValue: (item: Item) => item.brands?.map((b) => b.name).join(", ") || "" },
   { id: "category.name", label: "Categoria", getValue: (item: Item) => item.category?.name || "" },
   { id: "price", label: "Preço", getValue: (item: Item) => (item.prices?.[0]?.value ? formatCurrency(item.prices[0].value) : "") },
   { id: "totalPrice", label: "Valor Total", getValue: (item: Item) => (item.totalPrice ? formatCurrency(item.totalPrice) : "") },
@@ -91,7 +91,7 @@ export function ItemExport({ className, filters = {}, currentItems = [], totalRe
       ...filters,
       limit: totalRecords > 0 ? totalRecords : 10000, // Limit to prevent memory issues
       include: {
-        brand: true,
+        brands: true,
         category: true,
         supplier: true,
         prices: true,

@@ -208,11 +208,11 @@ export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItem
                                   {item.category.name}
                                 </>
                               )}
-                              {item.category && item.brand && <span className="mx-1">•</span>}
-                              {item.brand && (
+                              {item.category && item.brands && item.brands.length > 0 && <span className="mx-1">•</span>}
+                              {item.brands && item.brands.length > 0 && (
                                 <>
                                   <IconTag className="inline h-3 w-3 mr-1" />
-                                  {item.brand.name}
+                                  {item.brands.map((b) => b.name).join(", ")}
                                 </>
                               )}
                             </div>

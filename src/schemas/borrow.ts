@@ -17,7 +17,7 @@ export const borrowIncludeSchema = z
         z.object({
           include: z
             .object({
-              brand: z.boolean().optional(),
+              brands: z.boolean().optional(),
               category: z.boolean().optional(),
               supplier: z.boolean().optional(),
               price: z.boolean().optional(),
@@ -107,15 +107,6 @@ export const borrowOrderBySchema = z
               })
               .partial()
               .optional(),
-            brand: z
-              .object({
-                id: orderByDirectionSchema.optional(),
-                name: orderByDirectionSchema.optional(),
-                createdAt: orderByDirectionSchema.optional(),
-                updatedAt: orderByDirectionSchema.optional(),
-              })
-              .partial()
-              .optional(),
           })
           .partial()
           .optional(),
@@ -160,15 +151,6 @@ export const borrowOrderBySchema = z
                   name: orderByDirectionSchema.optional(),
                   type: orderByDirectionSchema.optional(),
                   typeOrder: orderByDirectionSchema.optional(),
-                  createdAt: orderByDirectionSchema.optional(),
-                  updatedAt: orderByDirectionSchema.optional(),
-                })
-                .partial()
-                .optional(),
-              brand: z
-                .object({
-                  id: orderByDirectionSchema.optional(),
-                  name: orderByDirectionSchema.optional(),
                   createdAt: orderByDirectionSchema.optional(),
                   updatedAt: orderByDirectionSchema.optional(),
                 })
@@ -428,7 +410,7 @@ const borrowTransform = (data: any) => {
   }
 
   if (data.brandIds?.length) {
-    andConditions.push({ item: { brandId: { in: data.brandIds } } });
+    andConditions.push({ item: { brands: { some: { id: { in: data.brandIds } } } } });
     delete data.brandIds;
   }
 

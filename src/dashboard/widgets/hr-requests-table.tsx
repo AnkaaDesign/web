@@ -13,6 +13,7 @@
 // requires a free-text reason — same UX as the page.
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import {
   IconClockEdit,
@@ -1055,18 +1056,9 @@ function HrRequestsTableConfigComponent({
   const currentAccentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
 
   return (
-    <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1 -mr-1">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={c.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Requisições de RH"
-        />
-      </div>
-
+    <div className="space-y-3">
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
+        <WidgetTabsBar><TabsList className="self-start">
           <TabsTrigger value="appearance" className="gap-1">
             <IconAdjustments className="h-3.5 w-3.5" /> Aparência
           </TabsTrigger>
@@ -1076,12 +1068,12 @@ function HrRequestsTableConfigComponent({
           <TabsTrigger value="filters" className="gap-1">
             <IconFilter className="h-3.5 w-3.5" /> Filtros
           </TabsTrigger>
-        </TabsList>
+        </TabsList></WidgetTabsBar>
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Acento (cor e ícone)" defaultOpen>
+            <Section title="Destaque (cor e ícone)" defaultOpen>
               <AccentPicker
                 value={{
                   color: currentAccentColor,
@@ -1098,16 +1090,15 @@ function HrRequestsTableConfigComponent({
               />
             </Section>
             <Section title="Densidade e linhas">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+              <div className="space-y-2">
                 <DensitySegmented
                   value={c.display.density}
                   onChange={(d) => setDisplay("density", d)}
                 />
-                <LimitInput value={c.limit} onChange={(n) => set("limit", n)} />
               </div>
             </Section>
             <Section title="Cabeçalho e link">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className="space-y-1">
                 <ToggleRow
                   label="Exibir cabeçalho"
                   checked={c.display.showHeader ?? true}
@@ -1129,7 +1120,6 @@ function HrRequestsTableConfigComponent({
                   onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
                 />
               </div>
-
             </Section>
             <Section title="Mensagem quando vazio">
               <Input
@@ -1147,7 +1137,7 @@ function HrRequestsTableConfigComponent({
         <TabsContent value="ordering" className="space-y-3 mt-0">
           <Section title="Ordenação" defaultOpen>
             <div className="grid grid-cols-2 gap-2">
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs">Ordenar por</Label>
                 <Combobox
                   mode="single"
@@ -1165,7 +1155,7 @@ function HrRequestsTableConfigComponent({
                   clearable={false}
                 />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs">Direção</Label>
                 <Combobox
                   mode="single"
@@ -1182,11 +1172,14 @@ function HrRequestsTableConfigComponent({
               </div>
             </div>
           </Section>
+          <Section title="Quantidade máxima">
+            <LimitInput value={c.limit} onChange={(n) => set("limit", n)} />
+          </Section>
         </TabsContent>
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Busca padrão</Label>
             <Input
               value={c.filters.searchingFor}
@@ -1200,7 +1193,7 @@ function HrRequestsTableConfigComponent({
               prevalece.
             </p>
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Status</Label>
             <Combobox
               mode="multiple"
@@ -1212,7 +1205,7 @@ function HrRequestsTableConfigComponent({
               placeholder="Todos os status"
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Tipo</Label>
             <Combobox
               mode="multiple"

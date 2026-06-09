@@ -28,7 +28,7 @@ const ProductDetailsPage = () => {
     refetch,
   } = useItem(id!, {
     include: {
-      brand: true,
+      brands: true,
       category: true,
       supplier: true,
       prices: {
@@ -44,13 +44,13 @@ const ProductDetailsPage = () => {
       },
       relatedItems: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
       },
       relatedTo: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
       },

@@ -24,8 +24,8 @@ export const EPIDeliveryEdit = () => {
     include: {
       item: {
         include: {
-          itemBrand: true,
-          itemCategory: true,
+          brands: true,
+          category: true,
         },
       },
       user: {

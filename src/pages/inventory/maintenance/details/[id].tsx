@@ -42,7 +42,7 @@ const MaintenanceDetailsPage = () => {
     include: {
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
           supplier: true,
           prices: {
@@ -55,7 +55,7 @@ const MaintenanceDetailsPage = () => {
         include: {
           item: {
             include: {
-              brand: true,
+              brands: true,
               category: true,
               prices: {
                 orderBy: { createdAt: "desc" },

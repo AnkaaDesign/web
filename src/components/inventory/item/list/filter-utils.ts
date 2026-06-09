@@ -215,17 +215,6 @@ export function extractActiveFilters(
         onRemove: () => onRemoveFilter("brandIds", brand.id),
       });
     });
-  } else if (filters.where?.brandId) {
-    const brand = brands.find((b) => b.id === filters.where?.brandId);
-    if (brand) {
-      activeFilters.push({
-        key: "brandId",
-        label: "Marca",
-        value: brand.name,
-        iconType: "tags",
-        onRemove: () => onRemoveFilter("brandId"),
-      });
-    }
   }
 
   // Entity filters - Suppliers (individual badges for each supplier)
@@ -513,9 +502,6 @@ export function createFilterRemover(currentFilters: Partial<ItemGetManyFormData>
           // Remove all brands
           delete newFilters.brandIds;
         }
-        break;
-      case "brandId":
-        delete newWhere.brandId;
         break;
       case "supplierIds":
         if (itemId && Array.isArray(newFilters.supplierIds)) {

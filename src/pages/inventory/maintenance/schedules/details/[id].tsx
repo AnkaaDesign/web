@@ -59,7 +59,7 @@ export function MaintenanceScheduleDetailPage() {
     include: {
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
           supplier: true,
           prices: {
@@ -569,7 +569,7 @@ function MaintenanceItemCard({ schedule, className }: { schedule: any; className
               {/* Brand */}
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground">Marca</span>
-                <span className="text-sm font-semibold text-foreground">{item.brand ? item.brand.name : <span className="text-muted-foreground italic">Não definida</span>}</span>
+                <span className="text-sm font-semibold text-foreground">{item.brands?.length ? item.brands.map((b: any) => b.name).join(", ") : <span className="text-muted-foreground italic">Não definida</span>}</span>
               </div>
 
               {/* Category */}

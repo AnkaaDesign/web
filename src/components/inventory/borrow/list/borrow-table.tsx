@@ -125,7 +125,7 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
     () => ({
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
       },

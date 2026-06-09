@@ -42,7 +42,7 @@ export function MaintenanceItemSelector<TFieldValues extends FieldValues = Field
         page: page,
         take: 50,
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
       };

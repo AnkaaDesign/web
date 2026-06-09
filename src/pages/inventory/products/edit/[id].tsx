@@ -26,7 +26,7 @@ export const EditProductPage = () => {
     error,
   } = useItem(id!, {
     include: {
-      brand: true,
+      brands: true,
       category: true,
       supplier: true,
       prices: {

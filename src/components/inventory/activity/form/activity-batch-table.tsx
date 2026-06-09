@@ -45,7 +45,7 @@ const ActivityBatchTableRow = ({
 }) => {
   const { data: itemResponse } = useItem(field.itemId, {
     include: {
-      brand: true,
+      brands: true,
       category: true,
     },
   });
@@ -71,7 +71,7 @@ const ActivityBatchTableRow = ({
       <TableCell className="p-0 !border-r-0">
         <div className="px-4 py-2">
           <div className="font-medium">{item ? item.name : "Carregando..."}</div>
-          {item?.brand?.name && <div className="text-xs text-muted-foreground">{item.brand.name}</div>}
+          {item?.brands && item.brands.length > 0 && <div className="text-xs text-muted-foreground">{item.brands.map((b) => b.name).join(", ")}</div>}
         </div>
       </TableCell>
       <TableCell className="w-24 p-0 !border-r-0">

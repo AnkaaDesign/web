@@ -7,6 +7,7 @@
 // so a number on this widget matches the full page exactly.
 
 import { useMemo } from "react";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import {
   IconAdjustments,
@@ -1135,18 +1136,9 @@ function ProductivityConfigComponent({
   );
 
   return (
-    <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 -mr-1">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={config.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Produtividade"
-        />
-      </div>
-
+    <div className="space-y-3">
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
+        <WidgetTabsBar><TabsList className="self-start">
           <TabsTrigger value="appearance" className="gap-1">
             <IconAdjustments className="h-3.5 w-3.5" /> Aparência
           </TabsTrigger>
@@ -1156,12 +1148,12 @@ function ProductivityConfigComponent({
           <TabsTrigger value="filters" className="gap-1">
             <IconFilter className="h-3.5 w-3.5" /> Filtros
           </TabsTrigger>
-        </TabsList>
+        </TabsList></WidgetTabsBar>
 
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
             <Section
-              title="Acento (cor e ícone)"
+              title="Destaque (cor e ícone)"
               icon={<IconAdjustments className="h-3.5 w-3.5" />}
               defaultOpen
             >
@@ -1181,29 +1173,31 @@ function ProductivityConfigComponent({
               title="Elementos visíveis"
               icon={<IconEye className="h-3.5 w-3.5" />}
             >
-              <ToggleRow
-                label="Cabeçalho do widget"
-                checked={config.display.showHeader}
-                onCheckedChange={(v) => setDisplay("showHeader", v)}
-              />
-              <ToggleRow
-                label="Cartões de resumo (Total / Média / Pico)"
-                hint="Exibidos acima do gráfico quando ativado."
-                checked={config.display.showSummary}
-                onCheckedChange={(v) => setDisplay("showSummary", v)}
-              />
-              <ToggleRow
-                label="Legenda do gráfico"
-                hint="Identifica séries, linha de meta e tendência."
-                checked={config.display.showLegend}
-                onCheckedChange={(v) => setDisplay("showLegend", v)}
-              />
-              <ToggleRow
-                label="Barra de zoom"
-                hint="Ativada automaticamente quando há mais de 12 períodos."
-                checked={config.display.showZoom}
-                onCheckedChange={(v) => setDisplay("showZoom", v)}
-              />
+              <div className="space-y-1">
+                <ToggleRow
+                  label="Cabeçalho do widget"
+                  checked={config.display.showHeader}
+                  onCheckedChange={(v) => setDisplay("showHeader", v)}
+                />
+                <ToggleRow
+                  label="Cartões de resumo (Total / Média / Pico)"
+                  hint="Exibidos acima do gráfico quando ativado."
+                  checked={config.display.showSummary}
+                  onCheckedChange={(v) => setDisplay("showSummary", v)}
+                />
+                <ToggleRow
+                  label="Legenda do gráfico"
+                  hint="Identifica séries, linha de meta e tendência."
+                  checked={config.display.showLegend}
+                  onCheckedChange={(v) => setDisplay("showLegend", v)}
+                />
+                <ToggleRow
+                  label="Barra de zoom"
+                  hint="Ativada automaticamente quando há mais de 12 períodos."
+                  checked={config.display.showZoom}
+                  onCheckedChange={(v) => setDisplay("showZoom", v)}
+                />
+              </div>
             </Section>
           </SectionGroup>
         </TabsContent>

@@ -63,7 +63,7 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
       { field: "barcodes", label: "Códigos de Barras", type: "array" as const },
       { field: "shouldAssignToUser", label: "Atribuir ao Usuário", type: "boolean" as const },
       { field: "isActive", label: "Ativo", type: "boolean" as const },
-      { field: "brandId", label: "Marca", type: "single" as const },
+      { field: "brands", label: "Marcas", type: "array" as const },
       { field: "categoryId", label: "Categoria", type: "single" as const },
       { field: "supplierId", label: "Fornecedor", type: "single" as const },
     ].filter((f) => canViewPrices || !priceFields.has(f.field));
@@ -86,7 +86,11 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
               formatted = value.toString();
             }
           } else if (type === "array" && Array.isArray(value)) {
-            formatted = value.length > 0 ? value.join(", ") : "Nenhum";
+            const display =
+              field === "brands"
+                ? value.map((b: any) => (typeof b === "string" ? b : b?.name)).filter(Boolean)
+                : value;
+            formatted = display.length > 0 ? display.join(", ") : "Nenhum";
           } else if (type === "boolean") {
             formatted = value ? "Sim" : "Não";
           } else {

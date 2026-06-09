@@ -40,7 +40,7 @@ export const LoanDetailsPage = () => {
     include: {
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
           supplier: true,
           prices: {
@@ -148,7 +148,7 @@ export const LoanDetailsPage = () => {
         include: {
           item: {
             include: {
-              brand: true,
+              brands: true,
               category: true,
               supplier: true,
             },

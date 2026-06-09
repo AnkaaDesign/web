@@ -92,8 +92,8 @@ export const createMaintenanceColumns = (): MaintenanceColumn[] => [
   {
     key: "item.brand.name",
     header: "MARCA DO ITEM",
-    accessor: (maintenance: Maintenance) => <div className="truncate text-sm">{maintenance.item?.brand?.name || "-"}</div>,
-    sortable: true,
+    accessor: (maintenance: Maintenance) => <div className="truncate text-sm">{maintenance.item?.brands?.map((b) => b.name).join(", ") || "-"}</div>,
+    sortable: false,
     className: "w-32",
     align: "left",
   },

@@ -48,7 +48,7 @@ export default function FormulaEdit() {
     },
     include: {
       measures: true,
-      brand: true,
+      brands: true,
       category: true,
     },
   });

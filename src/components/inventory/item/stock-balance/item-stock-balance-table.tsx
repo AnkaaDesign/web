@@ -166,7 +166,7 @@ export function ItemStockBalanceTable({ items, onCancel: _onCancel, onSubmit: _o
 
                       {/* Brand - Read-only */}
                       <TableCell className="py-2">
-                        {item.brand?.name || "-"}
+                        {item.brands?.map((b) => b.name).join(", ") || "-"}
                       </TableCell>
 
                       {/* Category - Read-only */}

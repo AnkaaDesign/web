@@ -54,7 +54,7 @@ const EPIDeliveryDetails = () => {
     include: {
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
           measures: true,
           prices: {

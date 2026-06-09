@@ -88,7 +88,7 @@ export const MyActivitiesPage = () => {
       include: {
         item: {
           include: {
-            brand: true,
+            brands: true,
             category: true,
           },
         },

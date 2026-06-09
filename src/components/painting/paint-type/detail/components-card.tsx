@@ -43,7 +43,7 @@ const createComponentColumns = () => [
   {
     key: "brand.name",
     header: "MARCA",
-    accessor: (item: Item) => (item.brand ? <Badge variant="outline">{item.brand.name}</Badge> : <span className="text-muted-foreground">-</span>),
+    accessor: (item: Item) => (item.brands && item.brands.length > 0 ? <Badge variant="outline">{item.brands.map((b) => b.name).join(", ")}</Badge> : <span className="text-muted-foreground">-</span>),
     sortable: true,
     className: "w-32",
     align: "left" as const,
@@ -133,7 +133,7 @@ export function PaintTypeComponentsCard({ paintType }: PaintTypeComponentsCardPr
       (item) =>
         item.name?.toLowerCase().includes(query) ||
         item.uniCode?.toLowerCase().includes(query) ||
-        item.brand?.name?.toLowerCase().includes(query) ||
+        item.brands?.some((b) => b.name.toLowerCase().includes(query)) ||
         item.category?.name?.toLowerCase().includes(query),
     );
   }, [components, searchQuery]);

@@ -232,7 +232,7 @@ export const OrderItemSelector = ({
   // Memoize include configuration to prevent re-renders
   const includeConfig = React.useMemo(
     () => ({
-      brand: true,
+      brands: true,
       category: true,
       supplier: true,
       measures: true,
@@ -261,7 +261,7 @@ export const OrderItemSelector = ({
           : {
               // Apply other filters only when not showing selected only
               ...(categoryIds.length && { categoryId: { in: categoryIds } }),
-              ...(brandIds.length && { brandId: { in: brandIds } }),
+              ...(brandIds.length && { brands: { some: { id: { in: brandIds } } } }),
               ...(supplierIds.length && { supplierId: { in: supplierIds } }),
             }),
       },
@@ -934,7 +934,7 @@ export const OrderItemSelector = ({
                       </TableCell>
                       <TableCell className="w-32 p-0 !border-r-0">
                         <div className="px-4 py-1">
-                          <div className="text-sm truncate">{item.brand?.name || "-"}</div>
+                          <div className="text-sm truncate">{item.brands?.map((b) => b.name).join(", ") || "-"}</div>
                         </div>
                       </TableCell>
                       <TableCell className="w-28 p-0 !border-r-0">

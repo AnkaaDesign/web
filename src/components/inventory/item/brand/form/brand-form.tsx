@@ -129,7 +129,7 @@ export function BrandForm(props: BrandFormProps) {
       value: item.id,
       label: item.name,
       unicode: item.uniCode,
-      brand: item.brand?.name,
+      brand: item.brands?.map((b: any) => b.name).join(", "),
       category: item.category?.name,
     }));
   }, [initialItems?.map((i) => i.id).join(",")]);
@@ -146,7 +146,7 @@ export function BrandForm(props: BrandFormProps) {
       params: {
         searchingFor: searchTerm,
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
         orderBy: { name: "asc" },
@@ -160,7 +160,7 @@ export function BrandForm(props: BrandFormProps) {
         value: item.id,
         label: item.name,
         unicode: item.uniCode,
-        brand: item.brand?.name,
+        brand: item.brands?.map((b: any) => b.name).join(", "),
         category: item.category?.name,
       })) || [];
 

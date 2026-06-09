@@ -28,7 +28,7 @@ export function PaintBrandDetailsPage() {
         include: {
           measures: true,
           category: true,
-          brand: true,
+          brands: true,
         },
       },
       paints: {

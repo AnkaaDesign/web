@@ -78,6 +78,9 @@ interface ComboboxProps<TData = ComboboxOption> {
   renderOption?: (option: TData, isSelected: boolean) => React.ReactNode;
   renderValue?: (option: TData | TData[]) => React.ReactNode;
   formatDisplay?: "category" | "brand";
+  // When true (single mode + renderOption), the option fills the whole row with no
+  // built-in check/padding — renderOption owns the full row (incl. its own selected marker).
+  fullWidthOption?: boolean;
 
   // Loading states
   loading?: boolean;
@@ -133,6 +136,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   renderOption,
   renderValue,
   formatDisplay,
+  fullWidthOption = false,
   loading: externalLoading,
   name,
   singleMode = false,
@@ -470,8 +474,9 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
         const parts = [];
         if (optionAny.unicode) parts.push(optionAny.unicode);
         parts.push(label);
-        if (optionAny.brand || optionAny.category) {
-          parts.push(`(${optionAny.brand || optionAny.category})`);
+        const brandNames = Array.isArray(optionAny.brands) ? optionAny.brands.map((b: any) => b?.name ?? b).filter(Boolean).join(", ") : optionAny.brand;
+        if (brandNames || optionAny.category) {
+          parts.push(`(${brandNames || optionAny.category})`);
         }
         return parts.join(" ");
       }
@@ -737,11 +742,11 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
             )}
 
             {isMultiple && filteredOptions.length > 0 && (
-              <div className="flex items-center justify-between px-3 py-2 border-b dark:border-border/30">
-                <span className="text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-2 border-b dark:border-border/30">
+                <span className="text-sm text-muted-foreground min-w-0 truncate">
                   {selectedValues.length} de {filteredOptions.length} selecionados
                 </span>
-                <div className="flex gap-1">
+                <div className="flex gap-1 shrink-0">
                   <Button variant="ghost" size="sm" onClick={handleSelectAll} className="h-auto py-1 px-2">
                     Selecionar todos
                   </Button>
@@ -776,7 +781,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
                 }
               }}
             >
-              <div className="p-1">
+              <div className="p-2">
                 {!isMultiple && clearable && selectedValues.length > 0 && (
                   <div
                     role="button"
@@ -856,6 +861,32 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
                     const isSelected = selectedValues.includes(optionValue);
                     const isDisabled = isOptionDisabled(option);
                     const description = getOptionDescription(option);
+
+                    // Full-width option: renderOption owns the entire row (no built-in
+                    // check/padding), so a colored option fully paints the row.
+                    if (fullWidthOption && renderOption && !isMultiple) {
+                      return (
+                        <div
+                          key={optionValue}
+                          role="option"
+                          aria-selected={isSelected}
+                          tabIndex={isDisabled ? -1 : 0}
+                          className={cn(
+                            "group w-full overflow-hidden rounded-sm cursor-pointer",
+                            isDisabled && "opacity-50 cursor-not-allowed",
+                          )}
+                          onClick={isDisabled ? undefined : () => handleSelect(optionValue)}
+                          onKeyDown={(e) => {
+                            if ((e.key === "Enter" || e.key === " ") && !isDisabled) {
+                              e.preventDefault();
+                              handleSelect(optionValue);
+                            }
+                          }}
+                        >
+                          {renderOption(option, isSelected)}
+                        </div>
+                      );
+                    }
 
                     return (
                       <div

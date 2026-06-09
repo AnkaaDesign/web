@@ -160,7 +160,7 @@ export const useItemsByCategory = createSpecializedQueryHook<{ categoryId: strin
 // Hook for items by brand
 export const useItemsByBrand = createSpecializedQueryHook<{ brandId: string; filters?: Partial<ItemGetManyFormData> }, ItemGetManyResponse>({
   queryKeyFn: ({ brandId, filters }) => itemKeys.byBrand(brandId, filters),
-  queryFn: ({ brandId, filters }) => getItems({ ...filters, where: { brandId } }),
+  queryFn: ({ brandId, filters }) => getItems({ ...filters, where: { brands: { some: { id: brandId } } } }),
   staleTime: 1000 * 60 * 5,
 });
 

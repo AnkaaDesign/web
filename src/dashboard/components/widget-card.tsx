@@ -10,10 +10,12 @@
 // the gallery card design from `add-widget-modal.tsx` so the user can
 // recognize each widget at a glance by its picked accent.
 
-import { type ReactNode } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { IconChevronRight } from "@tabler/icons-react";
 import { borderClassFor, resolveAccentClasses } from "./widget-accent";
+import { useWidgetChrome } from "./widget-chrome-context";
+import { WIDGET_TITLE_MAX } from "./config-kit";
 import type {
   WidgetAccentColor,
   WidgetAccentShade,
@@ -64,7 +66,45 @@ export function WidgetCard({
   className,
   children,
 }: WidgetCardProps) {
+  const chrome = useWidgetChrome();
+  const canRename = chrome.isEditing && !!chrome.onRenameCommit;
   const renderFooter = showFooter && (viewAllHref || footerExtra);
+
+  // Inline rename state — the title swaps to an <input> in place (no modal).
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  // config.title is the source of truth; fall back to a plain-string title.
+  const seedTitle =
+    chrome.currentTitle ?? (typeof title === "string" ? title : "");
+
+  const beginRename = useCallback(() => {
+    if (!canRename) return;
+    setDraftTitle(seedTitle);
+    setEditingTitle(true);
+  }, [canRename, seedTitle]);
+
+  const commitRename = useCallback(() => {
+    const trimmed = draftTitle.trim();
+    if (trimmed && trimmed !== seedTitle) chrome.onRenameCommit?.(trimmed);
+    setEditingTitle(false);
+  }, [draftTitle, seedTitle, chrome]);
+
+  const cancelRename = useCallback(() => setEditingTitle(false), []);
+
+  // The tile's pencil button bumps renameSignal to start inline editing.
+  const lastSignal = useRef(chrome.renameSignal ?? 0);
+  useEffect(() => {
+    const sig = chrome.renameSignal ?? 0;
+    if (sig !== lastSignal.current) {
+      lastSignal.current = sig;
+      beginRename();
+    }
+  }, [chrome.renameSignal, beginRename]);
+
+  useEffect(() => {
+    if (editingTitle) titleInputRef.current?.select();
+  }, [editingTitle]);
   // When the caller provides an `accentColor`, the card border itself adopts
   // that color/shade (auto-derived — there's no longer a separate borderColor
   // config field). Falls back to the legacy `borderColor` prop for any caller
@@ -84,14 +124,51 @@ export function WidgetCard({
         <div className={`h-1.5 w-full shrink-0 ${stripeClass}`} />
       )}
       {showHeader && (title || icon || headerExtra || count != null) && (
-        <div className="flex items-center justify-between gap-3 px-3 h-9 border-b border-border shrink-0 bg-muted/30">
+        <div className="relative z-30 flex items-center justify-between gap-3 px-3 h-9 border-b border-border shrink-0 bg-muted/30">
           <div className="flex items-center gap-2 min-w-0">
             {icon}
-            {title && (
-              <h3 className="text-sm font-semibold text-secondary-foreground truncate">
-                {title}
-              </h3>
-            )}
+            {title &&
+              (editingTitle ? (
+                <input
+                  ref={titleInputRef}
+                  type="text"
+                  value={draftTitle}
+                  maxLength={WIDGET_TITLE_MAX}
+                  autoFocus
+                  onChange={(e) => setDraftTitle(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitRename();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelRename();
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="min-w-0 flex-1 h-6 -my-0.5 px-1 text-sm font-semibold rounded bg-background border border-primary/60 outline-none focus:ring-1 focus:ring-ring text-secondary-foreground"
+                />
+              ) : canRename ? (
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    beginRename();
+                  }}
+                  title="Clique duas vezes para renomear"
+                  className="flex min-w-0 items-center -mx-1 rounded px-1 cursor-text transition-colors hover:bg-accent/60"
+                >
+                  <h3 className="text-sm font-semibold text-secondary-foreground truncate">
+                    {title}
+                  </h3>
+                </button>
+              ) : (
+                <h3 className="text-sm font-semibold text-secondary-foreground truncate">
+                  {title}
+                </h3>
+              ))}
             {count != null && (
               <span className="shrink-0 rounded-md bg-muted/70 text-muted-foreground text-[10px] font-medium tabular-nums px-1.5 py-0.5">
                 {count}

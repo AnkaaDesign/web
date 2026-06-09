@@ -7,6 +7,7 @@
 // dashboard table widgets.
 
 import { useMemo, useState } from "react";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import {
@@ -179,7 +180,7 @@ const COLUMN_CATALOG: ColumnDef[] = [
     label: "Marca",
     track: "minmax(0, 1fr)",
     render: (b) => (
-      <span className="text-sm truncate">{b.item?.brand?.name || "—"}</span>
+      <span className="text-sm truncate">{b.item?.brands?.map((br: any) => br.name).join(", ") || "—"}</span>
     ),
   },
   {
@@ -447,7 +448,7 @@ function buildParams(config: BorrowTableConfig): Record<string, unknown> {
     take: config.limit,
     orderBy: buildOrderBy(config.sorts),
     include: {
-      item: { include: { brand: true, category: true } },
+      item: { include: { brands: true, category: true } },
       user: { include: { sector: true } },
     } as any,
   };
@@ -791,33 +792,26 @@ function BorrowTableConfigComponent({
   const currentAccentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
 
   return (
-    <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1 -mr-1">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={c.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Empréstimos"
-        />
-      </div>
-
+    <div className="space-y-3">
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
-          <TabsTrigger value="appearance" className="gap-1">
-            <IconAdjustments className="h-3.5 w-3.5" /> Aparência
-          </TabsTrigger>
-          <TabsTrigger value="columns" className="gap-1">
-            <IconColumns className="h-3.5 w-3.5" /> Colunas e ordenação
-          </TabsTrigger>
-          <TabsTrigger value="filters" className="gap-1">
-            <IconFilter className="h-3.5 w-3.5" /> Filtros
-          </TabsTrigger>
-        </TabsList>
+        <WidgetTabsBar>
+          <TabsList className="self-start">
+            <TabsTrigger value="appearance" className="gap-1">
+              <IconAdjustments className="h-3.5 w-3.5" /> Aparência
+            </TabsTrigger>
+            <TabsTrigger value="columns" className="gap-1">
+              <IconColumns className="h-3.5 w-3.5" /> Colunas e ordenação
+            </TabsTrigger>
+            <TabsTrigger value="filters" className="gap-1">
+              <IconFilter className="h-3.5 w-3.5" /> Filtros
+            </TabsTrigger>
+          </TabsList>
+        </WidgetTabsBar>
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Acento (cor e ícone)" defaultOpen>
+            <Section title="Destaque (cor e ícone)" defaultOpen>
               <AccentPicker
                 value={{
                   color: currentAccentColor,
@@ -834,24 +828,24 @@ function BorrowTableConfigComponent({
               />
             </Section>
             <Section title="Densidade e linhas">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+              <div className="space-y-2">
                 <DensitySegmented
                   value={c.display?.density ?? "comfortable"}
                   onChange={(d) => setDisplay("density", d)}
+                />
+              </div>
+            </Section>
+            <Section title="Cabeçalho e link">
+              <div className="space-y-1">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={c.display?.showHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("showHeader", v)}
                 />
                 <ToggleRow
                   label="Cabeçalho fixo"
                   checked={c.display?.stickyHeader ?? true}
                   onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-                />
-              </div>
-            </Section>
-            <Section title="Cabeçalho e link">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <ToggleRow
-                  label="Exibir cabeçalho"
-                  checked={c.display?.showHeader ?? true}
-                  onCheckedChange={(v) => setDisplay("showHeader", v)}
                 />
                 <ToggleRow
                   label="Exibir contagem"
@@ -889,7 +883,7 @@ function BorrowTableConfigComponent({
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Busca</Label>
             <Input
               value={c.filters.searchingFor}
@@ -899,7 +893,7 @@ function BorrowTableConfigComponent({
               placeholder="Item, código, usuário..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Status</Label>
             <Combobox
               mode="multiple"
@@ -912,7 +906,7 @@ function BorrowTableConfigComponent({
               searchPlaceholder="Buscar status..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Período (Emprestado em)</Label>
             <Combobox
               mode="single"
@@ -927,7 +921,7 @@ function BorrowTableConfigComponent({
               clearable={false}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Itens</Label>
             <Combobox
               mode="multiple"
@@ -938,7 +932,7 @@ function BorrowTableConfigComponent({
               searchPlaceholder="Buscar item..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Categorias</Label>
             <Combobox
               mode="multiple"
@@ -949,7 +943,7 @@ function BorrowTableConfigComponent({
               searchPlaceholder="Buscar categoria..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Marcas</Label>
             <Combobox
               mode="multiple"
@@ -960,7 +954,7 @@ function BorrowTableConfigComponent({
               searchPlaceholder="Buscar marca..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Usuários</Label>
             <Combobox
               mode="multiple"
@@ -971,7 +965,7 @@ function BorrowTableConfigComponent({
               searchPlaceholder="Buscar usuário..."
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
             <ToggleRow
               label="Esconder devolvidos"
               checked={c.filters.hideReturned}

@@ -9,7 +9,7 @@ import type { Item } from "@/types";
 const ITEM_INCLUDE = {
   prices: true,
   measures: true,
-  brand: true,
+  brands: true,
   category: true,
 } as const;
 
@@ -122,7 +122,7 @@ export function CategoryItemSelector({
   );
 
   const renderItem = useCallback((item: Item) => {
-    const brand = item.brand?.name;
+    const brand = item.brands?.map((b) => b.name).join(", ");
     const code = item.uniCode;
     const parts: string[] = [];
     if (code) parts.push(code);

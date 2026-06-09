@@ -103,7 +103,7 @@ export const createPpeColumns = (canViewPrices: boolean = true): PpeColumn[] => 
   {
     key: "brand.name",
     header: "MARCA",
-    accessor: (item) => <div className="truncate">{item.brand?.name || "-"}</div>,
+    accessor: (item) => <div className="truncate">{item.brands?.map((b) => b.name).join(", ") || "-"}</div>,
     sortable: true,
     className: "w-32",
     align: "left",

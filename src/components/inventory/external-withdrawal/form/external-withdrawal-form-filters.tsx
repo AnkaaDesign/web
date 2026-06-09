@@ -72,11 +72,12 @@ export function ExternalWithdrawalFormFilters({ open, onOpenChange, filters, onF
       }
     }
 
-    if (where.brandId) {
-      if (typeof where.brandId === "string") {
-        currentState.brandIds = [where.brandId];
-      } else if (where.brandId.in) {
-        currentState.brandIds = where.brandId.in;
+    if (where.brands?.some?.id) {
+      const some = where.brands.some.id;
+      if (typeof some === "string") {
+        currentState.brandIds = [some];
+      } else if (some.in) {
+        currentState.brandIds = some.in;
       }
     }
 
@@ -145,12 +146,12 @@ export function ExternalWithdrawalFormFilters({ open, onOpenChange, filters, onF
         // Handle "no brand" case
         const otherIds = localState.brandIds.filter((id) => id !== "null");
         if (otherIds.length > 0) {
-          where.OR = [...(where.OR || []), { brandId: null }, { brandId: { in: otherIds } }];
+          where.OR = [...(where.OR || []), { brands: { none: {} } }, { brands: { some: { id: { in: otherIds } } } }];
         } else {
-          where.brandId = null;
+          where.brands = { none: {} };
         }
       } else {
-        where.brandId = { in: localState.brandIds };
+        where.brands = { some: { id: { in: localState.brandIds } } };
       }
     }
 

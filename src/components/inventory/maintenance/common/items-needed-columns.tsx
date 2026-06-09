@@ -33,8 +33,8 @@ export const createItemsNeededColumns = (canViewPrices: boolean = true): ItemNee
   {
     key: "brand.name",
     header: "MARCA",
-    accessor: (item) => <div className="truncate">{item.brand?.name || "-"}</div>,
-    sortable: true,
+    accessor: (item) => <div className="truncate">{item.brands?.map((b) => b.name).join(", ") || "-"}</div>,
+    sortable: false,
     className: "w-32",
     align: "left",
   },

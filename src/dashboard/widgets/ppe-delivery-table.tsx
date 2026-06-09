@@ -14,6 +14,7 @@
 // (the same batch endpoints the list page uses; we just submit a single id).
 
 import { useDeferredValue, useMemo, useState } from "react";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import {
@@ -782,18 +783,9 @@ function PpeDeliveryTableConfigComponent({
   const currentAccentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
 
   return (
-    <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1 -mr-1">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={c.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Entregas de EPI"
-        />
-      </div>
-
+    <div className="space-y-3">
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
+        <WidgetTabsBar><TabsList className="self-start">
           <TabsTrigger value="appearance" className="gap-1">
             <IconAdjustments className="h-3.5 w-3.5" /> Aparência
           </TabsTrigger>
@@ -803,12 +795,12 @@ function PpeDeliveryTableConfigComponent({
           <TabsTrigger value="filters" className="gap-1">
             <IconFilter className="h-3.5 w-3.5" /> Filtros
           </TabsTrigger>
-        </TabsList>
+        </TabsList></WidgetTabsBar>
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Acento (cor e ícone)" defaultOpen>
+            <Section title="Destaque (cor e ícone)" defaultOpen>
               <AccentPicker
                 value={{
                   color: currentAccentColor,
@@ -825,24 +817,24 @@ function PpeDeliveryTableConfigComponent({
               />
             </Section>
             <Section title="Densidade e linhas">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+              <div className="space-y-2">
                 <DensitySegmented
                   value={c.display.density}
                   onChange={(d) => setDisplay("density", d)}
+                />
+              </div>
+            </Section>
+            <Section title="Cabeçalho e link">
+              <div className="space-y-1">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={c.display.showHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("showHeader", v)}
                 />
                 <ToggleRow
                   label="Cabeçalho fixo"
                   checked={c.display.stickyHeader}
                   onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-                />
-              </div>
-            </Section>
-            <Section title="Cabeçalho e link">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <ToggleRow
-                  label="Exibir cabeçalho"
-                  checked={c.display.showHeader ?? true}
-                  onCheckedChange={(v) => setDisplay("showHeader", v)}
                 />
                 <ToggleRow
                   label="Exibir contagem"
@@ -894,7 +886,7 @@ function PpeDeliveryTableConfigComponent({
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Busca padrão</Label>
             <Input
               value={c.filters.searchingFor}
@@ -908,7 +900,7 @@ function PpeDeliveryTableConfigComponent({
               prevalece.
             </p>
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Status</Label>
             <Combobox
               mode="multiple"
@@ -921,7 +913,7 @@ function PpeDeliveryTableConfigComponent({
               searchPlaceholder="Buscar status..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">EPIs</Label>
             <Combobox
               mode="multiple"
@@ -932,7 +924,7 @@ function PpeDeliveryTableConfigComponent({
               searchPlaceholder="Buscar EPI..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Colaboradores</Label>
             <Combobox
               mode="multiple"

@@ -132,7 +132,7 @@ export function MaintenanceItemsCard({ maintenanceItems, className }: Maintenanc
 
                         {item.category && <p className="text-xs text-muted-foreground truncate">{item.category.name}</p>}
 
-                        {item.brand && <p className="text-xs text-muted-foreground truncate">Marca: {item.brand.name}</p>}
+                        {item.brands && item.brands.length > 0 && <p className="text-xs text-muted-foreground truncate">Marcas: {item.brands.map((b) => b.name).join(", ")}</p>}
                       </div>
 
                       <div className="mt-3">

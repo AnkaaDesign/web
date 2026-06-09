@@ -36,7 +36,7 @@ export default function ItemStockBalancePage() {
         id: { in: itemIds },
       },
       include: {
-        brand: true,
+        brands: true,
         category: true,
       },
     },

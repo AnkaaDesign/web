@@ -48,10 +48,10 @@ export function RelatedItemsCard({ item, className }: RelatedItemsCardProps) {
                             {relatedItem.isActive ? "Ativo" : "Inativo"}
                           </Badge>
                         </div>
-                        {(relatedItem.brand || relatedItem.category) && (
+                        {((relatedItem.brands && relatedItem.brands.length > 0) || relatedItem.category) && (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            {relatedItem.brand && <span className="truncate">{relatedItem.brand.name}</span>}
-                            {relatedItem.brand && relatedItem.category && <span className="font-enhanced-unicode">•</span>}
+                            {relatedItem.brands && relatedItem.brands.length > 0 && <span className="truncate">{relatedItem.brands.map((b) => b.name).join(", ")}</span>}
+                            {relatedItem.brands && relatedItem.brands.length > 0 && relatedItem.category && <span className="font-enhanced-unicode">•</span>}
                             {relatedItem.category && <span className="truncate">{relatedItem.category.name}</span>}
                           </div>
                         )}

@@ -15,7 +15,7 @@ import {
 } from "../../components/ui/collapsible";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
-import { Switch } from "../../components/ui/switch";
+import { Checkbox } from "../../components/ui/checkbox";
 import { cn } from "../../lib/utils";
 
 interface HomeDashboardWidgetBodyProps<TSlice> {
@@ -129,30 +129,58 @@ export const YES_NO_OPTIONS: Array<{ value: "yes" | "no"; label: string }> = [
 ];
 
 /**
- * Boolean field rendered as a Switch. Canonical control for any boolean config
- * (replaces the old Sim/Não dropdown). See WIDGET_CONFIG_SPEC.md §2.2 — a
- * dropdown to flip a boolean is the heaviest possible control; a Switch matches
- * the mobile app and is one tap.
+ * Boolean field rendered as a full-width, clickable checkbox row. Canonical
+ * control for any boolean config across every widget. The whole row is the hit
+ * target (checkbox + label + hint), the checkbox sits on the left aligned to
+ * the first text line, and selection state matches the column picker so the
+ * config UI speaks one visual language. `role="switch"` + `aria-checked` carry
+ * the state and the inner Checkbox is purely presentational (pointer-events-none
+ * + aria-hidden + tabIndex=-1) to avoid double-toggling.
  */
 export function ToggleRow({
   label,
   hint,
   checked,
   onCheckedChange,
+  disabled = false,
 }: {
   label: string;
   hint?: string;
   checked: boolean;
   onCheckedChange: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="space-y-0.5">
-        <Label className="text-xs">{label}</Label>
-        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
-      </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onCheckedChange(!checked)}
+      className={cn(
+        "flex w-full gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors",
+        // Center the checkbox with a single-line label; only top-align when a
+        // multi-line hint is present so it tracks the first line.
+        hint ? "items-start" : "items-center",
+        "hover:bg-accent/40 disabled:opacity-50 disabled:cursor-not-allowed",
+      )}
+    >
+      <Checkbox
+        checked={checked}
+        disabled={disabled}
+        tabIndex={-1}
+        aria-hidden="true"
+        className={cn("shrink-0 pointer-events-none", hint && "mt-0.5")}
+      />
+      <span className="min-w-0">
+        <span className="block text-xs font-medium leading-tight text-foreground">{label}</span>
+        {hint && (
+          <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+            {hint}
+          </span>
+        )}
+      </span>
+    </button>
   );
 }
 

@@ -14,6 +14,7 @@
 // uses. Combobox is used for all filter dropdowns (per user preference).
 
 import { useMemo, useState } from "react";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import {
@@ -159,7 +160,7 @@ const COLUMN_CATALOG: ColumnDef[] = [
     label: "Marca",
     track: "minmax(0, 1fr)",
     render: (i) => (
-      <span className="text-sm truncate">{(i as any).brand?.name || "—"}</span>
+      <span className="text-sm truncate">{(i as any).brands?.map((b: any) => b.name).join(", ") || "—"}</span>
     ),
   },
   {
@@ -474,7 +475,7 @@ function buildParams(config: ItemTableConfig): Record<string, unknown> {
   const params: Record<string, unknown> = {
     take: config.limit,
     orderBy: (config.sorts ?? []).map((s) => ({ [s.key]: s.direction })),
-    include: { brand: true, category: true, supplier: true, prices: true } as any,
+    include: { brands: true, category: true, supplier: true, prices: true } as any,
   };
   if (f.searchingFor) params.searchingFor = f.searchingFor;
   if (f.stockLevels.length > 0) params.stockLevels = f.stockLevels;
@@ -814,36 +815,26 @@ function ItemTableConfigComponent({
   const currentAccentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
 
   return (
-    <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1 -mr-1">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={c.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Itens"
-        />
-        <p className="text-[10px] text-muted-foreground">
-          A cor escolhida abaixo será aplicada ao título.
-        </p>
-      </div>
-
+    <div className="space-y-3">
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
-          <TabsTrigger value="appearance" className="gap-1">
-            <IconAdjustments className="h-3.5 w-3.5" /> Aparência
-          </TabsTrigger>
-          <TabsTrigger value="columns" className="gap-1">
-            <IconColumns className="h-3.5 w-3.5" /> Colunas e ordenação
-          </TabsTrigger>
-          <TabsTrigger value="filters" className="gap-1">
-            <IconFilter className="h-3.5 w-3.5" /> Filtros
-          </TabsTrigger>
-        </TabsList>
+        <WidgetTabsBar>
+          <TabsList className="self-start">
+            <TabsTrigger value="appearance" className="gap-1">
+              <IconAdjustments className="h-3.5 w-3.5" /> Aparência
+            </TabsTrigger>
+            <TabsTrigger value="columns" className="gap-1">
+              <IconColumns className="h-3.5 w-3.5" /> Colunas e ordenação
+            </TabsTrigger>
+            <TabsTrigger value="filters" className="gap-1">
+              <IconFilter className="h-3.5 w-3.5" /> Filtros
+            </TabsTrigger>
+          </TabsList>
+        </WidgetTabsBar>
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Acento (cor e ícone)" defaultOpen>
+            <Section title="Destaque (cor e ícone)" defaultOpen>
               <AccentPicker
                 value={{
                   color: currentAccentColor,
@@ -860,24 +851,24 @@ function ItemTableConfigComponent({
               />
             </Section>
             <Section title="Densidade e linhas">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+              <div className="space-y-2">
                 <DensitySegmented
                   value={c.display?.density ?? "comfortable"}
                   onChange={(d) => setDisplay("density", d)}
+                />
+              </div>
+            </Section>
+            <Section title="Cabeçalho e link">
+              <div className="space-y-1">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={c.display?.showHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("showHeader", v)}
                 />
                 <ToggleRow
                   label="Cabeçalho fixo"
                   checked={c.display?.stickyHeader ?? true}
                   onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-                />
-              </div>
-            </Section>
-            <Section title="Cabeçalho e link">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <ToggleRow
-                  label="Exibir cabeçalho"
-                  checked={c.display?.showHeader ?? true}
-                  onCheckedChange={(v) => setDisplay("showHeader", v)}
                 />
                 <ToggleRow
                   label="Exibir contagem"
@@ -908,7 +899,7 @@ function ItemTableConfigComponent({
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Busca</Label>
             <Input
               value={c.filters.searchingFor}
@@ -916,7 +907,7 @@ function ItemTableConfigComponent({
               placeholder="Nome, código, marca, categoria..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Níveis de estoque</Label>
             <Combobox
               mode="multiple"
@@ -927,7 +918,7 @@ function ItemTableConfigComponent({
               searchPlaceholder="Buscar nível..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Marcas</Label>
             <Combobox
               mode="multiple"
@@ -938,7 +929,7 @@ function ItemTableConfigComponent({
               searchPlaceholder="Buscar marca..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Categorias</Label>
             <Combobox
               mode="multiple"
@@ -949,7 +940,7 @@ function ItemTableConfigComponent({
               searchPlaceholder="Buscar categoria..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Fornecedores</Label>
             <Combobox
               mode="multiple"
@@ -960,7 +951,7 @@ function ItemTableConfigComponent({
               searchPlaceholder="Buscar fornecedor..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">ABC</Label>
             <Combobox
               mode="multiple"
@@ -972,7 +963,7 @@ function ItemTableConfigComponent({
               placeholder="Todas as classes ABC"
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">XYZ</Label>
             <Combobox
               mode="multiple"
@@ -985,7 +976,7 @@ function ItemTableConfigComponent({
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Ativo</Label>
               <Combobox
                 mode="single"
@@ -1000,7 +991,7 @@ function ItemTableConfigComponent({
                 clearable={false}
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Tem ponto de reposição</Label>
               <Combobox
                 mode="single"
@@ -1017,7 +1008,7 @@ function ItemTableConfigComponent({
                 clearable={false}
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Tem qtde máxima</Label>
               <Combobox
                 mode="single"
@@ -1034,7 +1025,7 @@ function ItemTableConfigComponent({
                 clearable={false}
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Atribuir ao usuário</Label>
               <Combobox
                 mode="single"
@@ -1051,7 +1042,7 @@ function ItemTableConfigComponent({
                 clearable={false}
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Quant. mínima</Label>
               <Input
                 type="number"
@@ -1062,7 +1053,7 @@ function ItemTableConfigComponent({
                 }}
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Quant. máxima</Label>
               <Input
                 type="number"

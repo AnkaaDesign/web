@@ -110,7 +110,7 @@ export const orderItemIncludeSchema = z
         z.object({
           include: z
             .object({
-              brand: z.boolean().optional(),
+              brands: z.boolean().optional(),
               category: z.boolean().optional(),
               supplier: z.boolean().optional(),
               activities: z.boolean().optional(),
@@ -216,6 +216,7 @@ export const orderOrderBySchema = z.union([
   z
     .object({
       id: orderByDirectionSchema.optional(),
+      orderNumber: orderByDirectionSchema.optional(),
       description: orderByDirectionSchema.optional(),
       forecast: orderByDirectionSchema.optional(),
       status: orderByDirectionSchema.optional(),
@@ -230,6 +231,7 @@ export const orderOrderBySchema = z.union([
     z
       .object({
         id: orderByDirectionSchema.optional(),
+        orderNumber: orderByDirectionSchema.optional(),
         description: orderByDirectionSchema.optional(),
         forecast: orderByDirectionSchema.optional(),
         status: orderByDirectionSchema.optional(),
@@ -844,7 +846,7 @@ const orderTransform = (data: any) => {
         { items: { some: { item: { name: { contains: searchTerm, mode: "insensitive" } } } } },
 
         // Search by item brand through order items
-        { items: { some: { item: { brand: { name: { contains: searchTerm, mode: "insensitive" } } } } } },
+        { items: { some: { item: { brands: { some: { name: { contains: searchTerm, mode: "insensitive" } } } } } } },
 
         // Search by item category through order items
         { items: { some: { item: { category: { name: { contains: searchTerm, mode: "insensitive" } } } } } },

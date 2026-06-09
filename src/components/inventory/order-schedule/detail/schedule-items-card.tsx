@@ -190,7 +190,7 @@ export function ScheduleItemsCard({ items, projection, projectionMeta, hasGapOpt
         item.name?.toLowerCase().includes(q) ||
         item.uniCode?.toLowerCase().includes(q) ||
         item.barcodes?.some((b) => b.toLowerCase().includes(q)) ||
-        item.brand?.name?.toLowerCase().includes(q) ||
+        item.brands?.some((b) => b.name.toLowerCase().includes(q)) ||
         item.category?.name?.toLowerCase().includes(q),
     );
   }, [safeItems, searchText]);

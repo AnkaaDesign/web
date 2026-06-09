@@ -6,6 +6,7 @@
 import { widgetRegistry } from "../registry";
 import { taskTableWidget } from "./task-table";
 import { itemTableWidget } from "./item-table";
+import { orderTableWidget } from "./order-table";
 import { borrowTableWidget } from "./borrow-table";
 import { installmentTableWidget } from "./installment-table";
 import { ppeDeliveryTableWidget } from "./ppe-delivery-table";
@@ -24,6 +25,7 @@ const allWidgets: any[] = [
   // Configurable workhorses (preferred — instantiate as many as needed)
   taskTableWidget,
   itemTableWidget,
+  orderTableWidget,
   borrowTableWidget,
   installmentTableWidget,
   // HR approval queues (sector-restricted)

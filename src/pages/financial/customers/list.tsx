@@ -17,7 +17,7 @@ export const FinancialCustomersListPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
-      <div className="h-full flex flex-col px-4 pt-4">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Clientes"
           favoritePage={FAVORITE_PAGES.FINANCEIRO_CLIENTES_LISTAR}
@@ -35,11 +35,10 @@ export const FinancialCustomersListPage = () => {
               variant: "default" as const,
             },
           ]}
+          className="flex-shrink-0"
         />
-        <div className="flex-1 overflow-y-auto pb-6">
-          <div className="mt-4 space-y-4">
-            <CustomerList className="flex-1 min-h-0" />
-          </div>
+        <div className="flex-1 min-h-0 pb-6 flex flex-col">
+          <CustomerList className="h-full" />
         </div>
       </div>
     </PrivilegeRoute>

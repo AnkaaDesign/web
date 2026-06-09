@@ -18,7 +18,7 @@ export const maintenanceIncludeSchema: z.ZodSchema = z.lazy(() =>
           z.object({
             include: z
               .object({
-                brand: z.boolean().optional(),
+                brands: z.boolean().optional(),
                 category: z.boolean().optional(),
                 supplier: z.boolean().optional(),
               })
@@ -38,7 +38,7 @@ export const maintenanceIncludeSchema: z.ZodSchema = z.lazy(() =>
                     z.object({
                       include: z
                         .object({
-                          brand: z.boolean().optional(),
+                          brands: z.boolean().optional(),
                           category: z.boolean().optional(),
                           supplier: z.boolean().optional(),
                         })
@@ -108,7 +108,7 @@ export const maintenanceItemIncludeSchema = z
         z.object({
           include: z
             .object({
-              brand: z.boolean().optional(),
+              brands: z.boolean().optional(),
               category: z.boolean().optional(),
               supplier: z.boolean().optional(),
             })
@@ -1047,7 +1047,7 @@ export const maintenanceScheduleIncludeSchema = z
         z.object({
           include: z
             .object({
-              brand: z.boolean().optional(),
+              brands: z.boolean().optional(),
               category: z.boolean().optional(),
               supplier: z.boolean().optional(),
             })

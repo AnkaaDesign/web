@@ -178,7 +178,7 @@ export function OrderList({ className }: OrderListProps) {
   // Use column visibility hook with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
     "order-list-visible-columns",
-    new Set(["description", "supplier.fantasyName", "statusOrder", "itemCount", ...(canViewPrices ? ["total"] : []), "forecast"])
+    new Set(["orderNumber", "description", "supplier.fantasyName", "statusOrder", "itemCount", ...(canViewPrices ? ["total"] : []), "forecast"])
   );
 
   // Get all available columns for column visibility manager

@@ -20,7 +20,7 @@ interface PpeExportProps {
 const EXPORT_COLUMNS: ExportColumn<Item>[] = [
   { id: "uniCode", label: "CÓDIGO ÚNICO", getValue: (item: Item) => item.uniCode || "" },
   { id: "name", label: "NOME", getValue: (item: Item) => item.name },
-  { id: "brand.name", label: "MARCA", getValue: (item: Item) => item.brand?.name || "" },
+  { id: "brand.name", label: "MARCA", getValue: (item: Item) => item.brands?.map((b) => b.name).join(", ") || "" },
   { id: "category.name", label: "CATEGORIA", getValue: (item: Item) => item.category?.name || "" },
   { id: "ppeCA", label: "CA", getValue: (item: Item) => item.ppeCA || "" },
   { id: "ppeType", label: "TIPO EPI", getValue: (item: Item) => (item.ppeType ? PPE_TYPE_LABELS[item.ppeType] || item.ppeType : "") },
@@ -95,7 +95,7 @@ export function PpeExport({ className, filters = {}, currentItems = [], totalRec
       ...filters,
       limit: totalRecords > 0 ? totalRecords : 10000, // Limit to prevent memory issues
       include: {
-        brand: true,
+        brands: true,
         category: true,
         supplier: true,
         prices: true,

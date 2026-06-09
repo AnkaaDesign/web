@@ -60,7 +60,7 @@ export function ItemBatchEditTable({ items, onCancel: _onCancel, onSubmit: _onSu
         data: {
           name: item.name,
           uniCode: item.uniCode || undefined,
-          brandId: item.brandId || undefined,
+          brandIds: item.brands?.map((b) => b.id) ?? [],
           categoryId: item.categoryId || undefined,
           supplierId: item.supplierId || undefined,
           isActive: item.isActive,
@@ -86,7 +86,7 @@ export function ItemBatchEditTable({ items, onCancel: _onCancel, onSubmit: _onSu
       const hasChanges =
         item.data.name !== originalItem.name ||
         item.data.uniCode !== originalItem.uniCode ||
-        item.data.brandId !== originalItem.brandId ||
+        JSON.stringify(item.data.brandIds ?? []) !== JSON.stringify(originalItem.brands?.map((b) => b.id) ?? []) ||
         item.data.categoryId !== originalItem.categoryId ||
         item.data.supplierId !== originalItem.supplierId ||
         item.data.isActive !== originalItem.isActive ||

@@ -26,7 +26,7 @@ export const BORROW_COLUMNS: BorrowColumn[] = [
 
   // Item Details
   { id: "item.uniCode", label: "Código do Item", group: "itemDetails", defaultVisible: false, description: "Código único do item" },
-  { id: "item.brand.name", label: "Marca", group: "itemDetails", defaultVisible: false, description: "Marca do item" },
+  { id: "item.brands", label: "Marca", group: "itemDetails", defaultVisible: false, description: "Marca do item" },
   { id: "item.category.name", label: "Categoria", group: "itemDetails", defaultVisible: false, description: "Categoria do item" },
   { id: "item.quantity", label: "Estoque Atual", group: "itemDetails", defaultVisible: false, description: "Quantidade atual em estoque do item" },
 

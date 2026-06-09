@@ -63,7 +63,7 @@ export const PersonalMyPpesRequest = () => {
         isActive: true,
       },
       include: {
-        brand: true,
+        brands: true,
         category: true,
       },
       orderBy: {

@@ -38,7 +38,7 @@ export default function BatchEditMovementsPage() {
       item: {
         include: {
           category: true,
-          brand: true,
+          brands: true,
         },
       },
       user: {

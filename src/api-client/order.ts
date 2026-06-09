@@ -85,6 +85,12 @@ export class OrderService {
     return response.data;
   }
 
+  /** Predicted next order number (highest saved + 1) — used to preview the order code before saving. */
+  async getNextOrderNumber(): Promise<{ success: boolean; data: { nextOrderNumber: number } }> {
+    const response = await apiClient.get<{ success: boolean; data: { nextOrderNumber: number } }>(`${this.basePath}/next-number`);
+    return response.data;
+  }
+
   // =====================
   // Order CRUD Operations
   // =====================
@@ -300,6 +306,7 @@ export const orderService = new OrderService();
 export const getOrders = (params: OrderGetManyFormData) => orderService.getOrders(params);
 export const getOrder = (id: string, params?: Omit<OrderGetByIdFormData, "id">) => orderService.getOrderById(id, params);
 export const getOrderById = (id: string, params?: Omit<OrderGetByIdFormData, "id">) => orderService.getOrderById(id, params);
+export const getNextOrderNumber = () => orderService.getNextOrderNumber();
 export const createOrder = (data: OrderCreateFormData, query?: OrderQueryFormData) => orderService.createOrder(data, query);
 export const updateOrder = (id: string, data: OrderUpdateFormData, query?: OrderQueryFormData) => orderService.updateOrder(id, data, query);
 export const deleteOrder = (id: string) => orderService.deleteOrder(id);

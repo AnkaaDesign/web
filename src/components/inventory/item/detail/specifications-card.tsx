@@ -55,7 +55,7 @@ export function SpecificationsCard({ item, className }: SpecificationsCardProps)
           <div>
             <h3 className="text-base font-semibold mb-4 text-foreground">Informações do Produto</h3>
             <div className="space-y-4">
-              <SpecRow label="Marca" value={item.brand ? item.brand.name : <NotDefined />} />
+              <SpecRow label="Marcas" value={item.brands?.length ? item.brands.map((b) => b.name).join(", ") : <NotDefined />} />
               <SpecRow label="Categoria" value={item.category ? item.category.name : <NotDefined />} />
               {item.supplier && <SpecRow label="Fornecedor" value={item.supplier.fantasyName} />}
             </div>

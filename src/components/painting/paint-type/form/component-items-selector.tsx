@@ -27,7 +27,7 @@ export function ComponentItemsSelector({ control, disabled, initialItems }: Comp
     return initialItems.map((item) => {
       const unicode = item.uniCode || "";
       const name = item.name || "";
-      const brand = item.brand?.name || "";
+      const brand = item.brands?.map((b) => b.name).join(", ") || "";
       const label = `${unicode} - ${name} - ${brand}`.replace(/^\s*-\s*/, "").replace(/\s*-\s*$/, "");
 
       const option = { label, value: item.id };
@@ -48,7 +48,7 @@ export function ComponentItemsSelector({ control, disabled, initialItems }: Comp
         include: {
           measures: true,
           category: true,
-          brand: true,
+          brands: true,
         },
       };
 
@@ -66,7 +66,7 @@ export function ComponentItemsSelector({ control, disabled, initialItems }: Comp
         // Format: unicode - name - brand
         const unicode = item.uniCode || "";
         const name = item.name || "";
-        const brand = item.brand?.name || "";
+        const brand = item.brands?.map((b) => b.name).join(", ") || "";
         const label = `${unicode} - ${name} - ${brand}`.replace(/^\s*-\s*/, "").replace(/\s*-\s*$/, "");
 
         const option = {

@@ -22,6 +22,7 @@
 // not exposed inline (file uploads, multi-customer billing, payment terms).
 
 import { useMemo, useState } from "react";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
 import { useReturnTo } from "@/hooks/common/use-return-to";
@@ -264,7 +265,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Nome / Logomarca</Label>
               <Input
                 value={taskName}
@@ -272,7 +273,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
                 placeholder="Ex: Frota verão"
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Identificador</Label>
               <Input
                 value={serialNumber}
@@ -282,7 +283,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Prazo</Label>
               <input
                 type="date"
@@ -291,7 +292,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
                 className="flex h-10 w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm focus:outline-none"
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Liberação</Label>
               <input
                 type="date"
@@ -301,7 +302,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
               />
             </div>
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Descrição</Label>
             <textarea
               value={details}
@@ -331,7 +332,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
               className="flex h-10 w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm focus:outline-none"
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Texto de garantia (opcional)</Label>
             <textarea
               value={customGuaranteeText}
@@ -341,7 +342,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
               className="w-full text-sm rounded-md border border-input bg-transparent px-3 py-2 focus:outline-none"
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Dias de previsão custom (opcional)</Label>
             <Input
               type="number"
@@ -468,28 +469,19 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
 
   return (
     <div className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={config.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Novo Orçamento"
-        />
-      </div>
-
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
+        <WidgetTabsBar><TabsList className="self-start">
           <TabsTrigger value="appearance" className="gap-1">
             <IconAdjustments className="h-3.5 w-3.5" /> Aparência
           </TabsTrigger>
           <TabsTrigger value="behavior" className="gap-1">
             <IconLayout className="h-3.5 w-3.5" /> Comportamento
           </TabsTrigger>
-        </TabsList>
+        </TabsList></WidgetTabsBar>
 
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Acento (cor e ícone)" defaultOpen>
+            <Section title="Destaque (cor e ícone)" defaultOpen>
               <AccentPicker
                 value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
                 onChange={(next) =>

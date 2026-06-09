@@ -13,6 +13,7 @@
 // categories to show by default, whether to show inline filter controls.
 
 import { useMemo, useState } from "react";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import { format, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -42,7 +43,6 @@ import {
 } from "../../hooks";
 import { Combobox } from "../../components/ui/combobox";
 import type { ComboboxOption } from "../../components/ui/combobox";
-import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import {
   Tooltip,
@@ -631,18 +631,9 @@ function HrCalendarConfigComponent({
   );
 
   return (
-    <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 -mr-1">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={config.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Calendário de Colaboradores"
-        />
-      </div>
-
+    <div className="space-y-3">
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
+        <WidgetTabsBar><TabsList className="self-start">
           <TabsTrigger value="appearance" className="gap-1">
             <IconAdjustments className="h-3.5 w-3.5" /> Aparência
           </TabsTrigger>
@@ -652,11 +643,11 @@ function HrCalendarConfigComponent({
           <TabsTrigger value="filters" className="gap-1">
             <IconUserSearch className="h-3.5 w-3.5" /> Filtros
           </TabsTrigger>
-        </TabsList>
+        </TabsList></WidgetTabsBar>
 
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Acento (cor e ícone)" defaultOpen>
+            <Section title="Destaque (cor e ícone)" defaultOpen>
               <AccentPicker
                 value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
                 onChange={(next) =>
@@ -669,16 +660,18 @@ function HrCalendarConfigComponent({
               />
             </Section>
             <Section title="Cabeçalho e link">
-              <ToggleRow
-                label="Exibir cabeçalho"
-                checked={config.display.showHeader ?? true}
-                onCheckedChange={(v) => setDisplay("showHeader", v)}
-              />
-              <ToggleRow
-                label='Link "Ver todos"'
-                checked={config.display.showViewAllLink ?? true}
-                onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
-              />
+              <div className="space-y-1">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={config.display.showHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("showHeader", v)}
+                />
+                <ToggleRow
+                  label='Link "Ver todos"'
+                  checked={config.display.showViewAllLink ?? true}
+                  onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
+                />
+              </div>
             </Section>
           </SectionGroup>
         </TabsContent>
@@ -686,7 +679,7 @@ function HrCalendarConfigComponent({
         <TabsContent value="display" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
             <Section title="Categorias visíveis" defaultOpen>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="space-y-1">
                 <ToggleRow
                   label="Férias / Ausência"
                   checked={config.display.showVacation}
@@ -711,7 +704,7 @@ function HrCalendarConfigComponent({
             </Section>
 
             <Section title="Layout">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className="space-y-1">
                 <ToggleRow
                   label="Filtros no cabeçalho"
                   checked={config.display.showFilters}
@@ -738,7 +731,7 @@ function HrCalendarConfigComponent({
 
         <TabsContent value="filters" className="space-y-3 mt-0">
           <Section title="Filtros padrão" defaultOpen>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-xs">Colaborador padrão</Label>
               <Combobox
                 options={userOptions}
@@ -751,7 +744,7 @@ function HrCalendarConfigComponent({
                 searchable
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-xs">Setor padrão</Label>
               <Combobox
                 options={sectorOptions}

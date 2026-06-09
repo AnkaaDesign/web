@@ -26,7 +26,7 @@ const EditCategoryPage = () => {
     include: {
       items: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
       },

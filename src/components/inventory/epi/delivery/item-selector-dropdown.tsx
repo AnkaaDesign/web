@@ -130,7 +130,7 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
           include: {
             category: true,
             measures: true,
-            brand: true,
+            brands: true,
           },
         };
 
@@ -188,7 +188,7 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
 
           // Format label: name + brand + size
           const displaySize = itemSize ? (itemSize.startsWith("SIZE_") ? itemSize.replace("SIZE_", "") : itemSize) : null;
-          const brandName = item.brand?.name || null;
+          const brandName = item.brands?.map((b) => b.name).join(", ") || null;
           const labelParts = [item.name, brandName, displaySize].filter(Boolean);
           const label = labelParts.join(" - ");
 
@@ -205,7 +205,7 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
               size: itemSize,
               ppeType: item.ppeType || null,
               categoryName: item.category?.name || null,
-              brandName: item.brand?.name || null,
+              brandName: item.brands?.map((b) => b.name).join(", ") || null,
               isMatchingSize,
               typeOrder,
               sizeOrder,

@@ -81,7 +81,7 @@ export const OrderBatchCreateForm = () => {
   const { data: selectedItemsResponse } = useItems({
     where: selectedItems.size > 0 ? { id: { in: Array.from(selectedItems) } } : undefined,
     include: {
-      brand: true,
+      brands: true,
       category: true,
       prices: {
         orderBy: { createdAt: "desc" },
@@ -676,7 +676,7 @@ export const OrderBatchCreateForm = () => {
                   <tr>
                     <td class="font-mono">${item.uniCode || "-"}</td>
                     <td class="font-medium">${item.name}</td>
-                    <td>${item.brand?.name || "-"}</td>
+                    <td>${item.brands?.map((b) => b.name).join(", ") || "-"}</td>
                     <td>${getMeasureDisplay()}</td>
                     <td class="text-right font-medium">${quantity.toLocaleString("pt-BR")}</td>
                     ${canViewPrices ? `<td class="text-right">${formatCurrency(price)}</td><td class="text-right font-semibold">${formatCurrency(total)}</td>` : ""}

@@ -108,7 +108,7 @@ export function PpeDeliveryItemCard({ ppeDelivery, className }: PpeDeliveryItemC
               <IconTag className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium text-muted-foreground">Marca</span>
             </div>
-            <span className="text-sm font-semibold text-foreground">{item.brand ? item.brand.name : <span className="text-muted-foreground italic">Não definida</span>}</span>
+            <span className="text-sm font-semibold text-foreground">{item.brands?.length ? item.brands.map((b) => b.name).join(", ") : <span className="text-muted-foreground italic">Não definida</span>}</span>
           </div>
 
           {/* Category */}

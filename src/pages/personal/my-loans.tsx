@@ -87,7 +87,7 @@ export const MyLoansPage = () => {
       include: {
         item: {
           include: {
-            brand: true,
+            brands: true,
             category: true,
           },
         },

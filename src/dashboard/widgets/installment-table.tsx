@@ -29,6 +29,7 @@ import {
   useState,
 } from "react";
 import { z } from "zod";
+import { WidgetTabsBar } from "../components/config-kit";
 import { useNavigate } from "react-router-dom";
 import { useReturnTo } from "@/hooks/common/use-return-to";
 import {
@@ -1221,35 +1222,28 @@ function ConfigComp({
 
   return (
     <div className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={config.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Boletos"
-        />
-      </div>
-
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
-          <TabsTrigger value="appearance" className="gap-1">
-            <IconAdjustments className="h-3.5 w-3.5" /> Aparência
-          </TabsTrigger>
-          <TabsTrigger value="columns" className="gap-1">
-            <IconColumns className="h-3.5 w-3.5" /> Colunas e ordenação
-          </TabsTrigger>
-          <TabsTrigger value="filters" className="gap-1">
-            <IconFilter className="h-3.5 w-3.5" /> Filtros
-          </TabsTrigger>
-          <TabsTrigger value="behavior" className="gap-1">
-            <IconLayout className="h-3.5 w-3.5" /> Comportamento
-          </TabsTrigger>
-        </TabsList>
+        <WidgetTabsBar>
+          <TabsList className="self-start">
+            <TabsTrigger value="appearance" className="gap-1">
+              <IconAdjustments className="h-3.5 w-3.5" /> Aparência
+            </TabsTrigger>
+            <TabsTrigger value="columns" className="gap-1">
+              <IconColumns className="h-3.5 w-3.5" /> Colunas e ordenação
+            </TabsTrigger>
+            <TabsTrigger value="filters" className="gap-1">
+              <IconFilter className="h-3.5 w-3.5" /> Filtros
+            </TabsTrigger>
+            <TabsTrigger value="behavior" className="gap-1">
+              <IconLayout className="h-3.5 w-3.5" /> Comportamento
+            </TabsTrigger>
+          </TabsList>
+        </WidgetTabsBar>
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Acento (cor e ícone)" defaultOpen>
+            <Section title="Destaque (cor e ícone)" defaultOpen>
               <AccentPicker
                 value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
                 onChange={(next) =>
@@ -1262,37 +1256,30 @@ function ConfigComp({
               />
             </Section>
             <Section title="Densidade e linhas">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+              <div className="space-y-2">
                 <DensitySegmented
                   value={config.display.density}
                   onChange={(d) => setDisplay("density", d)}
                 />
-                <ToggleRow
-                  label="Cabeçalho fixo"
-                  checked={config.display.stickyHeader}
-                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-                />
               </div>
             </Section>
             <Section title="Cabeçalho e link">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className="space-y-1">
                 <ToggleRow
                   label="Exibir cabeçalho"
                   checked={config.display.showHeader ?? true}
                   onCheckedChange={(v) => setDisplay("showHeader", v)}
                 />
                 <ToggleRow
+                  label="Cabeçalho fixo"
+                  checked={config.display.stickyHeader}
+                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
+                />
+                <ToggleRow
                   label="Exibir contagem"
                   checked={config.display.showCount}
                   onCheckedChange={(v) => setDisplay("showCount", v)}
                 />
-                <ToggleRow
-                  label='Link "Ver todos"'
-                  checked={config.display.showViewAllLink}
-                  onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                 <ToggleRow
                   label="Caixa de busca"
                   checked={config.display.showSearchBox}
@@ -1302,6 +1289,11 @@ function ConfigComp({
                   label="Chips de vencimento"
                   checked={config.display.showBucketChips}
                   onCheckedChange={(v) => setDisplay("showBucketChips", v)}
+                />
+                <ToggleRow
+                  label='Link "Ver todos"'
+                  checked={config.display.showViewAllLink}
+                  onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
                 />
               </div>
             </Section>
@@ -1338,7 +1330,7 @@ function ConfigComp({
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Vencimento padrão</Label>
             <Combobox
               mode="single"
@@ -1356,7 +1348,7 @@ function ConfigComp({
               clearable={false}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Status da parcela (vazio = todos)</Label>
             <Combobox
               mode="multiple"
@@ -1373,7 +1365,7 @@ function ConfigComp({
               }))}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Status do boleto (vazio = todos)</Label>
             <Combobox
               mode="multiple"
@@ -1390,7 +1382,7 @@ function ConfigComp({
               }))}
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Clientes (vazio = todos)</Label>
             <Combobox
               mode="multiple"
@@ -1405,7 +1397,7 @@ function ConfigComp({
               searchPlaceholder="Buscar cliente..."
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
             <ToggleRow
               label="Esconder pagas"
               checked={config.filters.hideFullyPaid}
@@ -1422,7 +1414,7 @@ function ConfigComp({
         {/* ---- BEHAVIOR ---- */}
         <TabsContent value="behavior" className="space-y-3 mt-0">
           <Section title="Layout" defaultOpen>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Modo de layout</Label>
               <Combobox
                 mode="single"
@@ -1442,7 +1434,7 @@ function ConfigComp({
             </div>
           </Section>
           <Section title="Atualização">
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Atualizar automaticamente</Label>
               <Combobox
                 mode="single"

@@ -36,6 +36,7 @@ import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { createOrderScheduleColumns, type OrderScheduleColumn, type OrderScheduleColumnContext } from "./order-schedule-table-columns";
+import { OrderScheduleTriggerDialog } from "../common/order-schedule-trigger-dialog";
 
 interface OrderScheduleTableProps {
   visibleColumns: Set<string>;
@@ -119,7 +120,7 @@ export function OrderScheduleTable({
   );
 
   // Fetch data
-  const { data, isLoading, error } = useOrderSchedules(queryParams);
+  const { data, isLoading, error, refetch } = useOrderSchedules(queryParams);
 
   const schedules = data?.data || [];
   const totalRecords = data?.meta?.totalRecords || 0;
@@ -145,6 +146,9 @@ export function OrderScheduleTable({
     items: OrderSchedule[];
     isBulk: boolean;
   } | null>(null);
+
+  // "Executar agora" target — opens the shared trigger dialog for a single schedule.
+  const [triggerTarget, setTriggerTarget] = useState<OrderSchedule | null>(null);
 
   // Column definitions - use centralized columns from order-schedule-table-columns
   const allColumns: OrderScheduleColumn[] = useMemo(() => createOrderScheduleColumns(), []);
@@ -268,6 +272,13 @@ export function OrderScheduleTable({
   const handleDelete = () => {
     if (contextMenu) {
       setDeleteDialog({ items: contextMenu.items, isBulk: contextMenu.isBulk });
+      setContextMenu(null);
+    }
+  };
+
+  const handleTriggerNow = () => {
+    if (contextMenu) {
+      setTriggerTarget(contextMenu.items[0]);
       setContextMenu(null);
     }
   };
@@ -490,6 +501,16 @@ export function OrderScheduleTable({
             </DropdownMenuItem>
           )}
 
+          {canEdit &&
+            !contextMenu?.isBulk &&
+            contextMenu?.items[0]?.isActive &&
+            !contextMenu?.items[0]?.finishedAt && (
+              <DropdownMenuItem onClick={handleTriggerNow}>
+                <IconPlayerPlay className="mr-2 h-4 w-4" />
+                Executar agora
+              </DropdownMenuItem>
+            )}
+
           {canEdit && contextMenu?.items.some((s) => !s.isActive) && (
             <DropdownMenuItem onClick={handleActivate} className="text-green-700">
               <IconPlayerPlay className="mr-2 h-4 w-4" />
@@ -515,6 +536,14 @@ export function OrderScheduleTable({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* "Executar agora" — same dialog as the schedule detail page */}
+      <OrderScheduleTriggerDialog
+        schedule={triggerTarget}
+        open={!!triggerTarget}
+        onOpenChange={(open) => !open && setTriggerTarget(null)}
+        onTriggered={() => refetch()}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>

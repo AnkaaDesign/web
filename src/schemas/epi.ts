@@ -536,7 +536,7 @@ export const ppeDeliveryIncludeSchema = z
         z.object({
           include: z
             .object({
-              brand: z.boolean().optional(),
+              brands: z.boolean().optional(),
               category: z.boolean().optional(),
               supplier: z.boolean().optional(),
               measures: z.boolean().optional(),
@@ -1165,7 +1165,7 @@ export const ppeDeliveryScheduleIncludeSchema = z
         z.object({
           include: z
             .object({
-              brand: z.boolean().optional(),
+              brands: z.boolean().optional(),
               category: z.boolean().optional(),
               supplier: z.boolean().optional(),
               prices: z.boolean().optional(),

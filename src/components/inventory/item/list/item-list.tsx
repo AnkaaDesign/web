@@ -78,7 +78,7 @@ export function ItemList({ className }: ItemListProps) {
     if (brands) {
       filters.brandIds = brands.split(",");
     } else if (brand) {
-      filters.where = { ...filters.where, brandId: brand };
+      filters.brandIds = [brand];
     }
 
     const supplier = params.get("supplier");
@@ -197,7 +197,6 @@ export function ItemList({ className }: ItemListProps) {
     else if (filters.where?.categoryId) params.category = filters.where.categoryId as string;
 
     if (filters.brandIds?.length) params.brands = filters.brandIds.join(",");
-    else if (filters.where?.brandId) params.brand = filters.where.brandId as string;
 
     if (filters.supplierIds?.length) params.suppliers = filters.supplierIds.join(",");
     else if (filters.where?.supplierId) params.supplier = filters.where.supplierId as string;

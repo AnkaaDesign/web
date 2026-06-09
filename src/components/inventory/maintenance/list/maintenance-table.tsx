@@ -97,7 +97,7 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
     include: {
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
       },

@@ -441,10 +441,10 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
                               {item?.category?.name || "Categoria"}
                             </span>
                           )}
-                          {item?.brandId && (
+                          {item?.brands && item.brands.length > 0 && (
                             <span className="flex items-center gap-1">
                               <IconTag className="h-3 w-3" />
-                              {item?.brand?.name || "Marca"}
+                              {item.brands.map((b) => b.name).join(", ")}
                             </span>
                           )}
                         </div>

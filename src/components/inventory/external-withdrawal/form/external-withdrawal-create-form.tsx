@@ -147,7 +147,7 @@ export const ExternalWithdrawalCreateForm = () => {
   const { data: selectedItemsResponse } = useItems({
     where: selectedItems.size > 0 ? { id: { in: Array.from(selectedItems) } } : undefined,
     include: {
-      brand: true,
+      brands: true,
       category: true,
       prices: {
         orderBy: { createdAt: "desc" },
@@ -876,7 +876,7 @@ export const ExternalWithdrawalCreateForm = () => {
                   <tr>
                     <td class="font-mono">${item.uniCode || "-"}</td>
                     <td class="font-medium">${item.name}</td>
-                    <td>${item.brand?.name || "-"}</td>
+                    <td>${item.brands?.map((b) => b.name).join(", ") || "-"}</td>
                     <td>${getMeasureDisplay()}</td>
                     <td class="text-right font-medium">${quantity.toLocaleString("pt-BR")}</td>
                     ${
@@ -1323,7 +1323,7 @@ export const ExternalWithdrawalCreateForm = () => {
                                   <TableRow key={item.id} className={cn("transition-colors", index % 2 === 1 && "bg-muted/10")}>
                                     <TableCell className="font-mono">{item.uniCode || "-"}</TableCell>
                                     <TableCell className="font-medium">{item.name}</TableCell>
-                                    <TableCell>{item.brand?.name || "-"}</TableCell>
+                                    <TableCell>{item.brands?.map((b) => b.name).join(", ") || "-"}</TableCell>
                                     <TableCell>{getMeasureDisplay()}</TableCell>
                                     <TableCell className="text-right font-medium">{quantity.toLocaleString("pt-BR")}</TableCell>
                                     {canViewPrices && withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (

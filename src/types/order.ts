@@ -119,6 +119,9 @@ export interface OrderItem extends BaseEntity {
 // =====================
 
 export interface Order extends BaseEntity {
+  // Incremental, human-readable order number (4-digit when formatted, e.g. "0001").
+  // Null for orders created before the numbering feature existed.
+  orderNumber: number | null;
   description: string;
   forecast: Date | null;
   status: ORDER_STATUS;
@@ -356,6 +359,7 @@ export interface OrderRuleWhere {
 
 export interface OrderOrderBy {
   id?: ORDER_BY_DIRECTION;
+  orderNumber?: ORDER_BY_DIRECTION;
   description?: ORDER_BY_DIRECTION;
   forecast?: ORDER_BY_DIRECTION;
   status?: ORDER_BY_DIRECTION;

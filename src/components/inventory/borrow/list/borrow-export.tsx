@@ -26,7 +26,7 @@ const EXPORT_COLUMNS: ExportColumn<Borrow>[] = [
   { id: "createdAt", label: "EMPRESTADO EM", getValue: (borrow: Borrow) => formatDate(new Date(borrow.createdAt)) },
   { id: "returnedAt", label: "DEVOLVIDO EM", getValue: (borrow: Borrow) => (borrow.returnedAt ? formatDate(new Date(borrow.returnedAt)) : "") },
   { id: "item.category.name", label: "CATEGORIA", getValue: (borrow: Borrow) => borrow.item?.category?.name || "" },
-  { id: "item.brand.name", label: "MARCA", getValue: (borrow: Borrow) => borrow.item?.brand?.name || "" },
+  { id: "item.brands", label: "MARCA", getValue: (borrow: Borrow) => borrow.item?.brands?.map((b) => b.name).join(", ") || "" },
   { id: "updatedAt", label: "ATUALIZADO EM", getValue: (borrow: Borrow) => formatDate(new Date(borrow.updatedAt)) },
 ];
 
@@ -58,7 +58,7 @@ export function BorrowExport({ className, filters = {}, currentItems = [], total
       include: {
         item: {
           include: {
-            brand: true,
+            brands: true,
             category: true,
           },
         },
@@ -326,7 +326,7 @@ export function BorrowExport({ className, filters = {}, currentItems = [], total
                   width = "90px";
                   break;
                 case "item.category.name":
-                case "item.brand.name":
+                case "item.brands":
                   width = "100px";
                   break;
                 default:

@@ -57,11 +57,11 @@ export const suggestionBuilders: Record<string, SuggestionBuilder> = {
     categoryLabel: "Produtos",
     icon: IconBox({ className: "h-4 w-4" }),
     getSearchableText: (item: Item) =>
-      [item.name, ...(item.barcodes || []), item.category?.description || "", item.brand?.name || "", item.category?.name || "", item.supplier?.fantasyName || ""].filter(Boolean),
+      [item.name, ...(item.barcodes || []), item.category?.description || "", ...(item.brands?.map((b) => b.name) || []), item.category?.name || "", item.supplier?.fantasyName || ""].filter(Boolean),
     createSuggestion: (item: Item, query: string) => ({
       id: `item-${item.id}`,
       label: item.name,
-      sublabel: item.barcodes && item.barcodes.length > 0 ? `Código: ${item.barcodes[0]}` : item.brand?.name,
+      sublabel: item.barcodes && item.barcodes.length > 0 ? `Código: ${item.barcodes[0]}` : item.brands?.map((b) => b.name).join(", "),
       category: "items",
       categoryLabel: "Produtos",
       entity: item,

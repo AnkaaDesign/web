@@ -17,6 +17,7 @@ import {
   useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import {
   IconAdjustments,
@@ -1049,18 +1050,9 @@ function DailyPontoConfigComponent({
   const accentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
 
   return (
-    <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 -mr-1">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={c.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Ponto do Dia"
-        />
-      </div>
-
+    <div className="space-y-3">
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
+        <WidgetTabsBar><TabsList className="self-start">
           <TabsTrigger value="appearance" className="gap-1">
             <IconAdjustments className="h-3.5 w-3.5" /> Aparência
           </TabsTrigger>
@@ -1073,12 +1065,12 @@ function DailyPontoConfigComponent({
           <TabsTrigger value="behavior" className="gap-1">
             <IconLayout className="h-3.5 w-3.5" /> Comportamento
           </TabsTrigger>
-        </TabsList>
+        </TabsList></WidgetTabsBar>
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Acento (cor e ícone)" defaultOpen>
+            <Section title="Destaque (cor e ícone)" defaultOpen>
               <AccentPicker
                 value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
                 onChange={(next) =>
@@ -1091,37 +1083,30 @@ function DailyPontoConfigComponent({
               />
             </Section>
             <Section title="Densidade e linhas">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+              <div className="space-y-2">
                 <DensitySegmented
                   value={c.display.density}
                   onChange={(d) => setDisplay("density", d)}
                 />
-                <ToggleRow
-                  label="Cabeçalho fixo"
-                  checked={c.display.stickyHeader}
-                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-                />
               </div>
             </Section>
             <Section title="Cabeçalho e link">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className="space-y-1">
                 <ToggleRow
                   label="Exibir cabeçalho"
                   checked={c.display.showHeader ?? true}
                   onCheckedChange={(v) => setDisplay("showHeader", v)}
                 />
                 <ToggleRow
+                  label="Cabeçalho fixo"
+                  checked={c.display.stickyHeader}
+                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
+                />
+                <ToggleRow
                   label="Exibir contagem"
                   checked={c.display.showCount ?? true}
                   onCheckedChange={(v) => setDisplay("showCount", v)}
                 />
-                <ToggleRow
-                  label='Link "Ver todos"'
-                  checked={c.display.showViewAllLink}
-                  onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                 <ToggleRow
                   label="Caixa de busca"
                   checked={c.display.showSearchBox}
@@ -1131,6 +1116,11 @@ function DailyPontoConfigComponent({
                   label="Navegador de dia"
                   checked={c.display.showDayNavigator}
                   onCheckedChange={(v) => setDisplay("showDayNavigator", v)}
+                />
+                <ToggleRow
+                  label='Link "Ver todos"'
+                  checked={c.display.showViewAllLink}
+                  onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
                 />
               </div>
             </Section>
@@ -1167,7 +1157,7 @@ function DailyPontoConfigComponent({
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Quem mostrar</Label>
             <Combobox
               mode="single"
@@ -1186,7 +1176,7 @@ function DailyPontoConfigComponent({
               em atraso, com horas extras, etc.
             </p>
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Setores</Label>
             <Combobox
               mode="multiple"
@@ -1197,7 +1187,7 @@ function DailyPontoConfigComponent({
               searchPlaceholder="Buscar setor..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Cargos</Label>
             <Combobox
               mode="multiple"
@@ -1208,7 +1198,7 @@ function DailyPontoConfigComponent({
               searchPlaceholder="Buscar cargo..."
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Termo de busca padrão</Label>
             <Input
               value={c.filters.defaultSearch}
@@ -1226,7 +1216,7 @@ function DailyPontoConfigComponent({
         {/* ---- BEHAVIOR ---- */}
         <TabsContent value="behavior" className="space-y-3 mt-0">
           <Section title="Layout" defaultOpen>
-            <div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Modo de exibição</Label>
               <Combobox
                 mode="single"

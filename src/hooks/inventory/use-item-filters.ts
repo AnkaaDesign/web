@@ -230,7 +230,7 @@ const filterSchemas = {
   // Include relations
   include: {
     schema: z.object({
-      brand: z.boolean().optional(),
+      brands: z.boolean().optional(),
       category: z.boolean().optional(),
       supplier: z.boolean().optional(),
       prices: z.boolean().optional(),
@@ -249,7 +249,7 @@ const filterSchemas = {
       count: z.boolean().optional(),
     }),
     defaultValue: {
-      brand: true,
+      brands: true,
       category: true,
       supplier: true,
       prices: true,
@@ -437,7 +437,7 @@ export function useItemFilters(options: UseItemFiltersOptions = {}): UseItemFilt
     if (!params.orderBy) params.orderBy = { name: "asc" };
     if (!params.include) {
       params.include = {
-        brand: true,
+        brands: true,
         category: true,
         supplier: true,
         prices: true,

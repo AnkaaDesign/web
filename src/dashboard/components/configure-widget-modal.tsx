@@ -5,16 +5,9 @@
 // submit. Invalid configs surface inline error messages and block save.
 
 import { useEffect, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../../components/ui/dialog";
 import { Button } from "../../components/ui/button";
 import { DynamicFormField } from "./dynamic-form-field";
+import { WidgetConfigDialog, TitleField } from "./config-kit";
 import { widgetRegistry } from "../registry";
 import { SectionGroup } from "../widgets/_shared";
 import type { WidgetInstance } from "../types";
@@ -52,42 +45,53 @@ export function ConfigureWidgetModal({ instance, onClose, onSave }: ConfigureWid
 
   const Custom = def.ConfigComponent;
 
-  return (
-    <Dialog open={!!instance} onOpenChange={(v) => (!v ? onClose() : undefined)}>
-      {/*
-        Fixed dimensions (w-[1080px] h-[800px]) keep the dialog from jumping when
-        accordion sections inside the config expand/collapse. The header and
-        footer stay fixed; only the inner content area scrolls.
+  // Título is hoisted here (fixed, never scrolls) so every widget shares one
+  // pinned title editor; the widget's ConfigComponent renders only its tabs.
+  const draftObj =
+    draft && typeof draft === "object" ? (draft as Record<string, unknown>) : {};
+  const hasTitle = "title" in draftObj || (def.defaultConfig as Record<string, unknown> | null)?.title != null;
+  const titleVal = typeof draftObj.title === "string" ? draftObj.title : "";
 
-        The default DialogContent uses `grid` — we override to flex column so
-        the middle scroll area can claim remaining height via `flex-1 min-h-0`.
-        max-w/max-h cap the dialog on smaller viewports. Size matches the
-        AddWidgetModal so the two dialogs feel visually consistent.
-      */}
-      <DialogContent className="!max-w-[1080px] w-[1080px] max-w-[calc(100vw-2rem)] h-[800px] max-h-[calc(100vh-2rem)] flex flex-col gap-4">
-        <DialogHeader className="shrink-0">
-          <DialogTitle>Configurar: {def.name}</DialogTitle>
-          <DialogDescription>{def.description}</DialogDescription>
-        </DialogHeader>
-        <div className="flex-1 min-h-0 overflow-y-auto -mr-2 pr-2">
-          <div className="space-y-3 pb-1">
-            <SectionGroup key={instance.instanceId}>
-              {Custom ? (
-                <Custom config={draft} onChange={setDraft} />
-              ) : (
-                <DynamicFormField schema={def.configSchema} value={draft} onChange={setDraft} />
-              )}
-            </SectionGroup>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-          </div>
-        </div>
-        <DialogFooter className="shrink-0">
+  // The title is hoisted into the fixed headerExtra zone only for Custom
+  // ConfigComponents that own a `title` field. The auto-generated form
+  // (DynamicFormField) already renders `title` as an ordinary string field, so
+  // hoisting there would duplicate it. When the hoisted title is shown, the
+  // body's top padding is removed (`pt-0`) so the tabs sit flush under it.
+  const showHoistedTitle = !!Custom && hasTitle;
+
+  return (
+    <WidgetConfigDialog
+      open={!!instance}
+      onOpenChange={(v) => (!v ? onClose() : undefined)}
+      title={`Configurar: ${def.name}`}
+      description={def.description}
+      headerExtra={
+        showHoistedTitle ? (
+          <TitleField
+            value={titleVal}
+            onChange={(t) => setDraft({ ...draftObj, title: t })}
+          />
+        ) : undefined
+      }
+      headerExtraBordered={false}
+      bodyClassName={showHoistedTitle ? "pt-0" : undefined}
+      footer={
+        <>
           <Button variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
           <Button onClick={handleSave}>Aplicar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <SectionGroup key={instance.instanceId}>
+        {Custom ? (
+          <Custom config={draft} onChange={setDraft} />
+        ) : (
+          <DynamicFormField schema={def.configSchema} value={draft} onChange={setDraft} />
+        )}
+      </SectionGroup>
+      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+    </WidgetConfigDialog>
   );
 }

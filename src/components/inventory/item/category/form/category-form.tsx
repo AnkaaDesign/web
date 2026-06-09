@@ -157,7 +157,7 @@ export function CategoryForm(props: CategoryFormProps) {
       params: {
         searchingFor: searchTerm,
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
         orderBy: { name: "asc" },
@@ -167,11 +167,11 @@ export function CategoryForm(props: CategoryFormProps) {
     });
 
     const items =
-      response.data?.data?.map((item: { id: string; name: string; uniCode?: string; brand?: { name: string }; category?: { name: string } }) => ({
+      response.data?.data?.map((item: { id: string; name: string; uniCode?: string; brands?: { name: string }[]; category?: { name: string } }) => ({
         value: item.id,
         label: item.name,
         unicode: item.uniCode,
-        brand: item.brand?.name,
+        brand: item.brands?.map((b) => b.name).join(", "),
         category: item.category?.name,
       })) || [];
 
@@ -189,7 +189,7 @@ export function CategoryForm(props: CategoryFormProps) {
       value: item.id,
       label: item.name,
       unicode: item.uniCode || undefined,
-      brand: item.brand?.name,
+      brand: item.brands?.map((b: any) => b.name).join(", "),
       category: item.category?.name,
     }));
   }, [initialItems?.map((i) => i.id).join(",")]);

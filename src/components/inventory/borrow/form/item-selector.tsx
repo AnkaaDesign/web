@@ -48,7 +48,7 @@ export function BorrowItemSelector({ control, name = "itemId", disabled, selecte
       orderBy: { name: "asc" },
       include: {
         category: true,
-        brand: true,
+        brands: true,
       },
     });
 
@@ -64,7 +64,7 @@ export function BorrowItemSelector({ control, name = "itemId", disabled, selecte
         metadata: {
           quantity: item.quantity,
           category: item.category,
-          brand: item.brand,
+          brands: item.brands,
           isActive: item.isActive,
         },
       })),

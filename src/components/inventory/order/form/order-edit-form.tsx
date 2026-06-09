@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { useOrderFormUrlState, composeTempItemDescription } from "@/hooks/inventory/use-order-form-url-state";
 import { formatCurrency, formatDate, formatPixKey } from "../../../../utils";
 import { exportOrderPdf } from "@/utils/order-pdf-generator";
+import { buildOrderCode } from "@/utils/order-code";
 import { OrderPdfExportButton } from "../common/order-pdf-export-button";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -447,7 +448,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   const { data: selectedItemsResponse, isLoading: _isLoadingSelectedItems } = useItems({
     where: selectedItemsArray.length > 0 ? { id: { in: selectedItemsArray } } : { id: { in: [] } },
     include: {
-      brand: true,
+      brands: true,
       category: true,
       prices: {
         orderBy: { createdAt: "desc" },
@@ -866,7 +867,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const inventoryItems = selectedItemsData.map((item: any) => ({
         code: item.uniCode || "-",
         name: item.name,
-        brand: item.brand?.name || "-",
+        brand: item.brands?.map((b: any) => b.name).join(", ") || "-",
         measures: getMeasureUnitDisplay(item.measures),
         quantity: Number(quantities[item.id]) || 1,
         unitPrice: Number(prices[item.id]) || 0,
@@ -887,7 +888,16 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         }));
 
       exportOrderPdf({
-        title: includePricing ? "Pedido de Compra" : "Solicitação de Orçamento",
+        title: buildOrderCode({
+          orderNumber: order.orderNumber,
+          orderScheduleId: order.orderScheduleId,
+          supplier: selectedSupplier ?? order.supplier,
+          items:
+            selectedItemsData && selectedItemsData.length
+              ? selectedItemsData.map((it: any) => ({ item: it }))
+              : order.items,
+        }),
+        documentType: includePricing ? "Pedido de Compra" : "Solicitação de Orçamento",
         includePricing,
         description: description || order.description || undefined,
         supplierName: selectedSupplier?.fantasyName || order.supplier?.fantasyName || undefined,
@@ -1533,7 +1543,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                     <TableCell className="font-mono">{item.uniCode}</TableCell>
                                     <TableCell>{item.name}</TableCell>
                                     <TableCell>{item.category?.name || "-"}</TableCell>
-                                    <TableCell>{item.brand?.name || "-"}</TableCell>
+                                    <TableCell>{item.brands?.map((b) => b.name).join(", ") || "-"}</TableCell>
                                     <TableCell className="text-right">{quantity} {getMeasureUnitDisplay(item.measures)}</TableCell>
                                     {canViewPrices && (
                                       <>

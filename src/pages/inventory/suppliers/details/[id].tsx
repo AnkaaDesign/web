@@ -35,7 +35,7 @@ const SupplierDetailsPage = () => {
       logo: true,
       items: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
       },

@@ -318,12 +318,20 @@ export function sortItemsByUpdateDate(items: Item[], order: "asc" | "desc" = "de
 }
 
 /**
+ * Get the comma-separated list of an item's brand names.
+ * Returns an empty string when the item has no brands.
+ */
+export function getItemBrandNames(item?: Pick<Item, "brands"> | null): string {
+  return item?.brands?.map((b) => b.name).join(", ") || "";
+}
+
+/**
  * Get item summary
  */
 export function getItemSummary(item: Item): string {
   const stock = formatItemQuantity(item);
   const price = getFormattedPrice(item);
-  const brand = item.brand?.name || "";
+  const brand = getItemBrandNames(item);
   return `${item.name}${brand ? ` - ${brand}` : ""} | ${stock} | ${price}`;
 }
 

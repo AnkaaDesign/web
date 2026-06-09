@@ -9,6 +9,7 @@
 // Click → opens the existing MessageModal so users can read full content.
 
 import { useCallback, useMemo, useState } from "react";
+import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import {
   IconAdjustments,
@@ -41,8 +42,6 @@ import type {
   WidgetAccentIcon,
   WidgetAccentShade,
 } from "../components/widget-accent";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
 import { MessageModal } from "../../components/common/message-modal/message-modal";
 import { useMarkAsViewed } from "../../hooks/administration/use-message";
@@ -513,26 +512,18 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
   const accentShade = (config.accent?.shade ?? "500") as WidgetAccentShade;
   return (
     <div className="space-y-4">
-      <div className="space-y-1.5">
-        <Label className="text-sm">Título</Label>
-        <Input
-          value={config.title}
-          onChange={(v) => set("title", typeof v === "string" ? v : "")}
-          placeholder="Mensagens Recentes"
-        />
-      </div>
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
+        <WidgetTabsBar><TabsList className="self-start">
           <TabsTrigger value="appearance" className="gap-1">
             <IconAdjustments className="h-3.5 w-3.5" /> Aparência
           </TabsTrigger>
           <TabsTrigger value="behavior" className="gap-1">
             <IconLayout className="h-3.5 w-3.5" /> Comportamento
           </TabsTrigger>
-        </TabsList>
+        </TabsList></WidgetTabsBar>
         <TabsContent value="appearance" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Acento (cor e ícone)" defaultOpen>
+            <Section title="Destaque (cor e ícone)" defaultOpen>
               <AccentPicker
                 value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
                 onChange={(next) =>
@@ -545,23 +536,25 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
               />
             </Section>
             <Section title="Cabeçalho e link">
-              <ToggleRow
-                label="Exibir cabeçalho"
-                checked={config.display?.showHeader ?? true}
-                onCheckedChange={(v) =>
-                  set("display", { ...(config.display ?? {}), showHeader: v } as Config["display"])
-                }
-              />
-              <ToggleRow
-                label='Link "Ver todos"'
-                checked={config.display?.showViewAllLink ?? true}
-                onCheckedChange={(v) =>
-                  set("display", {
-                    ...(config.display ?? {}),
-                    showViewAllLink: v,
-                  } as Config["display"])
-                }
-              />
+              <div className="space-y-1">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={config.display?.showHeader ?? true}
+                  onCheckedChange={(v) =>
+                    set("display", { ...(config.display ?? {}), showHeader: v } as Config["display"])
+                  }
+                />
+                <ToggleRow
+                  label='Link "Ver todos"'
+                  checked={config.display?.showViewAllLink ?? true}
+                  onCheckedChange={(v) =>
+                    set("display", {
+                      ...(config.display ?? {}),
+                      showViewAllLink: v,
+                    } as Config["display"])
+                  }
+                />
+              </div>
             </Section>
           </SectionGroup>
         </TabsContent>

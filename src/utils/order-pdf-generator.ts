@@ -28,8 +28,16 @@ export interface OrderPdfLineItem {
 }
 
 export interface OrderPdfData {
-  /** Document title, defaults to "Pedido de Compra". */
+  /**
+   * Document title. Pass the order code built by `buildOrderCode()` here
+   * (e.g. "Pedido 0001-01.1 - Bases"). Defaults to "Pedido de Compra".
+   */
   title?: string;
+  /**
+   * Secondary label under the title — the document kind, e.g. "Pedido de Compra"
+   * or "Solicitação de Orçamento". Rendered alongside the description.
+   */
+  documentType?: string;
   /** Order description / subtitle. */
   description?: string;
   supplierName?: string;
@@ -182,7 +190,7 @@ export function buildOrderPdfHtml(data: OrderPdfData): string {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>${escapeHtml(title)}${data.description ? ` - ${escapeHtml(data.description)}` : ""}</title>
+  <title>${escapeHtml(title)}</title>
   <style>
     @page { size: A4; margin: 0; }
 
@@ -310,7 +318,13 @@ export function buildOrderPdfHtml(data: OrderPdfData): string {
 
     <div class="content">
     <div class="doc-title">${escapeHtml(title)}</div>
-    ${data.description ? `<div class="doc-subtitle">${escapeHtml(data.description)}</div>` : ""}
+    ${
+      [data.documentType, data.description].filter(Boolean).length
+        ? `<div class="doc-subtitle">${escapeHtml(
+            [data.documentType, data.description].filter(Boolean).join(" — "),
+          )}</div>`
+        : ""
+    }
     <div class="doc-meta">${metaParts.join(" &nbsp;|&nbsp; ")}</div>
 
     <table>

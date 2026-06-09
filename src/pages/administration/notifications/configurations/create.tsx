@@ -34,7 +34,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormCombobox } from "@/components/ui/form-combobox";
 import { Separator } from "@/components/ui/separator";
-import { routes, SECTOR_PRIVILEGES } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS } from "@/constants";
 import { cn } from "@/lib/utils";
 import { useNotificationConfigurationMutations } from "@/hooks/administration/use-notification-configuration";
 
@@ -65,7 +65,6 @@ const configurationSchema = z.object({
   notificationType: z.enum(["SYSTEM", "PRODUCTION", "STOCK", "USER", "GENERAL"]),
   importance: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]),
   enabled: z.boolean(),
-  workHoursOnly: z.boolean(),
   batchingEnabled: z.boolean(),
   maxFrequencyPerDay: z.preprocess(
     (val) => {
@@ -86,7 +85,6 @@ const configurationSchema = z.object({
   channels: z.array(channelConfigSchema),
   targetRules: z.object({
     allowedSectors: z.array(z.string()),
-    excludeInactive: z.boolean(),
     excludeOnVacation: z.boolean(),
   }),
 });
@@ -147,20 +145,11 @@ const CHANNEL_CONFIG = {
   },
 };
 
-const SECTOR_OPTIONS = [
-  { value: "ADMIN", label: "Administração" },
-  { value: "PRODUCTION", label: "Produção" },
-  { value: "WAREHOUSE", label: "Almoxarifado" },
-  { value: "FINANCIAL", label: "Financeiro" },
-  { value: "COMMERCIAL", label: "Comercial" },
-  { value: "LOGISTIC", label: "Logística" },
-  { value: "DESIGNER", label: "Design" },
-  { value: "HUMAN_RESOURCES", label: "RH" },
-  { value: "PLOTTING", label: "Plotagem" },
-  { value: "MAINTENANCE", label: "Manutenção" },
-  { value: "BASIC", label: "Básico" },
-  { value: "EXTERNAL", label: "Externo" },
-];
+// Derived from the SECTOR_PRIVILEGES enum so every privilege (including
+// PRODUCTION_MANAGER) is always available and labels stay canonical.
+const SECTOR_OPTIONS = Object.values(SECTOR_PRIVILEGES)
+  .map((value) => ({ value, label: SECTOR_PRIVILEGES_LABELS[value] || value }))
+  .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 
 // =====================
 // Channel Config Card Component
@@ -249,7 +238,6 @@ export function NotificationConfigurationCreatePage() {
       notificationType: "GENERAL",
       importance: "NORMAL",
       enabled: true,
-      workHoursOnly: false,
       batchingEnabled: false,
       maxFrequencyPerDay: null,
       deduplicationWindow: null,
@@ -261,7 +249,6 @@ export function NotificationConfigurationCreatePage() {
       ],
       targetRules: {
         allowedSectors: [],
-        excludeInactive: true,
         excludeOnVacation: false,
       },
     },
@@ -279,7 +266,6 @@ export function NotificationConfigurationCreatePage() {
         notificationType: data.notificationType as any,
         importance: data.importance as any,
         enabled: data.enabled,
-        workHoursOnly: data.workHoursOnly,
         batchingEnabled: data.batchingEnabled,
         maxFrequencyPerDay: data.maxFrequencyPerDay || undefined,
         deduplicationWindow: data.deduplicationWindow || undefined,
@@ -289,10 +275,9 @@ export function NotificationConfigurationCreatePage() {
           mandatory: ch.mandatory,
           defaultOn: ch.defaultOn,
         })),
-        targetRules: data.targetRules.allowedSectors.length > 0 || data.targetRules.excludeInactive || data.targetRules.excludeOnVacation
+        targetRules: data.targetRules.allowedSectors.length > 0 || data.targetRules.excludeOnVacation
           ? {
               allowedSectors: data.targetRules.allowedSectors as any[],
-              excludeInactive: data.targetRules.excludeInactive,
               excludeOnVacation: data.targetRules.excludeOnVacation,
             }
           : undefined,
@@ -539,22 +524,6 @@ export function NotificationConfigurationCreatePage() {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label>Excluir usuários inativos</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Não enviar para usuários desativados
-                      </p>
-                    </div>
-                    <Controller
-                      name="targetRules.excludeInactive"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      )}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
                       <Label>Excluir usuários de férias</Label>
                       <p className="text-sm text-muted-foreground">
                         Não enviar para usuários em período de férias
@@ -583,23 +552,13 @@ export function NotificationConfigurationCreatePage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Apenas em horário comercial</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Enviar somente durante horário de trabalho
-                      </p>
-                    </div>
-                    <Controller
-                      name="workHoursOnly"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      )}
-                    />
+                  <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
+                    <IconClock className="w-4 h-4 shrink-0" />
+                    <span>
+                      As notificações são sempre enviadas apenas em dias úteis, das 07:00 às 18:00
+                      (sem fins de semana ou feriados).
+                    </span>
                   </div>
-
-                  <Separator />
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">

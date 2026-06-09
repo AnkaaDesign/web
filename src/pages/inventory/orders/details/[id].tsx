@@ -53,8 +53,9 @@ const OrderDetailsPage = () => {
         include: {
           item: {
             include: {
-              brand: true,
+              brands: true,
               measures: true,
+              category: true,
             },
           },
         },

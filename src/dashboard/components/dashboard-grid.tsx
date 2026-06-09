@@ -27,6 +27,7 @@ interface DashboardGridProps {
   onReorder: (items: WidgetInstance[]) => void;
   onResize: (instanceId: string, size: WidgetSize) => void;
   onConfigure: (instanceId: string) => void;
+  onRenameCommit: (instanceId: string, title: string) => void;
   onRemove: (instanceId: string) => void;
 }
 
@@ -54,6 +55,7 @@ export function DashboardGrid({
   onReorder,
   onResize,
   onConfigure,
+  onRenameCommit,
   onRemove,
 }: DashboardGridProps) {
   const responsiveCols = useResponsiveCols();
@@ -104,6 +106,7 @@ export function DashboardGrid({
               responsiveCols={responsiveCols}
               onResize={(size) => onResize(instance.instanceId, size)}
               onConfigure={() => onConfigure(instance.instanceId)}
+              onRenameCommit={(title) => onRenameCommit(instance.instanceId, title)}
               onRemove={() => onRemove(instance.instanceId)}
             />
           ))}

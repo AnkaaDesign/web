@@ -37,7 +37,7 @@ export default function LoanBatchEditPage() {
     include: {
       item: {
         include: {
-          brand: true,
+          brands: true,
           category: true,
         },
       },
