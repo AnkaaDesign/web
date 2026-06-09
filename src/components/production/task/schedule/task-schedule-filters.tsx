@@ -2,17 +2,9 @@ import React from "react";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import type { Sector } from "../../../../types";
 import type { DateRange } from "react-day-picker";
-import { IconFilter, IconX } from "@tabler/icons-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { IconFilter } from "@tabler/icons-react";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
@@ -81,19 +73,17 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros do Cronograma
-          </SheetTitle>
-          <SheetDescription>
-            Configure os filtros para refinar sua busca por tarefas no cronograma
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros do Cronograma"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure os filtros para refinar sua busca por tarefas no cronograma"
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar"
+    >
           {/* Sectors */}
           <div className="space-y-2">
             <Label>Setores</Label>
@@ -143,23 +133,20 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
           </div>
 
           {/* Show Overdue Only */}
-          <div className="flex items-center space-x-2 mb-4">
-            <Switch id="overdue" checked={localFilters.isOverdue || false} onCheckedChange={(checked) => setLocalFilters({ ...localFilters, isOverdue: checked })} />
-            <Label htmlFor="overdue">Mostrar apenas tarefas atrasadas</Label>
+          <div className="space-y-2 mb-4">
+            <Label htmlFor="overdue">Tarefas atrasadas</Label>
+            <Combobox
+              mode="single"
+              value={localFilters.isOverdue ? "yes" : "no"}
+              onValueChange={(value) => setLocalFilters({ ...localFilters, isOverdue: value === "yes" })}
+              options={[
+                { value: "no", label: "Todas" },
+                { value: "yes", label: "Apenas atrasadas" },
+              ]}
+              placeholder="Selecione..."
+              searchable={false}
+            />
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 mt-6 pt-4 border-t">
-          <Button variant="outline" onClick={handleReset} className="flex-1">
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar
-          </Button>
-          <Button onClick={handleApply} className="flex-1">
-            Aplicar Filtros
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

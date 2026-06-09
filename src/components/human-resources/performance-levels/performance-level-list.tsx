@@ -272,6 +272,13 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
               selectionCount={selectedUserIds.size}
             />
 
+            <GenericColumnVisibilityManager
+              columns={ALL_COLUMNS}
+              visibleColumns={visibleColumns}
+              onVisibilityChange={handleColumnVisibilityChange}
+              getDefaultVisibleColumns={() => DEFAULT_VISIBLE_COLUMNS}
+            />
+
             <Button
               variant={hasActiveFilters ? "default" : "outline"}
               size="default"
@@ -283,13 +290,6 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
                 {hasActiveFilters ? `Filtros (${activeFilters.length})` : "Filtros"}
               </span>
             </Button>
-
-            <GenericColumnVisibilityManager
-              columns={ALL_COLUMNS}
-              visibleColumns={visibleColumns}
-              onVisibilityChange={handleColumnVisibilityChange}
-              getDefaultVisibleColumns={() => DEFAULT_VISIBLE_COLUMNS}
-            />
 
             <PerformanceLevelExport
               filters={queryFilters}

@@ -354,6 +354,7 @@ export function CustomerList({ className }: CustomerListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button variant={activeFilterCount > 0 ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
               <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               <span className="text-foreground">
@@ -361,7 +362,6 @@ export function CustomerList({ className }: CustomerListProps) {
                 {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
               </span>
             </Button>
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <CustomerExport filters={filters} currentCustomers={tableData.customers} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
           </div>
         </div>

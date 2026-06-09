@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useSectors, useCustomers, useUsers } from "../../../../hooks";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, USER_STATUS } from "../../../../constants";
 import { IconChevronDown, IconChevronRight, IconFilter, IconX } from "@tabler/icons-react";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
@@ -43,7 +43,10 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
   // Load entity data
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" } });
   const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" }, include: { logo: true } });
-  const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
+  const { data: usersData } = useUsers({
+    orderBy: { name: "asc" },
+    statuses: [USER_STATUS.EXPERIENCE_PERIOD_1, USER_STATUS.EXPERIENCE_PERIOD_2, USER_STATUS.EFFECTED],
+  });
 
   const sectors = sectorsData?.data || [];
   const customers = customersData?.data || [];
@@ -199,24 +202,18 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
   const activeFilterCount = countActiveFilters();
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros de Tarefas
-            {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {activeFilterCount} {activeFilterCount === 1 ? "ativo" : "ativos"}
-              </Badge>
-            )}
-          </SheetTitle>
-          <SheetDescription>
-            Filtre tarefas por status, entidades, datas, características e valores
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros de Tarefas"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Filtre tarefas por status, entidades, datas, características e valores"
+      activeFilterCount={activeFilterCount}
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar filtros"
+      resetLabel="Limpar filtros"
+    >
             {/* Status Section */}
             <Collapsible open={openSections.has("status")} onOpenChange={() => toggleSection("status")}>
               <CollapsibleTrigger className="flex items-center justify-between w-full py-2 hover:bg-muted/50 rounded px-2 transition-colors">
@@ -825,18 +822,6 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
               </CollapsibleContent>
             </Collapsible>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleReset} className="flex-1">
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar filtros
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar filtros
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

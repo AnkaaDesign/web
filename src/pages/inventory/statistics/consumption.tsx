@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { FilterDrawer } from '@/components/common/filters/ui/FilterDrawer';
 import { Combobox } from '@/components/ui/combobox';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import {
@@ -61,7 +61,7 @@ import {
   IconChartBar, IconChartPie, IconChartLine, IconChartArea, IconStack2,
   IconFilter, IconDownload, IconRefresh, IconAlertCircle,
   IconPackage, IconCash, IconBox, IconCalendarStats, IconChartArcs3,
-  IconUsers, IconBuilding, IconX, IconNumbers,
+  IconUsers, IconBuilding, IconNumbers,
   IconFileTypeCsv, IconFileTypeXls, IconFileTypePdf, IconTrendingUp,
   IconArrowsExchange2,
 } from '@tabler/icons-react';
@@ -441,20 +441,18 @@ function ConsumptionFiltersSheet({
   }, []);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros — Análise de Consumo
-            {activeFilterCount > 0 && <Badge variant="secondary">{activeFilterCount}</Badge>}
-          </SheetTitle>
-          <SheetDescription>Configure o eixo, métricas, período e entidades para análise</SheetDescription>
-        </SheetHeader>
-
-        <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="space-y-5 py-4">
-
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros — Análise de Consumo"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure o eixo, métricas, período e entidades para análise"
+      activeFilterCount={activeFilterCount}
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar"
+      resetLabel="Limpar"
+    >
             {/* X-axis grouping */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2 text-sm font-medium">
@@ -730,20 +728,7 @@ function ConsumptionFiltersSheet({
               </div>
             )}
 
-          </div>
-        </ScrollArea>
-
-        <div className="flex gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={handleClear} className="flex-1">
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar
-          </Button>
-          <Button onClick={handleApply} className="flex-1">
-            Aplicar
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }
 
@@ -1509,33 +1494,6 @@ const ConsumptionPage = () => {
                 onDelete={deletePreset}
                 isSaving={isSavingPreset}
               />
-
-              {/* Export */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={isLoading || !chartData.length}>
-                    <IconDownload className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleExportPDF}>
-                    <IconFileTypePdf className="h-4 w-4 mr-2" />
-                    PDF do Gráfico
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleExportCSV}>
-                    <IconFileTypeCsv className="h-4 w-4 mr-2" />
-                    CSV dos Dados
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportXLSX}>
-                    <IconFileTypeXls className="h-4 w-4 mr-2" />
-                    Excel (XLSX) dos Dados
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </>
           }
         />
@@ -1622,6 +1580,33 @@ const ConsumptionPage = () => {
                     Filtros
                     {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>}
                   </Button>
+
+                  {/* Export */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" disabled={isLoading || !chartData.length}>
+                        <IconDownload className="h-4 w-4 mr-2" />
+                        Exportar
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleExportPDF}>
+                        <IconFileTypePdf className="h-4 w-4 mr-2" />
+                        PDF do Gráfico
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleExportCSV}>
+                        <IconFileTypeCsv className="h-4 w-4 mr-2" />
+                        CSV dos Dados
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleExportXLSX}>
+                        <IconFileTypeXls className="h-4 w-4 mr-2" />
+                        Excel (XLSX) dos Dados
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
                 </div>
               </div>

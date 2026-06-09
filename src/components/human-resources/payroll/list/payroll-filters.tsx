@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { IconFilter, IconX, IconCheck, IconBuilding, IconBriefcase, IconUserCheck } from "@tabler/icons-react";
+import { IconFilter, IconBuilding, IconBriefcase, IconUserCheck } from "@tabler/icons-react";
 import type { UserGetManyFormData } from "../../../../schemas";
 import { useUsers, useSectors, usePositions } from "../../../../hooks";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -161,22 +159,18 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter size={20} />
-            Filtros de Folha de Pagamento
-            {totalActiveFilters > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {totalActiveFilters} {totalActiveFilters === 1 ? "ativo" : "ativos"}
-              </Badge>
-            )}
-          </SheetTitle>
-          <SheetDescription>Configure os filtros para refinar a visualização da folha de pagamento.</SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros de Folha de Pagamento"
+      titleIcon={<IconFilter size={20} />}
+      description="Configure os filtros para refinar a visualização da folha de pagamento."
+      activeFilterCount={totalActiveFilters}
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+    >
           {/* Year and Month Selection */}
           <div>
             <Label className="text-sm font-medium mb-3 block">Ano e Mês</Label>
@@ -324,25 +318,6 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
               }
             </p>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={handleClear}
-              className="flex-1"
-              disabled={totalActiveFilters === 0}
-            >
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar Filtros
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              <IconCheck className="h-4 w-4 mr-2" />
-              Aplicar Filtros
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

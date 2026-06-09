@@ -32,7 +32,7 @@ import { cutService } from "../../../../api-client/cut";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole } from "@/types/responsible";
 import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
-import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { useAuth } from "../../../../contexts/auth-context";
 import { useTaskPermissions } from '@/hooks/common/use-task-permissions';
@@ -817,8 +817,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             id: a.id, // Preserve original airbrushing ID
             startDate: a.startDate ? new Date(a.startDate) : null,
             finishDate: a.finishDate ? new Date(a.finishDate) : null,
+            startedAt: a.startedAt ? new Date(a.startedAt) : null,
+            finishedAt: a.finishedAt ? new Date(a.finishedAt) : null,
             price: a.price,
             status: a.status,
+            paymentStatus: a.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
+            painterId: a.painterId || null,
+            painter: a.painter || null,
             receiptIds: a.receipts?.map((r: any) => r.id) || [],
             invoiceIds: a.invoices?.map((n: any) => n.id) || [],
             // CRITICAL: artworkIds should be File IDs (artwork.fileId), not Artwork entity IDs
@@ -832,9 +837,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             // Default empty airbrushing row
             id: `airbrushing-initial`,
             status: AIRBRUSHING_STATUS.PENDING,
+            paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
             price: null,
             startDate: null,
             finishDate: null,
+            startedAt: null,
+            finishedAt: null,
+            painterId: null,
+            painter: null,
             receiptIds: [],
             invoiceIds: [],
             artworkIds: [],
@@ -995,14 +1005,17 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             const hasPrice = airbrushing.price !== null && airbrushing.price !== undefined;
             const hasStartDate = airbrushing.startDate !== null && airbrushing.startDate !== undefined;
             const hasFinishDate = airbrushing.finishDate !== null && airbrushing.finishDate !== undefined;
+            const hasStartedAt = airbrushing.startedAt !== null && airbrushing.startedAt !== undefined;
+            const hasFinishedAt = airbrushing.finishedAt !== null && airbrushing.finishedAt !== undefined;
             const hasReceiptFiles = airbrushing.receiptIds && airbrushing.receiptIds.length > 0;
             const hasInvoiceFiles = airbrushing.invoiceIds && airbrushing.invoiceIds.length > 0;
             const hasArtworkFiles = airbrushing.artworkIds && airbrushing.artworkIds.length > 0;
             const hasNewReceiptFiles = airbrushing.receiptFiles && airbrushing.receiptFiles.some((f: any) => f instanceof File);
             const hasNewInvoiceFiles = airbrushing.invoiceFiles && airbrushing.invoiceFiles.some((f: any) => f instanceof File);
             const hasNewArtworkFiles = airbrushing.artworkFiles && airbrushing.artworkFiles.some((f: any) => f instanceof File);
+            const hasPainter = airbrushing.painterId !== null && airbrushing.painterId !== undefined;
 
-            return hasPrice || hasStartDate || hasFinishDate || hasReceiptFiles || hasInvoiceFiles || hasArtworkFiles || hasNewReceiptFiles || hasNewInvoiceFiles || hasNewArtworkFiles;
+            return hasPrice || hasStartDate || hasFinishDate || hasStartedAt || hasFinishedAt || hasPainter || hasReceiptFiles || hasInvoiceFiles || hasArtworkFiles || hasNewReceiptFiles || hasNewInvoiceFiles || hasNewArtworkFiles;
           });
 
           // If no valid airbrushings remain, remove entirely
@@ -1286,6 +1299,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                 // Remove file objects from airbrushing data to avoid sending them in JSON body
                 delete airbrushing.artworkFiles;
               }
+              // Remove the painter relation object (display-only) - only painterId is sent
+              delete airbrushing.painter;
             });
           }
 

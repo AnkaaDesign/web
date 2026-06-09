@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { IconFilter, IconX } from "@tabler/icons-react";
+import { IconFilter } from "@tabler/icons-react";
 import type { DateRange } from "react-day-picker";
 import { CUT_STATUS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES } from "../../../../constants";
 import { CUT_STATUS_LABELS, CUT_TYPE_LABELS, CUT_ORIGIN_LABELS } from "../../../../constants";
@@ -159,20 +158,18 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros de Cortes
-            {getActiveFilterCount() > 0 && <Badge variant="secondary">{getActiveFilterCount()}</Badge>}
-          </SheetTitle>
-          <SheetDescription>
-            Configure os filtros para visualizar cortes específicos
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros de Cortes"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure os filtros para visualizar cortes específicos"
+      activeFilterCount={getActiveFilterCount()}
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar filtros"
+      resetLabel="Limpar todos"
+    >
           <div className="space-y-3">
             <Label className="text-base font-medium">
               Status
@@ -318,23 +315,6 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleReset} className="flex-1">
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar todos
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar filtros
-              {getActiveFilterCount() > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {getActiveFilterCount()}
-                </Badge>
-              )}
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

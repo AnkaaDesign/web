@@ -525,14 +525,21 @@ export interface CategorizeResult {
 export interface RecurringForecastItem {
   category: TransactionCategory;
   paidAmount: number;
+  /** Expected amount, averaged from the past 3 months of the same category. */
+  forecastAmount: number;
   transactionCount: number;
   status: "PAID" | "PENDING";
+  /** ISO date: the actual last-paid date, or the predicted date when pending. */
+  paymentDate: string | null;
+  /** true when paymentDate is a prediction (category not yet paid this period). */
+  isPaymentDateForecast: boolean;
 }
 
 export interface RecurringForecast {
   from: string;
   to: string;
   totalPaid: number;
+  totalForecast: number;
   items: RecurringForecastItem[];
 }
 

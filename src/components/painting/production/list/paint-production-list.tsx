@@ -446,14 +446,14 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
             </Button>
           )}
 
+          {/* Column Visibility Manager */}
+          <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
+
           {/* Filter Button */}
           <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)}>
             <IconFilter className="h-4 w-4 mr-2" />
             {hasActiveFilters ? `Filtros (${activeFilters.length})` : "Filtros"}
           </Button>
-
-          {/* Column Visibility Manager */}
-          <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
 
           {/* Export Button */}
           <PaintProductionExport filters={queryFilters} currentItems={productions} totalRecords={totalRecords} visibleColumns={visibleColumns} />

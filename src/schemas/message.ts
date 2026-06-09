@@ -14,6 +14,7 @@ export interface MessageGetManyFormData {
   status?: MessageStatus[];
   recipientIds?: string[];
   senderIds?: string[];
+  sectorIds?: string[];
   createdAt?: {
     gte?: Date | string;
     lte?: Date | string;

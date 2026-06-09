@@ -12,13 +12,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FilterIndicators as StandardFilterIndicators } from "@/components/ui/filter-indicator";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
-import { IconSearch, IconPlus, IconPackage, IconFilter, IconX, IconTruck } from "@tabler/icons-react";
+import { IconSearch, IconPlus, IconPackage, IconFilter, IconTruck } from "@tabler/icons-react";
 import { useAuth } from "@/contexts/auth-context";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -407,69 +406,37 @@ export const MyPpesPage = () => {
       </Card>
 
       {/* Filter Modal */}
-      <Sheet open={showFilterModal} onOpenChange={setShowFilterModal}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <IconFilter className="h-5 w-5" />
-              Meus EPIs - Filtros
-              {filterCount > 0 && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge
-                        variant="secondary"
-                        className="ml-2 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                        onClick={handleFilterReset}
-                      >
-                        {filterCount}
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Clique para limpar todos os filtros</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </SheetTitle>
-            <SheetDescription>
-              Configure filtros para refinar sua busca de EPIs
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="mt-6 space-y-6">
-            {/* Status Filter */}
-            <div className="grid gap-2">
-              <Label className="flex items-center gap-2">
-                <IconTruck className="h-4 w-4" />
-                Status
-              </Label>
-              <Combobox
-                mode="multiple"
-                options={statusOptions}
-                value={localFilterState.status || []}
-                onValueChange={(value) =>
-                  setLocalFilterState((prev): FilterState => ({ ...prev, status: Array.isArray(value) ? value : undefined }))
-                }
-                placeholder="Selecione status..."
-                emptyText="Nenhum status encontrado"
-                searchPlaceholder="Buscar status..."
-              />
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 mt-6 pt-4 border-t">
-              <Button variant="outline" onClick={handleFilterReset} className="flex-1">
-                <IconX className="h-4 w-4 mr-2" />
-                Limpar Tudo
-              </Button>
-              <Button onClick={handleFilterApply} className="flex-1">
-                Aplicar
-              </Button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <FilterDrawer
+        open={showFilterModal}
+        onOpenChange={setShowFilterModal}
+        title="Meus EPIs - Filtros"
+        titleIcon={<IconFilter className="h-5 w-5" />}
+        description="Configure filtros para refinar sua busca de EPIs"
+        activeFilterCount={filterCount}
+        onApply={handleFilterApply}
+        onReset={handleFilterReset}
+        applyLabel="Aplicar"
+        resetLabel="Limpar Tudo"
+      >
+        {/* Status Filter */}
+        <div className="grid gap-2">
+          <Label className="flex items-center gap-2">
+            <IconTruck className="h-4 w-4" />
+            Status
+          </Label>
+          <Combobox
+            mode="multiple"
+            options={statusOptions}
+            value={localFilterState.status || []}
+            onValueChange={(value) =>
+              setLocalFilterState((prev): FilterState => ({ ...prev, status: Array.isArray(value) ? value : undefined }))
+            }
+            placeholder="Selecione status..."
+            emptyText="Nenhum status encontrado"
+            searchPlaceholder="Buscar status..."
+          />
+        </div>
+      </FilterDrawer>
     </div>
   );
 };

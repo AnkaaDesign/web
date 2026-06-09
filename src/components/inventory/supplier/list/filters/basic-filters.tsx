@@ -1,7 +1,6 @@
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { IconPhoto, IconPackages, IconShoppingCart, IconBuildingStore } from "@tabler/icons-react";
+import { Combobox } from "@/components/ui/combobox";
+import { IconBuildingStore } from "@tabler/icons-react";
 
 interface BasicFiltersProps {
   hasLogo?: boolean;
@@ -13,53 +12,37 @@ interface BasicFiltersProps {
 }
 
 export function BasicFilters({ hasLogo, onHasLogoChange, hasItems, onHasItemsChange, hasOrders, onHasOrdersChange }: BasicFiltersProps) {
+  const selected: string[] = [];
+  if (hasLogo) selected.push("hasLogo");
+  if (hasItems) selected.push("hasItems");
+  if (hasOrders) selected.push("hasOrders");
+
+  const handleChange = (value: string | string[] | null | undefined) => {
+    const values = Array.isArray(value) ? value : value ? [value] : [];
+    onHasLogoChange(values.includes("hasLogo") ? true : false);
+    onHasItemsChange(values.includes("hasItems") ? true : false);
+    onHasOrdersChange(values.includes("hasOrders") ? true : false);
+  };
+
   return (
-    <div className="space-y-4">
-      {/* Business Information */}
-      <div className="space-y-3">
-        <Label className="text-sm font-medium flex items-center gap-2">
-          <IconBuildingStore className="h-4 w-4" />
-          Informações da Empresa
-        </Label>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="hasLogo" className="text-sm font-normal flex items-center gap-2">
-              <IconPhoto className="h-4 w-4 text-muted-foreground" />
-              Tem logotipo
-            </Label>
-            <Switch id="hasLogo" checked={hasLogo ?? false} onCheckedChange={(checked) => onHasLogoChange(checked)} />
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Business Activity */}
-      <div className="space-y-3">
-        <Label className="text-sm font-medium flex items-center gap-2">
-          <IconShoppingCart className="h-4 w-4" />
-          Atividade Comercial
-        </Label>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="hasItems" className="text-sm font-normal flex items-center gap-2">
-              <IconPackages className="h-4 w-4 text-muted-foreground" />
-              Tem itens cadastrados
-            </Label>
-            <Switch id="hasItems" checked={hasItems ?? false} onCheckedChange={(checked) => onHasItemsChange(checked)} />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Label htmlFor="hasOrders" className="text-sm font-normal flex items-center gap-2">
-              <IconShoppingCart className="h-4 w-4 text-muted-foreground" />
-              Tem pedidos realizados
-            </Label>
-            <Switch id="hasOrders" checked={hasOrders ?? false} onCheckedChange={(checked) => onHasOrdersChange(checked)} />
-          </div>
-        </div>
-      </div>
+    <div className="space-y-3">
+      <Label className="text-sm font-medium flex items-center gap-2">
+        <IconBuildingStore className="h-4 w-4" />
+        Características
+      </Label>
+      <Combobox
+        mode="multiple"
+        value={selected}
+        onValueChange={handleChange}
+        options={[
+          { value: "hasLogo", label: "Tem logotipo" },
+          { value: "hasItems", label: "Tem itens cadastrados" },
+          { value: "hasOrders", label: "Tem pedidos realizados" },
+        ]}
+        placeholder="Selecione..."
+        searchable={false}
+        clearable
+      />
     </div>
   );
 }

@@ -241,11 +241,11 @@ export function AirbrushingList({ className }: AirbrushingListProps) {
           />
           <div className="flex gap-2">
             {selectionCount > 0 && <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />}
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={handleColumnVisibilityChange} />
             <Button variant={hasActiveFilters ? "default" : "outline"} onClick={() => setShowFilterModal(true)}>
               <IconFilter className="h-4 w-4 mr-2" />
               {hasActiveFilters ? `Filtros (${activeFilters.length})` : "Filtros"}
             </Button>
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={handleColumnVisibilityChange} />
           </div>
         </div>
 

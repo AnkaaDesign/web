@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Combobox } from "@/components/ui/combobox";
 import { IconFilter, IconPaint, IconTag, IconBrush, IconTruck, IconSparkles, IconX, IconColorPicker } from "@tabler/icons-react";
@@ -87,16 +84,6 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
     onOpenChange(false);
   };
 
-  // Reset filters
-  const handleReset = () => {
-    const resetFilters: Partial<PaintGetManyFormData> = {
-      limit: filters.limit,
-    };
-    setLocalFilters(resetFilters);
-    onFilterChange(resetFilters);
-    onOpenChange(false);
-  };
-
   // Clear all filters (for the clear all button)
   const handleClearAll = () => {
     const clearedFilters: Partial<PaintGetManyFormData> = {
@@ -113,31 +100,18 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
   const hasFormulas = localFilters.hasFormulas ?? undefined;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Tintas - Filtros
-            {activeFilterCount > 0 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="secondary" className="ml-2 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors" onClick={handleReset}>
-                      {activeFilterCount}
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Clique para limpar todos os filtros</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </SheetTitle>
-          <SheetDescription>Configure os filtros para refinar o catálogo de tintas.</SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Tintas - Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure os filtros para refinar o catálogo de tintas."
+      activeFilterCount={activeFilterCount}
+      onApply={handleApply}
+      onReset={handleClearAll}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Tudo"
+    >
             {/* Paint Type */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
@@ -231,12 +205,22 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
             </div>
 
             {/* Has Formulas */}
-            <div className="flex items-center justify-between">
+            <div className="space-y-2">
               <Label htmlFor="hasFormulas" className="flex items-center gap-2">
                 <IconSparkles className="h-4 w-4" />
-                Apenas com fórmulas
+                Fórmulas
               </Label>
-              <Switch id="hasFormulas" checked={hasFormulas === true} onCheckedChange={(checked) => handleChange("hasFormulas", checked ? true : undefined)} />
+              <Combobox
+                mode="single"
+                value={hasFormulas === true ? "yes" : "all"}
+                onValueChange={(value) => handleChange("hasFormulas", value === "yes" ? true : undefined)}
+                options={[
+                  { value: "all", label: "Todas" },
+                  { value: "yes", label: "Apenas com fórmulas" },
+                ]}
+                placeholder="Selecione..."
+                searchable={false}
+              />
             </div>
 
             {/* Color Similarity Filter */}
@@ -287,16 +271,6 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
               )}
             </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleClearAll} className="flex-1">
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar Tudo
-            </Button>
-            <Button onClick={handleApply} className="flex-1">Aplicar Filtros</Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

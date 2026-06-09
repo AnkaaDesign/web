@@ -1,35 +1,27 @@
 import { useState, useEffect } from "react";
-import { IconFilter, IconX } from "@tabler/icons-react";
+import { IconFilter } from "@tabler/icons-react";
 
-import { WARNING_SEVERITY, WARNING_SEVERITY_LABELS, WARNING_CATEGORY, WARNING_CATEGORY_LABELS } from "../../../../constants";
+import { WARNING_SEVERITY, WARNING_SEVERITY_LABELS, WARNING_CATEGORY, WARNING_CATEGORY_LABELS, USER_STATUS } from "../../../../constants";
 import { useUsers } from "../../../../hooks";
 
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MultiSelect } from "@/components/ui/multi-select";
 
 interface WarningFiltersProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onApply: (filters: {
-    severity?: WARNING_SEVERITY;
-    category?: WARNING_CATEGORY;
+    severities?: WARNING_SEVERITY[];
+    categories?: WARNING_CATEGORY[];
     isActive?: boolean;
     collaboratorIds?: string[];
     supervisorIds?: string[];
     witnessIds?: string[];
   }) => void;
-  currentSeverity?: WARNING_SEVERITY;
-  currentCategory?: WARNING_CATEGORY;
+  currentSeverities?: WARNING_SEVERITY[];
+  currentCategories?: WARNING_CATEGORY[];
   currentIsActive?: boolean;
   currentCollaboratorIds?: string[];
   currentSupervisorIds?: string[];
@@ -40,38 +32,55 @@ export function WarningFilters({
   open,
   onOpenChange,
   onApply,
-  currentSeverity,
-  currentCategory,
+  currentSeverities = [],
+  currentCategories = [],
   currentIsActive,
   currentCollaboratorIds = [],
   currentSupervisorIds = [],
   currentWitnessIds = [],
 }: WarningFiltersProps) {
-  const [severity, setSeverity] = useState<WARNING_SEVERITY | "">(currentSeverity || "");
-  const [category, setCategory] = useState<WARNING_CATEGORY | "">(currentCategory || "");
-  const [isActive, setIsActive] = useState<string>(currentIsActive === undefined ? "all" : currentIsActive ? "active" : "resolved");
+  const [severities, setSeverities] = useState<string[]>(currentSeverities);
+  const [categories, setCategories] = useState<string[]>(currentCategories);
+  // Status as multi-select: 'active' and/or 'resolved'
+  const [statuses, setStatuses] = useState<string[]>(
+    currentIsActive === undefined ? [] : currentIsActive ? ["active"] : ["resolved"],
+  );
   const [collaboratorIds, setCollaboratorIds] = useState<string[]>(currentCollaboratorIds);
   const [supervisorIds, setSupervisorIds] = useState<string[]>(currentSupervisorIds);
   const [witnessIds, setWitnessIds] = useState<string[]>(currentWitnessIds);
 
-  // Load users for multi-select
-  const { data: usersData } = useUsers({ limit: 100, orderBy: { name: "asc" } });
+  // Load active users only for multi-select (exclude dismissed/inactive)
+  const { data: usersData } = useUsers({
+    limit: 100,
+    orderBy: { name: "asc" },
+    statuses: [USER_STATUS.EXPERIENCE_PERIOD_1, USER_STATUS.EXPERIENCE_PERIOD_2, USER_STATUS.EFFECTED],
+  });
   const users = usersData?.data || [];
 
   useEffect(() => {
-    setSeverity(currentSeverity || "");
-    setCategory(currentCategory || "");
-    setIsActive(currentIsActive === undefined ? "all" : currentIsActive ? "active" : "resolved");
+    setSeverities(currentSeverities);
+    setCategories(currentCategories);
+    setStatuses(currentIsActive === undefined ? [] : currentIsActive ? ["active"] : ["resolved"]);
     setCollaboratorIds(currentCollaboratorIds);
     setSupervisorIds(currentSupervisorIds);
     setWitnessIds(currentWitnessIds);
-  }, [currentSeverity, currentCategory, currentIsActive, currentCollaboratorIds, currentSupervisorIds, currentWitnessIds]);
+  }, [currentSeverities, currentCategories, currentIsActive, currentCollaboratorIds, currentSupervisorIds, currentWitnessIds]);
+
+  // Map status multi-select to isActive output:
+  // only 'active' -> true; only 'resolved' -> false; both or none -> undefined
+  const resolveIsActive = (sel: string[]): boolean | undefined => {
+    const hasActive = sel.includes("active");
+    const hasResolved = sel.includes("resolved");
+    if (hasActive && !hasResolved) return true;
+    if (hasResolved && !hasActive) return false;
+    return undefined;
+  };
 
   const handleApply = () => {
     onApply({
-      severity: severity || undefined,
-      category: category || undefined,
-      isActive: isActive === "all" ? undefined : isActive === "active",
+      severities: severities.length > 0 ? (severities as WARNING_SEVERITY[]) : undefined,
+      categories: categories.length > 0 ? (categories as WARNING_CATEGORY[]) : undefined,
+      isActive: resolveIsActive(statuses),
       collaboratorIds: collaboratorIds.length > 0 ? collaboratorIds : undefined,
       supervisorIds: supervisorIds.length > 0 ? supervisorIds : undefined,
       witnessIds: witnessIds.length > 0 ? witnessIds : undefined,
@@ -79,9 +88,9 @@ export function WarningFilters({
   };
 
   const handleClear = () => {
-    setSeverity("");
-    setCategory("");
-    setIsActive("all");
+    setSeverities([]);
+    setCategories([]);
+    setStatuses([]);
     setCollaboratorIds([]);
     setSupervisorIds([]);
     setWitnessIds([]);
@@ -89,81 +98,66 @@ export function WarningFilters({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtrar Advertências
-          </SheetTitle>
-          <SheetDescription>
-            Filtre as advertências por severidade, categoria ou status
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtrar Advertências"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Filtre as advertências por severidade, categoria ou status"
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+    >
           <div className="space-y-2">
             <Label htmlFor="severity">Severidade</Label>
             <Combobox
-              value={severity}
-              onValueChange={(value) => setSeverity(value as WARNING_SEVERITY)}
-              options={[
-                { value: "", label: "Todas" },
-                ...Object.entries(WARNING_SEVERITY_LABELS).map(([key, label]: [string, string]) => ({
-                  value: key,
-                  label: label,
-                })),
-              ]}
+              mode="multiple"
+              value={severities}
+              onValueChange={(value) => setSeverities(Array.isArray(value) ? value : [])}
+              options={Object.entries(WARNING_SEVERITY_LABELS).map(([key, label]: [string, string]) => ({
+                value: key,
+                label: label,
+              }))}
               placeholder="Todas as severidades"
               emptyText="Nenhuma severidade encontrada"
-              searchPlaceholder="Buscar severidade..."
               searchable={false}
-              clearable={false}
+              clearable
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="category">Categoria</Label>
             <Combobox
-              value={category}
-              onValueChange={(value) => setCategory(value as WARNING_CATEGORY)}
-              options={[
-                { value: "", label: "Todas" },
-                ...Object.entries(WARNING_CATEGORY_LABELS).map(([key, label]: [string, string]) => ({
-                  value: key,
-                  label: label,
-                })),
-              ]}
+              mode="multiple"
+              value={categories}
+              onValueChange={(value) => setCategories(Array.isArray(value) ? value : [])}
+              options={Object.entries(WARNING_CATEGORY_LABELS).map(([key, label]: [string, string]) => ({
+                value: key,
+                label: label,
+              }))}
               placeholder="Todas as categorias"
               emptyText="Nenhuma categoria encontrada"
-              searchPlaceholder="Buscar categoria..."
               searchable={false}
-              clearable={false}
+              clearable
             />
           </div>
 
           <div className="space-y-2">
             <Label>Status</Label>
-            <RadioGroup value={isActive} onValueChange={setIsActive}>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="all" id="all" />
-                <Label htmlFor="all" className="font-normal">
-                  Todas
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="active" id="active" />
-                <Label htmlFor="active" className="font-normal">
-                  Ativas
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="resolved" id="resolved" />
-                <Label htmlFor="resolved" className="font-normal">
-                  Resolvidas
-                </Label>
-              </div>
-            </RadioGroup>
+            <Combobox
+              mode="multiple"
+              value={statuses}
+              onValueChange={(value) => setStatuses(Array.isArray(value) ? value : [])}
+              options={[
+                { value: "active", label: "Ativas" },
+                { value: "resolved", label: "Resolvidas" },
+              ]}
+              placeholder="Todos os status"
+              emptyText="Nenhum status encontrado"
+              searchable={false}
+              clearable
+            />
           </div>
 
           <div className="space-y-2">
@@ -198,19 +192,6 @@ export function WarningFilters({
               disabled={users.length === 0}
             />
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-4 border-t mt-6">
-          <Button variant="outline" onClick={handleClear} className="flex-1">
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar Filtros
-          </Button>
-          <Button onClick={handleApply} className="flex-1">
-            Aplicar Filtros
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

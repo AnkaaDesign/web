@@ -1,17 +1,19 @@
-import { useEffect, useState } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { IconX, IconFilter } from "@tabler/icons-react";
+import { Combobox } from "@/components/ui/combobox";
+import { DateTimeInput } from "@/components/ui/date-time-input";
+import { IconFilter } from "@tabler/icons-react";
 import type { MessageGetManyFormData } from "@/schemas/message";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { getUsers } from "@/api-client/user";
+import { getSectors } from "@/api-client/sector";
+import { ACTIVE_USER_STATUSES } from "@/constants";
+
+const STATUS_OPTIONS = [
+  { value: "draft", label: "Rascunho" },
+  { value: "active", label: "Ativa" },
+  { value: "archived", label: "Arquivada" },
+];
 
 interface MessageFiltersProps {
   open: boolean;
@@ -27,10 +29,60 @@ export function MessageFilters({
   onFilterChange,
 }: MessageFiltersProps) {
   const [localFilters, setLocalFilters] = useState(filters);
+  // Cache resolved entities so already-selected chips render labels even before a search runs.
+  const userCacheRef = useRef<Map<string, any>>(new Map());
+  const sectorCacheRef = useRef<Map<string, any>>(new Map());
 
   useEffect(() => {
-    setLocalFilters(filters);
-  }, [filters]);
+    if (open) setLocalFilters(filters);
+  }, [open, filters]);
+
+  // Async search for ACTIVE users only (excludes DISMISSED/inactive).
+  const searchUsers = useCallback(
+    async (search?: string, page: number = 1): Promise<{ data: any[]; hasMore: boolean }> => {
+      const params: any = {
+        orderBy: { name: "asc" },
+        page,
+        take: 50,
+        statuses: [...ACTIVE_USER_STATUSES],
+      };
+      if (search && search.trim()) {
+        params.searchingFor = search.trim();
+      }
+      try {
+        const response = await getUsers(params);
+        const users = response.data || [];
+        users.forEach((u: any) => userCacheRef.current.set(u.id, u));
+        return { data: users, hasMore: response.meta?.hasNextPage || false };
+      } catch {
+        return { data: [], hasMore: false };
+      }
+    },
+    [],
+  );
+
+  // Async search for sectors.
+  const searchSectors = useCallback(
+    async (search?: string, page: number = 1): Promise<{ data: any[]; hasMore: boolean }> => {
+      const params: any = {
+        orderBy: { name: "asc" },
+        page,
+        take: 50,
+      };
+      if (search && search.trim()) {
+        params.searchingFor = search.trim();
+      }
+      try {
+        const response = await getSectors(params);
+        const sectors = response.data || [];
+        sectors.forEach((s: any) => sectorCacheRef.current.set(s.id, s));
+        return { data: sectors, hasMore: response.meta?.hasNextPage || false };
+      } catch {
+        return { data: [], hasMore: false };
+      }
+    },
+    [],
+  );
 
   const handleApply = () => {
     onFilterChange(localFilters);
@@ -43,121 +95,137 @@ export function MessageFilters({
     onFilterChange(cleared);
   };
 
-  const toggleStatus = (status: string) => {
-    const currentStatuses = localFilters.status || [];
-    const newStatuses = currentStatuses.includes(status as any)
-      ? currentStatuses.filter((s) => s !== status)
-      : [...currentStatuses, status as any];
-
-    setLocalFilters({
-      ...localFilters,
-      status: newStatuses.length > 0 ? newStatuses : undefined,
-    });
-  };
-
-
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[400px] sm:w-[540px]">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros
-          </SheetTitle>
-          <SheetDescription>
-            Aplique filtros para refinar os resultados da busca
-          </SheetDescription>
-        </SheetHeader>
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Aplique filtros para refinar os resultados da busca"
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar"
+    >
+      {/* Status Filter */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Status</Label>
+        <Combobox
+          mode="multiple"
+          value={localFilters.status || []}
+          onValueChange={(v) =>
+            setLocalFilters({
+              ...localFilters,
+              status: Array.isArray(v) && v.length ? (v as any) : undefined,
+            })
+          }
+          options={STATUS_OPTIONS}
+          placeholder="Selecione o status"
+          searchable={false}
+          clearable
+        />
+      </div>
 
-        <div className="mt-6 space-y-6">
-          {/* Status Filter */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Status</Label>
-            <div className="space-y-2">
-              {[
-                { value: "draft", label: "Rascunho" },
-                { value: "active", label: "Ativa" },
-                { value: "archived", label: "Arquivada" },
-              ].map((option) => (
-                <div key={option.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`status-${option.value}`}
-                    checked={localFilters.status?.includes(option.value as any) || false}
-                    onCheckedChange={() => toggleStatus(option.value)}
-                  />
-                  <label
-                    htmlFor={`status-${option.value}`}
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    {option.label}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
+      {/* Recipients Filter */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Destinatários</Label>
+        <Combobox<any>
+          mode="multiple"
+          async
+          value={localFilters.recipientIds || []}
+          onValueChange={(v) =>
+            setLocalFilters({
+              ...localFilters,
+              recipientIds: Array.isArray(v) && v.length ? v : undefined,
+            })
+          }
+          queryKey={["msg-filter-users"]}
+          queryFn={searchUsers}
+          minSearchLength={0}
+          placeholder="Selecione os destinatários"
+          emptyText="Nenhum usuário encontrado"
+          clearable
+          getOptionValue={(o: any) => o.id}
+          getOptionLabel={(o: any) => o.name}
+        />
+      </div>
 
-          {/* Priority Filter - Commented out as not supported by MessageGetManyFormData schema
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Prioridade</Label>
-            <div className="space-y-2">
-              {[
-                { value: "low", label: "Baixa" },
-                { value: "normal", label: "Normal" },
-                { value: "high", label: "Alta" },
-              ].map((option) => (
-                <div key={option.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`priority-${option.value}`}
-                    checked={false}
-                    onCheckedChange={() => togglePriority(option.value)}
-                  />
-                  <label
-                    htmlFor={`priority-${option.value}`}
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    {option.label}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-          */}
+      {/* Sectors Filter */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Setores</Label>
+        <Combobox<any>
+          mode="multiple"
+          async
+          value={(localFilters as any).sectorIds || []}
+          onValueChange={(v) =>
+            setLocalFilters({
+              ...localFilters,
+              sectorIds: Array.isArray(v) && v.length ? v : undefined,
+            } as any)
+          }
+          queryKey={["msg-filter-sectors"]}
+          queryFn={searchSectors}
+          minSearchLength={0}
+          placeholder="Selecione os setores"
+          emptyText="Nenhum setor encontrado"
+          clearable
+          getOptionValue={(o: any) => o.id}
+          getOptionLabel={(o: any) => o.name}
+        />
+      </div>
 
-          {/* Date Range Filter */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Período de Criação</Label>
-            <DateRangePicker
-              from={localFilters.createdAt?.gte ? new Date(localFilters.createdAt.gte) : undefined}
-              to={localFilters.createdAt?.lte ? new Date(localFilters.createdAt.lte) : undefined}
-              onDateRangeChange={(range) => {
-                if (range?.from || range?.to) {
-                  setLocalFilters({
-                    ...localFilters,
-                    createdAt: {
-                      gte: range.from?.toISOString(),
-                      lte: range.to?.toISOString(),
-                    },
-                  });
-                } else {
-                  const { createdAt, ...rest } = localFilters;
-                  setLocalFilters(rest);
-                }
+      {/* Date Range Filter */}
+      <div className="space-y-3">
+        <Label className="text-sm font-medium">Período de Criação</Label>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+            <DateTimeInput
+              mode="date"
+              value={localFilters.createdAt?.gte ? new Date(localFilters.createdAt.gte) : undefined}
+              onChange={(dateOrRange) => {
+                const date =
+                  dateOrRange && typeof dateOrRange === "object" && "from" in dateOrRange ? dateOrRange.from : dateOrRange;
+                setLocalFilters((prev) => {
+                  const next = { ...(prev.createdAt || {}) };
+                  if (date) {
+                    next.gte = (date as Date).toISOString();
+                  } else {
+                    delete next.gte;
+                  }
+                  const hasRange = next.gte || next.lte;
+                  return { ...prev, createdAt: hasRange ? next : undefined };
+                });
               }}
+              hideLabel
+              placeholder="Selecionar data inicial..."
             />
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={handleClear} className="flex-1">
-              <IconX className="mr-2 h-4 w-4" />
-              Limpar
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar Filtros
-            </Button>
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+            <DateTimeInput
+              mode="date"
+              value={localFilters.createdAt?.lte ? new Date(localFilters.createdAt.lte) : undefined}
+              onChange={(dateOrRange) => {
+                const date =
+                  dateOrRange && typeof dateOrRange === "object" && "to" in dateOrRange ? dateOrRange.to : dateOrRange;
+                setLocalFilters((prev) => {
+                  const next = { ...(prev.createdAt || {}) };
+                  if (date) {
+                    next.lte = (date as Date).toISOString();
+                  } else {
+                    delete next.lte;
+                  }
+                  const hasRange = next.gte || next.lte;
+                  return { ...prev, createdAt: hasRange ? next : undefined };
+                });
+              }}
+              hideLabel
+              placeholder="Selecionar data final..."
+            />
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </FilterDrawer>
   );
 }

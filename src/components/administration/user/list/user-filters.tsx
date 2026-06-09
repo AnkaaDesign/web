@@ -1,19 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { Badge } from "@/components/ui/badge";
 import { getPositions, getSectors } from "../../../../api-client";
 import { USER_STATUS_LABELS } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
-import { IconFilter, IconUser, IconBriefcase, IconBuilding, IconCalendar, IconX } from "@tabler/icons-react";
+import { IconFilter, IconUser, IconBriefcase, IconBuilding, IconCalendar } from "@tabler/icons-react";
 import type { UserGetManyFormData } from "../../../../schemas";
 
 interface UserFiltersProps {
@@ -163,24 +155,18 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
   }).length;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros Avançados
-            {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {activeFilterCount} {activeFilterCount === 1 ? "ativo" : "ativos"}
-              </Badge>
-            )}
-          </SheetTitle>
-          <SheetDescription>
-            Filtre os usuários por status, cargo, setor, datas de nascimento, demissão e contratação
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros Avançados"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Filtre os usuários por status, cargo, setor, datas de nascimento, demissão e contratação"
+      activeFilterCount={activeFilterCount}
+      onApply={handleApplyFilters}
+      onReset={handleResetFilters}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+    >
             <div>
               <Label className="flex items-center gap-2 mb-2">
                 <IconUser className="h-4 w-4" />
@@ -417,19 +403,6 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 </div>
               </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 mt-6 pt-4 border-t">
-              <Button variant="outline" onClick={handleResetFilters} className="flex-1">
-                <IconX className="h-4 w-4 mr-2" />
-                Limpar Filtros
-              </Button>
-              <Button onClick={handleApplyFilters} className="flex-1">
-                Aplicar Filtros
-              </Button>
-            </div>
-          </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

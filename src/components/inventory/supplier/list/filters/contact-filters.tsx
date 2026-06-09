@@ -1,8 +1,8 @@
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { IconId, IconMail, IconWorld, IconPhone, IconAddressBook } from "@tabler/icons-react";
+import { IconId, IconPhone, IconAddressBook } from "@tabler/icons-react";
 
 interface ContactFiltersProps {
   hasCnpj?: boolean;
@@ -16,24 +16,39 @@ interface ContactFiltersProps {
 }
 
 export function ContactFilters({ hasCnpj, onHasCnpjChange, hasEmail, onHasEmailChange, hasSite, onHasSiteChange, phoneContains, onPhoneContainsChange }: ContactFiltersProps) {
+  const selected: string[] = [];
+  if (hasCnpj) selected.push("hasCnpj");
+  if (hasEmail) selected.push("hasEmail");
+  if (hasSite) selected.push("hasSite");
+
+  const handleChange = (value: string | string[] | null | undefined) => {
+    const values = Array.isArray(value) ? value : value ? [value] : [];
+    onHasCnpjChange(values.includes("hasCnpj") ? true : false);
+    onHasEmailChange(values.includes("hasEmail") ? true : false);
+    onHasSiteChange(values.includes("hasSite") ? true : false);
+  };
+
   return (
     <div className="space-y-4">
-      {/* Document Information */}
+      {/* Document & Contact Characteristics */}
       <div className="space-y-3">
         <Label className="text-sm font-medium flex items-center gap-2">
-          <IconId className="h-4 w-4" />
-          Documentação
+          <IconAddressBook className="h-4 w-4" />
+          Características
         </Label>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="hasCnpj" className="text-sm font-normal flex items-center gap-2">
-              <IconId className="h-4 w-4 text-muted-foreground" />
-              Tem CNPJ cadastrado
-            </Label>
-            <Switch id="hasCnpj" checked={hasCnpj ?? false} onCheckedChange={(checked) => onHasCnpjChange(checked)} />
-          </div>
-        </div>
+        <Combobox
+          mode="multiple"
+          value={selected}
+          onValueChange={handleChange}
+          options={[
+            { value: "hasCnpj", label: "Tem CNPJ cadastrado" },
+            { value: "hasEmail", label: "Tem email cadastrado" },
+            { value: "hasSite", label: "Tem site cadastrado" },
+          ]}
+          placeholder="Selecione..."
+          searchable={false}
+          clearable
+        />
       </div>
 
       <Separator />
@@ -41,27 +56,11 @@ export function ContactFilters({ hasCnpj, onHasCnpjChange, hasEmail, onHasEmailC
       {/* Contact Information */}
       <div className="space-y-3">
         <Label className="text-sm font-medium flex items-center gap-2">
-          <IconAddressBook className="h-4 w-4" />
+          <IconId className="h-4 w-4" />
           Informações de Contato
         </Label>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="hasEmail" className="text-sm font-normal flex items-center gap-2">
-              <IconMail className="h-4 w-4 text-muted-foreground" />
-              Tem email cadastrado
-            </Label>
-            <Switch id="hasEmail" checked={hasEmail ?? false} onCheckedChange={(checked) => onHasEmailChange(checked)} />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Label htmlFor="hasSite" className="text-sm font-normal flex items-center gap-2">
-              <IconWorld className="h-4 w-4 text-muted-foreground" />
-              Tem site cadastrado
-            </Label>
-            <Switch id="hasSite" checked={hasSite ?? false} onCheckedChange={(checked) => onHasSiteChange(checked)} />
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="phoneContains" className="text-sm font-normal flex items-center gap-2">
               <IconPhone className="h-4 w-4 text-muted-foreground" />

@@ -152,7 +152,7 @@ function FilterSheet({ open, onOpenChange, filters, onApply }: FilterSheetProps)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
+      <SheetContent side="right" className="w-full sm:max-w-xl md:max-w-xl border-border/50 flex flex-col">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" /> Filtros — NFS-e
@@ -204,7 +204,7 @@ function FilterSheet({ open, onOpenChange, filters, onApply }: FilterSheetProps)
           </div>
         </ScrollArea>
 
-        <div className="flex gap-2 pt-4 border-t">
+        <div className="flex gap-2 pt-4 border-t border-border/50">
           <Button
             variant="outline"
             onClick={() => setLocal({
@@ -455,20 +455,6 @@ const NfseStatisticsPage = () => {
                 onDelete={deletePreset}
                 isSaving={isSavingPreset}
               />
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2" disabled={isLoading || !items.length}>
-                    <IconDownload className="h-4 w-4" /> Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={handleExportPDF}><IconFileTypePdf className="h-4 w-4 mr-2" /> PDF do Gráfico</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={handleExportCSV}><IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV dos Dados</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={handleExportXLSX}><IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </>
           }
         />
@@ -534,6 +520,20 @@ const NfseStatisticsPage = () => {
                   <IconFilter className="h-4 w-4" /> Filtros
                   {activeFilterCount > 0 && <Badge variant="secondary" className="ml-1">{activeFilterCount}</Badge>}
                 </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2" disabled={isLoading || !items.length}>
+                      <IconDownload className="h-4 w-4" /> Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={handleExportPDF}><IconFileTypePdf className="h-4 w-4 mr-2" /> PDF do Gráfico</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={handleExportCSV}><IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV dos Dados</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={handleExportXLSX}><IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </CardHeader>

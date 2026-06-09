@@ -1,16 +1,8 @@
 import { useState, useEffect } from "react";
-import { IconFilter, IconX } from "@tabler/icons-react";
+import { IconFilter } from "@tabler/icons-react";
 import type { DateRange } from "react-day-picker";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
@@ -99,19 +91,17 @@ export function ObservationFilters({ open, onOpenChange, filters, onFilterChange
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros de Observações
-          </SheetTitle>
-          <SheetDescription>
-            Filtre as observações por tarefas, arquivos e datas
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros de Observações"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Filtre as observações por tarefas, arquivos e datas"
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar filtros"
+      resetLabel="Limpar todos"
+    >
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="basic">Básico</TabsTrigger>
@@ -123,30 +113,23 @@ export function ObservationFilters({ open, onOpenChange, filters, onFilterChange
               <div className="space-y-4">
                 <div className="space-y-3">
                   <Label className="text-base font-medium">Arquivos</Label>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={localState.hasFiles === true}
-                      onCheckedChange={(checked) => {
-                        setLocalState((prev) => ({
-                          ...prev,
-                          hasFiles: checked ? true : undefined,
-                        }));
-                      }}
-                    />
-                    <Label>Apenas com arquivos anexos</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={localState.hasFiles === false}
-                      onCheckedChange={(checked) => {
-                        setLocalState((prev) => ({
-                          ...prev,
-                          hasFiles: checked ? false : undefined,
-                        }));
-                      }}
-                    />
-                    <Label>Apenas sem arquivos anexos</Label>
-                  </div>
+                  <Combobox
+                    mode="single"
+                    value={localState.hasFiles === true ? "yes" : localState.hasFiles === false ? "no" : "all"}
+                    onValueChange={(value) => {
+                      setLocalState((prev) => ({
+                        ...prev,
+                        hasFiles: value === "yes" ? true : value === "no" ? false : undefined,
+                      }));
+                    }}
+                    options={[
+                      { value: "all", label: "Todos" },
+                      { value: "yes", label: "Apenas com arquivos anexos" },
+                      { value: "no", label: "Apenas sem arquivos anexos" },
+                    ]}
+                    placeholder="Selecione..."
+                    searchable={false}
+                  />
                 </div>
               </div>
             </TabsContent>
@@ -227,18 +210,6 @@ export function ObservationFilters({ open, onOpenChange, filters, onFilterChange
             </TabsContent>
           </Tabs>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleReset} className="flex-1">
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar todos
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar filtros
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

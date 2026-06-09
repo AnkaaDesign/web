@@ -100,6 +100,7 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
       receipts: true,
       invoices: true,
       artworks: true,
+      painter: true,
     }),
     [],
   );

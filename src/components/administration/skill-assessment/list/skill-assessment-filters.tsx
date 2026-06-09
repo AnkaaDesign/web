@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { IconFilter, IconX } from "@tabler/icons-react";
+import { IconFilter } from "@tabler/icons-react";
 
 import { ASSESSMENT_STATUS, ASSESSMENT_STATUS_LABELS } from "../../../../constants";
 
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 
@@ -45,17 +44,17 @@ export function SkillAssessmentFilters({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtrar Avaliações
-          </SheetTitle>
-          <SheetDescription>Filtre as campanhas de avaliação por status</SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtrar Avaliações"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Filtre as campanhas de avaliação por status"
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+    >
           <div className="space-y-2">
             <Label htmlFor="status">Status</Label>
             <Combobox
@@ -77,18 +76,6 @@ export function SkillAssessmentFilters({
               name="status"
             />
           </div>
-
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleClear} className="flex-1">
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar Filtros
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar Filtros
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

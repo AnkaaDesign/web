@@ -8,9 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { FilterDrawer } from '@/components/common/filters/ui/FilterDrawer';
 import { Combobox } from '@/components/ui/combobox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -42,7 +41,6 @@ import {
   IconCash,
   IconBox,
   IconRuler,
-  IconX,
   IconCalendarStats,
   IconTrendingUp,
   IconFileTypeCsv,
@@ -302,21 +300,18 @@ function OrderFiltersSheet({
   ].filter(Boolean).length;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros
-            {activeCount > 0 && <Badge variant="secondary">{activeCount}</Badge>}
-          </SheetTitle>
-          <SheetDescription>
-            Período, métrica e filtros de fornecedor.
-          </SheetDescription>
-        </SheetHeader>
-
-        <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="space-y-5 py-4">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Período, métrica e filtros de fornecedor."
+      activeFilterCount={activeCount}
+      onApply={apply}
+      onReset={clear}
+      applyLabel="Aplicar"
+      resetLabel="Limpar"
+    >
 
             {/* X-axis mode */}
             <div className="space-y-2">
@@ -457,17 +452,7 @@ function OrderFiltersSheet({
                 clearable
               />
             </div>
-          </div>
-        </ScrollArea>
-
-        <div className="flex gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={clear} className="flex-1">
-            <IconX className="h-4 w-4 mr-2" /> Limpar
-          </Button>
-          <Button onClick={apply} className="flex-1">Aplicar</Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }
 
@@ -1118,24 +1103,6 @@ const OrderPage = () => {
                 onDelete={deletePreset}
                 isSaving={isSavingPreset}
               />
-
-              {/* Export */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={isLoading || !displayBuckets.length}>
-                    <IconDownload className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={handleExportCSV}>
-                    <IconFileTypeCsv className="h-4 w-4 mr-2" />
-                    CSV dos Dados
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </>
           }
         />
@@ -1229,6 +1196,24 @@ const OrderPage = () => {
                     <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>
                   )}
                 </Button>
+
+                {/* Export */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={isLoading || !displayBuckets.length}>
+                      <IconDownload className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={handleExportCSV}>
+                      <IconFileTypeCsv className="h-4 w-4 mr-2" />
+                      CSV dos Dados
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
               </div>
             </div>

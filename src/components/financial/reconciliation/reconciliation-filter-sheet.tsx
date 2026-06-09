@@ -1,17 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { IconFilter, IconX, IconCalendar, IconCash } from "@tabler/icons-react";
+import { IconFilter, IconCalendar, IconCash } from "@tabler/icons-react";
 import { useReconciliationCategories } from "@/hooks/financial/use-reconciliation";
 import type {
   BankTransactionSubtype,
@@ -188,25 +180,20 @@ export function ReconciliationFilterSheet({ open, onOpenChange, filters, onApply
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Transações - Filtros
-            {activeCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {activeCount}
-              </Badge>
-            )}
-          </SheetTitle>
-          <SheetDescription>
-            Refine a lista de transações bancárias por período, status, tipo e valor.
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-5">
-          {/* Period — year + months side by side (this is the only horizontal pair
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Transações - Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Refine a lista de transações bancárias por período, status, tipo e valor."
+      activeFilterCount={activeCount}
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+      contentClassName="space-y-5"
+    >
+      {/* Period — year + months side by side (this is the only horizontal pair
               kept besides date range and amount range). */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium">
@@ -405,18 +392,6 @@ export function ReconciliationFilterSheet({ open, onOpenChange, filters, onApply
               </div>
             </div>
           </div>
-
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleReset} className="flex-1">
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar Filtros
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar Filtros
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

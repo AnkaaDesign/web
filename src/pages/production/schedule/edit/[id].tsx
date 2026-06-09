@@ -121,6 +121,7 @@ export const TaskEditPage = () => {
           receipts: true,
           invoices: true,
           artworks: true,
+          painter: true,
         },
       },
       createdBy: true,

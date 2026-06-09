@@ -311,11 +311,11 @@ export function BorrowList({ className, teamScope }: BorrowListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+            <ColumnVisibilityManager visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
               <IconFilter className="h-4 w-4" />
               <span>Filtros{hasActiveFilters ? ` (${activeFilters.length})` : ""}</span>
             </Button>
-            <ColumnVisibilityManager visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <BorrowExport filters={queryFilters} currentItems={tableData.items} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
           </div>
         </div>

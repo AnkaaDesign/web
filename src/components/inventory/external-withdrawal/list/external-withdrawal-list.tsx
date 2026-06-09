@@ -251,6 +251,7 @@ export function ExternalWithdrawalList({ className }: ExternalWithdrawalListProp
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button
               variant={hasActiveFilters ? "default" : "outline"}
               size="default"
@@ -262,7 +263,6 @@ export function ExternalWithdrawalList({ className }: ExternalWithdrawalListProp
                 {hasActiveFilters ? ` (${activeFilters.length})` : ""}
               </span>
             </Button>
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <ExternalWithdrawalExport
               currentItems={tableData.externalWithdrawals}
               totalRecords={tableData.totalRecords}

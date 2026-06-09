@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { IconX, IconCurrencyReal, IconFilter } from "@tabler/icons-react";
+import { IconCurrencyReal, IconFilter } from "@tabler/icons-react";
 
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
+import { Combobox } from "@/components/ui/combobox";
 
 interface PositionFiltersProps {
   open: boolean;
@@ -41,38 +40,38 @@ export function PositionFilters({ open, onOpenChange, onApply, currentMinRemuner
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtrar Cargos
-          </SheetTitle>
-          <SheetDescription>
-            Filtre os cargos por características e faixa de remuneração
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtrar Cargos"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Filtre os cargos por características e faixa de remuneração"
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+    >
           {/* Characteristics Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium">Características</h3>
 
-            <div className="flex items-center justify-between">
-              <Label htmlFor="bonifiable">Apenas bonificáveis</Label>
-              <Switch
-                id="bonifiable"
-                checked={!!bonifiable}
-                onCheckedChange={(checked) => setBonifiable(checked || undefined)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label htmlFor="hasUsers">Apenas com usuários</Label>
-              <Switch
-                id="hasUsers"
-                checked={!!hasUsers}
-                onCheckedChange={(checked) => setHasUsers(checked || undefined)}
+            <div className="space-y-2">
+              <Label>Características</Label>
+              <Combobox
+                mode="multiple"
+                value={[...(bonifiable ? ["bonifiable"] : []), ...(hasUsers ? ["hasUsers"] : [])]}
+                onValueChange={(v) => {
+                  const arr = Array.isArray(v) ? v : [];
+                  setBonifiable(arr.includes("bonifiable") || undefined);
+                  setHasUsers(arr.includes("hasUsers") || undefined);
+                }}
+                options={[
+                  { value: "bonifiable", label: "Bonificáveis" },
+                  { value: "hasUsers", label: "Com usuários" },
+                ]}
+                placeholder="Selecione características"
+                searchable={false}
+                clearable
               />
             </div>
           </div>
@@ -106,19 +105,6 @@ export function PositionFilters({ open, onOpenChange, onApply, currentMinRemuner
               />
             </div>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleClear} className="flex-1">
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar Filtros
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar Filtros
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

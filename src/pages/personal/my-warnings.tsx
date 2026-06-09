@@ -126,15 +126,21 @@ export const MyWarningsPage = () => {
                   ...filters,
                   where: {
                     ...filters.where,
-                    ...(newFilters.severity && { severity: newFilters.severity }),
-                    ...(newFilters.category && { category: newFilters.category }),
+                    severity: newFilters.severities?.length ? { in: newFilters.severities } : undefined,
+                    category: newFilters.categories?.length ? { in: newFilters.categories } : undefined,
                     ...(typeof newFilters.isActive === "boolean" && { isActive: newFilters.isActive }),
                   },
                 });
                 setShowFilterModal(false);
               }}
-              currentSeverity={filters.where?.severity}
-              currentCategory={filters.where?.category}
+              currentSeverities={(() => {
+                const s = filters.where?.severity as any;
+                return Array.isArray(s?.in) ? s.in : s ? [s] : [];
+              })()}
+              currentCategories={(() => {
+                const c = filters.where?.category as any;
+                return Array.isArray(c?.in) ? c.in : c ? [c] : [];
+              })()}
               currentIsActive={filters.where?.isActive}
             />
       </Card>

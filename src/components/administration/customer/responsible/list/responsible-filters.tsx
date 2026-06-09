@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -8,15 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@/components/ui/sheet";
-import { IconX } from "@tabler/icons-react";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import type { ResponsibleGetManyFormData } from "@/types/responsible";
 import {
   ResponsibleRole,
@@ -62,16 +53,16 @@ export function ResponsibleFilters({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[400px] sm:w-[540px]">
-        <SheetHeader>
-          <SheetTitle>Filtros</SheetTitle>
-          <SheetDescription>
-            Refine a lista de responsáveis usando os filtros abaixo
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros"
+      description="Refine a lista de responsáveis usando os filtros abaixo"
+      onApply={() => onOpenChange(false)}
+      onReset={handleClearAll}
+      applyLabel="Aplicar"
+      resetLabel="Limpar filtros"
+    >
           {/* Role Filter */}
           <div className="space-y-2">
             <Label htmlFor="role">Função</Label>
@@ -124,16 +115,6 @@ export function ResponsibleFilters({
               <Input value={filters.companyId} disabled />
             </div>
           )}
-        </div>
-
-        <SheetFooter className="mt-8">
-          <Button variant="outline" onClick={handleClearAll}>
-            <IconX className="mr-2 h-4 w-4" />
-            Limpar filtros
-          </Button>
-          <Button onClick={() => onOpenChange(false)}>Aplicar</Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

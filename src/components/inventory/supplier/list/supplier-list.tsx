@@ -403,6 +403,7 @@ export function SupplierList({ className }: SupplierListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button
               variant={hasActiveFilters ? "default" : "outline"}
               size="default"
@@ -414,7 +415,6 @@ export function SupplierList({ className }: SupplierListProps) {
                 {hasActiveFilters ? ` (${activeFilters.length})` : ""}
               </span>
             </Button>
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <SupplierExport filters={queryFilters} currentSuppliers={tableData.suppliers} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
           </div>
         </div>

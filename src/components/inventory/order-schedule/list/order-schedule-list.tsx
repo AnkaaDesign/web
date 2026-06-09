@@ -84,6 +84,11 @@ export function OrderScheduleList({ className }: OrderScheduleListProps) {
             className="flex-1"
           />
           <div className="flex gap-2">
+            <ColumnVisibilityManager
+              columns={allColumns}
+              visibleColumns={visibleColumns}
+              onVisibilityChange={setVisibleColumns}
+            />
             <Button
               variant={hasActiveFilters ? "default" : "outline"}
               size="default"
@@ -95,11 +100,6 @@ export function OrderScheduleList({ className }: OrderScheduleListProps) {
                 {hasActiveFilters ? ` (${activeFilterCount})` : ""}
               </span>
             </Button>
-            <ColumnVisibilityManager
-              columns={allColumns}
-              visibleColumns={visibleColumns}
-              onVisibilityChange={setVisibleColumns}
-            />
           </div>
         </div>
 

@@ -1,17 +1,8 @@
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { UserSelector } from "@/components/ui/user-selector";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Switch } from "@/components/ui/switch";
+import { DateTimeInput } from "@/components/ui/date-time-input";
 import type { NotificationGetManyFormData } from "@/schemas";
 import {
   NOTIFICATION_TYPE,
@@ -21,8 +12,7 @@ import {
   NOTIFICATION_IMPORTANCE_LABELS,
   NOTIFICATION_CHANNEL_LABELS,
 } from "@/constants";
-import { IconFilter, IconX } from "@tabler/icons-react";
-import type { DateRange } from "react-day-picker";
+import { IconFilter } from "@tabler/icons-react";
 
 interface NotificationFiltersProps {
   open: boolean;
@@ -62,27 +52,41 @@ export function NotificationFilters({
     onFilterChange({ ...filters, status });
   };
 
-  const handleUnreadChange = (checked: boolean) => {
-    onFilterChange({ ...filters, unread: checked || undefined });
+  const handleReadStatusChange = (value: string | string[] | null | undefined) => {
+    const statusValue = Array.isArray(value) ? value[0] : value;
+    let unread: boolean | undefined;
+    if (statusValue === "unread") unread = true;
+    else if (statusValue === "read") unread = false;
+    else unread = undefined;
+    onFilterChange({ ...filters, unread });
   };
 
-  const handleUserChange = (userId: string | null) => {
-    onFilterChange({ ...filters, userId: userId || undefined });
+  const getReadStatusValue = () => {
+    if (filters.unread === true) return "unread";
+    if (filters.unread === false) return "read";
+    return "";
   };
 
-  const handleDateRangeChange = (dateRange: DateRange | undefined) => {
-    if (dateRange?.from || dateRange?.to) {
-      onFilterChange({
-        ...filters,
-        createdAt: {
-          ...(dateRange.from && { gte: dateRange.from }),
-          ...(dateRange.to && { lte: dateRange.to }),
-        },
-      });
+  const handleCreatedAtChange = (key: "gte" | "lte", date: Date | undefined) => {
+    const nextCreatedAt = {
+      ...(filters.createdAt?.gte && { gte: filters.createdAt.gte }),
+      ...(filters.createdAt?.lte && { lte: filters.createdAt.lte }),
+    };
+    if (date) {
+      nextCreatedAt[key] = date;
+    } else {
+      delete nextCreatedAt[key];
+    }
+    if (nextCreatedAt.gte || nextCreatedAt.lte) {
+      onFilterChange({ ...filters, createdAt: nextCreatedAt });
     } else {
       const { createdAt, ...rest } = filters;
       onFilterChange(rest);
     }
+  };
+
+  const handleUserChange = (userId: string | null) => {
+    onFilterChange({ ...filters, userId: userId || undefined });
   };
 
   const handleClearFilters = () => {
@@ -99,14 +103,6 @@ export function NotificationFilters({
     return "";
   };
 
-  const getDateRange = (): DateRange | undefined => {
-    if (!filters.createdAt) return undefined;
-    return {
-      from: filters.createdAt.gte,
-      to: filters.createdAt.lte,
-    };
-  };
-
   const hasActiveFilters =
     (filters.types?.length || 0) > 0 ||
     (filters.importance?.length || 0) > 0 ||
@@ -117,19 +113,18 @@ export function NotificationFilters({
     filters.createdAt !== undefined;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[400px] sm:w-[540px]">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros de Notificações
-          </SheetTitle>
-          <SheetDescription>
-            Configure os filtros para refinar a lista de notificações
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="space-y-6 py-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros de Notificações"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure os filtros para refinar a lista de notificações"
+      onApply={() => onOpenChange(false)}
+      onReset={handleClearFilters}
+      showReset={hasActiveFilters}
+      applyLabel="Aplicar"
+      resetLabel="Limpar Filtros"
+    >
           {/* Type Filter - Multi-select */}
           <div className="space-y-2">
             <Label>Tipo</Label>
@@ -214,41 +209,55 @@ export function NotificationFilters({
             />
           </div>
 
-          {/* Unread Only Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Apenas Não Lidas</Label>
-              <p className="text-sm text-muted-foreground">
-                Mostrar apenas notificações não visualizadas
-              </p>
-            </div>
-            <Switch
-              checked={filters.unread || false}
-              onCheckedChange={handleUnreadChange}
+          {/* Reading Status Filter */}
+          <div className="space-y-2">
+            <Label>Status de Leitura</Label>
+            <Combobox
+              value={getReadStatusValue()}
+              onValueChange={handleReadStatusChange}
+              options={[
+                { value: "", label: "Todas" },
+                { value: "unread", label: "Não lidas" },
+                { value: "read", label: "Lidas" },
+              ]}
+              placeholder="Selecione o status de leitura"
+              searchable={false}
+              clearable
             />
           </div>
 
           {/* Date Range Filter */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label>Período de Criação</Label>
-            <DateRangePicker
-              dateRange={getDateRange()}
-              onDateRangeChange={handleDateRangeChange}
-              placeholder="Selecione o período"
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={filters.createdAt?.gte}
+                  onChange={(v) => {
+                    const d = v instanceof Date ? v : v && typeof v === "object" && "from" in v ? v.from : undefined;
+                    handleCreatedAtChange("gte", d ?? undefined);
+                  }}
+                  hideLabel
+                  placeholder="Data inicial..."
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={filters.createdAt?.lte}
+                  onChange={(v) => {
+                    const d = v instanceof Date ? v : v && typeof v === "object" && "to" in v ? v.to : undefined;
+                    handleCreatedAtChange("lte", d ?? undefined);
+                  }}
+                  hideLabel
+                  placeholder="Data final..."
+                />
+              </div>
+            </div>
           </div>
-        </div>
-
-        <SheetFooter className="flex gap-2">
-          {hasActiveFilters && (
-            <Button variant="outline" onClick={handleClearFilters}>
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar Filtros
-            </Button>
-          )}
-          <Button onClick={() => onOpenChange(false)}>Aplicar</Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

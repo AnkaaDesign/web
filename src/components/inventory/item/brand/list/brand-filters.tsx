@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import type { DateRange } from "react-day-picker";
-import { IconFilter, IconX } from "@tabler/icons-react";
+import { IconFilter } from "@tabler/icons-react";
 import type { ItemBrandGetManyFormData } from "../../../../../schemas";
 
 interface BrandFiltersProps {
@@ -37,92 +36,76 @@ export function BrandFilters({ open, onOpenChange, filters, onFilterChange }: Br
     setLocalFilters(clearedFilters);
   };
 
-  const hasActiveFilters = () => {
-    return !!(localFilters.createdAt?.gte || localFilters.createdAt?.lte);
-  };
-
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <div className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            <SheetTitle>Filtrar Marcas</SheetTitle>
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtrar Marcas"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure os filtros para refinar a lista de marcas"
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar"
+    >
+      {/* Created date range */}
+      <div className="space-y-3">
+        <div className="text-sm font-medium">Data de criação</div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+            <DateTimeInput
+              mode="date"
+              value={localFilters.createdAt?.gte}
+              onChange={(date: Date | DateRange | null) => {
+                if (date && !(date instanceof Date)) return;
+                if (!date && !localFilters.createdAt?.lte) {
+                  setLocalFilters({
+                    ...localFilters,
+                    createdAt: undefined,
+                  });
+                } else {
+                  setLocalFilters({
+                    ...localFilters,
+                    createdAt: {
+                      ...(date && { gte: date }),
+                      ...(localFilters.createdAt?.lte && { lte: localFilters.createdAt.lte }),
+                    },
+                  });
+                }
+              }}
+              hideLabel
+              placeholder="Selecionar data inicial..."
+            />
           </div>
-          <SheetDescription>
-            Configure os filtros para refinar a lista de marcas
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
-          {/* Created date range */}
-          <div className="space-y-3">
-            <div className="text-sm font-medium">Data de criação</div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
-                <DateTimeInput
-                  mode="date"
-                  value={localFilters.createdAt?.gte}
-                  onChange={(date: Date | DateRange | null) => {
-                    if (date && !(date instanceof Date)) return;
-                    if (!date && !localFilters.createdAt?.lte) {
-                      setLocalFilters({
-                        ...localFilters,
-                        createdAt: undefined,
-                      });
-                    } else {
-                      setLocalFilters({
-                        ...localFilters,
-                        createdAt: {
-                          ...(date && { gte: date }),
-                          ...(localFilters.createdAt?.lte && { lte: localFilters.createdAt.lte }),
-                        },
-                      });
-                    }
-                  }}
-                  hideLabel
-                  placeholder="Selecionar data inicial..."
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
-                <DateTimeInput
-                  mode="date"
-                  value={localFilters.createdAt?.lte}
-                  onChange={(date: Date | DateRange | null) => {
-                    if (date && !(date instanceof Date)) return;
-                    if (!date && !localFilters.createdAt?.gte) {
-                      setLocalFilters({
-                        ...localFilters,
-                        createdAt: undefined,
-                      });
-                    } else {
-                      setLocalFilters({
-                        ...localFilters,
-                        createdAt: {
-                          ...(localFilters.createdAt?.gte && { gte: localFilters.createdAt.gte }),
-                          ...(date && { lte: date }),
-                        },
-                      });
-                    }
-                  }}
-                  hideLabel
-                  placeholder="Selecionar data final..."
-                />
-              </div>
-            </div>
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+            <DateTimeInput
+              mode="date"
+              value={localFilters.createdAt?.lte}
+              onChange={(date: Date | DateRange | null) => {
+                if (date && !(date instanceof Date)) return;
+                if (!date && !localFilters.createdAt?.gte) {
+                  setLocalFilters({
+                    ...localFilters,
+                    createdAt: undefined,
+                  });
+                } else {
+                  setLocalFilters({
+                    ...localFilters,
+                    createdAt: {
+                      ...(localFilters.createdAt?.gte && { gte: localFilters.createdAt.gte }),
+                      ...(date && { lte: date }),
+                    },
+                  });
+                }
+              }}
+              hideLabel
+              placeholder="Selecionar data final..."
+            />
           </div>
         </div>
-
-        <div className="flex gap-2 pt-4 border-t mt-6">
-          <Button variant="outline" onClick={handleClear} disabled={!hasActiveFilters()} className="flex-1">
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar
-          </Button>
-          <Button onClick={handleApply} className="flex-1">Aplicar Filtros</Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </FilterDrawer>
   );
 }

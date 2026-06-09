@@ -155,7 +155,7 @@ function BottleneckFilters({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
+      <SheetContent side="right" className="w-full sm:max-w-xl md:max-w-xl border-border/50 flex flex-col">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
@@ -268,7 +268,7 @@ function BottleneckFilters({
           </div>
         </ScrollArea>
 
-        <div className="flex gap-2 pt-4 border-t">
+        <div className="flex gap-2 pt-4 border-t border-border/50">
           <Button variant="outline" onClick={handleClear} className="flex-1">
             <IconX className="h-4 w-4 mr-2" />
             Limpar Tudo
@@ -519,23 +519,6 @@ const BottlenecksPage = () => {
                 onDelete={deletePreset}
                 isSaving={isSavingPreset}
               />
-
-              {/* Export */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={isLoading || !stageDistribution.length}>
-                    <IconDownload className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleExportCSV}>
-                    <IconDownload className="h-4 w-4 mr-2" /> CSV dos Dados
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </>
           }
         />
@@ -595,6 +578,23 @@ const BottlenecksPage = () => {
                       </Badge>
                     )}
                   </Button>
+
+                  {/* Export */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" disabled={isLoading || !stageDistribution.length}>
+                        <IconDownload className="h-4 w-4 mr-2" />
+                        Exportar
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleExportCSV}>
+                        <IconDownload className="h-4 w-4 mr-2" /> CSV dos Dados
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
                 </div>
               </div>

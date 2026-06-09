@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { IconFilter, IconX, IconColorSwatch, IconBrush, IconTag, IconCalendar, IconFlask } from "@tabler/icons-react";
+import { IconFilter, IconColorSwatch, IconBrush, IconTag, IconCalendar, IconFlask } from "@tabler/icons-react";
 import { usePaintTypes } from "../../../../hooks";
 import { PAINT_FINISH, PAINT_FINISH_LABELS, PAINT_BRAND, PAINT_BRAND_LABELS } from "../../../../constants";
 import type { PaintProductionGetManyFormData } from "../../../../schemas";
@@ -72,31 +69,18 @@ export function PaintProductionFilters({ open, onOpenChange, filters, onFiltersC
   }));
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Produção de Tintas - Filtros
-            {activeFilterCount > 0 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="secondary" className="ml-2 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors" onClick={handleClear}>
-                      {activeFilterCount}
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Clique para limpar todos os filtros</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </SheetTitle>
-          <SheetDescription>Configure os filtros para refinar sua pesquisa de produções de tinta</SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Produção de Tintas - Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure os filtros para refinar sua pesquisa de produções de tinta"
+      activeFilterCount={activeFilterCount}
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar"
+      resetLabel="Limpar Tudo"
+    >
           {/* Paint Type Filter */}
           <div className="grid gap-2">
             <Label className="flex items-center gap-2">
@@ -297,16 +281,6 @@ export function PaintProductionFilters({ open, onOpenChange, filters, onFiltersC
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="flex gap-2 mt-6 pt-4 border-t">
-          <Button variant="outline" onClick={handleClear} className="flex-1 flex items-center gap-2">
-            <IconX className="h-4 w-4" />
-            Limpar Tudo
-          </Button>
-          <Button onClick={handleApply} className="flex-1">Aplicar</Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

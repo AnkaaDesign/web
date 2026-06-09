@@ -1,16 +1,12 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import type { ActivityGetManyFormData } from "../../../../schemas";
 import { ACTIVITY_OPERATION, ACTIVITY_REASON, ACTIVITY_REASON_LABELS } from "../../../../constants";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
-import { Switch } from "@/components/ui/switch";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { IconFilter, IconUserCheck, IconArrowsExchange, IconListDetails, IconUser, IconPackage, IconNumbers, IconCalendar, IconX } from "@tabler/icons-react";
+import { IconFilter, IconUserCheck, IconArrowsExchange, IconListDetails, IconUser, IconPackage, IconNumbers, IconCalendar } from "@tabler/icons-react";
 import { getUsers, getItems } from "../../../../api-client";
 
 interface ActivityFiltersProps {
@@ -144,31 +140,18 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
   }));
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Atividades - Filtros
-            {activeFilterCount > 0 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="secondary" className="ml-2 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors" onClick={handleClear}>
-                      {activeFilterCount}
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Clique para limpar todos os filtros</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </SheetTitle>
-          <SheetDescription>Configure os filtros para refinar a lista de atividades.</SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Atividades - Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure os filtros para refinar a lista de atividades."
+      activeFilterCount={activeFilterCount}
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar"
+      resetLabel="Limpar Tudo"
+    >
           {/* Attribution and Operation Filters */}
           <div className="grid grid-cols-2 gap-6">
             {/* Attribution Column */}
@@ -245,22 +228,26 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
           </div>
 
           {/* Paint Production Filter */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="showPaintProduction" className="text-sm font-normal">
-                Exibir atividades de produção de tinta
-              </Label>
-              <Switch
-                id="showPaintProduction"
-                checked={localFilters.showPaintProduction ?? false}
-                onCheckedChange={(checked) =>
-                  setLocalFilters({
-                    ...localFilters,
-                    showPaintProduction: checked ? true : undefined,
-                  })
-                }
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="showPaintProduction" className="text-sm font-normal">
+              Atividades de produção de tinta
+            </Label>
+            <Combobox
+              mode="single"
+              value={localFilters.showPaintProduction ? "yes" : "all"}
+              onValueChange={(value) =>
+                setLocalFilters({
+                  ...localFilters,
+                  showPaintProduction: value === "yes" ? true : undefined,
+                })
+              }
+              options={[
+                { value: "all", label: "Não exibir" },
+                { value: "yes", label: "Exibir" },
+              ]}
+              placeholder="Selecione..."
+              searchable={false}
+            />
           </div>
 
           {/* Reason Filter */}
@@ -449,16 +436,6 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="flex gap-2 mt-6 pt-4 border-t">
-          <Button variant="outline" onClick={handleClear} className="flex-1 flex items-center gap-2">
-            <IconX className="h-4 w-4" />
-            Limpar Tudo
-          </Button>
-          <Button onClick={handleApply} className="flex-1">Aplicar</Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 };

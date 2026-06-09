@@ -14,10 +14,11 @@ import {
   IconBuildingFactory,
   IconBuilding,
   IconHash,
+  IconUser,
 } from "@tabler/icons-react";
 import { type Airbrushing } from "../../../../types";
 import { formatDate, formatDateTime, formatCurrency } from "../../../../utils";
-import { TASK_STATUS_LABELS, AIRBRUSHING_STATUS_LABELS, ENTITY_BADGE_CONFIG } from "../../../../constants";
+import { TASK_STATUS_LABELS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS_LABELS, ENTITY_BADGE_CONFIG } from "../../../../constants";
 import { cn } from "@/lib/utils";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 
@@ -116,12 +117,23 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
                 </div>
               )}
 
-              {/* Start Date */}
+              {/* Payment Status */}
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconCurrencyReal className="h-4 w-4" />
+                  Status do Pagamento
+                </span>
+                <Badge variant={(ENTITY_BADGE_CONFIG.AIRBRUSHING_PAYMENT[airbrushing.paymentStatus as keyof typeof ENTITY_BADGE_CONFIG.AIRBRUSHING_PAYMENT] || "default") as any}>
+                  {AIRBRUSHING_PAYMENT_STATUS_LABELS[airbrushing.paymentStatus] || airbrushing.paymentStatus}
+                </Badge>
+              </div>
+
+              {/* Expected Start Date */}
               {airbrushing.startDate && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendar className="h-4 w-4" />
-                    Data de Início
+                    Início Previsto
                   </span>
                   <span className="text-sm font-semibold text-foreground">
                     {formatDate(airbrushing.startDate)}
@@ -129,18 +141,55 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
                 </div>
               )}
 
-              {/* Finish Date */}
+              {/* Expected Finish Date */}
               {airbrushing.finishDate && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarEvent className="h-4 w-4" />
-                    Data de Finalização
+                    Término Previsto
                   </span>
                   <span className="text-sm font-semibold text-foreground">
                     {formatDate(airbrushing.finishDate)}
                   </span>
                 </div>
               )}
+
+              {/* Actual Start */}
+              {airbrushing.startedAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4" />
+                    Iniciado em
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {formatDateTime(airbrushing.startedAt)}
+                  </span>
+                </div>
+              )}
+
+              {/* Actual Finish */}
+              {airbrushing.finishedAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCalendarEvent className="h-4 w-4" />
+                    Finalizado em
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {formatDateTime(airbrushing.finishedAt)}
+                  </span>
+                </div>
+              )}
+
+              {/* Painter */}
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconUser className="h-4 w-4" />
+                  Pintor
+                </span>
+                <span className="text-sm font-semibold text-foreground">
+                  {airbrushing.painter?.name || "-"}
+                </span>
+              </div>
 
               {/* Created At */}
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">

@@ -17,6 +17,7 @@ import {
   IconCash,
   IconCheck,
   IconClockHour4,
+  IconTrendingUp,
 } from "@tabler/icons-react";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -84,8 +85,17 @@ export const ReconciliationRecurringForecastPage = () => {
   const allItems = data?.items ?? [];
   const items = useMemo(() => {
     const q = searchText.trim().toLowerCase();
-    if (!q) return allItems;
-    return allItems.filter(i => i.category.name.toLowerCase().includes(q));
+    const filtered = q
+      ? allItems.filter(i => i.category.name.toLowerCase().includes(q))
+      : allItems;
+    // Sort by payment date (ISO strings compare chronologically); rows without
+    // a date go last.
+    return [...filtered].sort((a, b) => {
+      if (!a.paymentDate && !b.paymentDate) return 0;
+      if (!a.paymentDate) return 1;
+      if (!b.paymentDate) return -1;
+      return a.paymentDate.localeCompare(b.paymentDate);
+    });
   }, [allItems, searchText]);
   const paidCount = useMemo(
     () => allItems.filter(i => i.status === "PAID").length,
@@ -115,9 +125,32 @@ export const ReconciliationRecurringForecastPage = () => {
       ),
     },
     {
+      key: "paymentDate",
+      header: "Data",
+      width: "180px",
+      align: "left",
+      render: item => {
+        if (!item.paymentDate)
+          return <span className="text-muted-foreground text-sm">—</span>;
+        const label = format(new Date(item.paymentDate), "dd/MM", {
+          locale: ptBR,
+        });
+        return item.isPaymentDateForecast ? (
+          <span
+            className="tabular-nums text-sm text-muted-foreground italic"
+            title="Data prevista com base nos meses anteriores"
+          >
+            {label} (prev.)
+          </span>
+        ) : (
+          <span className="tabular-nums text-sm">{label}</span>
+        );
+      },
+    },
+    {
       key: "status",
       header: "Status",
-      width: "140px",
+      width: "190px",
       align: "center",
       render: item =>
         item.status === "PAID" ? (
@@ -133,7 +166,7 @@ export const ReconciliationRecurringForecastPage = () => {
     {
       key: "paidAmount",
       header: "Pago no período",
-      width: "160px",
+      width: "220px",
       align: "right",
       render: item => (
         <span className="font-semibold tabular-nums text-sm">
@@ -142,9 +175,23 @@ export const ReconciliationRecurringForecastPage = () => {
       ),
     },
     {
+      key: "forecastAmount",
+      header: "Previsão",
+      width: "200px",
+      align: "right",
+      render: item => (
+        <span
+          className="tabular-nums text-sm text-muted-foreground"
+          title="Valor previsto (média dos últimos 3 meses)"
+        >
+          {formatCurrency(item.forecastAmount)}
+        </span>
+      ),
+    },
+    {
       key: "transactionCount",
       header: "Transações",
-      width: "120px",
+      width: "170px",
       align: "center",
       render: item => (
         <span className="tabular-nums text-sm">{item.transactionCount}</span>
@@ -172,6 +219,7 @@ export const ReconciliationRecurringForecastPage = () => {
 
         <SummaryGrid
           totalPaid={data?.totalPaid ?? 0}
+          totalForecast={data?.totalForecast ?? 0}
           paidCount={paidCount}
           pendingCount={pendingCount}
           isLoading={isLoading}
@@ -230,25 +278,33 @@ export const ReconciliationRecurringForecastPage = () => {
 
 function SummaryGrid({
   totalPaid,
+  totalForecast,
   paidCount,
   pendingCount,
   isLoading,
   dateFrom,
 }: {
   totalPaid: number;
+  totalForecast: number;
   paidCount: number;
   pendingCount: number;
   isLoading: boolean;
   dateFrom: string;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <KpiCard
         label="Total pago no período"
         value={isLoading ? null : formatCurrency(totalPaid)}
         Icon={IconCash}
         tone="emerald"
         href={`${routes.financial.reconciliation.transactions}?dateFrom=${dateFrom}`}
+      />
+      <KpiCard
+        label="Previsão total (3 meses)"
+        value={isLoading ? null : formatCurrency(totalForecast)}
+        Icon={IconTrendingUp}
+        tone="violet"
       />
       <KpiCard
         label="Recorrentes pagas"
@@ -266,10 +322,11 @@ function SummaryGrid({
   );
 }
 
-const TONE_STYLES: Record<"emerald" | "amber" | "blue", string> = {
+const TONE_STYLES: Record<"emerald" | "amber" | "blue" | "violet", string> = {
   emerald: "text-emerald-600 bg-emerald-500/10",
   amber: "text-amber-600 bg-amber-500/10",
   blue: "text-blue-600 bg-blue-500/10",
+  violet: "text-violet-600 bg-violet-500/10",
 };
 
 function KpiCard({
@@ -282,7 +339,7 @@ function KpiCard({
   label: string;
   value: string | null;
   Icon: typeof IconCheck;
-  tone: "emerald" | "amber" | "blue";
+  tone: "emerald" | "amber" | "blue" | "violet";
   href?: string;
 }) {
   const body = (

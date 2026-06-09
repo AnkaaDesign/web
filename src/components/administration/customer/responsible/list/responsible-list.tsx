@@ -276,6 +276,7 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
               onToggle={toggleShowSelectedOnly}
               selectionCount={selectionCount}
             />
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button
               variant={activeFilterCountWithoutSearch > 0 ? "default" : "outline"}
               size="default"
@@ -288,7 +289,6 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
                 {activeFilterCountWithoutSearch > 0 ? ` (${activeFilterCountWithoutSearch})` : ""}
               </span>
             </Button>
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <ResponsibleExport filters={filters} currentResponsibles={tableData.responsibles} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
           </div>
         </div>

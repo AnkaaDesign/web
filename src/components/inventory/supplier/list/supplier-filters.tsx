@@ -1,20 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import type { SupplierGetManyFormData } from "../../../../schemas";
 import type { DateRange } from "react-day-picker";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
-import { IconFilter, IconX, IconMapPin, IconCalendarPlus, IconPackages } from "@tabler/icons-react";
+import { IconFilter, IconMapPin, IconCalendarPlus, IconPackages } from "@tabler/icons-react";
 import { BRAZILIAN_STATES, BRAZILIAN_STATE_NAMES } from "../../../../constants";
 
 interface SupplierFiltersProps {
@@ -133,27 +125,18 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros Avançados
-            {localActiveFilterCount > 0 && (
-              <Badge
-                variant="secondary"
-                className="ml-2 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                onClick={() => setLocalState({})}
-                title="Clique para limpar todos os filtros"
-              >
-                {localActiveFilterCount}
-              </Badge>
-            )}
-          </SheetTitle>
-          <SheetDescription>Configure filtros para refinar a pesquisa de fornecedores</SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros Avançados"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure filtros para refinar a pesquisa de fornecedores"
+      activeFilterCount={localActiveFilterCount}
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+    >
           {/* States Filter */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
@@ -301,19 +284,6 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-4 border-t mt-6">
-          <Button variant="outline" onClick={handleReset} className="flex-1">
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar Filtros
-          </Button>
-          <Button onClick={handleApply} className="flex-1">
-            Aplicar Filtros
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

@@ -1,17 +1,13 @@
 // web/src/components/inventory/statistics/order-filters.tsx
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
+import { FilterDrawer } from '@/components/common/filters/ui/FilterDrawer';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Combobox } from '@/components/ui/combobox';
 import {
   IconFilter,
-  IconX,
   IconCalendar,
   IconUsers,
   IconPackage,
@@ -275,25 +271,18 @@ export function OrderFilters({
   }, []);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Análise de Pedidos - Filtros
-            {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {activeFilterCount}
-              </Badge>
-            )}
-          </SheetTitle>
-          <SheetDescription>
-            Configure os filtros para refinar a análise de pedidos
-          </SheetDescription>
-        </SheetHeader>
-
-        <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="space-y-6 py-4">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Análise de Pedidos - Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure os filtros para refinar a análise de pedidos"
+      activeFilterCount={activeFilterCount}
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar"
+      resetLabel="Limpar Tudo"
+    >
             {/* Limit */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
@@ -533,19 +522,6 @@ export function OrderFilters({
                 clearable={true}
               />
             </div>
-          </div>
-        </ScrollArea>
-
-        <div className="flex gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={handleClear} className="flex-1">
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar Tudo
-          </Button>
-          <Button onClick={handleApply} className="flex-1">
-            Aplicar
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

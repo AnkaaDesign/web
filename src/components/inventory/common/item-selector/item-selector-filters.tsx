@@ -1,15 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ItemGetManyFormData } from "../../../../schemas";
-import { IconFilter, IconX, IconTriangleInverted, IconUser, IconPackages, IconCategory, IconBrandAsana, IconTruck, IconNumber, IconCurrencyDollar, IconAlertTriangleFilled } from "@tabler/icons-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { IconFilter, IconTriangleInverted, IconUser, IconPackages, IconCategory, IconBrandAsana, IconTruck, IconNumber, IconCurrencyDollar, IconAlertTriangleFilled } from "@tabler/icons-react";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
@@ -301,27 +293,16 @@ export function ItemSelectorFilters({ open, onOpenChange, filters, onFilterChang
   });
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Itens - Filtros
-            {activeFilterCount > 0 && (
-              <Badge
-                variant="secondary"
-                className="ml-2 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                onClick={handleReset}
-                title="Clique para limpar todos os filtros"
-              >
-                {activeFilterCount}
-              </Badge>
-            )}
-          </SheetTitle>
-          <SheetDescription>Configure filtros para refinar a pesquisa de itens</SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Itens - Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure filtros para refinar a pesquisa de itens"
+      activeFilterCount={activeFilterCount}
+      onApply={handleApply}
+      onReset={handleReset}
+    >
           {/* Status Filter */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
@@ -650,24 +631,6 @@ export function ItemSelectorFilters({ open, onOpenChange, filters, onFilterChang
           {/* Medidas (Measure Units) - simplified without quick filters */}
           {/* Note: The user requested "Medidas (without quick filters)" so I'm keeping it simple */}
           {/* This could be expanded based on specific requirements */}
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleReset} className="flex-1">
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar todos
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar filtros
-              {activeFilterCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {activeFilterCount}
-                </Badge>
-              )}
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

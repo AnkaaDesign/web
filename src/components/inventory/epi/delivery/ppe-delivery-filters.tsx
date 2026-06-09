@@ -1,12 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { IconFilter, IconX, IconTruck, IconUser, IconPackage, IconCalendarEvent, IconCalendarPlus } from "@tabler/icons-react";
+import { IconFilter, IconTruck, IconUser, IconPackage, IconCalendarEvent, IconCalendarPlus } from "@tabler/icons-react";
 import { getUsers, getItems } from "../../../../api-client";
 import type { PpeDeliveryGetManyFormData } from "../../../../schemas";
 import { PPE_DELIVERY_STATUS, PPE_DELIVERY_STATUS_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
@@ -221,31 +218,18 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
   }));
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Entregas de EPI - Filtros
-            {activeFilterCount > 0 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="secondary" className="ml-2 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors" onClick={handleReset}>
-                      {activeFilterCount}
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Clique para limpar todos os filtros</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </SheetTitle>
-          <SheetDescription>Configure filtros para refinar sua pesquisa de entregas de EPI</SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Entregas de EPI - Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure filtros para refinar sua pesquisa de entregas de EPI"
+      activeFilterCount={activeFilterCount}
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar"
+      resetLabel="Limpar Tudo"
+    >
           {/* Status Filter */}
           <div className="grid gap-2">
             <Label className="flex items-center gap-2">
@@ -429,19 +413,6 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
               </div>
             </div>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleReset} className="flex-1">
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar Tudo
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

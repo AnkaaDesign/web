@@ -9,7 +9,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { FileUploadField } from "@/components/common/file";
 import type { FileWithPreview } from "@/components/common/file";
-import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
+import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_PAYMENT_STATUS_LABELS } from "../../../../constants";
+import { PainterSelector } from "@/components/production/airbrushing/form/painter-selector";
 
 interface MultiAirbrushingSelectorProps {
   control: any;
@@ -21,9 +22,14 @@ interface MultiAirbrushingSelectorProps {
 interface AirbrushingItem {
   id: string;
   status: string;
+  paymentStatus: string;
   price: number | null;
   startDate: Date | null;
   finishDate: Date | null;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  painterId: string | null;
+  painter?: { id: string; name: string; email?: string | null } | null;
   receiptFiles: FileWithPreview[];
   invoiceFiles: FileWithPreview[];
   artworkFiles: FileWithPreview[];
@@ -74,9 +80,14 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       return data.map((airbrushing: any, index: number) => ({
         id: airbrushing.id || `airbrushing-${Date.now()}-${index}`,
         status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
+        paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
         price: airbrushing.price || null,
         startDate: airbrushing.startDate || null,
         finishDate: airbrushing.finishDate || null,
+        startedAt: airbrushing.startedAt || null,
+        finishedAt: airbrushing.finishedAt || null,
+        painterId: airbrushing.painterId || null,
+        painter: airbrushing.painter || null,
         // Merge existing uploaded files (from API as 'receipts') and newly selected files (as 'receiptFiles')
         receiptFiles: [
           ...convertFilesToFileWithPreview(airbrushing.receipts || []),
@@ -125,9 +136,14 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           return {
             id: airbrushing.id || `airbrushing-${Date.now()}-${index}`, // Preserve ID from form data
             status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
+            paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
             price: airbrushing.price || null,
             startDate: airbrushing.startDate || null,
             finishDate: airbrushing.finishDate || null,
+            startedAt: airbrushing.startedAt || null,
+            finishedAt: airbrushing.finishedAt || null,
+            painterId: airbrushing.painterId || null,
+            painter: airbrushing.painter || null,
             // Merge existing uploaded files (from API as 'receipts') and newly selected files (as 'receiptFiles')
             receiptFiles: [
               ...convertFilesToFileWithPreview(airbrushing.receipts || []),
@@ -171,9 +187,14 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         return {
           id: airbrushing.id, // Preserve ID for sync back
           status: airbrushing.status,
+          paymentStatus: airbrushing.paymentStatus,
           price: airbrushing.price,
           startDate: airbrushing.startDate,
           finishDate: airbrushing.finishDate,
+          startedAt: airbrushing.startedAt,
+          finishedAt: airbrushing.finishedAt,
+          painterId: airbrushing.painterId,
+          painter: airbrushing.painter,
           receiptIds: airbrushing.receiptIds || [],
           invoiceIds: airbrushing.invoiceIds || [],
           artworkIds: airbrushing.artworkIds || [],
@@ -201,9 +222,14 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       const newAirbrushing: AirbrushingItem = {
         id: `airbrushing-${Date.now()}`,
         status: AIRBRUSHING_STATUS.PENDING,
+        paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
         price: null,
         startDate: null,
         finishDate: null,
+        startedAt: null,
+        finishedAt: null,
+        painterId: null,
+        painter: null,
         receiptFiles: [],
         invoiceFiles: [],
         artworkFiles: [],
@@ -285,23 +311,84 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         <div className="space-y-3">
           {airbrushings.map((airbrushing) => (
               <div key={airbrushing.id} className="border border-border rounded-lg p-4 space-y-4">
-                {/* Status row (only in edit mode) */}
+                {/* Status row (only in edit mode): Status | Payment Status (gated) + Trash */}
                 {isEditMode && (
-                  <div className="flex gap-4 items-end">
-                    <div className="space-y-2 flex-1">
-                      <FormLabel>Status</FormLabel>
-                      <Combobox
-                        value={airbrushing.status}
-                        onValueChange={(value) => updateAirbrushing(airbrushing.id, { status: (value as string) || '' })}
+                  <div className="flex gap-4 items-start">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
+                      <div className="space-y-2">
+                        <FormLabel>Status</FormLabel>
+                        <Combobox
+                          value={airbrushing.status}
+                          onValueChange={(value) => updateAirbrushing(airbrushing.id, { status: (value as string) || '' })}
+                          disabled={disabled}
+                          options={Object.values(AIRBRUSHING_STATUS).map((status) => ({
+                            value: status,
+                            label: AIRBRUSHING_STATUS_LABELS[status],
+                          }))}
+                          placeholder="Status"
+                          searchable={false}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <FormLabel>Status do Pagamento</FormLabel>
+                        <Combobox
+                          value={airbrushing.paymentStatus}
+                          onValueChange={(value) => updateAirbrushing(airbrushing.id, { paymentStatus: (value as string) || AIRBRUSHING_PAYMENT_STATUS.PENDING })}
+                          disabled={disabled || airbrushing.status !== AIRBRUSHING_STATUS.COMPLETED}
+                          options={Object.values(AIRBRUSHING_PAYMENT_STATUS).map((paymentStatus) => ({
+                            value: paymentStatus,
+                            label: AIRBRUSHING_PAYMENT_STATUS_LABELS[paymentStatus],
+                          }))}
+                          placeholder="Status do pagamento"
+                          searchable={false}
+                        />
+                        {airbrushing.status !== AIRBRUSHING_STATUS.COMPLETED && (
+                          <p className="text-xs text-muted-foreground">Disponível somente após a conclusão da aerografia</p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => removeAirbrushing(airbrushing.id)}
+                      disabled={disabled}
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 flex-shrink-0 mt-7"
+                    >
+                      <IconTrash className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Row 1: Painter | Price (+ Trash in create mode) */}
+                <div className="flex gap-2 items-end">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
+                    <div className="space-y-2">
+                      <FormLabel>Pintor</FormLabel>
+                      <PainterSelector
+                        value={airbrushing.painterId ?? undefined}
+                        onChange={(userId) => updateAirbrushing(airbrushing.id, { painterId: userId })}
+                        initialUser={airbrushing.painter ?? undefined}
                         disabled={disabled}
-                        options={Object.values(AIRBRUSHING_STATUS).map((status) => ({
-                          value: status,
-                          label: AIRBRUSHING_STATUS_LABELS[status],
-                        }))}
-                        placeholder="Status"
-                        searchable={false}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <FormLabel>Preço</FormLabel>
+                      <Input
+                        type="currency"
+                        value={airbrushing.price || undefined}
+                        onChange={(value) => {
+                          updateAirbrushing(airbrushing.id, {
+                            price: typeof value === 'number' ? value : null,
+                          });
+                        }}
+                        disabled={disabled}
+                        placeholder="R$ 0,00"
+                        className="bg-transparent"
+                      />
+                    </div>
+                  </div>
+                  {!isEditMode && (
                     <Button
                       type="button"
                       onClick={() => removeAirbrushing(airbrushing.id)}
@@ -312,31 +399,13 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                     >
                       <IconTrash className="h-4 w-4 text-destructive" />
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
 
-                {/* Price, Dates aligned with File Uploads below */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Preço - aligns with Recibos */}
+                {/* Row 2: Expected dates */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <FormLabel>Preço</FormLabel>
-                    <Input
-                      type="currency"
-                      value={airbrushing.price || undefined}
-                      onChange={(value) => {
-                        updateAirbrushing(airbrushing.id, {
-                          price: typeof value === 'number' ? value : null,
-                        });
-                      }}
-                      disabled={disabled}
-                      placeholder="R$ 0,00"
-                      className="bg-transparent"
-                    />
-                  </div>
-
-                  {/* Início - aligns with Notas Fiscais */}
-                  <div className="space-y-2">
-                    <FormLabel>Início</FormLabel>
+                    <FormLabel>Início Previsto</FormLabel>
                     <DateTimeInput
                       field={{
                         value: airbrushing.startDate,
@@ -349,35 +418,51 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       disabled={disabled}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <FormLabel>Término Previsto</FormLabel>
+                    <DateTimeInput
+                      field={{
+                        value: airbrushing.finishDate,
+                        onChange: (date) => updateAirbrushing(airbrushing.id, { finishDate: date as Date | null }),
+                        onBlur: () => {},
+                        name: `airbrushings.${airbrushing.id}.finishDate`,
+                      }}
+                      mode="date"
+                      context="end"
+                      disabled={disabled}
+                    />
+                  </div>
+                </div>
 
-                  {/* Conclusão + Trash - aligns with Artes */}
-                  <div className="flex gap-2 items-end">
-                    <div className="space-y-2 flex-1">
-                      <FormLabel>Conclusão</FormLabel>
-                      <DateTimeInput
-                        field={{
-                          value: airbrushing.finishDate,
-                          onChange: (date) => updateAirbrushing(airbrushing.id, { finishDate: date as Date | null }),
-                          onBlur: () => {},
-                          name: `airbrushings.${airbrushing.id}.finishDate`,
-                        }}
-                        mode="date"
-                        context="end"
-                        disabled={disabled}
-                      />
-                    </div>
-                    {!isEditMode && (
-                      <Button
-                        type="button"
-                        onClick={() => removeAirbrushing(airbrushing.id)}
-                        disabled={disabled}
-                        size="icon"
-                        variant="ghost"
-                        className="h-9 w-9 flex-shrink-0"
-                      >
-                        <IconTrash className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
+                {/* Row 3: Actual dates */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <FormLabel>Iniciado em</FormLabel>
+                    <DateTimeInput
+                      field={{
+                        value: airbrushing.startedAt,
+                        onChange: (date) => updateAirbrushing(airbrushing.id, { startedAt: date as Date | null }),
+                        onBlur: () => {},
+                        name: `airbrushings.${airbrushing.id}.startedAt`,
+                      }}
+                      mode="datetime"
+                      context="start"
+                      disabled={disabled}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <FormLabel>Finalizado em</FormLabel>
+                    <DateTimeInput
+                      field={{
+                        value: airbrushing.finishedAt,
+                        onChange: (date) => updateAirbrushing(airbrushing.id, { finishedAt: date as Date | null }),
+                        onBlur: () => {},
+                        name: `airbrushings.${airbrushing.id}.finishedAt`,
+                      }}
+                      mode="datetime"
+                      context="end"
+                      disabled={disabled}
+                    />
                   </div>
                 </div>
 

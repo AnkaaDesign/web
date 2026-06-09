@@ -609,13 +609,13 @@ export function PpeDeliveryList({ className, teamScope }: PpeDeliveryListProps) 
           </div>
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+            <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)}>
               <IconFilter className="h-4 w-4" />
               <span>
                 Filtros{hasActiveFilters ? ` (${filterCount})` : ""}
               </span>
             </Button>
-            <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
           </div>
         </div>
 

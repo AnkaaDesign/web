@@ -46,6 +46,7 @@ export const AirbrushingDetails = () => {
       receipts: true,
       invoices: true,
       artworks: true,
+      painter: true,
     },
     enabled: !!id,
   });

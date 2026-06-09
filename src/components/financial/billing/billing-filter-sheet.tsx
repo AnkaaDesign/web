@@ -1,17 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { IconFilter, IconX, IconCalendar, IconBuilding } from "@tabler/icons-react";
+import { IconFilter, IconCalendar, IconBuilding } from "@tabler/icons-react";
 import { getCustomers } from "@/api-client/customer";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 
@@ -29,15 +21,15 @@ const QUOTE_STATUS_OPTIONS = [
 export interface BillingFilters {
   finishedFrom: Date | undefined;
   finishedTo: Date | undefined;
-  quoteStatus: string;
-  customerId: string;
+  quoteStatuses: string[];
+  customerIds: string[];
 }
 
 export const defaultBillingFilters: BillingFilters = {
   finishedFrom: undefined,
   finishedTo: undefined,
-  quoteStatus: "all",
-  customerId: "",
+  quoteStatuses: [],
+  customerIds: [],
 };
 
 interface BillingFilterSheetProps {
@@ -95,8 +87,8 @@ export function BillingFilterSheet({
     let c = 0;
     if (local.finishedFrom) c++;
     if (local.finishedTo) c++;
-    if (local.quoteStatus && local.quoteStatus !== "all") c++;
-    if (local.customerId) c++;
+    if (local.quoteStatuses && local.quoteStatuses.length > 0) c++;
+    if (local.customerIds && local.customerIds.length > 0) c++;
     return c;
   }, [local]);
 
@@ -111,42 +103,34 @@ export function BillingFilterSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Faturamento - Filtros
-            {activeCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {activeCount}
-              </Badge>
-            )}
-          </SheetTitle>
-          <SheetDescription>
-            Configure filtros para refinar a consulta de tarefas
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
-          {/* Quote Status */}
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Faturamento - Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure filtros para refinar a consulta de tarefas"
+      activeFilterCount={activeCount}
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+    >
+      {/* Quote Status */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Status Faturamento</Label>
             <Combobox
-              value={local.quoteStatus}
+              mode="multiple"
+              value={local.quoteStatuses || []}
               onValueChange={(v) =>
                 setLocal((prev) => ({
                   ...prev,
-                  quoteStatus: String(v ?? "all"),
+                  quoteStatuses: Array.isArray(v) ? v : [],
                 }))
               }
-              options={[
-                { value: "all", label: "Todos" },
-                ...QUOTE_STATUS_OPTIONS,
-              ]}
+              options={QUOTE_STATUS_OPTIONS}
               placeholder="Selecione o status..."
               searchable={false}
-              clearable={false}
+              clearable
             />
           </div>
 
@@ -157,13 +141,14 @@ export function BillingFilterSheet({
               Faturar Para (Cliente)
             </Label>
             <Combobox<any>
+              mode="multiple"
               placeholder="Buscar cliente..."
               emptyText="Nenhum cliente encontrado"
-              value={local.customerId || ""}
+              value={local.customerIds || []}
               onValueChange={(v) =>
                 setLocal((prev) => ({
                   ...prev,
-                  customerId: typeof v === "string" ? v : "",
+                  customerIds: Array.isArray(v) ? v : [],
                 }))
               }
               async={true}
@@ -231,23 +216,6 @@ export function BillingFilterSheet({
               </div>
             </div>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={handleReset}
-              className="flex-1"
-            >
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar Filtros
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar Filtros
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

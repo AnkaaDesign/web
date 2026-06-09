@@ -25,6 +25,16 @@ interface WarningListProps {
 
 const DEFAULT_PAGE_SIZE = 40;
 
+// Normalize a where-clause string filter (string | { in: [...] }) to a string array
+function whereToArray(value: unknown): string[] {
+  if (!value) return [];
+  if (typeof value === "string") return [value];
+  if (typeof value === "object" && value !== null && Array.isArray((value as any).in)) {
+    return (value as any).in as string[];
+  }
+  return [];
+}
+
 export function WarningList({ selectedSeverity, onDataUpdate, className, teamScope }: WarningListProps) {
   const [_tableData, setTableData] = useState<{ warnings: Warning[]; totalRecords: number }>({ warnings: [], totalRecords: 0 });
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
@@ -44,16 +54,22 @@ export function WarningList({ selectedSeverity, onDataUpdate, className, teamSco
   const deserializeWarningFilters = useCallback((params: URLSearchParams): Partial<WarningGetManyFormData> => {
     const filters: Partial<WarningGetManyFormData> = {};
 
-    // Parse severity filter
+    // Parse severity filter (comma-separated multi-select)
     const severity = params.get("severity");
     if (severity) {
-      filters.where = { ...filters.where, severity: severity as WARNING_SEVERITY };
+      const severities = severity.split(",").filter(Boolean);
+      if (severities.length > 0) {
+        filters.where = { ...filters.where, severity: { in: severities as WARNING_SEVERITY[] } };
+      }
     }
 
-    // Parse category filter
+    // Parse category filter (comma-separated multi-select)
     const category = params.get("category");
     if (category) {
-      filters.where = { ...filters.where, category: category as WARNING_CATEGORY };
+      const categories = category.split(",").filter(Boolean);
+      if (categories.length > 0) {
+        filters.where = { ...filters.where, category: { in: categories as WARNING_CATEGORY[] } };
+      }
     }
 
     // Parse isActive filter
@@ -69,14 +85,16 @@ export function WarningList({ selectedSeverity, onDataUpdate, className, teamSco
   const serializeWarningFilters = useCallback((filters: Partial<WarningGetManyFormData>): Record<string, string> => {
     const params: Record<string, string> = {};
 
-    // Severity filter
-    if (filters.where?.severity) {
-      params.severity = filters.where.severity as string;
+    // Severity filter (multi-select serialized as comma-separated)
+    const severityValues = whereToArray(filters.where?.severity);
+    if (severityValues.length > 0) {
+      params.severity = severityValues.join(",");
     }
 
-    // Category filter
-    if (filters.where?.category) {
-      params.category = filters.where.category as string;
+    // Category filter (multi-select serialized as comma-separated)
+    const categoryValues = whereToArray(filters.where?.category);
+    if (categoryValues.length > 0) {
+      params.category = categoryValues.join(",");
     }
 
     // IsActive filter
@@ -134,19 +152,22 @@ export function WarningList({ selectedSeverity, onDataUpdate, className, teamSco
 
   const handleFiltersApply = useCallback(
     (newFilters: {
-      severity?: WARNING_SEVERITY;
-      category?: WARNING_CATEGORY;
+      severities?: WARNING_SEVERITY[];
+      categories?: WARNING_CATEGORY[];
       isActive?: boolean;
       collaboratorIds?: string[];
       supervisorIds?: string[];
       witnessIds?: string[];
     }) => {
+      const hasSeverities = !!newFilters.severities && newFilters.severities.length > 0;
+      const hasCategories = !!newFilters.categories && newFilters.categories.length > 0;
+
       const updatedFilters: Partial<WarningGetManyFormData> = {
         ...filters,
         where: {
           ...filters.where,
-          ...(newFilters.severity && { severity: newFilters.severity }),
-          ...(newFilters.category && { category: newFilters.category }),
+          ...(hasSeverities && { severity: { in: newFilters.severities } }),
+          ...(hasCategories && { category: { in: newFilters.categories } }),
           ...(typeof newFilters.isActive === "boolean" && { isActive: newFilters.isActive }),
         },
         // Add array filters at the top level (schema transforms them to where clauses)
@@ -157,10 +178,10 @@ export function WarningList({ selectedSeverity, onDataUpdate, className, teamSco
 
       // Remove undefined values from where clause
       if (updatedFilters.where) {
-        if (!newFilters.severity) {
+        if (!hasSeverities) {
           delete updatedFilters.where.severity;
         }
-        if (!newFilters.category) {
+        if (!hasCategories) {
           delete updatedFilters.where.category;
         }
         if (typeof newFilters.isActive !== "boolean") {
@@ -217,20 +238,22 @@ export function WarningList({ selectedSeverity, onDataUpdate, className, teamSco
       });
     }
 
-    if (filters.where?.severity) {
+    const severityValues = whereToArray(filters.where?.severity);
+    if (severityValues.length > 0) {
       activeFiltersArray.push({
         key: "severity",
         label: "Severidade",
-        value: WARNING_SEVERITY_LABELS[filters.where.severity as WARNING_SEVERITY] || filters.where.severity,
+        value: severityValues.map((s) => WARNING_SEVERITY_LABELS[s as WARNING_SEVERITY] || s).join(", "),
         onRemove: () => onRemoveFilter("severity"),
       });
     }
 
-    if (filters.where?.category) {
+    const categoryValues = whereToArray(filters.where?.category);
+    if (categoryValues.length > 0) {
       activeFiltersArray.push({
         key: "category",
         label: "Categoria",
-        value: WARNING_CATEGORY_LABELS[filters.where.category as WARNING_CATEGORY] || filters.where.category,
+        value: categoryValues.map((c) => WARNING_CATEGORY_LABELS[c as WARNING_CATEGORY] || c).join(", "),
         onRemove: () => onRemoveFilter("category"),
       });
     }
@@ -330,8 +353,8 @@ export function WarningList({ selectedSeverity, onDataUpdate, className, teamSco
         open={isFilterModalOpen}
         onOpenChange={setIsFilterModalOpen}
         onApply={handleFiltersApply}
-        currentSeverity={filters.where?.severity}
-        currentCategory={filters.where?.category}
+        currentSeverities={whereToArray(filters.where?.severity) as WARNING_SEVERITY[]}
+        currentCategories={whereToArray(filters.where?.category) as WARNING_CATEGORY[]}
         currentIsActive={filters.where?.isActive}
         currentCollaboratorIds={filters.collaboratorIds}
         currentSupervisorIds={filters.supervisorIds}

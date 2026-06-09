@@ -17,13 +17,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { useTableState } from "@/hooks/common/use-table-state";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +40,6 @@ import {
   IconRefresh,
   IconFileInvoice,
   IconFilter,
-  IconX,
   IconCalendar,
   IconHash,
   IconExternalLink,
@@ -232,24 +225,18 @@ function NfseFilterSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            NFS-e - Filtros
-            {activeCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {activeCount}
-              </Badge>
-            )}
-          </SheetTitle>
-          <SheetDescription>
-            Configure filtros para refinar a consulta de notas fiscais
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="NFS-e - Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure filtros para refinar a consulta de notas fiscais"
+      activeFilterCount={activeCount}
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+    >
           {/* Situação - first filter */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Situação</Label>
@@ -350,23 +337,7 @@ function NfseFilterSheet({
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={handleReset}
-              className="flex-1"
-            >
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar Filtros
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar Filtros
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }
 

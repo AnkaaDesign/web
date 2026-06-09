@@ -234,6 +234,8 @@ export function ChangelogList({ className, onDataChange }: ChangelogListProps) {
           </div>
 
           <div className="flex gap-2">
+            <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
+
             <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)}>
               <IconFilter className="h-4 w-4" />
               <span>
@@ -241,8 +243,6 @@ export function ChangelogList({ className, onDataChange }: ChangelogListProps) {
                 {hasActiveFilters ? ` (${activeFilterCount})` : ""}
               </span>
             </Button>
-
-            <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
 
             <Button variant="outline" size="icon" onClick={() => refetch()} title="Atualizar">
               <IconRefresh className="h-4 w-4" />

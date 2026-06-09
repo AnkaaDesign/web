@@ -8,15 +8,8 @@
  */
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Combobox } from "@/components/ui/combobox";
 import { SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS } from "@/constants";
 import type { NotificationConfigurationQueryParams } from "@/types/notification-configuration";
@@ -120,16 +113,16 @@ export function NotificationConfigurationFilters({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:w-[400px]">
-        <SheetHeader>
-          <SheetTitle>Filtros de Configuração</SheetTitle>
-          <SheetDescription>
-            Configure os filtros para encontrar configurações específicas
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros de Configuração"
+      description="Configure os filtros para encontrar configurações específicas"
+      onApply={handleApplyFilters}
+      onReset={handleResetFilters}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar"
+    >
           {/* Type Filter */}
           <div className="space-y-2">
             <Label>Tipo de Notificação</Label>
@@ -189,16 +182,6 @@ export function NotificationConfigurationFilters({
               clearable
             />
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 justify-end mt-8">
-          <Button variant="outline" onClick={handleResetFilters}>
-            Limpar
-          </Button>
-          <Button onClick={handleApplyFilters}>Aplicar Filtros</Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

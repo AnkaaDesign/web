@@ -119,6 +119,22 @@ export const MessageListPage = () => {
       });
     }
 
+    if (filters.recipientIds?.length) {
+      indicators.push({
+        label: "Destinatários",
+        value: `${filters.recipientIds.length} selecionado(s)`,
+        onRemove: () => setFilters((prev) => ({ ...prev, recipientIds: undefined })),
+      });
+    }
+
+    if ((filters as any).sectorIds?.length) {
+      indicators.push({
+        label: "Setores",
+        value: `${(filters as any).sectorIds.length} selecionado(s)`,
+        onRemove: () => setFilters((prev) => ({ ...prev, sectorIds: undefined } as any)),
+      });
+    }
+
     if (filters.createdAt) {
       indicators.push({
         label: "Período",

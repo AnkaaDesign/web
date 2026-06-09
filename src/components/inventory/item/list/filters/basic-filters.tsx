@@ -1,9 +1,8 @@
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Combobox } from "@/components/ui/combobox";
 import { Separator } from "@/components/ui/separator";
 import { STOCK_LEVEL, STOCK_LEVEL_LABELS } from "../../../../../constants";
-import { getStockLevelTextColor } from "../../../../../utils";
-import { IconTriangleInverted, IconUser, IconPackages, IconAlertTriangle, IconXboxX } from "@tabler/icons-react";
+import { IconTriangleInverted, IconPackages } from "@tabler/icons-react";
 
 // Plain-Portuguese helpers for each stock band — explain inline (no jargon).
 // Mirrors algorithm-spec §15 bands.
@@ -41,37 +40,42 @@ export function BasicFilters({
   noReorderPoint,
   onNoReorderPointChange,
 }: BasicFiltersProps) {
-  const handleStockLevelToggle = (level: STOCK_LEVEL) => {
-    const currentLevels = stockLevels || [];
-    const newLevels = currentLevels.includes(level) ? currentLevels.filter((l) => l !== level) : [...currentLevels, level];
-    onStockLevelsChange(newLevels.length > 0 ? newLevels : undefined);
+  const charSelected: string[] = [];
+  if (showInactive) charSelected.push("showInactive");
+  if (shouldAssignToUser) charSelected.push("shouldAssignToUser");
+  if (nearReorderPoint) charSelected.push("nearReorderPoint");
+  if (noReorderPoint) charSelected.push("noReorderPoint");
+
+  const handleCharChange = (value: string | string[] | null | undefined) => {
+    const values = Array.isArray(value) ? value : value ? [value] : [];
+    onShowInactiveChange(values.includes("showInactive") ? true : false);
+    onShouldAssignToUserChange(values.includes("shouldAssignToUser") ? true : false);
+    onNearReorderPointChange(values.includes("nearReorderPoint") ? true : false);
+    onNoReorderPointChange(values.includes("noReorderPoint") ? true : false);
   };
+
   return (
     <div className="space-y-4">
-      {/* Status Switches */}
+      {/* Status and Characteristics */}
       <div className="space-y-3">
         <Label className="text-sm font-medium flex items-center gap-2">
           <IconTriangleInverted className="h-4 w-4" />
           Status e Características
         </Label>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="showInactive" className="text-sm font-normal flex items-center gap-2">
-              <IconXboxX className="h-4 w-4 text-muted-foreground" />
-              Mostrar também desativados
-            </Label>
-            <Switch id="showInactive" checked={showInactive ?? false} onCheckedChange={(checked) => onShowInactiveChange(checked)} />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Label htmlFor="shouldAssignToUser" className="text-sm font-normal flex items-center gap-2">
-              <IconUser className="h-4 w-4 text-muted-foreground" />
-              Atribuir ao usuário
-            </Label>
-            <Switch id="shouldAssignToUser" checked={shouldAssignToUser ?? false} onCheckedChange={(checked) => onShouldAssignToUserChange(checked)} />
-          </div>
-        </div>
+        <Combobox
+          mode="multiple"
+          value={charSelected}
+          onValueChange={handleCharChange}
+          options={[
+            { value: "showInactive", label: "Mostrar também desativados" },
+            { value: "shouldAssignToUser", label: "Atribuir ao usuário" },
+            { value: "nearReorderPoint", label: "Próximo ao Ponto de Reposição" },
+            { value: "noReorderPoint", label: "Sem Ponto de Reposição" },
+          ]}
+          placeholder="Selecione..."
+          searchable={false}
+          clearable
+        />
       </div>
 
       <Separator />
@@ -82,45 +86,22 @@ export function BasicFilters({
           <IconPackages className="h-4 w-4" />
           Status de Estoque
         </Label>
-
-        <div className="space-y-3">
-          {Object.values(STOCK_LEVEL).map((level) => {
-            const colorClass = getStockLevelTextColor(level);
-            const isChecked = stockLevels?.includes(level) || false;
-            const helper = STOCK_LEVEL_FILTER_HELPERS[level];
-
-            return (
-              <div key={level} className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <Label htmlFor={`stock-level-${level}`} className={`text-sm font-normal ${colorClass} flex items-center gap-2`}>
-                    <IconPackages className="h-3 w-3" />
-                    {STOCK_LEVEL_LABELS[level]}
-                  </Label>
-                  {helper && <p className="text-xs text-muted-foreground mt-1 ml-5">{helper}</p>}
-                </div>
-                <Switch id={`stock-level-${level}`} checked={isChecked} onCheckedChange={() => handleStockLevelToggle(level)} />
-              </div>
-            );
-          })}
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <Label htmlFor="nearReorderPoint" className="text-sm font-normal text-amber-600 dark:text-amber-400 flex items-center gap-2">
-              <IconAlertTriangle className="h-4 w-4" />
-              Próximo ao Ponto de Reposição
-            </Label>
-            <Switch id="nearReorderPoint" checked={nearReorderPoint ?? false} onCheckedChange={(checked) => onNearReorderPointChange(checked)} />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Label htmlFor="noReorderPoint" className="text-sm font-normal text-neutral-500 flex items-center gap-2">
-              <IconXboxX className="h-4 w-4" />
-              Sem Ponto de Reposição
-            </Label>
-            <Switch id="noReorderPoint" checked={noReorderPoint ?? false} onCheckedChange={(checked) => onNoReorderPointChange(checked)} />
-          </div>
-        </div>
+        <Combobox
+          mode="multiple"
+          value={stockLevels || []}
+          onValueChange={(value) => {
+            const values = Array.isArray(value) ? (value as STOCK_LEVEL[]) : [];
+            onStockLevelsChange(values.length > 0 ? values : undefined);
+          }}
+          options={Object.values(STOCK_LEVEL).map((level) => ({
+            value: level,
+            label: STOCK_LEVEL_LABELS[level],
+            description: STOCK_LEVEL_FILTER_HELPERS[level],
+          }))}
+          placeholder="Selecione..."
+          searchable={false}
+          clearable
+        />
       </div>
     </div>
   );

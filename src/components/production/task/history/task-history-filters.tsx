@@ -1,13 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { IconFilter, IconX, IconChecklist, IconCalendar, IconBuilding } from "@tabler/icons-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { IconFilter, IconChecklist, IconCalendar, IconBuilding } from "@tabler/icons-react";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DateTimeInput } from "@/components/ui/date-time-input";
@@ -158,19 +151,17 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
   }));
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros do Histórico
-          </SheetTitle>
-          <SheetDescription>
-            Filtre as tarefas por status, data, setor, cliente e mais
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros do Histórico"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Filtre as tarefas por status, data, setor, cliente e mais"
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+    >
           {/* Status Filter - only visible to admin/commercial/financial users */}
           {canViewStatusFilter && (
             <div className="space-y-2">
@@ -375,19 +366,6 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
               );
             })()}
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 mt-6 pt-4 border-t">
-          <Button variant="outline" onClick={handleClear} className="flex-1">
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar Filtros
-          </Button>
-          <Button onClick={handleApply} className="flex-1">
-            Aplicar Filtros
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

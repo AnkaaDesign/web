@@ -1,14 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import type { DateRange } from "react-day-picker";
 import { Combobox } from "@/components/ui/combobox";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Checkbox } from "@/components/ui/checkbox";
-import { IconFilter, IconX, IconUser, IconPackage, IconCalendarEvent, IconClock, IconToggleLeft } from "@tabler/icons-react";
+import { IconFilter, IconUser, IconPackage, IconCalendarEvent, IconClock, IconToggleLeft } from "@tabler/icons-react";
 import { getUsers, getItems } from "../../../../api-client";
 import type { PpeDeliveryScheduleGetManyFormData } from "../../../../schemas";
 import { SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
@@ -227,31 +223,18 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
   }));
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Agendamentos de EPI - Filtros
-            {activeFilterCount > 0 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="secondary" className="ml-2 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors" onClick={handleReset}>
-                      {activeFilterCount}
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Clique para limpar todos os filtros</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </SheetTitle>
-          <SheetDescription>Configure filtros para refinar sua pesquisa de agendamentos de EPI</SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Agendamentos de EPI - Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure filtros para refinar sua pesquisa de agendamentos de EPI"
+      activeFilterCount={activeFilterCount}
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar"
+      resetLabel="Limpar Tudo"
+    >
           {/* Item Filter */}
           <div className="grid gap-2">
             <Label className="flex items-center gap-2">
@@ -322,27 +305,23 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
               Status do Agendamento
             </Label>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="activeOnly"
-                checked={localState.isActive === true}
-                onCheckedChange={(checked) => setLocalState((prev) => ({ ...prev, isActive: checked ? true : undefined }))}
-              />
-              <Label htmlFor="activeOnly" className="text-sm font-normal">
-                Apenas agendamentos ativos
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="inactiveOnly"
-                checked={localState.isActive === false}
-                onCheckedChange={(checked) => setLocalState((prev) => ({ ...prev, isActive: checked ? false : undefined }))}
-              />
-              <Label htmlFor="inactiveOnly" className="text-sm font-normal">
-                Apenas agendamentos inativos
-              </Label>
-            </div>
+            <Combobox
+              mode="single"
+              value={localState.isActive === true ? "active" : localState.isActive === false ? "inactive" : "all"}
+              onValueChange={(value) =>
+                setLocalState((prev) => ({
+                  ...prev,
+                  isActive: value === "active" ? true : value === "inactive" ? false : undefined,
+                }))
+              }
+              options={[
+                { value: "all", label: "Todos" },
+                { value: "active", label: "Apenas agendamentos ativos" },
+                { value: "inactive", label: "Apenas agendamentos inativos" },
+              ]}
+              placeholder="Selecione..."
+              searchable={false}
+            />
           </div>
 
           {/* Next Delivery Date Range */}
@@ -400,17 +379,6 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
               </div>
             </div>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleReset} className="flex-1 flex items-center gap-2">
-              <IconX className="h-4 w-4" />
-              Limpar Tudo
-            </Button>
-            <Button onClick={handleApply} className="flex-1">Aplicar</Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

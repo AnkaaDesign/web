@@ -111,21 +111,24 @@ export function BillingTable({ className, searchingFor, filters }: BillingTableP
     }
 
     // Specific quote status filter (overrides the default shouldDisplayForFinancial range)
-    if (filters?.quoteStatus && filters.quoteStatus !== "all") {
+    if (filters?.quoteStatuses && filters.quoteStatuses.length > 0) {
       params.where = {
         ...params.where,
-        quote: { status: filters.quoteStatus },
+        quote: {
+          ...(params.where?.quote || {}),
+          status: { in: filters.quoteStatuses },
+        },
       };
     }
 
     // Customer filter (invoice-to customer in quote configs)
-    if (filters?.customerId) {
+    if (filters?.customerIds && filters.customerIds.length > 0) {
       params.where = {
         ...params.where,
         quote: {
           ...(params.where?.quote || {}),
           customerConfigs: {
-            some: { customerId: filters.customerId },
+            some: { customerId: { in: filters.customerIds } },
           },
         },
       };

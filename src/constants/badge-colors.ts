@@ -21,6 +21,7 @@ import {
   EXTERNAL_WITHDRAWAL_STATUS,
   SERVICE_ORDER_STATUS,
   AIRBRUSHING_STATUS,
+  AIRBRUSHING_PAYMENT_STATUS,
   CUT_STATUS,
   BORROW_STATUS,
   PPE_REQUEST_STATUS,
@@ -430,6 +431,13 @@ export const ENTITY_BADGE_CONFIG = {
     [AIRBRUSHING_STATUS.IN_PRODUCTION]: "blue" as BadgeVariant,    // Blue - in progress
     [AIRBRUSHING_STATUS.COMPLETED]: "completed" as BadgeVariant,   // Green - completed
     [AIRBRUSHING_STATUS.CANCELLED]: "cancelled" as BadgeVariant,   // Red - cancelled
+  },
+
+  // Airbrushing Payment Status
+  AIRBRUSHING_PAYMENT: {
+    [AIRBRUSHING_PAYMENT_STATUS.PENDING]: "pending" as BadgeVariant,        // Amber - awaiting payment
+    [AIRBRUSHING_PAYMENT_STATUS.PARTIALLY_PAID]: "orange" as BadgeVariant,  // Orange - partially paid
+    [AIRBRUSHING_PAYMENT_STATUS.PAID]: "green" as BadgeVariant,             // Green - fully paid
   },
 
   // Cut Status

@@ -354,6 +354,11 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
               onToggle={toggleShowSelectedOnly}
               selectionCount={selectionCount}
             />
+            <ColumnVisibilityManager
+              columns={createMaintenanceScheduleColumns()}
+              visibleColumns={visibleColumns}
+              onVisibilityChange={setVisibleColumns}
+            />
             <Button
               variant={activeFilters.length > 0 ? "default" : "outline"}
               size="default"
@@ -363,11 +368,6 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
               <IconFilter className="h-4 w-4" />
               <span>{activeFilters.length > 0 ? `Filtros (${activeFilters.length})` : "Filtros"}</span>
             </Button>
-            <ColumnVisibilityManager
-              columns={createMaintenanceScheduleColumns()}
-              visibleColumns={visibleColumns}
-              onVisibilityChange={setVisibleColumns}
-            />
           </div>
         </div>
 

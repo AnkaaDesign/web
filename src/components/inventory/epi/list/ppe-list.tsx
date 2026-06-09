@@ -362,11 +362,11 @@ export function PpeList({ className }: PpeListProps) {
           </div>
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+            <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button variant={activeFilters.length > 0 ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
               <IconFilter className="h-4 w-4" />
               <span>Filtros{activeFilters.length > 0 ? ` (${activeFilters.length})` : ""}</span>
             </Button>
-            <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <PpeExport filters={queryFilters} currentItems={tableData.items} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
           </div>
         </div>

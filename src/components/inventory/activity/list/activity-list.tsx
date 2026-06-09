@@ -230,11 +230,11 @@ export function ActivityList({ className, teamScope }: ActivityListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
               <IconFilter className="h-4 w-4" />
               <span>Filtros{activeFilters.length > 0 ? ` (${activeFilters.length})` : ""}</span>
             </Button>
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <ActivityExport
               filters={queryFilters}
               currentActivities={tableData.activities}

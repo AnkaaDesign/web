@@ -1,49 +1,37 @@
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { useWatch } from "react-hook-form";
+import { FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { FileUploadField, type FileWithPreview } from "@/components/common/file";
-import { ArtworkFileUploadField } from "@/components/production/task/form/artwork-file-upload-field";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import type { AirbrushingCreateFormData, AirbrushingUpdateFormData } from "../../../../schemas";
-import type { FieldErrors } from "react-hook-form";
-import { IconPaperclip, IconFileInvoice, IconPhoto } from "@tabler/icons-react";
-import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
+import { PainterSelector } from "./painter-selector";
+import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_PAYMENT_STATUS_LABELS } from "../../../../constants";
 
 interface AirbrushingFormFieldsProps {
   control: any;
-  mode: "create" | "edit";
-  receiptFiles: FileWithPreview[];
-  invoiceFiles: FileWithPreview[];
-  artworkFiles: FileWithPreview[];
-  onReceiptFilesChange: (files: FileWithPreview[]) => void;
-  onInvoiceFilesChange: (files: FileWithPreview[]) => void;
-  onArtworkFilesChange: (files: FileWithPreview[]) => void;
-  onArtworkStatusChange: (fileId: string, status: 'DRAFT' | 'APPROVED' | 'REPROVED') => void;
-  errors?: FieldErrors<AirbrushingCreateFormData | AirbrushingUpdateFormData>;
+  disabled?: boolean;
+  initialPainter?: { id: string; name: string; email?: string | null };
 }
 
-export function AirbrushingFormFields({
-  control,
-  mode: _mode,
-  receiptFiles,
-  invoiceFiles,
-  artworkFiles,
-  onReceiptFilesChange,
-  onInvoiceFilesChange,
-  onArtworkFilesChange,
-  onArtworkStatusChange,
-}: AirbrushingFormFieldsProps) {
+export function AirbrushingFormFields({ control, disabled, initialPainter }: AirbrushingFormFieldsProps) {
+  // Watch status reactively to gate the payment status field (never mirror form state with useState)
+  const status = useWatch({ control, name: "status" });
+  const isCompleted = status === AIRBRUSHING_STATUS.COMPLETED;
+
   const statusOptions: ComboboxOption[] = [
     { value: AIRBRUSHING_STATUS.PENDING, label: AIRBRUSHING_STATUS_LABELS.PENDING },
     { value: AIRBRUSHING_STATUS.IN_PRODUCTION, label: AIRBRUSHING_STATUS_LABELS.IN_PRODUCTION },
     { value: AIRBRUSHING_STATUS.COMPLETED, label: AIRBRUSHING_STATUS_LABELS.COMPLETED },
   ];
 
+  const paymentStatusOptions: ComboboxOption[] = Object.values(AIRBRUSHING_PAYMENT_STATUS).map((value) => ({
+    value,
+    label: AIRBRUSHING_PAYMENT_STATUS_LABELS[value],
+  }));
+
   return (
-    <div className="space-y-6">
-      {/* Price, Status, and Dates Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Price Field */}
+    <div className="space-y-4">
+      {/* Row 1: Price | Painter */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
           control={control}
           name="price"
@@ -51,14 +39,30 @@ export function AirbrushingFormFields({
             <FormItem>
               <FormLabel>Preço do Serviço</FormLabel>
               <FormControl>
-                <Input type="currency" value={field.value || undefined} onChange={field.onChange} placeholder="R$ 0,00" className="bg-transparent" />
+                <Input type="currency" value={field.value || undefined} onChange={field.onChange} placeholder="R$ 0,00" disabled={disabled} className="bg-transparent" />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        {/* Status Field */}
+        <FormField
+          control={control}
+          name="painterId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Pintor</FormLabel>
+              <FormControl>
+                <PainterSelector value={field.value ?? undefined} onChange={field.onChange} initialUser={initialPainter} disabled={disabled} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      {/* Row 2: Status | Payment Status (gated on COMPLETED) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
           control={control}
           name="status"
@@ -73,6 +77,7 @@ export function AirbrushingFormFields({
                   placeholder="Selecione o status"
                   searchable={false}
                   clearable={false}
+                  disabled={disabled}
                 />
               </FormControl>
               <FormMessage />
@@ -80,93 +85,66 @@ export function AirbrushingFormFields({
           )}
         />
 
-        {/* Start Date Field */}
         <FormField
           control={control}
-          name="startDate"
+          name="paymentStatus"
           render={({ field }) => (
-            <DateTimeInput
-              field={field}
-              label="Data de Início"
-              mode="date"
-              context="start"
-            />
-          )}
-        />
-
-        {/* Finish Date Field */}
-        <FormField
-          control={control}
-          name="finishDate"
-          render={({ field }) => (
-            <DateTimeInput
-              field={field}
-              label="Data de Finalização"
-              mode="date"
-              context="end"
-            />
+            <FormItem>
+              <FormLabel>Status do Pagamento</FormLabel>
+              <FormControl>
+                <Combobox
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={paymentStatusOptions}
+                  placeholder="Selecione o status do pagamento"
+                  searchable={false}
+                  clearable={false}
+                  disabled={disabled || !isCompleted}
+                />
+              </FormControl>
+              {!isCompleted && <FormDescription>Disponível somente após a conclusão da aerografia</FormDescription>}
+              <FormMessage />
+            </FormItem>
           )}
         />
       </div>
 
-      {/* File Upload Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Receipt Files */}
-        <FormItem className="flex flex-col">
-          <FormLabel className="flex items-center gap-2">
-            <IconPaperclip className="h-4 w-4" />
-            Recibos
-          </FormLabel>
-          <FormControl>
-            <FileUploadField
-              onFilesChange={onReceiptFilesChange}
-              existingFiles={receiptFiles}
-              maxFiles={10}
-              showPreview={true}
-              variant="compact"
-              placeholder="Adicione recibos do serviço"
-              label="Recibos anexados"
-            />
-          </FormControl>
-        </FormItem>
+      {/* Row 3: Expected dates */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          control={control}
+          name="startDate"
+          render={({ field }) => (
+            <DateTimeInput field={field} label="Início Previsto" mode="date" context="start" disabled={disabled} />
+          )}
+        />
 
-        {/* NFe Files */}
-        <FormItem className="flex flex-col">
-          <FormLabel className="flex items-center gap-2">
-            <IconFileInvoice className="h-4 w-4" />
-            Notas Fiscais
-          </FormLabel>
-          <FormControl>
-            <FileUploadField
-              onFilesChange={onInvoiceFilesChange}
-              existingFiles={invoiceFiles}
-              maxFiles={10}
-              showPreview={true}
-              variant="compact"
-              placeholder="Adicione notas fiscais"
-              label="NFes anexadas"
-            />
-          </FormControl>
-        </FormItem>
+        <FormField
+          control={control}
+          name="finishDate"
+          render={({ field }) => (
+            <DateTimeInput field={field} label="Término Previsto" mode="date" context="end" disabled={disabled} />
+          )}
+        />
+      </div>
 
-        {/* Artwork Files with Status Selector */}
-        <FormItem className="flex flex-col">
-          <FormLabel className="flex items-center gap-2">
-            <IconPhoto className="h-4 w-4" />
-            Layouts da Aerografia
-          </FormLabel>
-          <FormControl>
-            <ArtworkFileUploadField
-              onFilesChange={onArtworkFilesChange}
-              onStatusChange={onArtworkStatusChange}
-              existingFiles={artworkFiles}
-              maxFiles={20}
-              showPreview={true}
-              placeholder="Adicione os layouts da aerografia"
-              label="Layouts anexados"
-            />
-          </FormControl>
-        </FormItem>
+      {/* Row 4: Actual dates */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          control={control}
+          name="startedAt"
+          render={({ field }) => (
+            <DateTimeInput field={field} label="Iniciado em" mode="datetime" context="start" disabled={disabled} />
+          )}
+        />
+
+        <FormField
+          control={control}
+          name="finishedAt"
+          render={({ field }) => (
+            <DateTimeInput field={field} label="Finalizado em" mode="datetime" context="end" disabled={disabled} />
+          )}
+        />
       </div>
     </div>
   );

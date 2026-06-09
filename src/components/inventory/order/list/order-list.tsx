@@ -288,6 +288,7 @@ export function OrderList({ className }: OrderListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button
               variant={hasActiveFilters ? "default" : "outline"}
               size="default"
@@ -298,7 +299,6 @@ export function OrderList({ className }: OrderListProps) {
                 {hasActiveFilters ? `Filtros (${activeFilters.length})` : "Filtros"}
               </span>
             </Button>
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <OrderExport currentItems={tableData.orders} totalRecords={tableData.totalRecords} filters={queryFilters} visibleColumns={visibleColumns} />
           </div>
         </div>

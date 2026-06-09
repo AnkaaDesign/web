@@ -5,31 +5,22 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAirbrushing, useAirbrushingMutations, useTaskDetail } from "../../../../hooks";
 import type { AirbrushingCreateFormData, AirbrushingUpdateFormData } from "../../../../schemas";
 import { airbrushingCreateSchema, airbrushingUpdateSchema } from "../../../../schemas";
-import { routes, AIRBRUSHING_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
+import { routes, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form } from "@/components/ui/form";
-import { Badge } from "@/components/ui/badge";
+import { Form, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { Separator } from "@/components/ui/separator";
-import { FormSteps, type FormStep } from "@/components/ui/form-steps";
 import { AirbrushingFormFields } from "./airbrushing-form-fields";
 import { TaskSelector } from "./task-selector";
-import { IconSpray, IconFileInvoice, IconClipboardList, IconPhoto, IconUser, IconBuildingFactory, IconHash } from "@tabler/icons-react";
+import { IconSpray, IconClipboardList, IconPaperclip, IconFileInvoice, IconPhoto, IconUser, IconBuildingFactory, IconHash } from "@tabler/icons-react";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/sonner";
-import { formatCurrency, formatDate } from "../../../../utils";
-import type { FileWithPreview } from "@/components/common/file";
+import { FileUploadField, type FileWithPreview } from "@/components/common/file";
+import { ArtworkFileUploadField } from "@/components/production/task/form/artwork-file-upload-field";
 import { createAirbrushingFormData } from "@/utils/form-data-helper";
 
 export interface AirbrushingFormHandle {
-  handleNext: () => void;
-  handlePrev: () => void;
   handleSubmit: () => Promise<boolean>;
-  getCurrentStep: () => number;
-  isLastStep: () => boolean;
-  isFirstStep: () => boolean;
   canSubmit: () => boolean;
 }
 
@@ -40,61 +31,20 @@ interface AirbrushingFormProps {
   onSuccess?: (airbrushing: any) => void;
   onCancel?: () => void;
   className?: string;
-  onStepChange?: (step: number) => void;
   onFormStateChange?: () => void; // Callback to notify parent of form state changes
 }
 
-// Define steps for the form
-const steps: FormStep[] = [
-  {
-    id: 1,
-    name: "Informações Básicas",
-    description: "Data, preço e documentos",
-  },
-  {
-    id: 2,
-    name: "Seleção de Tarefa",
-    description: "Escolha a tarefa relacionada",
-  },
-  {
-    id: 3,
-    name: "Revisão",
-    description: "Confirme os dados da aerografia",
-  },
-];
-
-// Helper functions for URL step management
-const getStepFromUrl = (searchParams: URLSearchParams): number => {
-  const step = parseInt(searchParams.get("step") || "1", 10);
-  return Math.max(1, Math.min(3, step));
-};
-
-const setStepInUrl = (searchParams: URLSearchParams, step: number): URLSearchParams => {
-  const params = new URLSearchParams(searchParams);
-  params.set("step", step.toString());
-  return params;
-};
-
-export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingFormProps>(({ airbrushingId, mode, initialTaskId, onSuccess, className, onStepChange, onFormStateChange }, ref) => {
+export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingFormProps>(({ airbrushingId, mode, initialTaskId, onSuccess, className, onFormStateChange }, ref) => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // Initialize step from URL parameters
-  const [currentStep, setCurrentStep] = useState(mode === "edit" ? 1 : getStepFromUrl(searchParams));
+  const [searchParams] = useSearchParams();
 
   // State for task selection
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set(initialTaskId ? [initialTaskId] : []));
-
-  // State for step errors
-  const [stepErrors, setStepErrors] = useState<{ [key: number]: boolean }>({});
 
   // State for file uploads
   const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
   const [invoiceFiles, setInvoiceFiles] = useState<FileWithPreview[]>([]);
   const [artworkFiles, setArtworkFiles] = useState<FileWithPreview[]>([]);
-  const [_receiptFileIds, setReceiptFileIds] = useState<string[]>([]);
-  const [_invoiceFileIds, setInvoiceFileIds] = useState<string[]>([]);
-  const [_artworkFileIds, setArtworkFileIds] = useState<string[]>([]);
 
   // State for artwork statuses (keyed by file ID)
   const [artworkStatuses, setArtworkStatuses] = useState<Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>>({});
@@ -115,6 +65,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       receipts: true,
       invoices: true,
       artworks: true,
+      painter: true,
     },
     enabled: mode === "edit" && !!airbrushingId,
   });
@@ -124,18 +75,18 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
   // Get selected task for display
   const selectedTaskId = Array.from(selectedTasks)[0];
 
-  // Fetch selected task data for display in review
+  // Fetch selected task data (used for customer context on file uploads)
   const { data: selectedTask } = useTaskDetail(selectedTaskId || "", {
     include: {
       customer: true,
       sector: true,
-      serviceOrders: true,
     },
     enabled: !!selectedTaskId,
   });
 
   // Mutations
-  const { createAsync: create, updateAsync: update, isUpdating: _isUpdating } = useAirbrushingMutations();
+  const { createAsync: create, updateAsync: update, isCreating, isUpdating } = useAirbrushingMutations();
+  const isSubmitting = isCreating || isUpdating;
 
   // Set up form with appropriate schema
   const formSchema = mode === "create" ? airbrushingCreateSchema : airbrushingUpdateSchema;
@@ -145,12 +96,16 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
     defaultValues: {
       startDate: null,
       finishDate: null,
+      startedAt: null,
+      finishedAt: null,
       price: null,
       taskId: initialTaskId || "",
+      painterId: null,
       receiptIds: [],
       invoiceIds: [],
       artworkIds: [],
-      ...(mode === "edit" ? {} : { status: AIRBRUSHING_STATUS.PENDING }), // Status is set automatically for create mode
+      status: AIRBRUSHING_STATUS.PENDING,
+      paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
     },
   });
 
@@ -160,9 +115,13 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       form.reset({
         startDate: airbrushing.startDate ?? null,
         finishDate: airbrushing.finishDate ?? null,
+        startedAt: airbrushing.startedAt ?? null,
+        finishedAt: airbrushing.finishedAt ?? null,
         price: airbrushing.price,
         status: airbrushing.status,
+        paymentStatus: airbrushing.paymentStatus ?? AIRBRUSHING_PAYMENT_STATUS.PENDING,
         taskId: airbrushing.taskId,
+        painterId: airbrushing.painterId ?? null,
         receiptIds: airbrushing.receipts?.map((f) => f.id) || [],
         invoiceIds: airbrushing.invoices?.map((f) => f.id) || [],
         // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
@@ -173,47 +132,29 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       setSelectedTasks(new Set([airbrushing.taskId]));
 
       // Set uploaded files
-      const receipts: FileWithPreview[] =
-        airbrushing.receipts?.map((file) => {
-          const fileObj = Object.assign(
-            new File([new ArrayBuffer(0)], file.filename || file.originalName || "file", {
-              type: file.mimetype || "application/octet-stream",
-              lastModified: new Date(file.createdAt || Date.now()).getTime(),
-            }),
-            {
-              id: file.id,
-              uploaded: true,
-              uploadedFileId: file.id,
-              thumbnailUrl: file.thumbnailUrl,
-            },
-          ) as FileWithPreview;
-          return fileObj;
-        }) || [];
+      const mapFile = (file: any): FileWithPreview =>
+        Object.assign(
+          new File([new ArrayBuffer(0)], file.filename || file.originalName || "file", {
+            type: file.mimetype || "application/octet-stream",
+            lastModified: new Date(file.createdAt || Date.now()).getTime(),
+          }),
+          {
+            id: file.id,
+            uploaded: true,
+            uploadedFileId: file.id,
+            thumbnailUrl: file.thumbnailUrl,
+          },
+        ) as FileWithPreview;
 
-      const invoices: FileWithPreview[] =
-        airbrushing.invoices?.map((file) => {
-          const fileObj = Object.assign(
-            new File([new ArrayBuffer(0)], file.filename || file.originalName || "file", {
-              type: file.mimetype || "application/octet-stream",
-              lastModified: new Date(file.createdAt || Date.now()).getTime(),
-            }),
-            {
-              id: file.id,
-              uploaded: true,
-              uploadedFileId: file.id,
-              thumbnailUrl: file.thumbnailUrl,
-            },
-          ) as FileWithPreview;
-          return fileObj;
-        }) || [];
+      const receipts: FileWithPreview[] = airbrushing.receipts?.map(mapFile) || [];
+      const invoices: FileWithPreview[] = airbrushing.invoices?.map(mapFile) || [];
 
       // artworks are Artwork entities with fileId, status, and nested file data
       const artworks: FileWithPreview[] =
         airbrushing.artworks?.map((artwork: any) => {
-          // Get file data from nested file relation or use artwork properties as fallback
           const file = artwork.file || artwork;
           const fileId = artwork.fileId || file.id;
-          const fileObj = Object.assign(
+          return Object.assign(
             new File([new ArrayBuffer(0)], file.filename || file.originalName || "file", {
               type: file.mimetype || "application/octet-stream",
               lastModified: new Date(file.createdAt || Date.now()).getTime(),
@@ -226,7 +167,6 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
               status: artwork.status || 'DRAFT', // Include artwork status
             },
           ) as FileWithPreview;
-          return fileObj;
         }) || [];
 
       // Initialize artwork statuses from existing artworks
@@ -242,25 +182,8 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       setReceiptFiles(receipts);
       setInvoiceFiles(invoices);
       setArtworkFiles(artworks);
-      setReceiptFileIds(receipts.map((f) => f.id));
-      setInvoiceFileIds(invoices.map((f) => f.id));
-      setArtworkFileIds(artworks.map((f) => f.id));
     }
   }, [mode, airbrushing, form]);
-
-  // Keep step in sync with URL (only for create mode)
-  useEffect(() => {
-    if (mode === "create") {
-      const stepFromUrl = getStepFromUrl(searchParams);
-      if (stepFromUrl !== currentStep) {
-        setCurrentStep(stepFromUrl);
-        // Notify parent about step change
-        if (onStepChange) {
-          onStepChange(stepFromUrl);
-        }
-      }
-    }
-  }, [searchParams, mode, currentStep, onStepChange]);
 
   // Get initial task ID from URL params
   useEffect(() => {
@@ -270,82 +193,6 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       form.setValue("taskId", taskIdFromUrl, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
     }
   }, [searchParams, mode, form]);
-
-  // Navigation helpers
-  const nextStep = useCallback(() => {
-    if (currentStep < steps.length) {
-      const newStep = currentStep + 1;
-      setCurrentStep(newStep);
-      if (mode === "create") {
-        setSearchParams(setStepInUrl(searchParams, newStep), { replace: true });
-      }
-      // Notify parent about step change
-      if (onStepChange) {
-        onStepChange(newStep);
-      }
-    }
-  }, [currentStep, searchParams, setSearchParams, mode, onStepChange]);
-
-  const prevStep = useCallback(() => {
-    if (currentStep > 1) {
-      const newStep = currentStep - 1;
-      setCurrentStep(newStep);
-      if (mode === "create") {
-        setSearchParams(setStepInUrl(searchParams, newStep), { replace: true });
-      }
-      // Notify parent about step change
-      if (onStepChange) {
-        onStepChange(newStep);
-      }
-    }
-  }, [currentStep, searchParams, setSearchParams, mode, onStepChange]);
-
-  // Stage validation
-  const validateCurrentStep = useCallback(async (): Promise<boolean> => {
-    switch (currentStep) {
-      case 1:
-        // Basic info validation - dates and price are optional
-        // Trigger validation for step 1 fields
-        const step1Fields = ["startDate", "finishDate", "price"] as const;
-        const step1Valid = await form.trigger(step1Fields);
-        return step1Valid;
-
-      case 2:
-        // Validate task selection
-        if (selectedTasks.size === 0) {
-          form.setError("taskId", { message: "Uma tarefa deve ser selecionada" });
-          toast.error("Uma tarefa deve ser selecionada");
-          setStepErrors((prev) => ({ ...prev, 2: true }));
-          return false;
-        }
-        form.clearErrors("taskId");
-        setStepErrors((prev) => ({ ...prev, 2: false }));
-        return true;
-
-      case 3:
-        // Final validation
-        if (selectedTasks.size === 0) {
-          form.setError("taskId", { message: "Uma tarefa deve ser selecionada" });
-          toast.error("Uma tarefa deve ser selecionada");
-          return false;
-        }
-        // Only validate fields that matter, NOT file ID fields (receiptIds, invoiceIds, artworkIds)
-        // File ID fields are handled separately during submission - new files don't have valid UUIDs yet
-        const step3Fields = ["startDate", "finishDate", "price", "taskId", "status"] as const;
-        const isValid = await form.trigger(step3Fields);
-        return isValid;
-
-      default:
-        return true;
-    }
-  }, [currentStep, selectedTasks, form]);
-
-  const handleNext = useCallback(async () => {
-    const isValid = await validateCurrentStep();
-    if (isValid) {
-      nextStep();
-    }
-  }, [validateCurrentStep, nextStep]);
 
   // Handle task selection
   const handleTaskSelection = (taskId: string) => {
@@ -359,10 +206,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       // Select task (only one can be selected)
       setSelectedTasks(new Set([taskId]));
       form.setValue("taskId", taskId, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
-      // Clear task error when a task is selected
       form.clearErrors("taskId");
-      // Update step errors
-      setStepErrors((prev) => ({ ...prev, 2: false }));
     }
   };
 
@@ -371,47 +215,28 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
     // No-op for airbrushing form since we only allow one task
   };
 
-  // Handle receipt file changes
+  // File change handlers - only include IDs of already uploaded files (valid UUIDs);
+  // new files are sent as FormData during submission
+  const extractUploadedIds = (files: FileWithPreview[]) =>
+    files.filter((f) => f.uploaded && f.uploadedFileId).map((f) => f.uploadedFileId!).filter(Boolean);
+
   const handleReceiptFilesChange = (files: FileWithPreview[]) => {
     setReceiptFiles(files);
-    // Only include IDs from already uploaded files (valid UUIDs)
-    // New files don't have valid UUIDs yet - they're sent as FormData during submission
-    const fileIds = files
-      .filter(f => f.uploaded && f.uploadedFileId)
-      .map(f => f.uploadedFileId!)
-      .filter(Boolean);
-    setReceiptFileIds(fileIds);
-    form.setValue("receiptIds", fileIds);
+    form.setValue("receiptIds", extractUploadedIds(files));
   };
 
-  // Handle NFe file changes
   const handleInvoiceFilesChange = (files: FileWithPreview[]) => {
     setInvoiceFiles(files);
-    // Only include IDs from already uploaded files (valid UUIDs)
-    // New files don't have valid UUIDs yet - they're sent as FormData during submission
-    const fileIds = files
-      .filter(f => f.uploaded && f.uploadedFileId)
-      .map(f => f.uploadedFileId!)
-      .filter(Boolean);
-    setInvoiceFileIds(fileIds);
-    form.setValue("invoiceIds", fileIds);
+    form.setValue("invoiceIds", extractUploadedIds(files));
   };
 
-  // Handle artwork file changes
   const handleArtworkFilesChange = (files: FileWithPreview[]) => {
     setArtworkFiles(files);
-    // Only include IDs from already uploaded files (valid UUIDs)
-    // New files don't have valid UUIDs yet - they're sent as FormData during submission
-    const fileIds = files
-      .filter(f => f.uploaded && f.uploadedFileId)
-      .map(f => f.uploadedFileId!)
-      .filter(Boolean);
-    setArtworkFileIds(fileIds);
-    form.setValue("artworkIds", fileIds);
+    form.setValue("artworkIds", extractUploadedIds(files));
 
     // Clean up artworkStatuses: remove statuses for files that have been removed
-    setArtworkStatuses(prev => {
-      const currentFileIds = new Set(files.map(f => f.uploadedFileId || f.id));
+    setArtworkStatuses((prev) => {
+      const currentFileIds = new Set(files.map((f) => f.uploadedFileId || f.id));
       const newStatuses: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
       for (const [fileId, status] of Object.entries(prev)) {
         if (currentFileIds.has(fileId)) {
@@ -424,17 +249,29 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
   // Handle artwork status change
   const handleArtworkStatusChange = (fileId: string, status: 'DRAFT' | 'APPROVED' | 'REPROVED') => {
-    setArtworkStatuses(prev => ({
+    setArtworkStatuses((prev) => ({
       ...prev,
       [fileId]: status,
     }));
   };
 
+  // Validate the form (skips file ID fields - new files don't have valid UUIDs yet)
+  const validateForm = useCallback(async (): Promise<boolean> => {
+    if (selectedTasks.size === 0) {
+      form.setError("taskId", { message: "Uma tarefa deve ser selecionada" });
+      toast.error("Uma tarefa deve ser selecionada");
+      return false;
+    }
+    form.clearErrors("taskId");
+
+    const fieldsToValidate = ["startDate", "finishDate", "startedAt", "finishedAt", "price", "taskId", "status", "paymentStatus"] as const;
+    return form.trigger(fieldsToValidate as any);
+  }, [selectedTasks, form]);
+
   // Handle form submission
   // Returns true on success, false on validation failure, throws on error
   const handleSubmit = useCallback(async (): Promise<boolean> => {
-    // Validate final form
-    const isValid = await validateCurrentStep();
+    const isValid = await validateForm();
 
     if (!isValid) {
       return false;
@@ -444,39 +281,39 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       const data = form.getValues();
 
       // Separate existing files from new files using the 'uploaded' flag
-      // Existing files have uploaded=true, new files have uploaded=false
-      const newReceiptFiles = receiptFiles.filter(f => !f.uploaded);
-      const newInvoiceFiles = invoiceFiles.filter(f => !f.uploaded);
-      const newArtworkFiles = artworkFiles.filter(f => !f.uploaded);
+      const newReceiptFiles = receiptFiles.filter((f) => !f.uploaded);
+      const newInvoiceFiles = invoiceFiles.filter((f) => !f.uploaded);
+      const newArtworkFiles = artworkFiles.filter((f) => !f.uploaded);
 
       // Get IDs of existing files to keep
-      const existingReceiptIds = receiptFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-      const existingInvoiceIds = invoiceFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-      const existingArtworkIds = artworkFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+      const existingReceiptIds = receiptFiles.filter((f) => f.uploaded).map((f) => f.uploadedFileId || f.id).filter(Boolean) as string[];
+      const existingInvoiceIds = invoiceFiles.filter((f) => f.uploaded).map((f) => f.uploadedFileId || f.id).filter(Boolean) as string[];
+      const existingArtworkIds = artworkFiles.filter((f) => f.uploaded).map((f) => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
       const hasNewFiles = newReceiptFiles.length > 0 || newInvoiceFiles.length > 0 || newArtworkFiles.length > 0;
 
       let result;
 
       // Build artworkStatuses map for existing files
-      // Merges state with file status properties for completeness
       const existingArtworkStatusesMap: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
-      existingArtworkIds.forEach(fileId => {
+      existingArtworkIds.forEach((fileId) => {
         const statusFromState = artworkStatuses[fileId];
         if (statusFromState) {
           existingArtworkStatusesMap[fileId] = statusFromState;
         } else {
-          const file = artworkFiles.find(f => (f.uploadedFileId || f.id) === fileId);
+          const file = artworkFiles.find((f) => (f.uploadedFileId || f.id) === fileId);
           const statusFromFile = file?.status;
           existingArtworkStatusesMap[fileId] = (statusFromFile as 'DRAFT' | 'APPROVED' | 'REPROVED') || 'DRAFT';
         }
       });
 
       if (hasNewFiles) {
-        const customerInfo = selectedTask?.data?.customer ? {
-          id: selectedTask.data.customer.id,
-          name: selectedTask.data.customer.fantasyName || "",
-        } : undefined;
+        const customerInfo = selectedTask?.data?.customer
+          ? {
+              id: selectedTask.data.customer.id,
+              name: selectedTask.data.customer.fantasyName || "",
+            }
+          : undefined;
 
         // Prepare data with existing file IDs and artwork statuses
         const submitData = {
@@ -491,11 +328,11 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
         const formData = createAirbrushingFormData(
           submitData,
           {
-            receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
-            invoices: newInvoiceFiles.length > 0 ? newInvoiceFiles as File[] : undefined,
-            artworks: newArtworkFiles.length > 0 ? newArtworkFiles as File[] : undefined,
+            receipts: newReceiptFiles.length > 0 ? (newReceiptFiles as File[]) : undefined,
+            invoices: newInvoiceFiles.length > 0 ? (newInvoiceFiles as File[]) : undefined,
+            artworks: newArtworkFiles.length > 0 ? (newArtworkFiles as File[]) : undefined,
           },
-          customerInfo
+          customerInfo,
         );
 
         if (mode === "create") {
@@ -535,12 +372,8 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
         setReceiptFiles([]);
         setInvoiceFiles([]);
         setArtworkFiles([]);
-        setReceiptFileIds([]);
-        setInvoiceFileIds([]);
-        setArtworkFileIds([]);
         setArtworkStatuses({});
         setSelectedTasks(new Set());
-        setCurrentStep(1);
       }
 
       if (onSuccess && result?.data) {
@@ -556,40 +389,19 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       }
       throw error; // Rethrow so parent can handle
     }
-  }, [validateCurrentStep, form, mode, create, update, airbrushingId, onSuccess, navigate, receiptFiles, invoiceFiles, artworkFiles, artworkStatuses, selectedTask, selectedTasks, currentStep]);
-
-  const isLastStep = currentStep === steps.length;
-  const isFirstStep = currentStep === 1;
+  }, [validateForm, form, mode, create, update, airbrushingId, onSuccess, navigate, receiptFiles, invoiceFiles, artworkFiles, artworkStatuses, selectedTask]);
 
   // Expose methods via ref
   useImperativeHandle(
     ref,
     () => ({
-      handleNext,
-      handlePrev: prevStep,
       handleSubmit,
-      getCurrentStep: () => currentStep,
-      isLastStep: () => isLastStep,
-      isFirstStep: () => isFirstStep,
-      canSubmit: () => {
-        // For both create and edit modes, just check if a task is selected
-        // The actual validation happens during submission in validateCurrentStep
-        // form.formState.isValid can be unreliable when values are set programmatically
-        return selectedTasks.size > 0;
-      },
+      canSubmit: () => selectedTasks.size > 0,
     }),
-    [handleNext, prevStep, handleSubmit, currentStep, isLastStep, isFirstStep, selectedTasks, receiptFiles, invoiceFiles, artworkFiles, mode],
+    [handleSubmit, selectedTasks],
   );
 
-  // Notify parent about step changes
-  useEffect(() => {
-    if (onStepChange) {
-      onStepChange(currentStep);
-    }
-  }, [currentStep, onStepChange]);
-
   // Notify parent about form state changes (file changes, task selection changes)
-  // This allows the parent to update the button state
   useEffect(() => {
     if (onFormStateChange) {
       onFormStateChange();
@@ -606,255 +418,168 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
   }
 
   return (
-    <Card className={cn("flex flex-col h-full shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col overflow-hidden p-4">
-        <Form {...form}>
-          <form className="flex flex-col h-full">
-            {/* Hidden submit button FIRST */}
-            <button id="airbrushing-form-submit" type="submit" className="hidden">
-              Submit
-            </button>
+    <Form {...form}>
+      <form className={cn("space-y-4", className)} onSubmit={(e) => e.preventDefault()}>
+        {/* Task Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <IconClipboardList className="h-5 w-5" />
+              Tarefa
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mode === "edit" && airbrushing?.task ? (
+              <div className="space-y-3">
+                {/* Task Name */}
+                <div className="font-semibold text-base">{airbrushing.task.name}</div>
 
-            {/* Step Indicator - only show for create mode */}
-            {mode === "create" && (
-              <div className="flex-shrink-0 mb-6">
-                <FormSteps steps={steps} currentStep={currentStep} stepErrors={stepErrors} />
-              </div>
-            )}
-
-            {/* Step Content */}
-            <div className={cn("flex-1 min-h-0", currentStep === 2 && mode === "create" ? "flex flex-col overflow-hidden" : "overflow-y-auto")}>
-              {/* Step 1: Basic Information */}
-              {(mode === "edit" || currentStep === 1) && (
-                <div className="space-y-4">
-                  {/* Task Display for Edit Mode */}
-                  {mode === "edit" && airbrushing?.task && (
-                    <div className="border rounded-lg p-4 bg-muted/30">
-                      <Label className="text-sm font-medium text-muted-foreground mb-3 block">Tarefa Relacionada</Label>
-                      <div className="space-y-3">
-                        {/* Task Name */}
-                        <div>
-                          <div className="font-semibold text-base">{airbrushing.task.name}</div>
-                        </div>
-
-                        {/* Task Details Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          {/* Customer with Logo */}
-                          {airbrushing.task.customer && (
-                            <div>
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
-                                <IconUser className="h-3.5 w-3.5" />
-                                <span>Cliente</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <CustomerLogoDisplay
-                                  logo={airbrushing.task.customer.logo}
-                                  customerName={airbrushing.task.customer.fantasyName || "Cliente"}
-                                  size="sm"
-                                  shape="rounded"
-                                />
-                                <span className="font-medium text-sm">{airbrushing.task.customer.fantasyName}</span>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Sector */}
-                          {airbrushing.task.sector && (
-                            <div>
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
-                                <IconBuildingFactory className="h-3.5 w-3.5" />
-                                <span>Setor</span>
-                              </div>
-                              <div className="font-medium text-sm">{airbrushing.task.sector.name}</div>
-                            </div>
-                          )}
-
-                          {/* Serial Number */}
-                          {airbrushing.task.serialNumber && (
-                            <div>
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
-                                <IconHash className="h-3.5 w-3.5" />
-                                <span>Número de Série</span>
-                              </div>
-                              <div className="font-medium text-sm">{airbrushing.task.serialNumber}</div>
-                            </div>
-                          )}
-                        </div>
+                {/* Task Details Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Customer with Logo */}
+                  {airbrushing.task.customer && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                        <IconUser className="h-3.5 w-3.5" />
+                        <span>Cliente</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CustomerLogoDisplay
+                          logo={airbrushing.task.customer.logo}
+                          customerName={airbrushing.task.customer.fantasyName || "Cliente"}
+                          size="sm"
+                          shape="rounded"
+                        />
+                        <span className="font-medium text-sm">{airbrushing.task.customer.fantasyName}</span>
                       </div>
                     </div>
                   )}
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <IconSpray className="h-5 w-5" />
-                        Informações da Aerografia
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <AirbrushingFormFields
-                        control={form.control}
-                        mode={mode}
-                        receiptFiles={receiptFiles}
-                        invoiceFiles={invoiceFiles}
-                        artworkFiles={artworkFiles}
-                        onReceiptFilesChange={handleReceiptFilesChange}
-                        onInvoiceFilesChange={handleInvoiceFilesChange}
-                        onArtworkFilesChange={handleArtworkFilesChange}
-                        onArtworkStatusChange={handleArtworkStatusChange}
-                        errors={form.formState.errors}
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Step 2: Task Selection (only for create mode) */}
-              {currentStep === 2 && mode === "create" && (
-                <div className="flex flex-col h-full space-y-4">
-                  {/* Task selection error message */}
-                  {form.formState.errors.taskId && (
-                    <div className="bg-destructive/10 border border-destructive/20 rounded-md px-4 py-3 flex-shrink-0">
-                      <p className="text-sm text-destructive">{form.formState.errors.taskId.message}</p>
+                  {/* Sector */}
+                  {airbrushing.task.sector && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                        <IconBuildingFactory className="h-3.5 w-3.5" />
+                        <span>Setor</span>
+                      </div>
+                      <div className="font-medium text-sm">{airbrushing.task.sector.name}</div>
                     </div>
                   )}
+
+                  {/* Serial Number */}
+                  {airbrushing.task.serialNumber && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                        <IconHash className="h-3.5 w-3.5" />
+                        <span>Número de Série</span>
+                      </div>
+                      <div className="font-medium text-sm">{airbrushing.task.serialNumber}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Task selection error message */}
+                {form.formState.errors.taskId && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-md px-4 py-3">
+                    <p className="text-sm text-destructive">{form.formState.errors.taskId.message as string}</p>
+                  </div>
+                )}
+                <div className="h-[480px] flex flex-col">
                   <TaskSelector selectedTasks={selectedTasks} onSelectTask={handleTaskSelection} onSelectAll={handleSelectAll} className="flex-1 min-h-0" />
                 </div>
-              )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-              {/* Step 3: Review */}
-              {currentStep === 3 && mode === "create" && (
-                <div className="space-y-4">
-                  {/* Summary Header */}
-                  <div>
-                    <h2 className="text-xl font-semibold text-foreground">Revisão da Aerografia</h2>
-                    <p className="text-sm text-muted-foreground mt-1">Confirme os detalhes antes de finalizar</p>
-                  </div>
+        {/* Basic Information Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <IconSpray className="h-5 w-5" />
+              Informações da Aerografia
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AirbrushingFormFields control={form.control} disabled={isSubmitting} initialPainter={airbrushing?.painter ?? undefined} />
+          </CardContent>
+        </Card>
 
-                  {/* Summary Card - Basic Info */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <IconSpray className="h-5 w-5" />
-                        Informações Básicas
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {/* Start Date */}
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">DATA DE INÍCIO</p>
-                          <p className="text-sm font-medium text-foreground">{form.watch("startDate") ? formatDate(form.watch("startDate")!) : "Não informado"}</p>
-                        </div>
+        {/* Files Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <IconPaperclip className="h-5 w-5" />
+              Arquivos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Receipt Files */}
+              <FormItem className="flex flex-col">
+                <FormLabel className="flex items-center gap-2">
+                  <IconPaperclip className="h-4 w-4" />
+                  Recibos
+                </FormLabel>
+                <FormControl>
+                  <FileUploadField
+                    onFilesChange={handleReceiptFilesChange}
+                    existingFiles={receiptFiles}
+                    maxFiles={10}
+                    showPreview={true}
+                    variant="compact"
+                    placeholder="Adicione recibos do serviço"
+                    label="Recibos anexados"
+                    disabled={isSubmitting}
+                  />
+                </FormControl>
+              </FormItem>
 
-                        {/* Finish Date */}
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">DATA DE TÉRMINO</p>
-                          <p className="text-sm font-medium text-foreground">{form.watch("finishDate") ? formatDate(form.watch("finishDate")!) : "Não informado"}</p>
-                        </div>
+              {/* NFe Files */}
+              <FormItem className="flex flex-col">
+                <FormLabel className="flex items-center gap-2">
+                  <IconFileInvoice className="h-4 w-4" />
+                  Notas Fiscais
+                </FormLabel>
+                <FormControl>
+                  <FileUploadField
+                    onFilesChange={handleInvoiceFilesChange}
+                    existingFiles={invoiceFiles}
+                    maxFiles={10}
+                    showPreview={true}
+                    variant="compact"
+                    placeholder="Adicione notas fiscais"
+                    label="NFes anexadas"
+                    disabled={isSubmitting}
+                  />
+                </FormControl>
+              </FormItem>
 
-                        {/* Price */}
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">PREÇO</p>
-                          <p className="text-sm font-medium text-primary">{form.watch("price") ? formatCurrency(form.watch("price")!) : "Não informado"}</p>
-                        </div>
-                      </div>
-
-                      {/* Divider */}
-                      <Separator className="my-6" />
-
-                      {/* File counts */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-xs font-medium text-muted-foreground">COMPROVANTES</p>
-                          </div>
-                          <p className="text-2xl font-semibold text-foreground">{receiptFiles.length}</p>
-                        </div>
-
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-xs font-medium text-muted-foreground">NOTAS FISCAIS</p>
-                          </div>
-                          <p className="text-2xl font-semibold text-foreground">{invoiceFiles.length}</p>
-                        </div>
-
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <IconPhoto className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-xs font-medium text-muted-foreground">ARTES</p>
-                          </div>
-                          <p className="text-2xl font-semibold text-foreground">{artworkFiles.length}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Task Information */}
-                  {selectedTask && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <IconClipboardList className="h-5 w-5" />
-                          Tarefa Selecionada
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                          <div className="lg:col-span-2">
-                            <p className="text-xs font-medium text-muted-foreground mb-1">NOME DA TAREFA</p>
-                            <p className="text-sm font-medium text-foreground">{selectedTask?.data?.name}</p>
-                          </div>
-
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">CLIENTE</p>
-                            <p className="text-sm font-medium text-foreground">{selectedTask?.data?.customer?.fantasyName || "Não informado"}</p>
-                          </div>
-
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">SETOR</p>
-                            <p className="text-sm font-medium text-foreground">{selectedTask?.data?.sector?.name || "Não informado"}</p>
-                          </div>
-
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">STATUS</p>
-                            <Badge variant="outline">{TASK_STATUS_LABELS[selectedTask?.data?.status as keyof typeof TASK_STATUS_LABELS] || selectedTask?.data?.status}</Badge>
-                          </div>
-
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">PRAZO</p>
-                            <p className="text-sm font-medium text-foreground">{selectedTask?.data?.term ? formatDate(selectedTask.data.term) : "Não informado"}</p>
-                          </div>
-                        </div>
-
-                        {/* Services */}
-                        {selectedTask?.data?.serviceOrders && selectedTask.data.serviceOrders.length > 0 && (
-                          <>
-                            <Separator className="my-4" />
-                            <div>
-                              <p className="text-xs font-medium text-muted-foreground mb-2">SERVIÇOS</p>
-                              <div className="flex flex-wrap gap-2">
-                                {selectedTask.data.serviceOrders.map((service: any) => (
-                                  <Badge key={service.id} variant="secondary">
-                                    {service.description}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              )}
+              {/* Artwork Files with Status Selector */}
+              <FormItem className="flex flex-col">
+                <FormLabel className="flex items-center gap-2">
+                  <IconPhoto className="h-4 w-4" />
+                  Layouts da Aerografia
+                </FormLabel>
+                <FormControl>
+                  <ArtworkFileUploadField
+                    onFilesChange={handleArtworkFilesChange}
+                    onStatusChange={handleArtworkStatusChange}
+                    existingFiles={artworkFiles}
+                    maxFiles={20}
+                    showPreview={true}
+                    placeholder="Adicione os layouts da aerografia"
+                    label="Layouts anexados"
+                  />
+                </FormControl>
+              </FormItem>
             </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      </form>
+    </Form>
   );
 });
 

@@ -589,6 +589,7 @@ export function TaskHistoryList({
               </Button>
             )}
 
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} defaultColumns={defaultVisibleColumns} />
             <Button
               variant={activeFilters.length > 0 ? "default" : "outline"}
               size="default"
@@ -597,7 +598,6 @@ export function TaskHistoryList({
               <IconFilter className="h-4 w-4" />
               <span>Filtros{activeFilters.length > 0 ? ` (${activeFilters.length})` : ''}</span>
             </Button>
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} defaultColumns={defaultVisibleColumns} />
             {currentUser?.sector?.privileges !== SECTOR_PRIVILEGES.WAREHOUSE && (
               <TaskExport filters={queryFilters} currentItems={tableData.items} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
             )}

@@ -1,12 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { IconFilter, IconX } from "@tabler/icons-react";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { IconFilter } from "@tabler/icons-react";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ENTITY_TYPE_LABELS, CHANGE_LOG_ACTION, CHANGE_LOG_ACTION_LABELS } from "../../../../constants";
+import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ENTITY_TYPE_LABELS, CHANGE_LOG_ACTION, CHANGE_LOG_ACTION_LABELS, USER_STATUS } from "../../../../constants";
 import { useUsers } from "../../../../hooks";
 
 // Define props interface directly to avoid import issues
@@ -20,7 +18,10 @@ interface ChangelogFiltersProps {
 
 export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, onReset }: ChangelogFiltersProps) {
   const [localFilters, setLocalFilters] = useState(filters);
-  const { data: usersData } = useUsers({ limit: 100 });
+  const { data: usersData } = useUsers({
+    limit: 100,
+    statuses: [USER_STATUS.EXPERIENCE_PERIOD_1, USER_STATUS.EXPERIENCE_PERIOD_2, USER_STATUS.EFFECTED],
+  });
 
   useEffect(() => {
     setLocalFilters(filters);
@@ -82,22 +83,18 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
   }, [localFilters]);
 
   return (
-    <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros do Histórico
-            {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {activeFilterCount} {activeFilterCount === 1 ? "filtro ativo" : "filtros ativos"}
-              </Badge>
-            )}
-          </SheetTitle>
-          <SheetDescription>Configure os filtros para visualizar o histórico de alterações</SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={isOpen}
+      onOpenChange={onClose}
+      title="Filtros do Histórico"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure os filtros para visualizar o histórico de alterações"
+      activeFilterCount={activeFilterCount}
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+    >
             {/* Entity Types */}
             <div className="space-y-2">
               <Label>Tipos de Entidade</Label>
@@ -206,19 +203,6 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
                 </div>
               </div>
             </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleReset} disabled={activeFilterCount === 0} className="flex-1">
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar Filtros
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar Filtros
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { IconPhoto } from "@tabler/icons-react";
 import { formatDate, formatCurrency } from "../../../../utils";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { AIRBRUSHING_STATUS_LABELS, ENTITY_BADGE_CONFIG } from "../../../../constants";
+import { AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS_LABELS, ENTITY_BADGE_CONFIG } from "../../../../constants";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import type { Airbrushing } from "../../../../types";
 
@@ -17,7 +17,7 @@ export interface AirbrushingColumn {
 }
 
 export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["task.name", "task.customer.fantasyName", "status", "price", "startDate", "finishDate", "artworksCount"]);
+  return new Set(["task.name", "task.customer.fantasyName", "status", "paymentStatus", "price", "startDate", "finishDate", "artworksCount"]);
 }
 
 export function createAirbrushingColumns(): AirbrushingColumn[] {
@@ -82,8 +82,39 @@ export function createAirbrushingColumns(): AirbrushingColumn[] {
       align: "left",
     },
     {
+      key: "painter.name",
+      header: "PINTOR",
+      accessor: (airbrushing) => (
+        <div className="space-y-1">
+          {airbrushing.painter ? (
+            <TruncatedTextWithTooltip text={airbrushing.painter.name} className="text-sm" />
+          ) : (
+            <span className="text-muted-foreground text-sm">-</span>
+          )}
+        </div>
+      ),
+      sortable: true,
+      className: "w-40",
+      align: "left",
+    },
+    {
+      key: "paymentStatus",
+      header: "PAGAMENTO",
+      accessor: (airbrushing) => (
+        <Badge
+          variant={ENTITY_BADGE_CONFIG.AIRBRUSHING_PAYMENT[airbrushing.paymentStatus] || "default"}
+          className="whitespace-nowrap"
+        >
+          {AIRBRUSHING_PAYMENT_STATUS_LABELS[airbrushing.paymentStatus] || airbrushing.paymentStatus}
+        </Badge>
+      ),
+      sortable: true,
+      className: "w-36",
+      align: "left",
+    },
+    {
       key: "startDate",
-      header: "DATA INÍCIO",
+      header: "INÍCIO PREVISTO",
       accessor: (airbrushing) => (
         <div>
           {airbrushing.startDate ? (
@@ -99,11 +130,43 @@ export function createAirbrushingColumns(): AirbrushingColumn[] {
     },
     {
       key: "finishDate",
-      header: "DATA FINALIZAÇÃO",
+      header: "TÉRMINO PREVISTO",
       accessor: (airbrushing) => (
         <div>
           {airbrushing.finishDate ? (
             <div className="text-sm">{formatDate(airbrushing.finishDate)}</div>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          )}
+        </div>
+      ),
+      sortable: true,
+      className: "w-40",
+      align: "left",
+    },
+    {
+      key: "startedAt",
+      header: "INICIADO EM",
+      accessor: (airbrushing) => (
+        <div>
+          {airbrushing.startedAt ? (
+            <div className="text-sm">{formatDate(airbrushing.startedAt)}</div>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          )}
+        </div>
+      ),
+      sortable: true,
+      className: "w-40",
+      align: "left",
+    },
+    {
+      key: "finishedAt",
+      header: "FINALIZADO EM",
+      accessor: (airbrushing) => (
+        <div>
+          {airbrushing.finishedAt ? (
+            <div className="text-sm">{formatDate(airbrushing.finishedAt)}</div>
           ) : (
             <span className="text-sm text-muted-foreground">-</span>
           )}

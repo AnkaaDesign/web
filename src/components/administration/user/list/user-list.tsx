@@ -544,6 +544,7 @@ export function UserList({ className, teamScope }: UserListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button
               variant={hasActiveFilters ? "default" : "outline"}
               size="default"
@@ -555,7 +556,6 @@ export function UserList({ className, teamScope }: UserListProps) {
                 {hasActiveFilters ? ` (${activeFilterCount})` : ""}
               </span>
             </Button>
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <UserExport filters={filters} currentUsers={tableData.users} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
           </div>
         </div>

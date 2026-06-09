@@ -246,11 +246,11 @@ export function ObservationList({ className }: ObservationListProps) {
           </div>
           <div className="flex gap-2">
             {selectionCount > 0 && <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />}
+            <ColumnVisibilityManager columns={columnsForVisibility} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button variant={activeFilters.length > 0 ? "default" : "outline"} onClick={() => setShowFilterModal(true)}>
               <IconFilter className="h-4 w-4 mr-2" />
               Filtros{activeFilters.length > 0 ? ` (${activeFilters.length})` : ""}
             </Button>
-            <ColumnVisibilityManager columns={columnsForVisibility} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
           </div>
         </div>
 

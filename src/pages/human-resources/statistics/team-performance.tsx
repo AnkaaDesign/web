@@ -321,7 +321,7 @@ function EquipeFilters({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
+      <SheetContent side="right" className="w-full sm:max-w-xl md:max-w-xl border-border/50 flex flex-col">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
@@ -462,7 +462,7 @@ function EquipeFilters({
 
             {/* Toggle: include experience-period dismissals in the turnover
                 rate. Folded in from the (now removed) Rotatividade page. */}
-            <div className="space-y-2 pt-2 border-t">
+            <div className="space-y-2 pt-2 border-t border-border/50">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -482,7 +482,7 @@ function EquipeFilters({
           </div>
         </ScrollArea>
 
-        <div className="flex gap-2 pt-4 border-t">
+        <div className="flex gap-2 pt-4 border-t border-border/50">
           <Button variant="outline" onClick={handleClear} className="flex-1">
             <IconX className="h-4 w-4 mr-2" />Limpar
           </Button>
@@ -1469,23 +1469,6 @@ const EquipePage = () => {
                   onDelete={deletePreset}
                   isSaving={isSavingPreset}
                 />
-
-                {/* Export */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={isLoading || !timeseries.length}>
-                      <IconDownload className="h-4 w-4 mr-2" />Exportar
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleExportCSV}>
-                      <IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleExportXLSX}>
-                      <IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </>
             }
           />
@@ -1631,6 +1614,23 @@ const EquipePage = () => {
                     <IconFilter className="h-4 w-4 mr-2" />Filtros
                     {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>}
                   </Button>
+
+                  {/* Export */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" disabled={isLoading || !timeseries.length}>
+                        <IconDownload className="h-4 w-4 mr-2" />Exportar
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleExportCSV}>
+                        <IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleExportXLSX}>
+                        <IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </CardHeader>

@@ -2,15 +2,14 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { IconCalendar, IconFilter, IconX, IconTriangleInverted, IconCalendarRepeat } from "@tabler/icons-react";
+import { IconCalendar, IconFilter, IconTriangleInverted, IconCalendarRepeat } from "@tabler/icons-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -93,19 +92,18 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
   const activeFilterCount = countActiveFilters();
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros de Cronogramas
-          </SheetTitle>
-          <SheetDescription>
-            Configure os filtros para refinar sua busca por cronogramas de pedidos.
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros de Cronogramas"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure os filtros para refinar sua busca por cronogramas de pedidos."
+      activeFilterCount={activeFilterCount}
+      onApply={handleApply}
+      onReset={handleReset}
+      applyLabel="Aplicar filtros"
+      resetLabel="Limpar todos"
+    >
           <Form {...form}>
             <form className="space-y-6">
               {/* Status Filter */}
@@ -203,24 +201,6 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
               </div>
             </form>
           </Form>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={handleReset} className="flex-1">
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar todos
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              Aplicar filtros
-              {activeFilterCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {activeFilterCount}
-                </Badge>
-              )}
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

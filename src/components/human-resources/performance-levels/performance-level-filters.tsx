@@ -1,21 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Combobox } from "@/components/ui/combobox";
 import { Switch } from "@/components/ui/switch";
 import {
   IconFilter,
-  IconCheck,
-  IconX,
   IconBuilding,
   IconBriefcase,
   IconUserCheck,
@@ -328,24 +318,18 @@ export function PerformanceLevelFilters({
   }));
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5" />
-            Filtros
-            {totalActiveFilters > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {totalActiveFilters} {totalActiveFilters === 1 ? 'ativo' : 'ativos'}
-              </Badge>
-            )}
-          </SheetTitle>
-          <SheetDescription>
-            Configure os filtros para personalizar a visualização
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6">
+    <FilterDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros"
+      titleIcon={<IconFilter className="h-5 w-5" />}
+      description="Configure os filtros para personalizar a visualização"
+      activeFilterCount={totalActiveFilters}
+      onApply={handleApply}
+      onReset={handleClear}
+      applyLabel="Aplicar Filtros"
+      resetLabel="Limpar Filtros"
+    >
           {/* Performance Level Filter */}
           <div>
             <Label className="text-sm font-medium mb-3 block flex items-center gap-2">
@@ -484,25 +468,6 @@ export function PerformanceLevelFilters({
               onCheckedChange={handleShowOnlyBonifiableChange}
             />
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={handleClear}
-              className="flex-1"
-              disabled={totalActiveFilters === 0}
-            >
-              <IconX className="h-4 w-4 mr-2" />
-              Limpar Filtros
-            </Button>
-            <Button onClick={handleApply} className="flex-1">
-              <IconCheck className="h-4 w-4 mr-2" />
-              Aplicar Filtros
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    </FilterDrawer>
   );
 }

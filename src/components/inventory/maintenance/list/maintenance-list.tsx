@@ -278,6 +278,7 @@ export function MaintenanceList({ className }: MaintenanceListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+            <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button
               variant={activeFilters.length > 0 ? "default" : "outline"}
               size="default"
@@ -289,7 +290,6 @@ export function MaintenanceList({ className }: MaintenanceListProps) {
                 {activeFilters.length > 0 ? ` (${activeFilters.length})` : ""}
               </span>
             </Button>
-            <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <MaintenanceExport
               filters={queryFilters}
               currentMaintenance={tableData.items}

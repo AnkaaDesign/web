@@ -643,7 +643,7 @@ function SkillStatsFilterSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0">
+      <SheetContent side="right" className="w-full sm:max-w-xl md:max-w-xl border-border/50 flex flex-col p-0">
         <SheetHeader className="px-6 pt-6 pb-2 flex-shrink-0">
           <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
@@ -870,7 +870,7 @@ function SkillStatsFilterSheet({
           </div>
         </ScrollArea>
 
-        <div className="flex-shrink-0 border-t bg-background px-6 py-3 flex justify-end gap-2">
+        <div className="flex-shrink-0 border-t border-border/50 bg-background px-6 py-3 flex justify-end gap-2">
           <Button variant="outline" onClick={handleClear}>
             <IconX className="h-4 w-4 mr-2" />
             Limpar
@@ -2301,36 +2301,6 @@ export const HRSkillAssessmentStatisticsPage = () => {
                 onDelete={deletePreset}
                 isSaving={isSavingPreset}
               />
-
-              {/* Export */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={activeQuery.isLoading}
-                  >
-                    <IconDownload className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Exportar</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleExportPDF}>
-                    <IconFileTypePdf className="h-4 w-4 mr-2" />
-                    PDF do Gráfico
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportCSV}>
-                    <IconFileTypeCsv className="h-4 w-4 mr-2" />
-                    CSV dos Dados
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportXLSX}>
-                    <IconFileTypeXls className="h-4 w-4 mr-2" />
-                    Excel (XLSX)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </>
           }
         />
@@ -2447,6 +2417,36 @@ export const HRSkillAssessmentStatisticsPage = () => {
                   </Badge>
                 )}
               </Button>
+
+              {/* Export */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={activeQuery.isLoading}
+                  >
+                    <IconDownload className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Exportar</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExportPDF}>
+                    <IconFileTypePdf className="h-4 w-4 mr-2" />
+                    PDF do Gráfico
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <IconFileTypeCsv className="h-4 w-4 mr-2" />
+                    CSV dos Dados
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportXLSX}>
+                    <IconFileTypeXls className="h-4 w-4 mr-2" />
+                    Excel (XLSX)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardHeader>
