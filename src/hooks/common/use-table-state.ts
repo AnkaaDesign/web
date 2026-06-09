@@ -65,6 +65,15 @@ export interface UseTableStateOptions {
    * Useful when multiple tables on the same page would conflict on the shared ?sort= param.
    */
   useUrlForSort?: boolean;
+  /**
+   * Whitelist of sort column keys that the table actually renders. When set,
+   * any sort config (from URL, localStorage, or default) referencing a column
+   * NOT in this list is silently dropped. This self-heals stale URLs that still
+   * carry a renamed/removed column (e.g. an old `kind` key), which would
+   * otherwise occupy a sort slot with no visible header and skew the order
+   * badges. Pass a stable (module-level) reference to avoid re-renders.
+   */
+  allowedSortColumns?: string[];
 }
 
 /**
@@ -176,7 +185,7 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
  * Hook for managing table state (pagination, selection, sorting) in URL
  */
 export function useTableState(options: UseTableStateOptions = {}) {
-  const { defaultPageSize = 40, resetSelectionOnPageChange = false, defaultSort = [], sortStorageKey, useUrlForSort = true } = options;
+  const { defaultPageSize = 40, resetSelectionOnPageChange = false, defaultSort = [], sortStorageKey, useUrlForSort = true, allowedSortColumns } = options;
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -233,13 +242,19 @@ export function useTableState(options: UseTableStateOptions = {}) {
   }, [searchParams]);
 
   const sortState = useMemo(() => {
+    let sortConfigs: Array<{ column: string; direction: "asc" | "desc" }> = [];
+
     // When not using URL for sort, use local React state
     if (!useUrlForSort) {
-      return { sortConfigs: localSortConfigs };
+      sortConfigs = localSortConfigs;
+      // Drop any sort referencing a column the table no longer renders.
+      if (allowedSortColumns && allowedSortColumns.length > 0) {
+        sortConfigs = sortConfigs.filter((c) => allowedSortColumns.includes(c.column));
+      }
+      return { sortConfigs };
     }
 
     const sortValue = searchParams.get("sort");
-    let sortConfigs: Array<{ column: string; direction: "asc" | "desc" }> = [];
 
     if (sortValue !== null) {
       try {
@@ -272,9 +287,16 @@ export function useTableState(options: UseTableStateOptions = {}) {
       }
     }
 
+    // Drop any sort referencing a column the table no longer renders (stale
+    // URLs/localStorage carrying a renamed or removed key). This keeps the
+    // order badges contiguous and re-serializes cleanly on the next toggle.
+    if (allowedSortColumns && allowedSortColumns.length > 0) {
+      sortConfigs = sortConfigs.filter((c) => allowedSortColumns.includes(c.column));
+    }
+
     return { sortConfigs };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, defaultSort, sortStorageKey, useUrlForSort, localSortConfigs]);
+  }, [searchParams, defaultSort, sortStorageKey, useUrlForSort, localSortConfigs, allowedSortColumns]);
 
   const filterState = useMemo(() => {
     const showSelectedOnlyValue = searchParams.get("showSelectedOnly");

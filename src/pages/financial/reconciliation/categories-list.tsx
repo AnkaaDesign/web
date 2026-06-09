@@ -63,7 +63,6 @@ import {
 import type {
   CreateTransactionCategoryPayload,
   TransactionCategory,
-  TransactionCategoryKind,
   UpdateTransactionCategoryPayload,
 } from "@/types/reconciliation";
 
@@ -78,28 +77,26 @@ const ACCOUNTING_TYPE_OPTIONS = Object.entries(
   ACCOUNTING_TYPE_LABELS as Record<string, string>,
 ).map(([value, label]) => ({ value, label }));
 
-// Grouping order for the list: editable transaction categories first, then
-// services, then item-derived (read-only mirrors). Drives the primary sort.
-const KIND_ORDER: Record<TransactionCategoryKind, number> = {
-  TRANSACTION_ONLY: 0,
-  SERVICE: 1,
-  ITEM_DERIVED: 2,
-};
-
 // Resolves a category's accounting-type group label (the chart-of-accounts
 // cost group), falling back to a trailing "no group" bucket.
 const accountingGroupOf = (c: TransactionCategory) =>
   getAccountingTypeLabel(c) ?? NO_ACCOUNTING_GROUP;
 
 // Default multi-column sort applied on first load (no sort in the URL):
-// recurring first → kind (TRANSACTION_ONLY → SERVICE → ITEM_DERIVED) → name A→Z.
-// Matches the interactive sort headers below so clicking a column refines from here.
+// recurring first → grupo contábil (accounting type, A→Z) → name A→Z.
+// Every priority maps to a visible column header so clicking a header refines
+// from here (no hidden sort keys like the old `kind` ordering).
 // Module-level constant keeps a stable reference for useTableState/useMemo.
 const DEFAULT_SORT: Array<{ column: string; direction: "asc" | "desc" }> = [
   { column: "isRecurring", direction: "desc" },
-  { column: "kind", direction: "asc" },
+  { column: "accountingType", direction: "asc" },
   { column: "name", direction: "asc" },
 ];
+
+// The only sort keys that map to a visible column header. Passed to
+// useTableState so stale URLs carrying a removed key (the old `kind` sort) are
+// dropped instead of occupying an invisible sort slot and skewing order badges.
+const SORTABLE_COLUMNS = ["name", "accountingType", "isRecurring", "isActive"];
 
 // Per-column sort key extractors. Returns a comparable primitive so the same
 // comparator handles every sortable column (enums map to their group order).
@@ -109,7 +106,6 @@ const SORT_ACCESSORS: Record<
   (c: TransactionCategory) => number | string
 > = {
   name: c => c.name,
-  kind: c => KIND_ORDER[c.kind],
   accountingType: c => {
     const g = accountingGroupOf(c);
     return g === NO_ACCOUNTING_GROUP ? "￿" : g;
@@ -173,6 +169,7 @@ export const ReconciliationCategoriesListPage = () => {
   } = useTableState({
     defaultPageSize: DEFAULT_PAGE_SIZE,
     defaultSort: DEFAULT_SORT,
+    allowedSortColumns: SORTABLE_COLUMNS,
   });
 
   // Full sorted list. Applies the active sort configs in priority order, with a
@@ -272,7 +269,7 @@ export const ReconciliationCategoriesListPage = () => {
     },
     {
       key: "accountingType",
-      header: "Tipo (Grupo contábil)",
+      header: "Grupo contábil",
       width: "220px",
       sortable: true,
       render: c => {
