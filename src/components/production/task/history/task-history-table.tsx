@@ -188,11 +188,22 @@ export function TaskHistoryTable({
         },
       },
       truck: {
-        select: {
-          id: true,
-          plate: true,
-          chassisNumber: true,
-          // Don't load layouts for history list view - not displayed
+        include: {
+          leftSideLayout: {
+            include: {
+              layoutSections: true,
+            },
+          },
+          rightSideLayout: {
+            include: {
+              layoutSections: true,
+            },
+          },
+          backSideLayout: {
+            include: {
+              layoutSections: true,
+            },
+          },
         },
       },
       quote: {

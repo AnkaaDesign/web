@@ -50,6 +50,16 @@ import {
   type TaskAction,
 } from "../../components/production/task/schedule/task-table-context-menu";
 import { SetTermModal } from "../../components/production/task/schedule/set-term-modal";
+import { TaskDuplicateModal } from "../../components/production/task/modals/task-duplicate-modal";
+import { SetSectorModal } from "../../components/production/task/schedule/set-sector-modal";
+import { SetStatusModal } from "../../components/production/task/schedule/set-status-modal";
+import { CopyFromTaskModal } from "../../components/production/task/schedule/copy-from-task-modal";
+import { AdvancedBulkActionsHandler } from "../../components/production/task/bulk-operations/AdvancedBulkActionsHandler";
+import { taskService } from "@/api-client/task";
+import { taskKeys } from "@/hooks";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/components/ui/sonner";
+import type { CopyableTaskField } from "@/types/task-copy";
 import { getTaskQuoteEditRoute } from "../../utils/task";
 import { useReturnTo } from "../../hooks/common/use-return-to";
 import { useSectors } from "../../hooks/administration/use-sector";
@@ -1817,12 +1827,14 @@ function TaskTableRender({
   const visibleCount = tasks.length;
 
   // ----- Right-click context menu -----
-  // Mirrors the production schedule page's menu (start/finish/edit/quote/delete).
-  // We don't replicate the full advanced-actions surface (bulk arts, cutting
-  // plans, etc.) — those need modals the widget shouldn't carry. The menu
-  // component shows only the items the user has permission for, so unprivileged
-  // sectors will see no menu at all.
+  // Full parity with the production schedule page's menu: every action the
+  // shared TaskTableContextMenu renders (start/finish/edit/duplicate/quote/
+  // setSector/setTerm/setStatus, the advanced bulk submenu, copy-from-task and
+  // delete) is wired here to the same standalone modals/handlers those pages
+  // use. The menu component shows only items the user has permission for, so
+  // unprivileged sectors still see no menu at all.
   const { updateAsync, deleteAsync: deleteTaskAsync } = useTaskMutations();
+  const queryClient = useQueryClient();
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -1834,6 +1846,24 @@ function TaskTableRender({
   const [setTermDialog, setSetTermDialog] = useState<{ tasks: Task[] } | null>(
     null,
   );
+  const [taskToDuplicate, setTaskToDuplicate] = useState<Task | null>(null);
+  const [sectorDialog, setSectorDialog] = useState<{ tasks: Task[] } | null>(
+    null,
+  );
+  const [statusDialog, setStatusDialog] = useState<{ tasks: Task[] } | null>(
+    null,
+  );
+  const advancedActionsRef = useRef<{
+    openModal: (type: string, taskIds: string[]) => void;
+  } | null>(null);
+  // Copy-from-task is a list-level flow: pick fields → click a source row in
+  // this widget's own list → confirm. Mirrors task-history-list.tsx.
+  const [copyState, setCopyState] = useState<{
+    step: "idle" | "selecting_fields" | "selecting_source" | "confirming";
+    targetTasks: Task[];
+    selectedFields: CopyableTaskField[];
+    sourceTask: Task | null;
+  }>({ step: "idle", targetTasks: [], selectedFields: [], sourceTask: null });
 
   const handleContextMenu = useCallback((e: React.MouseEvent, task: Task) => {
     e.preventDefault();
@@ -1893,10 +1923,61 @@ function TaskTableRender({
           case "delete":
             setDeleteDialog({ tasks: actionTasks });
             break;
-          // Other actions (duplicate / setSector / setStatus / bulkArts / etc.)
-          // need standalone modals the widget doesn't carry. Fall through —
-          // the menu still renders them when the user is permitted, but they
-          // become no-ops in the dashboard context.
+          case "duplicate":
+            if (actionTasks.length === 1) {
+              setTaskToDuplicate(actionTasks[0]);
+            }
+            break;
+          case "setSector":
+            setSectorDialog({ tasks: actionTasks });
+            break;
+          case "setStatus":
+            setStatusDialog({ tasks: actionTasks });
+            break;
+          case "bulkArts":
+            advancedActionsRef.current?.openModal(
+              "arts",
+              actionTasks.map((t) => t.id),
+            );
+            break;
+          case "bulkBaseFiles":
+            advancedActionsRef.current?.openModal(
+              "baseFiles",
+              actionTasks.map((t) => t.id),
+            );
+            break;
+          case "bulkPaints":
+            advancedActionsRef.current?.openModal(
+              "paints",
+              actionTasks.map((t) => t.id),
+            );
+            break;
+          case "bulkCuttingPlans":
+            advancedActionsRef.current?.openModal(
+              "cuttingPlans",
+              actionTasks.map((t) => t.id),
+            );
+            break;
+          case "bulkServiceOrder":
+            advancedActionsRef.current?.openModal(
+              "serviceOrder",
+              actionTasks.map((t) => t.id),
+            );
+            break;
+          case "bulkLayout":
+            advancedActionsRef.current?.openModal(
+              "layout",
+              actionTasks.map((t) => t.id),
+            );
+            break;
+          case "copyFromTask":
+            setCopyState({
+              step: "selecting_fields",
+              targetTasks: actionTasks,
+              selectedFields: [],
+              sourceTask: null,
+            });
+            break;
           default:
             break;
         }
@@ -1930,6 +2011,126 @@ function TaskTableRender({
       }
     },
     [setTermDialog, updateAsync],
+  );
+
+  const confirmSetSector = useCallback(
+    async (sectorId: string | null) => {
+      if (!sectorDialog) return;
+      try {
+        for (const t of sectorDialog.tasks) {
+          await updateAsync({ id: t.id, data: { sectorId } } as any);
+        }
+      } finally {
+        setSectorDialog(null);
+      }
+    },
+    [sectorDialog, updateAsync],
+  );
+
+  const confirmSetStatus = useCallback(
+    async (status: TASK_STATUS) => {
+      if (!statusDialog) return;
+      try {
+        for (const t of statusDialog.tasks) {
+          await updateAsync({ id: t.id, data: { status } } as any);
+        }
+      } finally {
+        setStatusDialog(null);
+      }
+    },
+    [statusDialog, updateAsync],
+  );
+
+  // ----- Copy-from-task flow (mirrors task-history-list.tsx) -----
+  const resetCopyState = useCallback(
+    () =>
+      setCopyState({
+        step: "idle",
+        targetTasks: [],
+        selectedFields: [],
+        sourceTask: null,
+      }),
+    [],
+  );
+
+  const handleCopyStartSourceSelection = useCallback(
+    (selectedFields: CopyableTaskField[]) =>
+      setCopyState((prev) => ({ ...prev, step: "selecting_source", selectedFields })),
+    [],
+  );
+
+  const handleCopyChangeSource = useCallback(
+    () => setCopyState((prev) => ({ ...prev, step: "selecting_source", sourceTask: null })),
+    [],
+  );
+
+  const handleCopySourceSelected = useCallback(
+    async (sourceTask: Task) => {
+      try {
+        const full = await taskService.getTaskById(sourceTask.id, {
+          include: {
+            artworks: { include: { file: true } },
+            budgets: true,
+            invoices: true,
+            receipts: true,
+            quote: true,
+            logoPaints: true,
+            cuts: true,
+            serviceOrders: true,
+            truck: {
+              include: {
+                leftSideLayout: { include: { layoutSections: true, photo: true } },
+                rightSideLayout: { include: { layoutSections: true, photo: true } },
+                backSideLayout: { include: { layoutSections: true, photo: true } },
+              },
+            },
+          },
+        } as any);
+        if (!full.success || !full.data) {
+          throw new Error("Failed to fetch source task details");
+        }
+        setCopyState((prev) => ({ ...prev, step: "confirming", sourceTask: full.data ?? null }));
+      } catch {
+        toast.error("Falha ao carregar detalhes da tarefa de origem");
+        resetCopyState();
+      }
+    },
+    [resetCopyState],
+  );
+
+  const handleCopyConfirm = useCallback(
+    async (selectedFields: CopyableTaskField[], sourceTask: Task) => {
+      const targetTasks = copyState.targetTasks;
+      try {
+        let success = 0;
+        // Sequential to avoid budgetNumber unique-constraint races when copying quotes.
+        for (const target of targetTasks) {
+          try {
+            await taskService.copyFromTask(target.id, {
+              sourceTaskId: sourceTask.id,
+              fields: selectedFields,
+            });
+            success++;
+          } catch {
+            // Aggregate — reported below.
+          }
+        }
+        if (success > 0) {
+          toast.success("Campos copiados com sucesso", {
+            description: `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${success} tarefa(s)`,
+          });
+          queryClient.invalidateQueries({ queryKey: taskKeys.all });
+          refetch?.();
+        } else {
+          toast.error("Erro ao copiar campos", {
+            description: "Não foi possível copiar os campos. Tente novamente.",
+          });
+        }
+      } finally {
+        resetCopyState();
+      }
+    },
+    [copyState.targetTasks, queryClient, refetch, resetCopyState],
   );
 
   // Strip financial columns (price/quoteTotal/quoteStatus) for sectors
@@ -2092,22 +2293,40 @@ function TaskTableRender({
     return tasks.map((task, i) => renderRow(task, i));
   };
 
+  const selectingSource = copyState.step === "selecting_source";
+  const isCopyTarget = (id: string) => copyState.targetTasks.some((t) => t.id === id);
+  const activateRow = (task: Task) => {
+    if (selectingSource) {
+      // Don't allow a target task to be its own source.
+      if (isCopyTarget(task.id)) return;
+      handleCopySourceSelected(task);
+      return;
+    }
+    navigate(detailHref(task.id));
+  };
+
   const renderRow = (task: Task, i: number) => (
     <div
       key={task.id}
       role="button"
       tabIndex={0}
-      aria-label={`Abrir tarefa ${task.name ?? task.serialNumber ?? task.id}`}
+      aria-label={
+        selectingSource
+          ? `Copiar de ${task.name ?? task.serialNumber ?? task.id}`
+          : `Abrir tarefa ${task.name ?? task.serialNumber ?? task.id}`
+      }
       className={`grid gap-x-3 items-center cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${dens.row} ${rowBorder} ${rowHover} ${
         i % 2 === 1 ? "bg-muted/20" : ""
+      } ${selectingSource && isCopyTarget(task.id) ? "opacity-40 pointer-events-none" : ""} ${
+        selectingSource && !isCopyTarget(task.id) ? "hover:ring-2 hover:ring-primary hover:ring-inset" : ""
       }`}
       style={{ gridTemplateColumns: gridTemplate }}
-      onClick={() => navigate(detailHref(task.id))}
+      onClick={() => activateRow(task)}
       onContextMenu={(e) => handleContextMenu(e, task)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          navigate(detailHref(task.id));
+          activateRow(task);
         }
       }}
     >
@@ -2206,6 +2425,20 @@ function TaskTableRender({
       accentColor={config.accent?.color}
       accentShade={config.accent?.shade}
     >
+      {selectingSource && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 text-sm bg-primary/10 border-b border-primary/30">
+          <span className="text-primary font-medium truncate">
+            Clique em uma tarefa para copiar seus dados
+          </span>
+          <button
+            type="button"
+            onClick={resetCopyState}
+            className="shrink-0 text-xs font-medium text-muted-foreground hover:text-foreground underline"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
       {body}
       <TaskTableContextMenu
         contextMenu={contextMenu}
@@ -2217,6 +2450,48 @@ function TaskTableRender({
         onOpenChange={(open) => !open && setSetTermDialog(null)}
         tasks={setTermDialog?.tasks ?? []}
         onConfirm={confirmSetTerm}
+      />
+      <TaskDuplicateModal
+        task={taskToDuplicate}
+        open={!!taskToDuplicate}
+        onOpenChange={(open) => {
+          if (!open) setTaskToDuplicate(null);
+        }}
+        onSuccess={() => {
+          setTaskToDuplicate(null);
+          refetch?.();
+        }}
+      />
+      <SetSectorModal
+        open={!!sectorDialog}
+        onOpenChange={(open) => !open && setSectorDialog(null)}
+        tasks={sectorDialog?.tasks ?? []}
+        onConfirm={confirmSetSector}
+      />
+      <SetStatusModal
+        open={!!statusDialog}
+        onOpenChange={(open) => !open && setStatusDialog(null)}
+        tasks={statusDialog?.tasks ?? []}
+        onConfirm={confirmSetStatus}
+      />
+      <CopyFromTaskModal
+        open={copyState.step === "selecting_fields" || copyState.step === "confirming"}
+        onOpenChange={(open) => !open && resetCopyState()}
+        step={copyState.step === "confirming" ? "confirming" : "selecting_fields"}
+        targetTasks={copyState.targetTasks}
+        sourceTask={copyState.sourceTask}
+        onStartSourceSelection={handleCopyStartSourceSelection}
+        onConfirm={handleCopyConfirm}
+        onCancel={resetCopyState}
+        onChangeSource={handleCopyChangeSource}
+        userPrivilege={user?.sector?.privileges}
+      />
+      <AdvancedBulkActionsHandler
+        ref={advancedActionsRef}
+        selectedTaskIds={new Set<string>()}
+        onClearSelection={() => {
+          refetch?.();
+        }}
       />
       <AlertDialog
         open={!!deleteDialog}
