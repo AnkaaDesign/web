@@ -15,7 +15,6 @@ import type { Item, ItemCategory } from "../../../../../types";
 
 // Import form components
 import { NameInput } from "./name-input";
-import { TypeSelector } from "./type-selector";
 import { ParentCategorySelector } from "./parent-category-selector";
 import { AccountingTypeSelector } from "./accounting-type-selector";
 
@@ -224,11 +223,12 @@ export function CategoryForm(props: CategoryFormProps) {
               <AccountingTypeSelector control={form.control} disabled={isSubmitting} readOnlyRollup={isSubcategory} />
             </div>
 
+            {/* The physical ItemCategoryType (REGULAR/TOOL/PPE) is no longer user-facing:
+                item behavior is driven by per-item capability fields (isBorrowable,
+                stockModel, ppeType). The column survives in the DB as a create-time
+                default provider only. */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ParentCategorySelector control={form.control} disabled={isSubmitting} excludeId={editingCategoryId} onParentChange={handleParentChange} />
-
-              {/* Demoted: the physical ItemCategoryType is an internal flag (e.g. PPE detection). */}
-              <TypeSelector control={form.control} disabled={isSubmitting} />
             </div>
 
             <FormField

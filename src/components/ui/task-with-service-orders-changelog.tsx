@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useCallback, useContext, useMemo, useState, type KeyboardEvent } from "react";
 import { getApiBaseUrl } from "@/config/api";
+import { FileViewerContext } from "@/components/common/file/file-viewer";
+import { getFileById } from "@/api-client/file";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +24,7 @@ import { rollbackFieldChange } from "@/api-client/task";
 import { useQueryClient } from "@tanstack/react-query";
 import { taskKeys, serviceOrderKeys, truckKeys, changeLogKeys } from "../../hooks/common/query-keys";
 import { taskQuoteKeys } from "../../hooks/production/use-task-quote";
-import type { ChangeLog } from "../../types";
+import type { ChangeLog, File as AnkaaFile } from "../../types";
 import {
   CHANGE_LOG_ENTITY_TYPE,
   CHANGE_LOG_ACTION,
@@ -68,14 +70,30 @@ const LogoDisplay = ({
   size = "w-12 h-12",
   className = "",
   useThumbnail = false,
+  onClick,
 }: {
   logoId?: string;
   size?: string;
   className?: string;
   useThumbnail?: boolean;
+  onClick?: () => void;
 }) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
+  const clickable = !!onClick && !!logoId;
+  const clickableProps = clickable
+    ? {
+        onClick,
+        role: "button" as const,
+        tabIndex: 0,
+        onKeyDown: (e: KeyboardEvent) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick?.();
+          }
+        },
+      }
+    : {};
   if (!logoId) {
     return (
       <div
@@ -95,9 +113,11 @@ const LogoDisplay = ({
       <div
         className={cn(
           "bg-muted border border-border rounded-md flex items-center justify-center",
+          clickable && "cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow",
           size,
           className,
         )}
+        {...clickableProps}
       >
         <span className="text-xs text-muted-foreground">📷</span>
       </div>
@@ -109,7 +129,15 @@ const LogoDisplay = ({
     ? `${apiUrl}/files/thumbnail/${logoId}`
     : `${apiUrl}/files/serve/${logoId}`;
   return (
-    <div className={cn("relative", size, className)}>
+    <div
+      className={cn(
+        "relative",
+        clickable && "cursor-pointer rounded-md hover:ring-2 hover:ring-primary/50 transition-shadow",
+        size,
+        className,
+      )}
+      {...clickableProps}
+    >
       {imageLoading && (
         <div
           className={cn(
@@ -138,6 +166,17 @@ const LogoDisplay = ({
       />
     </div>
   );
+};
+
+// Extract the actual file ID from changelog file values, which come in several shapes:
+// - artworks: { id: artworkId, fileId, file: { id } } (the artwork ID is NOT the file ID)
+// - baseFiles/budgets/invoices/receipts: { id: fileId, filename, thumbnailUrl }
+// - legacy entries: a plain string ID
+const extractChangelogFileId = (file: any, isArtworkField: boolean): string | undefined => {
+  if (typeof file === "string") return file;
+  if (!file || typeof file !== "object") return undefined;
+  if (isArtworkField) return file.fileId || file.file?.id || file.id;
+  return file.id;
 };
 
 // Render cuts as cards (matching task detail page design)
@@ -720,6 +759,31 @@ const ChangelogTimelineItem = ({
     icon: IconEdit,
     color: "text-gray-500",
   };
+
+  // Open changelog file thumbnails in the unified file viewer (same modal the forms use).
+  // Changelog values only store file IDs, so fetch the real file records on click to get
+  // correct mimetypes (images, PDFs, videos) before handing them to the viewer.
+  const fileViewer = useContext(FileViewerContext);
+  const openChangelogFiles = useCallback(
+    async (fileIds: Array<string | undefined>, clickedIndex: number) => {
+      if (!fileViewer) return;
+      const validIds = fileIds.filter((id): id is string => !!id);
+      if (validIds.length === 0) return;
+      const results = await Promise.all(
+        validIds.map((id) =>
+          getFileById(id)
+            .then((res) => res.data ?? null)
+            .catch(() => null),
+        ),
+      );
+      const files = results.filter(Boolean) as AnkaaFile[];
+      if (files.length === 0) return;
+      const clickedId = fileIds[clickedIndex];
+      const index = files.findIndex((f) => f.id === clickedId);
+      fileViewer.actions.viewFiles(files, index >= 0 ? index : 0);
+    },
+    [fileViewer],
+  );
 
   const Icon = config.icon;
 
@@ -2072,10 +2136,14 @@ const ChangelogTimelineItem = ({
                             })()
                           ) : changelog.field === "artworks" ||
                             changelog.field === "artworkIds" ||
+                            changelog.field === "baseFiles" ||
                             changelog.field === "baseFileIds" ||
                             changelog.field === "budgets" ||
+                            changelog.field === "budgetIds" ||
                             changelog.field === "invoices" ||
-                            changelog.field === "receipts" ? (
+                            changelog.field === "invoiceIds" ||
+                            changelog.field === "receipts" ||
+                            changelog.field === "receiptIds" ? (
                             <>
                               <div className="text-sm">
                                 <span className="text-muted-foreground">
@@ -2106,37 +2174,23 @@ const ChangelogTimelineItem = ({
                                       </span>
                                     );
                                   }
+                                  const isArtworkField =
+                                    changelog.field === "artworks" ||
+                                    changelog.field === "artworkIds";
+                                  const fileIds = files.map((file: any) =>
+                                    extractChangelogFileId(file, isArtworkField),
+                                  );
                                   return (
                                     <div className="flex flex-wrap gap-2 mt-1">
-                                      {files.map((file: any, idx: number) => {
-                                        // Handle different data structures:
-                                        // - For artworks: { id: artworkId, fileId: fileId, file: { id, thumbnailUrl } }
-                                        // - For baseFiles/budgets/etc: { id: fileId, filename, thumbnailUrl }
-                                        // - For legacy: just a string ID
-                                        const isArtworkField =
-                                          changelog.field === "artworks" ||
-                                          changelog.field === "artworkIds";
-                                        let fileId: string;
-                                        if (typeof file === "string") {
-                                          fileId = file;
-                                        } else if (isArtworkField) {
-                                          // For artworks, use fileId or file.id (the actual file ID)
-                                          fileId =
-                                            file.fileId ||
-                                            file.file?.id ||
-                                            file.id;
-                                        } else {
-                                          fileId = file.id;
-                                        }
-                                        return (
-                                          <LogoDisplay
-                                            key={idx}
-                                            logoId={fileId}
-                                            size="w-12 h-12"
-                                            useThumbnail
-                                          />
-                                        );
-                                      })}
+                                      {files.map((_file: any, idx: number) => (
+                                        <LogoDisplay
+                                          key={idx}
+                                          logoId={fileIds[idx]}
+                                          size="w-12 h-12"
+                                          useThumbnail
+                                          onClick={() => openChangelogFiles(fileIds, idx)}
+                                        />
+                                      ))}
                                       <span className="text-sm text-muted-foreground self-center">
                                         ({files.length} arquivo
                                         {files.length > 1 ? "s" : ""})
@@ -2174,33 +2228,23 @@ const ChangelogTimelineItem = ({
                                       </span>
                                     );
                                   }
+                                  const isArtworkField =
+                                    changelog.field === "artworks" ||
+                                    changelog.field === "artworkIds";
+                                  const fileIds = files.map((file: any) =>
+                                    extractChangelogFileId(file, isArtworkField),
+                                  );
                                   return (
                                     <div className="flex flex-wrap gap-2 mt-1">
-                                      {files.map((file: any, idx: number) => {
-                                        // Handle different data structures (same as above)
-                                        const isArtworkField =
-                                          changelog.field === "artworks" ||
-                                          changelog.field === "artworkIds";
-                                        let fileId: string;
-                                        if (typeof file === "string") {
-                                          fileId = file;
-                                        } else if (isArtworkField) {
-                                          fileId =
-                                            file.fileId ||
-                                            file.file?.id ||
-                                            file.id;
-                                        } else {
-                                          fileId = file.id;
-                                        }
-                                        return (
-                                          <LogoDisplay
-                                            key={idx}
-                                            logoId={fileId}
-                                            size="w-12 h-12"
-                                            useThumbnail
-                                          />
-                                        );
-                                      })}
+                                      {files.map((_file: any, idx: number) => (
+                                        <LogoDisplay
+                                          key={idx}
+                                          logoId={fileIds[idx]}
+                                          size="w-12 h-12"
+                                          useThumbnail
+                                          onClick={() => openChangelogFiles(fileIds, idx)}
+                                        />
+                                      ))}
                                       <span className="text-sm text-muted-foreground self-center">
                                         ({files.length} arquivo
                                         {files.length > 1 ? "s" : ""})
@@ -2222,6 +2266,9 @@ const ChangelogTimelineItem = ({
                                   <LogoDisplay
                                     logoId={changelog.oldValue as string}
                                     size="w-10 h-10"
+                                    onClick={() =>
+                                      openChangelogFiles([changelog.oldValue as string], 0)
+                                    }
                                   />
                                 ) : (
                                   <span className="text-red-600 dark:text-red-400 font-medium">
@@ -2238,6 +2285,9 @@ const ChangelogTimelineItem = ({
                                   <LogoDisplay
                                     logoId={changelog.newValue as string}
                                     size="w-10 h-10"
+                                    onClick={() =>
+                                      openChangelogFiles([changelog.newValue as string], 0)
+                                    }
                                   />
                                 ) : (
                                   <span className="text-green-600 dark:text-green-400 font-medium">
@@ -2246,6 +2296,65 @@ const ChangelogTimelineItem = ({
                                 )}
                               </div>
                             </>
+                          ) : changelog.field === "layoutFileId" ||
+                            changelog.field === "customerSignatureId" ? (
+                            // Single-file fields (quote layout file, customer signature):
+                            // values are raw file IDs — render real thumbnails like other file changelogs
+                            (() => {
+                              const parseFileId = (val: any): string | null => {
+                                if (!val) return null;
+                                if (typeof val === "string") {
+                                  const trimmed = val.replace(/^"+|"+$/g, "").trim();
+                                  return trimmed || null;
+                                }
+                                if (typeof val === "object" && val.id) return val.id;
+                                return null;
+                              };
+                              const oldFileId = parseFileId(changelog.oldValue);
+                              const newFileId = parseFileId(changelog.newValue);
+                              return (
+                                <>
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">
+                                      Antes:{" "}
+                                    </span>
+                                    {oldFileId ? (
+                                      <div className="flex flex-wrap gap-2 mt-1">
+                                        <LogoDisplay
+                                          logoId={oldFileId}
+                                          size="w-12 h-12"
+                                          useThumbnail
+                                          onClick={() => openChangelogFiles([oldFileId], 0)}
+                                        />
+                                      </div>
+                                    ) : (
+                                      <span className="text-red-600 dark:text-red-400 font-medium">
+                                        Nenhum arquivo
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">
+                                      Depois:{" "}
+                                    </span>
+                                    {newFileId ? (
+                                      <div className="flex flex-wrap gap-2 mt-1">
+                                        <LogoDisplay
+                                          logoId={newFileId}
+                                          size="w-12 h-12"
+                                          useThumbnail
+                                          onClick={() => openChangelogFiles([newFileId], 0)}
+                                        />
+                                      </div>
+                                    ) : (
+                                      <span className="text-green-600 dark:text-green-400 font-medium">
+                                        Nenhum arquivo
+                                      </span>
+                                    )}
+                                  </div>
+                                </>
+                              );
+                            })()
                           ) : changelog.field === "layouts" ? (
                             // Display layout changelog with dimensions, door count, and SVG
                             (() => {

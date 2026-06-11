@@ -108,6 +108,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
       customer: true,
       createdBy: true,
       serviceOrders: true,
+      quote: true,
       generalPainting: {
         include: {
           paintType: true,

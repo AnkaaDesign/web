@@ -21,6 +21,7 @@ import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetStatusModal } from "./set-status-modal";
 import { SetTermModal } from "./set-term-modal";
+import { SetQuoteLayoutModal } from "./set-quote-layout-modal";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { toast } from "@/components/ui/sonner";
@@ -66,6 +67,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [setTermModalOpen, setSetTermModalOpen] = useState(false);
+  const [quoteLayoutModalOpen, setQuoteLayoutModalOpen] = useState(false);
   const [taskToDuplicate, setTaskToDuplicate] = useState<Task | null>(null);
   const [tasksToUpdate, setTasksToUpdate] = useState<Task[]>([]);
 
@@ -505,6 +507,11 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
           setSetTermModalOpen(true);
           break;
 
+        case "quoteLayout":
+          setTasksToUpdate(tasks);
+          setQuoteLayoutModalOpen(true);
+          break;
+
         case "bulkLayout":
           if (advancedActionsRef.current) {
             const taskIds = tasks.map(t => t.id);
@@ -816,6 +823,8 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       <SetStatusModal open={setStatusModalOpen} onOpenChange={setSetStatusModalOpen} tasks={tasksToUpdate} onConfirm={handleSetStatusConfirm} />
 
       <SetTermModal open={setTermModalOpen} onOpenChange={setSetTermModalOpen} tasks={tasksToUpdate} onConfirm={handleSetTermConfirm} />
+
+      <SetQuoteLayoutModal open={quoteLayoutModalOpen} onOpenChange={setQuoteLayoutModalOpen} tasks={tasksToUpdate} />
 
       {/* Only render AdvancedBulkActionsHandler if using internal ref (not shared) */}
       {!externalAdvancedActionsRef && (

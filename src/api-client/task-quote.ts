@@ -16,6 +16,11 @@ export const taskQuoteService = {
   // Update
   update: (id: string, data: any) => apiClient.put(`/task-quotes/${id}`, data),
 
+  // Update only the layout file — layoutFileId is a safe-after-billing field, so this
+  // works on locked quotes too. Toast suppressed so batch callers can emit one summary.
+  updateLayoutFile: (id: string, layoutFileId: string | null) =>
+    apiClient.put(`/task-quotes/${id}`, { layoutFileId }, { metadata: { suppressToast: true } } as any),
+
   // Update status
   updateStatus: (id: string, status: string, reason?: string) =>
     apiClient.put(`/task-quotes/${id}/status`, { status, reason }),

@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useState, useCallback, useContext, useRef, useEffect, useMemo } from "react";
+import { FileViewerContext } from "@/components/common/file/file-viewer";
 import { useNavigate } from "react-router-dom";
 import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -351,6 +352,31 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   });
   const [hasCheckinFileChanges, setHasCheckinFileChanges] = useState(false);
   const [hasCheckoutFileChanges, setHasCheckoutFileChanges] = useState(false);
+
+  // Opens the check-in reference thumbnails (shown above the check-out uploader)
+  // in the unified file viewer, as a gallery of that service order's check-in files
+  const fileViewer = useContext(FileViewerContext);
+  const openCheckinReference = useCallback(
+    (soId: string, clickedFileId: string) => {
+      if (!fileViewer) return;
+      const uploaded = (checkinFilesByServiceOrder[soId] || []).filter((f) => f.uploaded && f.uploadedFileId);
+      if (uploaded.length === 0) return;
+      const viewerFiles = uploaded.map(
+        (f) =>
+          ({
+            id: f.uploadedFileId || f.id,
+            filename: f.name,
+            originalName: f.name,
+            mimetype: f.type || "application/octet-stream",
+            size: f.size || 0,
+            thumbnailUrl: f.thumbnailUrl || null,
+          }) as any,
+      );
+      const index = uploaded.findIndex((f) => f.id === clickedFileId);
+      fileViewer.actions.viewFiles(viewerFiles, index >= 0 ? index : 0);
+    },
+    [fileViewer, checkinFilesByServiceOrder],
+  );
 
   // Refs for checkin/checkout file state (avoids stale closures in submit handler)
   const checkinFilesByServiceOrderRef = useRef(checkinFilesByServiceOrder);
@@ -2252,6 +2278,30 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   //   window.location.href = redirectUrl;
   // }, [task.id, detailsRoute]);
 
+  // A paint created inline has no formulas yet — add a "Formular Cor" ARTWORK
+  // service order so the arts team formulates the color
+  const handlePaintCreated = useCallback(() => {
+    const currentServiceOrders = form.getValues("serviceOrders") || [];
+    const alreadyAdded = currentServiceOrders.some(
+      (so: any) => (so?.description || "").trim().toLowerCase() === "formular cor"
+    );
+    if (alreadyAdded) return;
+    form.setValue(
+      "serviceOrders",
+      [
+        ...currentServiceOrders,
+        {
+          description: "Formular Cor",
+          type: SERVICE_ORDER_TYPE.ARTWORK,
+          status: SERVICE_ORDER_STATUS.PENDING,
+          statusOrder: 1,
+          assignedToId: null,
+        },
+      ],
+      { shouldDirty: true, shouldTouch: true, shouldValidate: true }
+    );
+  }, [form]);
+
   // Handle adding a service order from the Designar dialog in GeneralPaintingSelector
   const handleDesignarServiceOrder = useCallback((serviceOrder: ServiceOrderData) => {
     const currentServiceOrders = form.getValues("serviceOrders") || [];
@@ -3326,6 +3376,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       initialPaint={task.generalPainting}
                       onDesignarServiceOrder={handleDesignarServiceOrder}
                       userPrivilege={privilege}
+                      allowQuickCreate={!isSubmitting && canEditPaint}
+                      onPaintCreated={handlePaintCreated}
+                      quickCreateDescription='Informe os dados básicos da nova tinta. Uma ordem de serviço "Formular Cor" será adicionada para a equipe de artes.'
                     />
 
                     {canViewLogoPaint && (
@@ -3644,7 +3697,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                                     return (
                                       <div
                                         key={file.id}
-                                        className="relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border border-border/50 bg-muted opacity-60"
+                                        className="relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border border-border/50 bg-muted opacity-60 cursor-pointer hover:opacity-100 hover:ring-2 hover:ring-primary/50 transition-all"
+                                        onClick={() => openCheckinReference(so.id!, file.id)}
                                       >
                                         {src ? (
                                           <img

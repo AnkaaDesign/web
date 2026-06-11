@@ -20,7 +20,7 @@ interface TaskTableContextMenuProps {
   onAction: (action: TaskAction, tasks: Task[]) => void;
 }
 
-export type TaskAction = "start" | "finish" | "duplicate" | "setSector" | "setTerm" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkBaseFiles" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask" | "bulkServiceOrder" | "bulkLayout" | "bulkDocuments" | "quote";
+export type TaskAction = "start" | "finish" | "duplicate" | "setSector" | "setTerm" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkBaseFiles" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask" | "bulkServiceOrder" | "bulkLayout" | "bulkDocuments" | "quote" | "quoteLayout";
 
 export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTableContextMenuProps) {
   const { user } = useAuth();
@@ -123,6 +123,15 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           <DropdownMenuItem onClick={() => handleAction("setTerm")}>
             <IconCalendarTime className="mr-2 h-4 w-4" />
             {tasks.some((t) => t.term) ? "Alterar Prazo" : "Definir Prazo"}
+          </DropdownMenuItem>
+        )}
+
+        {/* Quote layout - COMMERCIAL only. Counterpart of the admin "Adicionar Layouts"
+            (artworks) bulk form: edits the quote's approved layout (layoutFileId) instead. */}
+        {isCommercial && (
+          <DropdownMenuItem onClick={() => handleAction("quoteLayout")}>
+            <IconPhoto className="mr-2 h-4 w-4" />
+            {tasks.some((t) => (t as any).quote?.layoutFileId) ? "Alterar Layout" : "Adicionar Layout"}
           </DropdownMenuItem>
         )}
 

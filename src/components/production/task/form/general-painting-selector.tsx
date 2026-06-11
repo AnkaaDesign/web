@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useWatch } from "react-hook-form";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { getPaints, getPaintById } from "../../../../api-client";
 import type { Paint } from "../../../../types";
-import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH } from "../../../../constants";
+import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH, SECTOR_PRIVILEGES } from "../../../../constants";
 import { IconX, IconFlask, IconBriefcase } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { DesignarServiceOrderDialog, type ServiceOrderData } from "./designar-service-order-dialog";
+import { PaintQuickCreateDialog } from "@/components/painting/form/paint-quick-create-dialog";
 
 interface GeneralPaintingSelectorProps {
   control: any;
@@ -18,9 +19,38 @@ interface GeneralPaintingSelectorProps {
   initialPaint?: Paint;
   onDesignarServiceOrder?: (serviceOrder: ServiceOrderData) => void;
   userPrivilege?: string;
+  /** Enables creating a new paint inline when the search finds no results */
+  allowQuickCreate?: boolean;
+  /** Called after a paint is created inline (already selected in the form) */
+  onPaintCreated?: (paint: Paint) => void;
+  /** Subtitle for the quick-create dialog (context-specific) */
+  quickCreateDescription?: string;
 }
 
-export function GeneralPaintingSelector({ control, disabled, initialPaint, onDesignarServiceOrder, userPrivilege }: GeneralPaintingSelectorProps) {
+export function GeneralPaintingSelector({
+  control,
+  disabled,
+  initialPaint,
+  onDesignarServiceOrder,
+  userPrivilege,
+  allowQuickCreate,
+  onPaintCreated,
+  quickCreateDescription,
+}: GeneralPaintingSelectorProps) {
+  const queryClient = useQueryClient();
+
+  // Quick-create is limited to the privileges allowed by POST /paints
+  const canQuickCreate =
+    !!allowQuickCreate &&
+    !!userPrivilege &&
+    (
+      [
+        SECTOR_PRIVILEGES.ADMIN,
+        SECTOR_PRIVILEGES.WAREHOUSE,
+        SECTOR_PRIVILEGES.COMMERCIAL,
+        SECTOR_PRIVILEGES.FINANCIAL,
+      ] as string[]
+    ).includes(userPrivilege);
   // Cache of selected paint to display details
   const [selectedPaint, setSelectedPaint] = useState<Paint | null>(initialPaint || null);
   const paintsCache = useRef<Map<string, Paint>>(new Map());
@@ -63,6 +93,13 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint, onDes
 
   // State for Designar Service Order dialog
   const [designarDialogOpen, setDesignarDialogOpen] = useState(false);
+
+  // State for inline paint quick-create dialog
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [quickCreateName, setQuickCreateName] = useState("");
+  // Resolver for the Combobox onCreate promise — resolving with the created
+  // paint lets the Combobox cache it, select it and close its popover
+  const pendingCreateResolveRef = useRef<((paint: Paint | null) => void) | null>(null);
 
   // Memoize initialOptions - include selected paint data for accordion remount scenarios
   const initialOptions = useMemo(() => {
@@ -261,6 +298,20 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint, onDes
                   debounceMs={500}
                   clearable={true}
                   initialOptions={initialOptions}
+                  allowCreate={canQuickCreate}
+                  createLabel={(value) => `Cadastrar tinta "${value}"`}
+                  onCreate={
+                    canQuickCreate
+                      ? (name: string) => {
+                          setQuickCreateName(name);
+                          setQuickCreateOpen(true);
+                          // Resolved by the dialog with the created paint (or null on cancel)
+                          return new Promise<Paint | null>((resolve) => {
+                            pendingCreateResolveRef.current = resolve;
+                          }) as Promise<any>;
+                        }
+                      : undefined
+                  }
                   customEmptyAction={onDesignarServiceOrder ? {
                     label: "Designar Ordem de Serviço",
                     icon: <IconBriefcase className="mr-2 h-4 w-4" />,
@@ -311,6 +362,38 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint, onDes
               </div>
             </FormControl>
             <FormMessage />
+
+            {/* Inline paint quick-create dialog */}
+            {canQuickCreate && (
+              <PaintQuickCreateDialog
+                open={quickCreateOpen}
+                onOpenChange={(open) => {
+                  setQuickCreateOpen(open);
+                  // Cancelled without creating — release the Combobox onCreate promise
+                  if (!open && pendingCreateResolveRef.current) {
+                    pendingCreateResolveRef.current(null);
+                    pendingCreateResolveRef.current = null;
+                  }
+                }}
+                initialName={quickCreateName}
+                description={quickCreateDescription}
+                onPaintCreated={(paint) => {
+                  // Seed local + query caches so the selector renders the new paint without refetching
+                  paintsCache.current.set(paint.id, paint);
+                  setSelectedPaint(paint);
+                  queryClient.setQueryData(["paints", "selected-general-detail", paint.id], paint);
+                  queryClient.invalidateQueries({ queryKey: ["paints", "general-selector"] });
+                  if (pendingCreateResolveRef.current) {
+                    // Combobox finishes the flow: caches the paint, selects it, closes the popover
+                    pendingCreateResolveRef.current(paint);
+                    pendingCreateResolveRef.current = null;
+                  } else {
+                    field.onChange(paint.id);
+                  }
+                  onPaintCreated?.(paint);
+                }}
+              />
+            )}
           </FormItem>
         );
       }}

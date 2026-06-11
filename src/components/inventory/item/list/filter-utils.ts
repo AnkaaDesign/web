@@ -1,6 +1,6 @@
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { formatDate } from "../../../../utils";
-import { STOCK_LEVEL, STOCK_LEVEL_LABELS, ITEM_CATEGORY_TYPE, ITEM_CATEGORY_TYPE_LABELS, ACCOUNTING_TYPE_LABELS } from "../../../../constants";
+import { STOCK_LEVEL, STOCK_LEVEL_LABELS, ACCOUNTING_TYPE_LABELS } from "../../../../constants";
 
 export interface FilterIndicator {
   key: string;
@@ -150,13 +150,10 @@ export function extractActiveFilters(
     const selectedCategories = categories.filter((cat) => filters.categoryIds?.includes(cat.id));
 
     selectedCategories.forEach((category) => {
-      const categoryType = (category as any).type || ITEM_CATEGORY_TYPE.REGULAR;
-      const typeLabel = ITEM_CATEGORY_TYPE_LABELS[categoryType as ITEM_CATEGORY_TYPE];
-      const displayValue = categoryType !== ITEM_CATEGORY_TYPE.REGULAR ? `${category.name} (${typeLabel})` : category.name;
       activeFilters.push({
         key: `categoryIds-${category.id}`, // Unique key for each category
         label: "Categoria",
-        value: displayValue,
+        value: category.name,
         iconType: "chart-bar",
         itemId: category.id,
         onRemove: () => onRemoveFilter("categoryIds", category.id),

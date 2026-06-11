@@ -117,6 +117,14 @@ export const FinancialBudgetCreatePage = () => {
     }
   }, [showResponsibleErrors]);
 
+  // Paints created inline via the quick-create dialog. If one is still selected
+  // at submit time, a "Formular Cor" ARTWORK service order is added so the arts
+  // team formulates the new color.
+  const createdPaintIdsRef = useRef<Set<string>>(new Set());
+  const handlePaintCreated = useCallback((paint: { id: string }) => {
+    createdPaintIdsRef.current.add(paint.id);
+  }, []);
+
   // Form - Combined task + budget fields
   const form = useForm({
     mode: "onChange",
@@ -467,6 +475,22 @@ export const FinancialBudgetCreatePage = () => {
         (so: any) => so && so.description && so.description.trim().length >= 3
       );
 
+      if (
+        data.paintId &&
+        createdPaintIdsRef.current.has(data.paintId) &&
+        !serviceOrders.some(
+          (so: any) => (so.description || "").trim().toLowerCase() === "formular cor"
+        )
+      ) {
+        serviceOrders.push({
+          description: "Formular Cor",
+          type: SERVICE_ORDER_TYPE.ARTWORK,
+          status: SERVICE_ORDER_STATUS.PENDING,
+          statusOrder: 1,
+          assignedToId: null,
+        });
+      }
+
       // 6. Build truck data
       const { plates, category, implementType } = data;
       const hasTruckFields = (plates && plates.length > 0) || category || implementType;
@@ -727,6 +751,7 @@ export const FinancialBudgetCreatePage = () => {
               artworkFiles={artworkFiles}
               onArtworkFilesChange={handleArtworkFilesChange}
               onArtworkStatusChange={handleArtworkStatusChange}
+              onPaintCreated={handlePaintCreated}
             />
           </div>
 

@@ -583,8 +583,10 @@ export function TaskPreparationView({
         },
         quote: {
           select: {
+            id: true,
             total: true,
             status: true,
+            layoutFileId: true,
             customerConfigs: {
               select: {
                 customer: {

@@ -52,6 +52,7 @@ interface BudgetStepTaskProps {
   artworkFiles: FileWithPreview[];
   onArtworkFilesChange: (files: FileWithPreview[]) => void;
   onArtworkStatusChange: (fileId: string, status: string) => void;
+  onPaintCreated?: (paint: any) => void;
 }
 
 export function BudgetStepTask({
@@ -65,6 +66,7 @@ export function BudgetStepTask({
   artworkFiles,
   onArtworkFilesChange,
   onArtworkStatusChange,
+  onPaintCreated,
 }: BudgetStepTaskProps) {
   const { user } = useAuth();
   const { control } = useFormContext();
@@ -414,6 +416,9 @@ export function BudgetStepTask({
                     control={control}
                     disabled={disabled}
                     userPrivilege={user?.sector?.privileges}
+                    allowQuickCreate={!disabled}
+                    onPaintCreated={onPaintCreated}
+                    quickCreateDescription='Informe os dados básicos da nova tinta. Ao salvar o orçamento, uma ordem de serviço "Formular Cor" será criada para a equipe de artes.'
                   />
                 </CardContent>
               </AccordionContent>

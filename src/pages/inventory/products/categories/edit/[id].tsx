@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { CategoryForm } from "@/components/inventory/item/category/form/category-form";
@@ -37,7 +38,22 @@ const EditCategoryPage = () => {
 
   // Extract items from category
   const currentItems = category?.items || [];
-  const currentItemIds = currentItems.map((item) => item.id);
+
+  // Memoized so CategoryForm's reset-on-defaultValues-change effect doesn't
+  // re-fire (and clobber user edits) on unrelated re-renders.
+  const defaultValues = useMemo(
+    () =>
+      category
+        ? {
+            name: category.name,
+            parentId: category.parentId ?? null,
+            categoryLevel: category.categoryLevel,
+            accountingType: category.accountingType ?? null,
+            itemIds: (category.items || []).map((item) => item.id),
+          }
+        : undefined,
+    [category],
+  );
 
   const handleFormSubmit = async (data: ItemCategoryUpdateFormData) => {
     if (!id) return;
@@ -123,10 +139,8 @@ const EditCategoryPage = () => {
       <div className="flex-1 overflow-y-auto pb-6">
         <CategoryForm
           mode="update"
-          defaultValues={{
-            name: category.name,
-            itemIds: currentItemIds,
-          }}
+          categoryId={id}
+          defaultValues={defaultValues}
           initialItems={currentItems}
           onSubmit={handleFormSubmit}
           isSubmitting={updateMutation.isPending}

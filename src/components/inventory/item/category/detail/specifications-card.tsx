@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconInfoCircle, IconShieldCheck, IconBox, IconTool } from "@tabler/icons-react";
+import { IconInfoCircle, IconBox } from "@tabler/icons-react";
 import type { ItemCategory } from "../../../../../types";
-import { ITEM_CATEGORY_TYPE, ITEM_CATEGORY_TYPE_LABELS } from "../../../../../constants";
 import { cn } from "@/lib/utils";
 
 interface SpecificationsCardProps {
@@ -28,24 +27,6 @@ export function SpecificationsCard({ category, itemCount = 0, className }: Speci
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground">Nome da Categoria</span>
                 <span className="text-sm font-semibold text-foreground">{category.name}</span>
-              </div>
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground">Tipo</span>
-                <div className="flex items-center gap-2">
-                  {category.type === ITEM_CATEGORY_TYPE.PPE ? (
-                    <>
-                      <IconShieldCheck className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm font-semibold text-blue-600">{ITEM_CATEGORY_TYPE_LABELS[ITEM_CATEGORY_TYPE.PPE]}</span>
-                    </>
-                  ) : category.type === ITEM_CATEGORY_TYPE.TOOL ? (
-                    <>
-                      <IconTool className="w-4 h-4 text-orange-600" />
-                      <span className="text-sm font-semibold text-orange-600">{ITEM_CATEGORY_TYPE_LABELS[ITEM_CATEGORY_TYPE.TOOL]}</span>
-                    </>
-                  ) : (
-                    <span className="text-sm font-semibold text-foreground">{ITEM_CATEGORY_TYPE_LABELS[ITEM_CATEGORY_TYPE.REGULAR]}</span>
-                  )}
-                </div>
               </div>
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground">Produtos Cadastrados</span>

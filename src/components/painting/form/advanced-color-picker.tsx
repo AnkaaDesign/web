@@ -106,7 +106,13 @@ export function AdvancedColorPicker({
             className,
           )}
         >
-          <span className="flex-1 text-left">{color || "Selecione uma cor"}</span>
+          <span className="flex flex-1 items-center gap-2 text-left">
+            <span
+              className="h-5 w-5 flex-shrink-0 rounded ring-1 ring-border shadow-sm"
+              style={{ backgroundColor: color || "#000000" }}
+            />
+            <span className="flex-1 truncate">{color || "Selecione uma cor"}</span>
+          </span>
           <IconPalette className="h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>

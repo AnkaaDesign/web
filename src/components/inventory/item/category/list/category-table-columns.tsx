@@ -2,7 +2,7 @@ import React from "react";
 import type { ItemCategory } from "../../../../../types";
 import { Badge } from "@/components/ui/badge";
 import { IconCornerDownRight } from "@tabler/icons-react";
-import { ITEM_CATEGORY_TYPE, ITEM_CATEGORY_TYPE_LABELS, ACCOUNTING_TYPE_LABELS } from "../../../../../constants";
+import { ACCOUNTING_TYPE_LABELS } from "../../../../../constants";
 import { usePrivileges } from "@/hooks/common/use-privileges";
 
 export interface CategoryColumn {
@@ -15,8 +15,7 @@ export interface CategoryColumn {
 }
 
 // Function to get default visible columns for categories.
-// "Grupo Contábil" (accountingType) is the headline type users care about; the
-// physical ItemCategoryType ("Natureza") is secondary and hidden by default.
+// "Grupo Contábil" (accountingType) is the headline type users care about.
 export function getDefaultVisibleColumns(): Set<string> {
   return new Set(["name", "accountingType", "_count.items", "createdAt"]);
 }
@@ -57,21 +56,6 @@ export function useCategoryTableColumns(): CategoryColumn[] {
           ) : (
             <span className="text-muted-foreground">-</span>
           ),
-        sortable: true,
-        className: "flex-1",
-        align: "left",
-      },
-      {
-        // The physical ItemCategoryType (REGULAR/TOOL/PPE) — the item's nature.
-        key: "type",
-        header: "Natureza",
-        accessor: (category: ItemCategory) => (
-          <div className="truncate">
-            <Badge variant={category.type === ITEM_CATEGORY_TYPE.PPE ? "default" : category.type === ITEM_CATEGORY_TYPE.TOOL ? "destructive" : "secondary"} className="text-xs">
-              {ITEM_CATEGORY_TYPE_LABELS[category.type as ITEM_CATEGORY_TYPE] || category.type}
-            </Badge>
-          </div>
-        ),
         sortable: true,
         className: "flex-1",
         align: "left",

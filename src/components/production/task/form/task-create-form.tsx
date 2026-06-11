@@ -274,6 +274,30 @@ export const TaskCreateForm = () => {
   // Submitting ref for form state
   const isSubmittingRef = useRef<boolean>(false);
 
+  // A paint created inline has no formulas yet — add a "Formular Cor" ARTWORK
+  // service order so the arts team formulates the color
+  const handlePaintCreated = useCallback(() => {
+    const currentServiceOrders = form.getValues("serviceOrders") || [];
+    const alreadyAdded = currentServiceOrders.some(
+      (so: any) => (so?.description || "").trim().toLowerCase() === "formular cor"
+    );
+    if (alreadyAdded) return;
+    form.setValue(
+      "serviceOrders",
+      [
+        ...currentServiceOrders,
+        {
+          description: "Formular Cor",
+          type: SERVICE_ORDER_TYPE.ARTWORK,
+          status: SERVICE_ORDER_STATUS.PENDING,
+          statusOrder: 1,
+          assignedToId: null,
+        },
+      ],
+      { shouldDirty: true, shouldTouch: true, shouldValidate: true }
+    );
+  }, [form]);
+
   // Calculate how many tasks will be created
   const taskCount = useMemo(() => {
     const platesCount = plates.length;
@@ -937,6 +961,9 @@ export const TaskCreateForm = () => {
                             control={form.control}
                             disabled={isSubmitting}
                             userPrivilege={user?.sector?.privileges}
+                            allowQuickCreate={!isSubmitting}
+                            onPaintCreated={handlePaintCreated}
+                            quickCreateDescription='Informe os dados básicos da nova tinta. Uma ordem de serviço "Formular Cor" será adicionada para a equipe de artes.'
                           />
                           {showLogoPaints && (
                             <LogoPaintsSelector

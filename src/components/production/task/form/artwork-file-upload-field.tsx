@@ -1,5 +1,7 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useContext, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
+import { FileViewerContext } from "@/components/common/file/file-viewer";
+import type { File as AnkaaFile } from "@/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -160,6 +162,34 @@ export function ArtworkFileUploadField({
     [disabled, onFilesChange],
   );
 
+  // Open a clicked thumbnail in the unified file viewer (already-uploaded files open
+  // as a gallery; freshly dropped files open their local blob preview in a new tab)
+  const fileViewer = useContext(FileViewerContext);
+  const openFilePreview = useCallback(
+    (clicked: FileWithPreview) => {
+      if (clicked.uploaded || clicked.uploadedFileId) {
+        if (!fileViewer) return;
+        const uploadedFiles = files.filter((f) => f.uploaded || f.uploadedFileId);
+        const viewerFiles = uploadedFiles.map(
+          (f) =>
+            ({
+              id: f.uploadedFileId || f.id,
+              filename: f.name,
+              originalName: f.name,
+              mimetype: f.type || "application/octet-stream",
+              size: f.size || 0,
+              thumbnailUrl: f.thumbnailUrl || null,
+            }) as unknown as AnkaaFile,
+        );
+        const index = uploadedFiles.findIndex((f) => f.id === clicked.id);
+        fileViewer.actions.viewFiles(viewerFiles, index >= 0 ? index : 0);
+      } else if (clicked.preview) {
+        window.open(clicked.preview, "_blank");
+      }
+    },
+    [fileViewer, files],
+  );
+
   const acceptedFilesList = useMemo(() => {
     const allExtensions = Object.values(acceptedFileTypes).flat();
     const uniqueExtensions = Array.from(new Set(allExtensions));
@@ -269,7 +299,13 @@ export function ArtworkFileUploadField({
               return (
                 <div key={file.id} className="flex items-center gap-1.5 p-2.5 min-h-14 border border-border/30 rounded-lg bg-card hover:bg-muted/30 transition-colors">
                   {/* Thumbnail or Icon */}
-                  <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded border border-border/20 bg-muted/50 overflow-hidden">
+                  <div
+                    className={cn(
+                      "flex-shrink-0 w-9 h-9 flex items-center justify-center rounded border border-border/20 bg-muted/50 overflow-hidden",
+                      !isUploading && (file.uploaded || file.uploadedFileId || file.preview) && "cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow",
+                    )}
+                    onClick={() => !isUploading && openFilePreview(file)}
+                  >
                     {isUploading ? (
                       <div className="w-4 h-4 border border-primary/30 border-t-primary animate-spin rounded-full" />
                     ) : shouldShowThumbnail ? (

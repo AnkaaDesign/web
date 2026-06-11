@@ -15,8 +15,8 @@ import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Combobox } from "@/components/ui/combobox";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
-import { routes, ITEM_CATEGORY_TYPE, ITEM_CATEGORY_TYPE_LABELS } from "../../../../../constants";
-import { IconLoader, IconDeviceFloppy, IconX, IconShield } from "@tabler/icons-react";
+import { routes } from "../../../../../constants";
+import { IconLoader, IconDeviceFloppy, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 
@@ -88,7 +88,6 @@ export function CategoryBatchEditTable({ categories, onCancel }: CategoryBatchEd
         id: category.id,
         data: {
           name: category.name,
-          type: category.type,
           itemIds: category.items?.map((item) => item.id) || [],
         },
       })),
@@ -195,12 +194,6 @@ export function CategoryBatchEditTable({ categories, onCancel }: CategoryBatchEd
                         <span>Produtos Associados</span>
                       </div>
                     </TableHead>
-                    <TableHead className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-[120px] min-w-[120px]")}>
-                      <div className="flex items-center justify-center h-full min-h-[2.5rem] px-4 py-2 gap-1">
-                        <IconShield className="h-4 w-4" />
-                        <span>Tipo</span>
-                      </div>
-                    </TableHead>
                   </TableRow>
                 </TableHeader>
 
@@ -264,31 +257,6 @@ export function CategoryBatchEditTable({ categories, onCancel }: CategoryBatchEd
                                       formatDisplay="brand"
                                       initialOptions={getInitialOptions()}
                                       queryKey={["category-items", index]}
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="p-0 !border-r-0 w-[120px] min-w-[120px]">
-                          <div className="flex items-center justify-center px-2 py-2">
-                            <FormField
-                              control={form.control}
-                              name={`categories.${index}.data.type`}
-                              render={({ field }) => (
-                                <FormItem className="w-full">
-                                  <FormControl>
-                                    <Combobox
-                                      onValueChange={field.onChange}
-                                      value={field.value}
-                                      options={Object.values(ITEM_CATEGORY_TYPE).map((type) => ({
-                                        label: ITEM_CATEGORY_TYPE_LABELS[type],
-                                        value: type,
-                                      }))}
-                                      placeholder="Selecione o tipo"
-                                      searchPlaceholder="Buscar tipo..."
-                                      className="h-8 text-xs"
                                     />
                                   </FormControl>
                                 </FormItem>

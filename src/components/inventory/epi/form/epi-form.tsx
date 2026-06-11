@@ -46,6 +46,18 @@ interface UpdateEpiFormProps extends BaseEpiFormProps {
 
 type EpiFormProps = CreateEpiFormProps | UpdateEpiFormProps;
 
+// An EPI must always carry a ppeType — it IS the PPE identity
+// (item.ppeType != null) under the capability-fields contract, so the
+// EPI forms enforce it even though the shared item schemas keep it optional.
+const epiCreateSchema = itemCreateSchema.refine((data) => data.ppeType != null, {
+  message: "Tipo de EPI é obrigatório",
+  path: ["ppeType"],
+});
+const epiUpdateSchema = itemUpdateSchema.refine((data) => data.ppeType !== null, {
+  message: "Tipo de EPI é obrigatório",
+  path: ["ppeType"],
+});
+
 export function EpiForm(props: EpiFormProps) {
   const { isSubmitting, defaultValues, mode, initialSupplier, initialBrands, initialCategory: _initialCategory } = props;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -110,7 +122,7 @@ export function EpiForm(props: EpiFormProps) {
 
   // Create a unified form that works for both modes
   const form = useForm({
-    resolver: zodResolver(mode === "create" ? itemCreateSchema : itemUpdateSchema),
+    resolver: zodResolver(mode === "create" ? epiCreateSchema : epiUpdateSchema),
     defaultValues: mode === "create" ? (createDefaults as ItemCreateFormData) : processedDefaultValues,
     mode: "onBlur", // Validate on blur for better UX
   });
@@ -274,8 +286,9 @@ export function EpiForm(props: EpiFormProps) {
               </CardContent>
             </Card>
 
-            {/* PPE Configuration - Always show for EPI forms */}
-            <PpeConfigSection disabled={isSubmitting} required={isRequired} />
+            {/* PPE Configuration - Always show for EPI forms; ppeType is mandatory
+                in both modes (it defines the item as PPE). */}
+            <PpeConfigSection disabled={isSubmitting} required />
             {/* Display PPE configuration validation errors */}
             {(form.formState.errors.ppeType || form.formState.errors.ppeCA || form.formState.errors.ppeDeliveryMode || form.formState.errors.ppeStandardQuantity) && (
               <div className="text-red-500 text-sm mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
