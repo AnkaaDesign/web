@@ -13,8 +13,8 @@ export * from "./use-supplier";
 // convertToApiFilters/convertFromApiFilters name conflicts across domains
 export * from "./use-borrow";
 export * from "./use-borrow-form-url-state";
-export * from "./use-external-withdrawal";
-export * from "./use-external-withdrawal-form-url-state";
+export * from "./use-external-operation";
+export * from "./use-external-operation-form-url-state";
 export * from "./use-maintenance";
 export * from "./use-stock-balance-form-url-state";
 export * from "./use-stock-metrics";

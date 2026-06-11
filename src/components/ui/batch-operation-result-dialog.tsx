@@ -482,7 +482,7 @@ export function BorrowBatchResultDialog(
 }
 
 // Specialized version for External Withdrawals
-interface ExternalWithdrawalBatchResult {
+interface ExternalOperationBatchResult {
   withdrawerName?: string;
   itemName?: string;
   quantity?: number;
@@ -491,10 +491,10 @@ interface ExternalWithdrawalBatchResult {
   [key: string]: any;
 }
 
-export function ExternalWithdrawalBatchResultDialog(
-  props: Omit<BatchOperationResultDialogProps<ExternalWithdrawalBatchResult, ExternalWithdrawalBatchResult>, "entityName" | "successItemDisplay" | "failedItemDisplay">,
+export function ExternalOperationBatchResultDialog(
+  props: Omit<BatchOperationResultDialogProps<ExternalOperationBatchResult, ExternalOperationBatchResult>, "entityName" | "successItemDisplay" | "failedItemDisplay">,
 ) {
-  const successItemDisplay = (item: ExternalWithdrawalBatchResult) => {
+  const successItemDisplay = (item: ExternalOperationBatchResult) => {
     // Handle both cases: data directly on item or nested
     const itemData = item as any;
     const itemName = itemData.itemName || itemData.item?.name || itemData.data?.itemName || "Item desconhecido";
@@ -531,10 +531,10 @@ export function ExternalWithdrawalBatchResultDialog(
     );
   };
 
-  const failedItemDisplay = (error: BatchOperationError<ExternalWithdrawalBatchResult>) => {
+  const failedItemDisplay = (error: BatchOperationError<ExternalOperationBatchResult>) => {
     // Handle both cases: data in error.data or directly on error object
     const errorData = error as any;
-    const item = error.data as ExternalWithdrawalBatchResult;
+    const item = error.data as ExternalOperationBatchResult;
 
     const itemName = errorData.itemName || item?.itemName || errorData.data?.itemName || "Item desconhecido";
     const withdrawerName = errorData.withdrawerName || item?.withdrawerName || errorData.data?.withdrawerName || "Retirador desconhecido";
@@ -618,7 +618,7 @@ export function ExternalWithdrawalBatchResultDialog(
     );
   };
 
-  return <BatchOperationResultDialog {...props} entityName="retirada externa" successItemDisplay={successItemDisplay} failedItemDisplay={failedItemDisplay} />;
+  return <BatchOperationResultDialog {...props} entityName="operação externa" successItemDisplay={successItemDisplay} failedItemDisplay={failedItemDisplay} />;
 }
 
 // Specialized version for Customers

@@ -38,7 +38,14 @@ export function StockStatusIndicator({ item, showQuantity = true, className }: S
   // band classification for older payloads.
   const stockLevel =
     item.stockLevel ??
-    determineStockLevel(quantity, item.reorderPoint || null, item.maxQuantity || null, false, item.category?.type ?? null);
+    determineStockLevel({
+      quantity,
+      reorderPoint: item.reorderPoint || null,
+      maxQuantity: item.maxQuantity || null,
+      hasActiveOrder: false,
+      stockModel: item.stockModel ?? null,
+      fixedTargetQuantity: item.fixedTargetQuantity ?? null,
+    });
 
   // Pending-order badge: prefer API-provided flag, fall back to a scan of
   // included orderItems for legacy callers.

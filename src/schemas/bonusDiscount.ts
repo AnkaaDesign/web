@@ -50,7 +50,7 @@ export const bonusDiscountIncludeSchema = z
                         customer: z.boolean().optional(),
                         sector: z.boolean().optional(),
                         services: z.boolean().optional(),
-                        commissions: z.boolean().optional(),
+                        bonifications: z.boolean().optional(),
                       })
                       .optional(),
                     where: z.any().optional(),

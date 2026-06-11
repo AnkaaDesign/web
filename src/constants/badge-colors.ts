@@ -18,7 +18,7 @@ import {
   TASK_STATUS,
   MAINTENANCE_STATUS,
   USER_STATUS,
-  EXTERNAL_WITHDRAWAL_STATUS,
+  EXTERNAL_OPERATION_STATUS,
   SERVICE_ORDER_STATUS,
   AIRBRUSHING_STATUS,
   AIRBRUSHING_PAYMENT_STATUS,
@@ -52,7 +52,7 @@ import {
   VALIDATION_SEVERITY,
   VERIFICATION_ERROR_SEVERITY,
   SECTOR_PRIVILEGES,
-  COMMISSION_STATUS,
+  BONIFICATION_STATUS,
 } from "./enums";
 
 /**
@@ -404,14 +404,14 @@ export const ENTITY_BADGE_CONFIG = {
   },
 
   // External Withdrawal Status
-  EXTERNAL_WITHDRAWAL: {
-    [EXTERNAL_WITHDRAWAL_STATUS.PENDING]: "pending" as BadgeVariant,
-    [EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED]: "orange" as BadgeVariant,  // Entity-specific: use orange
-    [EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED]: "green" as BadgeVariant,       // Entity-specific: use green
-    [EXTERNAL_WITHDRAWAL_STATUS.CHARGED]: "blue" as BadgeVariant,               // Entity-specific: use blue
-    [EXTERNAL_WITHDRAWAL_STATUS.LIQUIDATED]: "green" as BadgeVariant,           // Entity-specific: use green
-    [EXTERNAL_WITHDRAWAL_STATUS.DELIVERED]: "delivered" as BadgeVariant,
-    [EXTERNAL_WITHDRAWAL_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
+  EXTERNAL_OPERATION: {
+    [EXTERNAL_OPERATION_STATUS.PENDING]: "pending" as BadgeVariant,
+    [EXTERNAL_OPERATION_STATUS.PARTIALLY_RETURNED]: "orange" as BadgeVariant,  // Entity-specific: use orange
+    [EXTERNAL_OPERATION_STATUS.FULLY_RETURNED]: "green" as BadgeVariant,       // Entity-specific: use green
+    [EXTERNAL_OPERATION_STATUS.CHARGED]: "blue" as BadgeVariant,               // Entity-specific: use blue
+    [EXTERNAL_OPERATION_STATUS.LIQUIDATED]: "green" as BadgeVariant,           // Entity-specific: use green
+    [EXTERNAL_OPERATION_STATUS.DELIVERED]: "delivered" as BadgeVariant,
+    [EXTERNAL_OPERATION_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
 
   // Service Order Status
@@ -673,13 +673,13 @@ export const ENTITY_BADGE_CONFIG = {
     [SECTOR_PRIVILEGES.WAREHOUSE]: "green" as BadgeVariant,        // Green - warehouse role
   },
 
-  // Commission Status
-  // green = integral, blue = parcial, orange = sem comissão, red = suspensa
-  COMMISSION_STATUS: {
-    [COMMISSION_STATUS.FULL_COMMISSION]: "green" as BadgeVariant,      // Green - full commission
-    [COMMISSION_STATUS.PARTIAL_COMMISSION]: "blue" as BadgeVariant,    // Blue - partial commission
-    [COMMISSION_STATUS.NO_COMMISSION]: "orange" as BadgeVariant,       // Orange - no commission
-    [COMMISSION_STATUS.SUSPENDED_COMMISSION]: "suspended" as BadgeVariant, // Red - suspended
+  // Bonification Status
+  // green = integral, blue = parcial, orange = sem bonificação, red = suspensa
+  BONIFICATION_STATUS: {
+    [BONIFICATION_STATUS.FULL_BONIFICATION]: "green" as BadgeVariant,      // Green - full bonification
+    [BONIFICATION_STATUS.PARTIAL_BONIFICATION]: "blue" as BadgeVariant,    // Blue - partial bonification
+    [BONIFICATION_STATUS.NO_BONIFICATION]: "orange" as BadgeVariant,       // Orange - no bonification
+    [BONIFICATION_STATUS.SUSPENDED_BONIFICATION]: "suspended" as BadgeVariant, // Red - suspended
   },
 };
 
@@ -775,11 +775,11 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
   PARTIALLY_RETURNED: "orange",
   FULLY_RETURNED: "green",
 
-  // Commission Status fallback
-  FULL_COMMISSION: "green",
-  PARTIAL_COMMISSION: "blue",
-  NO_COMMISSION: "orange",
-  SUSPENDED_COMMISSION: "suspended",
+  // Bonification Status fallback
+  FULL_BONIFICATION: "green",
+  PARTIAL_BONIFICATION: "blue",
+  NO_BONIFICATION: "orange",
+  SUSPENDED_BONIFICATION: "suspended",
 };
 
 /**

@@ -56,12 +56,12 @@ export function LowStockList({ items, embedded }: LowStockListProps) {
       </div>
       {/* Table rows */}
       {pagedItems.map((item, index) => {
-        const stockLevel = determineStockLevel(
-          item.quantity,
-          item.reorderPoint || null,
-          item.maxQuantity,
-          false,
-        );
+        const stockLevel = determineStockLevel({
+          quantity: item.quantity,
+          reorderPoint: item.reorderPoint || null,
+          maxQuantity: item.maxQuantity,
+          hasActiveOrder: false,
+        });
         const textColor = getStockLevelTextColor(stockLevel);
         const stockLabel = STOCK_LEVEL_LABELS[stockLevel] || "";
 

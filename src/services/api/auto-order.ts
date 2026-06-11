@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api-client/axiosClient';
-import { ITEM_CATEGORY_TYPE } from '@/constants/enums';
+import { ITEM_CATEGORY_TYPE, STOCK_MODEL } from '@/constants/enums';
 import { itemKeys, orderKeys } from '@/hooks/common/query-keys';
 
 // =====================
@@ -22,9 +22,14 @@ export interface AutoOrderRecommendation {
   supplierName: string | null;
   categoryId: string | null;
   categoryName: string | null;
-  /** Category type so the UI can branch on tool / regular.
+  /** Category type — DISPLAY ONLY (capability-fields contract). Tool
+   *  badges/grouping must key on `stockModel === 'FIXED_TARGET'`.
    *  PPE never appears (excluded from the workflow for now). */
   categoryType: ITEM_CATEGORY_TYPE | null;
+  /** Stock math model — behavior gate for fixed-target badges/grouping. */
+  stockModel: STOCK_MODEL | null;
+  /** Target on hand for FIXED_TARGET items (engine falls back to 1). */
+  fixedTargetQuantity: number | null;
   lastOrderDate: Date | null;
   daysSinceLastOrder: number | null;
   hasActivePendingOrder: boolean;

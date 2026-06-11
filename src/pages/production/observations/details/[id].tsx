@@ -40,7 +40,7 @@ export const ObservationDetailsPage = () => {
         },
       },
       files: true,
-      commissions: {
+      bonifications: {
         include: {
           user: true,
         },
@@ -155,8 +155,8 @@ export const ObservationDetailsPage = () => {
               </DialogTitle>
               <DialogDescription>
                 Tem certeza que deseja excluir esta observação?
-                {(observation as any).commissions && (observation as any).commissions.length > 0 && (
-                  <span className="block mt-2 font-medium text-warning">Atenção: As comissões suspensas por esta observação serão restauradas automaticamente.</span>
+                {(observation as any).bonifications && (observation as any).bonifications.length > 0 && (
+                  <span className="block mt-2 font-medium text-warning">Atenção: As bonificações suspensas por esta observação serão restauradas automaticamente.</span>
                 )}
                 Esta ação não poderá ser desfeita.
               </DialogDescription>

@@ -150,7 +150,7 @@ export const TaskSelector = ({
         serviceOrders: true,
         files: true,
         airbrushings: true,
-        commissions: true,
+        bonifications: true,
       },
     };
 

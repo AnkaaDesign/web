@@ -295,13 +295,13 @@ export function extractActiveFilters(
     });
   }
 
-  if (filters.hasCommissions) {
+  if (filters.hasBonifications) {
     activeFilters.push({
-      key: "hasCommissions",
-      label: "Tem Comissões",
+      key: "hasBonifications",
+      label: "Tem Bonificações",
       value: "Sim",
       iconType: "cash",
-      onRemove: () => onRemoveFilter("hasCommissions"),
+      onRemove: () => onRemoveFilter("hasBonifications"),
     });
   }
 
@@ -446,8 +446,8 @@ export function createFilterRemover(currentFilters: Partial<TaskGetManyFormData>
       case "hasPaints":
         delete newFilters.hasPaints;
         break;
-      case "hasCommissions":
-        delete newFilters.hasCommissions;
+      case "hasBonifications":
+        delete newFilters.hasBonifications;
         break;
       case "hasServiceOrders":
         delete newFilters.hasServiceOrders;

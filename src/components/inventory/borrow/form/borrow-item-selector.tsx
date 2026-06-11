@@ -238,12 +238,12 @@ export const BorrowItemSelector = ({
         ...(showSelectedOnlyProp && selectedItems.size > 0
           ? {
               id: { in: Array.from(selectedItems) },
-              // Still apply TOOL filter even when showing selected only
-              category: { type: "TOOL" },
+              // Still apply borrowable filter even when showing selected only
+              isBorrowable: true,
             }
           : {
               // Apply all filters when not showing selected only
-              category: { type: "TOOL" },
+              isBorrowable: true,
               ...(categoryIds.length && { categoryId: { in: categoryIds } }),
               ...(brandIds.length && { brands: { some: { id: { in: brandIds } } } }),
               ...(supplierIds.length && { supplierId: { in: supplierIds } }),
@@ -274,9 +274,8 @@ export const BorrowItemSelector = ({
     }
   }, [apiTotalRecords, onTotalRecordsChange, currentTotalRecords]);
 
-  // Get filter options - only TOOL categories
+  // Get filter options - all categories (borrowable items may live anywhere)
   const { data: categoriesResponse } = useItemCategories({
-    where: { type: "TOOL" },
     orderBy: { name: "asc" },
   });
   const { data: brandsResponse } = useItemBrands({ orderBy: { name: "asc" } });

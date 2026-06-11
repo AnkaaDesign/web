@@ -80,6 +80,7 @@ const PPE_TYPE_SIZE_MAP: Record<PPE_TYPE, PPE_SIZE[]> = {
     PPE_SIZE.SIZE_47,
     PPE_SIZE.SIZE_48,
   ],
+  [PPE_TYPE.OVERALL]: [PPE_SIZE.P, PPE_SIZE.M, PPE_SIZE.G, PPE_SIZE.GG, PPE_SIZE.XG],
   [PPE_TYPE.OTHERS]: [], // OTHERS type doesn't require specific sizes
 };
 

@@ -152,11 +152,11 @@ export interface TaskProductionFilters {
   yAxisMode?: TaskProductionYAxisMode;
   compareMode?: TaskProductionCompareMode;
   /**
-   * Filter tasks by commission status. When provided, only tasks with one of
-   * the listed CommissionStatus values are counted in the statistics.
-   * e.g. ['FULL_COMMISSION', 'PARTIAL_COMMISSION']
+   * Filter tasks by bonification status. When provided, only tasks with one of
+   * the listed BonificationStatus values are counted in the statistics.
+   * e.g. ['FULL_BONIFICATION', 'PARTIAL_BONIFICATION']
    */
-  commissionStatuses?: string[];
+  bonificationStatuses?: string[];
   /**
    * Filter tasks by the internal user who created them (createdById). When
    * provided, only tasks registered by one of the listed user IDs are counted.

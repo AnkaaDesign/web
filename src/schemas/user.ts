@@ -136,7 +136,7 @@ export const userIncludeSchema = z
               createdBy: z.boolean().optional(),
               files: z.boolean().optional(),
               logoPaints: z.boolean().optional(),
-              commissions: z.boolean().optional(),
+              bonifications: z.boolean().optional(),
               services: z.boolean().optional(),
               truck: z.boolean().optional(),
               airbrushings: z.boolean().optional(),
@@ -145,7 +145,7 @@ export const userIncludeSchema = z
         }),
       ])
       .optional(),
-    commissions: z
+    bonifications: z
       .union([
         z.boolean(),
         z.object({
@@ -689,7 +689,7 @@ export const userWhereSchema: z.ZodSchema = z.lazy(() =>
         })
         .optional(),
 
-      commissions: z
+      bonifications: z
         .object({
           some: z.any().optional(),
           every: z.any().optional(),

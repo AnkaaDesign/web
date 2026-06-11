@@ -32,6 +32,10 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
       measures: item.measures || [], // Include measures array
       barcodes: item.barcodes || [],
       shouldAssignToUser: item.shouldAssignToUser,
+      // Capability fields — direct reads (an explicit false/0 must survive)
+      isBorrowable: item.isBorrowable,
+      stockModel: item.stockModel,
+      fixedTargetQuantity: item.fixedTargetQuantity,
       abcCategory: item.abcCategory,
       xyzCategory: item.xyzCategory,
       brandIds: item.brands?.map((b) => b.id) ?? [],

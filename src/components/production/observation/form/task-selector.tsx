@@ -162,7 +162,7 @@ export const TaskSelector = ({
         serviceOrders: true,
         files: true,
         observation: true,
-        commissions: true,
+        bonifications: true,
       },
     };
 

@@ -332,11 +332,11 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Tarefas Completas:</span>
-                  <span>{payroll.taskStats?.fullCommissionTasks || 0}</span>
+                  <span>{payroll.taskStats?.fullBonificationTasks || 0}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Tarefas Parciais:</span>
-                  <span>{payroll.taskStats?.partialCommissionTasks || 0}</span>
+                  <span>{payroll.taskStats?.partialBonificationTasks || 0}</span>
                 </div>
                 <div className="flex justify-between text-sm font-semibold">
                   <span>Total Ponderado:</span>

@@ -385,9 +385,7 @@ export const BorrowBatchCreateForm = () => {
                       storageKey="borrow-item-selector"
                       additionalFilters={{
                         where: {
-                          category: {
-                            type: 'TOOL',
-                          },
+                          isBorrowable: true,
                         },
                       }}
                       // URL state management

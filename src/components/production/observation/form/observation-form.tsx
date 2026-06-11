@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useObservation, useObservationMutations, useTasks } from "../../../../hooks";
 import { routes } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
@@ -811,6 +812,13 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
             <button id="observation-form-submit" type="submit" className="hidden" disabled={form.formState.isSubmitting}>
               Submit
             </button>
+
+            {/* Privacy warning - observation data is visible to the whole company */}
+            <Alert variant="warning" className="flex-shrink-0 mb-4">
+              <AlertDescription>
+                Ao enviar, os dados desta observação (descrição e arquivos) serão compartilhados com todos os usuários da empresa.
+              </AlertDescription>
+            </Alert>
 
             {/* Form Steps Indicator (only show in create mode) */}
             {mode === "create" && (

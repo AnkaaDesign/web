@@ -5,7 +5,6 @@ import { formatCurrency } from "../../../../utils";
 export interface PayrollUserRow extends User {
   monthLabel?: string;
   monthYear?: string;
-  monthCommissions?: any[];
   monthTaskCount?: number;
   // Payroll and Bonus information
   payrollId?: string; // ID of the payroll entity

@@ -714,8 +714,8 @@ export default function PayrollListPage() {
               totalTasksForPeriod = Number(bonus.totalTasks) || 0;
             } else if (bonus.tasks && Array.isArray(bonus.tasks)) {
               // Legacy: calculate from task array if available
-              const fullTasks = bonus.tasks.filter((t: any) => t.commission === 'FULL_COMMISSION').length;
-              const partialTasks = bonus.tasks.filter((t: any) => t.commission === 'PARTIAL_COMMISSION').length;
+              const fullTasks = bonus.tasks.filter((t: any) => t.bonification === 'FULL_BONIFICATION').length;
+              const partialTasks = bonus.tasks.filter((t: any) => t.bonification === 'PARTIAL_BONIFICATION').length;
               totalTasksForPeriod = Math.max(totalTasksForPeriod, fullTasks + (partialTasks * 0.5));
             }
           }
@@ -1070,7 +1070,7 @@ export default function PayrollListPage() {
                 return `Período: ${filters.months.length} meses de ${filters.year}`;
               }
             }
-            return "Visualização da folha de pagamento com cálculos de comissões e bonificações";
+            return "Visualização da folha de pagamento com cálculos de bonificações e bonificações";
           })()}
           actions={[]}
         />

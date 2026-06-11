@@ -35,9 +35,7 @@ export function BorrowItemSelector({ control, name = "itemId", disabled, selecte
       where: {
         isActive: true,
         quantity: { gt: 0 }, // Only show items with available stock
-        category: {
-          type: "TOOL", // Only show tools that can be borrowed
-        },
+        isBorrowable: true, // Only show items that can be borrowed
         ...(searchTerm ? {
           OR: [
             { name: { contains: searchTerm, mode: "insensitive" } },

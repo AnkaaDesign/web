@@ -22,7 +22,6 @@ import {
   IconFile,
   IconFlask,
   IconPalette,
-  IconCoins,
   IconFileInvoice,
   IconShield,
   IconNote,
@@ -97,7 +96,6 @@ export const PAGE_ICON_MAP: Record<string, { icon: Icon; color: string }> = {
   [FAVORITE_PAGES.PINTURA_TIPOS_TINTA_CADASTRAR]: { icon: IconPalette, color: "bg-indigo-500" },
 
   // Administração
-  [FAVORITE_PAGES.ADMINISTRACAO_COMISSOES_LISTAR]: { icon: IconCoins, color: "bg-green-500" },
   [FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR]: { icon: IconUsers, color: "bg-orange-500" },
   [FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_CADASTRAR]: { icon: IconUsers, color: "bg-orange-600" },
   [FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_LISTAR]: { icon: IconUsers, color: "bg-purple-500" },
@@ -139,7 +137,6 @@ export const PAGE_ICON_MAP: Record<string, { icon: Icon; color: string }> = {
   [FAVORITE_PAGES.PESSOAL_MINHAS_ATIVIDADES_LISTAR]: { icon: IconActivity, color: "bg-green-500" },
 
   // Meu Pessoal
-  //   [FAVORITE_PAGES.PESSOAL_MINHAS_COMISSOES_LISTAR]: { icon: IconCoins, color: "bg-green-500" },
   //   [FAVORITE_PAGES.MEU_PESSOAL_FERIAS_LISTAR]: { icon: IconBeach, color: "bg-blue-500" },
   //   [FAVORITE_PAGES.PESSOAL_MEUS_AVISOS_LISTAR]: { icon: IconAlertTriangle, color: "bg-red-500" },
   //   [FAVORITE_PAGES.PESSOAL_MEUS_EMPRESTIMOS_LISTAR]: { icon: IconRepeat, color: "bg-purple-500" },
@@ -201,7 +198,7 @@ const PATH_PREFIX_ICON_MAP: Array<{ prefix: string; icon: Icon; color: string }>
   { prefix: "/estoque/pedidos", icon: IconShoppingCart, color: "bg-blue-500" },
   { prefix: "/estoque/manutencao/agendamentos", icon: IconCalendar, color: "bg-red-500" },
   { prefix: "/estoque/manutencao", icon: IconTool, color: "bg-red-600" },
-  { prefix: "/estoque/retiradas-externas", icon: IconArchive, color: "bg-orange-500" },
+  { prefix: "/estoque/operacoes-externas", icon: IconArchive, color: "bg-orange-500" },
   { prefix: "/estoque/epi/entregas", icon: IconShield, color: "bg-yellow-400" },
   { prefix: "/estoque/epi/agendamentos", icon: IconCalendar, color: "bg-yellow-400" },
   { prefix: "/estoque/epi", icon: IconShield, color: "bg-yellow-500" },
@@ -219,7 +216,6 @@ const PATH_PREFIX_ICON_MAP: Array<{ prefix: string; icon: Icon; color: string }>
   { prefix: "/pintura", icon: IconPaint, color: "bg-indigo-500" },
 
   // Administração
-  { prefix: "/administracao/comissoes", icon: IconCoins, color: "bg-green-500" },
   { prefix: "/financeiro/orcamento", icon: IconFileDescription, color: "bg-green-600" },
   { prefix: "/financeiro/faturamento", icon: IconFileInvoice, color: "bg-amber-600" },
   { prefix: "/financeiro/clientes", icon: IconUsers, color: "bg-orange-500" },
@@ -338,8 +334,8 @@ export function getPageIconName(path: string): string {
     "/estoque/manutencao/cadastrar": "maintenance",
     "/estoque/manutencao/agendamentos": "calendar",
     "/estoque/manutencao/agendamentos/cadastrar": "calendar",
-    "/estoque/retiradas-externas": "external",
-    "/estoque/retiradas-externas/cadastrar": "external",
+    "/estoque/operacoes-externas": "external",
+    "/estoque/operacoes-externas/cadastrar": "external",
     "/estoque/epi": "helmet",
     "/estoque/epi/cadastrar": "helmet",
     "/estoque/epi/entregas": "truck",
@@ -362,7 +358,6 @@ export function getPageIconName(path: string): string {
     "/pintura/marcas-de-tinta/cadastrar": "brand",
 
     // Administração
-    "/administracao/comissoes": "coins",
     "/financeiro/clientes": "users",
     "/financeiro/clientes/cadastrar": "users",
     "/financeiro/orcamento": "file-description",
@@ -500,7 +495,6 @@ export function getPageIconName(path: string): string {
     [FAVORITE_PAGES.PINTURA_TIPOS_TINTA_CADASTRAR]: "tags",
 
     // Administração
-    [FAVORITE_PAGES.ADMINISTRACAO_COMISSOES_LISTAR]: "coins",
     [FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR]: "users",
     [FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_CADASTRAR]: "users",
     [FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_LISTAR]: "user",

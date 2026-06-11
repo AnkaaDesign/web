@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { PpeDelivery } from "../../../../types";
-import { PPE_DELIVERY_STATUS } from "../../../../constants";
+import { PPE_DELIVERY_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { useAuth } from "../../../../hooks";
+import { hasAnyPrivilege } from "../../../../utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconChevronUp, IconChevronDown, IconRefresh, IconEdit, IconTrash, IconSelector, IconAlertTriangle, IconTruck, IconCheck, IconX, IconArrowBackUp } from "@tabler/icons-react";
@@ -31,6 +33,12 @@ interface PpeDeliveryTableProps {
 
 export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove, onReject, onDeliver, onRevertToApproved, onDelete, filters = {}, onDataChange }: PpeDeliveryTableProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Per-action permission checks aligned to the API roles (ppe.controller.ts)
+  const canEditDeliveries = !!user && hasAnyPrivilege(user, [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]);
+  const canApproveReject = !!user && hasAnyPrivilege(user, [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]);
+  const canMarkDelivered = !!user && hasAnyPrivilege(user, [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]);
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -438,37 +446,40 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
         >
           {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.deliveries.length} entregas selecionadas</div>}
 
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.deliveries.length > 1 ? "Editar em lote" : "Editar"}
-          </DropdownMenuItem>
+          {/* Edit: HR, WAREHOUSE, and ADMIN (matches API update roles) */}
+          {canEditDeliveries && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.deliveries.length > 1 ? "Editar em lote" : "Editar"}
+            </DropdownMenuItem>
+          )}
 
-          {/* Only show approve option if at least one delivery is PENDING */}
-          {contextMenu?.deliveries.some((d) => d.status === PPE_DELIVERY_STATUS.PENDING) && (
+          {/* Approve: HR and ADMIN only; shown if at least one delivery is PENDING */}
+          {canApproveReject && contextMenu?.deliveries.some((d) => d.status === PPE_DELIVERY_STATUS.PENDING) && (
             <DropdownMenuItem onClick={handleApprove}>
               <IconCheck className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.deliveries.length > 1 ? "Aprovar entregas" : "Aprovar entrega"}
             </DropdownMenuItem>
           )}
 
-          {/* Only show reject option if at least one delivery is PENDING or APPROVED (not yet delivered) */}
-          {contextMenu?.deliveries.some((d) => d.status === PPE_DELIVERY_STATUS.PENDING || d.status === PPE_DELIVERY_STATUS.APPROVED) && (
+          {/* Reject: HR and ADMIN only; shown if at least one delivery is PENDING or APPROVED (not yet delivered) */}
+          {canApproveReject && contextMenu?.deliveries.some((d) => d.status === PPE_DELIVERY_STATUS.PENDING || d.status === PPE_DELIVERY_STATUS.APPROVED) && (
             <DropdownMenuItem onClick={handleReject}>
               <IconX className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.deliveries.length > 1 ? "Reprovar entregas" : "Reprovar entrega"}
             </DropdownMenuItem>
           )}
 
-          {/* Only show deliver option if at least one delivery is approved but not delivered */}
-          {contextMenu?.deliveries.some((d) => d.status === PPE_DELIVERY_STATUS.APPROVED) && (
+          {/* Mark delivered: WAREHOUSE and ADMIN only; shown if at least one delivery is approved but not delivered */}
+          {canMarkDelivered && contextMenu?.deliveries.some((d) => d.status === PPE_DELIVERY_STATUS.APPROVED) && (
             <DropdownMenuItem onClick={handleDeliver}>
               <IconTruck className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.deliveries.length > 1 ? "Marcar como entregues" : "Marcar como entregue"}
             </DropdownMenuItem>
           )}
 
-          {/* Only show revert option if at least one delivery is DELIVERED */}
-          {contextMenu?.deliveries.some((d) => d.status === PPE_DELIVERY_STATUS.DELIVERED) && (
+          {/* Revert delivered -> approved: WAREHOUSE and ADMIN (inverse of mark-delivered); shown if at least one delivery is DELIVERED */}
+          {canMarkDelivered && contextMenu?.deliveries.some((d) => d.status === PPE_DELIVERY_STATUS.DELIVERED) && (
             <DropdownMenuItem onClick={handleRevertToApproved}>
               <IconArrowBackUp className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.deliveries.length > 1 ? "Reverter para aprovado" : "Reverter para aprovado"}

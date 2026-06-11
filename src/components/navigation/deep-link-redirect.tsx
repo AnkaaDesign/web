@@ -53,6 +53,16 @@ const DEEP_LINK_ROUTES: Record<string, (id: string) => string> = {
 };
 
 /**
+ * List aliases for the 1-segment universal link format /app/:entityType (no id).
+ * Maps plural entity aliases to the corresponding list pages.
+ */
+const DEEP_LINK_LIST_ROUTES: Record<string, string> = {
+  items: routes.inventory.products.root,
+  orders: routes.inventory.orders.root,
+  tasks: routes.production.preparation.root,
+};
+
+/**
  * Detects if the user is on a mobile device
  */
 function isMobileDevice(): boolean {
@@ -90,6 +100,19 @@ export function DeepLinkRedirect() {
 
     let extractedEntityType: string;
     let extractedId: string;
+
+    // 1-segment universal link format (/app/items, /app/orders, /app/tasks):
+    // no entity id — redirect to the corresponding list page.
+    if (pathParts[0]?.toLowerCase() === 'app' && pathParts.length === 2) {
+      const listRoute = DEEP_LINK_LIST_ROUTES[pathParts[1].toLowerCase()];
+      if (listRoute) {
+        navigate(listRoute, { replace: true });
+      } else {
+        console.warn(`[DeepLink] Unknown list entity type: ${pathParts[1]}`);
+        navigate('/', { replace: true });
+      }
+      return;
+    }
 
     // Check if path starts with 'app' (universal link format: /app/task/123)
     if (pathParts[0]?.toLowerCase() === 'app' && pathParts.length >= 3) {

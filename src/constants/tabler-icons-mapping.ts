@@ -192,7 +192,7 @@ export const TABLER_ICONS = {
 
   // Payments
   dollarSign: "IconCurrencyDollar",
-  coins: "IconCoins", // Coins icon (for favorites - commissions)
+  coins: "IconCoins", // Coins icon (for favorites - bonus)
   salary: "IconCurrencyDollar",
 
   // Job Openings

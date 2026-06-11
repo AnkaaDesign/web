@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { PrivilegeRoute } from '@/components/navigation/privilege-route';
 import { PageHeader } from '@/components/ui/page-header';
-import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, ITEM_CATEGORY_TYPE } from '../../../../constants';
-import { ITEM_CATEGORY_TYPE_LABELS } from '@/constants/enum-labels';
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, ITEM_CATEGORY_TYPE, STOCK_MODEL } from '../../../../constants';
+import { ITEM_CATEGORY_TYPE_LABELS, STOCK_MODEL_LABELS } from '@/constants/enum-labels';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useCanViewPrices } from '@/hooks';
 import {
@@ -76,7 +76,6 @@ const COL = {
   urgency: 'w-[10%]',
 } as const;
 
-const TOOL_TYPES: Array<ITEM_CATEGORY_TYPE | null> = [ITEM_CATEGORY_TYPE.TOOL];
 
 export const AutomaticOrderListPage = () => {
   const canViewPrices = useCanViewPrices();
@@ -353,7 +352,6 @@ export const AutomaticOrderListPage = () => {
   const handleCreateAllSelected = () =>
     handleCreate(filteredGroups.flatMap(buildOrdersForGroup), 'all');
 
-  const totalSelected = selectedItems.size;
   // What the top "Criar pedidos" button will act on: selected rows when any are
   // picked, otherwise every visible row (full table).
   const totalEffective = filteredGroups.reduce(
@@ -361,11 +359,17 @@ export const AutomaticOrderListPage = () => {
     0,
   );
 
+  // Tool badge keys on the item's stockModel (capability-fields contract);
+  // categoryType is used only for the display label when it's a TOOL category.
   const renderCategoryBadge = (item: AutoOrderRecommendation) => {
-    if (!TOOL_TYPES.includes(item.categoryType)) return null;
+    if (item.stockModel !== STOCK_MODEL.FIXED_TARGET) return null;
+    const label =
+      item.categoryType === ITEM_CATEGORY_TYPE.TOOL
+        ? ITEM_CATEGORY_TYPE_LABELS[item.categoryType]
+        : STOCK_MODEL_LABELS[STOCK_MODEL.FIXED_TARGET];
     return (
       <Badge variant="outline" className="ml-2 text-[10px] font-medium">
-        {ITEM_CATEGORY_TYPE_LABELS[item.categoryType as ITEM_CATEGORY_TYPE]}
+        {label}
       </Badge>
     );
   };

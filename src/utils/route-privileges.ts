@@ -69,8 +69,8 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/financeiro/aerografia": "FINANCIAL", // Redirects to /producao/aerografia/listar
 
   // Estatísticas - Admin access (team leaders check at component level via isTeamLeader())
-  "/statistics": "ADMIN",
-  "/statistics/*": "ADMIN",
+  "/estatisticas": "ADMIN",
+  "/estatisticas/*": "ADMIN",
   // PRODUCTION_MANAGER stat pages — explicit allowlist (otherwise falls back to ADMIN default)
   "/estatisticas/recursos-humanos": ["ADMIN", "PRODUCTION_MANAGER"],
   "/estatisticas/recursos-humanos/equipe": ["ADMIN", "PRODUCTION_MANAGER"],
@@ -108,19 +108,19 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/estoque/manutencao/cadastrar": ["WAREHOUSE", "MAINTENANCE", "ADMIN"], // Maintenance create
   [routes.inventory.ppe.root]: "WAREHOUSE",
   [routes.inventory.ppe.deliveries.root]: ["HUMAN_RESOURCES", "WAREHOUSE", "ADMIN"], // PPE deliveries - Warehouse can view and mark as delivered
-  [routes.inventory.ppe.deliveries.create]: ["HUMAN_RESOURCES", "ADMIN"], // Only HR and Admin can create
+  [routes.inventory.ppe.deliveries.create]: ["HUMAN_RESOURCES", "WAREHOUSE", "ADMIN"], // HR, Warehouse, and Admin can create (matches API)
   [routes.inventory.ppe.schedules.root]: ["HUMAN_RESOURCES", "WAREHOUSE", "ADMIN"], // PPE schedules - Warehouse can view
-  [routes.inventory.ppe.schedules.create]: ["HUMAN_RESOURCES", "ADMIN"], // Only HR and Admin can create schedules
-  "/estoque/epi/agendamentos/editar/:id": ["HUMAN_RESOURCES", "ADMIN"], // Only HR and Admin can edit schedules - dynamic route
+  [routes.inventory.ppe.schedules.create]: ["HUMAN_RESOURCES", "WAREHOUSE", "ADMIN"], // HR, Warehouse, and Admin can create schedules (matches API)
+  "/estoque/epi/agendamentos/editar/:id": ["HUMAN_RESOURCES", "WAREHOUSE", "ADMIN"], // HR, Warehouse, and Admin can edit schedules (matches API) - dynamic route
   [routes.inventory.loans.root]: "WAREHOUSE",
   "/estoque/emprestimos/detalhes/:id": "WAREHOUSE", // Borrow detail pages
   "/estoque/emprestimos/editar/:id": "WAREHOUSE", // Borrow edit pages
   "/estoque/emprestimos/cadastrar": "WAREHOUSE", // Borrow create page
   "/estoque/emprestimos/editar-lote": "WAREHOUSE", // Borrow batch edit
-  [routes.inventory.externalWithdrawals.root]: "WAREHOUSE",
-  "/estoque/retiradas-externas/detalhes/:id": "WAREHOUSE", // External withdrawal detail
-  "/estoque/retiradas-externas/editar/:id": "WAREHOUSE", // External withdrawal edit
-  "/estoque/retiradas-externas/cadastrar": "WAREHOUSE", // External withdrawal create
+  [routes.inventory.externalOperations.root]: "ADMIN", // External operation list - ADMIN only (matches API)
+  "/estoque/operacoes-externas/detalhes/:id": "ADMIN", // External operation detail - ADMIN only (matches API)
+  "/estoque/operacoes-externas/editar/:id": "ADMIN", // External operation edit - ADMIN only (matches API)
+  "/estoque/operacoes-externas/cadastrar": "ADMIN", // External operation create - ADMIN only (matches API)
 
   // Favorites - All authenticated users can access
   "/favoritos": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
@@ -175,9 +175,9 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   [routes.production.schedule.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL"], // Team leaders check at component level
   // [routes.production.schedule.create]: ["PRODUCTION", "WAREHOUSE"], // Removed - tasks are now created in the "in preparation" page
   [routes.production.schedule.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL", "ADMIN"], // Task detail page
-  [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL", "ADMIN"], // DESIGNER, FINANCIAL, LOGISTIC, PRODUCTION_MANAGER, PLOTTING can edit with restrictions
+  [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // DESIGNER, FINANCIAL, LOGISTIC, PRODUCTION_MANAGER can edit with restrictions (PLOTTING excluded - API rejects)
   [routes.production.preparation.root]: ["DESIGNER", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // PRODUCTION, WAREHOUSE, and FINANCIAL excluded from preparation (FINANCIAL uses /financeiro/faturamento)
-  [routes.production.preparation.create]: ["PRODUCTION", "DESIGNER", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Preparation task create - WAREHOUSE excluded
+  [routes.production.preparation.create]: ["COMMERCIAL", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN"], // Preparation task create - matches API task create roles
   [routes.production.preparation.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // Preparation task detail - WAREHOUSE excluded
   "/producao/agenda/detalhes/:id": ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // Agenda details
   [routes.production.preparation.edit(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // Preparation task edit - WAREHOUSE excluded
@@ -187,21 +187,19 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   [routes.production.garages.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // Garages/Barracões - LOGISTIC and PRODUCTION_MANAGER can edit layouts
   [routes.production.airbrushings.root]: ["WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"], // PRODUCTION and DESIGNER excluded from airbrushings
   [routes.production.airbrushings.list]: ["WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"],
-  [routes.production.airbrushings.create]: ["WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // PRODUCTION and DESIGNER excluded
-  [routes.production.airbrushings.edit(":id")]: ["WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // PRODUCTION and DESIGNER excluded
+  [routes.production.airbrushings.create]: ["COMMERCIAL", "FINANCIAL", "ADMIN"], // WAREHOUSE read-only (API rejects writes); PRODUCTION and DESIGNER excluded
+  [routes.production.airbrushings.edit(":id")]: ["COMMERCIAL", "FINANCIAL", "ADMIN"], // WAREHOUSE read-only (API rejects writes); PRODUCTION and DESIGNER excluded
 
   // Cut-related routes - DESIGNER and PLOTTING have read-only access, WAREHOUSE removed
   [routes.production.cutting.root]: ["PRODUCTION", "DESIGNER", "PLOTTING", "ADMIN"],
   [routes.production.cutting.details(":id")]: ["PRODUCTION", "DESIGNER", "PLOTTING", "ADMIN"], // Cutting detail
-  [routes.production.cutting.create]: ["PRODUCTION", "DESIGNER", "PLOTTING", "ADMIN"], // Cutting create
-  [routes.production.cutting.edit(":id")]: ["PRODUCTION", "DESIGNER", "PLOTTING", "ADMIN"], // Cutting edit
 
   // Observations - accessible to production-related sectors (read-only for most, edit for admin)
   // DESIGNER and LOGISTIC excluded from observations
   [routes.production.observations.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL", "PRODUCTION_MANAGER", "ADMIN"],
   [routes.production.observations.details(":id")]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL", "PRODUCTION_MANAGER", "ADMIN"],
-  [routes.production.observations.create]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "PRODUCTION_MANAGER", "ADMIN"], // Production, warehouse, commercial, financial, production manager, and admin can create
-  [routes.production.observations.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "PRODUCTION_MANAGER", "ADMIN"], // Production, warehouse, commercial, financial, production manager, and admin can edit
+  [routes.production.observations.create]: ["WAREHOUSE", "COMMERCIAL", "FINANCIAL", "PRODUCTION_MANAGER", "ADMIN"], // Warehouse, commercial, financial, production manager, and admin can create (PRODUCTION excluded - API rejects)
+  [routes.production.observations.edit(":id")]: ["WAREHOUSE", "COMMERCIAL", "FINANCIAL", "PRODUCTION_MANAGER", "ADMIN"], // Warehouse, commercial, financial, production manager, and admin can edit (PRODUCTION excluded - API rejects)
 
   // Registro de Ponto - All authenticated users can access
   "/registro-de-ponto": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
@@ -217,20 +215,21 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // Unified Controle de Ponto. View tabs (colaborador, dia, ausências) are open to
   // this audience; the edit tabs (edição, fechamento) are gated client-side to HR + ADMIN
   // via PrivilegeRoute on each page + the hrOnly tab filter.
-  "/recursos-humanos/controle-ponto": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "COMMERCIAL"],
+  "/recursos-humanos/controle-ponto": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL"],
   // View tabs are explicitly listed so they win over the "/recursos-humanos/*" HR-only
   // wildcard below. Edição and Fechamento intentionally have NO entry here — they fall
   // through to the wildcard (HR/ADMIN) and are further guarded per-page via PrivilegeRoute.
-  "/recursos-humanos/controle-ponto/colaborador": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "COMMERCIAL"],
-  "/recursos-humanos/controle-ponto/dia": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "COMMERCIAL"],
-  "/recursos-humanos/controle-ponto/ausencias": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "COMMERCIAL"],
+  // COMMERCIAL excluded — the Secullum API endpoints reject it.
+  "/recursos-humanos/controle-ponto/colaborador": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL"],
+  "/recursos-humanos/controle-ponto/dia": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL"],
+  "/recursos-humanos/controle-ponto/ausencias": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL"],
   "/recursos-humanos/ferias": "HUMAN_RESOURCES",
   "/recursos-humanos/calendario": "HUMAN_RESOURCES",
   "/recursos-humanos/feriados": "HUMAN_RESOURCES",
   "/recursos-humanos/advertencias": "HUMAN_RESOURCES",
   "/recursos-humanos/ppe": "HUMAN_RESOURCES",
   "/recursos-humanos/ppe/entregas": ["HUMAN_RESOURCES", "ADMIN"],
-  "/recursos-humanos/ppe/entregas/cadastrar": ["HUMAN_RESOURCES", "ADMIN"],
+  "/recursos-humanos/ppe/entregas/cadastrar": ["HUMAN_RESOURCES", "WAREHOUSE", "ADMIN"], // HR, Warehouse, and Admin can create (matches API)
 
   // Human Resources - HR with admin requirements for sensitive operations (new English routes)
   "/human-resources": "HUMAN_RESOURCES",

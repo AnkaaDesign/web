@@ -43,7 +43,7 @@ interface CutItemTableProps {
 export function CutItemTable({ filters = {}, className, onDataChange, visibleColumns }: CutItemTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canEdit = canEditCuts(user); // WAREHOUSE, DESIGNER, ADMIN can edit cuts
+  const canEdit = canEditCuts(user); // DESIGNER, PLOTTING, ADMIN can edit cuts (matches API)
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [selectedCutItem, setSelectedCutItem] = useState<Cut | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; items: Cut[] }>({

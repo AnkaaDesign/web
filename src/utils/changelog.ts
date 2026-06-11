@@ -24,7 +24,7 @@ export const validateEntityType = (entityType: string): boolean => {
     "Task",
     "Supplier",
     "Customer",
-    "Commission",
+    "Bonification",
     "Vacation",
     "PpeRequest",
     "ServiceOrder",

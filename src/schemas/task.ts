@@ -127,9 +127,9 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
                 reprimand: z.boolean().optional(),
                 airbrushingReceipts: z.boolean().optional(),
                 airbrushingInvoices: z.boolean().optional(),
-                externalWithdrawalBudget: z.boolean().optional(),
-                externalWithdrawalNfe: z.boolean().optional(),
-                externalWithdrawalReceipt: z.boolean().optional(),
+                externalOperationBudget: z.boolean().optional(),
+                externalOperationNfe: z.boolean().optional(),
+                externalOperationReceipt: z.boolean().optional(),
               })
               .optional(),
           }),
@@ -273,7 +273,7 @@ export const taskOrderBySchema = z
       status: orderByDirectionSchema.optional(),
       statusOrder: orderByDirectionSchema.optional(),
       serialNumber: orderByDirectionSchema.optional(),
-      commissionOrder: orderByDirectionSchema.optional(),
+      bonificationOrder: orderByDirectionSchema.optional(),
       entryDate: orderByDirectionSchema.optional(),
       term: orderByDirectionSchema.optional(),
       startedAt: orderByDirectionSchema.optional(),
@@ -289,7 +289,7 @@ export const taskOrderBySchema = z
         status: orderByDirectionSchema.optional(),
         statusOrder: orderByDirectionSchema.optional(),
         serialNumber: orderByDirectionSchema.optional(),
-        commissionOrder: orderByDirectionSchema.optional(),
+        bonificationOrder: orderByDirectionSchema.optional(),
         entryDate: orderByDirectionSchema.optional(),
         term: orderByDirectionSchema.optional(),
         startedAt: orderByDirectionSchema.optional(),
@@ -318,7 +318,7 @@ export const taskWhereSchema: z.ZodSchema<any> = z.lazy(() =>
       statusOrder: z.union([z.number(), z.object({ gte: z.number().optional(), lte: z.number().optional() })]).optional(),
       serialNumber: z.union([z.string(), z.object({ contains: z.string().optional() })]).optional(),
       details: z.union([z.string(), z.object({ contains: z.string().optional() })]).optional(),
-      commission: z.union([z.string(), z.object({ in: z.array(z.string()).optional(), notIn: z.array(z.string()).optional() })]).optional(),
+      bonification: z.union([z.string(), z.object({ in: z.array(z.string()).optional(), notIn: z.array(z.string()).optional() })]).optional(),
       entryDate: z.object({ gte: z.coerce.date().optional(), lte: z.coerce.date().optional() }).optional(),
       term: z.object({ gte: z.coerce.date().optional(), lte: z.coerce.date().optional() }).optional(),
       startedAt: z.object({ gte: z.coerce.date().optional(), lte: z.coerce.date().optional() }).optional(),
@@ -362,7 +362,7 @@ export const taskWhereSchema: z.ZodSchema<any> = z.lazy(() =>
           none: z.any().optional(),
         })
         .optional(),
-      commissions: z
+      bonifications: z
         .object({
           some: z.any().optional(),
           every: z.any().optional(),
@@ -509,9 +509,9 @@ const taskTransform = (data: any): any => {
     delete data.hasPaints;
   }
 
-  // Commission functionality has been removed
-  if (data.hasCommissions !== undefined) {
-    delete data.hasCommissions;
+  // hasBonifications is not a supported API filter — strip it before sending
+  if (data.hasBonifications !== undefined) {
+    delete data.hasBonifications;
   }
 
   if (data.hasServiceOrders === true) {
@@ -1346,7 +1346,21 @@ export const taskUpdateSchema = z
     checkinFileIds: z.array(z.string().uuid("Arquivo de checkin inválido")).optional(),
     checkoutFileIds: z.array(z.string().uuid("Arquivo de checkout inválido")).optional(),
     paintIds: z.array(z.string().uuid("Paint inválida")).optional(), // Maps to logoPaints
-    observation: taskObservationCreateSchema.nullable().optional(),
+    // Preprocess observation: coerce effectively-empty observation objects to null
+    // so the inner schema (which requires description.min(1)) doesn't reject them.
+    // This lets users clear the description/files to remove the observation (API deletes on null).
+    observation: z.preprocess(
+      (val) => {
+        if (val && typeof val === "object" && val !== null) {
+          const obs = val as Record<string, unknown>;
+          const desc = typeof obs.description === "string" ? obs.description.trim() : "";
+          const hasFiles = Array.isArray(obs.fileIds) && obs.fileIds.length > 0;
+          if (!desc && !hasFiles) return null;
+        }
+        return val;
+      },
+      taskObservationCreateSchema.nullable().optional()
+    ),
     serviceOrders: taskServiceOrdersArraySchema, // Uses preprocessing to filter empty items
     // Decoupled file IDs per service order — avoids injecting file state into serviceOrders array
     // which could trigger the backend's service-order deletion logic

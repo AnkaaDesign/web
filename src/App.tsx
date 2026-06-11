@@ -184,10 +184,10 @@ const InventoryMovementsDetails = lazy(() => import("@/pages/inventory/movements
 const InventoryMovementsBatchEdit = lazy(() => import("@/pages/inventory/movements/batch-edit").then((module) => ({ default: module.default })));
 
 // External Withdrawals
-const InventoryExternalWithdrawals = lazy(() => import("@/pages/inventory/external-withdrawals/list").then((module) => ({ default: module.ExternalWithdrawalListPage })));
-const InventoryExternalWithdrawalsCreate = lazy(() => import("@/pages/inventory/external-withdrawals/create").then((module) => ({ default: module.ExternalWithdrawalCreate })));
-const InventoryExternalWithdrawalsEdit = lazy(() => import("@/pages/inventory/external-withdrawals/edit/[id]").then((module) => ({ default: module.ExternalWithdrawalEditPage })));
-const InventoryExternalWithdrawalsDetails = lazy(() => import("@/pages/inventory/external-withdrawals/details/[id]").then((module) => ({ default: module.default })));
+const InventoryExternalOperations = lazy(() => import("@/pages/inventory/external-operations/list").then((module) => ({ default: module.ExternalOperationListPage })));
+const InventoryExternalOperationsCreate = lazy(() => import("@/pages/inventory/external-operations/create").then((module) => ({ default: module.ExternalOperationCreate })));
+const InventoryExternalOperationsEdit = lazy(() => import("@/pages/inventory/external-operations/edit/[id]").then((module) => ({ default: module.ExternalOperationEditPage })));
+const InventoryExternalOperationsDetails = lazy(() => import("@/pages/inventory/external-operations/details/[id]").then((module) => ({ default: module.default })));
 
 const InventoryOrders = lazy(() => import("@/pages/inventory/orders/list").then((module) => ({ default: module.OrderListPage })));
 const InventoryOrdersCreate = lazy(() => import("@/pages/inventory/orders/create").then((module) => ({ default: module.CreateOrderPage })));
@@ -1905,36 +1905,36 @@ function App() {
                   }
                 />
 
-                {/* External Withdrawals routes */}
+                {/* External Operations routes */}
                 <Route
-                  path={routes.inventory.externalWithdrawals.root}
+                  path={routes.inventory.externalOperations.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <InventoryExternalWithdrawals />
+                      <InventoryExternalOperations />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.inventory.externalWithdrawals.create}
+                  path={routes.inventory.externalOperations.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <InventoryExternalWithdrawalsCreate />
+                      <InventoryExternalOperationsCreate />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.inventory.externalWithdrawals.edit(":id")}
+                  path={routes.inventory.externalOperations.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <InventoryExternalWithdrawalsEdit />
+                      <InventoryExternalOperationsEdit />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.inventory.externalWithdrawals.details(":id")}
+                  path={routes.inventory.externalOperations.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <InventoryExternalWithdrawalsDetails />
+                      <InventoryExternalOperationsDetails />
                     </Suspense>
                   }
                 />
@@ -3056,6 +3056,7 @@ function App() {
                             {/* Universal link / Deep link routes */}
                             {/* These handle URLs like /app/task/123 from iOS/Android universal links */}
                             <Route path="/app/:entityType/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/app/:entityType" element={<DeepLinkRedirect />} />
                             {/* Also handle direct entity routes like /task/123 */}
                             <Route path="/task/:id" element={<DeepLinkRedirect />} />
                             <Route path="/order/:id" element={<DeepLinkRedirect />} />

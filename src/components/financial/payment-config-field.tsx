@@ -60,7 +60,8 @@ export function legacyToConfig(condition: string | null | undefined): PaymentCon
   if (condition === "CASH_20") return { type: "CASH", cashDays: 20 };
   if (condition === "CASH_40") return { type: "CASH", cashDays: 40 };
   const m = condition.match(/^INSTALLMENTS_(\d+)$/);
-  if (m) return { type: "INSTALLMENTS", installmentCount: Number(m[1]), installmentStep: 20, entryDays: 5 };
+  // API caps installmentCount at 6; clamp legacy values (e.g. INSTALLMENTS_7) so resubmits don't 400
+  if (m) return { type: "INSTALLMENTS", installmentCount: Math.min(Number(m[1]), 6), installmentStep: 20, entryDays: 5 };
   return null;
 }
 

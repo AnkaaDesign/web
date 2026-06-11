@@ -103,8 +103,8 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
       if (fieldPath[0] === "status") {
         return { statusOrder: config.direction };
       }
-      if (fieldPath[0] === "commission") {
-        return { commissionOrder: config.direction };
+      if (fieldPath[0] === "bonification") {
+        return { bonificationOrder: config.direction };
       }
       // Special case: identificador is a computed field (serialNumber || truck.plate)
       // Sort by serialNumber as the primary identifier

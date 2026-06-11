@@ -6,7 +6,7 @@ import { IconInfoCircle, IconClipboardList, IconCurrencyDollar, IconBarcode, Ico
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemUpdateFormData } from "../../../../schemas";
 import { useItemCategories, useCanViewPrices } from "../../../../hooks";
-import { ITEM_CATEGORY_TYPE, ABC_CATEGORY_LABELS, XYZ_CATEGORY_LABELS } from "../../../../constants";
+import { ITEM_CATEGORY_TYPE, ABC_CATEGORY_LABELS, XYZ_CATEGORY_LABELS, PPE_TYPE, STOCK_MODEL } from "../../../../constants";
 import { serializeItemFormToUrlParams, debounce } from "@/utils/url-form-state";
 import type { Supplier, ItemBrand, ItemCategory } from "../../../../types";
 // import { FormValidationDebugger } from "@/components/debug/form-validation-debugger"; // Debug component removed
@@ -27,6 +27,9 @@ import { IpiInput } from "./ipi-input";
 import { MeasureInput } from "./measure-input";
 import { BarcodeManager } from "./barcode-manager";
 import { AssignToUserToggle } from "./assign-to-user-toggle";
+import { BorrowableToggle } from "./borrowable-toggle";
+import { StockModelSelector } from "./stock-model-selector";
+import { FixedTargetQuantityInput } from "./fixed-target-quantity-input";
 import { PpeConfigSection } from "./ppe-config-section";
 
 interface BaseItemFormProps {
@@ -58,7 +61,6 @@ export function ItemForm(props: ItemFormProps) {
   const canViewPrices = useCanViewPrices();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(defaultValues?.categoryId || undefined);
-  const [isPPE, setIsPPE] = useState(false);
 
   // Default values for create mode
   const createDefaults: ItemCreateFormData = {
@@ -74,6 +76,10 @@ export function ItemForm(props: ItemFormProps) {
     measures: defaultValues?.measures ?? [], // Initialize with empty measures array
     barcodes: defaultValues?.barcodes ?? [],
     shouldAssignToUser: defaultValues?.shouldAssignToUser ?? true,
+    // Capability fields (use ?? so an explicit false/0 survives)
+    isBorrowable: defaultValues?.isBorrowable ?? false,
+    stockModel: defaultValues?.stockModel ?? STOCK_MODEL.CONSUMPTION,
+    fixedTargetQuantity: defaultValues?.fixedTargetQuantity ?? null,
     abcCategory: defaultValues?.abcCategory ?? null,
     xyzCategory: defaultValues?.xyzCategory ?? null,
     brandIds: defaultValues?.brandIds ?? [],
@@ -226,16 +232,40 @@ export function ItemForm(props: ItemFormProps) {
     }
   }, [isValid, isDirty, onFormStateChange]);
 
-  // Check if selected category is PPE
+  // PPE section visibility keys on the FORM's ppeType (capability-fields
+  // contract) — the category select only PREFILLS, it never gates behavior.
+  const watchedPpeType = form.watch("ppeType");
+  const isPPE = watchedPpeType != null;
+  const watchedStockModel = form.watch("stockModel");
+
+  // Category lookup for the prefill below.
   const { data: categories } = useItemCategories({
     where: { id: selectedCategoryId },
   });
 
+  // Category prefill (create only): TOOL-type categories default the item to
+  // borrowable + alvo fixo (target 1); PPE-type categories suggest the PPE
+  // section by prefilling ppeType. The user can override every field, and a
+  // category change on UPDATE never silently flips item flags (server rule).
+  const initialCategoryIdRef = useRef(defaultValues?.categoryId ?? undefined);
+  const hasExplicitCapabilityDefaults =
+    defaultValues?.isBorrowable !== undefined || defaultValues?.stockModel !== undefined || defaultValues?.fixedTargetQuantity !== undefined;
   useEffect(() => {
-    if (categories?.data?.[0]) {
-      setIsPPE(categories.data[0].type === ITEM_CATEGORY_TYPE.PPE);
+    if (mode !== "create") return;
+    const category = categories?.data?.[0];
+    if (!category || category.id !== selectedCategoryId) return;
+    // Don't clobber values restored from URL state on first load.
+    if (category.id === initialCategoryIdRef.current && hasExplicitCapabilityDefaults) return;
+
+    if (category.type === ITEM_CATEGORY_TYPE.TOOL) {
+      form.setValue("isBorrowable", true, { shouldDirty: true });
+      form.setValue("stockModel", STOCK_MODEL.FIXED_TARGET, { shouldDirty: true });
+      form.setValue("fixedTargetQuantity", 1, { shouldDirty: true });
+    } else if (category.type === ITEM_CATEGORY_TYPE.PPE && form.getValues("ppeType") == null) {
+      form.setValue("ppeType", PPE_TYPE.OTHERS, { shouldDirty: true });
     }
-  }, [categories]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, selectedCategoryId, mode]);
 
   const handleSubmit = async (data: any) => {
     try {
@@ -317,6 +347,8 @@ export function ItemForm(props: ItemFormProps) {
                 <QuantityInput disabled={isSubmitting} required={isRequired} />
                 <BoxQuantityInput disabled={isSubmitting} />
                 <LeadTimeInput disabled={isSubmitting} />
+                <StockModelSelector disabled={isSubmitting} />
+                {watchedStockModel === STOCK_MODEL.FIXED_TARGET && <FixedTargetQuantityInput disabled={isSubmitting} />}
               </div>
             </CardContent>
           </Card>
@@ -446,6 +478,7 @@ export function ItemForm(props: ItemFormProps) {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <AssignToUserToggle disabled={isSubmitting} />
+                <BorrowableToggle disabled={isSubmitting} />
                 <StatusToggle disabled={isSubmitting} />
               </div>
             </CardContent>

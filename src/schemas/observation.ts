@@ -48,7 +48,7 @@ export const observationIncludeSchema = z
               createdBy: z.boolean().optional(),
               files: z.boolean().optional(),
               logoPaints: z.boolean().optional(),
-              commissions: z.boolean().optional(),
+              bonifications: z.boolean().optional(),
               services: z.boolean().optional(),
               truck: z.boolean().optional(),
               airbrushings: z.boolean().optional(),

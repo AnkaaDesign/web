@@ -27,8 +27,8 @@ import {
 import {
   ARTWORK_STATUS,
   ARTWORK_STATUS_LABELS,
-  COMMISSION_STATUS,
-  COMMISSION_STATUS_LABELS,
+  BONIFICATION_STATUS,
+  BONIFICATION_STATUS_LABELS,
   IMPLEMENT_TYPE,
   IMPLEMENT_TYPE_LABELS,
   PAINT_FINISH,
@@ -365,7 +365,7 @@ type ColumnKey =
   | "sector"
   // workflow
   | "status"
-  | "commission"
+  | "bonification"
   // dates
   | "term"
   | "remainingTime"
@@ -416,7 +416,7 @@ const COLUMN_KEY_VALUES = [
   "spot",
   "sector",
   "status",
-  "commission",
+  "bonification",
   "term",
   "remainingTime",
   "forecastDate",
@@ -757,15 +757,15 @@ function buildColumnCatalog(): ColumnDef[] {
       render: (t, ctx) => <StatusCell status={t.status} mode={ctx.cellModes.status} />,
     },
     {
-      key: "commission",
-      label: "Comissão",
+      key: "bonification",
+      label: "Bonificação",
       track: "minmax(0, 1fr)",
       render: (t) => {
-        const c = (t as any).commission as COMMISSION_STATUS | null | undefined;
+        const c = (t as any).bonification as BONIFICATION_STATUS | null | undefined;
         if (!c) return <span className="text-muted-foreground text-sm">—</span>;
         return (
           <Badge variant="outline" className="text-[10px] py-0 px-1.5 truncate">
-            {COMMISSION_STATUS_LABELS[c] ?? c}
+            {BONIFICATION_STATUS_LABELS[c] ?? c}
           </Badge>
         );
       },
@@ -1154,7 +1154,7 @@ const SORT_KEYS = [
   "statusOrder",
   "entryDate",
   "price",
-  "commissionOrder",
+  "bonificationOrder",
   "updatedAt",
 ] as const;
 const TRI_STATE = ["any", "yes", "no"] as const;
@@ -1333,7 +1333,7 @@ const taskTableConfigSchemaInner = z.object({
       assigneeIds: z.array(z.string().uuid()).default([]),
       truckCategories: z.array(z.nativeEnum(TRUCK_CATEGORY)).default([]),
       implementTypes: z.array(z.nativeEnum(IMPLEMENT_TYPE)).default([]),
-      commissions: z.array(z.nativeEnum(COMMISSION_STATUS)).default([]),
+      bonifications: z.array(z.nativeEnum(BONIFICATION_STATUS)).default([]),
       hasTruck: z.enum(TRI_STATE).default("any"),
       termPreset: z.enum(TERM_PRESETS).default("any"),
       forecastPreset: z.enum(FORECAST_PRESETS).default("any"),
@@ -1360,7 +1360,7 @@ const taskTableConfigSchemaInner = z.object({
       assigneeIds: [],
       truckCategories: [],
       implementTypes: [],
-      commissions: [],
+      bonifications: [],
       hasTruck: "any",
       termPreset: "any",
       forecastPreset: "any",
@@ -1508,7 +1508,7 @@ function buildQueryParams(
 
   if (f.sectorIds.length > 0) where.sectorId = { in: f.sectorIds };
   if (f.customerIds.length > 0) where.customerId = { in: f.customerIds };
-  if (f.commissions.length > 0) where.commission = { in: f.commissions };
+  if (f.bonifications.length > 0) where.bonification = { in: f.bonifications };
 
   // Calendar ranges win when set, otherwise fall back to presets.
   const term = rangeFromCalendar(f.termRange) ?? dateRangeFor(f.termPreset);
@@ -2506,11 +2506,11 @@ function TaskTableConfigComponent({
       })),
     [],
   );
-  const commissionOptions = useMemo(
+  const bonificationOptions = useMemo(
     () =>
-      (Object.values(COMMISSION_STATUS) as COMMISSION_STATUS[]).map((cs) => ({
+      (Object.values(BONIFICATION_STATUS) as BONIFICATION_STATUS[]).map((cs) => ({
         value: cs,
-        label: COMMISSION_STATUS_LABELS[cs] ?? cs,
+        label: BONIFICATION_STATUS_LABELS[cs] ?? cs,
       })),
     [],
   );
@@ -2701,7 +2701,7 @@ function TaskTableConfigComponent({
               set("columnLabels", next);
             }}
             // SortKey is a superset of ColumnKey — it also covers virtual
-            // keys like `statusOrder`, `commissionOrder`, `updatedAt` that
+            // keys like `statusOrder`, `bonificationOrder`, `updatedAt` that
             // have no matching column row. Drop those from the chip-driven
             // list so the picker only juggles sorts that map to a real
             // visible row. The trade-off: virtual sorts can no longer be
@@ -2813,15 +2813,15 @@ function TaskTableConfigComponent({
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Comissão</Label>
+            <Label className="text-xs">Bonificação</Label>
             <Combobox
               mode="multiple"
-              value={c.filters.commissions}
+              value={c.filters.bonifications}
               onValueChange={(v) =>
-                setFilter("commissions", asArray(v) as COMMISSION_STATUS[])
+                setFilter("bonifications", asArray(v) as BONIFICATION_STATUS[])
               }
-              options={commissionOptions}
-              placeholder="Qualquer comissão"
+              options={bonificationOptions}
+              placeholder="Qualquer bonificação"
               searchPlaceholder="Buscar..."
             />
           </div>
@@ -3288,7 +3288,7 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
       assigneeIds: [],
       truckCategories: [],
       implementTypes: [],
-      commissions: [],
+      bonifications: [],
       hasTruck: "any",
       termPreset: "any",
       forecastPreset: "any",

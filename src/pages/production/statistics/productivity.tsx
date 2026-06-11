@@ -9,8 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FilterDrawer } from '@/components/common/filters/ui/FilterDrawer';
 import { Combobox } from '@/components/ui/combobox';
-import { GOAL_METRIC, routes, SECTOR_PRIVILEGES, COMMISSION_STATUS } from '@/constants';
-import { COMMISSION_STATUS_LABELS } from '@/constants/enum-labels';
+import { GOAL_METRIC, routes, SECTOR_PRIVILEGES, BONIFICATION_STATUS } from '@/constants';
+import { BONIFICATION_STATUS_LABELS } from '@/constants/enum-labels';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useTaskProductionStats } from '@/hooks/production/use-production-analytics';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
@@ -265,7 +265,7 @@ const pageConfigSchema = z.object({
   yAxisMode: z.enum(['count', 'avgPerUser', 'both']).catch('count'),
   compareMode: z.enum(['combined', 'separated', 'separatedWithTotal']).catch('combined'),
   sectorIds: z.array(z.string()).catch([]),
-  commissionStatuses: z.array(z.string()).catch([]),
+  bonificationStatuses: z.array(z.string()).catch([]),
   userIds: z.array(z.string()).catch([]),
 });
 
@@ -286,9 +286,9 @@ interface FilterSheetProps {
   onApply: (filters: TaskProductionFilters, years: string[], months: string[], days: string[], yearCompare: boolean) => void;
 }
 
-const COMMISSION_OPTIONS = Object.values(COMMISSION_STATUS).map(v => ({
+const BONIFICATION_OPTIONS = Object.values(BONIFICATION_STATUS).map(v => ({
   value: v,
-  label: COMMISSION_STATUS_LABELS[v],
+  label: BONIFICATION_STATUS_LABELS[v],
 }));
 
 function TaskProductionFiltersSheet({
@@ -302,7 +302,7 @@ function TaskProductionFiltersSheet({
   const [localMonths, setLocalMonths]           = useState<string[]>(selectedMonths);
   const [localDays, setLocalDays]               = useState<string[]>(selectedDays);
   const [localYearCompare, setLocalYearCompare] = useState(yearCompareMode);
-  const [localCommissions, setLocalCommissions] = useState<string[]>(filters.commissionStatuses || []);
+  const [localBonifications, setLocalBonifications] = useState<string[]>(filters.bonificationStatuses || []);
   const [localUserIds, setLocalUserIds]         = useState<string[]>(filters.userIds || []);
 
   useEffect(() => {
@@ -315,7 +315,7 @@ function TaskProductionFiltersSheet({
       setLocalMonths(selectedMonths);
       setLocalDays(selectedDays);
       setLocalYearCompare(yearCompareMode);
-      setLocalCommissions(filters.commissionStatuses || []);
+      setLocalBonifications(filters.bonificationStatuses || []);
       setLocalUserIds(filters.userIds || []);
     }
   }, [open, filters, selectedYears, selectedMonths, selectedDays, yearCompareMode]);
@@ -368,14 +368,14 @@ function TaskProductionFiltersSheet({
       yAxisMode: localY,
       compareMode: canCompare ? localCmp : 'combined',
       sectorIds: localSectors.length > 0 ? localSectors : undefined,
-      commissionStatuses: localCommissions.length > 0 ? localCommissions : undefined,
+      bonificationStatuses: localBonifications.length > 0 ? localBonifications : undefined,
       userIds: localUserIds.length > 0 ? localUserIds : undefined,
     };
     const daysOut = localX === 'day' ? localDays : [];
     const yearCompare = localYears.length >= 2 && localX === 'month' ? localYearCompare : false;
     onApply(finalFilters, localYears, localMonths, daysOut, yearCompare);
     onOpenChange(false);
-  }, [localX, localY, localCmp, localSectors, localYears, localMonths, localDays, localYearCompare, localCommissions, localUserIds, canCompare, onApply, onOpenChange]);
+  }, [localX, localY, localCmp, localSectors, localYears, localMonths, localDays, localYearCompare, localBonifications, localUserIds, canCompare, onApply, onOpenChange]);
 
   const handleClear = useCallback(() => {
     setLocalX('month');
@@ -385,11 +385,11 @@ function TaskProductionFiltersSheet({
     setLocalYears([]);
     setLocalMonths([]);
     setLocalDays([]);
-    setLocalCommissions([]);
+    setLocalBonifications([]);
     setLocalUserIds([]);
   }, []);
 
-  const activeCount = [localSectors.length > 0, localYears.length > 0, localCommissions.length > 0, localUserIds.length > 0].filter(Boolean).length;
+  const activeCount = [localSectors.length > 0, localYears.length > 0, localBonifications.length > 0, localUserIds.length > 0].filter(Boolean).length;
 
   return (
     <FilterDrawer
@@ -616,23 +616,23 @@ function TaskProductionFiltersSheet({
               </div>
             )}
 
-            {/* Commission status filter */}
+            {/* Bonification status filter */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2 text-sm font-medium">
                 <IconCheckbox className="h-4 w-4" />
-                Status de Comissão
+                Status de Bonificação
               </Label>
               <Combobox
                 mode="multiple"
-                value={localCommissions}
-                onValueChange={v => setLocalCommissions(Array.isArray(v) && v.length > 0 ? v : [])}
-                options={COMMISSION_OPTIONS}
+                value={localBonifications}
+                onValueChange={v => setLocalBonifications(Array.isArray(v) && v.length > 0 ? v : [])}
+                options={BONIFICATION_OPTIONS}
                 placeholder="Todos os status..."
                 searchable={false}
                 clearable={true}
               />
               <p className="text-xs text-muted-foreground">
-                Filtra tarefas pelo status de comissão. Sem seleção = todos.
+                Filtra tarefas pelo status de bonificação. Sem seleção = todos.
               </p>
             </div>
 
@@ -728,7 +728,7 @@ const TaskProductionPage = () => {
     yAxisMode: (filters.yAxisMode ?? 'count') as PageConfig['yAxisMode'],
     compareMode: (filters.compareMode ?? 'combined') as PageConfig['compareMode'],
     sectorIds: filters.sectorIds ?? [],
-    commissionStatuses: filters.commissionStatuses ?? [],
+    bonificationStatuses: filters.bonificationStatuses ?? [],
     userIds: filters.userIds ?? [],
   }), [chartType, primaryChartType, secondaryChartType, trendLine, yearCompareMode, selectedYears, selectedMonths, selectedDays, filters]);
 
@@ -754,7 +754,7 @@ const TaskProductionPage = () => {
       yAxisMode: config.yAxisMode,
       compareMode: config.compareMode,
       sectorIds: config.sectorIds.length ? config.sectorIds : undefined,
-      commissionStatuses: config.commissionStatuses.length ? config.commissionStatuses : undefined,
+      bonificationStatuses: config.bonificationStatuses.length ? config.bonificationStatuses : undefined,
       userIds: config.userIds.length ? config.userIds : undefined,
     });
     setSelectedYears(years);
@@ -1146,7 +1146,7 @@ const TaskProductionPage = () => {
     if (selectedDays.length) c++;
     if (filters.xAxisMode !== 'month') c++;
     if (filters.yAxisMode !== 'count') c++;
-    if (filters.commissionStatuses?.length) c++;
+    if (filters.bonificationStatuses?.length) c++;
     if (filters.userIds?.length) c++;
     return c;
   }, [filters, selectedYears, selectedMonths, selectedDays]);
@@ -2018,7 +2018,7 @@ const TaskProductionPage = () => {
           period={clickedPeriod.period}
           label={clickedPeriod.label}
           sectorIds={filters.sectorIds}
-          commissionStatuses={filters.commissionStatuses}
+          bonificationStatuses={filters.bonificationStatuses}
           userIds={filters.userIds}
           activeUsers={clickedPeriod.activeUsers}
           sectorColorMap={sectorColorMap}

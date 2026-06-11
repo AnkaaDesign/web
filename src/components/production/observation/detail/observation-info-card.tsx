@@ -5,7 +5,7 @@ import { useFileViewer } from "@/components/common/file/file-viewer";
 import { IconAlertCircle, IconCalendar, IconUser, IconTruck, IconFileText, IconBuildingFactory, IconCircleCheck } from "@tabler/icons-react";
 import { type Observation } from "../../../../types";
 import { formatDate, formatRelativeTime } from "../../../../utils";
-import { TASK_STATUS_LABELS, COMMISSION_STATUS_LABELS } from "../../../../constants";
+import { TASK_STATUS_LABELS, BONIFICATION_STATUS_LABELS } from "../../../../constants";
 import { cn } from "@/lib/utils";
 
 interface ObservationInfoCardProps {
@@ -34,7 +34,7 @@ interface ObservationInfoCardProps {
       size: number;
       mimeType: string;
     }[];
-    commissions?: {
+    bonifications?: {
       id: string;
       status: string;
       reason?: string;
@@ -67,7 +67,7 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
     }
   };
 
-  const getCommissionStatusBadgeVariant = (status: string) => {
+  const getBonificationStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "PENDING":
         return "secondary";
@@ -75,9 +75,9 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
         return "success";
       case "PAID":
         return "success";
-      case "SUSPENDED_COMMISSION":
+      case "SUSPENDED_BONIFICATION":
         return "destructive";
-      case "NO_COMMISSION":
+      case "NO_BONIFICATION":
         return "secondary";
       default:
         return "secondary";
@@ -157,20 +157,20 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
                 </div>
               )}
 
-              {/* Commission Status */}
-              {observation.commissions && observation.commissions.length > 0 && (
+              {/* Bonification Status */}
+              {observation.bonifications && observation.bonifications.length > 0 && (
                 <div className="pt-4 border-t border-border">
-                  <h4 className="text-sm font-semibold mb-3 text-foreground">Comissões Afetadas</h4>
+                  <h4 className="text-sm font-semibold mb-3 text-foreground">Bonificações Afetadas</h4>
                   <div className="space-y-3">
-                    {observation.commissions.map((commission) => (
-                      <div key={commission.id} className="bg-muted/50 rounded-lg px-4 py-3">
+                    {observation.bonifications.map((bonification) => (
+                      <div key={bonification.id} className="bg-muted/50 rounded-lg px-4 py-3">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-medium text-muted-foreground">{commission.user?.name || "Usuário"}</span>
-                          <Badge variant={getCommissionStatusBadgeVariant(commission.status)}>
-                            {COMMISSION_STATUS_LABELS[commission.status as keyof typeof COMMISSION_STATUS_LABELS] || commission.status}
+                          <span className="text-sm font-medium text-muted-foreground">{bonification.user?.name || "Usuário"}</span>
+                          <Badge variant={getBonificationStatusBadgeVariant(bonification.status)}>
+                            {BONIFICATION_STATUS_LABELS[bonification.status as keyof typeof BONIFICATION_STATUS_LABELS] || bonification.status}
                           </Badge>
                         </div>
-                        {commission.reason && <p className="text-xs text-muted-foreground mt-2">{commission.reason}</p>}
+                        {bonification.reason && <p className="text-xs text-muted-foreground mt-2">{bonification.reason}</p>}
                       </div>
                     ))}
                   </div>
@@ -283,20 +283,20 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
               </div>
             )}
 
-            {/* Commission Status */}
-            {observation.commissions && observation.commissions.length > 0 && (
+            {/* Bonification Status */}
+            {observation.bonifications && observation.bonifications.length > 0 && (
               <div className="pt-4 border-t border-border">
-                <h4 className="text-sm font-semibold mb-3 text-foreground">Comissões Afetadas</h4>
+                <h4 className="text-sm font-semibold mb-3 text-foreground">Bonificações Afetadas</h4>
                 <div className="space-y-3">
-                  {observation.commissions.map((commission) => (
-                    <div key={commission.id} className="bg-muted/50 rounded-lg px-4 py-3">
+                  {observation.bonifications.map((bonification) => (
+                    <div key={bonification.id} className="bg-muted/50 rounded-lg px-4 py-3">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-muted-foreground">{commission.user?.name || "Usuário"}</span>
-                        <Badge variant={getCommissionStatusBadgeVariant(commission.status)}>
-                          {COMMISSION_STATUS_LABELS[commission.status as keyof typeof COMMISSION_STATUS_LABELS] || commission.status}
+                        <span className="text-sm font-medium text-muted-foreground">{bonification.user?.name || "Usuário"}</span>
+                        <Badge variant={getBonificationStatusBadgeVariant(bonification.status)}>
+                          {BONIFICATION_STATUS_LABELS[bonification.status as keyof typeof BONIFICATION_STATUS_LABELS] || bonification.status}
                         </Badge>
                       </div>
-                      {commission.reason && <p className="text-xs text-muted-foreground mt-2">{commission.reason}</p>}
+                      {bonification.reason && <p className="text-xs text-muted-foreground mt-2">{bonification.reason}</p>}
                     </div>
                   ))}
                 </div>

@@ -253,13 +253,13 @@ export function PayrollTable({
             aValue = 0;
             bValue = 0;
             if (a.bonus?.tasks) {
-              const aFull = a.bonus.tasks.filter((t: any) => t.commission === 'FULL_COMMISSION').length;
-              const aPartial = a.bonus.tasks.filter((t: any) => t.commission === 'PARTIAL_COMMISSION').length;
+              const aFull = a.bonus.tasks.filter((t: any) => t.bonification === 'FULL_BONIFICATION').length;
+              const aPartial = a.bonus.tasks.filter((t: any) => t.bonification === 'PARTIAL_BONIFICATION').length;
               aValue = aFull + (aPartial * 0.5);
             }
             if (b.bonus?.tasks) {
-              const bFull = b.bonus.tasks.filter((t: any) => t.commission === 'FULL_COMMISSION').length;
-              const bPartial = b.bonus.tasks.filter((t: any) => t.commission === 'PARTIAL_COMMISSION').length;
+              const bFull = b.bonus.tasks.filter((t: any) => t.bonification === 'FULL_BONIFICATION').length;
+              const bPartial = b.bonus.tasks.filter((t: any) => t.bonification === 'PARTIAL_BONIFICATION').length;
               bValue = bFull + (bPartial * 0.5);
             }
             break;
@@ -268,14 +268,14 @@ export function PayrollTable({
             aValue = 0;
             bValue = 0;
             if (a.bonus?.tasks && a.bonus?.users) {
-              const aFull = a.bonus.tasks.filter((t: any) => t.commission === 'FULL_COMMISSION').length;
-              const aPartial = a.bonus.tasks.filter((t: any) => t.commission === 'PARTIAL_COMMISSION').length;
+              const aFull = a.bonus.tasks.filter((t: any) => t.bonification === 'FULL_BONIFICATION').length;
+              const aPartial = a.bonus.tasks.filter((t: any) => t.bonification === 'PARTIAL_BONIFICATION').length;
               const aTotal = aFull + (aPartial * 0.5);
               aValue = a.bonus.users.length > 0 ? aTotal / a.bonus.users.length : 0;
             }
             if (b.bonus?.tasks && b.bonus?.users) {
-              const bFull = b.bonus.tasks.filter((t: any) => t.commission === 'FULL_COMMISSION').length;
-              const bPartial = b.bonus.tasks.filter((t: any) => t.commission === 'PARTIAL_COMMISSION').length;
+              const bFull = b.bonus.tasks.filter((t: any) => t.bonification === 'FULL_BONIFICATION').length;
+              const bPartial = b.bonus.tasks.filter((t: any) => t.bonification === 'PARTIAL_BONIFICATION').length;
               const bTotal = bFull + (bPartial * 0.5);
               bValue = b.bonus.users.length > 0 ? bTotal / b.bonus.users.length : 0;
             }
@@ -367,8 +367,8 @@ export function PayrollTable({
             const tasks = row.bonus.tasks;
             const usersCount = row.bonus.users.length;
 
-            const fullCount = tasks.filter((t: any) => t.commission === 'FULL_COMMISSION').length;
-            const partialCount = tasks.filter((t: any) => t.commission === 'PARTIAL_COMMISSION').length;
+            const fullCount = tasks.filter((t: any) => t.bonification === 'FULL_BONIFICATION').length;
+            const partialCount = tasks.filter((t: any) => t.bonification === 'PARTIAL_BONIFICATION').length;
             const totalWeighted = fullCount + (partialCount * 0.5);
 
             monthAverage = usersCount > 0 ? totalWeighted / usersCount : 0;

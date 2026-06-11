@@ -24,6 +24,7 @@ import {
   IconLock,
   IconClock,
   IconUsers,
+  IconTemplate,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -37,6 +38,7 @@ import { Separator } from "@/components/ui/separator";
 import { routes, SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS } from "@/constants";
 import { cn } from "@/lib/utils";
 import { useNotificationConfigurationMutations } from "@/hooks/administration/use-notification-configuration";
+import type { NotificationTemplateConfig } from "@/types/notification-configuration";
 
 // =====================
 // Schema
@@ -87,9 +89,55 @@ const configurationSchema = z.object({
     allowedSectors: z.array(z.string()),
     excludeOnVacation: z.boolean(),
   }),
+  templates: z.object({
+    inApp: z.object({ title: z.string(), body: z.string() }),
+    push: z.object({ title: z.string(), body: z.string() }),
+    email: z.object({ subject: z.string(), body: z.string() }),
+    whatsapp: z.object({ body: z.string() }),
+  }),
 });
 
 type ConfigurationFormData = z.infer<typeof configurationSchema>;
+
+const EMPTY_TEMPLATES: ConfigurationFormData["templates"] = {
+  inApp: { title: "", body: "" },
+  push: { title: "", body: "" },
+  email: { subject: "", body: "" },
+  whatsapp: { body: "" },
+};
+
+/**
+ * Builds the API `templates` payload from the form values.
+ * Empty fields are omitted; a channel whose fields are all empty is omitted entirely.
+ */
+function buildTemplatesPayload(templates: ConfigurationFormData["templates"]): NotificationTemplateConfig {
+  const payload: NotificationTemplateConfig = {};
+
+  const inAppTitle = templates.inApp.title.trim();
+  const inAppBody = templates.inApp.body.trim();
+  if (inAppTitle || inAppBody) {
+    payload.inApp = { ...(inAppTitle && { title: inAppTitle }), ...(inAppBody && { body: inAppBody }) };
+  }
+
+  const pushTitle = templates.push.title.trim();
+  const pushBody = templates.push.body.trim();
+  if (pushTitle || pushBody) {
+    payload.push = { ...(pushTitle && { title: pushTitle }), ...(pushBody && { body: pushBody }) };
+  }
+
+  const emailSubject = templates.email.subject.trim();
+  const emailBody = templates.email.body.trim();
+  if (emailSubject || emailBody) {
+    payload.email = { ...(emailSubject && { subject: emailSubject }), ...(emailBody && { body: emailBody }) };
+  }
+
+  const whatsappBody = templates.whatsapp.body.trim();
+  if (whatsappBody) {
+    payload.whatsapp = { body: whatsappBody };
+  }
+
+  return payload;
+}
 
 // =====================
 // Constants
@@ -144,6 +192,9 @@ const CHANNEL_CONFIG = {
     textClass: "text-green-600 dark:text-green-400",
   },
 };
+
+const TEXT_INPUT_CLASS =
+  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm bg-transparent";
 
 // Derived from the SECTOR_PRIVILEGES enum so every privilege (including
 // PRODUCTION_MANAGER) is always available and labels stay canonical.
@@ -251,12 +302,15 @@ export function NotificationConfigurationCreatePage() {
         allowedSectors: [],
         excludeOnVacation: false,
       },
+      templates: EMPTY_TEMPLATES,
     },
   });
 
   const onSubmit = async (data: ConfigurationFormData) => {
     try {
       setIsSaving(true);
+
+      const templates = buildTemplatesPayload(data.templates);
 
       const payload = {
         key: data.key,
@@ -281,6 +335,7 @@ export function NotificationConfigurationCreatePage() {
               excludeOnVacation: data.targetRules.excludeOnVacation,
             }
           : undefined,
+        templates: Object.keys(templates).length > 0 ? templates : undefined,
       };
 
       const result = await createMutation.mutateAsync(payload);
@@ -492,6 +547,126 @@ export function NotificationConfigurationCreatePage() {
                     <strong>Obrigatório:</strong> Usuário não pode desabilitar este canal.{" "}
                     <strong>Ativo por padrão:</strong> Canal ativado automaticamente para novos usuários.
                   </p>
+                </CardContent>
+              </Card>
+
+              {/* Templates */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <IconTemplate className="w-5 h-5" />
+                    Templates
+                  </CardTitle>
+                  <CardDescription>
+                    Personalize as mensagens enviadas em cada canal. Campos vazios usam os templates
+                    padrão do sistema. Use variáveis no formato {"{{variavel}}"}.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* IN_APP */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <IconBell className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                      <span className="font-medium">No App</span>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-inapp-title">Título</Label>
+                      <input
+                        id="templates-inapp-title"
+                        placeholder="Ex: Nova tarefa: {{taskName}}"
+                        className={TEXT_INPUT_CLASS}
+                        {...(form.register("templates.inApp.title") as any)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-inapp-body">Corpo</Label>
+                      <Textarea
+                        id="templates-inapp-body"
+                        rows={3}
+                        placeholder="Ex: A tarefa {{taskName}} foi criada por {{userName}}."
+                        {...form.register("templates.inApp.body")}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* PUSH */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <IconDeviceMobile className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span className="font-medium">Push</span>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-push-title">Título</Label>
+                      <input
+                        id="templates-push-title"
+                        placeholder="Ex: Nova tarefa: {{taskName}}"
+                        className={TEXT_INPUT_CLASS}
+                        {...(form.register("templates.push.title") as any)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-push-body">Corpo</Label>
+                      <Textarea
+                        id="templates-push-body"
+                        rows={3}
+                        placeholder="Ex: A tarefa {{taskName}} foi criada por {{userName}}."
+                        {...form.register("templates.push.body")}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* EMAIL */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <IconMail className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <span className="font-medium">E-mail</span>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-email-subject">Assunto</Label>
+                      <input
+                        id="templates-email-subject"
+                        placeholder="Ex: Nova tarefa criada: {{taskName}}"
+                        className={TEXT_INPUT_CLASS}
+                        {...(form.register("templates.email.subject") as any)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-email-body">Corpo</Label>
+                      <Textarea
+                        id="templates-email-body"
+                        rows={4}
+                        placeholder="Ex: Olá {{userName}}, a tarefa {{taskName}} foi criada."
+                        {...form.register("templates.email.body")}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* WHATSAPP */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <IconBrandWhatsapp className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="font-medium">WhatsApp</span>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-whatsapp-body">Corpo</Label>
+                      <Textarea
+                        id="templates-whatsapp-body"
+                        rows={3}
+                        placeholder="Ex: A tarefa {{taskName}} foi criada por {{userName}}."
+                        {...form.register("templates.whatsapp.body")}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Apenas o corpo da mensagem: o emoji de importância e a linha de título são
+                        adicionados automaticamente no envio.
+                      </p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 

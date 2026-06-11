@@ -322,12 +322,12 @@ export const routes = {
 
   // Inventory - Estoque - Inventory Management
   inventory: {
-    externalWithdrawals: {
-      create: "/estoque/retiradas-externas/cadastrar",
-      details: (id: string) => `/estoque/retiradas-externas/detalhes/${id}`,
-      edit: (id: string) => `/estoque/retiradas-externas/editar/${id}`,
-      list: "/estoque/retiradas-externas",
-      root: "/estoque/retiradas-externas",
+    externalOperations: {
+      create: "/estoque/operacoes-externas/cadastrar",
+      details: (id: string) => `/estoque/operacoes-externas/detalhes/${id}`,
+      edit: (id: string) => `/estoque/operacoes-externas/editar/${id}`,
+      list: "/estoque/operacoes-externas",
+      root: "/estoque/operacoes-externas",
     },
     loans: {
       batchEdit: "/estoque/emprestimos/editar-lote",

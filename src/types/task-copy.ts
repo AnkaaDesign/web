@@ -9,7 +9,7 @@ export type CopyableTaskField =
   | 'entryDate'
   | 'term'
   | 'forecastDate'
-  | 'commission'
+  | 'bonification'
   | 'responsibles'
   | 'customerId'
   | 'quoteId'
@@ -42,7 +42,7 @@ export const COPYABLE_TASK_FIELDS: CopyableTaskField[] = [
   'entryDate',
   'term',
   'forecastDate',
-  'commission',
+  'bonification',
   'responsibles',
   'customerId',
   'quoteId',
@@ -78,8 +78,8 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
   responsibles: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
   customerId: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
-  // Commission - disabled for Financial, Designer, Logistic, Warehouse
-  commission: ['ADMIN', 'COMMERCIAL', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  // Bonification - disabled for Financial, Designer, Logistic, Warehouse
+  bonification: ['ADMIN', 'COMMERCIAL', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Quote - only visible to ADMIN, FINANCIAL, COMMERCIAL (canViewQuoteSections)
   quoteId: ['ADMIN', 'FINANCIAL', 'COMMERCIAL'],
@@ -194,9 +194,9 @@ export const COPYABLE_FIELD_METADATA: Record<CopyableTaskField, CopyableFieldMet
     description: 'Data de previsão de liberação',
     category: 'Datas',
   },
-  commission: {
-    label: 'Comissão',
-    description: 'Informações de comissão',
+  bonification: {
+    label: 'Bonificação',
+    description: 'Informações de bonificação',
     category: 'Comercial',
   },
   responsibles: {

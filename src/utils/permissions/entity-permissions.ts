@@ -136,59 +136,53 @@ export function canLeaderManageTask(user: PermissionUser | null, taskSectorId: s
 // =====================
 
 /**
- * Can user create cuts?
- * Only ADMIN can create cuts directly
- */
-export function canCreateCuts(user: PermissionUser | null): boolean {
-  if (!user) return false;
-  return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.ADMIN,
-  ]);
-}
-
-/**
  * Can user edit cuts?
- * Only ADMIN can edit cut details
+ * DESIGNER, PLOTTING, and ADMIN can edit cut details (matches API PUT /cuts/:id)
  */
 export function canEditCuts(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.DESIGNER,
+    SECTOR_PRIVILEGES.PLOTTING,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
 
 /**
  * Can user delete cuts?
- * Only ADMIN can delete cuts
+ * DESIGNER and ADMIN can delete cuts (matches API DELETE /cuts/:id)
  */
 export function canDeleteCuts(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.DESIGNER,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
 
 /**
  * Can user start/finish cuts (change status)?
- * WAREHOUSE can start/finish cuts
- * ADMIN can also manage cut status
+ * DESIGNER, PLOTTING, and ADMIN can change cut status (status changes go
+ * through PUT /cuts/:id, which the API restricts to these roles)
  */
 export function canManageCutStatus(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.DESIGNER,
+    SECTOR_PRIVILEGES.PLOTTING,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
 
 /**
  * Can user request a new cut?
- * Team leaders can request cuts for their sector
- * ADMIN can also request cuts
+ * DESIGNER and ADMIN can request cuts (cut requests create cuts via
+ * POST /cuts, which the API restricts to these roles)
  */
 export function canRequestCut(user: PermissionUser | null): boolean {
   if (!user) return false;
-  return isTeamLeader(user) || hasAnyPrivilege(user, [
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.DESIGNER,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
@@ -223,6 +217,8 @@ export function canDeleteAirbrushings(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.FINANCIAL,
   ]);
 }
 
@@ -232,7 +228,8 @@ export function canDeleteAirbrushings(user: PermissionUser | null): boolean {
 
 /**
  * Can user create/edit/delete observations?
- * ADMIN, COMMERCIAL, FINANCIAL, PRODUCTION, and WAREHOUSE can create/edit observations
+ * ADMIN, COMMERCIAL, FINANCIAL, WAREHOUSE, and PRODUCTION_MANAGER can
+ * create/edit observations (PRODUCTION excluded — matches API)
  */
 export function canCreateObservations(user: PermissionUser | null): boolean {
   if (!user) return false;
@@ -240,9 +237,8 @@ export function canCreateObservations(user: PermissionUser | null): boolean {
     SECTOR_PRIVILEGES.ADMIN,
     SECTOR_PRIVILEGES.COMMERCIAL,
     SECTOR_PRIVILEGES.FINANCIAL,
-    SECTOR_PRIVILEGES.PRODUCTION,
-    SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
     SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   ]);
 }
 
@@ -252,9 +248,8 @@ export function canEditObservations(user: PermissionUser | null): boolean {
     SECTOR_PRIVILEGES.ADMIN,
     SECTOR_PRIVILEGES.COMMERCIAL,
     SECTOR_PRIVILEGES.FINANCIAL,
-    SECTOR_PRIVILEGES.PRODUCTION,
-    SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
     SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   ]);
 }
 
@@ -282,8 +277,15 @@ export function canEditItems(user: PermissionUser | null): boolean {
   ]);
 }
 
+/**
+ * Can user delete inventory items?
+ * Only ADMIN can delete items (matches API)
+ */
 export function canDeleteItems(user: PermissionUser | null): boolean {
-  return canEditItems(user);
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
 }
 
 export function canBatchOperateItems(user: PermissionUser | null): boolean {
@@ -322,12 +324,11 @@ export const canDeletePaintTypes = canDeletePaints;
 
 /**
  * Can user edit/delete paint productions?
- * PRODUCTION and WAREHOUSE can manage paint productions
+ * WAREHOUSE and ADMIN manage paint productions (PRODUCTION is view-only — matches API)
  */
 export function canEditPaintProductions(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.PRODUCTION,
     SECTOR_PRIVILEGES.WAREHOUSE,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
@@ -404,8 +405,15 @@ export function canEditOrders(user: PermissionUser | null): boolean {
   ]);
 }
 
+/**
+ * Can user delete orders?
+ * Only ADMIN can delete orders (matches API)
+ */
 export function canDeleteOrders(user: PermissionUser | null): boolean {
-  return canEditOrders(user);
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
 }
 
 export function canBatchOperateOrders(user: PermissionUser | null): boolean {
@@ -486,14 +494,27 @@ export function canBatchOperateMaintenance(user: PermissionUser | null): boolean
 }
 
 // =====================
-// EXTERNAL WITHDRAWAL PERMISSIONS
+// EXTERNAL OPERATION PERMISSIONS
 // =====================
 
 /**
- * Can user edit/delete external withdrawals?
- * WAREHOUSE manages external withdrawals
+ * Can user edit external operations?
+ * WAREHOUSE manages external operations; FINANCIAL handles billing (matches API)
  */
-export function canEditExternalWithdrawals(user: PermissionUser | null): boolean {
+export function canEditExternalOperations(user: PermissionUser | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.FINANCIAL,
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+/**
+ * Can user delete external operations?
+ * WAREHOUSE and ADMIN only (FINANCIAL has no delete on the API)
+ */
+export function canDeleteExternalOperations(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.WAREHOUSE,
@@ -501,12 +522,8 @@ export function canEditExternalWithdrawals(user: PermissionUser | null): boolean
   ]);
 }
 
-export function canDeleteExternalWithdrawals(user: PermissionUser | null): boolean {
-  return canEditExternalWithdrawals(user);
-}
-
-export function canBatchOperateExternalWithdrawals(user: PermissionUser | null): boolean {
-  return canEditExternalWithdrawals(user);
+export function canBatchOperateExternalOperations(user: PermissionUser | null): boolean {
+  return canDeleteExternalOperations(user);
 }
 
 // =====================
@@ -525,8 +542,15 @@ export function canEditSuppliers(user: PermissionUser | null): boolean {
   ]);
 }
 
+/**
+ * Can user delete suppliers?
+ * Only ADMIN can delete suppliers (matches API)
+ */
 export function canDeleteSuppliers(user: PermissionUser | null): boolean {
-  return canEditSuppliers(user);
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
 }
 
 // =====================
@@ -599,7 +623,7 @@ export function canDeleteUsers(user: PermissionUser | null): boolean {
 export function shouldShowInteractiveElements(
   user: PermissionUser | null,
   entityType: 'task' | 'cut' | 'item' | 'paint' | 'customer' | 'order' |
-               'borrow' | 'ppe' | 'maintenance' | 'externalWithdrawal' |
+               'borrow' | 'ppe' | 'maintenance' | 'externalOperation' |
                'supplier' | 'hr' | 'user' | 'paintBrand' | 'paintType' |
                'paintFormula' | 'observation' | 'airbrushing'
 ): boolean {
@@ -626,8 +650,8 @@ export function shouldShowInteractiveElements(
       return canEditPpeDeliveries(user);
     case 'maintenance':
       return canEditMaintenance(user);
-    case 'externalWithdrawal':
-      return canEditExternalWithdrawals(user);
+    case 'externalOperation':
+      return canEditExternalOperations(user);
     case 'supplier':
       return canEditSuppliers(user);
     case 'hr':

@@ -9,7 +9,7 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import type { AirbrushingGetManyFormData } from "../../../../schemas";
 import type { Task } from "../../../../types";
 import { Badge } from "@/components/ui/badge";
-import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
+import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_PAYMENT_STATUS_LABELS } from "../../../../constants";
 
 interface AirbrushingFiltersProps {
   open: boolean;
@@ -22,6 +22,7 @@ interface AirbrushingFiltersProps {
 interface FilterState {
   taskIds: string[];
   status: AIRBRUSHING_STATUS[];
+  paymentStatuses: AIRBRUSHING_PAYMENT_STATUS[];
   priceMin?: number;
   priceMax?: number;
   createdAfter?: Date;
@@ -32,6 +33,7 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
   const [localState, setLocalState] = useState<FilterState>({
     taskIds: [],
     status: [],
+    paymentStatuses: [],
     priceMin: undefined,
     priceMax: undefined,
     createdAfter: undefined,
@@ -45,6 +47,7 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
     setLocalState({
       taskIds: filters.taskIds || [],
       status: filters.status || [],
+      paymentStatuses: filters.paymentStatuses || [],
       priceMin: filters.priceRange?.min,
       priceMax: filters.priceRange?.max,
       createdAfter: filters.createdAt?.gte,
@@ -69,6 +72,13 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
       newFilters.status = localState.status;
     } else {
       delete newFilters.status;
+    }
+
+    // Payment status
+    if (localState.paymentStatuses.length > 0) {
+      newFilters.paymentStatuses = localState.paymentStatuses;
+    } else {
+      delete newFilters.paymentStatuses;
     }
 
     // Price range
@@ -105,6 +115,7 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
     setLocalState({
       taskIds: [],
       status: [],
+      paymentStatuses: [],
       priceMin: undefined,
       priceMax: undefined,
       createdAfter: undefined,
@@ -116,6 +127,7 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
     let count = 0;
     if (localState.taskIds.length > 0) count++;
     if (localState.status.length > 0) count++;
+    if (localState.paymentStatuses.length > 0) count++;
     if (localState.priceMin !== undefined || localState.priceMax !== undefined) count++;
     if (localState.createdAfter || localState.createdBefore) count++;
     return count;
@@ -155,6 +167,33 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
               }}
               placeholder="Selecionar status..."
               searchPlaceholder="Buscar status..."
+              emptyText="Nenhum status encontrado"
+              searchable={true}
+              clearable={true}
+            />
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-base font-medium">
+              Status do Pagamento
+              {localState.paymentStatuses.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {localState.paymentStatuses.length}
+                </Badge>
+              )}
+            </Label>
+            <Combobox
+              mode="multiple"
+              options={Object.values(AIRBRUSHING_PAYMENT_STATUS).map((paymentStatus) => ({
+                value: paymentStatus,
+                label: AIRBRUSHING_PAYMENT_STATUS_LABELS[paymentStatus],
+              }))}
+              value={localState.paymentStatuses}
+              onValueChange={(paymentStatuses: string | string[] | null | undefined) => {
+                setLocalState((prev) => ({ ...prev, paymentStatuses: (Array.isArray(paymentStatuses) ? paymentStatuses : []) as AIRBRUSHING_PAYMENT_STATUS[] }));
+              }}
+              placeholder="Selecionar status do pagamento..."
+              searchPlaceholder="Buscar status do pagamento..."
               emptyText="Nenhum status encontrado"
               searchable={true}
               clearable={true}

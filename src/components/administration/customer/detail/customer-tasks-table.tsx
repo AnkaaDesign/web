@@ -82,7 +82,7 @@ export function CustomerTasksTable({
       budgets: true,
       reimbursements: true,
       invoiceReimbursements: true,
-      // Note: commission is a direct field on Task, not a relation, so it's always included
+      // Note: bonification is a direct field on Task, not a relation, so it's always included
     }),
     [],
   );

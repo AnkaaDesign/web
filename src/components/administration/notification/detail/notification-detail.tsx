@@ -24,7 +24,29 @@ const importanceColors = {
   URGENT: "bg-red-100 text-red-800 border-red-300",
 } as const;
 
+/**
+ * actionUrl can be a plain path/URL or a JSON blob like
+ * {"web":"https://...","mobile":"app://...","universalLink":"https://..."}.
+ * Resolves it to a single usable web URL (web > universalLink > webPath),
+ * falling back to the raw string when it isn't JSON.
+ */
+function resolveActionUrl(actionUrl: string): string | null {
+  if (actionUrl.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(actionUrl);
+      if (parsed && typeof parsed === "object") {
+        const url = parsed.web || parsed.universalLink || parsed.webPath;
+        return typeof url === "string" && url.length > 0 ? url : null;
+      }
+    } catch {
+      // Not valid JSON: fall through and treat it as a plain URL
+    }
+  }
+  return actionUrl;
+}
+
 export function NotificationDetail({ notification, onEdit, onDelete, onSend, onMarkAsRead, className }: NotificationDetailProps) {
+  const resolvedActionUrl = notification.actionUrl ? resolveActionUrl(notification.actionUrl) : null;
   const isSent = !!notification.sentAt;
   const isRead = notification.seenBy && notification.seenBy.length > 0;
   const isScheduled = !!notification.scheduledAt && !isSent;
@@ -85,16 +107,17 @@ export function NotificationDetail({ notification, onEdit, onDelete, onSend, onM
                   <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{notification.body}</p>
                 </div>
 
-                {notification.actionUrl && (
+                {resolvedActionUrl && (
                   <>
                     <Separator />
                     <div>
                       <h4 className="font-medium text-gray-900 mb-2">Ação Relacionada</h4>
                       <Button variant="outline" size="sm" asChild>
-                        <a href={notification.actionUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center">
+                        <a href={resolvedActionUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center">
                           Ver Ação
                         </a>
                       </Button>
+                      <p className="text-xs text-gray-500 mt-1 break-all">{resolvedActionUrl}</p>
                       {notification.actionType && (
                         <p className="text-sm text-gray-500 mt-1">
                           Tipo:{" "}

@@ -150,13 +150,13 @@ export function BonusRulesModal({ open, onClose, highlightReference }: BonusRule
               highlighted={highlighted === "suspensas"}
             >
               <p>
-                Quando uma tarefa é marcada com <strong className="text-foreground">comissão suspensa</strong>, ela é <strong className="text-destructive">removida do cálculo do bônus</strong>.
+                Quando uma tarefa é marcada com <strong className="text-foreground">bonificação suspensa</strong>, ela é <strong className="text-destructive">removida do cálculo do bônus</strong>.
               </p>
               <p>
                 Tarefas suspensas <strong className="text-foreground">não contam</strong> na média ponderada por colaborador e portanto não geram bônus para nenhum dos elegíveis. O valor que seria recebido por aquela tarefa aparece como <strong className="text-foreground">desconto "Tarefas Suspensas"</strong> no bônus.
               </p>
               <p className="text-xs italic">
-                Tarefas com <strong className="text-foreground">comissão integral</strong> contam como 1.0 e <strong className="text-foreground">comissão parcial</strong> conta como 0.5 na ponderação. <strong className="text-foreground">Sem comissão</strong> e <strong className="text-foreground">suspensa</strong> contam como 0.
+                Tarefas com <strong className="text-foreground">bonificação integral</strong> contam como 1.0 e <strong className="text-foreground">bonificação parcial</strong> conta como 0.5 na ponderação. <strong className="text-foreground">Sem bonificação</strong> e <strong className="text-foreground">suspensa</strong> contam como 0.
               </p>
             </Section>
 

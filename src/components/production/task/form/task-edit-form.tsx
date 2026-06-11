@@ -18,6 +18,7 @@ import {
   IconId,
   IconNotes,
   IconStatusChange,
+  IconTrash,
   IconMapPin,
   IconUser,
   IconCamera,
@@ -32,7 +33,7 @@ import { cutService } from "../../../../api-client/cut";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole } from "@/types/responsible";
 import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
-import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, BONIFICATION_STATUS, BONIFICATION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { useAuth } from "../../../../contexts/auth-context";
 import { useTaskPermissions } from '@/hooks/common/use-task-permissions';
@@ -129,12 +130,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const {
     privilege, isTeamLeader,
     canViewRestrictedFields,
-    canViewCommission: canViewCommissionField,
+    canViewBonification: canViewBonificationField,
     canViewDates, canViewServices, canViewLayout, canViewTruckSpot,
     canViewPaint, canViewLogoPaint, canViewCuts,
     canViewAirbrushing, canViewBaseFiles, canViewProjectFiles,
     canViewCheckinCheckout, canViewReimbursement, canViewObservation,
-    canEditIdentity, canEditSector, canEditCommission,
+    canEditObservation,
+    canEditIdentity, canEditSector, canEditBonification,
     canEditDates, canEditResponsibles, canEditServices,
     canEditLayout, canEditPaint,
   } = useTaskPermissions();
@@ -448,7 +450,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     "truck.chassisNumber": "basic-information",
     sectorId: "basic-information",
     status: "basic-information",
-    commission: "basic-information",
+    bonification: "basic-information",
     details: "basic-information",
     truck: "basic-information",
     // Responsibles
@@ -740,7 +742,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       status: taskData.status || TASK_STATUS.PREPARATION,
       serialNumber: taskData.serialNumber || null,
       details: taskData.details || null,
-      commission: taskData.commission || null,
+      bonification: taskData.bonification || null,
       entryDate: taskData.entryDate ? new Date(taskData.entryDate) : null,
       term: taskData.term ? new Date(taskData.term) : null,
       startedAt: taskData.startedAt ? new Date(taskData.startedAt) : null,
@@ -1063,24 +1065,24 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         }
 
         // Validate observation is complete if data has been entered
+        // Files are optional (matches the standalone observation form and the API schema)
         const observation = form.getValues('observation');
-        const hasObservationData = observation?.description || observationFiles.length > 0;
+        const hasObservationData = observation?.description?.trim() || observationFiles.length > 0;
 
         if (hasObservationData) {
           const hasDescription = observation?.description && observation.description.trim() !== "";
-          const hasFiles = (observation?.fileIds && observation.fileIds.length > 0) || observationFiles.length > 0;
 
           if (!hasDescription) {
             console.log('[TaskEditForm] ❌ Early return: observation has data but no description');
             toast.error("A observação está incompleta. Preencha a descrição antes de enviar o formulário.");
             return;
           }
+        }
 
-          if (!hasFiles) {
-            console.log('[TaskEditForm] ❌ Early return: observation has data but no files');
-            toast.error("A observação está incompleta. Adicione pelo menos um arquivo antes de enviar o formulário.");
-            return;
-          }
+        // Normalize a cleared observation to null so the API deletes it
+        // (changedData carries raw form values; an empty object would fail API validation)
+        if (changedData.observation && !(changedData.observation as any).description?.trim() && !((changedData.observation as any).fileIds?.length > 0)) {
+          changedData.observation = null as any;
         }
 
         // Track layout photo files
@@ -1336,7 +1338,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             'paintId',
             'serialNumber',
             'details',
-            'commission',
+            'bonification',
             'observation',
           ]);
 
@@ -1725,7 +1727,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             'paintId',
             'serialNumber',
             'details',
-            'commission',
+            'bonification',
             'observation',
           ]);
 
@@ -2223,13 +2225,26 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
     const currentObservation = form.getValues("observation");
+    const description = currentObservation?.description || "";
+
+    // When everything is cleared, store null so the API deletes the observation
+    if (fileIds.length === 0 && files.length === 0 && !description.trim()) {
+      form.setValue("observation", null, { shouldDirty: true, shouldTouch: true, shouldValidate: false });
+      return;
+    }
 
     form.setValue("observation", {
-      description: currentObservation?.description || "",
+      description,
       fileIds: fileIds,
     }, { shouldDirty: true, shouldTouch: true, shouldValidate: false });
-    
+
     // Note: Form validation happens automatically via useWatch, no need to manually trigger
+  };
+
+  // Remove the observation entirely (the API deletes it when observation is null)
+  const handleRemoveObservation = () => {
+    setObservationFiles([]);
+    form.setValue("observation", null, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
   };
 
   // const _handleCancel = useCallback(() => {
@@ -2430,15 +2445,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const hasIncompleteObservation = useMemo(() => {
     // Only validate if observation has been started (has some data)
     const observation = observationValue;
-    const hasObservationData = observation?.description || observationFiles.length > 0;
+    const hasObservationData = observation?.description?.trim() || observationFiles.length > 0;
 
     if (!hasObservationData) return false;
 
+    // Files are optional (matches the standalone observation form and the API schema);
+    // only a description is required when the observation has any data
     const hasDescription = observation?.description && observation.description.trim() !== "";
-    const hasFiles = (observation?.fileIds && observation.fileIds.length > 0) || observationFiles.length > 0;
-
-    // Observation is incomplete if data exists but missing description OR files
-    return !hasDescription || !hasFiles;
+    return !hasDescription;
   }, [observationValue, observationFiles]);
 
   // Notify parent of form state changes
@@ -2807,7 +2821,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       />
                     </div>
 
-                    {/* Sector, Status and Commission in a row */}
+                    {/* Sector, Status and Bonification in a row */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Sector */}
                       <SectorSelector control={form.control} disabled={isSubmitting || !canEditSector} productionOnly />
@@ -2847,30 +2861,30 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                         )}
                       />
 
-                      {/* Commission Status (only visible to ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION) */}
-                      {canViewCommissionField && (
+                      {/* Bonification Status (only visible to ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION) */}
+                      {canViewBonificationField && (
                       <FormField
                         control={form.control}
-                        name={"commission" as any}
+                        name={"bonification" as any}
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="flex items-center gap-2">
                               <IconCurrencyReal className="h-4 w-4" />
-                              Status de Comissão
+                              Status de Bonificação
                             </FormLabel>
                             <FormControl>
                               <Combobox
                                 value={field.value || ""}
                                 onValueChange={(value) => field.onChange(value || null)}
-                                disabled={isSubmitting || !canEditCommission}
+                                disabled={isSubmitting || !canEditBonification}
                                 options={[
                                   { value: "", label: "Não definido" },
-                                  ...Object.values(COMMISSION_STATUS).map((status) => ({
+                                  ...Object.values(BONIFICATION_STATUS).map((status) => ({
                                     value: status,
-                                    label: COMMISSION_STATUS_LABELS[status] || status,
+                                    label: BONIFICATION_STATUS_LABELS[status] || status,
                                   })),
                                 ]}
-                                placeholder="Selecione o status de comissão"
+                                placeholder="Selecione o status de bonificação"
                                 searchable={false}
                               />
                             </FormControl>
@@ -3765,6 +3779,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                   <AccordionContent>
                     <CardContent className="pt-0">
                       <div className="space-y-4">
+                        <Alert variant="warning">
+                          <AlertDescription>
+                            Ao enviar, os dados desta observação (descrição e arquivos) serão compartilhados com todos os usuários da empresa.
+                          </AlertDescription>
+                        </Alert>
                         <FormField
                           control={form.control}
                           name="observation"
@@ -3786,7 +3805,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                                   }}
                                   placeholder="Descreva problemas ou observações sobre a tarefa..."
                                   rows={4}
-                                  disabled={isSubmitting}
+                                  disabled={isSubmitting || !canEditObservation}
                                   className="bg-transparent"
                                 />
                               </FormControl>
@@ -3799,12 +3818,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                         <div className="space-y-2">
                           <Label className="text-sm font-medium flex items-center gap-2">
                             <IconFile className="h-4 w-4 text-muted-foreground" />
-                            Arquivos de Evidência <span className="text-destructive">*</span>
+                            Arquivos de Evidência (Opcional)
                           </Label>
                           <FileUploadField
                             onFilesChange={handleObservationFilesChange}
                             maxFiles={10}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || !canEditObservation}
                             showPreview={true}
                             existingFiles={observationFiles}
                             variant="compact"
@@ -3815,8 +3834,24 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
                         {hasIncompleteObservation && (
                           <Alert variant="destructive">
-                            <AlertDescription>A observação está incompleta. Preencha a descrição e adicione pelo menos um arquivo antes de enviar o formulário.</AlertDescription>
+                            <AlertDescription>A observação está incompleta. Preencha a descrição antes de enviar o formulário.</AlertDescription>
                           </Alert>
+                        )}
+
+                        {canEditObservation && (observationValue?.description || observationFiles.length > 0) && (
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={isSubmitting}
+                              onClick={handleRemoveObservation}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <IconTrash className="h-4 w-4 mr-2" />
+                              Remover Observação
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </CardContent>

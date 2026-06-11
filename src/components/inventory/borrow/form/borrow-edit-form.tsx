@@ -75,12 +75,12 @@ export function BorrowEditForm({ borrow }: BorrowEditFormProps) {
           return;
         }
 
-        // Validate if item is a tool (can be borrowed)
-        if (selectedItem.category?.type !== "TOOL") {
-          toast.error("Apenas ferramentas podem ser emprestadas");
+        // Validate if item can be borrowed
+        if (!selectedItem.isBorrowable) {
+          toast.error("Apenas itens emprestáveis podem ser emprestados");
           form.setError("itemId", {
             type: "manual",
-            message: "Apenas ferramentas podem ser emprestadas",
+            message: "Apenas itens emprestáveis podem ser emprestados",
           });
           return;
         }
@@ -233,7 +233,7 @@ export function BorrowEditForm({ borrow }: BorrowEditFormProps) {
                   <p className="text-sm text-muted-foreground">
                     <span className="font-medium">Categoria:</span> {selectedItem.category?.name || "N/A"}
                   </p>
-                  {selectedItem.category?.type !== "TOOL" && <p className="text-sm text-destructive">⚠️ Apenas ferramentas podem ser emprestadas</p>}
+                  {!selectedItem.isBorrowable && <p className="text-sm text-destructive">⚠️ Apenas itens emprestáveis podem ser emprestados</p>}
                   {isReturned && <p className="text-sm text-green-600">✓ Este empréstimo foi devolvido em {formatDateTime(borrow.returnedAt!)}</p>}
                 </div>
               )}

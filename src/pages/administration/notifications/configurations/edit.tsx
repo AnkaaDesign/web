@@ -26,6 +26,7 @@ import {
   IconUsers,
   IconAlertTriangle,
   IconArrowLeft,
+  IconTemplate,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -46,6 +47,7 @@ import {
   useNotificationConfigurationMutations,
 } from "@/hooks/administration/use-notification-configuration";
 import { notificationConfigurationService } from "@/api-client/services/notification-configuration.service";
+import type { NotificationTemplateConfig } from "@/types/notification-configuration";
 
 // =====================
 // Schema
@@ -96,9 +98,79 @@ const configurationSchema = z.object({
     allowedSectors: z.array(z.string()),
     excludeOnVacation: z.boolean(),
   }),
+  templates: z.object({
+    inApp: z.object({ title: z.string(), body: z.string() }),
+    push: z.object({ title: z.string(), body: z.string() }),
+    email: z.object({ subject: z.string(), body: z.string() }),
+    whatsapp: z.object({ body: z.string() }),
+  }),
 });
 
 type ConfigurationFormData = z.infer<typeof configurationSchema>;
+
+const EMPTY_TEMPLATES: ConfigurationFormData["templates"] = {
+  inApp: { title: "", body: "" },
+  push: { title: "", body: "" },
+  email: { subject: "", body: "" },
+  whatsapp: { body: "" },
+};
+
+/**
+ * Maps the API templates object into the (always fully populated) form shape.
+ */
+function templatesToFormValues(templates?: NotificationTemplateConfig | null): ConfigurationFormData["templates"] {
+  return {
+    inApp: {
+      title: templates?.inApp?.title ?? "",
+      body: templates?.inApp?.body ?? "",
+    },
+    push: {
+      title: templates?.push?.title ?? "",
+      body: templates?.push?.body ?? "",
+    },
+    email: {
+      subject: templates?.email?.subject ?? "",
+      body: templates?.email?.body ?? "",
+    },
+    whatsapp: {
+      body: templates?.whatsapp?.body ?? "",
+    },
+  };
+}
+
+/**
+ * Builds the API `templates` payload from the form values.
+ * Empty fields are omitted; a channel whose fields are all empty is omitted entirely
+ * (the system falls back to its default templates).
+ */
+function buildTemplatesPayload(templates: ConfigurationFormData["templates"]): NotificationTemplateConfig {
+  const payload: NotificationTemplateConfig = {};
+
+  const inAppTitle = templates.inApp.title.trim();
+  const inAppBody = templates.inApp.body.trim();
+  if (inAppTitle || inAppBody) {
+    payload.inApp = { ...(inAppTitle && { title: inAppTitle }), ...(inAppBody && { body: inAppBody }) };
+  }
+
+  const pushTitle = templates.push.title.trim();
+  const pushBody = templates.push.body.trim();
+  if (pushTitle || pushBody) {
+    payload.push = { ...(pushTitle && { title: pushTitle }), ...(pushBody && { body: pushBody }) };
+  }
+
+  const emailSubject = templates.email.subject.trim();
+  const emailBody = templates.email.body.trim();
+  if (emailSubject || emailBody) {
+    payload.email = { ...(emailSubject && { subject: emailSubject }), ...(emailBody && { body: emailBody }) };
+  }
+
+  const whatsappBody = templates.whatsapp.body.trim();
+  if (whatsappBody) {
+    payload.whatsapp = { body: whatsappBody };
+  }
+
+  return payload;
+}
 
 // =====================
 // Constants
@@ -321,6 +393,7 @@ export function NotificationConfigurationEditPage() {
         allowedSectors: [],
         excludeOnVacation: false,
       },
+      templates: EMPTY_TEMPLATES,
     },
   });
 
@@ -356,6 +429,7 @@ export function NotificationConfigurationEditPage() {
           allowedSectors: config.targetRule?.allowedSectors || [],
           excludeOnVacation: config.targetRule?.excludeOnVacation ?? false,
         },
+        templates: templatesToFormValues(config.templates),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -397,6 +471,8 @@ export function NotificationConfigurationEditPage() {
           allowedSectors: data.targetRules.allowedSectors,
           excludeOnVacation: data.targetRules.excludeOnVacation,
         },
+        // Always send templates so clearing every field restores the system defaults.
+        templates: buildTemplatesPayload(data.templates),
       };
 
       await updateMutation.mutateAsync({ id: config.id, data: payload });
@@ -682,6 +758,150 @@ export function NotificationConfigurationEditPage() {
                         )}
                       />
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Templates */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <IconTemplate className="w-5 h-5" />
+                    Templates
+                  </CardTitle>
+                  <CardDescription>
+                    Personalize as mensagens enviadas em cada canal. Campos vazios usam os templates
+                    padrão do sistema. Use variáveis no formato {"{{variavel}}"}.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* IN_APP */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <IconBell className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                      <span className="font-medium">No App</span>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-inapp-title">Título</Label>
+                      <Controller
+                        name="templates.inApp.title"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Input
+                            id="templates-inapp-title"
+                            placeholder="Ex: Nova tarefa: {{taskName}}"
+                            transparent
+                            value={field.value}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                          />
+                        )}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-inapp-body">Corpo</Label>
+                      <Textarea
+                        id="templates-inapp-body"
+                        rows={3}
+                        placeholder="Ex: A tarefa {{taskName}} foi criada por {{userName}}."
+                        {...form.register("templates.inApp.body")}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* PUSH */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <IconDeviceMobile className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span className="font-medium">Push</span>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-push-title">Título</Label>
+                      <Controller
+                        name="templates.push.title"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Input
+                            id="templates-push-title"
+                            placeholder="Ex: Nova tarefa: {{taskName}}"
+                            transparent
+                            value={field.value}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                          />
+                        )}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-push-body">Corpo</Label>
+                      <Textarea
+                        id="templates-push-body"
+                        rows={3}
+                        placeholder="Ex: A tarefa {{taskName}} foi criada por {{userName}}."
+                        {...form.register("templates.push.body")}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* EMAIL */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <IconMail className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <span className="font-medium">E-mail</span>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-email-subject">Assunto</Label>
+                      <Controller
+                        name="templates.email.subject"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Input
+                            id="templates-email-subject"
+                            placeholder="Ex: Nova tarefa criada: {{taskName}}"
+                            transparent
+                            value={field.value}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                          />
+                        )}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-email-body">Corpo</Label>
+                      <Textarea
+                        id="templates-email-body"
+                        rows={4}
+                        placeholder="Ex: Olá {{userName}}, a tarefa {{taskName}} foi criada."
+                        {...form.register("templates.email.body")}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* WHATSAPP */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <IconBrandWhatsapp className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="font-medium">WhatsApp</span>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="templates-whatsapp-body">Corpo</Label>
+                      <Textarea
+                        id="templates-whatsapp-body"
+                        rows={3}
+                        placeholder="Ex: A tarefa {{taskName}} foi criada por {{userName}}."
+                        {...form.register("templates.whatsapp.body")}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Apenas o corpo da mensagem: o emoji de importância e a linha de título são
+                        adicionados automaticamente no envio.
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

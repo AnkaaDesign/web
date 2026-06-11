@@ -23,7 +23,7 @@ const PAYROLL_DETAIL_TASK_VISIBLE_COLUMNS = new Set([
   "status",
   "finishedAt",
   "createdBy.name",
-  "commission",
+  "bonification",
 ]);
 
 export function PayrollTasksTable({ tasks, userName = "Funcionário" }: PayrollTasksTableProps) {

@@ -6,6 +6,7 @@ import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconClipboardList, IconPlus } from "@tabler/icons-react";
 import { useAuth } from "@/contexts/auth-context";
+import { canCreateTasks } from "@/utils/permissions/entity-permissions";
 import { cn } from "@/lib/utils";
 
 export const PreparationPage = () => {
@@ -67,15 +68,11 @@ export const PreparationPage = () => {
     setControlsContainer(node);
   }, []);
 
-  // ADMIN, COMMERCIAL, LOGISTIC, and PRODUCTION_MANAGER can create tasks
-  const canCreateTasks =
-    user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN ||
-    user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL ||
-    user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC ||
-    user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
+  // ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, and PRODUCTION_MANAGER can create tasks (matches API)
+  const canCreate = canCreateTasks(user);
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div
         className="flex flex-col gap-4 bg-background px-4 pt-4 pb-4"
         style={{
@@ -103,7 +100,7 @@ export const PreparationPage = () => {
               { label: "Agenda" },
             ]}
             actions={
-              canCreateTasks
+              canCreate
                 ? [
                     {
                       key: "create-task",

@@ -108,10 +108,9 @@ export function PpeList({ className }: PpeListProps) {
   // Parse filters from URL
   const getFiltersFromUrl = useCallback((): Partial<ItemGetManyFormData> => {
     const filters: Partial<ItemGetManyFormData> = {
+      // PPE identity = item.ppeType != null (capability-fields contract).
       where: {
-        category: {
-          type: ITEM_CATEGORY_TYPE.PPE,
-        },
+        ppeType: { not: null },
       },
     };
 
@@ -248,10 +247,9 @@ export function PpeList({ className }: PpeListProps) {
   const handleClearAllFilters = useCallback(() => {
     setFilters({
       isActive: true, // Reset to default: show only active items
+      // PPE identity = item.ppeType != null (capability-fields contract).
       where: {
-        category: {
-          type: ITEM_CATEGORY_TYPE.PPE,
-        },
+        ppeType: { not: null },
       },
     });
   }, []);

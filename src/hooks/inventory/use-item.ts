@@ -34,7 +34,7 @@ import {
   ppeDeliveryScheduleKeys,
   maintenanceKeys,
   maintenanceItemKeys,
-  externalWithdrawalItemKeys,
+  externalOperationItemKeys,
   changeLogKeys,
 } from "../common/query-keys";
 import { createEntityHooks, createSpecializedQueryHook } from "../common/create-entity-hooks";
@@ -127,7 +127,7 @@ const baseHooks = createEntityHooks<
     ppeDeliveryScheduleKeys,
     maintenanceKeys,
     maintenanceItemKeys,
-    externalWithdrawalItemKeys,
+    externalOperationItemKeys,
     changeLogKeys,
   ], // Items affect many entities
 });
@@ -179,11 +179,9 @@ export const usePpeItems = createSpecializedQueryHook<Partial<ItemGetManyFormDat
       ...filters,
       where: {
         ...filters?.where,
-        category: {
-          type: {
-            equals: ITEM_CATEGORY_TYPE.PPE,
-          },
-        },
+        // PPE identity = item.ppeType != null (capability-fields contract);
+        // category.type is UI grouping only.
+        ppeType: { not: null },
       },
     }),
   staleTime: 1000 * 60 * 5,
@@ -198,11 +196,6 @@ export const usePpeItemsByType = createSpecializedQueryHook<{ ppeType: string; f
       where: {
         ...filters?.where,
         ppeType,
-        category: {
-          type: {
-            equals: ITEM_CATEGORY_TYPE.PPE,
-          },
-        },
       },
     }),
   staleTime: 1000 * 60 * 5,
@@ -218,11 +211,6 @@ export const usePpeItemsByTypeAndSize = createSpecializedQueryHook<{ ppeType: st
         ...filters?.where,
         ppeType,
         ppeSize,
-        category: {
-          type: {
-            equals: ITEM_CATEGORY_TYPE.PPE,
-          },
-        },
       },
     }),
   staleTime: 1000 * 60 * 5,
@@ -246,7 +234,8 @@ export const useItemsByType = createSpecializedQueryHook<{ type: ITEM_CATEGORY_T
   staleTime: 1000 * 60 * 5,
 });
 
-// Hook for Tool items only
+// Hook for borrowable items (capability-fields contract: borrow eligibility is
+// item.isBorrowable — borrowable items may live in any category).
 export const useToolItems = createSpecializedQueryHook<Partial<ItemGetManyFormData>, ItemGetManyResponse>({
   queryKeyFn: (filters) => itemKeys.byType("TOOL", filters),
   queryFn: (filters) =>
@@ -254,11 +243,7 @@ export const useToolItems = createSpecializedQueryHook<Partial<ItemGetManyFormDa
       ...filters,
       where: {
         ...filters?.where,
-        category: {
-          type: {
-            equals: ITEM_CATEGORY_TYPE.TOOL,
-          },
-        },
+        isBorrowable: true,
       },
     }),
   staleTime: 1000 * 60 * 5,
@@ -303,7 +288,7 @@ export function useItemMerge() {
       queryClient.invalidateQueries({ queryKey: ppeDeliveryScheduleKeys.all });
       queryClient.invalidateQueries({ queryKey: maintenanceKeys.all });
       queryClient.invalidateQueries({ queryKey: maintenanceItemKeys.all });
-      queryClient.invalidateQueries({ queryKey: externalWithdrawalItemKeys.all });
+      queryClient.invalidateQueries({ queryKey: externalOperationItemKeys.all });
       queryClient.invalidateQueries({ queryKey: changeLogKeys.all });
     },
   });

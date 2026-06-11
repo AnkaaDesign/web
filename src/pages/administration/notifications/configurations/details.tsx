@@ -110,6 +110,14 @@ const CHANNEL_CONFIG = {
 // Canonical sector labels (covers every privilege, including PRODUCTION_MANAGER).
 const SECTOR_LABELS: Record<string, string> = SECTOR_PRIVILEGES_LABELS;
 
+// Per-channel template rendering order (template key → channel visual config).
+const TEMPLATE_CHANNELS = [
+  { key: "inApp", channel: "IN_APP", titleLabel: "Título" },
+  { key: "push", channel: "PUSH", titleLabel: "Título" },
+  { key: "email", channel: "EMAIL", titleLabel: "Assunto" },
+  { key: "whatsapp", channel: "WHATSAPP", titleLabel: "Título" },
+] as const;
+
 // =====================
 // Field Row Component
 // =====================
@@ -596,9 +604,46 @@ export function NotificationConfigurationDetailsPage() {
               </CardHeader>
               <CardContent className="pt-0">
                 {config.templates && Object.keys(config.templates).length > 0 ? (
-                  <pre className="bg-muted/50 p-4 rounded-lg overflow-auto text-xs font-mono">
-                    {JSON.stringify(config.templates, null, 2)}
-                  </pre>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {TEMPLATE_CHANNELS.map(({ key, channel, titleLabel }) => {
+                      const template = config.templates?.[key];
+                      if (!template) return null;
+
+                      const channelConfig = CHANNEL_CONFIG[channel];
+                      const Icon = channelConfig.icon;
+                      const title = "title" in template ? template.title : "subject" in template ? template.subject : undefined;
+
+                      return (
+                        <div
+                          key={key}
+                          className={cn("p-4 rounded-lg border-2", channelConfig.borderColor, channelConfig.bgColor)}
+                        >
+                          <div className="flex items-center gap-2 mb-3">
+                            <Icon className={cn("w-4 h-4", channelConfig.color)} />
+                            <span className="font-medium">{channelConfig.label}</span>
+                          </div>
+                          <div className="space-y-3">
+                            {title && (
+                              <div>
+                                <div className="text-xs font-medium text-muted-foreground mb-1">{titleLabel}</div>
+                                <div className="text-sm bg-background rounded p-2 whitespace-pre-wrap break-words">
+                                  {title}
+                                </div>
+                              </div>
+                            )}
+                            {template.body && (
+                              <div>
+                                <div className="text-xs font-medium text-muted-foreground mb-1">Corpo</div>
+                                <div className="text-sm bg-background rounded p-2 whitespace-pre-wrap break-words">
+                                  {template.body}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <IconTemplate className="h-8 w-8 mx-auto mb-2 opacity-50" />

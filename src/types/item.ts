@@ -1,7 +1,7 @@
 // packages/interfaces/src/item.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, BaseMergeResponse } from "./common";
-import type { MEASURE_UNIT, ORDER_BY_DIRECTION, ABC_CATEGORY, XYZ_CATEGORY, PPE_TYPE, PPE_SIZE, PPE_DELIVERY_MODE, ITEM_CATEGORY_TYPE, ACCOUNTING_TYPE, STOCK_LEVEL } from "../constants";
+import type { MEASURE_UNIT, ORDER_BY_DIRECTION, ABC_CATEGORY, XYZ_CATEGORY, PPE_TYPE, PPE_SIZE, PPE_DELIVERY_MODE, ITEM_CATEGORY_TYPE, ACCOUNTING_TYPE, STOCK_LEVEL, STOCK_MODEL } from "../constants";
 import type { Supplier, SupplierIncludes, SupplierOrderBy } from "./supplier";
 import type { Activity, ActivityIncludes } from "./activity";
 import type { Borrow, BorrowIncludes } from "./borrow";
@@ -66,6 +66,9 @@ export interface Item extends BaseEntity {
   monthlyConsumptionTrendPercent: number | null;
   barcodes: string[];
   shouldAssignToUser: boolean;
+  isBorrowable: boolean;
+  stockModel: STOCK_MODEL;
+  fixedTargetQuantity: number | null;
   categoryId?: string;
   supplierId: string | null;
   estimatedLeadTime: number | null;
@@ -264,8 +267,13 @@ export interface ItemWhere {
   ppeSizeOrder?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] } | null;
   ppeStandardQuantity?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] } | null;
 
+  // Capability fields
+  stockModel?: STOCK_MODEL | { equals?: STOCK_MODEL; not?: STOCK_MODEL; in?: STOCK_MODEL[]; notIn?: STOCK_MODEL[] };
+  fixedTargetQuantity?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] } | null;
+
   // Boolean fields
   shouldAssignToUser?: boolean | { equals?: boolean; not?: boolean };
+  isBorrowable?: boolean | { equals?: boolean; not?: boolean };
   isActive?: boolean | { equals?: boolean; not?: boolean };
 
   // Array fields
@@ -390,6 +398,9 @@ export interface ItemOrderBy {
   monthlyConsumption?: ORDER_BY_DIRECTION;
   monthlyConsumptionTrendPercent?: ORDER_BY_DIRECTION;
   shouldAssignToUser?: ORDER_BY_DIRECTION;
+  isBorrowable?: ORDER_BY_DIRECTION;
+  stockModel?: ORDER_BY_DIRECTION;
+  fixedTargetQuantity?: ORDER_BY_DIRECTION;
   estimatedLeadTime?: ORDER_BY_DIRECTION;
   isActive?: ORDER_BY_DIRECTION;
   abcCategory?: ORDER_BY_DIRECTION;

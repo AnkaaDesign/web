@@ -7,39 +7,39 @@
 // the drift risk of having two independent implementations of the formula.
 
 // =====================
-// Commission Status Constants
+// Bonification Status Constants
 // =====================
-export const COMMISSION_STATUS = {
-  FULL_COMMISSION: 'FULL_COMMISSION',
-  PARTIAL_COMMISSION: 'PARTIAL_COMMISSION',
-  NO_COMMISSION: 'NO_COMMISSION',
+export const BONIFICATION_STATUS = {
+  FULL_BONIFICATION: 'FULL_BONIFICATION',
+  PARTIAL_BONIFICATION: 'PARTIAL_BONIFICATION',
+  NO_BONIFICATION: 'NO_BONIFICATION',
 } as const;
 
-export type CommissionStatus = typeof COMMISSION_STATUS[keyof typeof COMMISSION_STATUS];
+export type BonificationStatus = typeof BONIFICATION_STATUS[keyof typeof BONIFICATION_STATUS];
 
 // =====================
 // Task Computation Utilities (used for display/sorting)
 // =====================
 
-interface TaskWithCommission {
-  commission?: string;
+interface TaskWithBonification {
+  bonification?: string;
   [key: string]: any;
 }
 
 /**
  * Calculate weighted task count (ponderedTasks) from tasks array
- * FULL_COMMISSION = 1.0, PARTIAL_COMMISSION = 0.5, NO_COMMISSION = 0
+ * FULL_BONIFICATION = 1.0, PARTIAL_BONIFICATION = 0.5, NO_BONIFICATION = 0
  *
- * @param tasks Array of tasks with commission status
+ * @param tasks Array of tasks with bonification status
  * @returns Weighted task count
  */
-export function calculatePonderedTasks(tasks?: TaskWithCommission[]): number {
+export function calculatePonderedTasks(tasks?: TaskWithBonification[]): number {
   if (!tasks || tasks.length === 0) return 0;
 
   return tasks.reduce((sum, task) => {
-    if (task.commission === COMMISSION_STATUS.FULL_COMMISSION) {
+    if (task.bonification === BONIFICATION_STATUS.FULL_BONIFICATION) {
       return sum + 1.0;
-    } else if (task.commission === COMMISSION_STATUS.PARTIAL_COMMISSION) {
+    } else if (task.bonification === BONIFICATION_STATUS.PARTIAL_BONIFICATION) {
       return sum + 0.5;
     }
     return sum;
@@ -47,11 +47,11 @@ export function calculatePonderedTasks(tasks?: TaskWithCommission[]): number {
 }
 
 /**
- * Get task count by commission type
- * @param tasks Array of tasks with commission status
- * @returns Object with counts for each commission type
+ * Get task count by bonification type
+ * @param tasks Array of tasks with bonification status
+ * @returns Object with counts for each bonification type
  */
-export function getTaskCountByCommission(tasks?: TaskWithCommission[]): {
+export function getTaskCountByBonification(tasks?: TaskWithBonification[]): {
   full: number;
   partial: number;
   none: number;
@@ -67,9 +67,9 @@ export function getTaskCountByCommission(tasks?: TaskWithCommission[]): {
   let none = 0;
 
   for (const task of tasks) {
-    if (task.commission === COMMISSION_STATUS.FULL_COMMISSION) {
+    if (task.bonification === BONIFICATION_STATUS.FULL_BONIFICATION) {
       full++;
-    } else if (task.commission === COMMISSION_STATUS.PARTIAL_COMMISSION) {
+    } else if (task.bonification === BONIFICATION_STATUS.PARTIAL_BONIFICATION) {
       partial++;
     } else {
       none++;
@@ -92,7 +92,7 @@ export function getTaskCountByCommission(tasks?: TaskWithCommission[]): {
  * @param bonus Raw bonus entity from API
  * @returns Bonus with computed fields added
  */
-export function enrichBonusWithComputed<T extends { year: number; month: number; tasks?: TaskWithCommission[] }>(
+export function enrichBonusWithComputed<T extends { year: number; month: number; tasks?: TaskWithBonification[] }>(
   bonus: T
 ): T & { _computed: { ponderedTaskCount: number; periodStart: Date; periodEnd: Date } } {
   return {
@@ -111,7 +111,7 @@ export function enrichBonusWithComputed<T extends { year: number; month: number;
  * @param direction 'asc' or 'desc'
  * @returns Sorted array
  */
-export function sortBonusesByPonderedTasks<T extends { tasks?: TaskWithCommission[] }>(
+export function sortBonusesByPonderedTasks<T extends { tasks?: TaskWithBonification[] }>(
   bonuses: T[],
   direction: 'asc' | 'desc' = 'desc'
 ): T[] {

@@ -8,8 +8,8 @@ import type {
   PpeSizeGetManyFormData,
   PpeDeliveryGetManyFormData,
   PpeDeliveryScheduleGetManyFormData,
-  ExternalWithdrawalGetManyFormData,
-  ExternalWithdrawalItemGetManyFormData,
+  ExternalOperationGetManyFormData,
+  ExternalOperationItemGetManyFormData,
   FileGetManyFormData,
   ItemGetManyFormData,
   ItemBrandGetManyFormData,
@@ -307,29 +307,29 @@ export const ppeDeliveryScheduleKeys = {
 // External Withdrawal Query Keys
 // =====================================================
 
-export const externalWithdrawalKeys = {
-  all: ["externalWithdrawals"] as const,
-  lists: () => ["externalWithdrawals", "list"] as const,
-  list: (filters?: Partial<ExternalWithdrawalGetManyFormData>) => (filters ? (["externalWithdrawals", "list", filters] as const) : (["externalWithdrawals", "list"] as const)),
-  details: () => ["externalWithdrawals", "detail"] as const,
-  detail: (id: string, include?: any) => (include ? (["externalWithdrawals", "detail", id, include] as const) : (["externalWithdrawals", "detail", id] as const)),
-  byIds: (ids: string[]) => ["externalWithdrawals", "byIds", ids] as const,
+export const externalOperationKeys = {
+  all: ["externalOperations"] as const,
+  lists: () => ["externalOperations", "list"] as const,
+  list: (filters?: Partial<ExternalOperationGetManyFormData>) => (filters ? (["externalOperations", "list", filters] as const) : (["externalOperations", "list"] as const)),
+  details: () => ["externalOperations", "detail"] as const,
+  detail: (id: string, include?: any) => (include ? (["externalOperations", "detail", id, include] as const) : (["externalOperations", "detail", id] as const)),
+  byIds: (ids: string[]) => ["externalOperations", "byIds", ids] as const,
 };
 
-export const externalWithdrawalItemKeys = {
-  all: ["externalWithdrawalItems"] as const,
-  lists: () => ["externalWithdrawalItems", "list"] as const,
-  list: (filters?: Partial<ExternalWithdrawalItemGetManyFormData>) =>
-    filters ? (["externalWithdrawalItems", "list", filters] as const) : (["externalWithdrawalItems", "list"] as const),
-  details: () => ["externalWithdrawalItems", "detail"] as const,
-  detail: (id: string, include?: any) => (include ? (["externalWithdrawalItems", "detail", id, include] as const) : (["externalWithdrawalItems", "detail", id] as const)),
-  byIds: (ids: string[]) => ["externalWithdrawalItems", "byIds", ids] as const,
+export const externalOperationItemKeys = {
+  all: ["externalOperationItems"] as const,
+  lists: () => ["externalOperationItems", "list"] as const,
+  list: (filters?: Partial<ExternalOperationItemGetManyFormData>) =>
+    filters ? (["externalOperationItems", "list", filters] as const) : (["externalOperationItems", "list"] as const),
+  details: () => ["externalOperationItems", "detail"] as const,
+  detail: (id: string, include?: any) => (include ? (["externalOperationItems", "detail", id, include] as const) : (["externalOperationItems", "detail", id] as const)),
+  byIds: (ids: string[]) => ["externalOperationItems", "byIds", ids] as const,
 
   // Specialized queries
-  byWithdrawal: (withdrawalId: string, filters?: Partial<ExternalWithdrawalItemGetManyFormData>) =>
-    filters ? (["externalWithdrawalItems", "byWithdrawal", withdrawalId, filters] as const) : (["externalWithdrawalItems", "byWithdrawal", withdrawalId] as const),
-  byItem: (itemId: string, filters?: Partial<ExternalWithdrawalItemGetManyFormData>) =>
-    filters ? (["externalWithdrawalItems", "byItem", itemId, filters] as const) : (["externalWithdrawalItems", "byItem", itemId] as const),
+  byWithdrawal: (withdrawalId: string, filters?: Partial<ExternalOperationItemGetManyFormData>) =>
+    filters ? (["externalOperationItems", "byWithdrawal", withdrawalId, filters] as const) : (["externalOperationItems", "byWithdrawal", withdrawalId] as const),
+  byItem: (itemId: string, filters?: Partial<ExternalOperationItemGetManyFormData>) =>
+    filters ? (["externalOperationItems", "byItem", itemId, filters] as const) : (["externalOperationItems", "byItem", itemId] as const),
 };
 
 // =====================================================

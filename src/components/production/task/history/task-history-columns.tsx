@@ -9,8 +9,8 @@ import {
   TRUCK_MANUFACTURER_LABELS,
   TRUCK_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
-  COMMISSION_STATUS,
-  COMMISSION_STATUS_LABELS,
+  BONIFICATION_STATUS,
+  BONIFICATION_STATUS_LABELS,
   TASK_STATUS,
   SERVICE_ORDER_TYPE,
   SERVICE_ORDER_TYPE_LABELS,
@@ -598,9 +598,9 @@ export const createTaskHistoryColumns = (options?: {
     },
   },
   {
-    id: "commission",
-    header: "COMISSÃO",
-    accessorKey: "commission",
+    id: "bonification",
+    header: "BONIFICAÇÃO",
+    accessorKey: "bonification",
     sortable: true,
     filterable: true,
     defaultVisible: false,
@@ -608,14 +608,14 @@ export const createTaskHistoryColumns = (options?: {
     formatter: (value: string | null, row: Task) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
 
-      const status = value as COMMISSION_STATUS;
-      const variant = getBadgeVariant(status, "COMMISSION_STATUS");
-      const label = COMMISSION_STATUS_LABELS[status] || status;
+      const status = value as BONIFICATION_STATUS;
+      const variant = getBadgeVariant(status, "BONIFICATION_STATUS");
+      const label = BONIFICATION_STATUS_LABELS[status] || status;
 
-      // For suspended commission, show tooltip with reason
-      if (status === COMMISSION_STATUS.SUSPENDED_COMMISSION) {
+      // For suspended bonification, show tooltip with reason
+      if (status === BONIFICATION_STATUS.SUSPENDED_BONIFICATION) {
         // Determine suspension reason based on task status or other attributes
-        let suspensionReason = "Comissão suspensa";
+        let suspensionReason = "Bonificação suspensa";
 
         if (row.status === TASK_STATUS.PREPARATION) {
           suspensionReason = "Tarefa em preparação";
@@ -646,7 +646,7 @@ export const createTaskHistoryColumns = (options?: {
         );
       }
 
-      // For other commission statuses, just show the badge without tooltip
+      // For other bonification statuses, just show the badge without tooltip
       return (
         <Badge variant={variant as any}>
           {label}
@@ -774,8 +774,8 @@ export const createTaskHistoryColumns = (options?: {
     sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER
   );
 
-  // Define sectors that can view commission field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
-  const canViewCommissionField = sectorPrivilege && (
+  // Define sectors that can view bonification field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
+  const canViewBonificationField = sectorPrivilege && (
     sectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
     sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
     sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
@@ -791,10 +791,10 @@ export const createTaskHistoryColumns = (options?: {
     );
   }
 
-  // Filter out commission column for users without permission (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only)
+  // Filter out bonification column for users without permission (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only)
   // Only apply when sectorPrivilege is explicitly provided; without it, keep the column visible
-  if (sectorPrivilege && !canViewCommissionField) {
-    filteredColumns = filteredColumns.filter(col => col.id !== 'commission');
+  if (sectorPrivilege && !canViewBonificationField) {
+    filteredColumns = filteredColumns.filter(col => col.id !== 'bonification');
   }
 
   // Filter out observation column from agenda (preparation) page

@@ -15,7 +15,6 @@ export default function TimeClockAusenciasPage() {
         SECTOR_PRIVILEGES.ADMIN,
         SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
         SECTOR_PRIVILEGES.FINANCIAL,
-        SECTOR_PRIVILEGES.COMMERCIAL,
       ]}
     >
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">

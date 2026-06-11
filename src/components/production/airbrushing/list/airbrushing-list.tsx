@@ -17,6 +17,9 @@ import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
+import { useAuth } from "../../../../hooks/common/use-auth";
+import { hasAnyPrivilege } from "../../../../utils";
+import { SECTOR_PRIVILEGES } from "../../../../constants";
 
 interface AirbrushingListProps {
   className?: string;
@@ -27,6 +30,10 @@ const DEFAULT_PAGE_SIZE = 40;
 export function AirbrushingList({ className }: AirbrushingListProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
+
+  // Price visibility: FINANCIAL and ADMIN only (matches task-detail convention)
+  const { user } = useAuth();
+  const canViewFinancials = user ? hasAnyPrivilege(user, [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]) : false;
 
   // State to hold current page items and total count from the table
   const [, setTableData] = useState<{ items: Airbrushing[]; totalRecords: number }>({ items: [], totalRecords: 0 });
@@ -46,7 +53,7 @@ export function AirbrushingList({ className }: AirbrushingListProps) {
   });
 
   // Visible columns state with localStorage persistence
-  const { visibleColumns, setVisibleColumns } = useColumnVisibility("airbrushing-list-visible-columns", getDefaultVisibleColumns());
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility("airbrushing-list-visible-columns", getDefaultVisibleColumns(canViewFinancials));
 
   // Handle column visibility changes
   const handleColumnVisibilityChange = useCallback(
@@ -56,11 +63,11 @@ export function AirbrushingList({ className }: AirbrushingListProps) {
     [setVisibleColumns],
   );
 
-  // Get all available columns for column visibility manager
+  // Get all available columns for column visibility manager (price excluded for non-FINANCIAL/ADMIN)
   const allColumns = useMemo(
     () =>
-      getAirbrushingTableColumns(),
-    [],
+      getAirbrushingTableColumns(canViewFinancials),
+    [canViewFinancials],
   );
 
   // Custom deserializer for airbrushing filters

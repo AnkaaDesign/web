@@ -1,4 +1,4 @@
-import { useWatch } from "react-hook-form";
+import { useFormContext, useWatch } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
@@ -9,10 +9,12 @@ import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STAT
 interface AirbrushingFormFieldsProps {
   control: any;
   disabled?: boolean;
-  initialPainter?: { id: string; name: string; email?: string | null };
+  initialPainter?: { id: string; name: string; email?: string | null; status?: string | null };
 }
 
 export function AirbrushingFormFields({ control, disabled, initialPainter }: AirbrushingFormFieldsProps) {
+  const { setValue } = useFormContext();
+
   // Watch status reactively to gate the payment status field (never mirror form state with useState)
   const status = useWatch({ control, name: "status" });
   const isCompleted = status === AIRBRUSHING_STATUS.COMPLETED;
@@ -21,6 +23,7 @@ export function AirbrushingFormFields({ control, disabled, initialPainter }: Air
     { value: AIRBRUSHING_STATUS.PENDING, label: AIRBRUSHING_STATUS_LABELS.PENDING },
     { value: AIRBRUSHING_STATUS.IN_PRODUCTION, label: AIRBRUSHING_STATUS_LABELS.IN_PRODUCTION },
     { value: AIRBRUSHING_STATUS.COMPLETED, label: AIRBRUSHING_STATUS_LABELS.COMPLETED },
+    { value: AIRBRUSHING_STATUS.CANCELLED, label: AIRBRUSHING_STATUS_LABELS.CANCELLED },
   ];
 
   const paymentStatusOptions: ComboboxOption[] = Object.values(AIRBRUSHING_PAYMENT_STATUS).map((value) => ({
@@ -72,7 +75,14 @@ export function AirbrushingFormFields({ control, disabled, initialPainter }: Air
               <FormControl>
                 <Combobox
                   value={field.value}
-                  onValueChange={field.onChange}
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    // Payment status is only meaningful for completed airbrushings:
+                    // reset it to PENDING whenever the status leaves COMPLETED
+                    if (value !== AIRBRUSHING_STATUS.COMPLETED) {
+                      setValue("paymentStatus", AIRBRUSHING_PAYMENT_STATUS.PENDING, { shouldDirty: true });
+                    }
+                  }}
                   options={statusOptions}
                   placeholder="Selecione o status"
                   searchable={false}

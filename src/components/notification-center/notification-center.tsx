@@ -35,10 +35,13 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   ITEM: "/estoque/produtos/detalhes",
   Item: "/estoque/produtos/detalhes",
 
-  // Service Order routes (redirect handled separately to Task)
-  SERVICE_ORDER: "/producao/ordens-de-servico/detalhes",
-  ServiceOrder: "/producao/ordens-de-servico/detalhes",
-  SERVICEORDER: "/producao/ordens-de-servico/detalhes",
+  // Service Order routes — service orders have no detail page of their own; they
+  // are viewed within the parent Task. When metadata.taskId is present the click
+  // handler redirects to the task; this raw fallback also points at the task
+  // schedule details page (best effort) instead of a nonexistent route.
+  SERVICE_ORDER: "/producao/cronograma/detalhes",
+  ServiceOrder: "/producao/cronograma/detalhes",
+  SERVICEORDER: "/producao/cronograma/detalhes",
 
   // User routes
   USER: "/administracao/colaboradores/detalhes",
@@ -56,17 +59,17 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   SUPPLIER: "/estoque/fornecedores/detalhes",
   Supplier: "/estoque/fornecedores/detalhes",
 
-  // Warning routes
-  WARNING: "/recursos-humanos/advertencias/detalhes",
-  Warning: "/recursos-humanos/advertencias/detalhes",
+  // Warning routes (mounted at /recursos-humanos/avisos in App.tsx)
+  WARNING: "/recursos-humanos/avisos/detalhes",
+  Warning: "/recursos-humanos/avisos/detalhes",
 
-  // Bonus routes
-  BONUS: "/recursos-humanos/bonus/detalhes",
-  Bonus: "/recursos-humanos/bonus/detalhes",
+  // Bonus routes (registered route is /recursos-humanos/bonus/:id)
+  BONUS: "/recursos-humanos/bonus",
+  Bonus: "/recursos-humanos/bonus",
 
-  // Financial routes
-  FINANCIAL: "/financeiro/transacoes/detalhes",
-  Financial: "/financeiro/transacoes/detalhes",
+  // Financial routes (/financeiro/transacoes does not exist; billing details does)
+  FINANCIAL: "/financeiro/faturamento/detalhes",
+  Financial: "/financeiro/faturamento/detalhes",
 
   // PPE (Personal Protective Equipment) routes
   PPE: "/estoque/epi/entregas",
@@ -255,6 +258,24 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     }
 
     if (targetUrl) {
+      // Absolute URLs pointing at our own domain (old task.field.* notifications
+      // carry them) should SPA-navigate to the pathname instead of opening a new
+      // tab. Reducing them to a path first also lets the legacy rewrites below apply.
+      if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+        try {
+          const url = new URL(targetUrl);
+          const isOwnDomain =
+            url.origin === window.location.origin ||
+            url.hostname === "ankaadesign.com.br" ||
+            url.hostname.endsWith(".ankaadesign.com.br");
+          if (isOwnDomain) {
+            targetUrl = `${url.pathname}${url.search}${url.hash}`;
+          }
+        } catch {
+          // Malformed URL: keep as-is and let the external handler deal with it
+        }
+      }
+
       // Handle legacy /tasks/:id URLs
       if (targetUrl.startsWith("/tasks/")) {
         const taskId = targetUrl.replace("/tasks/", "");
@@ -277,6 +298,16 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
       if (targetUrl.startsWith("/pedidos/")) {
         const orderId = targetUrl.replace("/pedidos/", "");
         targetUrl = `/estoque/pedidos/detalhes/${orderId}`;
+      }
+
+      // Handle legacy /estoque/pedidos/:uuid URLs (missing the "detalhes/" segment).
+      // Only rewrite when the segment after /estoque/pedidos/ is a UUID, so list
+      // URLs and already-correct /estoque/pedidos/detalhes/... URLs are untouched.
+      const legacyOrderMatch = targetUrl.match(
+        /^\/estoque\/pedidos\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/
+      );
+      if (legacyOrderMatch) {
+        targetUrl = `/estoque/pedidos/detalhes/${legacyOrderMatch[1]}`;
       }
 
       // Handle both internal routes and external URLs

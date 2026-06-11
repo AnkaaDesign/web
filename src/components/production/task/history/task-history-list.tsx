@@ -214,7 +214,7 @@ export function TaskHistoryList({
       if (params.get("hasObservation") === "true") filters.hasObservation = true;
       if (params.get("hasArtworks") === "true") filters.hasArtworks = true;
       if (params.get("hasPaints") === "true") filters.hasPaints = true;
-      if (params.get("hasCommissions") === "true") filters.hasCommissions = true;
+      if (params.get("hasBonifications") === "true") filters.hasBonifications = true;
       if (params.get("hasServiceOrders") === "true") filters.hasServiceOrders = true;
 
       return filters;
@@ -258,7 +258,7 @@ export function TaskHistoryList({
     if (filters.hasObservation) params.hasObservation = "true";
     if (filters.hasArtworks) params.hasArtworks = "true";
     if (filters.hasPaints) params.hasPaints = "true";
-    if (filters.hasCommissions) params.hasCommissions = "true";
+    if (filters.hasBonifications) params.hasBonifications = "true";
     if (filters.hasServiceOrders) params.hasServiceOrders = "true";
 
     return params;
@@ -323,7 +323,7 @@ export function TaskHistoryList({
         ]);
       }
 
-      // History page: name, customer, general painting, identificador, sector, finishedAt, commission
+      // History page: name, customer, general painting, identificador, sector, finishedAt, bonification
       return new Set([
         "name",
         "customer.fantasyName",
@@ -331,7 +331,7 @@ export function TaskHistoryList({
         "identificador",
         "sector.name",
         "finishedAt",
-        "commission",
+        "bonification",
       ]);
     },
     [navigationRoute, userSectorPrivilege]

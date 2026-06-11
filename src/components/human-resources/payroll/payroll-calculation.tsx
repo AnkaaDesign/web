@@ -24,7 +24,7 @@ import {
   useTasks
 } from "../../../hooks";
 import { formatCurrency, formatRelativeTime } from "../../../utils";
-import { TASK_STATUS, COMMISSION_STATUS } from "../../../constants";
+import { TASK_STATUS, BONIFICATION_STATUS } from "../../../constants";
 import { toNumber } from "../../../types/common";
 
 interface PayrollCalculationProps {
@@ -122,9 +122,9 @@ export function PayrollCalculation({
 
       // Calculate weighted count (this should match bonus calculation logic)
       if (task.status === TASK_STATUS.COMPLETED) {
-        // Weight based on commission status: FULL_COMMISSION=1.0, PARTIAL_COMMISSION=0.5, NO_COMMISSION=0
-        const weight = task.commission === COMMISSION_STATUS.FULL_COMMISSION ? 1.0 :
-                       task.commission === COMMISSION_STATUS.PARTIAL_COMMISSION ? 0.5 : 0;
+        // Weight based on bonification status: FULL_BONIFICATION=1.0, PARTIAL_BONIFICATION=0.5, NO_BONIFICATION=0
+        const weight = task.bonification === BONIFICATION_STATUS.FULL_BONIFICATION ? 1.0 :
+                       task.bonification === BONIFICATION_STATUS.PARTIAL_BONIFICATION ? 0.5 : 0;
         acc.weightedCount += weight;
       }
 

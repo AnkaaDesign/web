@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUsers, useItems, useBatchMarkPpeDeliveriesAsDelivered, useAuth, useBatchApprovePpeDeliveries, useBatchRejectPpeDeliveries, usePpeDeliveryMutations, useBatchDeletePpeDeliveries } from "../../../../hooks";
 import type { PpeDelivery } from "../../../../types";
 import type { PpeDeliveryGetManyFormData } from "../../../../schemas";
-import { routes, PPE_DELIVERY_STATUS, ITEM_CATEGORY_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
+import { routes, PPE_DELIVERY_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { hasPrivilege } from "../../../../utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -138,7 +138,8 @@ export function PpeDeliveryList({ className, teamScope }: PpeDeliveryListProps) 
   const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
   const { data: itemsData } = useItems({
     where: {
-      category: { type: ITEM_CATEGORY_TYPE.PPE },
+      // PPE identity = item.ppeType != null (capability-fields contract).
+      ppeType: { not: null },
     },
     orderBy: { name: "asc" },
   });

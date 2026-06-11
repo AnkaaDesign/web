@@ -29,7 +29,14 @@ export function MaintenanceItemsCard({ maintenanceItems, className }: Maintenanc
     const stockLevels = safeItems.reduce(
       (acc, mi) => {
         if (mi.item) {
-          const level = determineStockLevel(mi.item.quantity || 0, mi.item.reorderPoint || null, mi.item.maxQuantity || null, false);
+          const level = determineStockLevel({
+            quantity: mi.item.quantity || 0,
+            reorderPoint: mi.item.reorderPoint || null,
+            maxQuantity: mi.item.maxQuantity || null,
+            hasActiveOrder: false,
+            stockModel: mi.item.stockModel ?? null,
+            fixedTargetQuantity: mi.item.fixedTargetQuantity ?? null,
+          });
           acc[level] = (acc[level] || 0) + 1;
         }
         return acc;
@@ -115,7 +122,14 @@ export function MaintenanceItemsCard({ maintenanceItems, className }: Maintenanc
                 );
               }
 
-              const stockLevel = determineStockLevel(item.quantity || 0, item.reorderPoint || null, item.maxQuantity || null, false);
+              const stockLevel = determineStockLevel({
+                quantity: item.quantity || 0,
+                reorderPoint: item.reorderPoint || null,
+                maxQuantity: item.maxQuantity || null,
+                hasActiveOrder: false,
+                stockModel: item.stockModel ?? null,
+                fixedTargetQuantity: item.fixedTargetQuantity ?? null,
+              });
               const stockTextColor = getStockLevelTextColor(stockLevel);
               const hasEnoughStock = item.quantity >= maintenanceItem.quantity;
 

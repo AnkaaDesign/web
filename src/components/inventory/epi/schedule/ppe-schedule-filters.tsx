@@ -7,7 +7,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { IconFilter, IconUser, IconPackage, IconCalendarEvent, IconClock, IconToggleLeft } from "@tabler/icons-react";
 import { getUsers, getItems } from "../../../../api-client";
 import type { PpeDeliveryScheduleGetManyFormData } from "../../../../schemas";
-import { SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
+import { SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS } from "../../../../constants";
 
 interface PpeScheduleFiltersProps {
   open: boolean;
@@ -60,7 +60,8 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
         orderBy: { name: "asc" },
         page: page,
         take: 50,
-        where: { category: { type: ITEM_CATEGORY_TYPE.PPE } },
+        // PPE identity = item.ppeType != null (capability-fields contract).
+        where: { ppeType: { not: null } },
       };
 
       // Only add searchingFor if there's a search term

@@ -1,7 +1,8 @@
 import { useCallback, useMemo } from "react";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Badge } from "@/components/ui/badge";
 import { getUsers } from "@/api-client";
-import { SECTOR_PRIVILEGES } from "@/constants";
+import { SECTOR_PRIVILEGES, USER_STATUS } from "@/constants";
 
 interface PainterSelectorProps {
   value?: string;
@@ -10,7 +11,7 @@ interface PainterSelectorProps {
   disabled?: boolean;
   required?: boolean;
   loading?: boolean;
-  initialUser?: { id: string; name: string; email?: string | null };
+  initialUser?: { id: string; name: string; email?: string | null; status?: string | null };
 }
 
 /**
@@ -37,6 +38,7 @@ export function PainterSelector({
         value: initialUser.id,
         label: initialUser.name,
         description: initialUser.email ?? undefined,
+        metadata: { status: initialUser.status ?? undefined },
       },
     ];
   }, [initialUser]);
@@ -51,7 +53,7 @@ export function PainterSelector({
         where: {
           // Painters belong to sectors with the AIRBRUSHING privilege.
           // Do NOT filter by status/isActive: painters are usually dismissed users.
-          sector: { privileges: SECTOR_PRIVILEGES.AIRBRUSHING },
+          sector: { is: { privileges: SECTOR_PRIVILEGES.AIRBRUSHING } },
           ...(searchTerm
             ? {
                 OR: [
@@ -67,6 +69,7 @@ export function PainterSelector({
           id: true,
           name: true,
           email: true,
+          status: true,
         },
       });
 
@@ -79,6 +82,7 @@ export function PainterSelector({
           value: user.id,
           label: user.name,
           description: user.email,
+          metadata: { status: user.status },
         })) as ComboboxOption[],
         hasMore,
         total,
@@ -92,6 +96,25 @@ export function PainterSelector({
         hasMore: false,
       };
     }
+  }, []);
+
+  // Render painter options with a "Desligado" badge for dismissed users
+  // (they stay selectable so they can still be paid, but should be visually flagged)
+  const renderPainterOption = useCallback((option: ComboboxOption) => {
+    const isDismissed = option.metadata?.status === USER_STATUS.DISMISSED;
+    return (
+      <div className="flex items-center justify-between gap-2 w-full">
+        <div className="flex flex-col min-w-0">
+          <span className="truncate">{option.label}</span>
+          {option.description && <span className="text-xs text-muted-foreground truncate">{option.description}</span>}
+        </div>
+        {isDismissed && (
+          <Badge variant="secondary" className="flex-shrink-0">
+            Desligado
+          </Badge>
+        )}
+      </div>
+    );
   }, []);
 
   return (
@@ -111,6 +134,7 @@ export function PainterSelector({
       }}
       placeholder={`${placeholder}${!required ? " (opcional)" : ""}`}
       emptyText={loading ? "Carregando pintores..." : "Nenhum pintor encontrado"}
+      renderOption={renderPainterOption}
       disabled={disabled || loading}
       searchable
       clearable={!required}

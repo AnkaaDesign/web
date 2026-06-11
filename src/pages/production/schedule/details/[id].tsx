@@ -23,7 +23,7 @@ import {
   TRUCK_MANUFACTURER_LABELS,
   SERVICE_ORDER_STATUS_LABELS,
   AIRBRUSHING_STATUS_LABELS,
-  COMMISSION_STATUS_LABELS,
+  BONIFICATION_STATUS_LABELS,
   TRUCK_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
 } from "../../../../constants";
@@ -791,7 +791,7 @@ const TASK_SECTIONS: SectionConfig[] = [
       { id: "customer", label: "Cliente", sectionId: "overview", required: true },
       { id: "responsibles", label: "Responsáveis", sectionId: "overview" },
       { id: "sector", label: "Setor", sectionId: "overview" },
-      { id: "commission", label: "Comissão", sectionId: "overview" },
+      { id: "bonification", label: "Bonificação", sectionId: "overview" },
       { id: "serialNumber", label: "Número de Série", sectionId: "overview" },
       { id: "plate", label: "Placa", sectionId: "overview" },
       { id: "chassisNumber", label: "Chassi", sectionId: "overview" },
@@ -1056,17 +1056,17 @@ export const TaskDetailsPage = () => {
     return Array.isArray(data) ? data : (data ? [data] : []);
   }, [invoiceResponse]);
 
-  // Check if user can view commission field - ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only
-  // (Production users receive commission, so they need to see it)
-  const canViewCommissionField = currentUser && (
+  // Check if user can view bonification field - ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only
+  // (Production users receive bonification, so they need to see it)
+  const canViewBonificationField = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.PRODUCTION)
   );
 
-  // Fields that should only be visible to users who can view commission (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
-  const COMMISSION_RESTRICTED_FIELDS = ['commission'];
+  // Fields that should only be visible to users who can view bonification (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
+  const BONIFICATION_RESTRICTED_FIELDS = ['bonification'];
 
   // Fields that should only be visible to privileged users (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER only)
   // Includes: forecastDate, responsibles
@@ -1116,9 +1116,9 @@ export const TaskDetailsPage = () => {
           filteredFields = filteredFields.filter(field => field.id !== 'finishedAt' && field.id !== 'invoiceToCustomers');
         }
 
-        // Filter commission field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only)
-        if (!canViewCommissionField) {
-          filteredFields = filteredFields.filter(field => !COMMISSION_RESTRICTED_FIELDS.includes(field.id));
+        // Filter bonification field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only)
+        if (!canViewBonificationField) {
+          filteredFields = filteredFields.filter(field => !BONIFICATION_RESTRICTED_FIELDS.includes(field.id));
         }
 
         // Filter privileged restricted fields (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER only)
@@ -1146,7 +1146,7 @@ export const TaskDetailsPage = () => {
         }
         return section;
       });
-  }, [canViewQuoteSection, canViewBaseFiles, canViewProjectFiles, canViewCheckinFiles, canViewLayoutSection, isWarehouseSector, isProductionSector, currentUser, canViewCommissionField, canViewRestrictedFields, isFinancialSector]);
+  }, [canViewQuoteSection, canViewBaseFiles, canViewProjectFiles, canViewCheckinFiles, canViewLayoutSection, isWarehouseSector, isProductionSector, currentUser, canViewBonificationField, canViewRestrictedFields, isFinancialSector]);
 
   // Initialize section visibility hook with filtered sections
   const sectionVisibility = useSectionVisibility(
@@ -1999,15 +1999,15 @@ export const TaskDetailsPage = () => {
                 </div>
                 )}
 
-                {/* Commission Status */}
-                {sectionVisibility.isFieldVisible("commission") && task.commission && (
+                {/* Bonification Status */}
+                {sectionVisibility.isFieldVisible("bonification") && task.bonification && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconCoin className="h-4 w-4" />
-                  Comissão
+                  Bonificação
                     </span>
                     <span className="text-sm font-medium">
-                  {COMMISSION_STATUS_LABELS[task.commission]}
+                  {BONIFICATION_STATUS_LABELS[task.bonification]}
                     </span>
                   </div>
                 )}

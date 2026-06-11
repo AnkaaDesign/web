@@ -1,7 +1,7 @@
 import type { AirbrushingGetManyFormData } from "../../../../schemas";
 import type { Task } from "../../../../types";
 import { formatDate, formatCurrency } from "../../../../utils";
-import { AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_STATUS } from "../../../../constants";
+import { AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS } from "../../../../constants";
 
 export interface ActiveFilter {
   key: string;
@@ -45,6 +45,20 @@ export function extractActiveFilters(filters: Partial<AirbrushingGetManyFormData
     activeFilters.push({
       key: "status",
       label: "Status",
+      value: displayValue,
+      type: "array",
+    });
+  }
+
+  // Payment status filter
+  if (filters.paymentStatuses && filters.paymentStatuses.length > 0) {
+    const paymentStatusLabels = filters.paymentStatuses.map((paymentStatus: AIRBRUSHING_PAYMENT_STATUS) => AIRBRUSHING_PAYMENT_STATUS_LABELS[paymentStatus]);
+    const displayValue =
+      paymentStatusLabels.length > 2 ? `${paymentStatusLabels.slice(0, 2).join(", ")}... (+${paymentStatusLabels.length - 2})` : paymentStatusLabels.join(", ");
+
+    activeFilters.push({
+      key: "paymentStatuses",
+      label: "Status do Pagamento",
       value: displayValue,
       type: "array",
     });
@@ -134,6 +148,7 @@ export function getFilterStats(filters: Partial<AirbrushingGetManyFormData>) {
 
   if (filters.taskIds && filters.taskIds.length > 0) count++;
   if (filters.status && filters.status.length > 0) count++;
+  if (filters.paymentStatuses && filters.paymentStatuses.length > 0) count++;
   if (filters.priceRange) count++;
   if (filters.hasStartDate !== undefined) count++;
   if (filters.hasFinishDate !== undefined) count++;

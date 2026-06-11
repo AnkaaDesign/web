@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { IconClipboardList } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
-import { COMMISSION_STATUS, getBadgeVariant } from "../../../../constants";
+import { BONIFICATION_STATUS, getBadgeVariant } from "../../../../constants";
 
 interface BonusTasksListProps {
   className?: string;
@@ -19,14 +19,14 @@ interface BonusTasksListProps {
   title?: string;
 }
 
-// Commission stats helper
-const getCommissionStats = (tasks: Task[]) => {
-  const fullCommission = tasks.filter((t) => t.commission === COMMISSION_STATUS.FULL_COMMISSION).length;
-  const partialCommission = tasks.filter((t) => t.commission === COMMISSION_STATUS.PARTIAL_COMMISSION).length;
-  const noCommission = tasks.filter((t) => t.commission === COMMISSION_STATUS.NO_COMMISSION).length;
-  const suspendedCommission = tasks.filter((t) => t.commission === COMMISSION_STATUS.SUSPENDED_COMMISSION).length;
+// Bonification stats helper
+const getBonificationStats = (tasks: Task[]) => {
+  const fullBonification = tasks.filter((t) => t.bonification === BONIFICATION_STATUS.FULL_BONIFICATION).length;
+  const partialBonification = tasks.filter((t) => t.bonification === BONIFICATION_STATUS.PARTIAL_BONIFICATION).length;
+  const noBonification = tasks.filter((t) => t.bonification === BONIFICATION_STATUS.NO_BONIFICATION).length;
+  const suspendedBonification = tasks.filter((t) => t.bonification === BONIFICATION_STATUS.SUSPENDED_BONIFICATION).length;
 
-  return { fullCommission, partialCommission, noCommission, suspendedCommission };
+  return { fullBonification, partialBonification, noBonification, suspendedBonification };
 };
 
 export function BonusTasksList({
@@ -60,7 +60,7 @@ export function BonusTasksList({
         "customer.fantasyName",
         "sector.name",
         "finishedAt",
-        "commission",
+        "bonification",
       ]),
     []
   );
@@ -85,8 +85,8 @@ export function BonusTasksList({
     setTableData(data);
   }, []);
 
-  // Commission stats
-  const commissionStats = useMemo(() => getCommissionStats(tasks), [tasks]);
+  // Bonification stats
+  const bonificationStats = useMemo(() => getBonificationStats(tasks), [tasks]);
 
   return (
     <Card className={cn("flex flex-col shadow-sm border border-border w-full", className)}>
@@ -96,19 +96,19 @@ export function BonusTasksList({
             <IconClipboardList className="h-5 w-5" />
             {title} ({tasks.length})
           </div>
-          {/* Commission summary badges - responsive layout */}
+          {/* Bonification summary badges - responsive layout */}
           <div className="flex flex-wrap items-center gap-3">
-            <Badge variant={getBadgeVariant(COMMISSION_STATUS.FULL_COMMISSION, "COMMISSION_STATUS") as any}>
-              Comissão Integral: {commissionStats.fullCommission}
+            <Badge variant={getBadgeVariant(BONIFICATION_STATUS.FULL_BONIFICATION, "BONIFICATION_STATUS") as any}>
+              Bonificação Integral: {bonificationStats.fullBonification}
             </Badge>
-            <Badge variant={getBadgeVariant(COMMISSION_STATUS.PARTIAL_COMMISSION, "COMMISSION_STATUS") as any}>
-              Comissão Parcial: {commissionStats.partialCommission}
+            <Badge variant={getBadgeVariant(BONIFICATION_STATUS.PARTIAL_BONIFICATION, "BONIFICATION_STATUS") as any}>
+              Bonificação Parcial: {bonificationStats.partialBonification}
             </Badge>
-            <Badge variant={getBadgeVariant(COMMISSION_STATUS.NO_COMMISSION, "COMMISSION_STATUS") as any}>
-              Sem Comissão: {commissionStats.noCommission}
+            <Badge variant={getBadgeVariant(BONIFICATION_STATUS.NO_BONIFICATION, "BONIFICATION_STATUS") as any}>
+              Sem Bonificação: {bonificationStats.noBonification}
             </Badge>
-            <Badge variant={getBadgeVariant(COMMISSION_STATUS.SUSPENDED_COMMISSION, "COMMISSION_STATUS") as any}>
-              Comissão Suspensa: {commissionStats.suspendedCommission}
+            <Badge variant={getBadgeVariant(BONIFICATION_STATUS.SUSPENDED_BONIFICATION, "BONIFICATION_STATUS") as any}>
+              Bonificação Suspensa: {bonificationStats.suspendedBonification}
             </Badge>
           </div>
         </CardTitle>

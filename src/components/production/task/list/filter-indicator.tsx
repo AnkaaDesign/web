@@ -134,7 +134,7 @@ function getIconForFilter(key: string, value: any): React.ReactNode | undefined 
       return renderFilterIcon("palette");
     case "hasPaints":
       return renderFilterIcon("brush");
-    case "hasCommissions":
+    case "hasBonifications":
       return renderFilterIcon("currency-dollar");
     case "hasNfe":
       return renderFilterIcon("file-invoice");

@@ -57,7 +57,14 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
     const hasActiveOrder = item.orderItems?.some((orderItem) => orderItem.order && activeOrderStatuses.includes(orderItem.order.status)) || false;
 
     // Use unified stock level determination
-    const stockLevel = determineStockLevel(item.quantity || 0, item.reorderPoint || null, item.maxQuantity || null, hasActiveOrder);
+    const stockLevel = determineStockLevel({
+      quantity: item.quantity || 0,
+      reorderPoint: item.reorderPoint || null,
+      maxQuantity: item.maxQuantity || null,
+      hasActiveOrder,
+      stockModel: item.stockModel ?? null,
+      fixedTargetQuantity: item.fixedTargetQuantity ?? null,
+    });
 
     const stockMessage = getStockLevelMessage(stockLevel, item.quantity || 0, item.reorderPoint || null);
 

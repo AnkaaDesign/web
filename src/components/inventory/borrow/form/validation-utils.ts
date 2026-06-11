@@ -1,5 +1,5 @@
 import type { Item, User, Borrow } from "../../../../types";
-import { BORROW_STATUS, SECTOR_PRIVILEGES, ITEM_CATEGORY_TYPE, USER_STATUS } from "../../../../constants";
+import { BORROW_STATUS, SECTOR_PRIVILEGES, USER_STATUS } from "../../../../constants";
 import { hasPrivilege } from "../../../../utils";
 
 /**
@@ -179,7 +179,7 @@ export function checkItemBorrowRestrictions(item: Item | null, user: User | null
   }
 
   // Check if item is a PPE and user has PPE configuration
-  if (item.category?.type === ITEM_CATEGORY_TYPE.PPE) {
+  if (item.ppeType != null) {
     // Check if user has PPE size configured if required
     if (!user.ppeSize) {
       return {

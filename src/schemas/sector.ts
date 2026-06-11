@@ -27,7 +27,7 @@ export const sectorIncludeSchema = z
               borrows: z.boolean().optional(),
               notifications: z.boolean().optional(),
               tasks: z.boolean().optional(),
-              commissions: z.boolean().optional(),
+              bonifications: z.boolean().optional(),
             })
             .optional(),
         }),
@@ -48,7 +48,7 @@ export const sectorIncludeSchema = z
               borrows: z.boolean().optional(),
               notifications: z.boolean().optional(),
               tasks: z.boolean().optional(),
-              commissions: z.boolean().optional(),
+              bonifications: z.boolean().optional(),
             })
             .optional(),
         }),
@@ -70,7 +70,7 @@ export const sectorIncludeSchema = z
               createdBy: z.boolean().optional(),
               files: z.boolean().optional(),
               logoPaints: z.boolean().optional(),
-              commissions: z.boolean().optional(),
+              bonifications: z.boolean().optional(),
               services: z.boolean().optional(),
               airbrushings: z.boolean().optional(),
               truck: z.boolean().optional(),

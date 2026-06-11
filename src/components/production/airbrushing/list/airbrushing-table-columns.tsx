@@ -16,11 +16,29 @@ export interface AirbrushingColumn {
   align?: "left" | "center" | "right";
 }
 
-export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["task.name", "task.customer.fantasyName", "status", "paymentStatus", "price", "startDate", "finishDate", "artworksCount"]);
+/**
+ * @param canViewFinancials - whether the current user may see monetary data
+ * (FINANCIAL/ADMIN only, matching the task-detail convention). When false the
+ * price column is excluded from the default-visible set.
+ */
+export function getDefaultVisibleColumns(canViewFinancials: boolean = true): Set<string> {
+  const columns = ["task.name", "task.customer.fantasyName", "status", "paymentStatus", "startDate", "finishDate", "artworksCount"];
+  if (canViewFinancials) {
+    columns.splice(4, 0, "price");
+  }
+  return new Set(columns);
 }
 
-export function createAirbrushingColumns(): AirbrushingColumn[] {
+/**
+ * @param canViewFinancials - whether the current user may see monetary data
+ * (FINANCIAL/ADMIN only). When false the price column is omitted entirely.
+ */
+export function createAirbrushingColumns(canViewFinancials: boolean = true): AirbrushingColumn[] {
+  const allColumns = createAllAirbrushingColumns();
+  return canViewFinancials ? allColumns : allColumns.filter((col) => col.key !== "price");
+}
+
+function createAllAirbrushingColumns(): AirbrushingColumn[] {
   return [
     {
       key: "task.name",

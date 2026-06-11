@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUsers, useItems, usePpeDeliveryScheduleMutations } from "../../../../hooks";
 import type { PpeDeliverySchedule } from "../../../../types";
 import type { PpeDeliveryScheduleGetManyFormData } from "../../../../schemas";
-import { routes, SCHEDULE_FREQUENCY, ITEM_CATEGORY_TYPE } from "../../../../constants";
+import { routes, SCHEDULE_FREQUENCY } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -129,7 +129,8 @@ export function PpeScheduleList({ className, scheduleRoutes }: PpeScheduleListPr
   const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
   const { data: itemsData } = useItems({
     where: {
-      category: { type: ITEM_CATEGORY_TYPE.PPE },
+      // PPE identity = item.ppeType != null (capability-fields contract).
+      ppeType: { not: null },
     },
     orderBy: { name: "asc" },
     page: 1, // API expects 1-based pagination (starts at 1)

@@ -5,6 +5,23 @@ import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreate
 import type { NOTIFICATION_TYPE, NOTIFICATION_CHANNEL, NOTIFICATION_IMPORTANCE, SECTOR_PRIVILEGES } from "../constants";
 
 // =====================
+// Notification Templates
+// =====================
+
+/**
+ * Per-channel notification templates. Values are Handlebars strings with
+ * {{placeholders}}. Matches the API's NotificationTemplateConfig shape.
+ * WhatsApp has no title: the importance emoji + title line are prepended
+ * automatically at send time.
+ */
+export interface NotificationTemplateConfig {
+  inApp?: { title?: string; body?: string };
+  push?: { title?: string; body?: string };
+  email?: { subject?: string; body?: string };
+  whatsapp?: { body?: string };
+}
+
+// =====================
 // Notification Configuration Entity
 // =====================
 
@@ -19,7 +36,7 @@ export interface NotificationConfiguration extends BaseEntity {
   batchingEnabled: boolean;
   maxFrequencyPerDay?: number | null;
   deduplicationWindow?: number | null;
-  templates?: Record<string, unknown> | null;
+  templates?: NotificationTemplateConfig | null;
   metadata?: Record<string, unknown> | null;
 
   // Relations
@@ -96,7 +113,7 @@ export interface CreateNotificationConfigurationDto {
   batchingEnabled?: boolean;
   maxFrequencyPerDay?: number;
   deduplicationWindow?: number;
-  templates?: Record<string, unknown>;
+  templates?: NotificationTemplateConfig;
   metadata?: Record<string, unknown>;
   channels?: Array<{
     channel: NOTIFICATION_CHANNEL;
@@ -123,7 +140,7 @@ export interface UpdateNotificationConfigurationDto {
   batchingEnabled?: boolean;
   maxFrequencyPerDay?: number;
   deduplicationWindow?: number;
-  templates?: Record<string, unknown>;
+  templates?: NotificationTemplateConfig;
   metadata?: Record<string, unknown>;
   targetRule?: {
     allowedSectors?: string[];

@@ -17,9 +17,9 @@ interface ProductionPeriodTasksModalProps {
   label: string;      // "14 Mai 2025", "Maio 2025"
   sectorIds?: string[];
   activeUsers?: number;
-  // Commission status filter — mirrors the chart's active commissionStatuses filter
+  // Bonification status filter — mirrors the chart's active bonificationStatuses filter
   // so the modal only shows the same subset of tasks the chart counted.
-  commissionStatuses?: string[];
+  bonificationStatuses?: string[];
   // User/assignee filter — mirrors the chart's active userIds filter.
   userIds?: string[];
   // sectorId → hex color, mirroring the chart's bar colors. When provided
@@ -65,7 +65,7 @@ export function ProductionPeriodTasksModal({
   label,
   sectorIds,
   activeUsers,
-  commissionStatuses,
+  bonificationStatuses,
   userIds,
   sectorColorMap,
 }: ProductionPeriodTasksModalProps) {
@@ -73,13 +73,13 @@ export function ProductionPeriodTasksModal({
   const [search, setSearch] = useState('');
 
   const { data: response, isLoading, isError } = useQuery({
-    queryKey: ['production-period-tasks', period, sectorIds, commissionStatuses, userIds],
+    queryKey: ['production-period-tasks', period, sectorIds, bonificationStatuses, userIds],
     queryFn: () =>
       getTasks({
         finishedDateRange: { from, to },
         status: [TASK_STATUS.COMPLETED],
         ...(sectorIds?.length ? { sectorIds } : {}),
-        ...(commissionStatuses?.length ? { where: { commission: { in: commissionStatuses } } } : {}),
+        ...(bonificationStatuses?.length ? { where: { bonification: { in: bonificationStatuses } } } : {}),
         ...(userIds?.length ? { assigneeIds: userIds } : {}),
         limit: 300,
         include: {

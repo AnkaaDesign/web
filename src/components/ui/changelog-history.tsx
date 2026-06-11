@@ -2650,8 +2650,8 @@ export function ChangelogHistory({
         SECTOR_PRIVILEGES.ADMIN,
       ]);
 
-    // Check if user can view commission field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
-    const canViewCommissionField =
+    // Check if user can view bonification field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
+    const canViewBonificationField =
       user &&
       hasAnyPrivilege(user as any, [
         SECTOR_PRIVILEGES.ADMIN,
@@ -2757,8 +2757,8 @@ export function ChangelogHistory({
         return false;
       }
 
-      // Filter out commission field for users without permission
-      if (!canViewCommissionField && fieldLower.includes("commission")) {
+      // Filter out bonification field for users without permission
+      if (!canViewBonificationField && fieldLower.includes("bonification")) {
         return false;
       }
 

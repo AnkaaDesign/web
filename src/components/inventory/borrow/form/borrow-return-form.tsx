@@ -65,11 +65,6 @@ export function BorrowReturnForm({ borrow, onCancel }: BorrowReturnFormProps) {
         errors.push("Informações do usuário não encontradas");
       }
 
-      // Validate item is still a valid tool
-      if (borrow.item?.itemCategory?.type !== "TOOL") {
-        errors.push("Este item não é mais uma ferramenta válida para empréstimo");
-      }
-
       // Validate user is still active (warning only)
       if (borrow.user?.status && borrow.user.status !== USER_STATUS.EFFECTED) {
         toast.warning("Aviso: Usuário do empréstimo está inativo");

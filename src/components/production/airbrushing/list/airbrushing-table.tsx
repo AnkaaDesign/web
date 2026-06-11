@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Airbrushing } from "../../../../types";
-import { routes, AIRBRUSHING_STATUS } from "../../../../constants";
+import { routes, AIRBRUSHING_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useAuth } from "../../../../hooks/common/use-auth";
+import { hasAnyPrivilege } from "../../../../utils";
 import { canEditAirbrushings, canDeleteAirbrushings, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -56,6 +57,8 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
   const { user, isLoading: _isAuthLoading } = useAuth();
   const canEdit = user ? canEditAirbrushings(user) : false;
   const canDelete = user ? canDeleteAirbrushings(user) : false;
+  // Price visibility: FINANCIAL and ADMIN only (matches task-detail convention)
+  const canViewFinancials = user ? hasAnyPrivilege(user, [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'airbrushing') : false;
 
   // Get scrollbar width info
@@ -179,7 +182,7 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
   // Use viewport boundary checking hook
   
   // Define all available columns
-  const allColumns: AirbrushingColumn[] = createAirbrushingColumns();
+  const allColumns: AirbrushingColumn[] = createAirbrushingColumns(canViewFinancials);
 
   // Filter columns based on visibility
   const columns = allColumns.filter((col) => visibleColumns.has(col.key));

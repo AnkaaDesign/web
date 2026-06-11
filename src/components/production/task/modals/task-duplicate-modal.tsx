@@ -162,7 +162,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       paintId: sourceTask.paintId,
       customerId: sourceTask.customerId,
       sectorId: sourceTask.sectorId,
-      commission: sourceTask.commission,
+      bonification: sourceTask.bonification,
 
       // Responsibles (shared references)
       responsibleIds: sourceTask.responsibles?.map((r: any) => r.id) || [],

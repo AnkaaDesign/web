@@ -1,7 +1,7 @@
 // packages/interfaces/src/task.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
-import type { ORDER_BY_DIRECTION, TASK_STATUS, COMMISSION_STATUS } from "../constants";
+import type { ORDER_BY_DIRECTION, TASK_STATUS, BONIFICATION_STATUS } from "../constants";
 import type { Sector, SectorIncludes, SectorOrderBy } from "./sector";
 import type { Customer, CustomerIncludes, CustomerOrderBy } from "./customer";
 import type { File, FileIncludes } from "./file";
@@ -9,8 +9,8 @@ import type { Observation, ObservationIncludes } from "./observation";
 import type { Paint, PaintIncludes, PaintOrderBy } from "./paint";
 import type { User, UserIncludes, UserOrderBy } from "./user";
 
-// Re-export Commission as alias for COMMISSION_STATUS for compatibility
-export type { COMMISSION_STATUS as Commission } from "../constants";
+// Re-export Bonification as a convenience alias for BONIFICATION_STATUS
+export type { BONIFICATION_STATUS as Bonification } from "../constants";
 import type { ServiceOrder, ServiceOrderIncludes } from "./serviceOrder";
 import type { Airbrushing, AirbrushingIncludes } from "./airbrushing";
 import type { Cut, CutIncludes } from "./cut";
@@ -28,8 +28,8 @@ export interface Task extends BaseEntity {
   name: string;
   status: TASK_STATUS;
   statusOrder: number;
-  commission: COMMISSION_STATUS | null;
-  commissionOrder: number;
+  bonification: BONIFICATION_STATUS | null;
+  bonificationOrder: number;
   serialNumber: string | null;
   details: string | null;
   entryDate: Date | null;
@@ -216,8 +216,8 @@ export interface TaskOrderBy {
   name?: ORDER_BY_DIRECTION;
   status?: ORDER_BY_DIRECTION;
   statusOrder?: ORDER_BY_DIRECTION;
-  commission?: ORDER_BY_DIRECTION;
-  commissionOrder?: ORDER_BY_DIRECTION;
+  bonification?: ORDER_BY_DIRECTION;
+  bonificationOrder?: ORDER_BY_DIRECTION;
   serialNumber?: ORDER_BY_DIRECTION;
   details?: ORDER_BY_DIRECTION;
   // Note: chassisNumber and plate are now on Truck, use truck.chassisNumber / truck.plate

@@ -6,8 +6,9 @@ export type NFSE_STATUS = 'PENDING' | 'PROCESSING' | 'AUTHORIZED' | 'CANCELLED' 
 
 export interface Invoice {
   id: string;
-  customerConfigId: string;
-  taskId: string;
+  customerConfigId: string | null;
+  taskId: string | null;
+  externalOperationId?: string | null;
   customerId: string;
   totalAmount: number;
   paidAmount: number;
@@ -25,7 +26,8 @@ export interface Invoice {
 
 export interface Installment {
   id: string;
-  customerConfigId: string;
+  customerConfigId: string | null;
+  externalOperationId?: string | null;
   invoiceId: string | null;
   number: number;
   dueDate: Date;

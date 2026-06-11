@@ -202,7 +202,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
         const response = await bonusService.getPeriodTaskStats(periodYear, periodMonth);
         const liveData = (response.data as any)?.data ?? response.data;
 
-        // Use totalWeightedTasks from the live calculation (excludes suspended commissions)
+        // Use totalWeightedTasks from the live calculation (excludes suspended bonifications)
         const weightedTaskCount = typeof liveData.totalWeightedTasks === 'number'
           ? liveData.totalWeightedTasks
           : Number(liveData.totalWeightedTasks) || 0;

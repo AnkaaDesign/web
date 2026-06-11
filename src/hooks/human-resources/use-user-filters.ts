@@ -32,7 +32,7 @@ const userFilterSchemas = {
   },
 
   // Boolean filters
-  hasCommissions: {
+  hasBonifications: {
     schema: z.coerce.boolean(),
   },
   hasLedSector: {
@@ -77,14 +77,14 @@ const userFilterSchemas = {
     }),
   },
 
-  // Commission range filters
-  commissionEarnings: {
+  // Bonification range filters
+  bonificationEarnings: {
     schema: z.object({
       min: z.number().min(0).optional(),
       max: z.number().min(0).optional(),
     }),
   },
-  commissionsCount: {
+  bonificationsCount: {
     schema: z.object({
       min: z.number().int().min(0).optional(),
       max: z.number().int().min(0).optional(),
@@ -139,7 +139,7 @@ const userFilterSchemas = {
       count: z
         .object({
           tasks: z.enum(["asc", "desc"]).optional(),
-          commissions: z.enum(["asc", "desc"]).optional(),
+          bonifications: z.enum(["asc", "desc"]).optional(),
           activities: z.enum(["asc", "desc"]).optional(),
         })
         .optional(),
@@ -176,7 +176,7 @@ export function convertToApiFilters(urlFilters: UserFilters): Partial<UserGetMan
   if (urlFilters.ledSectorId && urlFilters.ledSectorId.length > 0) apiFilters.ledSectorId = urlFilters.ledSectorId;
 
   // Boolean filters
-  if (typeof urlFilters.hasCommissions === "boolean") apiFilters.hasCommissions = urlFilters.hasCommissions;
+  if (typeof urlFilters.hasBonifications === "boolean") apiFilters.hasBonifications = urlFilters.hasBonifications;
   if (typeof urlFilters.hasLedSector === "boolean") apiFilters.hasLedSector = urlFilters.hasLedSector;
   if (typeof urlFilters.hasEmail === "boolean") apiFilters.hasEmail = urlFilters.hasEmail;
   if (typeof urlFilters.hasPhone === "boolean") apiFilters.hasPhone = urlFilters.hasPhone;
@@ -189,9 +189,9 @@ export function convertToApiFilters(urlFilters: UserFilters): Partial<UserGetMan
   if (urlFilters.updatedAt) apiFilters.updatedAt = urlFilters.updatedAt;
   if (urlFilters.lastLoginAt) apiFilters.lastLoginAt = urlFilters.lastLoginAt;
 
-  // Commission range filters
-  if (urlFilters.commissionEarnings) apiFilters.commissionEarnings = urlFilters.commissionEarnings;
-  if (urlFilters.commissionsCount) apiFilters.commissionsCount = urlFilters.commissionsCount;
+  // Bonification range filters
+  if (urlFilters.bonificationEarnings) apiFilters.bonificationEarnings = urlFilters.bonificationEarnings;
+  if (urlFilters.bonificationsCount) apiFilters.bonificationsCount = urlFilters.bonificationsCount;
 
   // Pagination and sorting - handle both limit and itemsPerPage
   if (urlFilters.page) apiFilters.page = urlFilters.page;
@@ -218,7 +218,7 @@ export function convertFromApiFilters(apiFilters: Partial<UserGetManyFormData>):
   if (apiFilters.ledSectorId) urlFilters.ledSectorId = apiFilters.ledSectorId;
 
   // Boolean filters
-  if (typeof apiFilters.hasCommissions === "boolean") urlFilters.hasCommissions = apiFilters.hasCommissions;
+  if (typeof apiFilters.hasBonifications === "boolean") urlFilters.hasBonifications = apiFilters.hasBonifications;
   if (typeof apiFilters.hasLedSector === "boolean") urlFilters.hasLedSector = apiFilters.hasLedSector;
   if (typeof apiFilters.hasEmail === "boolean") urlFilters.hasEmail = apiFilters.hasEmail;
   if (typeof apiFilters.hasPhone === "boolean") urlFilters.hasPhone = apiFilters.hasPhone;
@@ -231,9 +231,9 @@ export function convertFromApiFilters(apiFilters: Partial<UserGetManyFormData>):
   if (apiFilters.updatedAt) urlFilters.updatedAt = apiFilters.updatedAt;
   if (apiFilters.lastLoginAt) urlFilters.lastLoginAt = apiFilters.lastLoginAt;
 
-  // Commission range filters
-  if (apiFilters.commissionEarnings) urlFilters.commissionEarnings = apiFilters.commissionEarnings;
-  if (apiFilters.commissionsCount) urlFilters.commissionsCount = apiFilters.commissionsCount;
+  // Bonification range filters
+  if (apiFilters.bonificationEarnings) urlFilters.bonificationEarnings = apiFilters.bonificationEarnings;
+  if (apiFilters.bonificationsCount) urlFilters.bonificationsCount = apiFilters.bonificationsCount;
 
   // Pagination and sorting
   if (apiFilters.page) urlFilters.page = apiFilters.page;

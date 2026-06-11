@@ -124,9 +124,9 @@ export function BonusTasksTable({
             aValue = a.serialNumber || "";
             bValue = b.serialNumber || "";
             break;
-          case "commission":
-            aValue = a.commission || "";
-            bValue = b.commission || "";
+          case "bonification":
+            aValue = a.bonification || "";
+            bValue = b.bonification || "";
             break;
           default:
             aValue = "";

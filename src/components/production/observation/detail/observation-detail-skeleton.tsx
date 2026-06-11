@@ -69,7 +69,7 @@ export function ObservationDetailSkeleton() {
               </div>
             </div>
 
-            {/* Commissions Section */}
+            {/* Bonifications Section */}
             <div className="pt-4 border-t border-border">
               <Skeleton className="h-5 w-40 mb-3" />
               <div className="space-y-3">

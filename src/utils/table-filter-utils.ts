@@ -158,7 +158,7 @@ export function defaultGetLabel(key: string): string {
     states: "Estados",
     tags: "Tags",
     priority: "Prioridade",
-    commissionStatus: "Status de comissão",
+    bonificationStatus: "Status de bonificação",
     orderStatus: "Status do pedido",
     taskStatus: "Status da tarefa",
   };

@@ -641,8 +641,8 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         }
       }
 
-      // Fix array serialization issue for external-withdrawals
-      if (config.url?.includes("/external-withdrawals") && config.method?.toLowerCase() === "post") {
+      // Fix array serialization issue for external-operations
+      if (config.url?.includes("/external-operations") && config.method?.toLowerCase() === "post") {
         if (config.data && typeof config.data === "object" && !Array.isArray(config.data)) {
           // Fix array serialization issue for items
           if (config.data.items && typeof config.data.items === "object" && !Array.isArray(config.data.items)) {

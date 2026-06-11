@@ -107,8 +107,8 @@ export interface Payroll extends BaseEntity {
   // Task statistics (computed from bonus/task data)
   taskStats?: {
     totalTasks: number;
-    fullCommissionTasks: number;
-    partialCommissionTasks: number;
+    fullBonificationTasks: number;
+    partialBonificationTasks: number;
     totalPonderado: number;
   };
 

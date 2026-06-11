@@ -355,7 +355,7 @@ export function hasCA(item: Item): boolean {
  * Check if item is a PPE (Personal Protective Equipment)
  */
 export function isPpe(item: Item): boolean {
-  return item.ppeType !== null && item.ppeSize !== null;
+  return item.ppeType != null;
 }
 
 /**

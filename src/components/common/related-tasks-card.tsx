@@ -17,7 +17,7 @@ import {
   IconBuildingFactory,
 } from "@tabler/icons-react";
 import type { Task } from "../../types";
-import { TASK_STATUS, TASK_STATUS_LABELS, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, routes } from "../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, BONIFICATION_STATUS, BONIFICATION_STATUS_LABELS, routes } from "../../constants";
 import { cn } from "@/lib/utils";
 import { getBadgeVariantFromStatus } from "@/components/ui/badge";
 import { useTableState } from "@/hooks/common/use-table-state";
@@ -32,7 +32,7 @@ interface RelatedTasksCardProps {
   className?: string;
   defaultView?: "grid" | "table";
   showViewToggle?: boolean;
-  displayMode?: "status" | "commission";
+  displayMode?: "status" | "bonification";
 }
 
 export function RelatedTasksCard({
@@ -160,10 +160,10 @@ export function RelatedTasksCard({
       {} as Record<string, number>
     );
 
-    const commissionCounts = tasks.reduce(
+    const bonificationCounts = tasks.reduce(
       (acc, task) => {
-        const commission = task.commission || "NO_COMMISSION";
-        acc[commission] = (acc[commission] || 0) + 1;
+        const bonification = task.bonification || "NO_BONIFICATION";
+        acc[bonification] = (acc[bonification] || 0) + 1;
         return acc;
       },
       {} as Record<string, number>
@@ -174,7 +174,7 @@ export function RelatedTasksCard({
       activeTasks,
       completedTasks,
       statusCounts,
-      commissionCounts,
+      bonificationCounts,
     };
   }, [tasks]);
 
@@ -263,12 +263,12 @@ export function RelatedTasksCard({
       align: "center",
     },
     {
-      key: displayMode === "commission" ? "commission" : "status",
-      header: displayMode === "commission" ? "Comissão" : "Status",
+      key: displayMode === "bonification" ? "bonification" : "status",
+      header: displayMode === "bonification" ? "Bonificação" : "Status",
       accessor: (task) => {
-        if (displayMode === "commission") {
-          const variant = getBadgeVariantFromStatus(task.commission || "NO_COMMISSION", "COMMISSION_STATUS");
-          const label = COMMISSION_STATUS_LABELS[task.commission as keyof typeof COMMISSION_STATUS_LABELS] || task.commission || "Sem Comissão";
+        if (displayMode === "bonification") {
+          const variant = getBadgeVariantFromStatus(task.bonification || "NO_BONIFICATION", "BONIFICATION_STATUS");
+          const label = BONIFICATION_STATUS_LABELS[task.bonification as keyof typeof BONIFICATION_STATUS_LABELS] || task.bonification || "Sem Bonificação";
 
           return (
             <Badge variant={variant} className="text-xs">
@@ -388,11 +388,11 @@ export function RelatedTasksCard({
                       </span>
                     </div>
 
-                    {/* Status/Commission Badge */}
+                    {/* Status/Bonification Badge */}
                     <div className="absolute top-4 right-4">
-                      {displayMode === "commission" ? (
-                        <Badge variant={getBadgeVariantFromStatus(task.commission || "NO_COMMISSION", "COMMISSION_STATUS")}>
-                          {COMMISSION_STATUS_LABELS[task.commission as keyof typeof COMMISSION_STATUS_LABELS] || task.commission || "Sem Comissão"}
+                      {displayMode === "bonification" ? (
+                        <Badge variant={getBadgeVariantFromStatus(task.bonification || "NO_BONIFICATION", "BONIFICATION_STATUS")}>
+                          {BONIFICATION_STATUS_LABELS[task.bonification as keyof typeof BONIFICATION_STATUS_LABELS] || task.bonification || "Sem Bonificação"}
                         </Badge>
                       ) : (
                         <Badge variant={getBadgeVariantFromStatus(task.status, "TASK")}>
@@ -498,16 +498,16 @@ export function RelatedTasksCard({
           </div>
         )}
 
-        {/* Status/Commission Summary - Moved to Bottom */}
+        {/* Status/Bonification Summary - Moved to Bottom */}
         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border flex-shrink-0">
-          {displayMode === "commission" ? (
-            [COMMISSION_STATUS.FULL_COMMISSION, COMMISSION_STATUS.PARTIAL_COMMISSION, COMMISSION_STATUS.NO_COMMISSION, COMMISSION_STATUS.SUSPENDED_COMMISSION].map(
-              (commission: string) => {
-                const count = statistics.commissionCounts[commission] || 0;
-                const variant = getBadgeVariantFromStatus(commission, "COMMISSION_STATUS");
+          {displayMode === "bonification" ? (
+            [BONIFICATION_STATUS.FULL_BONIFICATION, BONIFICATION_STATUS.PARTIAL_BONIFICATION, BONIFICATION_STATUS.NO_BONIFICATION, BONIFICATION_STATUS.SUSPENDED_BONIFICATION].map(
+              (bonification: string) => {
+                const count = statistics.bonificationCounts[bonification] || 0;
+                const variant = getBadgeVariantFromStatus(bonification, "BONIFICATION_STATUS");
                 return (
-                  <Badge key={commission} variant={variant} className="font-medium">
-                    {COMMISSION_STATUS_LABELS[commission as keyof typeof COMMISSION_STATUS_LABELS]} ({count})
+                  <Badge key={bonification} variant={variant} className="font-medium">
+                    {BONIFICATION_STATUS_LABELS[bonification as keyof typeof BONIFICATION_STATUS_LABELS]} ({count})
                   </Badge>
                 );
               }

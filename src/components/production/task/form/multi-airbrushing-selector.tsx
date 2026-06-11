@@ -29,7 +29,7 @@ interface AirbrushingItem {
   startedAt: Date | null;
   finishedAt: Date | null;
   painterId: string | null;
-  painter?: { id: string; name: string; email?: string | null } | null;
+  painter?: { id: string; name: string; email?: string | null; status?: string | null } | null;
   receiptFiles: FileWithPreview[];
   invoiceFiles: FileWithPreview[];
   artworkFiles: FileWithPreview[];
@@ -319,7 +319,15 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                         <FormLabel>Status</FormLabel>
                         <Combobox
                           value={airbrushing.status}
-                          onValueChange={(value) => updateAirbrushing(airbrushing.id, { status: (value as string) || '' })}
+                          onValueChange={(value) => {
+                            const newStatus = (value as string) || '';
+                            // Payment status is only meaningful for completed airbrushings:
+                            // reset it to PENDING whenever the status leaves COMPLETED
+                            updateAirbrushing(airbrushing.id, {
+                              status: newStatus,
+                              ...(newStatus !== AIRBRUSHING_STATUS.COMPLETED ? { paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING } : {}),
+                            });
+                          }}
                           disabled={disabled}
                           options={Object.values(AIRBRUSHING_STATUS).map((status) => ({
                             value: status,

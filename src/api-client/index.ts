@@ -31,7 +31,7 @@ export * from "./changelog";
 export * from "./customer";
 export * from "./cut";
 export * from "./ppe";
-export * from "./externalWithdrawal";
+export * from "./externalOperation";
 export * from "./file";
 export * from "./goal";
 export * from "./holiday";

@@ -213,7 +213,7 @@ export function TaskHistoryTable({
           },
         },
       },
-      // Note: commission is a direct field on Task, not a relation, so it's always included
+      // Note: bonification is a direct field on Task, not a relation, so it's always included
     }),
     [],
   );

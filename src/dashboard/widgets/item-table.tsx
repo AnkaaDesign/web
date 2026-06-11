@@ -177,12 +177,14 @@ const COLUMN_CATALOG: ColumnDef[] = [
     track: "minmax(0, 0.8fr)",
     render: (i) => {
       const q = Number((i as any).quantity ?? 0);
-      const stockLevel = determineStockLevel(
-        q,
-        (i as any).reorderPoint ?? null,
-        (i as any).maxQuantity ?? null,
-        false,
-      );
+      const stockLevel = determineStockLevel({
+        quantity: q,
+        reorderPoint: (i as any).reorderPoint ?? null,
+        maxQuantity: (i as any).maxQuantity ?? null,
+        hasActiveOrder: false,
+        stockModel: (i as any).stockModel ?? null,
+        fixedTargetQuantity: (i as any).fixedTargetQuantity ?? null,
+      });
       const color = getStockLevelTextColor(stockLevel);
       return (
         <span className={`flex items-center gap-1.5 text-sm tabular-nums ${color}`}>

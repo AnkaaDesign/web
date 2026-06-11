@@ -141,13 +141,13 @@ export function extractActiveFilters(
   }
 
   // Boolean filters
-  if (filters.hasCommissions !== undefined) {
+  if (filters.hasBonifications !== undefined) {
     activeFilters.push({
-      key: "hasCommissions",
-      label: "Comissões",
-      value: filters.hasCommissions ? "Possui" : "Não possui",
+      key: "hasBonifications",
+      label: "Bonificações",
+      value: filters.hasBonifications ? "Possui" : "Não possui",
       iconType: "currency-dollar",
-      onRemove: () => onRemoveFilter("hasCommissions"),
+      onRemove: () => onRemoveFilter("hasBonifications"),
     });
   }
 
@@ -162,9 +162,9 @@ export function extractActiveFilters(
   }
 
   // Range filters
-  if (filters.commissionEarnings?.min !== undefined || filters.commissionEarnings?.max !== undefined) {
-    const min = filters.commissionEarnings.min;
-    const max = filters.commissionEarnings.max;
+  if (filters.bonificationEarnings?.min !== undefined || filters.bonificationEarnings?.max !== undefined) {
+    const min = filters.bonificationEarnings.min;
+    const max = filters.bonificationEarnings.max;
     let value = "";
 
     if (min !== undefined && max !== undefined) {
@@ -176,17 +176,17 @@ export function extractActiveFilters(
     }
 
     activeFilters.push({
-      key: "commissionEarnings",
-      label: "Ganhos Comissões",
+      key: "bonificationEarnings",
+      label: "Ganhos Bonificações",
       value,
       iconType: "currency-dollar",
-      onRemove: () => onRemoveFilter("commissionEarnings"),
+      onRemove: () => onRemoveFilter("bonificationEarnings"),
     });
   }
 
-  if (filters.commissionsCount?.min !== undefined || filters.commissionsCount?.max !== undefined) {
-    const min = filters.commissionsCount.min;
-    const max = filters.commissionsCount.max;
+  if (filters.bonificationsCount?.min !== undefined || filters.bonificationsCount?.max !== undefined) {
+    const min = filters.bonificationsCount.min;
+    const max = filters.bonificationsCount.max;
     let value = "";
 
     if (min !== undefined && max !== undefined) {
@@ -198,11 +198,11 @@ export function extractActiveFilters(
     }
 
     activeFilters.push({
-      key: "commissionsCount",
-      label: "Qtd. Comissões",
+      key: "bonificationsCount",
+      label: "Qtd. Bonificações",
       value,
       iconType: "currency-dollar",
-      onRemove: () => onRemoveFilter("commissionsCount"),
+      onRemove: () => onRemoveFilter("bonificationsCount"),
     });
   }
 
@@ -419,17 +419,17 @@ export function createFilterRemover(currentFilters: Partial<UserGetManyFormData>
           delete newFilters.ledSectorId;
         }
         break;
-      case "hasCommissions":
-        delete newFilters.hasCommissions;
+      case "hasBonifications":
+        delete newFilters.hasBonifications;
         break;
       case "hasLedSector":
         delete newFilters.hasLedSector;
         break;
-      case "commissionEarnings":
-        delete newFilters.commissionEarnings;
+      case "bonificationEarnings":
+        delete newFilters.bonificationEarnings;
         break;
-      case "commissionsCount":
-        delete newFilters.commissionsCount;
+      case "bonificationsCount":
+        delete newFilters.bonificationsCount;
         break;
       case "birth":
         delete newFilters.birth;

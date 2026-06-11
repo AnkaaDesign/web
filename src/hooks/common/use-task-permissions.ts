@@ -58,7 +58,7 @@ export function useTaskPermissions() {
   // -- Section visibility (edit form & detail page) -----------------------
   const canViewQuote = isAdmin || isFinancial || isCommercial;
   const canViewRestrictedFields = isAdmin || isFinancial || isCommercial || isLogistic || isProductionManager || isDesigner;
-  const canViewCommission = isAdmin || isFinancial || isCommercial || isProduction;
+  const canViewBonification = isAdmin || isFinancial || isCommercial || isProduction;
   const canViewDates = !isWarehouse;
   const canViewServices = !isWarehouse && !isPlotting;
   const canViewLayout = isAdmin || isLogistic || isProductionManager || (isProduction && isTeamLeader);
@@ -72,6 +72,8 @@ export function useTaskPermissions() {
   const canViewCheckinCheckout = isAdmin || isLogistic || isProductionManager;
   const canViewReimbursement = !isWarehouse && !isFinancial && !isLogistic && !isProductionManager;
   const canViewObservation = !isWarehouse && !isFinancial && !isDesigner && !isLogistic && !isProductionManager && !isCommercial;
+  // PRODUCTION can VIEW the observation section but must not edit it (API rejects observation writes from PRODUCTION)
+  const canEditObservation = canViewObservation && !isProduction;
   const canViewArtworkBadges = isAdmin || isCommercial || isFinancial || isLogistic || isProductionManager || isDesigner;
   const canViewDocuments = isAdmin || isFinancial;
 
@@ -79,7 +81,7 @@ export function useTaskPermissions() {
   // These return true when the user CAN edit (negate for disabled prop)
   const canEditIdentity = !isFinancial && !isWarehouse && !isDesigner;
   const canEditSector = !isFinancial && !isWarehouse && !isDesigner && !isCommercial;
-  const canEditCommission = !isFinancial && !isDesigner && !isLogistic && !isProductionManager && !isWarehouse;
+  const canEditBonification = !isFinancial && !isDesigner && !isLogistic && !isProductionManager && !isWarehouse;
   const canEditDates = !isWarehouse && !isFinancial && !isDesigner;
   const canEditResponsibles = !isFinancial && !isDesigner && !isLogistic && !isProductionManager;
   const canEditServices = !isWarehouse;
@@ -107,7 +109,7 @@ export function useTaskPermissions() {
     // Section visibility
     canViewQuote,
     canViewRestrictedFields,
-    canViewCommission,
+    canViewBonification,
     canViewDates,
     canViewServices,
     canViewLayout,
@@ -121,13 +123,14 @@ export function useTaskPermissions() {
     canViewCheckinCheckout,
     canViewReimbursement,
     canViewObservation,
+    canEditObservation,
     canViewArtworkBadges,
     canViewDocuments,
 
     // Field editability
     canEditIdentity,
     canEditSector,
-    canEditCommission,
+    canEditBonification,
     canEditDates,
     canEditResponsibles,
     canEditServices,

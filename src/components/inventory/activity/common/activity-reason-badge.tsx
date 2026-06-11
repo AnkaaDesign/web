@@ -21,7 +21,7 @@ export function ActivityReasonBadge({ reason, className, size = "default" }: Act
       // Negative/Outbound reasons - Red
       case ACTIVITY_REASON.PRODUCTION_USAGE:
       case ACTIVITY_REASON.PPE_DELIVERY:
-      case ACTIVITY_REASON.EXTERNAL_WITHDRAWAL:
+      case ACTIVITY_REASON.EXTERNAL_OPERATION:
       case ACTIVITY_REASON.DAMAGE:
       case ACTIVITY_REASON.LOSS:
         return "error";
@@ -34,7 +34,7 @@ export function ActivityReasonBadge({ reason, className, size = "default" }: Act
 
       // Neutral/Process reasons - Blue
       case ACTIVITY_REASON.BORROW:
-      case ACTIVITY_REASON.EXTERNAL_WITHDRAWAL_RETURN:
+      case ACTIVITY_REASON.EXTERNAL_OPERATION_RETURN:
         return "info";
 
       // Other/Default - Default

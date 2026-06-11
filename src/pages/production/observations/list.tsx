@@ -6,7 +6,7 @@ import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { useNavigate } from "react-router-dom";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useAuth } from "@/contexts/auth-context";
-import { hasPrivilege } from "@/utils";
+import { canCreateObservations } from "@/utils/permissions/entity-permissions";
 
 export const ObservationsList = () => {
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ export const ObservationsList = () => {
   // Track page for analytics
   usePageTracker({ title: "Observações - Lista", icon: "observations_list" });
 
-  const canCreate = user && (hasPrivilege(user, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(user, SECTOR_PRIVILEGES.COMMERCIAL));
+  const canCreate = canCreateObservations(user); // ADMIN, COMMERCIAL, FINANCIAL, WAREHOUSE, PRODUCTION_MANAGER (matches API)
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>

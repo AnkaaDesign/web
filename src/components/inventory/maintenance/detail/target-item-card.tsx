@@ -47,7 +47,14 @@ export function TargetItemCard({ item, className }: TargetItemCardProps) {
   const hasActiveOrder = item.orderItems?.some((orderItem) => orderItem.order && activeOrderStatuses.includes(orderItem.order.status)) || false;
 
   // Determine stock level using the unified algorithm
-  const stockLevel = determineStockLevel(item.quantity || 0, item.reorderPoint || null, item.maxQuantity || null, hasActiveOrder);
+  const stockLevel = determineStockLevel({
+    quantity: item.quantity || 0,
+    reorderPoint: item.reorderPoint || null,
+    maxQuantity: item.maxQuantity || null,
+    hasActiveOrder,
+    stockModel: item.stockModel ?? null,
+    fixedTargetQuantity: item.fixedTargetQuantity ?? null,
+  });
 
   // Get color based on stock level
   const getStockColor = () => {

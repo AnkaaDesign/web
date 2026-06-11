@@ -3,7 +3,7 @@ import { toast } from "@/components/ui/sonner";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { formatDate, formatDateTime, getDurationBetweenDates, formatCurrency, formatTaskMeasures } from "../../../../utils";
-import { TASK_STATUS, COMMISSION_STATUS_LABELS, COMMISSION_STATUS, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS, TASK_QUOTE_STATUS_LABELS, TASK_QUOTE_STATUS } from "../../../../constants";
+import { TASK_STATUS, BONIFICATION_STATUS_LABELS, BONIFICATION_STATUS, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS, TASK_QUOTE_STATUS_LABELS, TASK_QUOTE_STATUS } from "../../../../constants";
 import { taskService } from "../../../../api-client";
 
 // Format date as dd/mm/yy for PDF export
@@ -76,32 +76,32 @@ const getPeriodLabel = (filters: Partial<TaskGetManyFormData>): string => {
   return "Todos os períodos";
 };
 
-// Calculate commission statistics from tasks
-const getCommissionStats = (tasks: Task[]) => {
+// Calculate bonification statistics from tasks
+const getBonificationStats = (tasks: Task[]) => {
   const stats = {
     total: tasks.length,
-    fullCommission: 0,
-    partialCommission: 0,
-    noCommission: 0,
-    suspendedCommission: 0,
+    fullBonification: 0,
+    partialBonification: 0,
+    noBonification: 0,
+    suspendedBonification: 0,
     weighted: 0, // Ponderadas: full (1.0) + partial (0.5)
   };
 
   tasks.forEach((task) => {
-    switch (task.commission) {
-      case COMMISSION_STATUS.FULL_COMMISSION:
-        stats.fullCommission++;
+    switch (task.bonification) {
+      case BONIFICATION_STATUS.FULL_BONIFICATION:
+        stats.fullBonification++;
         stats.weighted += 1;
         break;
-      case COMMISSION_STATUS.PARTIAL_COMMISSION:
-        stats.partialCommission++;
+      case BONIFICATION_STATUS.PARTIAL_BONIFICATION:
+        stats.partialBonification++;
         stats.weighted += 0.5;
         break;
-      case COMMISSION_STATUS.NO_COMMISSION:
-        stats.noCommission++;
+      case BONIFICATION_STATUS.NO_BONIFICATION:
+        stats.noBonification++;
         break;
-      case COMMISSION_STATUS.SUSPENDED_COMMISSION:
-        stats.suspendedCommission++;
+      case BONIFICATION_STATUS.SUSPENDED_BONIFICATION:
+        stats.suspendedBonification++;
         break;
     }
   });
@@ -172,7 +172,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
       return configs.map((c: any) => c.customer?.corporateName || c.customer?.fantasyName || "").filter(Boolean).join(", ");
     },
   },
-  { id: "commission", label: "Comissão", getValue: (task: Task) => task.commission ? COMMISSION_STATUS_LABELS[task.commission] || task.commission : "" },
+  { id: "bonification", label: "Bonificação", getValue: (task: Task) => task.bonification ? BONIFICATION_STATUS_LABELS[task.bonification] || task.bonification : "" },
   { id: "details", label: "Detalhes", getValue: (task: Task) => task.details || "" },
   { id: "observation", label: "Observação", getValue: (task: Task) => task.observation?.description || "" },
 ];
@@ -320,9 +320,9 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
     const periodLabel = getPeriodLabel(exportFilters);
     const headerPadding = columnCount <= 6 ? "8px 5px" : columnCount <= 10 ? "6px 4px" : "4px 2px";
 
-    // Check if commission column is visible
-    const hasCommissionColumn = columns.some((col) => col.id === "commission");
-    const commissionStats = hasCommissionColumn ? getCommissionStats(tasks) : null;
+    // Check if bonification column is visible
+    const hasBonificationColumn = columns.some((col) => col.id === "bonification");
+    const bonificationStats = hasBonificationColumn ? getBonificationStats(tasks) : null;
 
     // Format values for PDF with short dates
     const getFormattedValue = (task: Task, col: ExportColumn<Task>): string => {
@@ -534,7 +534,7 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
                 case "status":
                   width = columnCount <= 6 ? "75px" : "60px";
                   break;
-                case "commission":
+                case "bonification":
                   width = columnCount <= 6 ? "90px" : "75px";
                   break;
                 case "details":
@@ -629,14 +629,14 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
             <div class="info">
               <p><strong>Período:</strong> ${periodLabel}</p>
               ${
-                commissionStats
+                bonificationStats
                   ? `
-                <p><strong>Total de tarefas:</strong> ${commissionStats.total}</p>
-                <p><strong>Comissão Integral:</strong> ${commissionStats.fullCommission}</p>
-                <p><strong>Comissão Parcial:</strong> ${commissionStats.partialCommission}</p>
-                <p><strong>Sem Comissão:</strong> ${commissionStats.noCommission}</p>
-                <p><strong>Suspensas:</strong> ${commissionStats.suspendedCommission}</p>
-                <p><strong>Tarefas Ponderadas:</strong> ${commissionStats.weighted.toFixed(1)}</p>
+                <p><strong>Total de tarefas:</strong> ${bonificationStats.total}</p>
+                <p><strong>Bonificação Integral:</strong> ${bonificationStats.fullBonification}</p>
+                <p><strong>Bonificação Parcial:</strong> ${bonificationStats.partialBonification}</p>
+                <p><strong>Sem Bonificação:</strong> ${bonificationStats.noBonification}</p>
+                <p><strong>Suspensas:</strong> ${bonificationStats.suspendedBonification}</p>
+                <p><strong>Tarefas Ponderadas:</strong> ${bonificationStats.weighted.toFixed(1)}</p>
               `
                   : `
                 <p><strong>Total de tarefas:</strong> ${tasks.length}</p>
@@ -709,7 +709,7 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
                             else if (task.status === TASK_STATUS.COMPLETED) className += " status-completed";
                             else if (task.status === TASK_STATUS.CANCELLED) className += " status-cancelled";
                             break;
-                          case "commission":
+                          case "bonification":
                             className = "text-left";
                             break;
                           case "details":

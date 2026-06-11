@@ -4,7 +4,7 @@ import { getItems } from "../../../../api-client";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Item } from "../../../../types";
-import { ITEM_CATEGORY_TYPE, PPE_TYPE, PPE_TYPE_ORDER, BOOT_SIZE_ORDER, PANTS_SIZE_ORDER, SHIRT_SIZE_ORDER, MASK_SIZE_ORDER } from "../../../../constants";
+import { PPE_TYPE, PPE_TYPE_ORDER, BOOT_SIZE_ORDER, PANTS_SIZE_ORDER, SHIRT_SIZE_ORDER, MASK_SIZE_ORDER } from "../../../../constants";
 import { getPpeSizeFromMeasures } from "@/utils/ppe-size-helpers";
 
 interface ItemSelectorDropdownProps {
@@ -120,9 +120,8 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
           take: 50,
           where: {
             isActive: true,
-            category: {
-              type: ITEM_CATEGORY_TYPE.PPE,
-            },
+            // PPE identity = item.ppeType != null (capability-fields contract).
+            ppeType: { not: null },
             quantity: {
               gt: 0,
             },

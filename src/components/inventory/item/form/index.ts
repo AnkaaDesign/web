@@ -14,3 +14,6 @@ export { MeasureUnitSelector } from "./measure-unit-selector";
 export { MeasureInput } from "./measure-input";
 export { BarcodeManager } from "./barcode-manager";
 export { AssignToUserToggle } from "./assign-to-user-toggle";
+export { BorrowableToggle } from "./borrowable-toggle";
+export { StockModelSelector } from "./stock-model-selector";
+export { FixedTargetQuantityInput } from "./fixed-target-quantity-input";

@@ -171,7 +171,7 @@ export const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   // Status/badge columns
   "sector.name": 140,
   truckCategory: 160,
-  commission: 140,
+  bonification: 140,
   generalPainting: 140,
 
   // Service order columns

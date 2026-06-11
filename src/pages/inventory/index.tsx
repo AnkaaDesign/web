@@ -1,5 +1,5 @@
 export * from "./root";
-export * from "./external-withdrawals";
+export * from "./external-operations";
 export * from "./loans";
 export * from "./maintenance";
 export * from "./movements";

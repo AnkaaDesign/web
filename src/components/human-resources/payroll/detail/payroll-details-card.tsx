@@ -7,10 +7,9 @@ import {
   IconCurrencyDollar,
   IconTrendingUp,
   IconCalculator,
-  IconChecklist,
   IconChartLine
 } from "@tabler/icons-react";
-import { COMMISSION_STATUS, USER_STATUS } from "../../../../constants";
+import { USER_STATUS } from "../../../../constants";
 
 interface PayrollDetailsCardProps {
   users: PayrollUserRow[];
@@ -24,7 +23,6 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
     let totalBonus = 0;
     let totalRemuneration = 0;
     let bonusEligibleCount = 0;
-    let performanceUsersCount = 0;
 
     // Use the first user's average if available (all users have the same avg)
     const averageTasksPerEmployee = users[0]?.averageTasksPerEmployee || 0;
@@ -39,35 +37,6 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
         uniqueUserIds.add(baseUserId);
         uniqueUsers.push(user);
       }
-    });
-
-    // Calculate GLOBAL task counts by deduplicating taskIds across ALL users (matching backend)
-    const allCommissions: any[] = [];
-    users.forEach(user => {
-      if (user.monthCommissions) {
-        allCommissions.push(...user.monthCommissions);
-      }
-    });
-
-    // Deduplicate by taskId (same logic as backend BonusCalculationService)
-    const processedTasks = new Set<string>();
-    let totalFullTasks = 0;
-    let totalPartialTasks = 0;
-    let totalTasksWeighted = 0;
-
-    allCommissions.forEach(commission => {
-      const taskId = commission.taskId;
-      if (processedTasks.has(taskId)) return; // Skip if task already processed
-      processedTasks.add(taskId);
-
-      if (commission.status === COMMISSION_STATUS.FULL_COMMISSION) {
-        totalFullTasks++;
-        totalTasksWeighted += 1;
-      } else if (commission.status === COMMISSION_STATUS.PARTIAL_COMMISSION) {
-        totalPartialTasks++;
-        totalTasksWeighted += 0.5;
-      }
-      // NO_COMMISSION and SUSPENDED_COMMISSION don't count
     });
 
     // Calculate totals from UNIQUE users only
@@ -97,7 +66,6 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
 
     const totalEarnings = totalRemuneration + totalBonus;
     const averageBonus = bonusEligibleCount > 0 ? totalBonus / bonusEligibleCount : 0;
-    const realTotalTasks = totalFullTasks + totalPartialTasks; // For display purposes
 
     return {
       totalBonus,
@@ -105,11 +73,6 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
       totalEarnings,
       averageBonus,
       bonusEligibleCount,
-      totalFullTasks,
-      totalPartialTasks,
-      totalTasks: realTotalTasks,
-      averageTasksPerPerformanceUser: totalTasksWeighted / Math.max(performanceUsersCount, 1), // Use weighted tasks for average
-      performanceUsersCount,
       uniqueUsersCount: uniqueUsers.length,
       averageTasksPerEmployee
     };
@@ -121,11 +84,6 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
     totalEarnings,
     averageBonus,
     bonusEligibleCount,
-    totalFullTasks,
-    totalPartialTasks,
-    totalTasks,
-    averageTasksPerPerformanceUser,
-    performanceUsersCount,
     uniqueUsersCount,
     averageTasksPerEmployee
   } = calculateSummaryStats();
@@ -151,7 +109,7 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Header Stats - Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Total Employees */}
           <div className="space-y-2 p-4 bg-gradient-to-br from-blue-50 to-blue-25 dark:from-blue-950/20 dark:to-blue-900/10 rounded-lg border border-blue-200/50 dark:border-blue-800/30">
             <div className="flex items-center gap-2">
@@ -176,29 +134,17 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
             </p>
           </div>
 
-          {/* Total Tasks */}
-          <div className="space-y-2 p-4 bg-gradient-to-br from-purple-50 to-purple-25 dark:from-purple-950/20 dark:to-purple-900/10 rounded-lg border border-purple-200/50 dark:border-purple-800/30">
-            <div className="flex items-center gap-2">
-              <IconChecklist className="h-4 w-4 text-purple-600" />
-              <p className="text-sm font-medium text-purple-700 dark:text-purple-300">Total Tarefas</p>
-            </div>
-            <p className="text-2xl font-bold text-purple-800 dark:text-purple-200">{totalTasks}</p>
-            <p className="text-xs text-purple-600 dark:text-purple-400">
-              {totalFullTasks} completas • {totalPartialTasks} parciais
-            </p>
-          </div>
-
-          {/* Average Tasks Per User (Weighted) */}
+          {/* Average Tasks Per Employee */}
           <div className="space-y-2 p-4 bg-gradient-to-br from-orange-50 to-orange-25 dark:from-orange-950/20 dark:to-orange-900/10 rounded-lg border border-orange-200/50 dark:border-orange-800/30">
             <div className="flex items-center gap-2">
               <IconChartLine className="h-4 w-4 text-orange-600" />
-              <p className="text-sm font-medium text-orange-700 dark:text-orange-300">Média por Usuário</p>
+              <p className="text-sm font-medium text-orange-700 dark:text-orange-300">Média de Tarefas</p>
             </div>
             <p className="text-2xl font-bold text-orange-800 dark:text-orange-200">
-              {averageTasksPerPerformanceUser.toFixed(1)}
+              {averageTasksPerEmployee.toFixed(1)}
             </p>
             <p className="text-xs text-orange-600 dark:text-orange-400">
-              {performanceUsersCount} usuários ativos • Base: {averageTasksPerEmployee.toFixed(1)}
+              Tarefas por funcionário no período
             </p>
           </div>
         </div>

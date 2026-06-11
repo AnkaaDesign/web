@@ -7,7 +7,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { IconFilter, IconShield, IconBrandApple, IconCalendarPlus, IconTriangleInverted } from "@tabler/icons-react";
 import { getItemBrands } from "../../../../api-client";
 import type { ItemGetManyFormData } from "../../../../schemas";
-import { PPE_TYPE, PPE_TYPE_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
+import { PPE_TYPE, PPE_TYPE_LABELS } from "../../../../constants";
 
 interface PpeFiltersProps {
   open: boolean;
@@ -117,10 +117,9 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
       orderBy: filters.orderBy,
       include: filters.include,
       page: 1, // Reset to first page when applying filters
+      // PPE identity = item.ppeType != null (capability-fields contract).
       where: {
-        category: {
-          type: ITEM_CATEGORY_TYPE.PPE,
-        },
+        ppeType: { not: null },
       },
     };
 
@@ -153,10 +152,9 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
     const resetFilters: Partial<ItemGetManyFormData> = {
       limit: filters.limit || 40,
       orderBy: filters.orderBy || { name: "asc" },
+      // PPE identity = item.ppeType != null (capability-fields contract).
       where: {
-        category: {
-          type: ITEM_CATEGORY_TYPE.PPE,
-        },
+        ppeType: { not: null },
       },
     };
     setLocalState({});

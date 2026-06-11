@@ -30,9 +30,12 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        // Convert addedAt string to Date
+        // Convert addedAt string to Date + one-time migration of legacy
+        // "Retiradas Externas" favorites to "Operações Externas" paths/titles
         return parsed.map((item: any) => ({
           ...item,
+          path: typeof item.path === "string" ? item.path.replace(/^\/estoque\/retiradas-externas/, "/estoque/operacoes-externas") : item.path,
+          title: typeof item.title === "string" ? item.title.replace(/Retiradas Externas/g, "Operações Externas") : item.title,
           addedAt: new Date(item.addedAt),
         }));
       }

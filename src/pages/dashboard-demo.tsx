@@ -2032,7 +2032,7 @@ function ApariencaTab({
 function ColunasTab({ columns, hiddenCols }: { columns: string[]; hiddenCols: string[] }) {
   const visibleCols = columns.filter((c) => !hiddenCols.includes(c));
   const availableCols = [
-    "Acabamento", "Artes", "Categoria", "Chassi", "Comissão", "Concluída em",
+    "Acabamento", "Artes", "Categoria", "Chassi", "Bonificação", "Concluída em",
     "Criado em", "Detalhes", "Entrada", "Identificador", "Implemento", "Iniciada em",
   ];
   return (

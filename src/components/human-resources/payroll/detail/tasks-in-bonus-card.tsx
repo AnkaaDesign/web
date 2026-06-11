@@ -14,18 +14,18 @@ import {
 } from "@tabler/icons-react";
 import { formatDate } from "../../../../utils";
 import {
-  COMMISSION_STATUS,
-  COMMISSION_STATUS_LABELS
+  BONIFICATION_STATUS,
+  BONIFICATION_STATUS_LABELS
 } from "../../../../constants";
 import { getBadgeVariant } from "../../../../constants";
 import { useTableState } from "@/hooks/common/use-table-state";
 import type { Task } from "../../../../types";
 
-// Extended task interface for display with commission data
-interface TaskInBonusRow extends Omit<Task, 'commission'> {
-  commission?: COMMISSION_STATUS | null;
-  commissionStatus?: COMMISSION_STATUS;
-  commissionValue?: number;
+// Extended task interface for display with bonification data
+interface TaskInBonusRow extends Omit<Task, 'bonification'> {
+  bonification?: BONIFICATION_STATUS | null;
+  bonificationStatus?: BONIFICATION_STATUS;
+  bonificationValue?: number;
   weightedValue?: number; // For display purposes (Full=1, Partial=0.5)
 }
 
@@ -45,7 +45,7 @@ export function TasksInBonusCard({
   description = "Lista de tarefas concluídas incluídas no cálculo da bonificação"
 }: TasksInBonusCardProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<COMMISSION_STATUS | "ALL">("ALL");
+  const [statusFilter, setStatusFilter] = useState<BONIFICATION_STATUS | "ALL">("ALL");
 
   // Table state management
   const {
@@ -70,8 +70,8 @@ export function TasksInBonusCard({
 
       // Status filter
       const matchesStatus = statusFilter === "ALL" ||
-        task.commissionStatus === statusFilter ||
-        task.commission === statusFilter;
+        task.bonificationStatus === statusFilter ||
+        task.bonification === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
@@ -105,8 +105,8 @@ export function TasksInBonusCard({
             const dateB = b.finishedAt ? new Date(b.finishedAt).getTime() : 0;
             comparison = dateA - dateB;
             break;
-          case "commissionStatus":
-            comparison = (a.commissionStatus || "").localeCompare(b.commissionStatus || "");
+          case "bonificationStatus":
+            comparison = (a.bonificationStatus || "").localeCompare(b.bonificationStatus || "");
             break;
           case "weightedValue":
             comparison = (a.weightedValue || 0) - (b.weightedValue || 0);
@@ -124,17 +124,17 @@ export function TasksInBonusCard({
   // Calculate summary statistics
   const summary = useMemo(() => {
     const total = filteredTasks.length;
-    const fullCommission = filteredTasks.filter(t =>
-      t.commissionStatus === COMMISSION_STATUS.FULL_COMMISSION ||
-      t.commission === COMMISSION_STATUS.FULL_COMMISSION
+    const fullBonification = filteredTasks.filter(t =>
+      t.bonificationStatus === BONIFICATION_STATUS.FULL_BONIFICATION ||
+      t.bonification === BONIFICATION_STATUS.FULL_BONIFICATION
     ).length;
-    const partialCommission = filteredTasks.filter(t =>
-      t.commissionStatus === COMMISSION_STATUS.PARTIAL_COMMISSION ||
-      t.commission === COMMISSION_STATUS.PARTIAL_COMMISSION
+    const partialBonification = filteredTasks.filter(t =>
+      t.bonificationStatus === BONIFICATION_STATUS.PARTIAL_BONIFICATION ||
+      t.bonification === BONIFICATION_STATUS.PARTIAL_BONIFICATION
     ).length;
-    const totalWeighted = fullCommission + (partialCommission * 0.5);
+    const totalWeighted = fullBonification + (partialBonification * 0.5);
 
-    return { total, fullCommission, partialCommission, totalWeighted };
+    return { total, fullBonification, partialBonification, totalWeighted };
   }, [filteredTasks]);
 
   // Table columns
@@ -197,14 +197,14 @@ export function TasksInBonusCard({
       align: "center",
     },
     {
-      key: "commissionStatus",
-      header: "Status Comissão",
+      key: "bonificationStatus",
+      header: "Status Bonificação",
       accessor: (task) => {
-        const status = task.commissionStatus || task.commission;
+        const status = task.bonificationStatus || task.bonification;
         if (!status) return <span className="text-muted-foreground">-</span>;
 
-        const variant = getBadgeVariant("COMMISSION_STATUS", status);
-        const label = COMMISSION_STATUS_LABELS[status] || status;
+        const variant = getBadgeVariant("BONIFICATION_STATUS", status);
+        const label = BONIFICATION_STATUS_LABELS[status] || status;
 
         return (
           <Badge variant={variant} className="text-xs">
@@ -220,12 +220,12 @@ export function TasksInBonusCard({
       key: "weightedValue",
       header: "Valor Ponderado",
       accessor: (task) => {
-        const status = task.commissionStatus || task.commission;
+        const status = task.bonificationStatus || task.bonification;
         let weight = 0;
 
-        if (status === COMMISSION_STATUS.FULL_COMMISSION) {
+        if (status === BONIFICATION_STATUS.FULL_BONIFICATION) {
           weight = 1.0;
-        } else if (status === COMMISSION_STATUS.PARTIAL_COMMISSION) {
+        } else if (status === BONIFICATION_STATUS.PARTIAL_BONIFICATION) {
           weight = 0.5;
         }
 
@@ -288,21 +288,21 @@ export function TasksInBonusCard({
             <IconAdjustments className="h-4 w-4 text-muted-foreground" />
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as COMMISSION_STATUS | "ALL")}
+              onChange={(e) => setStatusFilter(e.target.value as BONIFICATION_STATUS | "ALL")}
               className="px-3 py-2 text-sm border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             >
               <option value="ALL">Todos os Status</option>
-              <option value={COMMISSION_STATUS.FULL_COMMISSION}>
-                {COMMISSION_STATUS_LABELS[COMMISSION_STATUS.FULL_COMMISSION]}
+              <option value={BONIFICATION_STATUS.FULL_BONIFICATION}>
+                {BONIFICATION_STATUS_LABELS[BONIFICATION_STATUS.FULL_BONIFICATION]}
               </option>
-              <option value={COMMISSION_STATUS.PARTIAL_COMMISSION}>
-                {COMMISSION_STATUS_LABELS[COMMISSION_STATUS.PARTIAL_COMMISSION]}
+              <option value={BONIFICATION_STATUS.PARTIAL_BONIFICATION}>
+                {BONIFICATION_STATUS_LABELS[BONIFICATION_STATUS.PARTIAL_BONIFICATION]}
               </option>
-              <option value={COMMISSION_STATUS.NO_COMMISSION}>
-                {COMMISSION_STATUS_LABELS[COMMISSION_STATUS.NO_COMMISSION]}
+              <option value={BONIFICATION_STATUS.NO_BONIFICATION}>
+                {BONIFICATION_STATUS_LABELS[BONIFICATION_STATUS.NO_BONIFICATION]}
               </option>
-              <option value={COMMISSION_STATUS.SUSPENDED_COMMISSION}>
-                {COMMISSION_STATUS_LABELS[COMMISSION_STATUS.SUSPENDED_COMMISSION]}
+              <option value={BONIFICATION_STATUS.SUSPENDED_BONIFICATION}>
+                {BONIFICATION_STATUS_LABELS[BONIFICATION_STATUS.SUSPENDED_BONIFICATION]}
               </option>
             </select>
           </div>
@@ -316,11 +316,11 @@ export function TasksInBonusCard({
               <div className="text-xs text-muted-foreground">Total</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-semibold text-green-600">{summary.fullCommission}</div>
+              <div className="text-lg font-semibold text-green-600">{summary.fullBonification}</div>
               <div className="text-xs text-muted-foreground">Integral</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-semibold text-orange-600">{summary.partialCommission}</div>
+              <div className="text-lg font-semibold text-orange-600">{summary.partialBonification}</div>
               <div className="text-xs text-muted-foreground">Parcial</div>
             </div>
             <div className="text-center">

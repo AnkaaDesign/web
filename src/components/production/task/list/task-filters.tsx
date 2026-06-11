@@ -32,7 +32,7 @@ interface FilterSection {
 }
 
 const filterSections: FilterSection[] = [
-  { id: "status", label: "Status e Comissão", defaultOpen: true },
+  { id: "status", label: "Status e Bonificação", defaultOpen: true },
   { id: "entities", label: "Entidades", defaultOpen: true },
   { id: "dates", label: "Datas", defaultOpen: false },
   { id: "characteristics", label: "Características", defaultOpen: false },
@@ -180,7 +180,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
       "hasObservation",
       "hasArtworks",
       "hasPaints",
-      "hasCommissions",
+      "hasBonifications",
       "hasServices",
       "hasAirbrushing",
     ] as const;
@@ -758,7 +758,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                     { key: "hasObservation", label: "Tem observação" },
                     { key: "hasArtworks", label: "Tem layouts" },
                     { key: "hasPaints", label: "Tem tintas" },
-                    { key: "hasCommissions", label: "Tem comissões" },
+                    { key: "hasBonifications", label: "Tem bonificações" },
                     { key: "hasServices", label: "Tem serviços" },
                     { key: "hasAirbrushing", label: "Tem aerografia" },
                     { key: "hasBudget", label: "Tem orçamento" },

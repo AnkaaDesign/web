@@ -8,8 +8,8 @@ import { SECTOR_PRIVILEGES } from "@/constants";
  * `canViewQuote` in `use-task-permissions.ts` (the rule used on detail/
  * form pages) so list and detail views agree.
  *
- * Commission is intentionally NOT gated here — production users receive
- * commission and must be able to see it on tables they have access to.
+ * Bonification is intentionally NOT gated here — production users receive
+ * bonification and must be able to see it on tables they have access to.
  */
 
 const FINANCIAL_COLUMN_SECTORS: readonly SECTOR_PRIVILEGES[] = [
