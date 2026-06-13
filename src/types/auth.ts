@@ -16,7 +16,9 @@ export interface AuthUser {
   email: string | null;
   phone: string | null;
   name: string;
-  status: string;
+  currentContractType?: string | null;
+  currentContractStatus?: string | null;
+  currentEmployeeType?: string | null;
   requirePasswordChange?: boolean;
   verified?: boolean;
   sectorId?: string | null;

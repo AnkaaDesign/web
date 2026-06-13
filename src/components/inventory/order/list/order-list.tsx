@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useOrderBatchMutations, useSuppliers, useCanViewPrices } from "../../../../hooks";
 import type { Order } from "../../../../types";
 import type { OrderGetManyFormData } from "../../../../schemas";
-import { routes, ORDER_STATUS } from "../../../../constants";
+import { routes, ORDER_STATUS, ORDER_PAYMENT_STATUS } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -81,6 +81,12 @@ export function OrderList({ className }: OrderListProps) {
       filters.status = status.split(",") as ORDER_STATUS[];
     }
 
+    // Parse payment status filter
+    const paymentStatuses = params.get("paymentStatuses");
+    if (paymentStatuses) {
+      filters.paymentStatuses = paymentStatuses.split(",") as ORDER_PAYMENT_STATUS[];
+    }
+
     // Parse hasItems filter
     const hasItems = params.get("hasItems");
     if (hasItems !== null) {
@@ -137,6 +143,10 @@ export function OrderList({ className }: OrderListProps) {
 
     if (filters.status && filters.status.length > 0) {
       params.status = filters.status.join(",");
+    }
+
+    if (filters.paymentStatuses && filters.paymentStatuses.length > 0) {
+      params.paymentStatuses = filters.paymentStatuses.join(",");
     }
 
     // Handle boolean filters

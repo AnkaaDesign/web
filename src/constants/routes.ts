@@ -194,6 +194,15 @@ export const routes = {
       fiscalDocumentDetail: (id: string) => `/financeiro/conciliacao/notas/${id}`,
       categories: "/financeiro/conciliacao/categorias",
       recurring: "/financeiro/conciliacao/recorrentes",
+      // Conciliação Bancária workflow views (spec §4: Extrato, Saídas,
+      // Previsão de Saídas, Conciliação de Entrada).
+      statement: "/financeiro/conciliacao/extrato",
+      outflows: "/financeiro/conciliacao/saidas",
+      inflows: "/financeiro/conciliacao/entradas",
+      outflowForecast: "/financeiro/conciliacao/previsao-de-saidas",
+    },
+    accountsPayable: {
+      root: "/financeiro/contas-a-pagar",
     },
     root: "/financeiro",
   },
@@ -467,6 +476,26 @@ export const routes = {
     warnings: "/meu-pessoal/advertencias",
   },
 
+  // Occupational Health - Medicina do Trabalho - Occupational Health Management
+  occupationalHealth: {
+    root: "/medicina-do-trabalho",
+    medicalExams: {
+      create: "/medicina-do-trabalho/aso/cadastrar",
+      details: (id: string) => `/medicina-do-trabalho/aso/detalhes/${id}`,
+      edit: (id: string) => `/medicina-do-trabalho/aso/editar/${id}`,
+      root: "/medicina-do-trabalho/aso",
+    },
+    periodicExams: {
+      root: "/medicina-do-trabalho/exames-periodicos",
+    },
+    leaves: {
+      create: "/medicina-do-trabalho/afastamentos/cadastrar",
+      details: (id: string) => `/medicina-do-trabalho/afastamentos/detalhes/${id}`,
+      edit: (id: string) => `/medicina-do-trabalho/afastamentos/editar/${id}`,
+      root: "/medicina-do-trabalho/afastamentos",
+    },
+  },
+
   // Painting - Pintura - Paint Management
   painting: {
     catalog: {
@@ -548,6 +577,45 @@ export const routes = {
     },
     pmSchedules: {
       root: "/pessoal/horarios",
+    },
+  },
+
+  // Personnel Department - Departamento Pessoal - Personnel Department Management
+  personnelDepartment: {
+    root: "/departamento-pessoal",
+    admissions: {
+      create: "/departamento-pessoal/admissoes/cadastrar",
+      details: (id: string) => `/departamento-pessoal/admissoes/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/admissoes/editar/${id}`,
+      root: "/departamento-pessoal/admissoes",
+    },
+    terminations: {
+      create: "/departamento-pessoal/rescisoes/cadastrar",
+      details: (id: string) => `/departamento-pessoal/rescisoes/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/rescisoes/editar/${id}`,
+      root: "/departamento-pessoal/rescisoes",
+    },
+    salaryAdjustments: {
+      details: (id: string) => `/departamento-pessoal/reajustes/detalhes/${id}`,
+      root: "/departamento-pessoal/reajustes",
+    },
+    promotions: {
+      root: "/departamento-pessoal/promocoes",
+    },
+    salaryRanges: {
+      root: "/departamento-pessoal/faixas-salariais",
+    },
+    benefits: {
+      create: "/departamento-pessoal/beneficios/cadastrar",
+      details: (id: string) => `/departamento-pessoal/beneficios/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/beneficios/editar/${id}`,
+      root: "/departamento-pessoal/beneficios",
+      enrollments: {
+        create: "/departamento-pessoal/beneficios/adesoes/cadastrar",
+        details: (id: string) => `/departamento-pessoal/beneficios/adesoes/detalhes/${id}`,
+        edit: (id: string) => `/departamento-pessoal/beneficios/adesoes/editar/${id}`,
+        root: "/departamento-pessoal/beneficios/adesoes",
+      },
     },
   },
 
@@ -703,6 +771,9 @@ export const routes = {
     colorPalette: {
       root: "/ferramentas/paleta",
     },
+    calculator: {
+      root: "/ferramentas/calculadora",
+    },
     timeCalculator: {
       root: "/ferramentas/calculadora-de-horas",
     },
@@ -714,6 +785,12 @@ export const routes = {
     },
     wasteCertificate: {
       root: "/ferramentas/certificado-residuos",
+    },
+    employeeCost: {
+      root: "/ferramentas/custo-de-funcionario",
+    },
+    postIts: {
+      root: "/ferramentas/post-its",
     },
   },
 

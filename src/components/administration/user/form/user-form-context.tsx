@@ -88,7 +88,7 @@ export function UserFormProvider({ children, initialValues, onSubmit, mode, onDi
 
   const setValues = useCallback((newValues: Partial<FormData>) => {
     setValuesState((prev) => {
-      return { ...prev, ...newValues };
+      return { ...prev, ...newValues } as FormData;
     });
   }, []);
 

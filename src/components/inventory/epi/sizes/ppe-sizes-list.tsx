@@ -1,7 +1,7 @@
 import { useRef, useMemo, useState, useCallback } from "react";
 import { usePositions, useSectors } from "../../../../hooks";
 import type { UserGetManyFormData } from "../../../../schemas";
-import { USER_STATUS } from "../../../../constants";
+import { CONTRACT_TYPE } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -13,7 +13,7 @@ import { PpeSizesColumnVisibility } from "./ppe-sizes-column-visibility";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { FilterIndicators as StandardFilterIndicators } from "@/components/ui/filter-indicator";
-import { USER_STATUS_LABELS } from "../../../../constants";
+import { CONTRACT_TYPE_LABELS } from "../../../../constants";
 import {
   SHIRT_SIZE_LABELS,
   PANTS_SIZE_LABELS,
@@ -54,7 +54,7 @@ const DEFAULT_PAGE_SIZE = 40;
 const serializePpeSizeFilters = (filters: Partial<UserGetManyFormData>): Record<string, string> => {
   const params: Record<string, string> = {};
 
-  if (filters.status?.length) params.statuses = filters.status.join(",");
+  if (filters.contractKind?.length) params.contractTypes = filters.contractKind.join(",");
   if (filters.positionId?.length) params.positions = filters.positionId.join(",");
   if (filters.sectorId?.length) params.sectors = filters.sectorId.join(",");
 
@@ -75,8 +75,8 @@ const serializePpeSizeFilters = (filters: Partial<UserGetManyFormData>): Record<
 const deserializePpeSizeFilters = (params: URLSearchParams): Partial<UserGetManyFormData> => {
   const filters: any = {};
 
-  const statuses = params.get("statuses");
-  if (statuses) filters.status = statuses.split(",");
+  const contractTypes = params.get("contractTypes") ?? params.get("contractKinds");
+  if (contractTypes) filters.contractKind = contractTypes.split(",");
 
   const positions = params.get("positions");
   if (positions) filters.positionId = positions.split(",");
@@ -157,10 +157,10 @@ export function PpeSizesList({ className }: PpeSizesListProps) {
       isActive: true,
     };
 
-    // Convert status array to API format
-    if (result.status && Array.isArray(result.status) && result.status.length > 0) {
-      result.statuses = [...result.status];
-      delete result.status;
+    // Convert contract kind array to API format
+    if (result.contractKind && Array.isArray(result.contractKind) && result.contractKind.length > 0) {
+      result.contractTypes = [...result.contractKind];
+      delete result.contractKind;
     }
 
     // Convert frontend filter names to API schema
@@ -219,15 +219,15 @@ export function PpeSizesList({ className }: PpeSizesListProps) {
       });
     }
 
-    if (filters.status && Array.isArray(filters.status)) {
-      filters.status.forEach((status: string) => {
+    if (filters.contractKind && Array.isArray(filters.contractKind)) {
+      filters.contractKind.forEach((contractKind: string) => {
         indicators.push({
-          key: `status-${status}`,
-          label: "Status",
-          value: USER_STATUS_LABELS[status as USER_STATUS] || status,
+          key: `contractKind-${contractKind}`,
+          label: "Tipo de Contrato",
+          value: CONTRACT_TYPE_LABELS[contractKind as CONTRACT_TYPE] || contractKind,
           onRemove: () => {
-            const newStatuses = (filters.status || []).filter((s: string) => s !== status);
-            handleFilterChange({ ...filters, status: newStatuses.length > 0 ? newStatuses : undefined });
+            const newContractKinds = (filters.contractKind || []).filter((s: string) => s !== contractKind);
+            handleFilterChange({ ...filters, contractKind: newContractKinds.length > 0 ? newContractKinds : undefined });
           },
         });
       });

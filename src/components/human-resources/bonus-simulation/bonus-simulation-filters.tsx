@@ -10,7 +10,7 @@ import {
   IconUserMinus,
 } from "@tabler/icons-react";
 import { useUsers, usePositions } from "../../../hooks";
-import { USER_STATUS } from "../../../constants";
+import { CONTRACT_TYPE } from "../../../constants";
 
 interface BonusSimulationFiltersProps {
   open: boolean;
@@ -49,7 +49,7 @@ export function BonusSimulationFilters({
   const { data: allUsersData } = useUsers({
     include: { position: true, sector: true },
     where: {
-      status: USER_STATUS.EFFECTED, // Only effected users (not dismissed, not inactive)
+      currentContractType: CONTRACT_TYPE.EFFECTED, // Only effected users (not dismissed, not inactive)
       secullumEmployeeId: { not: null }, // Only users registered in Secullum
     },
     orderBy: { name: "asc" },

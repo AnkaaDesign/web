@@ -131,18 +131,21 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "dismissedAt",
     header: "DATA DE DEMISSÃO",
-    accessor: (user: User) => <div className="text-sm truncate">{user.dismissedAt ? formatDate(new Date(user.dismissedAt)) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => {
+      const terminationDate = user.currentContract?.terminationDate;
+      return <div className="text-sm truncate">{terminationDate ? formatDate(new Date(terminationDate)) : <span className="text-muted-foreground">-</span>}</div>;
+    },
     sortable: true,
     className: "min-w-[150px]",
     align: "left",
   },
 
-  // Status
+  // Contract type
   {
-    key: "status",
-    header: "STATUS",
+    key: "currentContractType",
+    header: "TIPO DE CONTRATO",
     accessor: (user: User) => {
-      const variant = getBadgeVariantFromStatus(user.status, "USER");
+      const variant = getBadgeVariantFromStatus(user.currentContractType ?? "", "USER");
 
       return (
         <Badge variant={variant} className="text-xs whitespace-nowrap">
@@ -357,4 +360,4 @@ export const createUserColumns = (): UserColumn[] => [
 ];
 
 // Export the default visible columns
-export const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "status"]);
+export const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "currentContractType"]);

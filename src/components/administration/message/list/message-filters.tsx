@@ -7,7 +7,7 @@ import { IconFilter } from "@tabler/icons-react";
 import type { MessageGetManyFormData } from "@/schemas/message";
 import { getUsers } from "@/api-client/user";
 import { getSectors } from "@/api-client/sector";
-import { ACTIVE_USER_STATUSES } from "@/constants";
+import { CONTRACT_STATUS } from "@/constants";
 
 const STATUS_OPTIONS = [
   { value: "draft", label: "Rascunho" },
@@ -44,7 +44,8 @@ export function MessageFilters({
         orderBy: { name: "asc" },
         page,
         take: 50,
-        statuses: [...ACTIVE_USER_STATUSES],
+        // Active users only — filtered by current vínculo status.
+        statuses: [CONTRACT_STATUS.ACTIVE],
       };
       if (search && search.trim()) {
         params.searchingFor = search.trim();

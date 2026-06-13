@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { useUrlFilters } from "../common/use-url-filters";
 import type { UserGetManyFormData } from "../../schemas";
-import { USER_STATUS } from "../../constants";
+import { CONTRACT_TYPE } from "../../constants";
 
 // Define filter schemas specific to users - matching the API schema
 const userFilterSchemas = {
@@ -11,9 +11,9 @@ const userFilterSchemas = {
     debounceMs: 500, // Debounce text input
   },
 
-  // Status filter
-  status: {
-    schema: z.array(z.enum(Object.values(USER_STATUS) as [USER_STATUS, ...USER_STATUS[]])),
+  // Contract type filter
+  contractTypes: {
+    schema: z.array(z.enum(Object.values(CONTRACT_TYPE) as [CONTRACT_TYPE, ...CONTRACT_TYPE[]])),
     defaultValue: [] as string[],
   },
 
@@ -112,8 +112,8 @@ const userFilterSchemas = {
       cpf: z.enum(["asc", "desc"]).optional(),
       pis: z.enum(["asc", "desc"]).optional(),
       phone: z.enum(["asc", "desc"]).optional(),
-      status: z.enum(["asc", "desc"]).optional(),
-      statusOrder: z.enum(["asc", "desc"]).optional(),
+      currentContractType: z.enum(["asc", "desc"]).optional(),
+      currentContractStatus: z.enum(["asc", "desc"]).optional(),
       verified: z.enum(["asc", "desc"]).optional(),
       birth: z.enum(["asc", "desc"]).optional(),
       performanceLevel: z.enum(["asc", "desc"]).optional(),
@@ -167,8 +167,8 @@ export function convertToApiFilters(urlFilters: UserFilters): Partial<UserGetMan
   // Text search
   if (urlFilters.searchingFor) apiFilters.searchingFor = urlFilters.searchingFor;
 
-  // Status filter
-  if (urlFilters.status && urlFilters.status.length > 0) apiFilters.status = urlFilters.status;
+  // Contract type filter
+  if (urlFilters.contractTypes && urlFilters.contractTypes.length > 0) apiFilters.contractTypes = urlFilters.contractTypes;
 
   // Entity filters
   if (urlFilters.positionId && urlFilters.positionId.length > 0) apiFilters.positionId = urlFilters.positionId;
@@ -209,8 +209,8 @@ export function convertFromApiFilters(apiFilters: Partial<UserGetManyFormData>):
   // Text search
   if (apiFilters.searchingFor) urlFilters.searchingFor = apiFilters.searchingFor;
 
-  // Status filter
-  if (apiFilters.status) urlFilters.status = apiFilters.status;
+  // Contract type filter
+  if (apiFilters.contractTypes) urlFilters.contractTypes = apiFilters.contractTypes;
 
   // Entity filters
   if (apiFilters.positionId) urlFilters.positionId = apiFilters.positionId;

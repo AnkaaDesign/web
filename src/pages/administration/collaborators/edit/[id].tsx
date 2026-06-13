@@ -9,6 +9,13 @@ import { IconUsers, IconCheck, IconLoader2 } from "@tabler/icons-react";
 import { toast } from "@/components/ui/sonner";
 import type { UserUpdateFormData } from "../../../../schemas";
 import type { UserUpdateResponse } from "../../../../types";
+import { useNavBreadcrumbs } from "@/contexts/navigation-context";
+
+// Truncate long names to prevent layout issues in breadcrumbs
+const truncateName = (name: string, maxLength: number = 30) => {
+  if (name.length <= maxLength) return name;
+  return `${name.substring(0, maxLength)}...`;
+};
 
 const EditCollaboratorPage = () => {
   const navigate = useNavigate();
@@ -50,13 +57,13 @@ const EditCollaboratorPage = () => {
 
     try {
       // If data is FormData, send it as-is (for file uploads)
-      // Otherwise, remove currentStatus before sending to API (it's only used for validation)
+      // Otherwise, remove currentContractType before sending to API (it's only used for validation)
       const dataToSend = data instanceof FormData
         ? data
         : (() => {
-            const { currentStatus, ...rest } = data as UserUpdateFormData;
+            const { currentContractType, ...rest } = data as UserUpdateFormData;
             return rest;
-          })() as Omit<UserUpdateFormData, 'currentStatus'>;
+          })() as Omit<UserUpdateFormData, 'currentContractType'>;
 
       const response = (await update({ id, data: dataToSend as any })) as UserUpdateResponse;
 
@@ -137,8 +144,12 @@ const EditCollaboratorPage = () => {
       performanceLevel: user.performanceLevel,
       sectorId: user.sectorId ?? null,
       isSectorLeader: Boolean(user.ledSector?.id),
-      status: user.status,
-      currentStatus: user.status, // Store current status for validation
+      contractType: user.currentContractType ?? undefined,
+      employeeType: user.currentEmployeeType ?? undefined,
+      contractStatus: user.currentContractStatus ?? undefined,
+      currentContractType: user.currentContractType ?? undefined, // for transition validation
+      providerName: user.currentContract?.providerName ?? undefined,
+      providerCnpj: user.currentContract?.providerCnpj ?? undefined,
       verified: user.verified,
       isActive: user.isActive,
       address: user.address ?? null,
@@ -153,15 +164,15 @@ const EditCollaboratorPage = () => {
 
       // Parse all dates to local timezone to avoid timezone shift bugs
       birth: parseLocalDate(user.birth),
-      dismissal: parseLocalDate(user.dismissedAt),
 
-      // Status tracking dates (CRITICAL - these were missing before!)
-      effectedAt: parseLocalDate(user.effectedAt),
-      exp1StartAt: parseLocalDate(user.exp1StartAt),
-      exp1EndAt: parseLocalDate(user.exp1EndAt),
-      exp2StartAt: parseLocalDate(user.exp2StartAt),
-      exp2EndAt: parseLocalDate(user.exp2EndAt),
-      dismissedAt: parseLocalDate(user.dismissedAt),
+      // Current vínculo dates — sourced from the current EmploymentContract.
+      admissionDate: parseLocalDate(user.currentContract?.admissionDate ?? user.currentContract?.exp1StartAt),
+      effectedAt: parseLocalDate(user.currentContract?.effectedAt),
+      exp1StartAt: parseLocalDate(user.currentContract?.exp1StartAt ?? user.currentContract?.admissionDate),
+      exp1EndAt: parseLocalDate(user.currentContract?.exp1EndAt),
+      exp2StartAt: parseLocalDate(user.currentContract?.exp2StartAt),
+      exp2EndAt: parseLocalDate(user.currentContract?.exp2EndAt),
+      terminationDate: parseLocalDate(user.currentContract?.terminationDate),
 
       // PPE Sizes (CRITICAL - this was missing before!)
       ppeSize: user.ppeSize ? {
@@ -202,6 +213,24 @@ const EditCollaboratorPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Context-aware trail (shared page): "Departamento Pessoal" for accounting users,
+  // "Administração" only when reached from that section. Must run before early returns.
+  const breadcrumbs = useNavBreadcrumbs(
+    [
+      { label: "Início", href: routes.home },
+      { label: "Administração", href: routes.administration.root },
+      { label: "Colaboradores", href: routes.administration.collaborators.root },
+      { label: user?.name ? truncateName(user.name) : "Colaborador", href: id ? routes.administration.collaborators.details(id) : undefined },
+      { label: "Editar" },
+    ],
+    {
+      leaf: [
+        { label: user?.name ? truncateName(user.name) : "Colaborador", href: id ? routes.administration.collaborators.details(id) : undefined },
+        { label: "Editar" },
+      ],
+    },
+  );
+
   // Loading state
   if (isLoading) {
     return (
@@ -223,12 +252,6 @@ const EditCollaboratorPage = () => {
     );
   }
 
-  // Truncate long names to prevent layout issues in breadcrumbs
-  const truncateName = (name: string, maxLength: number = 30) => {
-    if (name.length <= maxLength) return name;
-    return `${name.substring(0, maxLength)}...`;
-  };
-
   const actions = [
     {
       key: "cancel",
@@ -249,20 +272,14 @@ const EditCollaboratorPage = () => {
   ];
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <div className="container mx-auto max-w-4xl flex-shrink-0">
           <PageHeader
             variant="form"
             title="Editar Colaborador"
             icon={IconUsers}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Administração", href: routes.administration.root },
-              { label: "Colaboradores", href: routes.administration.collaborators.root },
-              { label: truncateName(user.name), href: routes.administration.collaborators.details(id!) },
-              { label: "Editar" },
-            ]}
+            breadcrumbs={breadcrumbs}
             actions={actions}
           />
         </div>

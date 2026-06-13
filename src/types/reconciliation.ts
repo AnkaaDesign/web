@@ -549,6 +549,95 @@ export interface ClassifyBatchResult {
   byCategory: Record<string, number>;
 }
 
+// GET /suggestions — medium-confidence category proposals awaiting one-click
+// confirm. Rows are full BankTransactions plus the proposed category.
+export interface ReconciliationSuggestion extends BankTransaction {
+  suggestedCategoryId: string | null;
+  suggestionConfidence: number | null;
+  suggestedCategory: Pick<
+    TransactionCategory,
+    "id" | "name" | "slug" | "kind" | "color" | "isResolving"
+  > | null;
+}
+
+// GET /outflow-forecast — composite "Previsão de Saídas" (spec §4.3).
+export type OrderPaymentStatusKey =
+  | "NOT_REQUESTED"
+  | "REQUESTED"
+  | "AWAITING_PAYMENT"
+  | "PAID";
+
+export interface OutflowForecastOrderRow {
+  id: string;
+  orderNumber: number | null;
+  description: string;
+  supplierName: string | null;
+  paymentStatus: OrderPaymentStatusKey;
+  forecast: string | null;
+  total: number;
+}
+
+export interface OutflowForecastScheduleRow {
+  id: string;
+  name: string | null;
+  supplierName: string | null;
+  nextRun: string | null;
+  itemCount: number;
+}
+
+export interface OutflowForecastTaxRow {
+  category: { id: string; name: string; slug: string; color: string | null };
+  monthlyAverage: number;
+  perMonth: { month: string; amount: number }[];
+  paidThisMonth: number;
+  lastAmount: number | null;
+  lastPaidAt: string | null;
+}
+
+export interface OutflowForecast {
+  reference: string; // YYYY-MM
+  from: string;
+  to: string;
+  /** pedidos.totalOpen + impostos.totalForecast + folha.total + recorrentes.totalForecast */
+  total: number;
+  pedidos: {
+    totalOpen: number;
+    byStatus: Record<
+      "NOT_REQUESTED" | "REQUESTED" | "AWAITING_PAYMENT",
+      { count: number; total: number }
+    >;
+    orders: OutflowForecastOrderRow[];
+    schedules: OutflowForecastScheduleRow[];
+  };
+  impostos: {
+    basis: string;
+    lookbackMonths: string[];
+    totalForecast: number;
+    totalPaidThisMonth: number;
+    items: OutflowForecastTaxRow[];
+  };
+  folha: {
+    available: boolean;
+    /** Gross payroll total — bonus already included ("com bonificação"). */
+    total: number;
+    bonusTotal: number;
+    netTotal: number;
+    employeeCount: number;
+  };
+  recorrentes: {
+    totalPaid: number;
+    totalForecast: number;
+    /** Recurring categories folded into Impostos/Folha (excluded here). */
+    excludedCount: number;
+    items: RecurringForecastItem[];
+  };
+  learned: {
+    expectedMonthlyTotal: number;
+    itemCount: number;
+    overdueCount: number;
+  };
+}
+
 export interface FiscalDocumentFilters {
   page?: number;
   pageSize?: number;

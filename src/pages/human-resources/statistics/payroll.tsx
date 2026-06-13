@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Combobox } from '@/components/ui/combobox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { GOAL_METRIC, routes } from '@/constants';
+import { GOAL_METRIC, routes, PAYROLL_EMPLOYEE_TYPES, CONTRACT_STATUS } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
 import { usePayrollTrends, getHrComparisonType } from '@/hooks/human-resources/use-hr-analytics';
@@ -443,15 +443,18 @@ function PayrollEmployeesModal({
     if (open) setSearch('');
   }, [open]);
 
-  // exp1StartAt <= window-end gets every employee admitted before the window
-  // ended. The OR on dismissedAt is applied client-side: keep employees still
-  // active (no dismissedAt) OR dismissed at or after window start.
+  // admissionDate <= window-end gets every employee admitted before the window
+  // ended. The OR on terminationDate is applied client-side: keep employees still
+  // active (no terminationDate) OR dismissed at or after window start.
+  // Off-folha gate: only employee types that actually run through the payroll
+  // (PAYROLL_EMPLOYEE_TYPES = [CLT]) are included.
   const { data: usersResp, isLoading } = useUsers({
     where: {
-      exp1StartAt: endDate ? { lte: endDate } : undefined,
+      currentContract: endDate ? { is: { admissionDate: { lte: endDate } } } : undefined,
+      currentEmployeeType: { in: [...PAYROLL_EMPLOYEE_TYPES] },
       sectorId: sectorIds && sectorIds.length > 0 ? { in: sectorIds } : undefined,
     },
-    include: { sector: true, position: true },
+    include: { sector: true, position: true, currentContract: true },
     orderBy: { name: 'asc' },
     limit: 100,
     enabled: open,
@@ -462,8 +465,12 @@ function PayrollEmployeesModal({
     return raw
       .filter(u => {
         if (!startDate) return true;
-        if (!u.dismissedAt) return true;
-        return new Date(u.dismissedAt).getTime() >= startDate.getTime();
+        // Active (not dismissed) employees always pass; dismissed ones only if
+        // their termination date falls at or after the window start.
+        if (u.currentContractStatus !== CONTRACT_STATUS.DISMISSED) return true;
+        const termination = u.currentContract?.terminationDate;
+        if (!termination) return true;
+        return new Date(termination).getTime() >= startDate.getTime();
       })
       .map(u => ({
         id: u.id as string,

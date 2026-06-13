@@ -9,10 +9,20 @@ import type { MessageFormData } from "@/components/administration/message/editor
 import { useCreateMessage } from "@/hooks/administration/use-message";
 import type { MessageCreateFormData } from "@/schemas/message";
 import { resolveTargetingToUserIds } from "@/utils/message-targeting";
+import { useNavBreadcrumbs } from "@/contexts/navigation-context";
 
 export const CreateMessagePage = () => {
   const navigate = useNavigate();
   const createMessage = useCreateMessage();
+
+  // Context-aware trail: shared page — accounting users have root-level "Mensagens"
+  // (no "Administração" section in their menu).
+  const breadcrumbs = useNavBreadcrumbs([
+    { label: "Início", href: routes.home },
+    { label: "Administração", href: routes.administration.root },
+    { label: "Mensagens", href: routes.administration.messages?.root || routes.administration.root },
+    { label: "Criar" },
+  ]);
   const [formState, setFormState] = useState({ isValid: false, isDirty: false, canPreview: false });
   const [stepState, setStepState] = useState({ currentStep: 1, totalSteps: 2, canGoNext: true, canGoPrev: false });
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -151,12 +161,7 @@ export const CreateMessagePage = () => {
           title="Criar Mensagem"
           icon={IconMessagePlus}
           favoritePage={FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_CRIAR}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Administração", href: routes.administration.root },
-            { label: "Mensagens", href: routes.administration.messages?.root || routes.administration.root },
-            { label: "Criar" },
-          ]}
+          breadcrumbs={breadcrumbs}
           actions={actions}
         />
       </div>

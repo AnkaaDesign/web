@@ -1,5 +1,5 @@
 import type { User, AuthUser } from "../types";
-import { USER_STATUS, SECTOR_PRIVILEGES, TEAM_LEADER } from "../constants";
+import { CONTRACT_TYPE, CONTRACT_STATUS, SECTOR_PRIVILEGES, TEAM_LEADER } from "../constants";
 import { dateUtils } from "./date";
 
 // Type representing the minimal user shape needed for privilege checks
@@ -8,12 +8,16 @@ type PrivilegeCheckUser = User | AuthUser;
 /**
  * Get user status color
  */
-export function getUserStatusColor(status: USER_STATUS): string {
-  const colors: Record<USER_STATUS, string> = {
-    [USER_STATUS.EXPERIENCE_PERIOD_1]: "orange",
-    [USER_STATUS.EXPERIENCE_PERIOD_2]: "orange",
-    [USER_STATUS.EFFECTED]: "green",
-    [USER_STATUS.DISMISSED]: "gray",
+export function getUserStatusColor(status: CONTRACT_TYPE | CONTRACT_STATUS): string {
+  const colors: Record<string, string> = {
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_1]: "orange",
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_2]: "orange",
+    [CONTRACT_TYPE.EFFECTED]: "green",
+    [CONTRACT_TYPE.FIXED_TERM]: "blue",
+    [CONTRACT_TYPE.APPRENTICE]: "blue",
+    [CONTRACT_TYPE.INTERMITTENT]: "purple",
+    [CONTRACT_TYPE.TEMPORARY]: "purple",
+    [CONTRACT_STATUS.DISMISSED]: "gray",
   };
   return colors[status] || "default";
 }
@@ -22,21 +26,21 @@ export function getUserStatusColor(status: USER_STATUS): string {
  * Check if user is active (not dismissed)
  */
 export function isUserActive(user: User): boolean {
-  return user.status !== USER_STATUS.DISMISSED && user.verified === true && user.password !== null;
+  return user.currentContractStatus !== CONTRACT_STATUS.DISMISSED && user.verified === true && user.password !== null;
 }
 
 /**
  * Check if user is dismissed
  */
 export function isUserInactive(user: User): boolean {
-  return user.status === USER_STATUS.DISMISSED;
+  return user.currentContractStatus === CONTRACT_STATUS.DISMISSED;
 }
 
 /**
  * Check if user is blocked
  */
 export function isUserBlocked(user: User): boolean {
-  return user.status === USER_STATUS.DISMISSED;
+  return user.currentContractStatus === CONTRACT_STATUS.DISMISSED;
 }
 
 /**
@@ -180,17 +184,27 @@ export function isNewUser(user: User, daysThreshold: number = 30): boolean {
 /**
  * Group users by status
  */
-export function groupUsersByStatus(users: User[]): Record<USER_STATUS, User[]> {
+export function groupUsersByStatus(users: User[]): Record<string, User[]> {
   const groups = {
-    [USER_STATUS.EXPERIENCE_PERIOD_1]: [],
-    [USER_STATUS.EXPERIENCE_PERIOD_2]: [],
-    [USER_STATUS.EFFECTED]: [],
-    [USER_STATUS.DISMISSED]: [],
-  } as Record<USER_STATUS, User[]>;
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_1]: [],
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_2]: [],
+    [CONTRACT_TYPE.EFFECTED]: [],
+    [CONTRACT_TYPE.FIXED_TERM]: [],
+    [CONTRACT_TYPE.INTERMITTENT]: [],
+    [CONTRACT_TYPE.APPRENTICE]: [],
+    [CONTRACT_TYPE.TEMPORARY]: [],
+    [CONTRACT_STATUS.DISMISSED]: [],
+  } as Record<string, User[]>;
 
   users.forEach((user) => {
-    if (groups[user.status]) {
-      groups[user.status].push(user);
+    // Dismissed users group under the DISMISSED status bucket regardless of type;
+    // everyone else groups by their current contract type.
+    const key =
+      user.currentContractStatus === CONTRACT_STATUS.DISMISSED
+        ? CONTRACT_STATUS.DISMISSED
+        : user.currentContractType;
+    if (key && groups[key]) {
+      groups[key].push(user);
     }
   });
 
@@ -346,14 +360,14 @@ export function canAccessTeamManagement(user: User): boolean {
 /**
  * Check if user is eligible for bonus calculation. This is the SINGLE
  * canonical definition (must match the API live calc) — all four predicates:
- * 1. user.status === EFFECTED (not in experience period or dismissed)
+ * 1. user.currentContractType === EFFECTED (not in experience period or dismissed)
  * 2. position.bonifiable === true
  * 3. user.performanceLevel > 0
  * 4. user.secullumEmployeeId != null (registered in the time-clock system)
  */
 export function isUserEligibleForBonus(user: User): boolean {
   // Check if user is EFFECTED (not in experience period or dismissed)
-  if (user.status !== USER_STATUS.EFFECTED) {
+  if (user.currentContractType !== CONTRACT_TYPE.EFFECTED) {
     return false;
   }
 
@@ -381,7 +395,7 @@ export function isUserEligibleForBonus(user: User): boolean {
  * Returns null if user is eligible, or a reason string if not eligible
  */
 export function getBonusIneligibilityReason(user: User): string | null {
-  if (user.status === USER_STATUS.DISMISSED) {
+  if (user.currentContractStatus === CONTRACT_STATUS.DISMISSED) {
     return "Usuário está desligado";
   }
 
@@ -462,15 +476,15 @@ export function calculateBonusEligibilityStats(users: User[]) {
 export function getDaysRemainingInExperiencePeriod(user: User): number | null {
   const now = new Date();
 
-  if (user.status === USER_STATUS.EXPERIENCE_PERIOD_1 && user.exp1EndAt) {
-    const endDate = new Date(user.exp1EndAt);
+  if (user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_1 && user.currentContract?.exp1EndAt) {
+    const endDate = new Date(user.currentContract.exp1EndAt);
     const diffTime = endDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
   }
 
-  if (user.status === USER_STATUS.EXPERIENCE_PERIOD_2 && user.exp2EndAt) {
-    const endDate = new Date(user.exp2EndAt);
+  if (user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_2 && user.currentContract?.exp2EndAt) {
+    const endDate = new Date(user.currentContract.exp2EndAt);
     const diffTime = endDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
@@ -488,10 +502,10 @@ export function getTimeSinceStatusChange(user: User): { years: number; months: n
   const now = new Date();
   let startDate: Date | null = null;
 
-  if (user.status === USER_STATUS.EFFECTED && user.effectedAt) {
-    startDate = new Date(user.effectedAt);
-  } else if (user.status === USER_STATUS.DISMISSED && user.dismissedAt) {
-    startDate = new Date(user.dismissedAt);
+  if (user.currentContractStatus === CONTRACT_STATUS.DISMISSED && user.currentContract?.terminationDate) {
+    startDate = new Date(user.currentContract.terminationDate);
+  } else if (user.currentContractType === CONTRACT_TYPE.EFFECTED && user.currentContract?.effectedAt) {
+    startDate = new Date(user.currentContract.effectedAt);
   }
 
   if (!startDate) {
@@ -578,36 +592,37 @@ export function formatTimeSinceStatusChangeCompact(user: User): string | null {
  */
 export function getDaysSinceExperienceStart(user: User): number | null {
   const now = new Date();
+  const contract = user.currentContract;
 
-  if (user.status === USER_STATUS.EXPERIENCE_PERIOD_1 && user.exp1StartAt) {
-    const startDate = new Date(user.exp1StartAt);
+  if (user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_1 && contract?.exp1StartAt) {
+    const startDate = new Date(contract.exp1StartAt);
     const diffTime = now.getTime() - startDate.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     return diffDays >= 0 ? diffDays : 0;
   }
 
-  if (user.status === USER_STATUS.EXPERIENCE_PERIOD_2) {
+  if (user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_2) {
     let exp1Duration = 30; // Default to 30 days if we can't calculate
     let exp2Start: Date | null = null;
 
     // Calculate exp1 duration if we have the dates
-    if (user.exp1StartAt && user.exp1EndAt) {
-      const exp1StartDate = new Date(user.exp1StartAt);
-      const exp1EndDate = new Date(user.exp1EndAt);
+    if (contract?.exp1StartAt && contract?.exp1EndAt) {
+      const exp1StartDate = new Date(contract.exp1StartAt);
+      const exp1EndDate = new Date(contract.exp1EndAt);
       exp1Duration = Math.floor((exp1EndDate.getTime() - exp1StartDate.getTime()) / (1000 * 60 * 60 * 24));
       exp2Start = exp1EndDate;
-    } else if (user.exp1StartAt && user.exp2StartAt) {
+    } else if (contract?.exp1StartAt && contract?.exp2StartAt) {
       // If exp1EndAt not available, use exp2StartAt
-      const exp1StartDate = new Date(user.exp1StartAt);
-      const exp2StartDate = new Date(user.exp2StartAt);
+      const exp1StartDate = new Date(contract.exp1StartAt);
+      const exp2StartDate = new Date(contract.exp2StartAt);
       exp1Duration = Math.floor((exp2StartDate.getTime() - exp1StartDate.getTime()) / (1000 * 60 * 60 * 24));
       exp2Start = exp2StartDate;
-    } else if (user.exp2StartAt) {
+    } else if (contract?.exp2StartAt) {
       // Only exp2StartAt available, use it with default exp1 duration
-      exp2Start = new Date(user.exp2StartAt);
-    } else if (user.exp1EndAt) {
+      exp2Start = new Date(contract.exp2StartAt);
+    } else if (contract?.exp1EndAt) {
       // Only exp1EndAt available, use it with default exp1 duration
-      exp2Start = new Date(user.exp1EndAt);
+      exp2Start = new Date(contract.exp1EndAt);
     }
 
     // Calculate days into exp2
@@ -628,14 +643,21 @@ export function getDaysSinceExperienceStart(user: User): number | null {
  * Get status badge text with time information
  */
 export function getUserStatusBadgeText(user: User): string {
-  const statusLabels: Record<USER_STATUS, string> = {
-    [USER_STATUS.EXPERIENCE_PERIOD_1]: "Experiencia 1",
-    [USER_STATUS.EXPERIENCE_PERIOD_2]: "Experiencia 2",
-    [USER_STATUS.EFFECTED]: "Efetivado",
-    [USER_STATUS.DISMISSED]: "Demitido",
+  const typeLabels: Record<string, string> = {
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_1]: "Experiencia 1",
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_2]: "Experiencia 2",
+    [CONTRACT_TYPE.EFFECTED]: "Efetivado",
+    [CONTRACT_TYPE.FIXED_TERM]: "Prazo Determinado",
+    [CONTRACT_TYPE.INTERMITTENT]: "Intermitente",
+    [CONTRACT_TYPE.APPRENTICE]: "Aprendiz",
+    [CONTRACT_TYPE.TEMPORARY]: "Temporário",
   };
 
-  const baseLabel = statusLabels[user.status] || user.status;
+  // Dismissed bond takes precedence over the contract type for the badge label.
+  const baseLabel =
+    user.currentContractStatus === CONTRACT_STATUS.DISMISSED
+      ? "Demitido"
+      : typeLabels[user.currentContractType ?? ""] || user.currentContractType || "—";
 
   // For experience periods, show days since start (just the number)
   const daysSinceStart = getDaysSinceExperienceStart(user);

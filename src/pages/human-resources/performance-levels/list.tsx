@@ -59,7 +59,7 @@ export default function PerformanceLevelsListPage() {
 
   return (
     <PrivilegeRoute
-      requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}
+      requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING]}
     >
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
         <PageHeader

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { OrderStatusBadge } from "../common/order-status-badge";
+import { OrderPaymentStatusBadge } from "../common/order-payment-status-badge";
 import { OrderTotalBadge } from "../common/order-total-calculator";
 import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFileText, IconId, IconCreditCard, IconCopy, IconQrcode, IconUser } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
@@ -168,13 +169,42 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
           </div>
         </div>
 
-        {/* Payment Information */}
-        {(order.paymentMethod || order.paymentResponsible) && (
-          <>
-            <Separator className="bg-border" />
-            <div className="space-y-4">
-              <h3 className="text-base font-semibold mb-4 text-foreground">Pagamento</h3>
-              <div className="space-y-4">
+        {/* Payment Information — paymentStatus always exists (contas a pagar
+            workflow), so the section is always rendered. */}
+        <Separator className="bg-border" />
+        <div className="space-y-4">
+          <h3 className="text-base font-semibold mb-4 text-foreground">Pagamento</h3>
+          <div className="space-y-4">
+                {order.paymentStatus && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconCreditCard className="h-4 w-4" />
+                      Status de Pagamento
+                    </span>
+                    <OrderPaymentStatusBadge status={order.paymentStatus} />
+                  </div>
+                )}
+
+                {order.paymentRequestedAt && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconCalendar className="h-4 w-4" />
+                      Pagamento Solicitado em
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{formatDateTime(order.paymentRequestedAt)}</span>
+                  </div>
+                )}
+
+                {order.paidAt && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconCalendar className="h-4 w-4" />
+                      Pago em
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{formatDateTime(order.paidAt)}</span>
+                  </div>
+                )}
+
                 {order.paymentResponsible && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -226,10 +256,8 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
                   </div>
                 )}
 
-              </div>
-            </div>
-          </>
-        )}
+          </div>
+        </div>
 
       </CardContent>
     </Card>

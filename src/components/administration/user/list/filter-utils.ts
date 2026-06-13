@@ -1,6 +1,6 @@
 import type { UserGetManyFormData } from "../../../../schemas";
 import { formatDate, formatCurrency } from "../../../../utils";
-import { USER_STATUS, USER_STATUS_LABELS } from "../../../../constants";
+import { CONTRACT_TYPE, CONTRACT_TYPE_LABELS } from "../../../../constants";
 
 export interface FilterIndicator {
   key: string;
@@ -35,27 +35,29 @@ export function extractActiveFilters(
     });
   }
 
-  // Status filters (individual badges for each status)
-  if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
-    filters.status.forEach((status: string) => {
-      const statusLabel = USER_STATUS_LABELS[status as USER_STATUS] || status;
+  // Contract type filters (individual badges for each type)
+  if (filters.contractTypes && Array.isArray(filters.contractTypes) && filters.contractTypes.length > 0) {
+    filters.contractTypes.forEach((contractType: string) => {
+      const contractTypeLabel = CONTRACT_TYPE_LABELS[contractType as CONTRACT_TYPE] || contractType;
       activeFilters.push({
-        key: `status-${status}`,
-        label: "Status",
-        value: statusLabel,
+        key: `contractTypes-${contractType}`,
+        label: "Tipo de Contrato",
+        value: contractTypeLabel,
         iconType: "user",
-        itemId: status,
-        onRemove: () => onRemoveFilter("status", status),
+        itemId: contractType,
+        onRemove: () => onRemoveFilter("contractTypes", contractType),
       });
     });
-  } else if (filters.where?.status) {
-    const statusLabel = USER_STATUS_LABELS[filters.where.status as USER_STATUS] || filters.where.status;
+  } else if (filters.where?.currentContractType) {
+    const value = filters.where.currentContractType as any;
+    const contractType = (typeof value === "object" && value !== null ? value.equals ?? value.in?.[0] : value) as string;
+    const contractTypeLabel = CONTRACT_TYPE_LABELS[contractType as CONTRACT_TYPE] || contractType;
     activeFilters.push({
-      key: "status",
-      label: "Status",
-      value: statusLabel,
+      key: "contractTypes",
+      label: "Tipo de Contrato",
+      value: contractTypeLabel,
       iconType: "user",
-      onRemove: () => onRemoveFilter("status"),
+      onRemove: () => onRemoveFilter("contractTypes"),
     });
   }
 
@@ -295,9 +297,15 @@ export function extractActiveFilters(
     });
   }
 
-  if (filters.dismissedAt?.gte || filters.dismissedAt?.lte) {
-    const gte = filters.dismissedAt.gte;
-    const lte = filters.dismissedAt.lte;
+  // Dismissal/admission date ranges now live on the related current
+  // EmploymentContract, read via where.currentContract.is.{terminationDate,exp1EndAt}.
+  const currentContractIs = (filters.where as any)?.currentContract?.is as
+    | { terminationDate?: { gte?: Date; lte?: Date }; exp1EndAt?: { gte?: Date; lte?: Date } }
+    | undefined;
+
+  if (currentContractIs?.terminationDate?.gte || currentContractIs?.terminationDate?.lte) {
+    const gte = currentContractIs.terminationDate.gte;
+    const lte = currentContractIs.terminationDate.lte;
     let value = "";
 
     if (gte && lte) {
@@ -309,17 +317,17 @@ export function extractActiveFilters(
     }
 
     activeFilters.push({
-      key: "dismissedAt",
+      key: "currentContract.terminationDate",
       label: "Data Demissão",
       value,
       iconType: "calendar",
-      onRemove: () => onRemoveFilter("dismissedAt"),
+      onRemove: () => onRemoveFilter("currentContract.terminationDate"),
     });
   }
 
-  if (filters.exp1EndAt?.gte || filters.exp1EndAt?.lte) {
-    const gte = filters.exp1EndAt.gte;
-    const lte = filters.exp1EndAt.lte;
+  if (currentContractIs?.exp1EndAt?.gte || currentContractIs?.exp1EndAt?.lte) {
+    const gte = currentContractIs.exp1EndAt.gte;
+    const lte = currentContractIs.exp1EndAt.lte;
     let value = "";
 
     if (gte && lte) {
@@ -331,11 +339,11 @@ export function extractActiveFilters(
     }
 
     activeFilters.push({
-      key: "exp1EndAt",
+      key: "currentContract.exp1EndAt",
       label: "Data de Contratação",
       value,
       iconType: "calendar",
-      onRemove: () => onRemoveFilter("exp1EndAt"),
+      onRemove: () => onRemoveFilter("currentContract.exp1EndAt"),
     });
   }
 
@@ -351,21 +359,21 @@ export function createFilterRemover(currentFilters: Partial<UserGetManyFormData>
       case "searchingFor":
         delete newFilters.searchingFor;
         break;
-      case "status":
-        if (itemId && Array.isArray(newFilters.status)) {
-          // Remove specific status from array
-          const filteredStatuses = newFilters.status.filter((status) => status !== itemId);
-          if (filteredStatuses.length > 0) {
-            newFilters.status = filteredStatuses;
+      case "contractTypes":
+        if (itemId && Array.isArray(newFilters.contractTypes)) {
+          // Remove specific contract type from array
+          const filteredContractTypes = newFilters.contractTypes.filter((contractType) => contractType !== itemId);
+          if (filteredContractTypes.length > 0) {
+            newFilters.contractTypes = filteredContractTypes;
           } else {
-            delete newFilters.status;
+            delete newFilters.contractTypes;
           }
-        } else if (newWhere.status) {
-          // Remove status from where clause
-          delete newWhere.status;
+        } else if ((newWhere as any).currentContractType) {
+          // Remove contract type from where clause
+          delete (newWhere as any).currentContractType;
         } else {
-          // Remove all statuses
-          delete newFilters.status;
+          // Remove all contract types
+          delete newFilters.contractTypes;
         }
         break;
       case "positionId":
@@ -443,12 +451,19 @@ export function createFilterRemover(currentFilters: Partial<UserGetManyFormData>
       case "lastLoginAt":
         delete newFilters.lastLoginAt;
         break;
-      case "dismissedAt":
-        delete newFilters.dismissedAt;
+      case "currentContract.terminationDate":
+      case "currentContract.exp1EndAt": {
+        // Dismissal/admission ranges live on where.currentContract.is.{...}
+        const field = key === "currentContract.terminationDate" ? "terminationDate" : "exp1EndAt";
+        const relIs = { ...((newWhere as any).currentContract?.is ?? {}) };
+        delete relIs[field];
+        if (Object.keys(relIs).length > 0) {
+          (newWhere as any).currentContract = { is: relIs };
+        } else {
+          delete (newWhere as any).currentContract;
+        }
         break;
-      case "exp1EndAt":
-        delete newFilters.exp1EndAt;
-        break;
+      }
     }
 
     // Update where clause

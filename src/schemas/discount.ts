@@ -237,17 +237,38 @@ export const discountCreateSchema = z
       .transform((val) => Math.round(val * 100) / 100)
       .optional(),
     reference: createNameSchema(1, 200, "Referência"),
-    calculationOrder: z
+    discountType: z.string().optional(),
+    isPersistent: z.boolean().default(false),
+    expirationDate: nullableDate.optional(),
+    // Parcelamento (ex.: empréstimo consignado): total de parcelas e parcela corrente
+    totalInstallments: z
       .number()
-      .int("Ordem de desconto deve ser um número inteiro")
-      .min(1, "Ordem de desconto deve ser maior ou igual a 1")
-      .default(1),
+      .int("O total de parcelas deve ser um número inteiro")
+      .min(1, "O total de parcelas deve ser pelo menos 1")
+      .max(120, "O total de parcelas deve ser no máximo 120")
+      .nullable()
+      .optional(),
+    currentInstallment: z
+      .number()
+      .int("A parcela atual deve ser um número inteiro")
+      .min(1, "A parcela atual deve ser pelo menos 1")
+      .nullable()
+      .optional(),
   })
   .refine(
     (data) => data.percentage !== undefined || data.value !== undefined,
     {
       message: "Pelo menos um dos campos 'percentual' ou 'valor fixo' deve ser fornecido",
       path: ["percentage", "value"],
+    }
+  )
+  .refine(
+    (data) =>
+      !data.currentInstallment ||
+      (data.totalInstallments != null && data.currentInstallment <= data.totalInstallments),
+    {
+      message: "A parcela atual não pode exceder o total de parcelas",
+      path: ["currentInstallment"],
     }
   );
 
@@ -265,10 +286,23 @@ export const discountUpdateSchema = z
       .transform((val) => Math.round(val * 100) / 100)
       .optional(),
     reference: createNameSchema(1, 200, "Referência").optional(),
-    calculationOrder: z
+    discountType: z.string().optional(),
+    isPersistent: z.boolean().optional(),
+    isActive: z.boolean().optional(),
+    expirationDate: nullableDate.optional(),
+    // Parcelamento (ex.: empréstimo consignado)
+    totalInstallments: z
       .number()
-      .int("Ordem de desconto deve ser um número inteiro")
-      .min(1, "Ordem de desconto deve ser maior ou igual a 1")
+      .int("O total de parcelas deve ser um número inteiro")
+      .min(1, "O total de parcelas deve ser pelo menos 1")
+      .max(120, "O total de parcelas deve ser no máximo 120")
+      .nullable()
+      .optional(),
+    currentInstallment: z
+      .number()
+      .int("A parcela atual deve ser um número inteiro")
+      .min(1, "A parcela atual deve ser pelo menos 1")
+      .nullable()
       .optional(),
   })
   .refine(
@@ -402,8 +436,12 @@ export type DiscountWhere = z.infer<typeof discountWhereSchema>;
 // =====================
 
 export const mapToDiscountFormData = createMapToFormDataHelper<Discount, DiscountUpdateFormData>((discount) => ({
-  percentage: discount.percentage ? (typeof discount.percentage === 'number' ? discount.percentage : discount.percentage.toNumber()) : undefined,
-  value: discount.value ? (typeof discount.value === 'number' ? discount.value : discount.value.toNumber()) : undefined,
+  percentage: discount.percentage ? (typeof discount.percentage === 'number' ? discount.percentage : Number(discount.percentage)) : undefined,
+  value: discount.value ? (typeof discount.value === 'number' ? discount.value : Number(discount.value)) : undefined,
   reference: discount.reference,
-  calculationOrder: discount.calculationOrder,
+  discountType: discount.discountType,
+  isPersistent: discount.isPersistent,
+  isActive: discount.isActive,
+  totalInstallments: discount.totalInstallments ?? undefined,
+  currentInstallment: discount.currentInstallment ?? undefined,
 }));

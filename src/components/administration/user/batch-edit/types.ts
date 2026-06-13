@@ -1,4 +1,4 @@
-import type { USER_STATUS } from "../../../../constants";
+import type { CONTRACT_TYPE } from "../../../../constants";
 
 export interface UserBatchEditFormData {
   users: Array<{
@@ -11,7 +11,7 @@ export interface UserBatchEditFormData {
       positionId?: string | null;
       sectorId?: string | null;
       ledSectorId?: string | null;
-      status?: USER_STATUS;
+      contractType?: CONTRACT_TYPE;
     };
   }>;
 }

@@ -46,6 +46,7 @@ export const getSectorPrivilegeDescription = (privilege: SECTOR_PRIVILEGES): str
     [SECTOR_PRIVILEGES.EXTERNAL]: "Acesso externo limitado",
     [SECTOR_PRIVILEGES.PRODUCTION_MANAGER]: "Acesso de gerente de produção",
     [SECTOR_PRIVILEGES.AIRBRUSHING]: "Acesso a aerografia",
+    [SECTOR_PRIVILEGES.ACCOUNTING]: "Acesso a contabilidade e departamento pessoal",
     [TEAM_LEADER]: "Acesso de líder de equipe (gestão do setor)",
   };
   return descriptions[privilege] || "Privilégio não definido";
@@ -67,6 +68,7 @@ export const getSectorPrivilegeColor = (privilege: SECTOR_PRIVILEGES): string =>
     [SECTOR_PRIVILEGES.WAREHOUSE]: "green",
     [SECTOR_PRIVILEGES.PRODUCTION_MANAGER]: "emerald",
     [SECTOR_PRIVILEGES.AIRBRUSHING]: "amber",
+    [SECTOR_PRIVILEGES.ACCOUNTING]: "lime",
     [TEAM_LEADER]: "teal",
   };
   return colors[privilege] || "gray";
@@ -88,6 +90,7 @@ export const getSectorPrivilegeBadgeVariant = (privilege: SECTOR_PRIVILEGES): "d
     [SECTOR_PRIVILEGES.EXTERNAL]: "outline" as const,
     [SECTOR_PRIVILEGES.PRODUCTION_MANAGER]: "default" as const,
     [SECTOR_PRIVILEGES.AIRBRUSHING]: "secondary" as const,
+    [SECTOR_PRIVILEGES.ACCOUNTING]: "secondary" as const,
     [TEAM_LEADER]: "default" as const,
   };
   return variants[privilege] || "outline";

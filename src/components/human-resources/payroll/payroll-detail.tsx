@@ -121,10 +121,7 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
 
     addDiscount({
       payrollId: payroll.id,
-      discount: {
-        ...discountData,
-        calculationOrder: (payroll.discounts?.length || 0) + 1,
-      }
+      discount: discountData,
     }, {
       onSuccess: () => {
         setShowDiscountDialog(false);

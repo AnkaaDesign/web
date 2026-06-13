@@ -8,7 +8,7 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import { useBorrows, usePpeDeliveries, useActivities } from "../../hooks";
 import { useNavigate } from "react-router-dom";
-import { routes, PPE_DELIVERY_STATUS, BORROW_STATUS, USER_STATUS_LABELS } from "../../constants";
+import { routes, PPE_DELIVERY_STATUS, BORROW_STATUS, CONTRACT_TYPE_LABELS } from "../../constants";
 import { formatDate, getFileUrl } from "../../utils";
 import {
   CalendarDays,
@@ -308,7 +308,7 @@ export function Personal() {
                     <p className="text-sm text-muted-foreground">{user?.position?.name || "Sem cargo"}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge variant={user?.isActive ? "default" : "destructive"}>
-                        {user?.status ? USER_STATUS_LABELS[user.status] : "Desconhecido"}
+                        {user?.currentContractType ? CONTRACT_TYPE_LABELS[user.currentContractType] : "Desconhecido"}
                       </Badge>
                     </div>
                   </div>

@@ -13,7 +13,7 @@ import {
   IconChartBar,
 } from "@tabler/icons-react";
 import { useUsers, usePositions, useSectors } from "../../../hooks";
-import { USER_STATUS } from "../../../constants";
+import { CONTRACT_TYPE } from "../../../constants";
 import type { UserGetManyFormData } from "../../../schemas";
 
 interface PerformanceLevelFiltersProps {
@@ -70,7 +70,7 @@ export function PerformanceLevelFilters({
   const { data: allUsersData } = useUsers({
     include: { position: true, sector: true },
     where: {
-      status: USER_STATUS.EFFECTED, // Only effected users (not dismissed, not inactive)
+      currentContractType: CONTRACT_TYPE.EFFECTED, // Only effected users (not dismissed, not inactive)
     },
     orderBy: { name: "asc" },
     limit: 100, // API maximum limit
@@ -233,9 +233,9 @@ export function PerformanceLevelFilters({
 
   const handleApply = useCallback(() => {
     const newWhere: any = {
-      // Preserve existing where conditions (especially status: EFFECTED)
+      // Preserve existing where conditions (especially currentContractType: EFFECTED)
       ...filters.where,
-      status: USER_STATUS.EFFECTED, // Always filter to EFFECTED users
+      currentContractType: CONTRACT_TYPE.EFFECTED, // Always filter to EFFECTED users
     };
 
     // Add performance level filter if not default

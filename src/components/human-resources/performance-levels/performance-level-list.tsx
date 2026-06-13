@@ -14,7 +14,7 @@ import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-t
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { IconFilter } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { USER_STATUS } from "../../../constants";
+import { CONTRACT_TYPE } from "../../../constants";
 import type { UserGetManyFormData } from "../../../schemas";
 import type { User } from "../../../types";
 
@@ -92,7 +92,7 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
       where: {
-        status: USER_STATUS.EFFECTED,  // Only EFFECTED users (not dismissed, not inactive)
+        currentContractType: CONTRACT_TYPE.EFFECTED,  // Only EFFECTED users (not dismissed, not inactive)
         position: {
           is: {
             bonifiable: true  // Only users with bonifiable positions

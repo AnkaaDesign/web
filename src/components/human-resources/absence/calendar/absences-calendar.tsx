@@ -11,22 +11,32 @@ import {
 import { ptBR } from "date-fns/locale";
 import {
   IconCalendar,
+  IconCalendarEvent,
+  IconCake,
   IconChevronLeft,
   IconChevronRight,
   IconBriefcase,
   IconBeach,
+  IconStethoscope,
   IconUserOff,
   IconUserExclamation,
   IconConfetti,
+  IconStar,
   IconUsersGroup,
+  IconPencil,
+  IconPlus,
+  IconTrash,
 } from "@tabler/icons-react";
 
 import {
-  USER_STATUS,
+  CONTRACT_STATUS,
+  LEAVE_STATUS,
+  LEAVE_TYPE_LABELS,
   VACATION_JUSTIFICATIVA_ID,
   getJustificativaCategory,
   getJustificativaMeta,
 } from "../../../../constants";
+import type { LEAVE_TYPE } from "../../../../constants";
 
 // Category-level color tokens. The cell bars and the summary stat tiles share
 // these so the visual story is consistent. Hues are spaced around the wheel
@@ -45,14 +55,30 @@ const CATEGORY_BAR_CLASSES = {
 } as const;
 type BarCategory = keyof typeof CATEGORY_BAR_CLASSES;
 const HOLIDAY_BAR_CLASS = "bg-cyan-600 text-white border border-cyan-700";
-import type { SecullumAggregatedAbsence } from "../../../../types";
+// New unified-calendar overlays: afastamentos (Leave), aniversários (User.birth)
+// e eventos da agenda (AgendaEvent). Hues keep distance from the existing four.
+const LEAVE_BAR_CLASS = "bg-orange-600 text-white border border-orange-700";
+const BIRTHDAY_BAR_CLASS = "bg-pink-600 text-white border border-pink-700";
+const EVENT_BAR_CLASS = "bg-indigo-600 text-white border border-indigo-700";
+// Datas comemorativas (dataset estático pt-BR + aniversário da empresa) —
+// fúcsia, longe do ciano dos feriados oficiais e do rosa dos aniversários.
+const COMMEMORATIVE_BAR_CLASS = "bg-fuchsia-600 text-white border border-fuchsia-700";
+import type { SecullumAggregatedAbsence, Leave, AgendaEvent, User } from "../../../../types";
 import {
+  useAgendaEventMutations,
+  useAgendaEvents,
+  useLeaves,
   useSecullumAggregatedAbsences,
   useSecullumHolidays,
   useSecullumUnjustifiedAbsences,
   useSectors,
   useUsers,
 } from "../../../../hooks";
+import { AgendaEventDialog } from "../../calendar/agenda-event-dialog";
+import {
+  getCommemorativesForDay,
+  type CommemorativeDate,
+} from "../../calendar/commemorative-dates";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,19 +104,43 @@ const miniWeekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 type ViewMode = "month" | "year";
 
-// Brazilian payroll period: day 26 of previous month → day 25 of selected month.
-function getPayrollPeriod(refMonth: Date) {
-  const start = new Date(refMonth.getFullYear(), refMonth.getMonth() - 1, 26);
-  const end = new Date(refMonth.getFullYear(), refMonth.getMonth(), 25);
+// Standard calendar month (day 1 → last day). The old payroll-period window
+// (26→25) made the grid open with a week of blank spacer cells, which read
+// as a broken layout — the unified calendar shows conventional months.
+function getMonthPeriod(refMonth: Date) {
+  const start = new Date(refMonth.getFullYear(), refMonth.getMonth(), 1);
+  const end = new Date(refMonth.getFullYear(), refMonth.getMonth() + 1, 0);
   return { start, end };
 }
 
-// Default to the payroll period that contains today.
+// Default to the current calendar month.
 function defaultRefMonth(): Date {
   const today = new Date();
-  return today.getDate() >= 26
-    ? new Date(today.getFullYear(), today.getMonth() + 1, 1)
-    : new Date(today.getFullYear(), today.getMonth(), 1);
+  return new Date(today.getFullYear(), today.getMonth(), 1);
+}
+
+// ---- Visibility toggles persistence (localStorage) ---------------------
+const VISIBILITY_STORAGE_KEY = "hr-calendar-visibility";
+
+type VisibilityPrefs = Partial<Record<
+  | "vacation"
+  | "justifiedFalta"
+  | "unjustifiedFalta"
+  | "holiday"
+  | "leave"
+  | "birthday"
+  | "event"
+  | "commemorative",
+  boolean
+>>;
+
+function loadVisibilityPrefs(): VisibilityPrefs {
+  try {
+    const raw = localStorage.getItem(VISIBILITY_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as VisibilityPrefs) : {};
+  } catch {
+    return {};
+  }
 }
 
 function startOfWeekSunday(d: Date): Date {
@@ -109,29 +159,56 @@ export function AbsencesCalendar() {
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [sectorId, setSectorId] = useState<string | undefined>(undefined);
   const [selectedUserId, setSelectedUserId] = useState<string>(ALL_USERS);
-  // Visibility toggles per category — user can hide férias / justificadas /
-  // não justificadas / feriados independently. StatsRow tiles act as on/off
-  // switches.
-  const [showVacation, setShowVacation] = useState(true);
-  const [showJustifiedFalta, setShowJustifiedFalta] = useState(true);
-  const [showUnjustifiedFalta, setShowUnjustifiedFalta] = useState(true);
-  const [showHoliday, setShowHoliday] = useState(true);
+  // Visibility toggles per category — user can hide each overlay
+  // independently. StatsRow tiles act as on/off switches and the choices
+  // persist in localStorage across visits.
+  const [showVacation, setShowVacation] = useState(() => loadVisibilityPrefs().vacation ?? true);
+  const [showJustifiedFalta, setShowJustifiedFalta] = useState(() => loadVisibilityPrefs().justifiedFalta ?? true);
+  const [showUnjustifiedFalta, setShowUnjustifiedFalta] = useState(() => loadVisibilityPrefs().unjustifiedFalta ?? true);
+  const [showHoliday, setShowHoliday] = useState(() => loadVisibilityPrefs().holiday ?? true);
+  const [showLeave, setShowLeave] = useState(() => loadVisibilityPrefs().leave ?? true);
+  const [showBirthday, setShowBirthday] = useState(() => loadVisibilityPrefs().birthday ?? true);
+  const [showEvent, setShowEvent] = useState(() => loadVisibilityPrefs().event ?? true);
+  const [showCommemorative, setShowCommemorative] = useState(
+    () => loadVisibilityPrefs().commemorative ?? true,
+  );
+
+  // Agenda-event dialog (create/edit) wiring.
+  const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<AgendaEvent | null>(null);
+  const agendaEventMutations = useAgendaEventMutations();
+
+  // Persist toggle choices.
+  useEffect(() => {
+    try {
+      const prefs: VisibilityPrefs = {
+        vacation: showVacation,
+        justifiedFalta: showJustifiedFalta,
+        unjustifiedFalta: showUnjustifiedFalta,
+        holiday: showHoliday,
+        leave: showLeave,
+        birthday: showBirthday,
+        event: showEvent,
+        commemorative: showCommemorative,
+      };
+      localStorage.setItem(VISIBILITY_STORAGE_KEY, JSON.stringify(prefs));
+    } catch {
+      // localStorage indisponível — preferências não persistem nesta sessão.
+    }
+  }, [showVacation, showJustifiedFalta, showUnjustifiedFalta, showHoliday, showLeave, showBirthday, showEvent, showCommemorative]);
   // Selected day powers the right-side "Detalhe do dia" panel. Clicking a
   // cell selects it; clicking the same cell again or pressing "Limpar"
   // clears it. Persists only while the day stays inside the visible period.
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
-  // Fetch + render range — driven by payroll period (26→25).
+  // Fetch + render range — standard calendar months.
   const range = useMemo(() => {
     if (viewMode === "year") {
-      // Year view = the 12 payroll periods anchored in this year. Each runs
-      // day 26 of the previous month → day 25 of the anchor month, so the
-      // year as a whole spans Dec 26 of prev year → Dec 25 of this year.
-      const start = new Date(refMonth.getFullYear() - 1, 11, 26);
-      const end = new Date(refMonth.getFullYear(), 11, 25);
+      const start = new Date(refMonth.getFullYear(), 0, 1);
+      const end = new Date(refMonth.getFullYear(), 11, 31);
       return { periodStart: start, periodEnd: end, gridStart: start, gridEnd: end };
     }
-    const { start, end } = getPayrollPeriod(refMonth);
+    const { start, end } = getMonthPeriod(refMonth);
     const gridStart = startOfWeekSunday(start);
     const gridEnd = endOfWeekSaturday(end);
     return { periodStart: start, periodEnd: end, gridStart, gridEnd };
@@ -156,14 +233,57 @@ export function AbsencesCalendar() {
   );
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" }, take: 100 } as any);
   const { data: usersData, isLoading: usersLoading } = useUsers({
-    statuses: [
-      USER_STATUS.EXPERIENCE_PERIOD_1,
-      USER_STATUS.EXPERIENCE_PERIOD_2,
-      USER_STATUS.EFFECTED,
-    ],
+    statuses: [CONTRACT_STATUS.ACTIVE],
     where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,
+  } as any);
+
+  // ---- Unified-calendar overlays --------------------------------------
+  // Aniversários: every active collaborator (no Secullum link required) —
+  // birthdays recur yearly, so the list is range-independent.
+  const { data: birthdayUsersData } = useUsers({
+    statuses: [CONTRACT_STATUS.ACTIVE],
+    orderBy: { name: "asc" },
+    // 100 é o teto do paginationSchema da API — limit: 200 era REJEITADO
+    // pelo zod (400) e os aniversários nunca carregavam.
+    limit: 100,
+  } as any);
+
+  // Afastamentos (Leave): only records that can overlap the visible period —
+  // started before it ends AND not finished before it starts (end =
+  // actualEndDate ?? expectedEndDate; both null ⇒ open-ended, always kept).
+  // Without the end-date bound, old COMPLETED leaves would consume the
+  // result cap (orderBy startDate asc) and truncate current ones.
+  const { data: leavesData, isLoading: leavesLoading } = useLeaves({
+    where: {
+      status: { in: [LEAVE_STATUS.SCHEDULED, LEAVE_STATUS.ACTIVE, LEAVE_STATUS.COMPLETED] },
+      startDate: { lte: format(range.periodEnd, "yyyy-MM-dd'T'23:59:59") },
+      OR: [
+        { actualEndDate: { gte: format(range.periodStart, "yyyy-MM-dd'T'00:00:00") } },
+        { actualEndDate: null, expectedEndDate: { gte: format(range.periodStart, "yyyy-MM-dd'T'00:00:00") } },
+        { actualEndDate: null, expectedEndDate: null },
+      ],
+    },
+    include: { user: true },
+    orderBy: { startDate: "asc" },
+    // 100 é o teto do paginationSchema da API; com o filtro de sobreposição
+    // acima, os afastamentos visíveis de um período nunca chegam perto disso.
+    limit: 100,
+  } as any);
+
+  // Eventos da agenda dentro do período visível.
+  const { data: agendaEventsData, isLoading: agendaEventsLoading } = useAgendaEvents({
+    where: {
+      isActive: true,
+      eventDate: {
+        gte: format(range.periodStart, "yyyy-MM-dd'T'00:00:00"),
+        lte: format(range.periodEnd, "yyyy-MM-dd'T'23:59:59"),
+      },
+    },
+    include: { createdBy: true },
+    orderBy: { eventDate: "asc" },
+    limit: 100,
   } as any);
 
   // Resolve the selected Ankaa user's Secullum funcionarioId so we can match
@@ -219,6 +339,39 @@ export function AbsencesCalendar() {
     if (root && Array.isArray(root.data)) return root.data;
     return [];
   }, [holidaysData, showHoliday]);
+
+  // Afastamentos visíveis — respeitam o toggle e os filtros de colaborador/setor.
+  const leaves: Leave[] = useMemo(() => {
+    if (!showLeave) return [];
+    let arr: Leave[] = leavesData?.data ?? [];
+    if (selectedUserId !== ALL_USERS) {
+      arr = arr.filter((l) => l.userId === selectedUserId);
+    }
+    if (sectorId) {
+      arr = arr.filter((l: any) => l.user?.sectorId === sectorId);
+    }
+    return arr;
+  }, [leavesData, showLeave, selectedUserId, sectorId]);
+
+  // Aniversariantes visíveis — recorrentes por dia/mês de nascimento.
+  const birthdayUsers: User[] = useMemo(() => {
+    if (!showBirthday) return [];
+    let arr: User[] = (birthdayUsersData?.data ?? []).filter((u: any) => !!u.birth);
+    if (selectedUserId !== ALL_USERS) {
+      arr = arr.filter((u) => u.id === selectedUserId);
+    }
+    if (sectorId) {
+      arr = arr.filter((u: any) => u.sectorId === sectorId);
+    }
+    return arr;
+  }, [birthdayUsersData, showBirthday, selectedUserId, sectorId]);
+
+  // Eventos da agenda visíveis (não filtram por colaborador/setor — são
+  // eventos da empresa, com alvos próprios de notificação).
+  const agendaEvents: AgendaEvent[] = useMemo(() => {
+    if (!showEvent) return [];
+    return agendaEventsData?.data ?? [];
+  }, [agendaEventsData, showEvent]);
 
   const sectorOptions = useMemo<ComboboxOption[]>(() => {
     const arr = sectorsData?.data ?? [];
@@ -294,6 +447,37 @@ export function AbsencesCalendar() {
         usersOnJustifiedFalta.add(a.userId);
       }
     }
+    // Afastamentos — person-work-day overlap, same rule as the absence bars.
+    const usersOnLeave = new Set<string>();
+    let leaveDays = 0;
+    for (const l of leaves) {
+      const bounds = getLeaveBounds(l);
+      const overlap = workDaysInPeriod.filter((d) => d >= bounds.start && d <= bounds.end).length;
+      if (overlap === 0) continue;
+      leaveDays += overlap;
+      usersOnLeave.add(l.userId);
+    }
+
+    // Aniversários no período (qualquer dia, inclusive fins de semana).
+    let birthdayCount = 0;
+    for (const d of days) {
+      birthdayCount += getBirthdaysForDay(birthdayUsers, d).length;
+    }
+
+    // Datas comemorativas no período (dataset estático — qualquer dia).
+    let commemorativeCount = 0;
+    if (showCommemorative) {
+      for (const d of days) {
+        commemorativeCount += getCommemorativesForDay(d).length;
+      }
+    }
+
+    // Eventos da agenda no período.
+    const eventCount = agendaEvents.filter((e) => {
+      const day = toLocalDay(new Date(e.eventDate));
+      return day >= range.periodStart && day <= range.periodEnd;
+    }).length;
+
     return {
       workingDays,
       vacationDays,
@@ -303,10 +487,26 @@ export function AbsencesCalendar() {
       usersOnJustifiedFalta: usersOnJustifiedFalta.size,
       usersOnUnjustifiedFalta: usersOnUnjustifiedFalta.size,
       holidayDays: holidayDaysInPeriod,
+      leaveDays,
+      usersOnLeave: usersOnLeave.size,
+      birthdayCount,
+      eventCount,
+      commemorativeCount,
     };
-  }, [range.periodStart, range.periodEnd, absences, holidays]);
+  }, [range.periodStart, range.periodEnd, absences, holidays, leaves, birthdayUsers, agendaEvents, showCommemorative]);
 
-  const isLoading = absencesLoading || holidaysLoading || unjustifiedLoading;
+  const isLoading =
+    absencesLoading || holidaysLoading || unjustifiedLoading || leavesLoading || agendaEventsLoading;
+
+  const handleEditEvent = (event: AgendaEvent) => {
+    setEditingEvent(event);
+    setEventDialogOpen(true);
+  };
+
+  const handleDeleteEvent = (event: AgendaEvent) => {
+    if (!window.confirm(`Excluir o evento "${event.title}"?`)) return;
+    agendaEventMutations.delete(event.id);
+  };
 
   const goPrev = () =>
     setRefMonth(viewMode === "year" ? subYears(refMonth, 1) : subMonths(refMonth, 1));
@@ -351,8 +551,12 @@ export function AbsencesCalendar() {
   }, [viewMode]);
 
   return (
-    <Card className="h-full flex flex-col shadow-sm border border-border">
-      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
+    // `flex-1` (not h-full + overflow-hidden): the card fills the viewport
+    // when there's room and GROWS past it when the month grid needs more
+    // height — the page then scrolls. The old hard-capped chain compressed
+    // the grid rows on shorter screens, clipping/overlapping the cells.
+    <Card className="flex-1 flex flex-col shadow-sm border border-border">
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4">
         {/* Filter bar — single row */}
         <div className="flex items-stretch gap-2 flex-shrink-0">
           <div className="flex-1 min-w-0">
@@ -381,6 +585,17 @@ export function AbsencesCalendar() {
           </div>
 
           <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+          <Button
+            type="button"
+            onClick={() => {
+              setEditingEvent(null);
+              setEventDialogOpen(true);
+            }}
+            className="h-10"
+          >
+            <IconPlus className="h-4 w-4 mr-1.5" />
+            Novo Evento
+          </Button>
           <div className="flex items-center gap-1 rounded-md border border-border p-0.5 bg-background">
             <Button
               type="button"
@@ -424,12 +639,6 @@ export function AbsencesCalendar() {
                     : format(refMonth, "MMMM yyyy", { locale: ptBR })}
                 </span>
               </div>
-              {viewMode === "month" && (
-                <div className="text-xs text-muted-foreground tabular-nums">
-                  {format(range.periodStart, "dd/MM", { locale: ptBR })} a{" "}
-                  {format(range.periodEnd, "dd/MM/yyyy", { locale: ptBR })}
-                </div>
-              )}
             </div>
             <Button
               type="button"
@@ -456,10 +665,18 @@ export function AbsencesCalendar() {
           showJustifiedFalta={showJustifiedFalta}
           showUnjustifiedFalta={showUnjustifiedFalta}
           showHoliday={showHoliday}
+          showLeave={showLeave}
+          showBirthday={showBirthday}
+          showEvent={showEvent}
+          showCommemorative={showCommemorative}
           onToggleVacation={() => setShowVacation((v) => !v)}
           onToggleJustifiedFalta={() => setShowJustifiedFalta((v) => !v)}
           onToggleUnjustifiedFalta={() => setShowUnjustifiedFalta((v) => !v)}
           onToggleHoliday={() => setShowHoliday((v) => !v)}
+          onToggleLeave={() => setShowLeave((v) => !v)}
+          onToggleBirthday={() => setShowBirthday((v) => !v)}
+          onToggleEvent={() => setShowEvent((v) => !v)}
+          onToggleCommemorative={() => setShowCommemorative((v) => !v)}
         />
 
 
@@ -468,8 +685,8 @@ export function AbsencesCalendar() {
             <LoadingSpinner size="lg" />
           </div>
         ) : viewMode === "month" ? (
-          <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
-            <div className="flex-1 min-w-0 overflow-hidden flex">
+          <div className="flex-1 flex gap-4 items-stretch">
+            <div className="flex-1 min-w-0 flex">
               <MonthView
                 gridStart={range.gridStart}
                 gridEnd={range.gridEnd}
@@ -477,6 +694,10 @@ export function AbsencesCalendar() {
                 periodEnd={range.periodEnd}
                 absences={absences}
                 holidays={holidays}
+                leaves={leaves}
+                birthdayUsers={birthdayUsers}
+                agendaEvents={agendaEvents}
+                showCommemoratives={showCommemorative}
                 selectedDay={selectedDay}
                 onSelectDay={setSelectedDay}
               />
@@ -485,6 +706,12 @@ export function AbsencesCalendar() {
               selectedDay={selectedDay}
               absences={absences}
               holidays={holidays}
+              leaves={leaves}
+              birthdayUsers={birthdayUsers}
+              agendaEvents={agendaEvents}
+              showCommemoratives={showCommemorative}
+              onEditEvent={handleEditEvent}
+              onDeleteEvent={handleDeleteEvent}
               onClose={() => setSelectedDay(null)}
             />
           </div>
@@ -494,12 +721,21 @@ export function AbsencesCalendar() {
             absences={absences}
             holidays={holidays}
             onMonthClick={(monthIdx) => {
-              // Year months 0..11; map to payroll-period anchor refMonth.
               setRefMonth(new Date(refMonth.getFullYear(), monthIdx, 1));
               setViewMode("month");
             }}
           />
         )}
+
+        <AgendaEventDialog
+          open={eventDialogOpen}
+          onOpenChange={(open) => {
+            setEventDialogOpen(open);
+            if (!open) setEditingEvent(null);
+          }}
+          editing={editingEvent}
+          defaultDate={selectedDay}
+        />
       </CardContent>
     </Card>
   );
@@ -512,10 +748,18 @@ function StatsRow({
   showJustifiedFalta,
   showUnjustifiedFalta,
   showHoliday,
+  showLeave,
+  showBirthday,
+  showEvent,
+  showCommemorative,
   onToggleVacation,
   onToggleJustifiedFalta,
   onToggleUnjustifiedFalta,
   onToggleHoliday,
+  onToggleLeave,
+  onToggleBirthday,
+  onToggleEvent,
+  onToggleCommemorative,
 }: {
   stats: {
     workingDays: number;
@@ -526,19 +770,32 @@ function StatsRow({
     usersOnJustifiedFalta: number;
     usersOnUnjustifiedFalta: number;
     holidayDays: number;
+    leaveDays: number;
+    usersOnLeave: number;
+    birthdayCount: number;
+    eventCount: number;
+    commemorativeCount: number;
   };
   showVacation: boolean;
   showJustifiedFalta: boolean;
   showUnjustifiedFalta: boolean;
   showHoliday: boolean;
+  showLeave: boolean;
+  showBirthday: boolean;
+  showEvent: boolean;
+  showCommemorative: boolean;
   onToggleVacation: () => void;
   onToggleJustifiedFalta: () => void;
   onToggleUnjustifiedFalta: () => void;
   onToggleHoliday: () => void;
+  onToggleLeave: () => void;
+  onToggleBirthday: () => void;
+  onToggleEvent: () => void;
+  onToggleCommemorative: () => void;
 }) {
   const colabSuffix = (n: number) => `${n} ${n === 1 ? "colab." : "colabs."}`;
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 flex-shrink-0">
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-9 gap-3 flex-shrink-0">
       <StatTile
         icon={IconBriefcase}
         label="Dias úteis"
@@ -582,6 +839,42 @@ function StatsRow({
         active={showHoliday}
         onClick={onToggleHoliday}
       />
+      <StatTile
+        icon={IconStethoscope}
+        label="Afastamentos"
+        value={stats.leaveDays}
+        suffix={`dias · ${colabSuffix(stats.usersOnLeave)}`}
+        tone="orange"
+        active={showLeave}
+        onClick={onToggleLeave}
+      />
+      <StatTile
+        icon={IconCake}
+        label="Aniversários"
+        value={stats.birthdayCount}
+        suffix={stats.birthdayCount === 1 ? "colab." : "colabs."}
+        tone="pink"
+        active={showBirthday}
+        onClick={onToggleBirthday}
+      />
+      <StatTile
+        icon={IconCalendarEvent}
+        label="Eventos"
+        value={stats.eventCount}
+        suffix={stats.eventCount === 1 ? "evento" : "eventos"}
+        tone="indigo"
+        active={showEvent}
+        onClick={onToggleEvent}
+      />
+      <StatTile
+        icon={IconStar}
+        label="Comemorativas"
+        value={stats.commemorativeCount}
+        suffix={stats.commemorativeCount === 1 ? "data" : "datas"}
+        tone="fuchsia"
+        active={showCommemorative}
+        onClick={onToggleCommemorative}
+      />
     </div>
   );
 }
@@ -599,12 +892,14 @@ function StatTile({
   label: string;
   value: number;
   suffix?: string;
-  tone: "emerald" | "purple" | "red" | "amber" | "cyan";
+  tone: "emerald" | "purple" | "red" | "amber" | "cyan" | "orange" | "pink" | "indigo" | "fuchsia";
   active?: boolean;
   onClick?: () => void;
 }) {
   // Tile hue mirrors the bar palette so the legend reads as the same story:
-  //   purple = ausência, amber = falta justificada, red = falta n.j., cyan = feriado.
+  //   purple = férias, amber = falta justificada, red = falta n.j., cyan = feriado,
+  //   orange = afastamento, pink = aniversário, indigo = evento da agenda,
+  //   fuchsia = data comemorativa.
   // Tiles use a soft tint (vs the bars' solid bg) so the dashboard's stat
   // header doesn't compete visually with the calendar grid below it.
   const toneClasses: Record<typeof tone, string> = {
@@ -613,6 +908,10 @@ function StatTile({
     amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
     red: "bg-red-500/15 text-red-700 dark:text-red-300 ring-red-500/40",
     cyan: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 ring-cyan-500/20",
+    orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/20",
+    pink: "bg-pink-500/10 text-pink-600 dark:text-pink-400 ring-pink-500/20",
+    indigo: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 ring-indigo-500/20",
+    fuchsia: "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 ring-fuchsia-500/20",
   };
   const isToggleable = typeof onClick === "function";
   // When the tile is toggleable and inactive, mute it heavily so the user
@@ -668,6 +967,10 @@ function MonthView({
   periodEnd,
   absences,
   holidays,
+  leaves,
+  birthdayUsers,
+  agendaEvents,
+  showCommemoratives,
   selectedDay,
   onSelectDay,
 }: {
@@ -677,14 +980,19 @@ function MonthView({
   periodEnd: Date;
   absences: SecullumAggregatedAbsence[];
   holidays: any[];
+  leaves: Leave[];
+  birthdayUsers: User[];
+  agendaEvents: AgendaEvent[];
+  showCommemoratives: boolean;
   selectedDay: Date | null;
   onSelectDay: (d: Date | null) => void;
 }) {
   const allDays = eachDayOfInterval({ start: gridStart, end: gridEnd });
-  // Lock all rows to the same fraction of available height. `auto-rows-fr`
-  // sets `1fr` only as a minimum, so a cell whose min-content exceeds that
-  // share will stretch its whole row. `repeat(N, minmax(0, 1fr))` is a hard
-  // cap — content overflow stays inside the cell where it can scroll.
+  // Rows get an equal share of the available height but never shrink below
+  // 120px: `minmax(120px, 1fr)`. When the viewport is short the grid simply
+  // grows past it and the PAGE scrolls — the old hard `minmax(0, 1fr)` cap
+  // plus per-cell min-heights compressed/overlapped the bottom rows, which
+  // was the "broken layout" users saw on smaller screens.
   const numRows = Math.max(1, Math.ceil(allDays.length / 7));
 
   return (
@@ -700,25 +1008,24 @@ function MonthView({
         ))}
       </div>
       <div
-        className="flex-1 grid grid-cols-7 min-h-0"
-        style={{ gridTemplateRows: `repeat(${numRows}, minmax(0, 1fr))` }}
+        className="flex-1 grid grid-cols-7"
+        style={{ gridTemplateRows: `repeat(${numRows}, minmax(120px, 1fr))` }}
       >
         {allDays.map((date, idx) => {
           const isInPeriod = date >= periodStart && date <= periodEnd;
           const isLastCol = (idx + 1) % 7 === 0;
           const isLastRow = idx >= allDays.length - 7;
 
-          // Out-of-period slots are rendered as blank spacers so the calendar
-          // visually starts at periodStart (day 26) and ends at periodEnd
-          // (day 25), without the dimmed prev/next-month dates that read as
-          // "disabled". The grid alignment is preserved by keeping the cell.
+          // Out-of-month slots are rendered as blank spacers so the grid
+          // keeps its 7-column alignment without the dimmed prev/next-month
+          // dates that read as "disabled".
           if (!isInPeriod) {
             return (
               <div
                 key={idx}
                 aria-hidden
                 className={cn(
-                  "min-h-[120px] bg-muted/20 border-border",
+                  "bg-muted/20 border-border",
                   !isLastCol && "border-r",
                   !isLastRow && "border-b",
                 )}
@@ -728,6 +1035,10 @@ function MonthView({
 
           const dayAbsences = getAbsencesForDay(absences, date);
           const dayHolidays = getHolidaysForDay(holidays, date);
+          const dayLeaves = getLeavesForDay(leaves, date);
+          const dayBirthdays = getBirthdaysForDay(birthdayUsers, date);
+          const dayEvents = getEventsForDay(agendaEvents, date);
+          const dayCommemoratives = showCommemoratives ? getCommemorativesForDay(date) : [];
           const isToday = isSameDay(date, new Date());
           const isSelected = selectedDay ? isSameDay(date, selectedDay) : false;
           const dow = date.getDay();
@@ -740,7 +1051,7 @@ function MonthView({
                   onClick={() => onSelectDay(isSelected ? null : date)}
                   aria-pressed={isSelected}
                   className={cn(
-                    "bg-background min-h-[120px] p-2 relative overflow-hidden transition-colors duration-150 border-border text-left flex flex-col items-stretch justify-start gap-1.5",
+                    "bg-background p-2 relative overflow-hidden transition-colors duration-150 border-border text-left flex flex-col items-stretch justify-start gap-1.5",
                     !isLastCol && "border-r",
                     !isLastRow && "border-b",
                     isWeekend && "bg-blue-50/40 dark:bg-blue-950/20",
@@ -769,7 +1080,7 @@ function MonthView({
                     className="mt-1.5 space-y-1 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full"
                     onWheel={(e) => e.stopPropagation()}
                   >
-                    {/* Holidays — amber. Matches "Feriados úteis" tile. */}
+                    {/* Holidays — cyan. Matches "Feriados úteis" tile. */}
                     {dayHolidays.slice(0, 1).map((h, i) => (
                       <div
                         key={`h${i}`}
@@ -781,6 +1092,63 @@ function MonthView({
                         {h.Descricao || h.descricao || "Feriado"}
                       </div>
                     ))}
+                    {/* Commemorative dates — fuchsia. Always visible (incl. weekends/holidays). */}
+                    {dayCommemoratives.map((c, i) => (
+                      <div
+                        key={`cm${i}`}
+                        className={cn(
+                          "text-[10px] px-1.5 py-0.5 rounded-sm truncate font-medium flex items-center gap-1",
+                          COMMEMORATIVE_BAR_CLASS,
+                        )}
+                        title={c.name}
+                      >
+                        <IconStar className="h-3 w-3 flex-shrink-0" strokeWidth={2.5} />
+                        <span className="truncate">{c.name}</span>
+                      </div>
+                    ))}
+                    {/* Agenda events — indigo. Always visible (incl. weekends/holidays). */}
+                    {dayEvents.map((ev) => (
+                      <div
+                        key={`e${ev.id}`}
+                        className={cn(
+                          "text-[10px] px-1.5 py-0.5 rounded-sm truncate font-medium flex items-center gap-1",
+                          EVENT_BAR_CLASS,
+                        )}
+                        title={ev.title}
+                      >
+                        <IconCalendarEvent className="h-3 w-3 flex-shrink-0" strokeWidth={2.5} />
+                        <span className="truncate">{ev.title}</span>
+                      </div>
+                    ))}
+                    {/* Birthdays — pink. Always visible (incl. weekends/holidays). */}
+                    {dayBirthdays.map((u) => (
+                      <div
+                        key={`b${u.id}`}
+                        className={cn(
+                          "text-[10px] px-1.5 py-0.5 rounded-sm truncate font-medium flex items-center gap-1",
+                          BIRTHDAY_BAR_CLASS,
+                        )}
+                        title={`Aniversário de ${u.name}`}
+                      >
+                        <IconCake className="h-3 w-3 flex-shrink-0" strokeWidth={2.5} />
+                        <span className="truncate">{shortName(u.name)}</span>
+                      </div>
+                    ))}
+                    {/* Leaves (afastamentos) — orange. Workdays only, same
+                        noise rule as the absence bars. */}
+                    {!isWeekend && dayHolidays.length === 0 &&
+                      dayLeaves.map((l) => (
+                        <div
+                          key={`l${l.id}`}
+                          className={cn(
+                            "text-[10px] px-1.5 py-0.5 rounded-sm truncate font-medium",
+                            LEAVE_BAR_CLASS,
+                          )}
+                          title={`${l.user?.name ?? "Colaborador"} · ${getLeaveTypeLabel(l)}`}
+                        >
+                          {shortName(l.user?.name ?? "Colaborador")} · {getLeaveTypeLabel(l)}
+                        </div>
+                      ))}
                     {/* Absence bars use category-level color so they line up
                         with the summary stat tiles (violet=férias, red=falta).
                         Hidden on weekends and holidays — neither are work days,
@@ -862,15 +1230,32 @@ function DayDetailPanel({
   selectedDay,
   absences,
   holidays,
+  leaves,
+  birthdayUsers,
+  agendaEvents,
+  showCommemoratives,
+  onEditEvent,
+  onDeleteEvent,
   onClose,
 }: {
   selectedDay: Date | null;
   absences: SecullumAggregatedAbsence[];
   holidays: any[];
+  leaves: Leave[];
+  birthdayUsers: User[];
+  agendaEvents: AgendaEvent[];
+  showCommemoratives: boolean;
+  onEditEvent: (event: AgendaEvent) => void;
+  onDeleteEvent: (event: AgendaEvent) => void;
   onClose: () => void;
 }) {
   const dayAbsences = selectedDay ? getAbsencesForDay(absences, selectedDay) : [];
   const dayHolidays = selectedDay ? getHolidaysForDay(holidays, selectedDay) : [];
+  const dayLeaves = selectedDay ? getLeavesForDay(leaves, selectedDay) : [];
+  const dayBirthdays = selectedDay ? getBirthdaysForDay(birthdayUsers, selectedDay) : [];
+  const dayEvents = selectedDay ? getEventsForDay(agendaEvents, selectedDay) : [];
+  const dayCommemoratives =
+    selectedDay && showCommemoratives ? getCommemorativesForDay(selectedDay) : [];
   const isWeekend =
     !!selectedDay && (selectedDay.getDay() === 0 || selectedDay.getDay() === 6);
 
@@ -881,10 +1266,16 @@ function DayDetailPanel({
     ? bucketDayAbsences(dayAbsences)
     : { collectives: [], individuals: [] as SecullumAggregatedAbsence[] };
 
-  const totalCards = dayHolidays.length + buckets.collectives.length + buckets.individuals.length;
-  const showWeekendNote = !!selectedDay && isWeekend && dayHolidays.length === 0;
-  const showWorkdayNote =
-    !!selectedDay && !isWeekend && dayHolidays.length === 0 && dayAbsences.length === 0;
+  const totalCards =
+    dayHolidays.length +
+    buckets.collectives.length +
+    buckets.individuals.length +
+    dayLeaves.length +
+    dayBirthdays.length +
+    dayEvents.length +
+    dayCommemoratives.length;
+  const showWeekendNote = !!selectedDay && isWeekend && totalCards === 0;
+  const showWorkdayNote = !!selectedDay && !isWeekend && totalCards === 0;
 
   return (
     <aside className="hidden lg:flex w-[360px] shrink-0 flex-col rounded-lg border border-border bg-card overflow-hidden">
@@ -923,6 +1314,18 @@ function DayDetailPanel({
         {selectedDay && dayHolidays.map((h: any, i: number) => (
           <HolidayCard key={`h${i}`} holiday={h} />
         ))}
+        {selectedDay && dayCommemoratives.map((c, i) => (
+          <CommemorativeCard key={`cm${i}`} commemorative={c} />
+        ))}
+        {selectedDay && dayEvents.map((ev) => (
+          <EventCard key={ev.id} event={ev} onEdit={onEditEvent} onDelete={onDeleteEvent} />
+        ))}
+        {selectedDay && dayBirthdays.map((u) => (
+          <BirthdayCard key={u.id} user={u} referenceDate={selectedDay} />
+        ))}
+        {selectedDay && dayLeaves.map((l) => (
+          <LeaveCard key={l.id} leave={l} />
+        ))}
         {selectedDay && buckets.collectives.map((b) => (
           <CollectiveCard key={b.key} bucket={b} />
         ))}
@@ -940,7 +1343,7 @@ function CategoryBadge({
   category,
   label,
 }: {
-  category: BarCategory | "HOLIDAY";
+  category: BarCategory | "HOLIDAY" | "LEAVE" | "BIRTHDAY" | "EVENT" | "COMMEMORATIVE";
   label: string;
 }) {
   const tone = {
@@ -948,6 +1351,10 @@ function CategoryBadge({
     FALTA_JUSTIFIED: "bg-amber-600 text-white",
     FALTA_UNJUSTIFIED: "bg-red-700 text-white",
     HOLIDAY: "bg-cyan-600 text-white",
+    LEAVE: "bg-orange-600 text-white",
+    BIRTHDAY: "bg-pink-600 text-white",
+    EVENT: "bg-indigo-600 text-white",
+    COMMEMORATIVE: "bg-fuchsia-600 text-white",
   }[category];
   const Icon =
     category === "AUSENCIA"
@@ -956,7 +1363,15 @@ function CategoryBadge({
         ? IconUserOff
         : category === "FALTA_UNJUSTIFIED"
           ? IconUserExclamation
-          : IconConfetti;
+          : category === "LEAVE"
+            ? IconStethoscope
+            : category === "BIRTHDAY"
+              ? IconCake
+              : category === "EVENT"
+                ? IconCalendarEvent
+                : category === "COMMEMORATIVE"
+                  ? IconStar
+                  : IconConfetti;
   return (
     <span
       className={cn(
@@ -976,6 +1391,119 @@ function HolidayCard({ holiday }: { holiday: any }) {
     <div className="rounded-md border border-border bg-background px-2.5 py-2">
       <CategoryBadge category="HOLIDAY" label="Feriado" />
       <div className="mt-1 text-sm font-semibold truncate">{desc}</div>
+    </div>
+  );
+}
+
+function CommemorativeCard({ commemorative }: { commemorative: CommemorativeDate }) {
+  return (
+    <div className="rounded-md border border-border bg-background px-2.5 py-2">
+      <CategoryBadge
+        category="COMMEMORATIVE"
+        label={commemorative.isCompanyAnniversary ? "Empresa" : "Comemorativa"}
+      />
+      <div className="mt-1 text-sm font-semibold truncate">{commemorative.name}</div>
+    </div>
+  );
+}
+
+function EventCard({
+  event,
+  onEdit,
+  onDelete,
+}: {
+  event: AgendaEvent;
+  onEdit: (event: AgendaEvent) => void;
+  onDelete: (event: AgendaEvent) => void;
+}) {
+  // Codificação de notifyDaysBefore: N > 0 = N dias antes; 0 = no dia
+  // (notifyOnDay legado também conta); -1 = aviso de atraso (1 dia após).
+  const reminders: string[] = [];
+  const allReminders = event.notifyDaysBefore ?? [];
+  const beforeDays = allReminders.filter((d) => d > 0).sort((a, b) => b - a);
+  if (beforeDays.length > 0) {
+    reminders.push(`D-${beforeDays.join(", D-")}`);
+  }
+  if (event.notifyOnDay || allReminders.includes(0)) reminders.push("no dia");
+  if (allReminders.includes(-1)) reminders.push("atraso (1 dia após)");
+  return (
+    <div className="rounded-md border border-border bg-background px-2.5 py-2 space-y-1">
+      <div className="flex items-start justify-between gap-2">
+        <CategoryBadge category="EVENT" label="Evento" />
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            title="Editar evento"
+            onClick={() => onEdit(event)}
+          >
+            <IconPencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-destructive hover:text-destructive"
+            title="Excluir evento"
+            onClick={() => onDelete(event)}
+          >
+            <IconTrash className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+      <div className="text-sm font-semibold">{event.title}</div>
+      {event.description && (
+        <div className="text-xs text-muted-foreground whitespace-pre-wrap">{event.description}</div>
+      )}
+      {reminders.length > 0 && (
+        <div className="text-[11px] text-muted-foreground/80">
+          Lembretes: {reminders.join(" · ")}
+        </div>
+      )}
+      {event.createdBy?.name && (
+        <div className="text-[11px] text-muted-foreground/80 truncate">
+          Criado por {event.createdBy.name}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BirthdayCard({ user, referenceDate }: { user: User; referenceDate: Date }) {
+  const birth = user.birth ? new Date(user.birth) : null;
+  const age = birth ? referenceDate.getFullYear() - birth.getFullYear() : null;
+  return (
+    <div className="rounded-md border border-border bg-background px-2.5 py-2 space-y-1">
+      <CategoryBadge category="BIRTHDAY" label="Aniversário" />
+      <div className="text-sm font-semibold truncate">{user.name}</div>
+      {age !== null && age > 0 && (
+        <div className="text-xs text-muted-foreground">Completa {age} anos</div>
+      )}
+      {(user as any).sector?.name && (
+        <div className="text-[11px] text-muted-foreground/80 truncate">
+          {(user as any).sector.name}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LeaveCard({ leave }: { leave: Leave }) {
+  const start = toLocalDay(new Date(leave.startDate));
+  const end = leave.actualEndDate
+    ? toLocalDay(new Date(leave.actualEndDate))
+    : leave.expectedEndDate
+      ? toLocalDay(new Date(leave.expectedEndDate))
+      : null;
+  return (
+    <div className="rounded-md border border-border bg-background px-2.5 py-2 space-y-1">
+      <CategoryBadge category="LEAVE" label="Afastamento" />
+      <div className="text-sm font-semibold truncate">{leave.user?.name ?? "Colaborador"}</div>
+      <div className="text-xs text-muted-foreground truncate">{getLeaveTypeLabel(leave)}</div>
+      <div className="text-[11px] text-muted-foreground/80">
+        {format(start, "dd/MM/yyyy")}
+        {end ? ` a ${format(end, "dd/MM/yyyy")}` : " — sem data de retorno"}
+      </div>
     </div>
   );
 }
@@ -1084,10 +1612,9 @@ function MiniMonth({
   holidays: any[];
   onClick: () => void;
 }) {
-  // Each mini-month renders the payroll period anchored at this month
-  // (day 26 of previous month → day 25 of this month) so the year overview
+  // Each mini-month renders the standard calendar month so the year overview
   // matches what the user sees when they click in to the month view.
-  const { start: periodStart, end: periodEnd } = getPayrollPeriod(monthDate);
+  const { start: periodStart, end: periodEnd } = getMonthPeriod(monthDate);
   const gridStart = startOfWeekSunday(periodStart);
   const gridEnd = endOfWeekSaturday(periodEnd);
   // Pad to 42 cells (6 weeks × 7 days) so every mini-month has identical
@@ -1490,6 +2017,54 @@ function getAbsencesForDay(
     const endD = new Date(end.getFullYear(), end.getMonth(), end.getDate());
     return date >= startD && date <= endD;
   });
+}
+
+// Normalizes any Date to local midnight for day-level comparisons.
+function toLocalDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+// Leave day bounds: start = startDate; end = actualEndDate ?? expectedEndDate.
+// Open-ended leaves (no end at all) run "forever" so they paint every day
+// from the start onward — matches how an active afastamento really behaves.
+function getLeaveBounds(leave: Leave): { start: Date; end: Date } {
+  const start = toLocalDay(new Date(leave.startDate));
+  const rawEnd = leave.actualEndDate ?? leave.expectedEndDate;
+  const end = rawEnd ? toLocalDay(new Date(rawEnd)) : new Date(9999, 0, 1);
+  return { start, end };
+}
+
+function getLeavesForDay(leaves: Leave[], date: Date): Leave[] {
+  const day = toLocalDay(date);
+  return leaves.filter((l) => {
+    const { start, end } = getLeaveBounds(l);
+    return day >= start && day <= end;
+  });
+}
+
+// Birthdays recur yearly by day/month. Feb 29 birthdays celebrate on Feb 28
+// in non-leap years.
+function getBirthdaysForDay(users: User[], date: Date): User[] {
+  const month = date.getMonth();
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const matchesFeb29 = month === 1 && day === 28 && !isLeap;
+  return users.filter((u) => {
+    if (!u.birth) return false;
+    const b = new Date(u.birth);
+    if (b.getMonth() === month && b.getDate() === day) return true;
+    if (matchesFeb29 && b.getMonth() === 1 && b.getDate() === 29) return true;
+    return false;
+  });
+}
+
+function getEventsForDay(events: AgendaEvent[], date: Date): AgendaEvent[] {
+  return events.filter((e) => isSameDay(toLocalDay(new Date(e.eventDate)), date));
+}
+
+function getLeaveTypeLabel(leave: Leave): string {
+  return LEAVE_TYPE_LABELS[leave.type as LEAVE_TYPE] ?? "Afastamento";
 }
 
 function getHolidaysForDay(holidays: any[], date: Date): any[] {

@@ -64,63 +64,63 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
                 </div>
               )}
 
-              {user.exp1StartAt && (
+              {(user.currentContract?.admissionDate ?? user.currentContract?.exp1StartAt) && (
                 <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarTime className="h-4 w-4" />
                     Início Experiência 1
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{formatDate(user.exp1StartAt)}</span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.currentContract?.admissionDate ?? user.currentContract?.exp1StartAt)}</span>
                 </div>
               )}
 
-              {user.exp1EndAt && (
+              {user.currentContract?.exp1EndAt && (
                 <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarShare className="h-4 w-4" />
                     Fim Experiência 1
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{formatDate(user.exp1EndAt)}</span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.currentContract.exp1EndAt)}</span>
                 </div>
               )}
 
-              {user.exp2StartAt && (
+              {user.currentContract?.exp2StartAt && (
                 <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarTime className="h-4 w-4" />
                     Início Experiência 2
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{formatDate(user.exp2StartAt)}</span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.currentContract.exp2StartAt)}</span>
                 </div>
               )}
 
-              {user.exp2EndAt && (
+              {user.currentContract?.exp2EndAt && (
                 <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarShare className="h-4 w-4" />
                     Fim Experiência 2
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{formatDate(user.exp2EndAt)}</span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.currentContract.exp2EndAt)}</span>
                 </div>
               )}
 
-              {user.effectedAt && (
+              {user.currentContract?.effectedAt && (
                 <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarCheck className="h-4 w-4" />
                     Data de Contratação
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{formatDate(user.effectedAt)}</span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.currentContract.effectedAt)}</span>
                 </div>
               )}
 
-              {user.dismissedAt && (
+              {user.currentContract?.terminationDate && (
                 <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarCancel className="h-4 w-4" />
                     Data de Demissão
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{formatDate(user.dismissedAt)}</span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.currentContract.terminationDate)}</span>
                 </div>
               )}
             </div>

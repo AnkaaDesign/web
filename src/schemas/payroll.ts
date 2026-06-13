@@ -18,12 +18,33 @@ import { BONUS_STATUS, PAYROLL_STATUS } from "../constants";
 export const discountCreateSchema = z.object({
   percentage: percentageSchema.nullable().optional(),
   value: moneySchema.nullable().optional(),
-  calculationOrder: z.number().int().min(1, "Ordem de cálculo deve ser pelo menos 1").default(1),
-  reference: createNameSchema(1, 200, "Referência")
+  reference: createNameSchema(1, 200, "Referência"),
+  discountType: z.string().optional(),
+  isPersistent: z.boolean().optional(),
+  expirationDate: nullableDate.optional(),
+  // Parcelamento (ex.: empréstimo consignado)
+  totalInstallments: z
+    .number()
+    .int("O total de parcelas deve ser um número inteiro")
+    .min(1, "O total de parcelas deve ser pelo menos 1")
+    .max(120, "O total de parcelas deve ser no máximo 120")
+    .nullable()
+    .optional(),
+  currentInstallment: z
+    .number()
+    .int("A parcela atual deve ser um número inteiro")
+    .min(1, "A parcela atual deve ser pelo menos 1")
+    .nullable()
+    .optional()
 }).refine(
   data => (data.percentage !== null && data.percentage !== undefined) ||
          (data.value !== null && data.value !== undefined),
   { message: "Deve informar porcentagem ou valor fixo para o desconto" }
+).refine(
+  data =>
+    !data.currentInstallment ||
+    (data.totalInstallments != null && data.currentInstallment <= data.totalInstallments),
+  { message: "A parcela atual não pode exceder o total de parcelas" }
 );
 
 export type DiscountCreateFormData = z.infer<typeof discountCreateSchema>;
@@ -31,8 +52,25 @@ export type DiscountCreateFormData = z.infer<typeof discountCreateSchema>;
 export const discountUpdateSchema = z.object({
   percentage: percentageSchema.nullable().optional(),
   value: moneySchema.nullable().optional(),
-  calculationOrder: z.number().int().min(1, "Ordem de cálculo deve ser pelo menos 1").optional(),
-  reference: createNameSchema(1, 200, "Referência").optional()
+  reference: createNameSchema(1, 200, "Referência").optional(),
+  discountType: z.string().optional(),
+  isPersistent: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  expirationDate: nullableDate.optional(),
+  // Parcelamento (ex.: empréstimo consignado)
+  totalInstallments: z
+    .number()
+    .int("O total de parcelas deve ser um número inteiro")
+    .min(1, "O total de parcelas deve ser pelo menos 1")
+    .max(120, "O total de parcelas deve ser no máximo 120")
+    .nullable()
+    .optional(),
+  currentInstallment: z
+    .number()
+    .int("A parcela atual deve ser um número inteiro")
+    .min(1, "A parcela atual deve ser pelo menos 1")
+    .nullable()
+    .optional()
 }).refine(
   data => {
     // If any field is provided, we need to validate the percentage/value constraint
@@ -143,7 +181,6 @@ export const mapPayrollToFormData = (payroll: any): PayrollUpdateFormData => {
     discounts: payroll.discounts?.map((discount: any) => ({
       percentage: discount.percentage,
       value: discount.value,
-      calculationOrder: discount.calculationOrder,
       reference: discount.reference
     }))
   };

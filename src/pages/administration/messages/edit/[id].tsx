@@ -11,12 +11,22 @@ import type { MessageUpdateFormData } from "@/schemas/message";
 import { resolveTargetingToUserIds } from "@/utils/message-targeting";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useNavBreadcrumbs } from "@/contexts/navigation-context";
 
 export const EditMessagePage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: response, isLoading, error } = useMessage(id!);
   const updateMessage = useUpdateMessage();
+
+  // Context-aware trail: shared page — accounting users have root-level "Mensagens"
+  // (no "Administração" section in their menu). Must run before early returns.
+  const breadcrumbs = useNavBreadcrumbs([
+    { label: "Início", href: routes.home },
+    { label: "Administração", href: routes.administration.root },
+    { label: "Mensagens", href: routes.administration.messages?.root || routes.administration.root },
+    { label: "Editar" },
+  ]);
   const [formState, setFormState] = useState({ isValid: false, isDirty: false, canPreview: false });
   const [stepState, setStepState] = useState({ currentStep: 1, totalSteps: 2, canGoNext: true, canGoPrev: false });
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -219,12 +229,7 @@ export const EditMessagePage = () => {
           title="Editar Mensagem"
           icon={IconPencil}
           favoritePage={FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_EDITAR}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Administração", href: routes.administration.root },
-            { label: "Mensagens", href: routes.administration.messages?.root || routes.administration.root },
-            { label: "Editar" },
-          ]}
+          breadcrumbs={breadcrumbs}
           actions={actions}
         />
       </div>

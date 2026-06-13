@@ -5,7 +5,7 @@ import { createMapToFormDataHelper, orderByDirectionSchema, orderByWithNullsSche
 import { cleanCPF } from "../utils/cleaners";
 import { isValidCPF } from "../utils/validators";
 import type { User } from '@types';
-import { USER_STATUS, VERIFICATION_TYPE, SECTOR_PRIVILEGES } from '@constants';
+import { CONTRACT_TYPE, CONTRACT_STATUS, EMPLOYEE_TYPE, TERMINATION_TYPE, VERIFICATION_TYPE, SECTOR_PRIVILEGES } from '@constants';
 
 // =====================
 // Include Schema Based on Prisma Schema (Second Level Only)
@@ -15,6 +15,38 @@ export const userIncludeSchema = z
   .object({
     // Direct User relations
     avatar: z.boolean().optional(),
+    // Employment contracts (vínculos)
+    currentContract: z
+      .union([
+        z.boolean(),
+        z.object({
+          include: z.any().optional(),
+          select: z.any().optional(),
+        }),
+      ])
+      .optional(),
+    contracts: z
+      .union([
+        z.boolean(),
+        z.object({
+          include: z.any().optional(),
+          select: z.any().optional(),
+          where: z.any().optional(),
+          orderBy: z.any().optional(),
+        }),
+      ])
+      .optional(),
+    admissions: z
+      .union([
+        z.boolean(),
+        z.object({
+          include: z.any().optional(),
+          select: z.any().optional(),
+          where: z.any().optional(),
+          orderBy: z.any().optional(),
+        }),
+      ])
+      .optional(),
     ppeSize: z
       .union([
         z.boolean(),
@@ -183,8 +215,9 @@ export const userOrderBySchema = z.union([
       email: orderByDirectionSchema.optional(),
       name: orderByDirectionSchema.optional(),
       avatarId: orderByDirectionSchema.optional(),
-      status: orderByDirectionSchema.optional(),
-      statusOrder: orderByDirectionSchema.optional(),
+      currentContractType: orderByDirectionSchema.optional(),
+      currentContractStatus: orderByDirectionSchema.optional(),
+      currentEmployeeType: orderByDirectionSchema.optional(),
       phone: orderByDirectionSchema.optional(),
       positionId: orderByDirectionSchema.optional(),
       pis: orderByDirectionSchema.optional(),
@@ -192,12 +225,6 @@ export const userOrderBySchema = z.union([
       verified: orderByDirectionSchema.optional(),
       payrollNumber: orderByDirectionSchema.optional(),
       birth: orderByDirectionSchema.optional(),
-      effectedAt: orderByDirectionSchema.optional(),
-      exp1StartAt: orderByDirectionSchema.optional(),
-      exp1EndAt: orderByDirectionSchema.optional(),
-      exp2StartAt: orderByDirectionSchema.optional(),
-      exp2EndAt: orderByDirectionSchema.optional(),
-      dismissedAt: orderByDirectionSchema.optional(),
       performanceLevel: orderByDirectionSchema.optional(),
       sectorId: orderByDirectionSchema.optional(),
       createdAt: orderByDirectionSchema.optional(),
@@ -242,8 +269,9 @@ export const userOrderBySchema = z.union([
         email: orderByDirectionSchema.optional(),
         name: orderByDirectionSchema.optional(),
         avatarId: orderByDirectionSchema.optional(),
-        status: orderByDirectionSchema.optional(),
-        statusOrder: orderByDirectionSchema.optional(),
+        currentContractType: orderByDirectionSchema.optional(),
+        currentContractStatus: orderByDirectionSchema.optional(),
+        currentEmployeeType: orderByDirectionSchema.optional(),
         phone: orderByDirectionSchema.optional(),
         positionId: orderByDirectionSchema.optional(),
         pis: orderByDirectionSchema.optional(),
@@ -251,12 +279,6 @@ export const userOrderBySchema = z.union([
         verified: orderByDirectionSchema.optional(),
         payrollNumber: orderByDirectionSchema.optional(),
         birth: orderByDirectionSchema.optional(),
-        effectedAt: orderByDirectionSchema.optional(),
-        exp1StartAt: orderByDirectionSchema.optional(),
-        exp1EndAt: orderByDirectionSchema.optional(),
-        exp2StartAt: orderByDirectionSchema.optional(),
-        exp2EndAt: orderByDirectionSchema.optional(),
-        dismissedAt: orderByDirectionSchema.optional(),
         performanceLevel: orderByDirectionSchema.optional(),
         sectorId: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
@@ -362,32 +384,62 @@ export const userWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      status: z
+      // Current-vínculo caches (synced from the user's current EmploymentContract).
+      currentContractType: z
         .union([
-          z.nativeEnum(USER_STATUS),
+          z.nativeEnum(CONTRACT_TYPE),
+          z.null(),
           z.object({
-            equals: z.nativeEnum(USER_STATUS).optional(),
-            not: z.nativeEnum(USER_STATUS).optional(),
-            in: z.array(z.nativeEnum(USER_STATUS)).optional(),
-            notIn: z.array(z.nativeEnum(USER_STATUS)).optional(),
+            equals: z.union([z.nativeEnum(CONTRACT_TYPE), z.null()]).optional(),
+            not: z.union([z.nativeEnum(CONTRACT_TYPE), z.null()]).optional(),
+            in: z.array(z.nativeEnum(CONTRACT_TYPE)).optional(),
+            notIn: z.array(z.nativeEnum(CONTRACT_TYPE)).optional(),
           }),
         ])
         .optional(),
 
-      statusOrder: z
+      currentContractStatus: z
         .union([
-          z.number(),
+          z.nativeEnum(CONTRACT_STATUS),
+          z.null(),
           z.object({
-            equals: z.number().optional(),
-            not: z.number().optional(),
-            in: z.array(z.number()).optional(),
-            notIn: z.array(z.number()).optional(),
-            lt: z.number().optional(),
-            lte: z.number().optional(),
-            gt: z.number().optional(),
-            gte: z.number().optional(),
+            equals: z.union([z.nativeEnum(CONTRACT_STATUS), z.null()]).optional(),
+            not: z.union([z.nativeEnum(CONTRACT_STATUS), z.null()]).optional(),
+            in: z.array(z.nativeEnum(CONTRACT_STATUS)).optional(),
+            notIn: z.array(z.nativeEnum(CONTRACT_STATUS)).optional(),
           }),
         ])
+        .optional(),
+
+      currentEmployeeType: z
+        .union([
+          z.nativeEnum(EMPLOYEE_TYPE),
+          z.null(),
+          z.object({
+            equals: z.union([z.nativeEnum(EMPLOYEE_TYPE), z.null()]).optional(),
+            not: z.union([z.nativeEnum(EMPLOYEE_TYPE), z.null()]).optional(),
+            in: z.array(z.nativeEnum(EMPLOYEE_TYPE)).optional(),
+            notIn: z.array(z.nativeEnum(EMPLOYEE_TYPE)).optional(),
+          }),
+        ])
+        .optional(),
+
+      currentContractId: z.union([z.string(), z.null(), z.object({}).passthrough()]).optional(),
+
+      // Relation filter against the current EmploymentContract (dates etc.),
+      // e.g. { currentContract: { is: { effectedAt: { gte } } } }.
+      currentContract: z
+        .object({
+          is: z.lazy(() => z.any()).optional(),
+          isNot: z.lazy(() => z.any()).optional(),
+        })
+        .optional(),
+      contracts: z
+        .object({
+          some: z.lazy(() => z.any()).optional(),
+          every: z.lazy(() => z.any()).optional(),
+          none: z.lazy(() => z.any()).optional(),
+        })
         .optional(),
 
       phone: z
@@ -471,96 +523,6 @@ export const userWhereSchema: z.ZodSchema = z.lazy(() =>
           z.object({
             equals: z.date().optional(),
             not: z.date().optional(),
-            gte: z.coerce.date().optional(),
-            gt: z.coerce.date().optional(),
-            lte: z.coerce.date().optional(),
-            lt: z.coerce.date().optional(),
-          }),
-        ])
-        .optional(),
-
-      effectedAt: z
-        .union([
-          z.date(),
-          z.null(),
-          z.object({
-            equals: z.union([z.date(), z.null()]).optional(),
-            not: z.union([z.date(), z.null()]).optional(),
-            gte: z.coerce.date().optional(),
-            gt: z.coerce.date().optional(),
-            lte: z.coerce.date().optional(),
-            lt: z.coerce.date().optional(),
-          }),
-        ])
-        .optional(),
-
-      exp1StartAt: z
-        .union([
-          z.date(),
-          z.null(),
-          z.object({
-            equals: z.union([z.date(), z.null()]).optional(),
-            not: z.union([z.date(), z.null()]).optional(),
-            gte: z.coerce.date().optional(),
-            gt: z.coerce.date().optional(),
-            lte: z.coerce.date().optional(),
-            lt: z.coerce.date().optional(),
-          }),
-        ])
-        .optional(),
-
-      exp1EndAt: z
-        .union([
-          z.date(),
-          z.null(),
-          z.object({
-            equals: z.union([z.date(), z.null()]).optional(),
-            not: z.union([z.date(), z.null()]).optional(),
-            gte: z.coerce.date().optional(),
-            gt: z.coerce.date().optional(),
-            lte: z.coerce.date().optional(),
-            lt: z.coerce.date().optional(),
-          }),
-        ])
-        .optional(),
-
-      exp2StartAt: z
-        .union([
-          z.date(),
-          z.null(),
-          z.object({
-            equals: z.union([z.date(), z.null()]).optional(),
-            not: z.union([z.date(), z.null()]).optional(),
-            gte: z.coerce.date().optional(),
-            gt: z.coerce.date().optional(),
-            lte: z.coerce.date().optional(),
-            lt: z.coerce.date().optional(),
-          }),
-        ])
-        .optional(),
-
-      exp2EndAt: z
-        .union([
-          z.date(),
-          z.null(),
-          z.object({
-            equals: z.union([z.date(), z.null()]).optional(),
-            not: z.union([z.date(), z.null()]).optional(),
-            gte: z.coerce.date().optional(),
-            gt: z.coerce.date().optional(),
-            lte: z.coerce.date().optional(),
-            lt: z.coerce.date().optional(),
-          }),
-        ])
-        .optional(),
-
-      dismissedAt: z
-        .union([
-          z.date(),
-          z.null(),
-          z.object({
-            equals: z.union([z.date(), z.null()]).optional(),
-            not: z.union([z.date(), z.null()]).optional(),
             gte: z.coerce.date().optional(),
             gt: z.coerce.date().optional(),
             lte: z.coerce.date().optional(),
@@ -709,7 +671,13 @@ const userFilters = {
   payrollNumber: z.coerce.number().int().optional(),
   sectorIds: z.array(z.string()).optional(),
   positionIds: z.array(z.string()).optional(),
-  statuses: z.array(z.nativeEnum(USER_STATUS)).optional(),
+  // Current-vínculo caches. `contractTypes`/`statuses`/`employeeTypes` map to
+  // currentContractType/currentContractStatus/currentEmployeeType. `contractKinds`
+  // is kept as a back-compat alias for `contractTypes`.
+  contractTypes: z.array(z.nativeEnum(CONTRACT_TYPE)).optional(),
+  contractKinds: z.array(z.nativeEnum(CONTRACT_TYPE)).optional(),
+  statuses: z.array(z.nativeEnum(CONTRACT_STATUS)).optional(),
+  employeeTypes: z.array(z.nativeEnum(EMPLOYEE_TYPE)).optional(),
   isActive: z.boolean().optional(),
   isVerified: z.boolean().optional(),
   hasPosition: z.boolean().optional(),
@@ -796,19 +764,33 @@ const userTransform = (data: any) => {
     delete data.positionIds;
   }
 
-  // Handle statuses filter
+  // Handle contractTypes / contractKinds (alias) filter — maps to the current
+  // vínculo's contract-type cache.
+  const contractTypeFilter = data.contractTypes ?? data.contractKinds;
+  if (contractTypeFilter && Array.isArray(contractTypeFilter) && contractTypeFilter.length > 0) {
+    andConditions.push({ currentContractType: { in: contractTypeFilter } });
+  }
+  delete data.contractTypes;
+  delete data.contractKinds;
+
+  // Handle statuses filter — current vínculo status (ACTIVE/DISMISSED).
   if (data.statuses && Array.isArray(data.statuses) && data.statuses.length > 0) {
-    andConditions.push({ status: { in: data.statuses } });
+    andConditions.push({ currentContractStatus: { in: data.statuses } });
     delete data.statuses;
   }
 
-  // Handle isActive filter
-  // isActive now means "not dismissed" since we no longer have ACTIVE/INACTIVE statuses
+  // Handle employeeTypes filter — worker category (CLT/Estágio/...).
+  if (data.employeeTypes && Array.isArray(data.employeeTypes) && data.employeeTypes.length > 0) {
+    andConditions.push({ currentEmployeeType: { in: data.employeeTypes } });
+    delete data.employeeTypes;
+  }
+
+  // Handle isActive filter — driven by the current vínculo's status cache.
   if (typeof data.isActive === "boolean") {
     andConditions.push({
-      status: data.isActive
-        ? { not: USER_STATUS.DISMISSED }  // Active = not dismissed (any employment status)
-        : USER_STATUS.DISMISSED            // Inactive = dismissed
+      currentContractStatus: data.isActive
+        ? { not: CONTRACT_STATUS.DISMISSED } // Active = not dismissed
+        : CONTRACT_STATUS.DISMISSED, // Inactive = dismissed
     });
     delete data.isActive;
   }
@@ -999,16 +981,51 @@ const notificationPreferenceCreateNestedSchema = z.object({
   importance: z.string().default("MEDIUM"),
 });
 
+// First employment contract (vínculo) created together with the collaborator.
+// When omitted, the service defaults employeeType=CLT, contractType=EXPERIENCE_PERIOD_1
+// and uses the user's admissionDate (positionId/sectorId mirror the user).
+export const userContractCreateNestedSchema = z.object({
+  employeeType: z
+    .enum(Object.values(EMPLOYEE_TYPE) as [string, ...string[]], {
+      errorMap: () => ({ message: "categoria de colaborador inválida" }),
+    })
+    .default(EMPLOYEE_TYPE.CLT),
+  contractType: z
+    .enum(Object.values(CONTRACT_TYPE) as [string, ...string[]], {
+      errorMap: () => ({ message: "tipo de contrato inválido" }),
+    })
+    .nullable()
+    .optional(),
+  admissionDate: nullableDate.optional(),
+  positionId: z.string().uuid("Cargo inválido").nullable().optional(),
+  sectorId: z.string().uuid("Setor inválido").nullable().optional(),
+  payrollNumber: z.number().int().positive("Número da folha deve ser positivo").nullable().optional(),
+  providerName: z.string().nullable().optional(),
+  providerCnpj: z.string().nullable().optional(),
+});
+
 export const userCreateSchema = z
   .object({
     email: emailSchema.nullable().optional(),
     name: createNameSchema(2, 200, "Nome"),
     avatarId: z.string().uuid("ID de avatar inválido").nullable().optional(),
-    status: z
-      .enum(Object.values(USER_STATUS) as [string, ...string[]], {
-        errorMap: () => ({ message: "status inválido" }),
-      })
-      .default(USER_STATUS.EXPERIENCE_PERIOD_1),
+    // First vínculo (EmploymentContract) created with the collaborator. Optional;
+    // the service defaults employeeType=CLT, contractType=EXPERIENCE_PERIOD_1.
+    contract: userContractCreateNestedSchema.optional(),
+    // FLAT helper fields for the create FORMS (user-form + admission collaborator
+    // form). They are mapped into the nested `contract` on submit; the service
+    // ignores them at the top level. Kept here so zodResolver doesn't strip them
+    // before the form's submit handler can read them.
+    employeeType: z.nativeEnum(EMPLOYEE_TYPE).optional(),
+    contractType: z.nativeEnum(CONTRACT_TYPE).nullable().optional(),
+    contractStatus: z.nativeEnum(CONTRACT_STATUS).optional(),
+    exp1StartAt: nullableDate.optional(),
+    exp1EndAt: nullableDate.optional(),
+    exp2StartAt: nullableDate.optional(),
+    exp2EndAt: nullableDate.optional(),
+    effectedAt: nullableDate.optional(),
+    providerName: z.string().nullable().optional(),
+    providerCnpj: z.string().nullable().optional(),
     phone: phoneSchema.nullable().optional(),
     // Cargo (position) — required at create time. The bound Secullum função is
     // resolved from it, and HR workflows assume every collaborator has a cargo.
@@ -1099,19 +1116,17 @@ export const userCreateSchema = z
         { message: "Idade não pode exceder 120 anos" }
       ),
 
-    // Status timestamp tracking
-    effectedAt: nullableDate.optional(),
-    // Admission date — required at create time. Backend depends on it for
-    // Secullum sync (Admissao) and CLT period auto-calculation. The form
-    // shows a red asterisk on this field; the schema must agree.
-    // createDateSchema rejects null/'' up front. A bare z.coerce.date() would
-    // coerce the form's null default to the 1970 epoch and pass validation,
-    // which is why the submit button used to enable with the field empty.
-    exp1StartAt: createDateSchema("Data de admissão"),
-    exp1EndAt: nullableDate.optional(),
-    exp2StartAt: nullableDate.optional(),
-    exp2EndAt: nullableDate.optional(),
-    dismissedAt: nullableDate.optional(),
+    // Admission date — required at create time. The service routes it into the
+    // first EmploymentContract (vínculo) as its admissionDate (and Secullum's
+    // Admissao). createDateSchema rejects null/'' up front; a bare
+    // z.coerce.date() would coerce the form's null default to the 1970 epoch.
+    admissionDate: createDateSchema("Data de admissão"),
+
+    // Payroll fields (mirrors API userCreateSchema)
+    unionMember: z.boolean().default(false),
+    unionAuthorizationDate: nullableDate.optional(),
+    dependentsCount: z.number().int().min(0).default(0),
+    hasSimplifiedDeduction: z.boolean().default(true),
 
     // Payroll info — required at create time. Required by Secullum (NumeroFolha)
     // and by all payroll calculations. Existing rows with NULL can still be
@@ -1148,9 +1163,21 @@ export const userUpdateSchema = z
     email: emailSchema.nullable().optional(),
     name: createNameSchema(2, 200, "Nome").optional(),
     avatarId: z.string().uuid("ID de avatar inválido").nullable().optional(),
-    status: z
-      .enum(Object.values(USER_STATUS) as [string, ...string[]], {
-        errorMap: () => ({ message: "status inválido" }),
+    // Current vínculo edit — these update the user's CURRENT EmploymentContract
+    // (and re-sync the User cache). The contract is the source of truth.
+    contractType: z
+      .enum(Object.values(CONTRACT_TYPE) as [string, ...string[]], {
+        errorMap: () => ({ message: "tipo de contrato inválido" }),
+      })
+      .optional(),
+    contractStatus: z
+      .enum(Object.values(CONTRACT_STATUS) as [string, ...string[]], {
+        errorMap: () => ({ message: "situação do contrato inválida" }),
+      })
+      .optional(),
+    employeeType: z
+      .enum(Object.values(EMPLOYEE_TYPE) as [string, ...string[]], {
+        errorMap: () => ({ message: "categoria de colaborador inválida" }),
       })
       .optional(),
     phone: phoneSchema.nullable().optional(),
@@ -1216,13 +1243,19 @@ export const userUpdateSchema = z
       )
       .optional(),
 
-    // Status timestamp tracking
+    // Current vínculo (EmploymentContract) date edits — applied to the user's
+    // current contract by the service, then mirrored into the User cache.
+    admissionDate: nullableDate.optional(),
     effectedAt: nullableDate.optional(),
     exp1StartAt: nullableDate.optional(),
     exp1EndAt: nullableDate.optional(),
     exp2StartAt: nullableDate.optional(),
     exp2EndAt: nullableDate.optional(),
-    dismissedAt: nullableDate.optional(),
+    terminationDate: nullableDate.optional(),
+    terminationType: z
+      .enum(Object.values(TERMINATION_TYPE) as [string, ...string[]])
+      .nullable()
+      .optional(),
 
     // Payroll info
     payrollNumber: z.number().int().positive("Número da folha deve ser positivo").nullable().optional(),
@@ -1237,14 +1270,18 @@ export const userUpdateSchema = z
     requirePasswordChange: z.boolean().optional(),
     lastLoginAt: z.date().optional(),
     sessionToken: z.string().nullable().optional(),
-    statusOrder: z.number().optional(),
+    // Payroll fields
+    unionMember: z.boolean().optional(),
+    unionAuthorizationDate: nullableDate.optional(),
+    dependentsCount: z.number().int().min(0).optional(),
+    hasSimplifiedDeduction: z.boolean().optional(),
     // Required for changelog tracking
     userId: z.string().optional(),
     preferences: z.record(z.any()).optional(),
     // PPE Size update
     ppeSize: ppeSizeCreateNestedSchema.optional(),
-    // Store current status for validation (used by backend)
-    currentStatus: z.nativeEnum(USER_STATUS).optional(),
+    // Store the current contract type for transition validation (set by backend).
+    currentContractType: z.nativeEnum(CONTRACT_TYPE).nullable().optional(),
     // Sector leader flag - when true, sets this user as manager of their sector
     // The backend will update Sector.leaderId accordingly
     isSectorLeader: z.boolean().optional(),
@@ -1255,70 +1292,45 @@ export const userUpdateSchema = z
   })
   .refine(
     (data) => {
-      // If dismissedAt date is provided, status must be DISMISSED
-      if (data.dismissedAt && data.status && data.status !== USER_STATUS.DISMISSED) {
+      // If a termination date is provided, the contract status must be DISMISSED.
+      if (data.terminationDate && data.contractStatus && data.contractStatus !== CONTRACT_STATUS.DISMISSED) {
         return false;
       }
       return true;
     },
     {
-      message: "Quando a data de demissão é fornecida, o status deve ser DISMISSED",
-      path: ["status"],
+      message: "Quando a data de demissão é fornecida, a situação do contrato deve ser DISMISSED",
+      path: ["contractStatus"],
     }
   )
   .refine(
     (data) => {
-      // If status is DISMISSED, dismissedAt date is required
-      if (data.status === USER_STATUS.DISMISSED && !data.dismissedAt) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "Data de demissão é obrigatória quando o status é DISMISSED",
-      path: ["dismissedAt"],
-    }
-  )
-  .refine(
-    (data) => {
-      // Prevent EFFECTED users from being set to experience periods
+      // EFFECTED contracts cannot be reverted to an experience period.
       if (
-        data.currentStatus === USER_STATUS.EFFECTED &&
-        data.status &&
-        (data.status === USER_STATUS.EXPERIENCE_PERIOD_1 || data.status === USER_STATUS.EXPERIENCE_PERIOD_2)
+        data.currentContractType === CONTRACT_TYPE.EFFECTED &&
+        data.contractType &&
+        (data.contractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_1 || data.contractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_2)
       ) {
         return false;
       }
       return true;
     },
     {
-      message: "Colaboradores EFETIVADOS não podem ser alterados para períodos de experiência",
-      path: ["status"],
+      message: "Colaboradores efetivados não podem retornar ao período de experiência",
+      path: ["contractType"],
     }
   )
-  // NOTE: We intentionally allow DISMISSED → other statuses. The CLT
-  // protection is meant to enforce that a true re-hire creates a new
-  // employment record, but operators frequently dismiss by mistake and
-  // need to undo it (especially within minutes of the action). We also
-  // call isValidStatusTransition() below for the OTHER directions, but
-  // relax the rule for un-dismissal here.
   .refine(
     (data) => {
-      // Validate status transition using helper function — but allow
-      // DISMISSED → anything (mistake correction).
-      if (
-        data.currentStatus &&
-        data.status &&
-        data.currentStatus !== data.status &&
-        data.currentStatus !== USER_STATUS.DISMISSED
-      ) {
-        return isValidStatusTransition(data.currentStatus, data.status);
+      // Validate the contract-type transition within the current vínculo.
+      if (data.currentContractType && data.contractType && data.currentContractType !== data.contractType) {
+        return isValidStatusTransition(data.currentContractType, data.contractType);
       }
       return true;
     },
     {
-      message: "Transição de status inválida",
-      path: ["status"],
+      message: "Transição de tipo de contrato inválida",
+      path: ["contractType"],
     }
   );
 
@@ -1392,74 +1404,80 @@ export type UserWhere = z.infer<typeof userWhereSchema>;
 // =====================
 
 /**
- * Status transition validation rules
- * Defines which status transitions are allowed
+ * Contract-type transition rules WITHIN a single vínculo (EmploymentContract).
+ * The experiência phases advance to efetivado (or to other CLT kinds) inside the
+ * SAME contract. Dismissal is a STATUS change (CONTRACT_STATUS.DISMISSED), not a
+ * type transition — terminations close the contract. Mirrors api/src/schemas/user.ts.
  */
-export const USER_STATUS_TRANSITIONS: Record<USER_STATUS, USER_STATUS[]> = {
-  [USER_STATUS.EXPERIENCE_PERIOD_1]: [USER_STATUS.EXPERIENCE_PERIOD_2, USER_STATUS.DISMISSED],
-  [USER_STATUS.EXPERIENCE_PERIOD_2]: [USER_STATUS.EFFECTED, USER_STATUS.DISMISSED],
-  [USER_STATUS.EFFECTED]: [USER_STATUS.DISMISSED],
-  // DISMISSED → active permitted so operators can undo a mistaken dismissal
-  // (mirrors api/src/schemas/user.ts and api UserService.validateUserStatusTransition).
-  [USER_STATUS.DISMISSED]: [
-    USER_STATUS.EXPERIENCE_PERIOD_1,
-    USER_STATUS.EXPERIENCE_PERIOD_2,
-    USER_STATUS.EFFECTED,
+export const CONTRACT_TYPE_TRANSITIONS: Record<CONTRACT_TYPE, CONTRACT_TYPE[]> = {
+  [CONTRACT_TYPE.EXPERIENCE_PERIOD_1]: [
+    CONTRACT_TYPE.EXPERIENCE_PERIOD_2,
+    CONTRACT_TYPE.EFFECTED,
+    CONTRACT_TYPE.APPRENTICE,
+    CONTRACT_TYPE.INTERMITTENT,
   ],
+  [CONTRACT_TYPE.EXPERIENCE_PERIOD_2]: [
+    CONTRACT_TYPE.EFFECTED,
+    CONTRACT_TYPE.APPRENTICE,
+    CONTRACT_TYPE.INTERMITTENT,
+  ],
+  // EFFECTED is terminal as a type (only dismissal closes it).
+  [CONTRACT_TYPE.EFFECTED]: [],
+  [CONTRACT_TYPE.APPRENTICE]: [CONTRACT_TYPE.EFFECTED],
+  [CONTRACT_TYPE.INTERMITTENT]: [CONTRACT_TYPE.EFFECTED],
+  [CONTRACT_TYPE.FIXED_TERM]: [CONTRACT_TYPE.EFFECTED],
+  [CONTRACT_TYPE.TEMPORARY]: [CONTRACT_TYPE.EFFECTED],
 };
 
 /**
- * Validates if a status transition is allowed
- * @param currentStatus - The current status
- * @param newStatus - The desired new status
- * @returns true if the transition is allowed, false otherwise
+ * Validates whether a contract-type transition is allowed within a vínculo.
  */
-export function isValidStatusTransition(currentStatus: USER_STATUS | string, newStatus: USER_STATUS | string): boolean {
-  // Same status is always allowed
-  if (currentStatus === newStatus) {
+export function isValidStatusTransition(currentType: CONTRACT_TYPE | string, newType: CONTRACT_TYPE | string): boolean {
+  // Same type is always allowed
+  if (currentType === newType) {
     return true;
   }
 
-  const allowedTransitions = USER_STATUS_TRANSITIONS[currentStatus as USER_STATUS];
+  const allowedTransitions = CONTRACT_TYPE_TRANSITIONS[currentType as CONTRACT_TYPE];
   if (!allowedTransitions) {
     return false;
   }
-  return allowedTransitions.includes(newStatus as USER_STATUS);
+  return allowedTransitions.includes(newType as CONTRACT_TYPE);
 }
 
 /**
- * Gets a human-readable error message for an invalid status transition
- * @param currentStatus - The current status
- * @param newStatus - The attempted new status
- * @returns Error message in Portuguese
+ * Gets a human-readable error message for an invalid contract-type transition.
  */
-export function getStatusTransitionError(currentStatus: USER_STATUS | string, newStatus: USER_STATUS | string): string {
-  const statusLabels: Record<string, string> = {
-    [USER_STATUS.EXPERIENCE_PERIOD_1]: "Experiência 1",
-    [USER_STATUS.EXPERIENCE_PERIOD_2]: "Experiência 2",
-    [USER_STATUS.EFFECTED]: "Efetivado",
-    [USER_STATUS.DISMISSED]: "Demitido",
+export function getStatusTransitionError(currentType: CONTRACT_TYPE | string, newType: CONTRACT_TYPE | string): string {
+  const typeLabels: Record<string, string> = {
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_1]: "Experiência 1",
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_2]: "Experiência 2",
+    [CONTRACT_TYPE.EFFECTED]: "Efetivado",
+    [CONTRACT_TYPE.FIXED_TERM]: "Prazo determinado",
+    [CONTRACT_TYPE.INTERMITTENT]: "Intermitente",
+    [CONTRACT_TYPE.APPRENTICE]: "Aprendiz",
+    [CONTRACT_TYPE.TEMPORARY]: "Temporário",
   };
 
-  if (currentStatus === USER_STATUS.DISMISSED) {
-    return "Colaboradores demitidos não podem ter o status alterado";
-  }
-
-  if (currentStatus === USER_STATUS.EFFECTED && (newStatus === USER_STATUS.EXPERIENCE_PERIOD_1 || newStatus === USER_STATUS.EXPERIENCE_PERIOD_2)) {
+  if (
+    currentType === CONTRACT_TYPE.EFFECTED &&
+    (newType === CONTRACT_TYPE.EXPERIENCE_PERIOD_1 || newType === CONTRACT_TYPE.EXPERIENCE_PERIOD_2)
+  ) {
     return "Colaboradores efetivados não podem retornar ao período de experiência";
   }
 
-  const allowedTransitions = USER_STATUS_TRANSITIONS[currentStatus as USER_STATUS] || [];
-  const allowedLabels = allowedTransitions.map((s: USER_STATUS) => statusLabels[s]).join(", ");
+  const allowedTransitions = CONTRACT_TYPE_TRANSITIONS[currentType as CONTRACT_TYPE] || [];
+  const allowedLabels = allowedTransitions.map((t: CONTRACT_TYPE) => typeLabels[t]).join(", ");
 
-  return `Transição inválida de ${statusLabels[currentStatus] || currentStatus} para ${statusLabels[newStatus] || newStatus}. Transições permitidas: ${allowedLabels}`;
+  return `Transição inválida de ${typeLabels[currentType] || currentType} para ${typeLabels[newType] || newType}. Transições permitidas: ${allowedLabels}`;
 }
 
 export const mapUserToFormData = createMapToFormDataHelper<User, UserUpdateFormData>((user) => ({
   email: user.email || undefined,
   name: user.name,
   avatarId: user.avatarId || undefined,
-  status: user.status as USER_STATUS,
+  contractType: (user.currentContractType ?? undefined) as CONTRACT_TYPE | undefined,
+  employeeType: (user.currentEmployeeType ?? undefined) as EMPLOYEE_TYPE | undefined,
   phone: user.phone || undefined,
   positionId: user.positionId || undefined,
   pis: user.pis || undefined,
@@ -1480,13 +1498,13 @@ export const mapUserToFormData = createMapToFormDataHelper<User, UserUpdateFormD
   zipCode: user.zipCode || undefined,
   // site: user.site || undefined,
 
-  // Additional dates - use birth and dismissedAt
-  birth: user.birth,
-  dismissedAt: user.dismissedAt || undefined,
+  // Additional dates from the current vínculo
+  birth: user.birth ?? undefined,
+  terminationDate: user.currentContract?.terminationDate ?? undefined,
 
   // Payroll info
   payrollNumber: user.payrollNumber || undefined,
 
-  // Store current status for validation
-  currentStatus: user.status as USER_STATUS,
+  // Store current contract type for transition validation
+  currentContractType: (user.currentContractType ?? undefined) as CONTRACT_TYPE | undefined,
 }));

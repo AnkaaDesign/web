@@ -75,7 +75,7 @@ export const EPIDeliveryEdit = () => {
   // Loading state
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <div className="space-y-6">
           <PageHeader
             variant="form"
@@ -117,7 +117,7 @@ export const EPIDeliveryEdit = () => {
   // Error state
   if (error || !ppeDelivery) {
     return (
-      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <div className="space-y-6">
           <PageHeader
             variant="form"
@@ -150,7 +150,7 @@ export const EPIDeliveryEdit = () => {
   }
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col px-4 pt-4">
         <PageHeader
           variant="form"

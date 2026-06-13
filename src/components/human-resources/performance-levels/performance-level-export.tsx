@@ -2,7 +2,7 @@ import { BaseExportPopover, type ExportColumn, type ExportFormat } from "@/compo
 import { toast } from "@/components/ui/sonner";
 import { formatDate, formatDateTime } from "../../../utils";
 import { userService } from "../../../api-client";
-import { USER_STATUS_LABELS, USER_STATUS } from "../../../constants";
+import { CONTRACT_TYPE_LABELS, CONTRACT_TYPE } from "../../../constants";
 import type { User } from "../../../types";
 
 const EXPORT_COLUMNS: ExportColumn<User>[] = [
@@ -16,7 +16,7 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
   { id: "sector", label: "Setor", getValue: (user) => user.sector?.name || "" },
   { id: "performanceLevel", label: "Nível de Desempenho", getValue: (user) => String(user.performanceLevel || "0") },
   { id: "bonus", label: "Bonificação", getValue: (_user) => "" },  // To be implemented
-  { id: "status", label: "Status", getValue: (user) => USER_STATUS_LABELS[user.status] || user.status },
+  { id: "contractType", label: "Tipo de Contrato", getValue: (user) => (user.currentContractType ? CONTRACT_TYPE_LABELS[user.currentContractType] : "") },
   { id: "createdAt", label: "Data de Cadastro", getValue: (user) => new Date(user.createdAt).toLocaleDateString("pt-BR") },
 ];
 
@@ -240,8 +240,8 @@ export function PerformanceLevelExport({
 
                       // Apply formatting based on column
                       switch (col.id) {
-                        case "status":
-                          const statusClass = item.status === USER_STATUS.EFFECTED ? "badge-active" : "badge-inactive";
+                        case "contractType":
+                          const statusClass = item.currentContractType === CONTRACT_TYPE.EFFECTED ? "badge-active" : "badge-inactive";
                           value = `<span class="badge ${statusClass}">${value}</span>`;
                           break;
                         case "performanceLevel":

@@ -14,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { GOAL_METRIC, routes } from '@/constants';
-import { USER_STATUS, ACTIVE_USER_STATUSES } from '@/constants/enums';
+import { CONTRACT_TYPE, CONTRACT_STATUS } from '@/constants/enums';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
 import { useHeadcountAnalytics, useTurnoverAnalytics, hrAnalyticsKeys } from '@/hooks/human-resources/use-hr-analytics';
@@ -549,29 +549,33 @@ function TeamDrillDownModal({
     const where: Record<string, any> = {};
 
     if (mode === 'headcount') {
-      // Active right now = currently-active status AND not dismissed.
-      where.status = { in: [...ACTIVE_USER_STATUSES] };
-      where.dismissedAt = null;
+      // Active right now = currently-active status (not dismissed).
+      where.currentContractStatus = CONTRACT_STATUS.ACTIVE;
     } else if (mode === 'newHires') {
       // Mirror the backend's joinDate() = effectedAt ?? createdAt
       // (hr-statistics.service.ts). Without the fallback the modal counts
       // users by createdAt only and shows far more rows than the summary card.
+      // effectedAt now lives on the current contract relation.
       if (startDate) {
         const range = { gte: startDate, ...(endDate ? { lte: endDate } : {}) };
         where.OR = [
-          { effectedAt: range },
-          { effectedAt: null, createdAt: range },
+          { currentContract: { is: { effectedAt: range } } },
+          { currentContract: { is: { effectedAt: null } }, createdAt: range },
         ];
       }
     } else if (mode === 'dismissals') {
-      where.status = USER_STATUS.DISMISSED;
+      where.currentContractStatus = CONTRACT_STATUS.DISMISSED;
       if (startDate) {
-        where.dismissedAt = {
-          gte: startDate,
-          ...(endDate ? { lte: endDate } : {}),
+        where.currentContract = {
+          is: {
+            terminationDate: {
+              gte: startDate,
+              ...(endDate ? { lte: endDate } : {}),
+            },
+          },
         };
       } else {
-        where.dismissedAt = { not: null };
+        where.currentContract = { is: { terminationDate: { not: null } } };
       }
     }
 
@@ -583,9 +587,9 @@ function TeamDrillDownModal({
     return {
       where,
       orderBy: mode === 'dismissals'
-        ? { dismissedAt: 'desc' as const }
+        ? { currentContract: { terminationDate: 'desc' as const } }
         : { name: 'asc' as const },
-      include: { position: true, sector: true },
+      include: { position: true, sector: true, currentContract: true },
       limit: 100,
     };
   }, [mode, startDate, endDate, sectorIds, positionIds]);
@@ -605,7 +609,7 @@ function TeamDrillDownModal({
     if (mode !== 'headcount') return rawUsers;
     const now = Date.now();
     return rawUsers.filter(u => {
-      const join = u.effectedAt ?? u.createdAt;
+      const join = u.currentContract?.effectedAt ?? u.createdAt;
       if (!join) return true;
       return new Date(join).getTime() <= now;
     });
@@ -635,11 +639,11 @@ function TeamDrillDownModal({
       // (admission for newHires/headcount/netChange, dismissal otherwise) —
       // newest first.
       const dateA = mode === 'dismissals'
-        ? a.dismissedAt
-        : (a.effectedAt ?? a.createdAt);
+        ? a.currentContract?.terminationDate
+        : (a.currentContract?.effectedAt ?? a.createdAt);
       const dateB = mode === 'dismissals'
-        ? b.dismissedAt
-        : (b.effectedAt ?? b.createdAt);
+        ? b.currentContract?.terminationDate
+        : (b.currentContract?.effectedAt ?? b.createdAt);
       const ta = dateA ? new Date(dateA).getTime() : 0;
       const tb = dateB ? new Date(dateB).getTime() : 0;
       return tb - ta;
@@ -709,11 +713,11 @@ function TeamDrillDownModal({
                 ) : (
                   filteredUsers.map((u) => {
                     const dateValue = config?.dateColumn === 'dismissal'
-                      ? u.dismissedAt
+                      ? u.currentContract?.terminationDate
                       // Match backend joinDate() — effectedAt when present,
                       // otherwise fall back to createdAt. Keeps the displayed
                       // date consistent with the summary count.
-                      : (u.effectedAt ?? u.createdAt);
+                      : (u.currentContract?.effectedAt ?? u.createdAt);
                     const formattedDate = dateValue
                       ? format(new Date(dateValue), 'dd/MM/yyyy', { locale: ptBR })
                       : '—';
@@ -788,7 +792,7 @@ function TeamPeriodModal({
   const range = item ? getPeriodRange(item.period) : null;
 
   // Hired ON or BEFORE `to` (created during/before period) AND
-  // (dismissedAt is null OR dismissedAt >= from). Server-side filters on the
+  // (still active OR terminated >= from). Server-side filters on the
   // common shape we already use elsewhere — see useUsers / use-user.ts.
   const queryArgs = useMemo(() => {
     if (!range) return null;
@@ -796,12 +800,12 @@ function TeamPeriodModal({
       where: {
         createdAt: { lte: range.to },
         OR: [
-          { dismissedAt: null },
-          { dismissedAt: { gte: range.from } },
+          { currentContractStatus: { not: CONTRACT_STATUS.DISMISSED } },
+          { currentContract: { is: { terminationDate: { gte: range.from } } } },
         ],
       },
       orderBy: { name: 'asc' as const },
-      include: { position: true, sector: true },
+      include: { position: true, sector: true, currentContract: true },
       limit: 100,
     };
     if (sectorIds?.length) args.sectorIds = sectorIds;
@@ -838,8 +842,8 @@ function TeamPeriodModal({
     return [...base].sort((a, b) => {
       const s = (a.sector?.name ?? '').localeCompare(b.sector?.name ?? '');
       if (s !== 0) return s;
-      const da = a.exp1StartAt ?? a.createdAt;
-      const db = b.exp1StartAt ?? b.createdAt;
+      const da = a.currentContract?.admissionDate ?? a.currentContract?.exp1StartAt ?? a.createdAt;
+      const db = b.currentContract?.admissionDate ?? b.currentContract?.exp1StartAt ?? b.createdAt;
       const ta = da ? new Date(da).getTime() : 0;
       const tb = db ? new Date(db).getTime() : 0;
       return tb - ta;
@@ -847,12 +851,19 @@ function TeamPeriodModal({
   }, [rawUsers, search, multiSector]);
 
   const statusLabel = (u: any): { label: string; tone: string } => {
-    switch (u.status) {
-      case USER_STATUS.EFFECTED: return { label: 'Efetivado', tone: 'text-emerald-700 dark:text-emerald-400' };
-      case USER_STATUS.EXPERIENCE_PERIOD_1: return { label: 'Experiência (30d)', tone: 'text-blue-700 dark:text-blue-400' };
-      case USER_STATUS.EXPERIENCE_PERIOD_2: return { label: 'Experiência (90d)', tone: 'text-blue-700 dark:text-blue-400' };
-      case USER_STATUS.DISMISSED: return { label: 'Desligado', tone: 'text-red-700 dark:text-red-400' };
-      default: return { label: u.status ?? '—', tone: 'text-foreground/70' };
+    // Dismissal is a lifecycle status orthogonal to the contract type — show it first.
+    if (u.currentContractStatus === CONTRACT_STATUS.DISMISSED) {
+      return { label: 'Desligado', tone: 'text-red-700 dark:text-red-400' };
+    }
+    switch (u.currentContractType) {
+      case CONTRACT_TYPE.EFFECTED: return { label: 'Efetivado', tone: 'text-emerald-700 dark:text-emerald-400' };
+      case CONTRACT_TYPE.EXPERIENCE_PERIOD_1: return { label: 'Experiência (30d)', tone: 'text-blue-700 dark:text-blue-400' };
+      case CONTRACT_TYPE.EXPERIENCE_PERIOD_2: return { label: 'Experiência (90d)', tone: 'text-blue-700 dark:text-blue-400' };
+      case CONTRACT_TYPE.APPRENTICE: return { label: 'Aprendiz', tone: 'text-blue-700 dark:text-blue-400' };
+      case CONTRACT_TYPE.FIXED_TERM: return { label: 'Prazo Determinado', tone: 'text-blue-700 dark:text-blue-400' };
+      case CONTRACT_TYPE.INTERMITTENT: return { label: 'Intermitente', tone: 'text-violet-700 dark:text-violet-400' };
+      case CONTRACT_TYPE.TEMPORARY: return { label: 'Temporário', tone: 'text-violet-700 dark:text-violet-400' };
+      default: return { label: u.currentContractType ?? '—', tone: 'text-foreground/70' };
     }
   };
 
@@ -924,7 +935,7 @@ function TeamPeriodModal({
                 ) : (
                   filteredUsers.map((u) => {
                     const { label, tone } = statusLabel(u);
-                    const admissionDate = u.exp1StartAt ?? u.createdAt;
+                    const admissionDate = u.currentContract?.admissionDate ?? u.currentContract?.exp1StartAt ?? u.createdAt;
                     const admittedAt = admissionDate
                       ? format(new Date(admissionDate), 'dd/MM/yyyy', { locale: ptBR })
                       : '—';

@@ -77,7 +77,7 @@ export const PPEScheduleEditPage = () => {
   // Loading state
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <div className="space-y-6">
           <PageHeader
             variant="form"
@@ -117,7 +117,7 @@ export const PPEScheduleEditPage = () => {
   // Error state
   if (error || !ppeSchedule || !ppeSchedule.data) {
     return (
-      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <div className="space-y-6">
           <PageHeader
             variant="form"
@@ -150,7 +150,7 @@ export const PPEScheduleEditPage = () => {
   }
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col px-4 pt-4 max-w-5xl mx-auto w-full">
         <PageHeader
           variant="form"

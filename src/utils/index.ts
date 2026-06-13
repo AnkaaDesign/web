@@ -3,6 +3,7 @@ export * from "./airbrushing";
 export * from "./analyticsEnumGetters";
 export * from "./auth";
 export * from "./batch-toast";
+export * from "./benefit-discount";
 export * from "./bonus";
 export * from "./borrow";
 export * from "./changelog";

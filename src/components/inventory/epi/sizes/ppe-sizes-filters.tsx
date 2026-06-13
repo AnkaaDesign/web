@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { getPositions, getSectors } from "../../../../api-client";
-import { USER_STATUS_LABELS } from "../../../../constants";
+import { CONTRACT_TYPE_LABELS } from "../../../../constants";
 import {
   SHIRT_SIZE_LABELS,
   PANTS_SIZE_LABELS,
@@ -39,7 +39,7 @@ export function PpeSizesFilters({ open, onOpenChange, filters, onFilterChange }:
     }
   }, [open, filters]);
 
-  const selectedStatuses = localFilters.status || [];
+  const selectedContractTypes = localFilters.contractTypes || [];
   const selectedPositions = localFilters.positionId || [];
   const selectedSectors = localFilters.sectorId || [];
 
@@ -57,9 +57,9 @@ export function PpeSizesFilters({ open, onOpenChange, filters, onFilterChange }:
     onOpenChange(false);
   };
 
-  const handleStatusChange = (statuses: string | string[] | null | undefined) => {
-    const statusArray = Array.isArray(statuses) ? statuses : statuses ? [statuses] : [];
-    setLocalFilters({ ...localFilters, status: statusArray.length > 0 ? statusArray : undefined });
+  const handleContractTypeChange = (contractTypes: string | string[] | null | undefined) => {
+    const contractTypeArray = Array.isArray(contractTypes) ? contractTypes : contractTypes ? [contractTypes] : [];
+    setLocalFilters({ ...localFilters, contractTypes: contractTypeArray.length > 0 ? (contractTypeArray as any) : undefined });
   };
 
   const handlePositionChange = (positions: string | string[] | null | undefined) => {
@@ -84,7 +84,7 @@ export function PpeSizesFilters({ open, onOpenChange, filters, onFilterChange }:
     setLocalFilters({ ...localFilters, ppeSizeFilters: hasAny ? newPpeSizeFilters : undefined } as any);
   };
 
-  const statusOptions = Object.entries(USER_STATUS_LABELS).map(([value, label]) => ({
+  const contractTypeOptions = Object.entries(CONTRACT_TYPE_LABELS).map(([value, label]) => ({
     value,
     label,
   }));
@@ -144,7 +144,7 @@ export function PpeSizesFilters({ open, onOpenChange, filters, onFilterChange }:
       onOpenChange={onOpenChange}
       title="Filtros Avançados"
       titleIcon={<IconFilter className="h-5 w-5" />}
-      description="Filtre por status, cargo, setor e tamanhos de EPI"
+      description="Filtre por tipo de contrato, cargo, setor e tamanhos de EPI"
       activeFilterCount={activeFilterCount}
       onApply={handleApplyFilters}
       onReset={handleResetFilters}
@@ -154,14 +154,14 @@ export function PpeSizesFilters({ open, onOpenChange, filters, onFilterChange }:
           <div>
             <Label className="flex items-center gap-2 mb-2">
               <IconUser className="h-4 w-4" />
-              Status
+              Tipo de Contrato
             </Label>
             <Combobox
               mode="multiple"
-              options={statusOptions}
-              value={selectedStatuses}
-              onValueChange={handleStatusChange}
-              placeholder="Selecione os status"
+              options={contractTypeOptions}
+              value={selectedContractTypes}
+              onValueChange={handleContractTypeChange}
+              placeholder="Selecione os tipos de contrato"
               searchable={true}
               minSearchLength={0}
             />

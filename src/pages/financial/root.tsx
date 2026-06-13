@@ -117,7 +117,7 @@ export const FinancialRootPage = () => {
 
   const { data: dashboard, isLoading, error } = useFinancialDashboard({ timePeriod });
 
-  const requiredPrivilege = [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL];
+  const requiredPrivilege = [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ACCOUNTING];
 
   const headerContent = (
     <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">

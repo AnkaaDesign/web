@@ -40,8 +40,13 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
       phone: user.phone,
       cpf: user.cpf,
       pis: user.pis,
-      status: user.status,
-      currentStatus: user.status, // Required for validation in update mode
+      // Current vínculo (EmploymentContract) cache → edit fields
+      contractType: user.currentContractType ?? undefined,
+      employeeType: user.currentEmployeeType ?? undefined,
+      contractStatus: user.currentContractStatus ?? undefined,
+      currentContractType: user.currentContractType ?? undefined, // for transition validation
+      providerName: user.currentContract?.providerName ?? undefined,
+      providerCnpj: user.currentContract?.providerCnpj ?? undefined,
       verified: user.verified,
       isActive: user.isActive, // Fix: Include isActive from user data
       birth: toDate(user.birth),
@@ -76,13 +81,14 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
         gloves: null,
         rainBoots: null,
       },
-      // Status tracking timestamps - properly convert to Date objects
-      effectedAt: toDate(user.effectedAt),
-      exp1StartAt: toDate(user.exp1StartAt),
-      exp1EndAt: toDate(user.exp1EndAt),
-      exp2StartAt: toDate(user.exp2StartAt),
-      exp2EndAt: toDate(user.exp2EndAt),
-      dismissedAt: toDate(user.dismissedAt),
+      // Current vínculo dates — sourced from the current EmploymentContract.
+      admissionDate: toDate(user.currentContract?.admissionDate ?? user.currentContract?.exp1StartAt),
+      effectedAt: toDate(user.currentContract?.effectedAt),
+      exp1StartAt: toDate(user.currentContract?.exp1StartAt ?? user.currentContract?.admissionDate),
+      exp1EndAt: toDate(user.currentContract?.exp1EndAt),
+      exp2StartAt: toDate(user.currentContract?.exp2StartAt),
+      exp2EndAt: toDate(user.currentContract?.exp2EndAt),
+      terminationDate: toDate(user.currentContract?.terminationDate),
       // Don't include password in default values
       password: undefined,
     }),
@@ -119,7 +125,8 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
       // Special handling for dates - compare only date parts (year, month, day)
       else if (
         typedKey === "birth" ||
-        typedKey === "dismissedAt" ||
+        typedKey === "admissionDate" ||
+        typedKey === "terminationDate" ||
         typedKey === "exp1StartAt" ||
         typedKey === "exp1EndAt" ||
         typedKey === "exp2StartAt" ||

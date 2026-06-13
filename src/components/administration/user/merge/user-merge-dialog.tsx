@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconArrowRight, IconCheck, IconLoader2, IconUsers, IconInfoCircle } from "@tabler/icons-react";
 import type { User } from "@types";
+import { CONTRACT_TYPE_LABELS } from "../../../../constants";
 
 interface ConflictField {
   field: string;
@@ -48,7 +49,7 @@ export function UserMergeDialog({ open, onOpenChange, users, onMerge }: UserMerg
       { field: "cpf", label: "CPF", type: "single" as const },
       { field: "pis", label: "PIS", type: "single" as const },
       { field: "birth", label: "Data de Nascimento", type: "single" as const },
-      { field: "status", label: "Status", type: "single" as const },
+      { field: "currentContractType", label: "Tipo de Contrato", type: "single" as const },
       { field: "positionId", label: "Cargo", type: "single" as const },
       { field: "sectorId", label: "Setor", type: "single" as const },
       { field: "ledSectorId", label: "Setor Liderado", type: "single" as const },
@@ -80,8 +81,8 @@ export function UserMergeDialog({ open, onOpenChange, users, onMerge }: UserMerg
             formatted = value ? "Sim" : "Não";
           } else if (field === "birth" && value instanceof Date) {
             formatted = value.toLocaleDateString("pt-BR");
-          } else if (field === "status") {
-            formatted = value; // Keep status as-is for now
+          } else if (field === "currentContractType") {
+            formatted = CONTRACT_TYPE_LABELS[value as keyof typeof CONTRACT_TYPE_LABELS] ?? String(value);
           } else {
             formatted = String(value);
           }
@@ -402,8 +403,12 @@ export function UserMergeDialog({ open, onOpenChange, users, onMerge }: UserMerg
                     <p className="font-medium">{mergedPreview.phone || "N/A"}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Status</Label>
-                    <p className="font-medium">{mergedPreview.status || "N/A"}</p>
+                    <Label className="text-muted-foreground">Tipo de Contrato</Label>
+                    <p className="font-medium">
+                      {mergedPreview.currentContractType
+                        ? CONTRACT_TYPE_LABELS[mergedPreview.currentContractType as keyof typeof CONTRACT_TYPE_LABELS] ?? mergedPreview.currentContractType
+                        : "N/A"}
+                    </p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Cidade</Label>

@@ -201,7 +201,7 @@ export const ReconciliationRecurringForecastPage = () => {
 
   return (
     <PrivilegeRoute
-      requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}
+      requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING]}
     >
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader

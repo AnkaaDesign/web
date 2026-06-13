@@ -10,6 +10,7 @@ import type {
   OrderBatchCreateFormData,
   OrderBatchUpdateFormData,
   OrderBatchDeleteFormData,
+  OrderBatchPaymentFormData,
   OrderQueryFormData,
   OrderItemGetManyFormData,
   OrderItemGetByIdFormData,
@@ -58,6 +59,7 @@ import type {
   OrderScheduleTriggerResponse,
   OrderScheduleExpectedTotalsResponse,
   OrderScheduleCascadeMode,
+  OrderPaymentSummaryResponse,
 } from "../types";
 
 // =====================
@@ -88,6 +90,12 @@ export class OrderService {
   /** Predicted next order number (highest saved + 1) — used to preview the order code before saving. */
   async getNextOrderNumber(): Promise<{ success: boolean; data: { nextOrderNumber: number } }> {
     const response = await apiClient.get<{ success: boolean; data: { nextOrderNumber: number } }>(`${this.basePath}/next-number`);
+    return response.data;
+  }
+
+  /** Per-paymentStatus aggregates for the Contas a Pagar summary cards (PAID windowed to 90 days, server-side). */
+  async getPaymentSummary(): Promise<OrderPaymentSummaryResponse> {
+    const response = await apiClient.get<OrderPaymentSummaryResponse>(`${this.basePath}/payment-summary`);
     return response.data;
   }
 
@@ -126,6 +134,43 @@ export class OrderService {
 
   async batchDeleteOrders(data: OrderBatchDeleteFormData): Promise<OrderBatchDeleteResponse> {
     const response = await apiClient.delete<OrderBatchDeleteResponse>(`${this.basePath}/batch`, { data });
+    return response.data;
+  }
+
+  // =====================
+  // Order Payment Operations (contas a pagar)
+  // =====================
+
+  /** NOT_REQUESTED → REQUESTED (sets paymentRequestedAt). */
+  async requestPayment(id: string, query?: OrderQueryFormData): Promise<OrderUpdateResponse> {
+    const response = await apiClient.put<OrderUpdateResponse>(`${this.basePath}/${id}/request-payment`, undefined, { params: query });
+    return response.data;
+  }
+
+  /** NOT_REQUESTED/REQUESTED → AWAITING_PAYMENT. */
+  async markAwaitingPayment(id: string, query?: OrderQueryFormData): Promise<OrderUpdateResponse> {
+    const response = await apiClient.put<OrderUpdateResponse>(`${this.basePath}/${id}/mark-awaiting-payment`, undefined, { params: query });
+    return response.data;
+  }
+
+  /** Any non-PAID → PAID (sets paidAt). */
+  async markPaid(id: string, query?: OrderQueryFormData): Promise<OrderUpdateResponse> {
+    const response = await apiClient.put<OrderUpdateResponse>(`${this.basePath}/${id}/mark-paid`, undefined, { params: query });
+    return response.data;
+  }
+
+  async batchRequestPayment(data: OrderBatchPaymentFormData, query?: OrderQueryFormData): Promise<OrderBatchUpdateResponse<OrderUpdateFormData>> {
+    const response = await apiClient.put<OrderBatchUpdateResponse<OrderUpdateFormData>>(`${this.basePath}/batch/request-payment`, data, { params: query });
+    return response.data;
+  }
+
+  async batchMarkAwaitingPayment(data: OrderBatchPaymentFormData, query?: OrderQueryFormData): Promise<OrderBatchUpdateResponse<OrderUpdateFormData>> {
+    const response = await apiClient.put<OrderBatchUpdateResponse<OrderUpdateFormData>>(`${this.basePath}/batch/mark-awaiting-payment`, data, { params: query });
+    return response.data;
+  }
+
+  async batchMarkPaid(data: OrderBatchPaymentFormData, query?: OrderQueryFormData): Promise<OrderBatchUpdateResponse<OrderUpdateFormData>> {
+    const response = await apiClient.put<OrderBatchUpdateResponse<OrderUpdateFormData>>(`${this.basePath}/batch/mark-paid`, data, { params: query });
     return response.data;
   }
 
@@ -313,6 +358,15 @@ export const deleteOrder = (id: string) => orderService.deleteOrder(id);
 export const batchCreateOrders = (data: OrderBatchCreateFormData, query?: OrderQueryFormData) => orderService.batchCreateOrders(data, query);
 export const batchUpdateOrders = (data: OrderBatchUpdateFormData, query?: OrderQueryFormData) => orderService.batchUpdateOrders(data, query);
 export const batchDeleteOrders = (data: OrderBatchDeleteFormData) => orderService.batchDeleteOrders(data);
+
+// Order payment exports (contas a pagar)
+export const getOrderPaymentSummary = () => orderService.getPaymentSummary();
+export const requestOrderPayment = (id: string, query?: OrderQueryFormData) => orderService.requestPayment(id, query);
+export const markOrderAwaitingPayment = (id: string, query?: OrderQueryFormData) => orderService.markAwaitingPayment(id, query);
+export const markOrderPaid = (id: string, query?: OrderQueryFormData) => orderService.markPaid(id, query);
+export const batchRequestOrderPayment = (data: OrderBatchPaymentFormData, query?: OrderQueryFormData) => orderService.batchRequestPayment(data, query);
+export const batchMarkOrdersAwaitingPayment = (data: OrderBatchPaymentFormData, query?: OrderQueryFormData) => orderService.batchMarkAwaitingPayment(data, query);
+export const batchMarkOrdersPaid = (data: OrderBatchPaymentFormData, query?: OrderQueryFormData) => orderService.batchMarkPaid(data, query);
 
 // OrderItem exports
 export const getOrderItems = (params: OrderItemGetManyFormData) => orderService.getOrderItems(params);

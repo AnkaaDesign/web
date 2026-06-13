@@ -11,7 +11,7 @@ import { createCalculationColumns } from "./calculation-table-columns";
 import { PeriodControl } from "@/components/human-resources/time-clock-entry/period-control";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
-import { USER_STATUS } from "../../../../../constants";
+import { CONTRACT_STATUS } from "../../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { addMonths, format, subMonths } from "date-fns";
@@ -128,11 +128,7 @@ export function CalculationList({ className, mode = 'hr', teamScope = false, onE
   const userFilters = isPersonalMode
     ? undefined
     : {
-        statuses: [
-          USER_STATUS.EXPERIENCE_PERIOD_1,
-          USER_STATUS.EXPERIENCE_PERIOD_2,
-          USER_STATUS.EFFECTED,
-        ],
+        statuses: [CONTRACT_STATUS.ACTIVE],
         where: { secullumEmployeeId: { not: null } },
         orderBy: { name: "asc" } as const,
         take: 100,

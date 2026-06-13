@@ -3,8 +3,7 @@ import { useFormContext } from "react-hook-form";
 import { IconCalendar } from "@tabler/icons-react";
 import { FormField } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import type { UserCreateFormData, UserUpdateFormData } from "../../../../schemas";
-import { USER_STATUS } from "../../../../constants";
+import { CONTRACT_TYPE } from "../../../../constants";
 import { addDays, startOfDay, getDay, subDays } from "date-fns";
 
 interface StatusDatesSectionProps {
@@ -12,103 +11,78 @@ interface StatusDatesSectionProps {
 }
 
 /**
- * Adjusts a date to the previous Friday if it falls on a weekend
- * @param date The date to adjust
- * @returns The adjusted date (Friday if weekend, original date otherwise)
+ * Adjusts a date to the previous Friday if it falls on a weekend.
  */
 function adjustToFridayIfWeekend(date: Date): Date {
   const dayOfWeek = getDay(date);
-
-  // Sunday = 0, Saturday = 6
   if (dayOfWeek === 0) {
-    // Sunday -> move back to Friday (2 days)
+    // Sunday -> Friday
     return subDays(date, 2);
   } else if (dayOfWeek === 6) {
-    // Saturday -> move back to Friday (1 day)
+    // Saturday -> Friday
     return subDays(date, 1);
   }
-
   return date;
 }
 
 /**
- * Calculates all status-related dates based on exp1StartAt
- * First experience period is 30 days, second is 50 days
- * End dates are adjusted to Friday if they fall on weekends
- * Effective hire date (effectedAt) is 1 day after exp2EndAt
+ * Calculates the CLT experience-period dates from the admission date.
+ * First experience period is 30 days, second is 50 days; end dates are pushed
+ * to the previous Friday if they land on a weekend; effectedAt is the day after
+ * exp2 ends.
  */
-function calculateStatusDates(exp1StartAt: Date | null) {
-  if (!exp1StartAt) {
-    return {
-      exp1EndAt: null,
-      exp2StartAt: null,
-      exp2EndAt: null,
-      effectedAt: null,
-    };
+function calculateStatusDates(admissionDate: Date | null) {
+  if (!admissionDate) {
+    return { exp1EndAt: null, exp2StartAt: null, exp2EndAt: null, effectedAt: null };
   }
 
-  // Normalize to start of day to avoid timezone issues
-  const normalizedStart = startOfDay(exp1StartAt);
-
-  // Calculate exp1 end date (30 days from start, so end is on day 31) and adjust to Friday if weekend
+  const normalizedStart = startOfDay(admissionDate);
   const rawExp1EndAt = addDays(normalizedStart, 30);
   const exp1EndAt = adjustToFridayIfWeekend(rawExp1EndAt);
-
-  // exp2 starts the day after exp1 ends
   const exp2StartAt = addDays(exp1EndAt, 1);
-
-  // Calculate exp2 end date (50 days) and adjust to Friday if weekend
   const rawExp2EndAt = addDays(exp2StartAt, 50);
   const exp2EndAt = adjustToFridayIfWeekend(rawExp2EndAt);
-
-  // Effective hire date is 1 day after exp2 ends
   const effectedAt = addDays(exp2EndAt, 1);
 
-  return {
-    exp1EndAt,
-    exp2StartAt,
-    exp2EndAt,
-    effectedAt,
-  };
+  return { exp1EndAt, exp2StartAt, exp2EndAt, effectedAt };
 }
 
+/**
+ * CLT period dates bound to the current vínculo. `exp1StartAt` doubles as the
+ * admission date and drives the auto-calculated exp1/exp2/effected dates. The
+ * dismissal date is NOT editable here — it is set by the termination flow.
+ */
 export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
-  const form = useFormContext<UserCreateFormData | UserUpdateFormData>();
-  const status = form.watch("status");
-  const exp1StartAt = form.watch("exp1StartAt");
-  const effectedAt = form.watch("effectedAt");
+  const form = useFormContext();
+  const status = form.watch("contractType") as CONTRACT_TYPE | undefined;
+  const exp1StartAt = form.watch("exp1StartAt") as Date | null | undefined;
 
-  // Track previous values to detect actual changes (not just initial mount)
   const prevExp1StartAtRef = useRef<Date | null | undefined>(undefined);
   const prevStatusRef = useRef<string | undefined>(undefined);
   const isFirstRenderRef = useRef(true);
 
-  // Auto-calculate dates when exp1StartAt changes (but not on initial mount)
+  // Auto-calculate dates when exp1StartAt changes (but not on initial mount).
   useEffect(() => {
-    // Skip on first render to avoid overwriting values loaded from API
     if (isFirstRenderRef.current) {
       isFirstRenderRef.current = false;
       prevExp1StartAtRef.current = exp1StartAt;
       return;
     }
 
-    // Only recalculate if exp1StartAt actually changed
     const hasChanged = prevExp1StartAtRef.current?.getTime() !== exp1StartAt?.getTime();
     if (!hasChanged) return;
-
     prevExp1StartAtRef.current = exp1StartAt;
+
+    // Keep the (required) admissionDate in sync with the admission/exp1 start.
+    form.setValue("admissionDate", exp1StartAt ?? null, { shouldValidate: true, shouldDirty: true });
 
     if (exp1StartAt) {
       const dates = calculateStatusDates(exp1StartAt);
-
-      // Recalculate these fields when user changes exp1StartAt
       form.setValue("exp1EndAt", dates.exp1EndAt, { shouldValidate: false, shouldDirty: true });
       form.setValue("exp2StartAt", dates.exp2StartAt, { shouldValidate: false, shouldDirty: true });
       form.setValue("exp2EndAt", dates.exp2EndAt, { shouldValidate: false, shouldDirty: true });
-      // Effective hire date is 1 day after exp2 ends
       form.setValue("effectedAt", dates.effectedAt, { shouldValidate: false, shouldDirty: true });
     } else {
-      // Clear dates if exp1StartAt is cleared
       form.setValue("exp1EndAt", null, { shouldValidate: false, shouldDirty: true });
       form.setValue("exp2StartAt", null, { shouldValidate: false, shouldDirty: true });
       form.setValue("exp2EndAt", null, { shouldValidate: false, shouldDirty: true });
@@ -116,252 +90,174 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
     }
   }, [exp1StartAt, form]);
 
-  // Update dates when status changes (but not on initial mount)
+  // Clear dates not applicable to the new contract type; stamp the entering one.
   useEffect(() => {
-    // Skip if this is the first render or status hasn't changed
     if (prevStatusRef.current === undefined) {
       prevStatusRef.current = status;
       return;
     }
-
     const hasChanged = prevStatusRef.current !== status;
     if (!hasChanged) return;
-
     prevStatusRef.current = status;
 
-    // Clear date fields that are NOT applicable to the new status. Each
-    // status only "owns" the dates up to its tier:
-    //   EXP_PERIOD_1 → exp1Start, exp1End
-    //   EXP_PERIOD_2 → + exp2Start, exp2End
-    //   EFFECTED      → + effectedAt
-    //   DISMISSED     → + dismissedAt
-    // Anything beyond the tier is cleared so we don't carry stale values
-    // (e.g., un-dismissing into EXP_1 would otherwise keep the dismissed
-    // user's old contractedAt and exp2 dates, which the user reported).
     const tier =
-      status === USER_STATUS.DISMISSED
-        ? 4
-        : status === USER_STATUS.EFFECTED
-          ? 3
-          : status === USER_STATUS.EXPERIENCE_PERIOD_2
-            ? 2
-            : status === USER_STATUS.EXPERIENCE_PERIOD_1
-              ? 1
-              : 0;
+      status === CONTRACT_TYPE.EFFECTED || status === CONTRACT_TYPE.APPRENTICE || status === CONTRACT_TYPE.INTERMITTENT
+        ? 3
+        : status === CONTRACT_TYPE.EXPERIENCE_PERIOD_2
+          ? 2
+          : status === CONTRACT_TYPE.EXPERIENCE_PERIOD_1
+            ? 1
+            : 0;
 
-    if (tier < 4) form.setValue("dismissedAt", null, { shouldDirty: true, shouldValidate: true });
     if (tier < 3) form.setValue("effectedAt", null, { shouldDirty: true, shouldValidate: true });
     if (tier < 2) {
       form.setValue("exp2StartAt", null, { shouldDirty: true, shouldValidate: true });
       form.setValue("exp2EndAt", null, { shouldDirty: true, shouldValidate: true });
     }
 
-    // Auto-stamp the entering tier's date if not already set.
-    if (status === USER_STATUS.EFFECTED && !form.getValues("effectedAt")) {
+    if (status === CONTRACT_TYPE.EFFECTED && !form.getValues("effectedAt")) {
       form.setValue("effectedAt", startOfDay(new Date()), { shouldValidate: false, shouldDirty: true });
     }
-    if (status === USER_STATUS.DISMISSED && !form.getValues("dismissedAt")) {
-      form.setValue("dismissedAt", startOfDay(new Date()), { shouldValidate: false, shouldDirty: true });
-    }
-  }, [status, effectedAt, form]);
+  }, [status, form]);
 
-  // Don't show section if status is not set
   if (!status) {
     return null;
   }
 
   const showExp1Dates = [
-    USER_STATUS.EXPERIENCE_PERIOD_1,
-    USER_STATUS.EXPERIENCE_PERIOD_2,
-    USER_STATUS.EFFECTED,
-    USER_STATUS.DISMISSED,
-  ].includes(status as USER_STATUS);
+    CONTRACT_TYPE.EXPERIENCE_PERIOD_1,
+    CONTRACT_TYPE.EXPERIENCE_PERIOD_2,
+    CONTRACT_TYPE.EFFECTED,
+    CONTRACT_TYPE.APPRENTICE,
+    CONTRACT_TYPE.INTERMITTENT,
+    CONTRACT_TYPE.FIXED_TERM,
+    CONTRACT_TYPE.TEMPORARY,
+  ].includes(status as CONTRACT_TYPE);
 
   const showExp2Dates = [
-    USER_STATUS.EXPERIENCE_PERIOD_2,
-    USER_STATUS.EFFECTED,
-    USER_STATUS.DISMISSED,
-  ].includes(status as USER_STATUS);
+    CONTRACT_TYPE.EXPERIENCE_PERIOD_2,
+    CONTRACT_TYPE.EFFECTED,
+    CONTRACT_TYPE.APPRENTICE,
+    CONTRACT_TYPE.INTERMITTENT,
+  ].includes(status as CONTRACT_TYPE);
 
-  const showContractedDate = [USER_STATUS.EFFECTED, USER_STATUS.DISMISSED].includes(status as USER_STATUS);
-  const showDismissedDate = status === USER_STATUS.DISMISSED;
+  const showContractedDate = status === CONTRACT_TYPE.EFFECTED;
 
-  // Don't render if no dates should be shown
-  if (!showExp1Dates && !showContractedDate && !showDismissedDate) {
+  if (!showExp1Dates && !showContractedDate) {
     return null;
   }
 
   return (
     <div className="space-y-6 border-t border-border/30 pt-6">
-        {/* Experience Period 1 */}
-        {showExp1Dates && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <IconCalendar className="h-4 w-4" />
-              Experiência 1 (30 dias)
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
-              <FormField
-                control={form.control}
-                name="exp1StartAt"
-                render={({ field }) => (
-                  <DateTimeInput
-                    field={{
-                      onChange: field.onChange,
-                      onBlur: field.onBlur,
-                      value: field.value ?? null,
-                      name: field.name,
-                    }}
-                    label={
-                      <span className="flex items-center gap-1.5">
-                        Início da Experiência 1
-                        <span className="text-destructive ml-0.5">*</span>
-                      </span>
-                    }
-                    disabled={disabled}
-                    mode="date"
-                    required
-                  />
-                )}
-              />
+      {/* Experience Period 1 (doubles as admission date) */}
+      {showExp1Dates && (
+        <div className="space-y-4">
+          <h4 className="text-sm font-semibold flex items-center gap-2">
+            <IconCalendar className="h-4 w-4" />
+            Admissão / Experiência 1 (30 dias)
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
+            <FormField
+              control={form.control}
+              name="exp1StartAt"
+              render={({ field }) => (
+                <DateTimeInput
+                  field={{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null, name: field.name }}
+                  label={
+                    <span className="flex items-center gap-1.5">
+                      Data de Admissão
+                      <span className="text-destructive ml-0.5">*</span>
+                    </span>
+                  }
+                  disabled={disabled}
+                  mode="date"
+                  required
+                />
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="exp1EndAt"
-                render={({ field }) => (
-                  <DateTimeInput
-                    field={{
-                      onChange: field.onChange,
-                      onBlur: field.onBlur,
-                      value: field.value ?? null,
-                      name: field.name,
-                    }}
-                    label="Fim da Experiência 1"
-                    disabled={true}
-                    mode="date"
-                  />
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="exp1EndAt"
+              render={({ field }) => (
+                <DateTimeInput
+                  field={{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null, name: field.name }}
+                  label="Fim da Experiência 1"
+                  disabled={true}
+                  mode="date"
+                />
+              )}
+            />
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Experience Period 2 */}
-        {showExp2Dates && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <IconCalendar className="h-4 w-4" />
-              Experiência 2 (50 dias)
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
-              <FormField
-                control={form.control}
-                name="exp2StartAt"
-                render={({ field }) => (
-                  <DateTimeInput
-                    field={{
-                      onChange: field.onChange,
-                      onBlur: field.onBlur,
-                      value: field.value ?? null,
-                      name: field.name,
-                    }}
-                    label="Início da Experiência 2"
-                    disabled={true}
-                    mode="date"
-                  />
-                )}
-              />
+      {/* Experience Period 2 */}
+      {showExp2Dates && (
+        <div className="space-y-4">
+          <h4 className="text-sm font-semibold flex items-center gap-2">
+            <IconCalendar className="h-4 w-4" />
+            Experiência 2 (50 dias)
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
+            <FormField
+              control={form.control}
+              name="exp2StartAt"
+              render={({ field }) => (
+                <DateTimeInput
+                  field={{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null, name: field.name }}
+                  label="Início da Experiência 2"
+                  disabled={true}
+                  mode="date"
+                />
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="exp2EndAt"
-                render={({ field }) => (
-                  <DateTimeInput
-                    field={{
-                      onChange: field.onChange,
-                      onBlur: field.onBlur,
-                      value: field.value ?? null,
-                      name: field.name,
-                    }}
-                    label="Fim da Experiência 2"
-                    disabled={true}
-                    mode="date"
-                  />
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="exp2EndAt"
+              render={({ field }) => (
+                <DateTimeInput
+                  field={{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null, name: field.name }}
+                  label="Fim da Experiência 2"
+                  disabled={true}
+                  mode="date"
+                />
+              )}
+            />
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Contracted Date */}
-        {showContractedDate && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <IconCalendar className="h-4 w-4" />
-              Contratação Efetiva
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
-              <FormField
-                control={form.control}
-                name="effectedAt"
-                render={({ field }) => (
-                  <DateTimeInput
-                    field={{
-                      onChange: field.onChange,
-                      onBlur: field.onBlur,
-                      value: field.value ?? null,
-                      name: field.name,
-                    }}
-                    label={
-                      <span className="flex items-center gap-1.5">
-                        Data de Contratação
-                        <span className="text-destructive ml-0.5">*</span>
-                      </span>
-                    }
-                    disabled={true}
-                    mode="date"
-                    required
-                  />
-                )}
-              />
-            </div>
+      {/* Effective hire date */}
+      {showContractedDate && (
+        <div className="space-y-4">
+          <h4 className="text-sm font-semibold flex items-center gap-2">
+            <IconCalendar className="h-4 w-4" />
+            Contratação Efetiva
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
+            <FormField
+              control={form.control}
+              name="effectedAt"
+              render={({ field }) => (
+                <DateTimeInput
+                  field={{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null, name: field.name }}
+                  label={
+                    <span className="flex items-center gap-1.5">
+                      Data de Contratação
+                      <span className="text-destructive ml-0.5">*</span>
+                    </span>
+                  }
+                  disabled={true}
+                  mode="date"
+                  required
+                />
+              )}
+            />
           </div>
-        )}
-
-        {/* Dismissed Date */}
-        {showDismissedDate && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <IconCalendar className="h-4 w-4" />
-              Demissão
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
-              <FormField
-                control={form.control}
-                name="dismissedAt"
-                render={({ field }) => (
-                  <DateTimeInput
-                    field={{
-                      onChange: field.onChange,
-                      onBlur: field.onBlur,
-                      value: field.value ?? null,
-                      name: field.name,
-                    }}
-                    label={
-                      <span className="flex items-center gap-1.5">
-                        Data de Demissão
-                        <span className="text-destructive ml-0.5">*</span>
-                      </span>
-                    }
-                    disabled={disabled}
-                    mode="date"
-                    required
-                  />
-                )}
-              />
-            </div>
-          </div>
-        )}
+        </div>
+      )}
     </div>
   );
 }

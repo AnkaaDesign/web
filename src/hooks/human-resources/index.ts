@@ -33,3 +33,5 @@ export type {
 } from "../../api-client";
 export * from "./use-payroll";
 export * from "./use-team-staff";
+export * from "./use-dependents";
+export * from "./use-agenda-events";

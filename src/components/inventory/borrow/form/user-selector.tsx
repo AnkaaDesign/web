@@ -49,6 +49,7 @@ export function BorrowUserSelector({ control, disabled, selectedUserId: _selecte
         email: true,
         cpf: true,
         status: true,
+        currentContractStatus: true,
         isActive: true,
         position: {
           select: {
@@ -77,7 +78,7 @@ export function BorrowUserSelector({ control, disabled, selectedUserId: _selecte
         metadata: {
           email: user.email,
           position: user.position,
-          status: user.status,
+          status: user.currentContractStatus,
         },
       })),
       hasMore,

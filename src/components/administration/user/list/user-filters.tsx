@@ -3,7 +3,7 @@ import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { getPositions, getSectors } from "../../../../api-client";
-import { USER_STATUS_LABELS } from "../../../../constants";
+import { CONTRACT_TYPE_LABELS } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
 import { IconFilter, IconUser, IconBriefcase, IconBuilding, IconCalendar } from "@tabler/icons-react";
 import type { UserGetManyFormData } from "../../../../schemas";
@@ -31,7 +31,7 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
   }, [open, filters]);
 
   // Get current values for multi-select components
-  const selectedStatuses = localFilters.status || [];
+  const selectedContractTypes = localFilters.contractTypes || [];
   const selectedPositions = localFilters.positionId || [];
   const selectedSectors = localFilters.sectorId || [];
 
@@ -48,9 +48,50 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
     onOpenChange(false);
   };
 
-  const handleStatusChange = (statuses: string[]) => {
-    setLocalFilters({ ...localFilters, status: statuses.length > 0 ? statuses : undefined });
+  const handleContractTypeChange = (contractTypes: string[]) => {
+    setLocalFilters({ ...localFilters, contractTypes: contractTypes.length > 0 ? (contractTypes as any) : undefined });
   };
+
+  // Dismissal/admission date ranges now live on the related current EmploymentContract.
+  // We read/write them through the `where.currentContract.is` relation filter
+  // (terminationDate = dismissal, exp1EndAt = first experience-period end).
+  const currentContractIs = ((localFilters.where as any)?.currentContract?.is ?? {}) as {
+    terminationDate?: { gte?: Date; lte?: Date };
+    exp1EndAt?: { gte?: Date; lte?: Date };
+  };
+  const dismissedRange = currentContractIs.terminationDate ?? {};
+  const exp1EndRange = currentContractIs.exp1EndAt ?? {};
+
+  const writeCurrentContractDate = (
+    field: "terminationDate" | "exp1EndAt",
+    range: { gte?: Date; lte?: Date },
+  ) => {
+    const nextIs: any = { ...currentContractIs };
+    const cleaned: { gte?: Date; lte?: Date } = {
+      ...(range.gte && { gte: range.gte }),
+      ...(range.lte && { lte: range.lte }),
+    };
+    if (cleaned.gte || cleaned.lte) {
+      nextIs[field] = cleaned;
+    } else {
+      delete nextIs[field];
+    }
+
+    const nextWhere: any = { ...(localFilters.where as any) };
+    if (Object.keys(nextIs).length > 0) {
+      nextWhere.currentContract = { is: nextIs };
+    } else {
+      delete nextWhere.currentContract;
+    }
+
+    setLocalFilters({
+      ...localFilters,
+      where: Object.keys(nextWhere).length > 0 ? nextWhere : undefined,
+    });
+  };
+
+  const setDismissedRange = (range: { gte?: Date; lte?: Date }) => writeCurrentContractDate("terminationDate", range);
+  const setExp1EndRange = (range: { gte?: Date; lte?: Date }) => writeCurrentContractDate("exp1EndAt", range);
 
   const handlePositionChange = (positions: string[]) => {
     setLocalFilters({ ...localFilters, positionId: positions.length > 0 ? positions : undefined });
@@ -60,8 +101,8 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
     setLocalFilters({ ...localFilters, sectorId: sectors.length > 0 ? sectors : undefined });
   };
 
-  // Status options (static, no async needed)
-  const statusOptions = Object.entries(USER_STATUS_LABELS).map(([value, label]) => ({
+  // Contract type options (static, no async needed)
+  const contractTypeOptions = Object.entries(CONTRACT_TYPE_LABELS).map(([value, label]) => ({
     value,
     label,
   }));
@@ -160,7 +201,7 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
       onOpenChange={onOpenChange}
       title="Filtros Avançados"
       titleIcon={<IconFilter className="h-5 w-5" />}
-      description="Filtre os usuários por status, cargo, setor, datas de nascimento, demissão e contratação"
+      description="Filtre os usuários por tipo de contrato, cargo, setor, datas de nascimento, demissão e contratação"
       activeFilterCount={activeFilterCount}
       onApply={handleApplyFilters}
       onReset={handleResetFilters}
@@ -170,17 +211,17 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
             <div>
               <Label className="flex items-center gap-2 mb-2">
                 <IconUser className="h-4 w-4" />
-                Status
+                Tipo de Contrato
               </Label>
               <Combobox
                 mode="multiple"
-                options={statusOptions}
-                value={selectedStatuses}
+                options={contractTypeOptions}
+                value={selectedContractTypes}
                 onValueChange={(value) => {
                   const arr = Array.isArray(value) ? value : (value ? [value] : []);
-                  handleStatusChange(arr);
+                  handleContractTypeChange(arr);
                 }}
-                placeholder="Selecione os status"
+                placeholder="Selecione os tipos de contrato"
                 searchable={true}
                 minSearchLength={0}
               />
@@ -291,7 +332,8 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 </div>
               </div>
 
-              {/* Dismissed Date Range */}
+              {/* Dismissed Date Range — maps onto the current EmploymentContract's
+                  terminationDate via the currentContract relation filter. */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <IconCalendar className="h-4 w-4" />
@@ -302,20 +344,10 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                     <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
                     <DateTimeInput
                       mode="date"
-                      value={localFilters.dismissedAt?.gte}
+                      value={dismissedRange.gte}
                       onChange={(date) => {
                         const dateValue = date instanceof Date ? date : null;
-                        if (!dateValue && !localFilters.dismissedAt?.lte) {
-                          setLocalFilters({ ...localFilters, dismissedAt: undefined });
-                        } else {
-                          setLocalFilters({
-                            ...localFilters,
-                            dismissedAt: {
-                              ...(dateValue && { gte: dateValue }),
-                              ...(localFilters.dismissedAt?.lte && { lte: localFilters.dismissedAt.lte }),
-                            },
-                          });
-                        }
+                        setDismissedRange({ ...dismissedRange, gte: dateValue ?? undefined });
                       }}
                       hideLabel
                       placeholder="Selecionar data inicial..."
@@ -325,20 +357,10 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                     <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
                     <DateTimeInput
                       mode="date"
-                      value={localFilters.dismissedAt?.lte}
+                      value={dismissedRange.lte}
                       onChange={(date) => {
                         const dateValue = date instanceof Date ? date : null;
-                        if (!dateValue && !localFilters.dismissedAt?.gte) {
-                          setLocalFilters({ ...localFilters, dismissedAt: undefined });
-                        } else {
-                          setLocalFilters({
-                            ...localFilters,
-                            dismissedAt: {
-                              ...(localFilters.dismissedAt?.gte && { gte: localFilters.dismissedAt.gte }),
-                              ...(dateValue && { lte: dateValue }),
-                            },
-                          });
-                        }
+                        setDismissedRange({ ...dismissedRange, lte: dateValue ?? undefined });
                       }}
                       hideLabel
                       placeholder="Selecionar data final..."
@@ -347,7 +369,8 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 </div>
               </div>
 
-              {/* Exp1 End Date Range */}
+              {/* Exp1 End Date Range — maps onto the current EmploymentContract's
+                  exp1EndAt via the currentContract relation filter. */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <IconCalendar className="h-4 w-4" />
@@ -358,20 +381,10 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                     <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
                     <DateTimeInput
                       mode="date"
-                      value={localFilters.exp1EndAt?.gte}
+                      value={exp1EndRange.gte}
                       onChange={(date) => {
                         const dateValue = date instanceof Date ? date : null;
-                        if (!dateValue && !localFilters.exp1EndAt?.lte) {
-                          setLocalFilters({ ...localFilters, exp1EndAt: undefined });
-                        } else {
-                          setLocalFilters({
-                            ...localFilters,
-                            exp1EndAt: {
-                              ...(dateValue && { gte: dateValue }),
-                              ...(localFilters.exp1EndAt?.lte && { lte: localFilters.exp1EndAt.lte }),
-                            },
-                          });
-                        }
+                        setExp1EndRange({ ...exp1EndRange, gte: dateValue ?? undefined });
                       }}
                       hideLabel
                       placeholder="Selecionar data inicial..."
@@ -381,20 +394,10 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                     <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
                     <DateTimeInput
                       mode="date"
-                      value={localFilters.exp1EndAt?.lte}
+                      value={exp1EndRange.lte}
                       onChange={(date) => {
                         const dateValue = date instanceof Date ? date : null;
-                        if (!dateValue && !localFilters.exp1EndAt?.gte) {
-                          setLocalFilters({ ...localFilters, exp1EndAt: undefined });
-                        } else {
-                          setLocalFilters({
-                            ...localFilters,
-                            exp1EndAt: {
-                              ...(localFilters.exp1EndAt?.gte && { gte: localFilters.exp1EndAt.gte }),
-                              ...(dateValue && { lte: dateValue }),
-                            },
-                          });
-                        }
+                        setExp1EndRange({ ...exp1EndRange, lte: dateValue ?? undefined });
                       }}
                       hideLabel
                       placeholder="Selecionar data final..."

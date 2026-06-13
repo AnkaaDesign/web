@@ -814,10 +814,16 @@ export default function PayrollListPage() {
         }
         const netBonusAmount = bonusAmount - bonusDiscountsTotal;
 
-        // Calculate the discounts total with proper number handling
+        // Calculate the discounts total with proper number handling.
+        // FGTS rows are an EMPLOYER contribution (informational only) and
+        // inactive rows are historical — neither reduces the net salary.
         const totalDiscounts = payroll.discounts && Array.isArray(payroll.discounts)
           ? payroll.discounts.reduce((sum: number, discount: any) => {
               if (!discount) return sum;
+              if (discount.isActive === false) return sum;
+              const isFgts = discount.discountType === 'FGTS' ||
+                `${discount.reference || ''}`.toUpperCase().includes('FGTS');
+              if (isFgts) return sum;
               const discountValue = discount.value ? Number(discount.value) : 0;
               return sum + (isNaN(discountValue) ? 0 : discountValue);
             }, 0)
@@ -847,7 +853,7 @@ export default function PayrollListPage() {
           position: user.position,
           sector: user.sector,
           performanceLevel: payroll.performanceLevel || bonus?.performanceLevel || user.performanceLevel || 0,
-          status: payroll.status || user.status || 'ACTIVE',
+          status: user.currentContractType || 'ACTIVE',
 
           // Payroll data - Base
           payrollId: payroll.id,
@@ -1054,7 +1060,7 @@ export default function PayrollListPage() {
   const hasActiveFilters = activeFiltersCount > 0;
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
         <PageHeader
           className="flex-shrink-0"
@@ -1070,7 +1076,7 @@ export default function PayrollListPage() {
                 return `Período: ${filters.months.length} meses de ${filters.year}`;
               }
             }
-            return "Visualização da folha de pagamento com cálculos de bonificações e bonificações";
+            return "Visualização da folha de pagamento com cálculos de bonificações e descontos";
           })()}
           actions={[]}
         />

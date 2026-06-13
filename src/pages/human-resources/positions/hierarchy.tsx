@@ -167,7 +167,7 @@ export const PositionHierarchyPage = () => {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col px-4 pt-4">
         <div className="flex-shrink-0">
           <PageHeader

@@ -134,6 +134,21 @@ export * from "./push-notifications";
 export { reconciliationService } from "./reconciliation";
 export { siegService } from "./sieg";
 
+// Accounting area — Departamento Pessoal / Medicina do Trabalho
+export * from "./salary-adjustment";
+export * from "./user-position-history";
+export * from "./admission";
+export * from "./termination";
+export * from "./employment-contract";
+export * from "./medical-exam";
+export * from "./leave";
+export * from "./benefit";
+export * from "./dependent";
+
+// Calendário/agenda + post-its (a5-calendar)
+export * from "./agenda-event";
+export * from "./postit";
+
 // Skill-Assessment domain
 export * from "./skill";
 export * from "./topic";

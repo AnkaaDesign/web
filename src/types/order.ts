@@ -1,7 +1,7 @@
 // packages/interfaces/src/order.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
-import type { ORDER_STATUS, PAYMENT_METHOD, SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, ORDER_TRIGGER_TYPE, ORDER_BY_DIRECTION, RESCHEDULE_REASON } from '@constants';
+import type { ORDER_STATUS, ORDER_PAYMENT_STATUS, PAYMENT_METHOD, SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, ORDER_TRIGGER_TYPE, ORDER_BY_DIRECTION, RESCHEDULE_REASON } from '@constants';
 import type { Supplier, SupplierIncludes, SupplierOrderBy } from "./supplier";
 import type { Item, ItemIncludes, ItemOrderBy, ItemWhere } from "./item";
 import type { File, FileIncludes } from "./file";
@@ -126,6 +126,11 @@ export interface Order extends BaseEntity {
   forecast: Date | null;
   status: ORDER_STATUS;
   statusOrder: number; // Status numeric order for sorting: 1=Created, 2=PartiallyFulfilled, 3=Fulfilled, 4=Overdue, 5=PartiallyReceived, 6=Received, 7=Cancelled
+  // Payment workflow (contas a pagar)
+  paymentStatus: ORDER_PAYMENT_STATUS;
+  paymentStatusOrder: number; // 1=NotRequested, 2=Requested, 3=AwaitingPayment, 4=Paid
+  paymentRequestedAt: Date | null;
+  paidAt: Date | null;
   budgetIds?: string[];
   invoiceIds?: string[];
   receiptIds?: string[];
@@ -299,6 +304,10 @@ export interface OrderWhere {
   description?: string | { equals?: string; not?: string; contains?: string; startsWith?: string; endsWith?: string; mode?: "default" | "insensitive" };
   status?: ORDER_STATUS | { equals?: ORDER_STATUS; not?: ORDER_STATUS; in?: ORDER_STATUS[]; notIn?: ORDER_STATUS[] };
   statusOrder?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number };
+  paymentStatus?: ORDER_PAYMENT_STATUS | { equals?: ORDER_PAYMENT_STATUS; not?: ORDER_PAYMENT_STATUS; in?: ORDER_PAYMENT_STATUS[]; notIn?: ORDER_PAYMENT_STATUS[] };
+  paymentStatusOrder?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number };
+  paymentRequestedAt?: Date | null | { equals?: Date | null; not?: Date | null; lt?: Date; lte?: Date; gt?: Date; gte?: Date };
+  paidAt?: Date | null | { equals?: Date | null; not?: Date | null; lt?: Date; lte?: Date; gt?: Date; gte?: Date };
   supplierId?: string | null | { equals?: string | null; not?: string | null; in?: string[]; notIn?: string[] };
   forecast?: Date | null | { equals?: Date | null; not?: Date | null; lt?: Date; lte?: Date; gt?: Date; gte?: Date };
   createdAt?: Date | { equals?: Date; not?: Date; lt?: Date; lte?: Date; gt?: Date; gte?: Date };
@@ -364,6 +373,10 @@ export interface OrderOrderBy {
   forecast?: ORDER_BY_DIRECTION;
   status?: ORDER_BY_DIRECTION;
   statusOrder?: ORDER_BY_DIRECTION;
+  paymentStatus?: ORDER_BY_DIRECTION;
+  paymentStatusOrder?: ORDER_BY_DIRECTION;
+  paymentRequestedAt?: ORDER_BY_DIRECTION;
+  paidAt?: ORDER_BY_DIRECTION;
   notes?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
@@ -420,6 +433,27 @@ export interface OrderRuleOrderBy {
 // Order responses
 export interface OrderGetUniqueResponse extends BaseGetUniqueResponse<Order> {}
 export interface OrderGetManyResponse extends BaseGetManyResponse<Order> {}
+
+// Payment summary (contas a pagar) — lightweight per-paymentStatus aggregates
+// computed server-side: items (price×qty + ICMS/IPI) − discount% on goods
+// subtotal + freight. PAID is windowed to the last 90 days.
+export interface OrderPaymentSummaryBucket {
+  count: number;
+  total: number;
+}
+
+export interface OrderPaymentSummaryData {
+  NOT_REQUESTED: OrderPaymentSummaryBucket;
+  REQUESTED: OrderPaymentSummaryBucket;
+  AWAITING_PAYMENT: OrderPaymentSummaryBucket;
+  PAID_LAST_90_DAYS: OrderPaymentSummaryBucket;
+}
+
+export interface OrderPaymentSummaryResponse {
+  success: boolean;
+  message: string;
+  data: OrderPaymentSummaryData;
+}
 export interface OrderCreateResponse extends BaseCreateResponse<Order> {}
 export interface OrderUpdateResponse extends BaseUpdateResponse<Order> {}
 export interface OrderDeleteResponse extends BaseDeleteResponse {}

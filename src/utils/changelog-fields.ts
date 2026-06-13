@@ -16,6 +16,7 @@ import {
   TASK_QUOTE_STATUS,
   DISCOUNT_TYPE,
   PAYMENT_CONDITION,
+  ORDER_PAYMENT_STATUS_LABELS,
 } from '@constants';
 import { formatDateTime, formatDate } from "./date";
 import { formatCurrency } from "./number";
@@ -180,6 +181,10 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     paymentDueDays: "Prazo de Vencimento",
     paymentResponsibleId: "Responsável pelo Pagamento",
     paymentAssignedById: "Atribuído por",
+    paymentStatus: "Status de Pagamento",
+    paymentStatusOrder: "Ordem do Status de Pagamento",
+    paymentRequestedAt: "Pagamento Solicitado em",
+    paidAt: "Pago em",
     items: "Itens do Pedido",
   },
   [CHANGE_LOG_ENTITY_TYPE.ORDER_ITEM]: {
@@ -230,9 +235,20 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     ledSector: "Setor Liderado",
     performanceLevel: "Nível de Desempenho",
 
-    // Status and employment
-    status: "Status",
-    statusOrder: "Ordem do Status",
+    // Contract kind and employment
+    contractKind: "Tipo de Contrato", // legacy field name kept for historical changelog rows
+    contractKindOrder: "Ordem do Tipo de Contrato",
+    contractType: "Tipo de Contrato",
+    currentContractType: "Tipo de Contrato",
+    currentContractStatus: "Situação do Contrato",
+    currentEmployeeType: "Tipo de Funcionário",
+    contractStatus: "Situação do Contrato",
+    employeeType: "Tipo de Funcionário",
+    terminationDate: "Data de Demissão",
+    admissionDate: "Data de Admissão",
+    // Legacy field names kept for historical changelog rows
+    status: "Tipo de Contrato",
+    statusOrder: "Ordem do Tipo de Contrato",
     isActive: "Ativo",
     effectedAt: "Data de Contratação",
     exp1StartAt: "Data de Admissão / Início Exp. 1",
@@ -1174,6 +1190,11 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return orderStatusLabels[value] || value;
   }
 
+  // Handle order payment status (contas a pagar workflow)
+  if (field === "paymentStatus" && entityType === CHANGE_LOG_ENTITY_TYPE.ORDER && typeof value === "string") {
+    return ORDER_PAYMENT_STATUS_LABELS[value as keyof typeof ORDER_PAYMENT_STATUS_LABELS] || value;
+  }
+
   // Handle order payment method
   if (field === "paymentMethod" && entityType === CHANGE_LOG_ENTITY_TYPE.ORDER && typeof value === "string") {
     const paymentMethodLabels: Record<string, string> = {
@@ -1240,15 +1261,21 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return maintenanceStatusLabels[value] || value;
   }
 
-  // Handle user status
-  if ((field === "status" || field === "status_transition") && entityType === CHANGE_LOG_ENTITY_TYPE.USER && typeof value === "string") {
-    const userStatusLabels: Record<string, string> = {
+  // Handle user contract kind (field renamed status -> contractKind; legacy names kept for old rows)
+  if (
+    (field === "contractKind" || field === "contractKind_transition" || field === "status" || field === "status_transition") &&
+    entityType === CHANGE_LOG_ENTITY_TYPE.USER &&
+    typeof value === "string"
+  ) {
+    const contractKindLabels: Record<string, string> = {
       EXPERIENCE_PERIOD_1: "Experiência - 1º Período",
       EXPERIENCE_PERIOD_2: "Experiência - 2º Período",
       EFFECTED: "Efetivado",
+      APPRENTICE: "Aprendiz",
+      INTERMITTENT: "Intermitente",
       DISMISSED: "Demitido",
     };
-    return userStatusLabels[value] || value;
+    return contractKindLabels[value] || value;
   }
 
   // Handle PPE size fields for User entity

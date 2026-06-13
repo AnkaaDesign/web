@@ -10,7 +10,7 @@ export const HRCalendarPage = () => {
   usePageTracker({ title: "Calendário RH", icon: "calendarStats" });
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Calendário"
@@ -22,7 +22,10 @@ export const HRCalendarPage = () => {
           ]}
           className="flex-shrink-0"
         />
-        <div className="flex-1 overflow-y-auto pb-6">
+        {/* Scroll container with a column flex: the calendar card fills the
+            viewport when it fits and grows past it (page scrolls) when the
+            month grid needs more height. */}
+        <div className="flex-1 min-h-0 overflow-y-auto pb-6 flex flex-col">
           <AbsencesCalendar />
         </div>
       </div>

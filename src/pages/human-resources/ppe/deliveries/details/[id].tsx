@@ -148,7 +148,7 @@ const EPIDeliveryDetails = () => {
   // Loading state
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
           <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
             <div className="animate-pulse space-y-6">
@@ -187,7 +187,7 @@ const EPIDeliveryDetails = () => {
   // Error state
   if (error || !ppeDelivery) {
     return (
-      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
           <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
             <div className="flex flex-1 items-center justify-center min-h-[60vh]">
@@ -254,7 +254,7 @@ const EPIDeliveryDetails = () => {
   }
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col px-4 pt-4">
         {/* Header */}
         <div className="animate-in fade-in-50 duration-500">

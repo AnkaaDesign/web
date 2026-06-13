@@ -1,0 +1,60 @@
+## ERP – Ankaa
+Área - Andressa
+## 1. Minha Área
+-Minhas mensagens
+-Mensagens
+## 2. Departamento Pessoal
+-Colaboradores
+-Advertencias
+-controle de ponto
+-requisiçoes
+-férias 
+-integração secullum
+-Admissão
+Cadastro de colaborador 
+Documentação 
+Contrato 
+Registro 
+-Rescisão
+Cálculos 
+Aviso prévio 
+Documentos 
+Homologação 
+-Salários e cargos
+Faixas salariais 
+cargos
+horarios
+Reajustes 
+Promoções 
+Gratificações 
+Benefícios
+Vale transporte 
+Vale alimentação 
+Plano de saúde 
+Convênios 
+## 3. Medicina do Trabalho
+-Entrega de epis
+-ASO
+-Exames periódicos
+-Afastamentos 
+## 4. FINANCEIRO
+-Contas a pagar (nos pedidos, botão direito “solicitar pagamento”, “aguardando pagamento”)
+-notas fiscais
+-Conciliação bancaria
+1. Extrato
+2. Saídas
+3. Previsão de saídas
+-pedidos
+-calculo aproximado dos impostos
+-folha (com bonificação) e afins
+4. Conciliação de entrada
+## 5. FERRAMENTAS
+Postites
+Calculadora com histórico
+Calendário
+com feriados, datas comemorativas, aniversários funcionários e empresa (com parabenização temática pelo app e a sacanagem de avisar todo mundo.
+Função agenda com configuração de avisos (dias antes, no dia, pelo zap, e atrasos)
+Calculadora de horas
+Certificado de Resíduos
+Custo de horas extras
+Custo de funcionário - um simulador para ajudar a empresa a ver quanto um funcionário realmente custa (Salário + FGTS + Férias + 13º + Benefícios)

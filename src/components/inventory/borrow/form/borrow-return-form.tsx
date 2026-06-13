@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconPackage, IconUser, IconCalendar, IconArrowLeft, IconCheck, IconExclamationCircle } from "@tabler/icons-react";
 import { type Borrow } from "../../../../types";
-import { BORROW_STATUS, routes, USER_STATUS } from "../../../../constants";
+import { BORROW_STATUS, routes, CONTRACT_TYPE } from "../../../../constants";
 import { formatDateTime, formatRelativeTime } from "../../../../utils";
 import { toast } from "@/components/ui/sonner";
 import { useBorrowMutations } from "../../../../hooks";
@@ -24,7 +24,7 @@ import {
 interface BorrowReturnFormProps {
   borrow: Borrow & {
     item?: { name: string; uniCode?: string; quantity?: number; measureUnit?: string; itemCategory?: { name: string; type: string } };
-    user?: { name: string; email?: string; status?: string; position?: { name: string } };
+    user?: { name: string; email?: string; status?: string; currentContractType?: CONTRACT_TYPE | null; position?: { name: string } };
   };
   onCancel: () => void;
 }
@@ -66,7 +66,7 @@ export function BorrowReturnForm({ borrow, onCancel }: BorrowReturnFormProps) {
       }
 
       // Validate user is still active (warning only)
-      if (borrow.user?.status && borrow.user.status !== USER_STATUS.EFFECTED) {
+      if (borrow.user?.currentContractType && borrow.user.currentContractType !== CONTRACT_TYPE.EFFECTED) {
         toast.warning("Aviso: Usuário do empréstimo está inativo");
       }
 
@@ -220,9 +220,9 @@ export function BorrowReturnForm({ borrow, onCancel }: BorrowReturnFormProps) {
                   <label className="text-sm text-muted-foreground">Nome</label>
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium">{borrow.user?.name || "-"}</p>
-                    {borrow.user?.status && (
-                      <Badge variant={borrow.user.status === USER_STATUS.EFFECTED ? "default" : "destructive"} className="text-xs">
-                        {borrow.user.status === USER_STATUS.EFFECTED ? "Ativo" : "Inativo"}
+                    {borrow.user?.currentContractType && (
+                      <Badge variant={borrow.user.currentContractType === CONTRACT_TYPE.EFFECTED ? "default" : "destructive"} className="text-xs">
+                        {borrow.user.currentContractType === CONTRACT_TYPE.EFFECTED ? "Ativo" : "Inativo"}
                       </Badge>
                     )}
                   </div>

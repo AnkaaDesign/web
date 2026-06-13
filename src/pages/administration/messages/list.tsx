@@ -11,6 +11,7 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { FAVORITE_PAGES, routes } from "../../../constants";
+import { useNavBreadcrumbs } from "@/contexts/navigation-context";
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -55,6 +56,14 @@ function FilterIndicator({
 
 export const MessageListPage = () => {
   const navigate = useNavigate();
+
+  // Context-aware trail: shared page — accounting users have root-level "Mensagens"
+  // (no "Administração" section in their menu).
+  const breadcrumbs = useNavBreadcrumbs([
+    { label: "Início", href: "/" },
+    { label: "Administração", href: "/administracao" },
+    { label: "Mensagens" },
+  ]);
 
   // State
   const [searchInput, setSearchInput] = useState("");
@@ -162,11 +171,7 @@ export const MessageListPage = () => {
           title="Mensagens"
           icon={IconMessagePlus}
           favoritePage={FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_LISTAR}
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Administração", href: "/administracao" },
-            { label: "Mensagens" },
-          ]}
+          breadcrumbs={breadcrumbs}
           className="flex-shrink-0"
           actions={[
             {

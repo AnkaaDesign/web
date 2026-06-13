@@ -39,7 +39,7 @@ export function PayrollSummaryCard({ payroll }: PayrollSummaryCardProps) {
   ) || [];
 
   const legalDiscounts = payroll.discounts?.filter(d =>
-    ['UNION_CONTRIBUTION', 'ALIMONY', 'GARNISHMENT'].includes(d.discountType || '')
+    ['UNION', 'ALIMONY', 'GARNISHMENT'].includes(d.discountType || '')
   ) || [];
 
   const loanDiscounts = payroll.discounts?.filter(d =>

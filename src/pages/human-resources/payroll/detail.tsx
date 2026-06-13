@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { Fragment, useState, useMemo, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { payrollService } from "../../../api-client";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
@@ -7,17 +7,21 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { formatCurrency } from "../../../utils";
 import { formatCPF, formatPIS } from "../../../utils/formatters";
 import { cn } from "@/lib/utils";
 import { generatePayrollPDF } from "@/utils/payroll-pdf-generator";
+import { LoanDialog, type LoanDiscountRow } from "@/components/human-resources/payroll/loan-dialog";
 import {
   IconAlertCircle,
   IconRefresh,
   IconFileDownload,
   IconUser,
   IconCurrencyReal,
+  IconCreditCard,
+  IconPencil,
 } from "@tabler/icons-react";
 
 interface PayrollDetailPageParams extends Record<string, string | undefined> {
@@ -54,6 +58,58 @@ const getNumericValue = (value: any): number => {
   return 0;
 };
 
+// FGTS is an EMPLOYER contribution: it must never be summed into the
+// employee's discounts. Saved payrolls carry an informational FGTS discount
+// row ("FGTS (Empregador)"); live payrolls don't.
+const isFgtsDiscount = (discount: any): boolean => {
+  if (discount?.discountType === 'FGTS') return true;
+  const text = `${discount?.reference || ''} ${discount?.description || ''}`.toUpperCase();
+  return text.includes('FGTS');
+};
+
+// Discounts that actually reduce the employee's net salary
+const isEmployeeDiscount = (discount: any): boolean => {
+  if (!discount) return false;
+  if (discount.isActive === false) return false;
+  return !isFgtsDiscount(discount);
+};
+
+// Grouping of PayrollDiscountType values for display
+const DISCOUNT_GROUPS: Array<{ key: string; label: string; types: string[] }> = [
+  { key: 'taxes', label: 'Impostos', types: ['INSS', 'IRRF'] },
+  {
+    key: 'absences',
+    label: 'Faltas e Atrasos',
+    types: ['ABSENCE', 'PARTIAL_ABSENCE', 'DSR_ABSENCE', 'LATE_ARRIVAL', 'SICK_LEAVE'],
+  },
+  {
+    key: 'benefits',
+    label: 'Benefícios',
+    types: ['HEALTH_INSURANCE', 'DENTAL_INSURANCE', 'MEAL_VOUCHER', 'TRANSPORT_VOUCHER'],
+  },
+  { key: 'loans', label: 'Empréstimos e Adiantamentos', types: ['LOAN', 'ADVANCE'] },
+  {
+    key: 'others',
+    label: 'Outros Descontos',
+    types: ['UNION', 'ALIMONY', 'GARNISHMENT', 'AUTHORIZED_DISCOUNT', 'CUSTOM'],
+  },
+];
+
+const getDiscountGroupKey = (discount: any): string => {
+  const type = discount?.discountType;
+  if (type) {
+    const group = DISCOUNT_GROUPS.find((g) => g.types.includes(type));
+    if (group) return group.key;
+    return 'others';
+  }
+  // Untyped rows: classify taxes by reference text, everything else as "others"
+  const text = `${discount?.reference || ''}`.toUpperCase();
+  if (text.includes('INSS') || text.includes('IRRF') || text.includes('I.N.S.S') || text.includes('I.R.R.F')) {
+    return 'taxes';
+  }
+  return 'others';
+};
+
 
 // Info row component for consistent styling
 function InfoRow({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
@@ -73,6 +129,10 @@ export default function PayrollDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Loan (consignado) dialog state
+  const [loanDialogOpen, setLoanDialogOpen] = useState(false);
+  const [editingLoan, setEditingLoan] = useState<LoanDiscountRow | null>(null);
+
   // Track page access
   usePageTracker({
     title: "Detalhes da Folha de Pagamento",
@@ -80,74 +140,83 @@ export default function PayrollDetailPage() {
   });
 
   // Fetch payroll data - Backend handles both regular UUIDs and live IDs (live-{userId}-{year}-{month})
-  useEffect(() => {
+  const fetchPayroll = useCallback(async (showLoading = true) => {
     if (!payrollId) {
       setError('ID da folha de pagamento não fornecido');
       setLoading(false);
       return;
     }
 
-    const fetchPayroll = async () => {
-      setLoading(true);
-      setError(null);
+    if (showLoading) setLoading(true);
+    setError(null);
 
-      try {
-        // Single endpoint handles both live IDs and regular UUIDs
-        // Backend's findByIdOrLive parses live IDs and returns consistent data format
-        const response = await payrollService.getById(payrollId, {
-          include: {
-            user: {
-              include: {
-                position: true,
-                sector: true,
-              },
+    try {
+      // Single endpoint handles both live IDs and regular UUIDs
+      // Backend's findByIdOrLive parses live IDs and returns consistent data format
+      const response = await payrollService.getById(payrollId, {
+        include: {
+          user: {
+            include: {
+              position: true,
+              sector: true,
             },
-            position: true,
-            bonus: {
-              include: {
-                bonusDiscounts: true,
-                bonusExtras: true,
-              },
-            },
-            discounts: true,
           },
-        });
+          position: true,
+          bonus: {
+            include: {
+              bonusDiscounts: true,
+              bonusExtras: true,
+            },
+          },
+          discounts: true,
+        },
+      });
 
-        const responseData = response.data;
+      const responseData: any = response.data;
 
-        // Backend response handling:
-        // - Regular UUID: returns Payroll directly
-        // - Live ID: returns { success, message, data: { payroll, bonus, calculations } }
-        // Check if response has the wrapped format (live endpoint)
-        if (responseData && typeof responseData === 'object') {
-          // Type guard for live endpoint response
-          const isLiveResponse = (data: any): data is { success: boolean; message: string; data: { payroll: any } } => {
-            return 'success' in data && 'data' in data && typeof data.data === 'object' && data.data !== null && 'payroll' in data.data;
-          };
+      // Backend response handling — both GET /payroll/:id and
+      // GET /payroll/live/:userId/:year/:month return:
+      //   { success, message, data: <payroll> }
+      // where data is the payroll object directly (live and saved share the
+      // exact same structure). A legacy shape { data: { payroll } } is also
+      // tolerated.
+      let resolved: any = null;
+      let failureMessage: string | null = null;
 
-          if (isLiveResponse(responseData)) {
-            // Live endpoint format: { success, message, data: { payroll, ... } }
-            if (responseData.success) {
-              setPayroll(responseData.data.payroll);
-            } else {
-              setError(responseData.message || 'Folha de pagamento não encontrada.');
-            }
+      if (responseData && typeof responseData === 'object') {
+        if ('data' in responseData && ('success' in responseData || 'message' in responseData)) {
+          if (responseData.success === false) {
+            failureMessage = responseData.message || null;
           } else {
-            // Regular UUID format: Payroll object directly
-            setPayroll(responseData);
+            const inner = responseData.data;
+            if (inner && typeof inner === 'object' && 'payroll' in inner && !('id' in inner)) {
+              // Legacy wrapped format: { data: { payroll, bonus, calculations } }
+              resolved = inner.payroll;
+            } else {
+              resolved = inner;
+            }
           }
         } else {
-          setError('Folha de pagamento não encontrada.');
+          // Payroll object returned directly (no wrapper)
+          resolved = responseData;
         }
-      } catch (err: any) {
-        setError(err?.response?.data?.message || 'Erro ao carregar folha de pagamento.');
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchPayroll();
+      if (resolved) {
+        setPayroll(resolved);
+      } else {
+        setError(failureMessage || 'Folha de pagamento não encontrada.');
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Erro ao carregar folha de pagamento.');
+    } finally {
+      if (showLoading) setLoading(false);
+    }
   }, [payrollId]);
+
+  useEffect(() => {
+    fetchPayroll();
+  }, [fetchPayroll]);
 
   // Calculate values
   const calculations = useMemo(() => {
@@ -166,6 +235,12 @@ export default function PayrollDetailPage() {
         totalGross: 0,
         totalDiscounts: 0,
         totalNet: 0,
+        inssBase: 0,
+        inssAmount: 0,
+        irrfBase: 0,
+        irrfAmount: 0,
+        fgtsAmount: 0,
+        employeeDiscounts: [] as any[],
       };
     }
 
@@ -187,24 +262,47 @@ export default function PayrollDetailPage() {
     const nightHours = getNumericValue(payroll.nightHours);
     const dsrAmount = getNumericValue(payroll.dsrAmount);
 
-    // Total gross includes ALL earnings (use netBonusAmount since bonus discounts are internal to the bonus)
-    const totalGross = baseRemuneration + netBonusAmount + overtime50Amount + overtime100Amount + nightDifferentialAmount + dsrAmount;
+    // Total gross includes ALL earnings. Prefer the API-calculated grossSalary
+    // (saved AND live payrolls carry it); fall back to a client-side sum.
+    const computedGross = baseRemuneration + netBonusAmount + overtime50Amount + overtime100Amount + nightDifferentialAmount + dsrAmount;
+    const apiGross = getNumericValue(payroll.grossSalary);
+    const totalGross = apiGross > 0 ? apiGross : computedGross;
 
-    // Calculate discounts
-    let totalDiscounts = 0;
-    if (payroll.discounts && payroll.discounts.length > 0) {
-      payroll.discounts.forEach((discount: any) => {
-        const discountVal = getNumericValue(discount.value);
-        if (discountVal > 0) {
-          totalDiscounts += discountVal;
-        } else if (discount.percentage) {
-          totalDiscounts += totalGross * (getNumericValue(discount.percentage) / 100);
-        }
-      });
-    }
+    // Employee discounts: active rows only and NEVER FGTS (employer contribution)
+    const employeeDiscounts: any[] = (payroll.discounts || []).filter(isEmployeeDiscount);
 
-    // Bonus discounts are already factored into netBonusAmount, so we don't need to calculate them separately
-    const totalNet = totalGross - totalDiscounts;
+    // Calculate discounts (employee rows only)
+    let computedDiscounts = 0;
+    employeeDiscounts.forEach((discount: any) => {
+      const discountVal = getNumericValue(discount.value);
+      if (discountVal > 0) {
+        computedDiscounts += discountVal;
+      } else if (discount.percentage) {
+        computedDiscounts += totalGross * (getNumericValue(discount.percentage) / 100);
+      }
+    });
+
+    // Prefer API totals (FGTS is already excluded from them server-side)
+    const apiTotalDiscounts = payroll.totalDiscounts !== undefined && payroll.totalDiscounts !== null
+      ? getNumericValue(payroll.totalDiscounts)
+      : null;
+    const totalDiscounts = apiTotalDiscounts !== null ? apiTotalDiscounts : computedDiscounts;
+
+    const apiNet = payroll.netSalary !== undefined && payroll.netSalary !== null
+      ? getNumericValue(payroll.netSalary)
+      : null;
+    const totalNet = apiNet !== null ? apiNet : totalGross - totalDiscounts;
+
+    // Tax details
+    const inssBase = getNumericValue(payroll.inssBase);
+    const inssAmount = getNumericValue(payroll.inssAmount);
+    const irrfBase = getNumericValue(payroll.irrfBase);
+    const irrfAmount = getNumericValue(payroll.irrfAmount);
+
+    // FGTS (employer deposit): live payrolls only have the payroll field;
+    // saved payrolls also carry an informational discount row.
+    const fgtsRow = (payroll.discounts || []).find(isFgtsDiscount);
+    const fgtsAmount = getNumericValue(payroll.fgtsAmount) || (fgtsRow ? getNumericValue(fgtsRow.value) : 0);
 
     return {
       baseRemuneration,
@@ -220,13 +318,19 @@ export default function PayrollDetailPage() {
       totalGross,
       totalDiscounts,
       totalNet,
+      inssBase,
+      inssAmount,
+      irrfBase,
+      irrfAmount,
+      fgtsAmount,
+      employeeDiscounts,
     };
   }, [payroll]);
 
   // Validation - check if payrollId is provided
   if (!payrollId) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <Alert variant="destructive">
           <IconAlertCircle className="h-4 w-4" />
           <AlertDescription>ID da folha de pagamento não fornecido</AlertDescription>
@@ -237,7 +341,7 @@ export default function PayrollDetailPage() {
 
   if (loading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <div className="space-y-6">
           {/* Page Header Skeleton */}
           <div className="flex items-center justify-between">
@@ -324,7 +428,7 @@ export default function PayrollDetailPage() {
 
   if (error) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <Alert variant="destructive">
           <IconAlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
@@ -335,7 +439,7 @@ export default function PayrollDetailPage() {
 
   if (!payroll) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <Alert variant="destructive">
           <IconAlertCircle className="h-4 w-4" />
           <AlertDescription>Folha de pagamento não encontrada</AlertDescription>
@@ -370,22 +474,25 @@ export default function PayrollDetailPage() {
   const handleExport = () => {
     if (!payroll) return;
 
-    // Collect other discounts
-    const otherDiscounts = payroll.discounts
-      ?.filter((d: any) =>
-        !['INSS', 'IRRF', 'FGTS'].some(type => d.description?.toUpperCase().includes(type))
-      )
+    // Collect non-tax employee discounts (FGTS and inactive rows already excluded)
+    const otherDiscounts = calculations.employeeDiscounts
+      .filter((d: any) => {
+        if (d.discountType === 'INSS' || d.discountType === 'IRRF') return false;
+        const text = `${d.reference || ''}`.toUpperCase();
+        return !text.includes('INSS') && !text.includes('IRRF');
+      })
       .map((d: any) => ({
-        description: d.description || 'Desconto',
-        amount: getNumericValue(d.amount)
-      })) || [];
+        description: d.reference || 'Desconto',
+        amount: getNumericValue(d.value) ||
+          (d.percentage ? calculations.totalGross * (getNumericValue(d.percentage) / 100) : 0),
+      }));
 
-    // Get INSS and IRRF discounts
-    const inssDiscount = payroll.discounts?.find((d: any) =>
-      d.description?.toUpperCase().includes('INSS')
+    // Get INSS and IRRF discounts (typed rows first, reference text as fallback)
+    const inssDiscount = calculations.employeeDiscounts.find((d: any) =>
+      d.discountType === 'INSS' || `${d.reference || ''}`.toUpperCase().includes('INSS')
     );
-    const irrfDiscount = payroll.discounts?.find((d: any) =>
-      d.description?.toUpperCase().includes('IRRF')
+    const irrfDiscount = calculations.employeeDiscounts.find((d: any) =>
+      d.discountType === 'IRRF' || `${d.reference || ''}`.toUpperCase().includes('IRRF')
     );
 
     // Generate PDF with proper data structure
@@ -414,15 +521,12 @@ export default function PayrollDetailPage() {
       bonusAmount: calculations.bonusAmount,
 
       // Deductions
-      inssBase: getNumericValue(payroll.inssBase),
-      inssAmount: inssDiscount ? getNumericValue(inssDiscount.amount) : getNumericValue(payroll.inssAmount),
-      irrfBase: getNumericValue(payroll.irrfBase),
-      irrfAmount: irrfDiscount ? getNumericValue(irrfDiscount.amount) : getNumericValue(payroll.irrfAmount),
-      fgtsAmount: getNumericValue(payroll.fgtsAmount),
+      inssBase: calculations.inssBase,
+      inssAmount: (inssDiscount ? getNumericValue(inssDiscount.value) : 0) || calculations.inssAmount,
+      irrfBase: calculations.irrfBase,
+      irrfAmount: (irrfDiscount ? getNumericValue(irrfDiscount.value) : 0) || calculations.irrfAmount,
+      fgtsAmount: calculations.fgtsAmount,
       absenceHours: getNumericValue(payroll.absenceHours),
-      absenceAmount: getNumericValue(payroll.absenceAmount),
-      lateArrivalMinutes: getNumericValue(payroll.lateArrivalMinutes),
-      lateArrivalAmount: getNumericValue(payroll.lateArrivalAmount),
       otherDiscounts: otherDiscounts,
 
       // Totals
@@ -444,11 +548,26 @@ export default function PayrollDetailPage() {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  const hasPayrollDiscounts = payroll.discounts && payroll.discounts.length > 0;
   const hasBonusDiscounts = payroll.bonus?.bonusDiscounts && payroll.bonus.bonusDiscounts.length > 0;
 
+  // Live payrolls (id "live-{userId}-{year}-{month}" or isLive flag) have no
+  // database record yet, so persistent discounts (loans) can't be attached.
+  const isLivePayroll = payroll.isLive === true || (typeof payroll.id === 'string' && payroll.id.startsWith('live-'));
+  const canManageLoans = !isLivePayroll && !!payroll.id;
+
+  // Employee discounts grouped for display
+  const groupedDiscounts = DISCOUNT_GROUPS.map((group) => ({
+    ...group,
+    discounts: calculations.employeeDiscounts.filter((d: any) => getDiscountGroupKey(d) === group.key),
+  })).filter((group) => group.discounts.length > 0);
+
+  const openLoanDialog = (loan: LoanDiscountRow | null) => {
+    setEditingLoan(loan);
+    setLoanDialogOpen(true);
+  };
+
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="p-4 space-y-4">
         <PageHeader
           variant="detail"
@@ -460,6 +579,13 @@ export default function PayrollDetailPage() {
               label: "Atualizar",
               icon: IconRefresh,
               onClick: handleRefresh,
+            },
+            {
+              key: "register-loan",
+              label: "Registrar Empréstimo",
+              icon: IconCreditCard,
+              onClick: () => openLoanDialog(null),
+              disabled: !canManageLoans,
             },
             {
               key: "export",
@@ -617,102 +743,174 @@ export default function PayrollDetailPage() {
                     </>
                   )}
 
-                  {/* Discounts */}
-                  {hasPayrollDiscounts && payroll.discounts
-                    .filter((discount: any) => {
-                      // Filter out FGTS since we show it separately
-                      const desc = discount.description?.toUpperCase() || "";
-                      return !desc.includes("FGTS");
-                    })
-                    .map((discount: any, index: number) => {
-                      const discountValue = getNumericValue(discount.amount) ||
-                        getNumericValue(discount.value) ||
-                        (calculations.totalGross * (getNumericValue(discount.percentage) / 100));
+                  {/* Salário Bruto subtotal (all earnings) */}
+                  <tr className="border-b-2 border-border bg-muted/30">
+                    <td className="py-2 px-0 font-semibold" colSpan={2}>Salário Bruto</td>
+                    <td className="py-2 px-0 text-right font-bold">{formatAmount(calculations.totalGross)}</td>
+                  </tr>
 
-                      // Use reference for display (clean names like "I.N.S.S.")
-                      const displayDescription = discount.reference || discount.description || "Desconto";
+                  {/* Discounts - grouped (FGTS and inactive rows never shown here) */}
+                  {groupedDiscounts.map((group) => (
+                    <Fragment key={group.key}>
+                      <tr>
+                        <td colSpan={3} className="pt-3 pb-1 px-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {group.label}
+                        </td>
+                      </tr>
+                      {group.discounts.map((discount: any, index: number) => {
+                        const discountValue = getNumericValue(discount.value) ||
+                          (calculations.totalGross * (getNumericValue(discount.percentage) / 100));
 
-                      // Calculate reference text based on discount type
-                      let referenceText = "-";
-                      const desc = discount.description?.toUpperCase() || "";
-                      const ref = discount.reference?.toUpperCase() || "";
-                      const discountType = discount.discountType;
+                        // Use reference for display (clean names like "I.N.S.S.")
+                        const displayDescription = discount.reference || "Desconto";
 
-                      // Helper to format decimal hours to HH:MM
-                      const formatHoursToHHMM = (decimalHours: number): string => {
-                        const hours = Math.floor(decimalHours);
-                        const minutes = Math.round((decimalHours - hours) * 60);
-                        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-                      };
+                        // Calculate reference text based on discount type
+                        let referenceText = "-";
+                        const ref = discount.reference?.toUpperCase() || "";
+                        const discountType = discount.discountType;
+                        const isInss = discountType === 'INSS' || ref.includes("INSS") || ref.includes("I.N.S.S");
+                        const isIrrf = discountType === 'IRRF' || ref.includes("IRRF") || ref.includes("I.R.R.F");
+                        const isLoanRow = discountType === 'LOAN' || discountType === 'ADVANCE';
+                        const totalInstallments = discount.totalInstallments ? Number(discount.totalInstallments) : null;
+                        const currentInstallment = discount.currentInstallment ? Number(discount.currentInstallment) : 1;
 
-                      if (discountType === 'ABSENCE') {
-                        // Show hours in HH:MM format - prefer baseValue, fallback to payroll.absenceHours
-                        const hoursValue = getNumericValue(discount.baseValue) || getNumericValue(payroll.absenceHours);
-                        if (hoursValue > 0) {
-                          referenceText = formatHoursToHHMM(hoursValue);
-                        }
-                      } else if (discountType === 'LATE_ARRIVAL') {
-                        // Show hours in HH:MM format from baseValue
-                        const hoursValue = getNumericValue(discount.baseValue);
-                        if (hoursValue > 0) {
-                          referenceText = formatHoursToHHMM(hoursValue);
-                        }
-                      } else if (desc.includes("INSS") || ref.includes("INSS")) {
-                        // Use percentage field if available, otherwise calculate from base
-                        if (discount.percentage) {
-                          referenceText = `${getNumericValue(discount.percentage).toFixed(2)}%`;
-                        } else if (payroll.inssBase) {
-                          const inssBase = getNumericValue(payroll.inssBase);
-                          if (inssBase > 0) {
-                            const percentage = (discountValue / inssBase) * 100;
-                            referenceText = `${percentage.toFixed(2)}%`;
+                        if (isLoanRow && totalInstallments) {
+                          referenceText = `Parcela ${currentInstallment}/${totalInstallments}`;
+                        } else if (['ABSENCE', 'PARTIAL_ABSENCE', 'LATE_ARRIVAL'].includes(discountType)) {
+                          // Show hours in HH:MM format - prefer baseValue, fallback to payroll.absenceHours
+                          const hoursValue = getNumericValue(discount.baseValue) ||
+                            (discountType !== 'LATE_ARRIVAL' ? getNumericValue(payroll.absenceHours) : 0);
+                          if (hoursValue > 0) {
+                            referenceText = formatHoursToHHMM(hoursValue);
                           }
-                        }
-                      } else if (desc.includes("IRRF") || ref.includes("IRRF")) {
-                        // Use percentage field if available, otherwise calculate from base
-                        if (discount.percentage) {
-                          referenceText = `${getNumericValue(discount.percentage).toFixed(2)}%`;
-                        } else if (payroll.irrfBase) {
-                          const irrfBase = getNumericValue(payroll.irrfBase);
-                          if (irrfBase > 0 && discountValue > 0) {
-                            const percentage = (discountValue / irrfBase) * 100;
-                            referenceText = `${percentage.toFixed(2)}%`;
+                        } else if (isInss) {
+                          if (discount.percentage) {
+                            referenceText = `${getNumericValue(discount.percentage).toFixed(2)}%`;
+                          } else if (calculations.inssBase > 0 && discountValue > 0) {
+                            referenceText = `${((discountValue / calculations.inssBase) * 100).toFixed(2)}%`;
                           }
+                        } else if (isIrrf) {
+                          if (discount.percentage) {
+                            referenceText = `${getNumericValue(discount.percentage).toFixed(2)}%`;
+                          } else if (calculations.irrfBase > 0 && discountValue > 0) {
+                            referenceText = `${((discountValue / calculations.irrfBase) * 100).toFixed(2)}%`;
+                          }
+                        } else if (discount.percentage) {
+                          referenceText = `${getNumericValue(discount.percentage).toFixed(2)}%`;
                         }
-                      } else if (discount.percentage) {
-                        referenceText = `${getNumericValue(discount.percentage).toFixed(2)}%`;
-                      }
 
-                      return (
-                        <tr key={discount.id || index} className="border-b border-border">
-                          <td className="py-2 px-0">{displayDescription}</td>
-                          <td className="py-2 px-0 text-left text-muted-foreground text-xs">{referenceText}</td>
-                          <td className="py-2 px-0 text-right font-semibold text-destructive">-{formatAmount(discountValue)}</td>
-                        </tr>
-                      );
-                    })}
+                        return (
+                          <tr key={discount.id || `${group.key}-${index}`} className="border-b border-border">
+                            <td className="py-2 px-0">
+                              <span>{displayDescription}</span>
+                              {isInss && calculations.inssBase > 0 && (
+                                <span className="block text-xs text-muted-foreground">
+                                  Base INSS: {formatAmount(calculations.inssBase)}
+                                </span>
+                              )}
+                              {isIrrf && calculations.irrfBase > 0 && (
+                                <span className="block text-xs text-muted-foreground">
+                                  Base IRRF: {formatAmount(calculations.irrfBase)} (dedução de dependentes e redutor legal já aplicados)
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2 px-0 text-left text-muted-foreground text-xs">{referenceText}</td>
+                            <td className="py-2 px-0 text-right font-semibold text-destructive">
+                              <span className="inline-flex items-center gap-1.5 justify-end">
+                                -{formatAmount(discountValue)}
+                                {isLoanRow && canManageLoans && discount.id && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground"
+                                    title="Editar empréstimo"
+                                    onClick={() => openLoanDialog(discount as LoanDiscountRow)}
+                                  >
+                                    <IconPencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
+                  ))}
 
+                  {/* Synthetic tax rows: live fallback when amounts exist without discount rows */}
+                  {calculations.inssAmount > 0 &&
+                    !calculations.employeeDiscounts.some((d: any) => d.discountType === 'INSS' || `${d.reference || ''}`.toUpperCase().includes('INSS')) && (
+                    <tr className="border-b border-border">
+                      <td className="py-2 px-0">
+                        <span>INSS</span>
+                        {calculations.inssBase > 0 && (
+                          <span className="block text-xs text-muted-foreground">Base INSS: {formatAmount(calculations.inssBase)}</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">
+                        {calculations.inssBase > 0 ? `${((calculations.inssAmount / calculations.inssBase) * 100).toFixed(2)}%` : '-'}
+                      </td>
+                      <td className="py-2 px-0 text-right font-semibold text-destructive">-{formatAmount(calculations.inssAmount)}</td>
+                    </tr>
+                  )}
+                  {calculations.irrfAmount > 0 &&
+                    !calculations.employeeDiscounts.some((d: any) => d.discountType === 'IRRF' || `${d.reference || ''}`.toUpperCase().includes('IRRF')) && (
+                    <tr className="border-b border-border">
+                      <td className="py-2 px-0">
+                        <span>IRRF</span>
+                        {calculations.irrfBase > 0 && (
+                          <span className="block text-xs text-muted-foreground">Base IRRF: {formatAmount(calculations.irrfBase)} (dedução de dependentes e redutor legal já aplicados)</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">
+                        {calculations.irrfBase > 0 ? `${((calculations.irrfAmount / calculations.irrfBase) * 100).toFixed(2)}%` : '-'}
+                      </td>
+                      <td className="py-2 px-0 text-right font-semibold text-destructive">-{formatAmount(calculations.irrfAmount)}</td>
+                    </tr>
+                  )}
 
                   {/* Totals */}
                   <tr className="border-t-2 border-border">
-                    <td className="py-2 px-0 font-semibold" colSpan={2}>Total Bruto</td>
-                    <td className="py-2 px-0 text-right font-bold">{formatAmount(calculations.totalGross)}</td>
+                    <td className="py-2 px-0 font-semibold" colSpan={2}>Total de Descontos</td>
+                    <td className="py-2 px-0 text-right font-bold text-destructive">-{formatAmount(calculations.totalDiscounts)}</td>
                   </tr>
-                  {calculations.totalDiscounts > 0 && (
-                    <tr className="border-b">
-                      <td className="py-2 px-0 font-semibold" colSpan={2}>Total Descontos</td>
-                      <td className="py-2 px-0 text-right font-bold text-destructive">-{formatAmount(calculations.totalDiscounts)}</td>
-                    </tr>
-                  )}
                   <tr className="bg-primary text-primary-foreground">
-                    <td className="py-3 -ml-6 pl-3 font-bold" colSpan={2}>Total Líquido</td>
+                    <td className="py-3 -ml-6 pl-3 font-bold" colSpan={2}>Salário Líquido</td>
                     <td className="py-3 -mr-6 pr-3 text-right font-bold text-lg">{formatAmount(calculations.totalNet)}</td>
                   </tr>
+
+                  {/* FGTS - employer contribution, never part of the employee discounts */}
+                  {calculations.fgtsAmount > 0 && (
+                    <tr>
+                      <td className="pt-3 pb-1 px-0 text-muted-foreground" colSpan={2}>
+                        <span>FGTS (Empregador)</span>
+                        <span className="block text-xs">Depósito do empregador — não descontado do colaborador</span>
+                      </td>
+                      <td className="pt-3 pb-1 px-0 text-right font-semibold text-muted-foreground">
+                        {formatAmount(calculations.fgtsAmount)}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </CardContent>
           </Card>
         </div>
+
+        {/* Loan (consignado) registration/edit dialog */}
+        {canManageLoans && (
+          <LoanDialog
+            open={loanDialogOpen}
+            onOpenChange={(open) => {
+              setLoanDialogOpen(open);
+              if (!open) setEditingLoan(null);
+            }}
+            payrollId={payroll.id}
+            loan={editingLoan}
+            onSaved={() => fetchPayroll(false)}
+          />
+        )}
       </div>
     </PrivilegeRoute>
   );

@@ -402,7 +402,11 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
   const payrollNumber = user?.payrollNumber != null ? String(user.payrollNumber) : "—";
   const positionName = user?.position?.name ?? "—";
   const sectorName = user?.sector?.name ?? "—";
-  const admissionDate = user?.effectedAt ? formatDate(user.effectedAt) : "—";
+  const admissionDate = user?.currentContract?.admissionDate
+    ? formatDate(user.currentContract.admissionDate)
+    : user?.currentContract?.effectedAt
+      ? formatDate(user.currentContract.effectedAt)
+      : "—";
 
   const totalRows = rows.length;
 

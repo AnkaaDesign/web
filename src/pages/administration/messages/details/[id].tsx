@@ -30,6 +30,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useNavBreadcrumbs } from "@/contexts/navigation-context";
 
 export const MessageDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -44,6 +45,15 @@ export const MessageDetailsPage = () => {
 
   const message = response?.data;
   const stats = statsResponse?.data;
+
+  // Context-aware trail: shared page — accounting users have root-level "Mensagens"
+  // (no "Administração" section in their menu). Must run before early returns.
+  const breadcrumbs = useNavBreadcrumbs([
+    { label: "Início", href: routes.home },
+    { label: "Administração", href: routes.administration.root },
+    { label: "Mensagens", href: routes.administration.messages.root },
+    { label: "Detalhes" },
+  ]);
 
 
   const handleEdit = () => {
@@ -180,12 +190,7 @@ export const MessageDetailsPage = () => {
             title={message.title}
             icon={IconMessageCircle}
             favoritePage={FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_LISTAR}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Administração", href: routes.administration.root },
-              { label: "Mensagens", href: routes.administration.messages.root },
-              { label: "Detalhes" },
-            ]}
+            breadcrumbs={breadcrumbs}
             actions={actions}
           />
         </div>

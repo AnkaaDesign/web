@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { User, BatchOperationResult } from "../../../../types";
 import { useUserBatchMutations } from "../../../../hooks";
 import { UserBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
-import { USER_STATUS, USER_STATUS_LABELS, routes } from "../../../../constants";
+import { CONTRACT_TYPE, CONTRACT_TYPE_LABELS, routes } from "../../../../constants";
 import type { UserBatchEditFormData } from "./types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,8 +40,8 @@ const userBatchEditSchema = z.object({
           sectorId: z.string().uuid("ID do setor inválido").nullable().optional(),
           ledSectorId: z.string().uuid("ID do setor liderado inválido").nullable().optional(),
 
-          // Status - use enum type that matches UserBatchEditFormData
-          status: z.nativeEnum(USER_STATUS).optional(),
+          // Contract type - use enum type that matches UserBatchEditFormData
+          contractType: z.nativeEnum(CONTRACT_TYPE).optional(),
         })
         .partial(),
     }),
@@ -75,7 +75,7 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
           positionId: user.positionId,
           sectorId: user.sectorId,
           ledSectorId: user.ledSector?.id ?? null,
-          status: user.status,
+          contractType: user.currentContractType ?? undefined,
         },
       })),
     },
@@ -100,7 +100,7 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
         user.data.positionId !== originalUser.positionId ||
         user.data.sectorId !== originalUser.sectorId ||
         user.data.ledSectorId !== (originalUser.ledSector?.id ?? null) ||
-        user.data.status !== originalUser.status;
+        user.data.contractType !== originalUser.currentContractType;
 
       return hasChanges;
     });
@@ -171,13 +171,13 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
             </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Status</label>
-                <Select onValueChange={(value) => handleGlobalUpdate("status", value === "none" ? null : value)}>
+                <label className="text-xs font-medium text-muted-foreground">Tipo de Contrato</label>
+                <Select onValueChange={(value) => handleGlobalUpdate("contractKind", value === "none" ? null : value)}>
                   <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Selecionar status para todos" />
+                    <SelectValue placeholder="Selecionar tipo de contrato para todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(USER_STATUS_LABELS).map(([value, label]) => (
+                    {Object.entries(CONTRACT_TYPE_LABELS).map(([value, label]) => (
                       <SelectItem key={value} value={value}>
                         {label}
                       </SelectItem>
@@ -231,7 +231,7 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-40">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                      <span className="truncate">Status</span>
+                      <span className="truncate">Tipo de Contrato</span>
                     </div>
                   </TableHead>
                 </TableRow>
@@ -348,18 +348,18 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
                         <div className="px-4 py-2">
                           <FormField
                             control={form.control}
-                            name={`users.${index}.data.status`}
+                            name={`users.${index}.data.contractType`}
                             render={({ field }) => (
                               <FormItem>
                                 <FormControl>
                                   <Combobox
                                     value={field.value}
                                     onValueChange={field.onChange}
-                                    options={Object.entries(USER_STATUS_LABELS).map(([value, label]) => ({
+                                    options={Object.entries(CONTRACT_TYPE_LABELS).map(([value, label]) => ({
                                       value,
                                       label,
                                     }))}
-                                    placeholder="Status"
+                                    placeholder="Tipo de Contrato"
                                     searchable={false}
                                     clearable={false}
                                     className="w-full h-8 border-muted-foreground/20"

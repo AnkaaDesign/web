@@ -29,7 +29,7 @@ import {
 
 import {
   SECTOR_PRIVILEGES,
-  USER_STATUS,
+  CONTRACT_STATUS,
   getJustificativaCategory,
   getJustificativaMeta,
 } from "../../constants";
@@ -240,11 +240,7 @@ function HrCalendarRender({ config, size }: WidgetRenderProps<HrCalendarConfig>)
   });
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" }, take: 100 } as any);
   const { data: usersData, isLoading: usersLoading } = useUsers({
-    statuses: [
-      USER_STATUS.EXPERIENCE_PERIOD_1,
-      USER_STATUS.EXPERIENCE_PERIOD_2,
-      USER_STATUS.EFFECTED,
-    ],
+    statuses: [CONTRACT_STATUS.ACTIVE],
     where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,
@@ -608,11 +604,7 @@ function HrCalendarConfigComponent({
 
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" }, take: 100 } as any);
   const { data: usersData } = useUsers({
-    statuses: [
-      USER_STATUS.EXPERIENCE_PERIOD_1,
-      USER_STATUS.EXPERIENCE_PERIOD_2,
-      USER_STATUS.EFFECTED,
-    ],
+    statuses: [CONTRACT_STATUS.ACTIVE],
     where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,

@@ -23,7 +23,10 @@ export function PrivilegesSelect({ control, disabled, required }: PrivilegesSele
     [SECTOR_PRIVILEGES.COMMERCIAL]: { order: 9, description: "Atividades comerciais e vendas" },
     [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: { order: 10, description: "Recursos humanos e pessoal" },
     [SECTOR_PRIVILEGES.FINANCIAL]: { order: 11, description: "Controle financeiro e orçamentário" },
-    [SECTOR_PRIVILEGES.ADMIN]: { order: 12, description: "Administração completa do sistema" },
+    [SECTOR_PRIVILEGES.PRODUCTION_MANAGER]: { order: 12, description: "Gerência de produção e coordenação de equipes" },
+    [SECTOR_PRIVILEGES.AIRBRUSHING]: { order: 13, description: "Aerografia e pintura artística" },
+    [SECTOR_PRIVILEGES.ACCOUNTING]: { order: 14, description: "Contabilidade e departamento pessoal" },
+    [SECTOR_PRIVILEGES.ADMIN]: { order: 15, description: "Administração completa do sistema" },
   };
 
   // Sort privileges by order (with fallback for any missing entries)

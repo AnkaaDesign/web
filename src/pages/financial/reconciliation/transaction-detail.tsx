@@ -39,7 +39,7 @@ import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unma
 // whole subtree — including the stateful match section — and drop input focus).
 function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">{children}</div>
     </PrivilegeRoute>
   );

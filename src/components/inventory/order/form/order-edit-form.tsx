@@ -10,7 +10,7 @@ import type { OrderUpdateFormData } from "../../../../schemas";
 import type { Order, OrderItem } from "../../../../types";
 import { orderUpdateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useCanViewPrices } from "../../../../hooks";
-import { routes } from "../../../../constants";
+import { routes, CONTRACT_STATUS } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1336,7 +1336,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   const { getUsers } = await import("../../../../api-client");
                                   const response = await getUsers({
                                     where: { isActive: true },
-                                    statuses: ["EXPERIENCE_PERIOD_1", "EXPERIENCE_PERIOD_2", "EFFECTED"],
+                                    statuses: [CONTRACT_STATUS.ACTIVE],
                                     orderBy: { name: "asc" },
                                     page,
                                     take: 50,

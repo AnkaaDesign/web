@@ -27,8 +27,8 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
   { id: "sector.name", label: "Setor", getValue: (user: User) => user.sector?.name || "" },
   { id: "tasksCount", label: "Tarefas", getValue: (user: User) => user._count?.createdTasks?.toString() || "0" },
   { id: "birth", label: "Data de Nascimento", getValue: (user: User) => (user.birth ? formatDate(new Date(user.birth)) : "") },
-  { id: "dismissedAt", label: "Data de Demissão", getValue: (user: User) => (user.dismissedAt ? formatDate(new Date(user.dismissedAt)) : "") },
-  { id: "status", label: "Status", getValue: (user: User) => getUserStatusBadgeText(user) },
+  { id: "dismissedAt", label: "Data de Demissão", getValue: (user: User) => (user.currentContract?.terminationDate ? formatDate(new Date(user.currentContract.terminationDate)) : "") },
+  { id: "contractKind", label: "Tipo de Contrato", getValue: (user: User) => getUserStatusBadgeText(user) },
   { id: "performanceLevel", label: "Nível de Performance", getValue: (user: User) => user.performanceLevel?.toString() || "0" },
   { id: "verified", label: "Verificado", getValue: (user: User) => (user.verified ? "Sim" : "Não") },
   { id: "lastLoginAt", label: "Último Login", getValue: (user: User) => (user.lastLoginAt ? formatDateTime(new Date(user.lastLoginAt)) : "") },
@@ -54,7 +54,7 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
 ];
 
 // Default visible columns if none specified - matches table default
-const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "status"]);
+const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "contractKind"]);
 
 export function UserExport({ className, filters, currentUsers = [], totalRecords = 0, visibleColumns, selectedUsers }: UserExportProps) {
   const fetchAllUsers = async (): Promise<User[]> => {
@@ -72,6 +72,7 @@ export function UserExport({ className, filters, currentUsers = [], totalRecords
             position: true,
             sector: true,
             ledSector: true,
+            currentContract: true,
             _count: {
               select: {
                 createdTasks: true,
@@ -346,7 +347,7 @@ export function UserExport({ className, filters, currentUsers = [], totalRecords
                 case "dismissedAt":
                   width = "100px";
                   break;
-                case "status":
+                case "contractKind":
                   width = "150px";
                   break;
                 case "verified":

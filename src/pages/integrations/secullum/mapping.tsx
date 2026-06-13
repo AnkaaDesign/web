@@ -63,7 +63,7 @@ export default function SecullumMappingPage() {
   });
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Integração Secullum"
@@ -655,7 +655,7 @@ type UserRow = {
   name: string;
   payrollNumber?: number | null;
   secullumEmployeeId?: number | null;
-  status?: string | null;
+  contractKind?: string | null;
   sector?: { id: string; name: string } | null;
 };
 

@@ -33,7 +33,7 @@ import { useUsers, useSectors } from "../../../hooks";
 import { bonusService } from "../../../api-client";
 import { useBonusSimulation, usePeriodAdjustment } from "../../../hooks/human-resources/use-bonus";
 import { cn } from "@/lib/utils";
-import { USER_STATUS } from "../../../constants";
+import { CONTRACT_TYPE } from "../../../constants";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
 import { toast } from "@/components/ui/sonner";
@@ -244,7 +244,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   // Client-side filters will handle eligibility, sectors, positions, etc.
   const { data: usersData } = useUsers({
     where: {
-      status: USER_STATUS.EFFECTED, // Only EFFECTED users (not dismissed, not inactive)
+      currentContractType: CONTRACT_TYPE.EFFECTED, // Only EFFECTED users (not dismissed, not inactive)
       secullumEmployeeId: { not: null }, // Only users registered in Secullum
     },
     include: {

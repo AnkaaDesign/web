@@ -120,7 +120,7 @@ function deriveQuery(
   const where: any = {};
   // Always exclude dismissed collaborators — they must never surface in the
   // score lists even when they have a real (historical) entry in scope.
-  let evaluatee: any = { status: { not: 'DISMISSED' } };
+  let evaluatee: any = { contractKind: { not: 'DISMISSED' } };
   let responses: any = undefined;
   let responseTopicId: string | undefined;
   let responseSkillId: string | undefined;

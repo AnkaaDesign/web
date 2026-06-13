@@ -1,5 +1,5 @@
 import type { OrderGetManyFormData } from "../../../../schemas";
-import { ORDER_STATUS_LABELS, ORDER_STATUS } from "../../../../constants";
+import { ORDER_STATUS_LABELS, ORDER_STATUS, ORDER_PAYMENT_STATUS_LABELS, ORDER_PAYMENT_STATUS } from "../../../../constants";
 import type { Supplier } from "../../../../types";
 
 export interface FilterIndicator {
@@ -59,6 +59,17 @@ export function extractActiveFilters(
       label: "Status",
       value: labels.join(", "),
       onRemove: () => onRemoveFilter("status"),
+    });
+  }
+
+  // Payment status filter
+  if (filters.paymentStatuses && filters.paymentStatuses.length > 0) {
+    const labels = filters.paymentStatuses.map((status: ORDER_PAYMENT_STATUS) => ORDER_PAYMENT_STATUS_LABELS[status] || status);
+    activeFilters.push({
+      key: "paymentStatuses",
+      label: "Pagamento",
+      value: labels.join(", "),
+      onRemove: () => onRemoveFilter("paymentStatuses"),
     });
   }
 
@@ -156,6 +167,10 @@ export function createFilterRemover(currentFilters: Partial<OrderGetManyFormData
 
       case "status":
         delete newFilters.status;
+        break;
+
+      case "paymentStatuses":
+        delete newFilters.paymentStatuses;
         break;
 
       case "isPriority":

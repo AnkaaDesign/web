@@ -940,6 +940,11 @@ export const reconciliationKeys = {
       : (["reconciliation", "categories"] as const),
   recurringForecast: (from: string, to: string) =>
     ["reconciliation", "recurringForecast", from, to] as const,
+  outflowForecast: (reference?: string) =>
+    reference
+      ? (["reconciliation", "outflowForecast", reference] as const)
+      : (["reconciliation", "outflowForecast"] as const),
+  suggestions: () => ["reconciliation", "suggestions"] as const,
   siegStatus: () => ["reconciliation", "siegStatus"] as const,
 };
 
@@ -1075,6 +1080,49 @@ export const skillAnalyticsKeys = {
       ? (["skill-analytics", "evolution", filters] as const)
       : (["skill-analytics", "evolution"] as const),
 };
+
+// =====================================================
+// Accounting Area — Departamento Pessoal & Medicina do Trabalho
+// =====================================================
+
+export const salaryAdjustmentKeys = createQueryKeyStore<Record<string, any>>("salaryAdjustments");
+
+export const userPositionHistoryKeys = {
+  ...createQueryKeyStore<Record<string, any>>("userPositionHistories"),
+  // Specialized queries
+  byUser: (userId: string, filters?: Record<string, any>) =>
+    filters ? (["userPositionHistories", "byUser", userId, filters] as const) : (["userPositionHistories", "byUser", userId] as const),
+};
+
+export const benefitKeys = createQueryKeyStore<Record<string, any>>("benefits");
+
+export const userBenefitKeys = {
+  ...createQueryKeyStore<Record<string, any>>("userBenefits"),
+  // Specialized queries
+  byUser: (userId: string, filters?: Record<string, any>) =>
+    filters ? (["userBenefits", "byUser", userId, filters] as const) : (["userBenefits", "byUser", userId] as const),
+};
+
+export const admissionKeys = createQueryKeyStore<Record<string, any>>("admissions");
+
+export const terminationKeys = createQueryKeyStore<Record<string, any>>("terminations");
+
+export const employmentContractKeys = createQueryKeyStore<Record<string, any>>("employmentContracts");
+
+export const medicalExamKeys = {
+  ...createQueryKeyStore<Record<string, any>>("medicalExams"),
+  // Specialized queries
+  expiring: (days?: number) => (days !== undefined ? (["medicalExams", "expiring", days] as const) : (["medicalExams", "expiring"] as const)),
+};
+
+export const leaveKeys = createQueryKeyStore<Record<string, any>>("leaves");
+
+export const dependentKeys = createQueryKeyStore<Record<string, any>>("dependents");
+
+// Calendário/agenda + post-its (a5-calendar)
+export const agendaEventKeys = createQueryKeyStore<Record<string, any>>("agendaEvents");
+
+export const postitKeys = createQueryKeyStore<Record<string, any>>("postits");
 
 // Legacy keys retained until Phase-6 page rewrite. Do NOT use in new code.
 export const legacySkillKeys = {

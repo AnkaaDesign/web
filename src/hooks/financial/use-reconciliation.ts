@@ -369,6 +369,48 @@ export function useCategorize() {
   });
 }
 
+/**
+ * Composite "Previsão de Saídas" for one competence month (YYYY-MM). Server
+ * composes pedidos + impostos (aprox.) + folha (aggregate, com bonificação) +
+ * recorrentes; the payroll slice can be slow (live calc), so cache it a bit.
+ */
+export function useOutflowForecast(reference?: string) {
+  return useQuery({
+    queryKey: reconciliationKeys.outflowForecast(reference),
+    queryFn: () =>
+      reconciliationService
+        .getOutflowForecast(reference ? { reference } : undefined)
+        .then((r) => r.data),
+    staleTime: 60_000,
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** Inbox of medium-confidence category suggestions (PENDING transactions). */
+export function useReconciliationSuggestions(enabled = true) {
+  return useQuery({
+    queryKey: reconciliationKeys.suggestions(),
+    queryFn: () =>
+      reconciliationService.listSuggestions().then((r) => r.data),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+/** Promotes a stored suggestion to a MANUAL category (also trains learners). */
+export function useConfirmSuggestion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (transactionId: string) =>
+      reconciliationService
+        .confirmSuggestion(transactionId)
+        .then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reconciliationKeys.all });
+    },
+  });
+}
+
 export function useRecurringForecast(from: string, to: string) {
   return useQuery({
     queryKey: reconciliationKeys.recurringForecast(from, to),

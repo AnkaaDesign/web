@@ -67,6 +67,12 @@ const toolGroups: ToolGroup[] = [
     icon: IconCalculator,
     links: [
       {
+        label: "Calculadora",
+        description: "Calculadora com histórico — operações básicas, % e parênteses",
+        route: routes.tools.calculator.root,
+        icon: IconCalculator,
+      },
+      {
         label: "Calculadora de Horas",
         description: "Some, subtraia e converta horas trabalhadas",
         route: routes.tools.timeCalculator.root,

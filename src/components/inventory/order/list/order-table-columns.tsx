@@ -5,6 +5,7 @@ import { formatOrderNumber } from "@/utils/order-code";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Badge } from "@/components/ui/badge";
 import { OrderStatusBadge } from "../common/order-status-badge";
+import { OrderPaymentStatusBadge } from "../common/order-payment-status-badge";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,16 @@ export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[]
     className: "w-44",
   },
   {
+    // Optional column (not in the curated default set) — sorts by the numeric
+    // paymentStatusOrder mirror, same pattern as statusOrder.
+    key: "paymentStatusOrder",
+    header: "PAGAMENTO",
+    accessor: (order) => <OrderPaymentStatusBadge status={order.paymentStatus} />,
+    sortable: true,
+    align: "left",
+    className: "w-48",
+  },
+  {
     key: "itemCount",
     header: "ITENS",
     accessor: (order) => {
@@ -99,6 +110,24 @@ export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[]
     key: "forecast",
     header: "PREVISÃO",
     accessor: (order) => <span className="text-sm text-muted-foreground whitespace-nowrap">{order.forecast ? formatDate(order.forecast) : "-"}</span>,
+    sortable: true,
+    align: "left",
+    className: "w-24",
+  },
+  {
+    key: "paymentRequestedAt",
+    header: "PAG. SOLICITADO EM",
+    accessor: (order) => (
+      <span className="text-sm text-muted-foreground whitespace-nowrap">{order.paymentRequestedAt ? formatDate(order.paymentRequestedAt) : "-"}</span>
+    ),
+    sortable: true,
+    align: "left",
+    className: "w-28",
+  },
+  {
+    key: "paidAt",
+    header: "PAGO EM",
+    accessor: (order) => <span className="text-sm text-muted-foreground whitespace-nowrap">{order.paidAt ? formatDate(order.paidAt) : "-"}</span>,
     sortable: true,
     align: "left",
     className: "w-24",

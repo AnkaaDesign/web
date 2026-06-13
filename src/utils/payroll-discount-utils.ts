@@ -32,9 +32,27 @@ export const DISCOUNT_TYPE_INFO: Record<PayrollDiscountType, DiscountTypeInfo> =
     color: 'red',
     category: 'absence',
   },
+  PARTIAL_ABSENCE: {
+    label: 'Falta Parcial',
+    icon: '⏰',
+    color: 'red',
+    category: 'absence',
+  },
+  DSR_ABSENCE: {
+    label: 'DSR sobre Faltas',
+    icon: '📅',
+    color: 'red',
+    category: 'absence',
+  },
   LATE_ARRIVAL: {
     label: 'Atrasos',
     icon: '⏱️',
+    color: 'orange',
+    category: 'absence',
+  },
+  SICK_LEAVE: {
+    label: 'Afastamento por Doença',
+    icon: '🏥',
     color: 'orange',
     category: 'absence',
   },
@@ -62,7 +80,7 @@ export const DISCOUNT_TYPE_INFO: Record<PayrollDiscountType, DiscountTypeInfo> =
     color: 'cyan',
     category: 'benefit',
   },
-  UNION_CONTRIBUTION: {
+  UNION: {
     label: 'Contribuição Sindical',
     icon: '🤝',
     color: 'purple',
@@ -91,6 +109,12 @@ export const DISCOUNT_TYPE_INFO: Record<PayrollDiscountType, DiscountTypeInfo> =
     icon: '💸',
     color: 'brown',
     category: 'loan',
+  },
+  AUTHORIZED_DISCOUNT: {
+    label: 'Desconto Autorizado',
+    icon: '✅',
+    color: 'gray',
+    category: 'custom',
   },
   CUSTOM: {
     label: 'Desconto Personalizado',

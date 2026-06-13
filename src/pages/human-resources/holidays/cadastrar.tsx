@@ -62,7 +62,7 @@ export const HolidayCreatePage = () => {
   ];
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col">
         {/* Fixed Header */}
         <div className="flex-shrink-0">

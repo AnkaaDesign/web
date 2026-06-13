@@ -2,10 +2,11 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useRef } from "react";
 import { IconUser, IconInfoCircle, IconFileText, IconMapPin, IconBriefcase, IconShieldCheck } from "@tabler/icons-react";
-import { Form } from "@/components/ui/form";
+import { Form, FormField } from "@/components/ui/form";
+import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { userCreateSchema, userUpdateSchema, type UserCreateFormData, type UserUpdateFormData } from "../../../../schemas";
-import { USER_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { CONTRACT_TYPE, EMPLOYEE_TYPE, CONTRACT_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useSector } from "../../../../hooks";
 // Import all form components
 import { NameInput } from "./name-input";
@@ -16,7 +17,7 @@ import { SectorSelector } from "./sector-selector";
 import { SectorLeaderSwitch } from "./sector-leader-switch";
 import { SecullumSyncSwitch } from "./secullum-sync-switch";
 import { HorarioSelector } from "./horario-selector";
-import { UserStatusSelector } from "./status-selector";
+import { EmployeeTypeSelector, ContractTypeSelector, ContractStatusDisplay, ProviderFields } from "./status-selector";
 import { VerifiedSwitch } from "./verified-switch";
 import { ActiveSwitch } from "./active-switch";
 import { StatusDatesSection } from "./status-dates-section";
@@ -66,7 +67,6 @@ export function UserForm(props: UserFormProps) {
   const createDefaults: UserCreateFormData = {
     name: "",
     email: null,
-    status: USER_STATUS.EXPERIENCE_PERIOD_1,
     phone: null,
     cpf: null as any,
     pis: null,
@@ -90,13 +90,21 @@ export function UserForm(props: UserFormProps) {
     // Additional dates
     birth: null as any, // Will be validated by schema when submitted
 
-    // Status tracking dates
+    // Current vínculo (EmploymentContract). The collaborator-create flow nests
+    // these into `contract` on submit; the flat date fields below drive the
+    // shared StatusDatesSection + admission date.
+    employeeType: EMPLOYEE_TYPE.CLT as any,
+    contractType: CONTRACT_TYPE.EXPERIENCE_PERIOD_1 as any,
+    contractStatus: CONTRACT_STATUS.ACTIVE as any,
+    unionMember: false,
+    dependentsCount: 0,
+    hasSimplifiedDeduction: true,
+    admissionDate: null as any,
     exp1StartAt: null as any,
     exp1EndAt: null,
     exp2StartAt: null,
     exp2EndAt: null,
     effectedAt: null,
-    dismissedAt: null,
 
     // Payroll info
     payrollNumber: null as any,
@@ -133,6 +141,11 @@ export function UserForm(props: UserFormProps) {
     shouldFocusError: true, // Focus on first error field when validation fails
     criteriaMode: "all", // Show all errors for better UX
   });
+
+  // Watch the worker category to drive the contract-type vs provider fields.
+  const employeeType = useWatch({ control: form.control, name: "employeeType" as any }) as EMPLOYEE_TYPE | undefined;
+  const isClt = !employeeType || employeeType === EMPLOYEE_TYPE.CLT;
+  const isProvider = employeeType === EMPLOYEE_TYPE.TERCEIRIZADO || employeeType === EMPLOYEE_TYPE.PJ;
 
   // Watch the selected sector to determine its privilege
   const selectedSectorId = useWatch({ control: form.control, name: "sectorId" });
@@ -172,38 +185,8 @@ export function UserForm(props: UserFormProps) {
   // Access formState properties during render for proper subscription
   const { isValid, isDirty, errors } = form.formState;
 
-  // Auto-sync dismissal date and status to prevent validation errors
-  useEffect(() => {
-    if (mode === "update") {
-      const subscription = form.watch((value, { name }) => {
-        // If dismissal date is set and status is not DISMISSED, auto-set status to DISMISSED
-        if (name === "dismissedAt" && value.dismissedAt && value.status !== USER_STATUS.DISMISSED) {
-          form.setValue("status", USER_STATUS.DISMISSED, { shouldDirty: true, shouldValidate: true });
-        }
-        // If dismissal date is cleared and status is DISMISSED, revert status
-        if (name === "dismissedAt" && !value.dismissedAt && value.status === USER_STATUS.DISMISSED) {
-          const currentStatus = (defaultValues as any)?.currentStatus;
-          if (currentStatus && currentStatus !== USER_STATUS.DISMISSED) {
-            form.setValue("status", currentStatus, { shouldDirty: true, shouldValidate: true });
-          }
-        }
-        // If status is changed AWAY from DISMISSED while a dismissedAt
-        // date is still set, clear the date. The schema's
-        // "dismissedAt → status must be DISMISSED" refine would
-        // otherwise reject the form and keep Salvar disabled.
-        if (
-          name === "status" &&
-          value.status &&
-          value.status !== USER_STATUS.DISMISSED &&
-          value.dismissedAt
-        ) {
-          form.setValue("dismissedAt", null, { shouldDirty: true, shouldValidate: true });
-        }
-        // If status is set to DISMISSED and no dismissal date, don't auto-set (user might want to set it manually)
-      });
-      return () => subscription.unsubscribe();
-    }
-  }, [form, mode, defaultValues]);
+  // Dismissal is no longer set inline — the contract STATUS (ACTIVE/DISMISSED)
+  // is driven by the termination flow and shown read-only. No sync effect needed.
 
   // Debug validation errors in development - only log on user interaction
   useEffect(() => {
@@ -253,8 +236,31 @@ export function UserForm(props: UserFormProps) {
     }
   }, [isValid, isDirty, onFormStateChange]);
 
-  const onSubmit = async (data: UserCreateFormData | UserUpdateFormData) => {
+  // Build the nested `contract` block for the collaborator-create payload from
+  // the flat form fields, and route the admission date. The current vínculo is
+  // created together with the user (server applies CLT/experiência defaults).
+  const buildCreatePayload = (data: any): UserCreateFormData => {
+    const { contractType, employeeType, contractStatus, exp1StartAt, providerName, providerCnpj, ...rest } = data;
+    const admissionDate = exp1StartAt ?? data.admissionDate ?? null;
+    return {
+      ...rest,
+      admissionDate,
+      contract: {
+        employeeType: employeeType ?? EMPLOYEE_TYPE.CLT,
+        contractType: employeeType && employeeType !== EMPLOYEE_TYPE.CLT ? null : (contractType ?? CONTRACT_TYPE.EXPERIENCE_PERIOD_1),
+        admissionDate,
+        positionId: data.positionId ?? null,
+        sectorId: data.sectorId ?? null,
+        payrollNumber: data.payrollNumber ?? null,
+        providerName: providerName ?? null,
+        providerCnpj: providerCnpj ?? null,
+      },
+    } as UserCreateFormData;
+  };
+
+  const onSubmit = async (rawData: UserCreateFormData | UserUpdateFormData) => {
     try {
+      const data = mode === "create" ? buildCreatePayload(rawData) : rawData;
       // Check if we have an avatar file to upload
       const avatarFile = (data as any).avatarFile || form.getValues('avatarFile' as any);
 
@@ -445,15 +451,58 @@ export function UserForm(props: UserFormProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
-                Status do Colaborador
+                Tipo de Contrato do Colaborador
               </CardTitle>
-              <CardDescription>Defina o status atual do colaborador e as datas relacionadas</CardDescription>
+              <CardDescription>Defina a categoria, o vínculo atual do colaborador e as datas relacionadas</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <UserStatusSelector disabled={isSubmitting} required />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <EmployeeTypeSelector disabled={isSubmitting} required />
+                {/* Tipo de contrato só se aplica a CLT */}
+                {isClt && <ContractTypeSelector disabled={isSubmitting} required />}
+              </div>
 
-              {/* Status-Specific Dates - Inline */}
-              <StatusDatesSection disabled={isSubmitting} />
+              {/* Prestador (terceirizado/PJ) */}
+              {isProvider && <ProviderFields disabled={isSubmitting} namePath="providerName" cnpjPath="providerCnpj" />}
+
+              {/* Situação do vínculo (somente leitura — definida pelo desligamento) */}
+              {mode === "update" && <ContractStatusDisplay />}
+
+              {/* Datas do período de experiência (apenas CLT) */}
+              {isClt && <StatusDatesSection disabled={isSubmitting} />}
+
+              {/* Data de admissão (não-CLT: sem período de experiência) */}
+              {!isClt && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name={"exp1StartAt" as any}
+                    render={({ field }) => (
+                      <DateTimeInput
+                        field={{
+                          onChange: (d: any) => {
+                            const date = d instanceof Date ? d : null;
+                            field.onChange(date);
+                            form.setValue("admissionDate" as any, date, { shouldValidate: true, shouldDirty: true });
+                          },
+                          onBlur: field.onBlur,
+                          value: (field.value as Date | null) ?? null,
+                          name: field.name,
+                        }}
+                        label={
+                          <span className="flex items-center gap-1.5">
+                            Data de Admissão
+                            <span className="text-destructive ml-0.5">*</span>
+                          </span>
+                        }
+                        disabled={isSubmitting}
+                        mode="date"
+                        required
+                      />
+                    )}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 

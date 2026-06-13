@@ -195,7 +195,9 @@ export function PayrollTable({
         payrollNumber: user.payrollNumber,
         position: user.position,
         sector: user.sector,
-        status: user.status,
+        currentContractType: user.currentContractType,
+        currentContractStatus: user.currentContractStatus,
+        currentContract: user.currentContract,
 
         // Payroll fields
         payrollId: payroll.id,

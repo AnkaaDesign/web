@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useUserBatchMutations, usePositions, useSectors } from "../../../../hooks";
 import type { User } from "../../../../types";
 import type { UserGetManyFormData } from "../../../../schemas";
-import { routes, USER_STATUS } from "../../../../constants";
+import { routes, CONTRACT_TYPE, CONTRACT_STATUS } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -83,13 +83,14 @@ export function UserList({ className, teamScope }: UserListProps) {
   const deserializeUserFilters = useCallback((params: URLSearchParams): Partial<UserGetManyFormData> => {
     const filters: Partial<UserGetManyFormData> = {};
 
-    // Parse status filters (support both single and multiple selections)
-    const status = params.get("status");
-    const statuses = params.get("statuses");
-    if (statuses) {
-      filters.status = statuses.split(",");
-    } else if (status) {
-      filters.where = { ...filters.where, status: status };
+    // Parse contract type filters (support both single and multiple selections).
+    // `contractTypes` is canonical; `contractKinds`/`contractKind` kept as back-compat aliases.
+    const contractType = params.get("contractType") || params.get("contractKind");
+    const contractTypes = params.get("contractTypes") || params.get("contractKinds");
+    if (contractTypes) {
+      filters.contractTypes = contractTypes.split(",") as any;
+    } else if (contractType) {
+      filters.where = { ...filters.where, currentContractType: contractType } as any;
     }
 
     // Parse entity filters (support both single and multiple selections)
@@ -176,22 +177,27 @@ export function UserList({ className, teamScope }: UserListProps) {
       };
     }
 
+    // Dismissal (terminationDate) and admission (exp1EndAt) ranges now live on the
+    // related current EmploymentContract, expressed via where.currentContract.is.{...}.
     const dismissedAfter = params.get("dismissedAfter");
     const dismissedBefore = params.get("dismissedBefore");
-    if (dismissedAfter || dismissedBefore) {
-      filters.dismissedAt = {
-        ...(dismissedAfter && { gte: new Date(dismissedAfter) }),
-        ...(dismissedBefore && { lte: new Date(dismissedBefore) }),
-      };
-    }
-
     const exp1EndAfter = params.get("exp1EndAfter");
     const exp1EndBefore = params.get("exp1EndBefore");
-    if (exp1EndAfter || exp1EndBefore) {
-      filters.exp1EndAt = {
-        ...(exp1EndAfter && { gte: new Date(exp1EndAfter) }),
-        ...(exp1EndBefore && { lte: new Date(exp1EndBefore) }),
-      };
+    if (dismissedAfter || dismissedBefore || exp1EndAfter || exp1EndBefore) {
+      const relIs: any = {};
+      if (dismissedAfter || dismissedBefore) {
+        relIs.terminationDate = {
+          ...(dismissedAfter && { gte: new Date(dismissedAfter) }),
+          ...(dismissedBefore && { lte: new Date(dismissedBefore) }),
+        };
+      }
+      if (exp1EndAfter || exp1EndBefore) {
+        relIs.exp1EndAt = {
+          ...(exp1EndAfter && { gte: new Date(exp1EndAfter) }),
+          ...(exp1EndBefore && { lte: new Date(exp1EndBefore) }),
+        };
+      }
+      filters.where = { ...filters.where, currentContract: { is: relIs } } as any;
     }
 
     // Parse range filters
@@ -203,9 +209,9 @@ export function UserList({ className, teamScope }: UserListProps) {
   const serializeUserFilters = useCallback((filters: Partial<UserGetManyFormData>): Record<string, string> => {
     const params: Record<string, string> = {};
 
-    // Status filters
-    if (filters.status?.length) params.statuses = filters.status.join(",");
-    else if (filters.where?.status) params.status = filters.where.status as string;
+    // Contract type filters
+    if (filters.contractTypes?.length) params.contractTypes = filters.contractTypes.join(",");
+    else if ((filters.where as any)?.currentContractType) params.contractType = (filters.where as any).currentContractType as string;
 
     // Entity filters
     if (filters.positionId?.length) params.positions = filters.positionId.join(",");
@@ -240,10 +246,14 @@ export function UserList({ className, teamScope }: UserListProps) {
     if (filters.birth?.lte) params.birthBefore = filters.birth.lte.toISOString();
     if (filters.lastLoginAt?.gte) params.lastLoginAfter = filters.lastLoginAt.gte.toISOString();
     if (filters.lastLoginAt?.lte) params.lastLoginBefore = filters.lastLoginAt.lte.toISOString();
-    if (filters.dismissedAt?.gte) params.dismissedAfter = filters.dismissedAt.gte.toISOString();
-    if (filters.dismissedAt?.lte) params.dismissedBefore = filters.dismissedAt.lte.toISOString();
-    if (filters.exp1EndAt?.gte) params.exp1EndAfter = filters.exp1EndAt.gte.toISOString();
-    if (filters.exp1EndAt?.lte) params.exp1EndBefore = filters.exp1EndAt.lte.toISOString();
+    // Dismissal/admission ranges read off the current EmploymentContract relation filter.
+    const currentContractIs = (filters.where as any)?.currentContract?.is as
+      | { terminationDate?: { gte?: Date; lte?: Date }; exp1EndAt?: { gte?: Date; lte?: Date } }
+      | undefined;
+    if (currentContractIs?.terminationDate?.gte) params.dismissedAfter = currentContractIs.terminationDate.gte.toISOString();
+    if (currentContractIs?.terminationDate?.lte) params.dismissedBefore = currentContractIs.terminationDate.lte.toISOString();
+    if (currentContractIs?.exp1EndAt?.gte) params.exp1EndAfter = currentContractIs.exp1EndAt.gte.toISOString();
+    if (currentContractIs?.exp1EndAt?.lte) params.exp1EndBefore = currentContractIs.exp1EndAt.lte.toISOString();
 
     // Range filters
 
@@ -273,8 +283,8 @@ export function UserList({ className, teamScope }: UserListProps) {
 
   // Visible columns state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
-    "user-list-visible-columns",
-    new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "status"])
+    "user-list-visible-columns-v2", // v2: "status" column renamed to "contractKind"
+    new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "contractKind"])
   );
 
   // Get all available columns for column visibility manager
@@ -284,16 +294,18 @@ export function UserList({ className, teamScope }: UserListProps) {
   const queryFilters = useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
 
-    // Check if user has explicitly selected status filters
-    const hasExplicitStatusFilter =
-      filterWithoutOrderBy.status &&
-      Array.isArray(filterWithoutOrderBy.status) &&
-      filterWithoutOrderBy.status.length > 0;
+    // Check if user has explicitly selected contract type filters
+    const hasExplicitContractTypeFilter =
+      filterWithoutOrderBy.contractTypes &&
+      Array.isArray(filterWithoutOrderBy.contractTypes) &&
+      filterWithoutOrderBy.contractTypes.length > 0;
 
-    // Check if dismissedAt filter is active
-    const hasDismissedAtFilter =
-      filterWithoutOrderBy.dismissedAt &&
-      (filterWithoutOrderBy.dismissedAt.gte || filterWithoutOrderBy.dismissedAt.lte);
+    // Check if a dismissal (terminationDate) range filter is active on the
+    // current EmploymentContract relation.
+    const hasDismissedAtFilter = Boolean(
+      (filterWithoutOrderBy.where as any)?.currentContract?.is?.terminationDate?.gte ||
+      (filterWithoutOrderBy.where as any)?.currentContract?.is?.terminationDate?.lte,
+    );
 
     // Build result object - preserve searchingFor from baseQueryFilters
     const result: Partial<UserGetManyFormData> = {
@@ -303,9 +315,9 @@ export function UserList({ className, teamScope }: UserListProps) {
       searchingFor: filterWithoutOrderBy.searchingFor,
     };
 
-    // Remove any where.status filters to avoid conflicts
-    if (result.where?.status) {
-      const { status: _, ...restWhere } = result.where;
+    // Remove any where.currentContractType filters to avoid conflicts with contractTypes
+    if ((result.where as any)?.currentContractType) {
+      const { currentContractType: _ct, ...restWhere } = result.where as any;
       if (Object.keys(restWhere).length > 0) {
         result.where = restWhere;
       } else {
@@ -314,11 +326,7 @@ export function UserList({ className, teamScope }: UserListProps) {
     }
 
     // Convert frontend filter names to API schema names
-    // The API expects plural field names (statuses, positionIds, sectorIds, ledSectorIds)
-    if (result.status) {
-      result.statuses = result.status;
-      delete result.status;
-    }
+    // The API expects plural field names (positionIds, sectorIds, ledSectorIds)
     if (result.positionId) {
       result.positionIds = result.positionId;
       delete result.positionId;
@@ -332,14 +340,15 @@ export function UserList({ className, teamScope }: UserListProps) {
       delete result.ledSectorId;
     }
 
-    // Apply status filter logic
-    if (hasExplicitStatusFilter) {
-      // User has explicitly selected statuses - use only those
-      result.statuses = [...filterWithoutOrderBy.status!];
+    // Apply contract type / status filter logic
+    if (hasExplicitContractTypeFilter) {
+      // User has explicitly selected contract types - use only those
+      result.contractTypes = [...filterWithoutOrderBy.contractTypes!];
     } else if (hasDismissedAtFilter) {
-      // If filtering by dismissedAt without explicit status filter, include DISMISSED status
-      result.statuses = [USER_STATUS.DISMISSED];
-    } else if (result.isActive === undefined) {
+      // Filtering by dismissal date without an explicit contract type filter:
+      // restrict to dismissed vínculos via the status cache.
+      result.statuses = [CONTRACT_STATUS.DISMISSED];
+    } else if (result.isActive === undefined && result.statuses === undefined) {
       // No explicit filter - default to active users only
       result.isActive = true;
     }
@@ -357,10 +366,10 @@ export function UserList({ className, teamScope }: UserListProps) {
       // Remove orderBy from filters to avoid conflicts with sort management
       const { orderBy: _, ...filtersWithoutOrderBy } = newFilters;
 
-      // Clean up any where.status filters if we have a direct status array filter
-      if (filtersWithoutOrderBy.status && Array.isArray(filtersWithoutOrderBy.status)) {
-        if (filtersWithoutOrderBy.where?.status) {
-          const { status: _, ...restWhere } = filtersWithoutOrderBy.where;
+      // Clean up any where.currentContractType filters if we have a direct contractTypes array filter
+      if (filtersWithoutOrderBy.contractTypes && Array.isArray(filtersWithoutOrderBy.contractTypes)) {
+        if ((filtersWithoutOrderBy.where as any)?.currentContractType) {
+          const { currentContractType: _ct, ...restWhere } = filtersWithoutOrderBy.where as any;
           if (Object.keys(restWhere).length > 0) {
             filtersWithoutOrderBy.where = restWhere;
           } else {
@@ -463,7 +472,7 @@ export function UserList({ className, teamScope }: UserListProps) {
       const updateUsers = contractDialog.items.map((user) => ({
         id: user.id,
         data: {
-          status: USER_STATUS.EFFECTED,
+          contractType: CONTRACT_TYPE.EFFECTED,
           effectedAt: new Date(),
         },
       }));
@@ -484,7 +493,7 @@ export function UserList({ className, teamScope }: UserListProps) {
     try {
       const updateUsers = dismissDialog.items.map((user) => ({
         id: user.id,
-        data: { status: USER_STATUS.DISMISSED, dismissedAt: new Date() },
+        data: { contractStatus: CONTRACT_STATUS.DISMISSED, terminationDate: new Date() },
       }));
 
       await batchUpdateAsync({ users: updateUsers });

@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { getUsers, getUserById } from "../../../../api-client";
-import { USER_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { CONTRACT_STATUS, EMPLOYEE_TYPE, CONTRACT_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useUserMutations } from "../../../../hooks";
 import type { User } from "../../../../types";
 
@@ -72,11 +72,7 @@ export function AdminUserSelector<_T extends FieldValues = FieldValues>({
     try {
       const queryParams: any = {
         where: { isActive: true },
-        statuses: [
-          USER_STATUS.EXPERIENCE_PERIOD_1,
-          USER_STATUS.EXPERIENCE_PERIOD_2,
-          USER_STATUS.EFFECTED
-        ],
+        statuses: [CONTRACT_STATUS.ACTIVE],
         orderBy: { name: "asc" },
         page: page,
         take: 50,
@@ -130,7 +126,11 @@ export function AdminUserSelector<_T extends FieldValues = FieldValues>({
       const result = await createUserAsync({
         name,
         birth: new Date(), // Required field - set to current date by default
-        status: USER_STATUS.EXPERIENCE_PERIOD_1,
+        admissionDate: new Date() as any,
+        contract: {
+          employeeType: EMPLOYEE_TYPE.CLT,
+          contractType: CONTRACT_TYPE.EXPERIENCE_PERIOD_1,
+        },
         verified: false,
         performanceLevel: 0,
         isActive: true,
@@ -140,9 +140,8 @@ export function AdminUserSelector<_T extends FieldValues = FieldValues>({
         cpf: null as any,
         positionId: null as any,
         sectorId: null as any,
-        exp1StartAt: null as any,
         payrollNumber: null as any,
-      });
+      } as any);
 
       if (result.success && result.data) {
         // Return the newly created user ID

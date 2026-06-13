@@ -12,6 +12,13 @@ import {
   batchCreateOrders,
   batchUpdateOrders,
   batchDeleteOrders,
+  getOrderPaymentSummary,
+  requestOrderPayment,
+  markOrderAwaitingPayment,
+  markOrderPaid,
+  batchRequestOrderPayment,
+  batchMarkOrdersAwaitingPayment,
+  batchMarkOrdersPaid,
 } from "../../api-client";
 import type {
   // Order types
@@ -21,6 +28,7 @@ import type {
   OrderBatchCreateFormData,
   OrderBatchUpdateFormData,
   OrderBatchDeleteFormData,
+  OrderBatchPaymentFormData,
   OrderInclude,
 } from "../../schemas";
 import type {
@@ -114,6 +122,19 @@ export const useNextOrderNumber = (options?: { enabled?: boolean }) =>
     queryKey: [...orderKeys.all, "next-number"] as const,
     queryFn: getNextOrderNumber,
     staleTime: 0,
+    enabled: options?.enabled ?? true,
+  });
+
+/**
+ * Per-paymentStatus aggregates for the Contas a Pagar summary cards
+ * (count + payable total per bucket; PAID windowed to 90 days server-side).
+ * Keyed under orderKeys.all so payment mutations invalidate it automatically.
+ */
+export const useOrderPaymentSummary = (options?: { enabled?: boolean }) =>
+  useQuery({
+    queryKey: [...orderKeys.all, "payment-summary"] as const,
+    queryFn: getOrderPaymentSummary,
+    staleTime: 1000 * 60, // 1 minute
     enabled: options?.enabled ?? true,
   });
 
@@ -257,13 +278,43 @@ export const useOrderMutations = (options?: {
     },
   });
 
+  // PAYMENT STATUS (contas a pagar) — single-order transitions
+  const requestPaymentMutation = useMutation({
+    mutationFn: (id: string) => requestOrderPayment(id),
+    onSuccess: (data) => {
+      invalidateQueries(data.data?.supplierId || undefined);
+    },
+  });
+
+  const markAwaitingPaymentMutation = useMutation({
+    mutationFn: (id: string) => markOrderAwaitingPayment(id),
+    onSuccess: (data) => {
+      invalidateQueries(data.data?.supplierId || undefined);
+    },
+  });
+
+  const markPaidMutation = useMutation({
+    mutationFn: (id: string) => markOrderPaid(id),
+    onSuccess: (data) => {
+      invalidateQueries(data.data?.supplierId || undefined);
+    },
+  });
+
   const isLoading =
     createMutation.isPending ||
     updateMutation.isPending ||
-    deleteMutation.isPending;
+    deleteMutation.isPending ||
+    requestPaymentMutation.isPending ||
+    markAwaitingPaymentMutation.isPending ||
+    markPaidMutation.isPending;
 
   const error =
-    createMutation.error || updateMutation.error || deleteMutation.error;
+    createMutation.error ||
+    updateMutation.error ||
+    deleteMutation.error ||
+    requestPaymentMutation.error ||
+    markAwaitingPaymentMutation.error ||
+    markPaidMutation.error;
 
   return {
     create: createMutation.mutate,
@@ -272,6 +323,12 @@ export const useOrderMutations = (options?: {
     updateAsync: updateMutation.mutateAsync,
     delete: deleteMutation.mutate,
     deleteAsync: deleteMutation.mutateAsync,
+    requestPayment: requestPaymentMutation.mutate,
+    requestPaymentAsync: requestPaymentMutation.mutateAsync,
+    markAwaitingPayment: markAwaitingPaymentMutation.mutate,
+    markAwaitingPaymentAsync: markAwaitingPaymentMutation.mutateAsync,
+    markPaid: markPaidMutation.mutate,
+    markPaidAsync: markPaidMutation.mutateAsync,
     isLoading,
     error,
     refresh: () => invalidateQueries(),
@@ -279,6 +336,9 @@ export const useOrderMutations = (options?: {
     createMutation,
     updateMutation,
     deleteMutation,
+    requestPaymentMutation,
+    markAwaitingPaymentMutation,
+    markPaidMutation,
   };
 };
 
@@ -392,15 +452,44 @@ export const useOrderBatchMutations = (options?: {
     },
   });
 
+  // BATCH PAYMENT STATUS (contas a pagar) — single API call per batch, so the
+  // axios interceptor emits exactly one toast for the whole operation.
+  const batchRequestPaymentMutation = useMutation({
+    mutationFn: (data: OrderBatchPaymentFormData) => batchRequestOrderPayment(data),
+    onSuccess: () => {
+      invalidateQueries();
+    },
+  });
+
+  const batchMarkAwaitingPaymentMutation = useMutation({
+    mutationFn: (data: OrderBatchPaymentFormData) => batchMarkOrdersAwaitingPayment(data),
+    onSuccess: () => {
+      invalidateQueries();
+    },
+  });
+
+  const batchMarkPaidMutation = useMutation({
+    mutationFn: (data: OrderBatchPaymentFormData) => batchMarkOrdersPaid(data),
+    onSuccess: () => {
+      invalidateQueries();
+    },
+  });
+
   const isLoading =
     batchCreateMutation.isPending ||
     batchUpdateMutation.isPending ||
-    batchDeleteMutation.isPending;
+    batchDeleteMutation.isPending ||
+    batchRequestPaymentMutation.isPending ||
+    batchMarkAwaitingPaymentMutation.isPending ||
+    batchMarkPaidMutation.isPending;
 
   const error =
     batchCreateMutation.error ||
     batchUpdateMutation.error ||
-    batchDeleteMutation.error;
+    batchDeleteMutation.error ||
+    batchRequestPaymentMutation.error ||
+    batchMarkAwaitingPaymentMutation.error ||
+    batchMarkPaidMutation.error;
 
   return {
     batchCreate: batchCreateMutation.mutate,
@@ -409,6 +498,12 @@ export const useOrderBatchMutations = (options?: {
     batchUpdateAsync: batchUpdateMutation.mutateAsync,
     batchDelete: batchDeleteMutation.mutate,
     batchDeleteAsync: batchDeleteMutation.mutateAsync,
+    batchRequestPayment: batchRequestPaymentMutation.mutate,
+    batchRequestPaymentAsync: batchRequestPaymentMutation.mutateAsync,
+    batchMarkAwaitingPayment: batchMarkAwaitingPaymentMutation.mutate,
+    batchMarkAwaitingPaymentAsync: batchMarkAwaitingPaymentMutation.mutateAsync,
+    batchMarkPaid: batchMarkPaidMutation.mutate,
+    batchMarkPaidAsync: batchMarkPaidMutation.mutateAsync,
     isLoading,
     error,
     refresh: invalidateQueries,
@@ -416,6 +511,9 @@ export const useOrderBatchMutations = (options?: {
     batchCreateMutation,
     batchUpdateMutation,
     batchDeleteMutation,
+    batchRequestPaymentMutation,
+    batchMarkAwaitingPaymentMutation,
+    batchMarkPaidMutation,
   };
 };
 

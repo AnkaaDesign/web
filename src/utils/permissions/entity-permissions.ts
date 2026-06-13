@@ -559,12 +559,13 @@ export function canDeleteSuppliers(user: PermissionUser | null): boolean {
 
 /**
  * Can user edit HR entities (vacations, warnings, positions)?
- * HUMAN_RESOURCES and ADMIN manage HR data
+ * HUMAN_RESOURCES, ACCOUNTING (Departamento Pessoal), and ADMIN manage HR data (matches API @Roles)
  */
 export function canEditHrEntities(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.HUMAN_RESOURCES,
+    SECTOR_PRIVILEGES.ACCOUNTING,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
@@ -598,18 +599,27 @@ export function canDeleteAssessments(user: PermissionUser | null): boolean {
 
 /**
  * Can user edit/delete users?
- * Only ADMIN and HR can manage users
+ * ADMIN, HR, and ACCOUNTING (read/update — Departamento Pessoal) can manage users
  */
 export function canEditUsers(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.HUMAN_RESOURCES,
+    SECTOR_PRIVILEGES.ACCOUNTING,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
 
+/**
+ * Can user delete users?
+ * HR and ADMIN only — ACCOUNTING has read/update but NOT delete (matches API)
+ */
 export function canDeleteUsers(user: PermissionUser | null): boolean {
-  return canEditUsers(user);
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.HUMAN_RESOURCES,
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
 }
 
 // =====================

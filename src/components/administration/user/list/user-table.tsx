@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { User } from "../../../../types";
-import { routes, USER_STATUS } from "../../../../constants";
+import { routes, CONTRACT_TYPE, CONTRACT_STATUS } from "../../../../constants";
 import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditUsers, canDeleteUsers, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -261,14 +261,14 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             // Bulk mark as effected
             const users = contextMenu.users.map((user) => ({
               id: user.id,
-              data: { status: USER_STATUS.EFFECTED },
+              data: { contractType: CONTRACT_TYPE.EFFECTED },
             }));
             await batchUpdate({ users });
           } else {
             // Single mark as effected
             await updateUser({
               id: contextMenu.users[0].id,
-              data: { status: USER_STATUS.EFFECTED },
+              data: { contractType: CONTRACT_TYPE.EFFECTED },
             });
           }
         }
@@ -292,7 +292,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             // Bulk mark as dismissed
             const users = contextMenu.users.map((user) => ({
               id: user.id,
-              data: { status: USER_STATUS.DISMISSED, dismissedAt: new Date() },
+              data: { contractStatus: CONTRACT_STATUS.DISMISSED, terminationDate: new Date() },
             }));
             await batchUpdate({ users });
           } else {
@@ -301,7 +301,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             // funcionario. Same shape as the edit page.
             const response = (await updateUser({
               id: contextMenu.users[0].id,
-              data: { status: USER_STATUS.DISMISSED, dismissedAt: new Date() },
+              data: { contractStatus: CONTRACT_STATUS.DISMISSED, terminationDate: new Date() },
             })) as { secullumSync?: { status: "synced" | "skipped" | "error"; reason?: string; funcionarioId?: number } };
             const sync = response?.secullumSync;
             if (sync) {
@@ -595,7 +595,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
               <DropdownMenuSeparator />
 
               {/* Show efetivar option if any user is in experience period */}
-              {contextMenu?.users.some((user) => user.status === USER_STATUS.EXPERIENCE_PERIOD_1 || user.status === USER_STATUS.EXPERIENCE_PERIOD_2) && (
+              {contextMenu?.users.some((user) => user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_1 || user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_2) && (
                 <DropdownMenuItem onClick={handleMarkAsContracted}>
                   <IconUserCheck className="mr-2 h-4 w-4" />
                   {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Efetivar selecionados" : "Efetivar"}
@@ -603,7 +603,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
               )}
 
               {/* Show dismiss option if any user is not dismissed */}
-              {contextMenu?.users.some((user) => user.status !== USER_STATUS.DISMISSED) && (
+              {contextMenu?.users.some((user) => user.currentContractStatus !== CONTRACT_STATUS.DISMISSED) && (
                 <DropdownMenuItem onClick={handleMarkAsDismissed}>
                   <IconUserX className="mr-2 h-4 w-4" />
                   {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Demitir selecionados" : "Demitir"}

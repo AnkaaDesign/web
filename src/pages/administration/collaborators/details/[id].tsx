@@ -8,12 +8,17 @@ import { useAuth } from "@/contexts/auth-context";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { BasicInfoCard, AddressCard, ProfessionalInfoCard, LoginInfoCard, RelatedActivitiesCard, PpeSizesCard } from "@/components/administration/user/detail";
+import { BasicInfoCard, AddressCard, ProfessionalInfoCard, LoginInfoCard, RelatedActivitiesCard, PpeSizesCard, EmploymentHistoryCard } from "@/components/administration/user/detail";
+import { UserDocumentationCard } from "@/components/personnel-department/admission/user-documentation-card";
+import { UserPositionHistoryCard } from "@/components/personnel-department/user-position-history/detail/user-position-history-card";
+import { UserBenefitsCard } from "@/components/personnel-department/user-benefit/user-benefits-card";
+import { DependentsCard } from "@/components/human-resources/dependent/dependents-card";
 import { UserDetailSkeleton } from "@/components/administration/user/detail/user-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { useNavBreadcrumbs } from "@/contexts/navigation-context";
 
 const CollaboratorDetailsPage = () => {
   usePageTracker({ title: "Detalhes do Colaborador" });
@@ -35,6 +40,7 @@ const CollaboratorDetailsPage = () => {
       ledSector: true,
       ppeSize: true,
       avatar: true,
+      currentContract: true,
       activities: {
         include: {
           item: true,
@@ -47,6 +53,18 @@ const CollaboratorDetailsPage = () => {
 
   const user = response?.data;
   const mutations = useUserMutations();
+
+  // Context-aware trail (shared page): "Departamento Pessoal" for accounting users,
+  // "Administração" only when reached from that section. Must run before early returns.
+  const breadcrumbs = useNavBreadcrumbs(
+    [
+      { label: "Início", href: "/" },
+      { label: "Administração", href: routes.administration.root },
+      { label: "Colaboradores", href: routes.administration.collaborators.root },
+      { label: user?.name ?? "Detalhes" },
+    ],
+    { leaf: [{ label: user?.name ?? "Detalhes" }] },
+  );
 
   if (!id) {
     return <Navigate to={routes.administration.collaborators.root} replace />;
@@ -63,7 +81,7 @@ const CollaboratorDetailsPage = () => {
 
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <UserDetailSkeleton />
       </PrivilegeRoute>
     );
@@ -86,17 +104,12 @@ const CollaboratorDetailsPage = () => {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
           title={user.name}
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Administração", href: routes.administration.root },
-            { label: "Colaboradores", href: routes.administration.collaborators.root },
-            { label: user.name },
-          ]}
+          breadcrumbs={breadcrumbs}
           actions={[
             {
               key: "refresh",
@@ -135,11 +148,26 @@ const CollaboratorDetailsPage = () => {
               <LoginInfoCard user={user} />
             </div>
 
+            {/* Documentação (Admissão — DP/Contabilidade) */}
+            <UserDocumentationCard userId={user.id} />
+
+            {/* Histórico de Vínculos (vínculos empregatícios) */}
+            <EmploymentHistoryCard userId={id} maxHeight="400px" />
+
+            {/* Histórico de Cargos (Departamento Pessoal) */}
+            <UserPositionHistoryCard userId={id} maxHeight="400px" />
+
+            {/* Benefícios ativos (Empresa × Colaborador) */}
+            <UserBenefitsCard userId={id} />
+
             {/* PPE Sizes and Changelog History - Side by Side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <PpeSizesCard user={user} className="h-[700px]" />
               <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.USER} entityId={id} maxHeight="700px" className="h-[700px]" />
             </div>
+
+            {/* Dependentes (IRRF / Salário-Família) */}
+            <DependentsCard userId={id} />
 
             {/* Related Activities */}
             <RelatedActivitiesCard user={user} />

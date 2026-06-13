@@ -12,8 +12,10 @@ import type {
   FiscalDocumentFilters,
   ImportSummary,
   MatchCandidate,
+  OutflowForecast,
   ReconciliationPaginatedResponse,
   ReconciliationStatistics,
+  ReconciliationSuggestion,
   RecurringForecast,
   SetFiscalItemCategoryPayload,
   TransactionCategory,
@@ -200,5 +202,24 @@ export const reconciliationService = {
       {
         params,
       },
+    ),
+
+  // Composite "Previsão de Saídas": pedidos + impostos (aprox.) + folha (com
+  // bonificação, agregado) + recorrentes, composed server-side.
+  getOutflowForecast: (params?: { reference?: string }) =>
+    apiClient.get<OutflowForecast>(
+      "/financial/reconciliation/outflow-forecast",
+      { params },
+    ),
+
+  // Inbox of medium-confidence category suggestions awaiting one-click confirm.
+  listSuggestions: () =>
+    apiClient.get<ReconciliationSuggestion[]>(
+      "/financial/reconciliation/suggestions",
+    ),
+
+  confirmSuggestion: (transactionId: string) =>
+    apiClient.post<BankTransaction>(
+      `/financial/reconciliation/transactions/${transactionId}/suggestion/confirm`,
     ),
 };

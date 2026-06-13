@@ -9,3 +9,5 @@ export * from "./server";
 export * from "./integrations";
 export * from "./skill";
 export * from "./questionnaire";
+export * from "./personnel-department";
+export * from "./occupational-health";

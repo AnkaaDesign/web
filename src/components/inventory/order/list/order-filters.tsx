@@ -3,7 +3,7 @@ import type { OrderGetManyFormData } from "../../../../schemas";
 import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { IconFilter } from "@tabler/icons-react";
-import { ORDER_STATUS, ORDER_STATUS_LABELS } from "../../../../constants";
+import { ORDER_STATUS, ORDER_STATUS_LABELS, ORDER_PAYMENT_STATUS, ORDER_PAYMENT_STATUS_LABELS } from "../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { getSuppliers } from "../../../../api-client";
@@ -18,6 +18,7 @@ interface OrderFiltersProps {
 
 interface FilterState {
   status?: ORDER_STATUS[];
+  paymentStatuses?: ORDER_PAYMENT_STATUS[];
   supplierIds?: string[];
   createdAtRange?: { gte?: Date; lte?: Date };
   forecastRange?: { gte?: Date; lte?: Date };
@@ -36,6 +37,7 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
 
     setLocalState({
       status: filters.status || [],
+      paymentStatuses: filters.paymentStatuses || [],
       supplierIds: filters.supplierIds || [],
       createdAtRange: filters.createdAt,
       forecastRange: filters.forecastRange,
@@ -53,6 +55,11 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
     // Add status filter
     if (localState.status && localState.status.length > 0) {
       newFilters.status = localState.status;
+    }
+
+    // Add payment status filter
+    if (localState.paymentStatuses && localState.paymentStatuses.length > 0) {
+      newFilters.paymentStatuses = localState.paymentStatuses;
     }
 
     // Add supplier filter
@@ -93,6 +100,7 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
   const countActiveFilters = () => {
     let count = 0;
     if (localState.status && localState.status.length > 0) count += localState.status.length;
+    if (localState.paymentStatuses && localState.paymentStatuses.length > 0) count += localState.paymentStatuses.length;
     if (localState.supplierIds && localState.supplierIds.length > 0) count += localState.supplierIds.length;
     if (localState.createdAtRange?.gte || localState.createdAtRange?.lte) count++;
     if (localState.forecastRange?.gte || localState.forecastRange?.lte) count++;
@@ -105,6 +113,11 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
   const statusOptions: ComboboxOption[] = Object.values(ORDER_STATUS).map((status) => ({
     value: status,
     label: ORDER_STATUS_LABELS[status],
+  }));
+
+  const paymentStatusOptions: ComboboxOption[] = Object.values(ORDER_PAYMENT_STATUS).map((status) => ({
+    value: status,
+    label: ORDER_PAYMENT_STATUS_LABELS[status],
   }));
 
   // Async query function for suppliers
@@ -164,6 +177,22 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
               value={localState.status || []}
               onValueChange={(values) => setLocalState((prev) => ({ ...prev, status: (Array.isArray(values) ? values : []) as ORDER_STATUS[] }))}
               placeholder="Selecione os status"
+              emptyText="Nenhum status encontrado"
+              mode="multiple"
+              searchable={true}
+            />
+          </div>
+
+          {/* Payment Status Filter */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Status de Pagamento</Label>
+            <Combobox<ComboboxOption>
+              options={paymentStatusOptions}
+              value={localState.paymentStatuses || []}
+              onValueChange={(values) =>
+                setLocalState((prev) => ({ ...prev, paymentStatuses: (Array.isArray(values) ? values : []) as ORDER_PAYMENT_STATUS[] }))
+              }
+              placeholder="Selecione os status de pagamento"
               emptyText="Nenhum status encontrado"
               mode="multiple"
               searchable={true}

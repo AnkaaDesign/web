@@ -17,6 +17,7 @@ import { NotificationCenter } from "@/components/notification-center";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { SidebarFlyout, useFlyoutController } from "./sidebar-flyout";
+import { recordNavClick, clearNavContext, useRecordedNav, resolveActiveNav, computeExpandedFromActive } from "@/contexts/navigation-context";
 
 import {
   IconDashboard,
@@ -117,6 +118,8 @@ import {
   IconServer,
   IconQrcode,
   IconTarget,
+  IconCheck,
+  IconUserCheck,
 } from "@tabler/icons-react";
 
 // Types for better type safety
@@ -225,6 +228,8 @@ const iconComponents: Record<string, any> = {
   IconServer,
   IconQrcode,
   IconTarget,
+  IconCheck,
+  IconUserCheck,
 };
 
 // Get icon component helper
@@ -290,6 +295,11 @@ export const Sidebar = memo(() => {
 
   // Collapsed-sidebar cascading hover flyout (handles full menu hierarchy).
   const flyout = useFlyoutController();
+
+  // Navigation context: the menu entry the user actually clicked (per-tab, survives
+  // reload). Drives winner resolution + auto-expansion so pages shared by several
+  // sections highlight/expand the section the user came from.
+  const recordedNav = useRecordedNav();
 
   // Refs
   const navigationTimeoutRef = useRef<number | null>(null);
@@ -364,70 +374,6 @@ export const Sidebar = memo(() => {
       return currentPath === itemPath;
     },
     [location.pathname],
-  );
-
-  // Check if current path is under this item's path (for styling)
-  const isPathUnderItem = useCallback(
-    (item: any): boolean => {
-      const currentPath = location.pathname;
-      const itemPath = item.path;
-
-      if (!itemPath) return false;
-
-      // Known static route segments that should NOT trigger dynamic route matching
-      const knownStaticSegments = ["criar", "cadastrar", "editar", "detalhes", "editar-em-lote", "editar-lote", "list", "novo"];
-
-      // If item path has dynamic segments, we need special handling
-      if (itemPath.includes(":")) {
-        // Extract the base path (everything before the first :param)
-        const basePathMatch = itemPath.match(/^(.+?)\/:[^/]+/);
-        if (basePathMatch) {
-          const basePath = basePathMatch[1];
-          // Check if current path starts with the base path
-          if (currentPath.startsWith(basePath + "/")) {
-            // Get the segment that would match the dynamic parameter
-            const remainingPath = currentPath.slice(basePath.length + 1);
-            const firstSegment = remainingPath.split("/")[0];
-
-            // If the first segment is a known static route name, this dynamic route is NOT a parent
-            if (knownStaticSegments.includes(firstSegment)) {
-              return false;
-            }
-          }
-        }
-      }
-
-      // Clean paths for comparison (remove dynamic segments like :id)
-      const cleanItemPath = itemPath.replace(/\/:[^/]+/g, "");
-
-      // Don't match if this item is a contextual item (cadastrar, criar, editar, detalhes)
-      // These should only be active when exactly matched, not when path starts with them
-      const contextualActions = ["cadastrar", "criar", "editar", "detalhes"];
-      const isContextualItem = contextualActions.some(
-        (action) => item.id?.includes(action) || cleanItemPath.endsWith(`/${action}`) || cleanItemPath.includes(`/${action}/`)
-      );
-
-      if (isContextualItem) {
-        return false;
-      }
-
-      return currentPath.startsWith(cleanItemPath + "/");
-    },
-    [location.pathname],
-  );
-
-  // Check if item has active child
-  const hasActiveChild = useCallback(
-    (item: any): boolean => {
-      if (!item.children) return false;
-
-      return item.children.some((child: any) => {
-        // Check if child is exactly active or if current path is under child
-        if (isItemActive(child) || isPathUnderItem(child)) return true;
-        return hasActiveChild(child);
-      });
-    },
-    [isItemActive, isPathUnderItem],
   );
 
   // Toggle submenu with accordion behavior
@@ -682,12 +628,41 @@ export const Sidebar = memo(() => {
     });
   }, [filteredMenu, location.pathname]);
 
+  // Single-winner active highlight. For any URL, exactly ONE visible nav item gets the
+  // full active style. Resolution lives in @/contexts/navigation-context: the recorded
+  // nav click (when its subtree still matches the URL) takes priority, otherwise the
+  // longest match across the whole visible tree wins (exact beats prefix, leaf beats
+  // container, then tree order). Ancestors of the winner get a subtle context tint
+  // instead — this kills the "double highlight" (e.g. ".../beneficios" lighting up
+  // together with ".../beneficios/adesoes", or a section sharing its child's path)
+  // AND the "wrong section highlighted" bug for paths shared between sections.
+  const activeNav = useMemo(() => {
+    const active = resolveActiveNav(menuWithContextualItems as MenuItem[], location.pathname, recordedNav);
+    return { ...active, ancestorIds: new Set(active.trail.map((t) => t.id)) };
+  }, [menuWithContextualItems, location.pathname, recordedNav]);
+
+  // Active check used by the collapsed-sidebar flyout: nav items highlight only when
+  // they ARE the single winner; non-nav rows (favorites) fall back to exact path match.
+  const isFlyoutItemActive = useCallback(
+    (it: any): boolean => {
+      const id = it?.id || it?.path;
+      if (id && activeNav.navIds.has(id)) return id === activeNav.id;
+      return !!it?.path && it.path === location.pathname;
+    },
+    [activeNav, location.pathname],
+  );
+
   // Save showFavorites state
   useEffect(() => {
     localStorage.setItem("ankaa-sidebar-show-favorites", showFavorites.toString());
   }, [showFavorites]);
 
-  // Auto-expand menus based on current route
+  // Auto-expand menus based on the SINGLE active winner: exactly the winner's ancestor
+  // chain is expanded and every unrelated section (at every level) is collapsed. This
+  // replaces the old per-item path matching, which expanded EVERY section containing a
+  // matching path (e.g. navigating to /administracao/colaboradores yanked open both
+  // "Administração" and "Departamento Pessoal" for ADMIN).
+  const lastExpandKeyRef = useRef<string | null>(null);
   useEffect(() => {
     // Check navigation source
     const navSource = navigationSourceRef.current;
@@ -700,47 +675,26 @@ export const Sidebar = memo(() => {
       return;
     }
 
-    const newExpandedMenus: { [key: string]: boolean } = {};
+    // No winner (e.g. /favoritos, /perfil): leave the expansion state untouched.
+    if (!activeNav.id) {
+      return;
+    }
 
-    const findAndExpandPath = (items: any[], parentExpanded = false) => {
-      let hasExpandedSibling = false;
+    // Re-apply only when the route/winner pair actually changed — menu identity churn
+    // (e.g. contextual children appearing) must not fight manual chevron toggles.
+    const key = `${location.pathname}|${activeNav.id}`;
+    if (lastExpandKeyRef.current === key) {
+      return;
+    }
+    lastExpandKeyRef.current = key;
 
-      items.forEach((item) => {
-        const isActive = isItemActive(item);
-        const hasActive = hasActiveChild(item);
-
-        if ((isActive || hasActive) && item.id) {
-          newExpandedMenus[item.id] = true;
-          hasExpandedSibling = true;
-        }
-
-        if (item.children && (isActive || hasActive || parentExpanded)) {
-          findAndExpandPath(item.children, isActive || hasActive);
-        }
-      });
-
-      // If we found an expanded sibling, close others at this level (accordion behavior)
-      if (hasExpandedSibling) {
-        items.forEach((item) => {
-          if (item.id && !newExpandedMenus[item.id]) {
-            newExpandedMenus[item.id] = false;
-          }
-        });
-      }
-    };
-
-    findAndExpandPath(menuWithContextualItems);
+    const newExpandedMenus = computeExpandedFromActive(menuWithContextualItems as MenuItem[], activeNav);
 
     setExpandedMenus((prev) => {
-      // Only update if there are changes
-      const hasChanges = Object.keys(newExpandedMenus).some((key) => prev[key] !== newExpandedMenus[key]);
-
-      if (hasChanges) {
-        return { ...prev, ...newExpandedMenus };
-      }
-      return prev;
+      const hasChanges = Object.keys(newExpandedMenus).some((k) => !!prev[k] !== newExpandedMenus[k]);
+      return hasChanges ? newExpandedMenus : prev;
     });
-  }, [location.pathname, menuWithContextualItems, isItemActive, hasActiveChild]);
+  }, [location.pathname, menuWithContextualItems, activeNav]);
 
   // Clear navigation state on route change
   useEffect(() => {
@@ -760,6 +714,11 @@ export const Sidebar = memo(() => {
         return;
       }
       navigationSourceRef.current = opts?.fromFavorite ? "favorite" : "menu";
+      if (opts?.fromFavorite) {
+        clearNavContext(); // favorites are section-less jumps
+      } else {
+        recordNavClick(item.id, item.path);
+      }
       startNavigation(item.id || item.path, fixNavigationPath(item.path), !!opts?.fromFavorite);
       flyout.close();
     },
@@ -786,8 +745,11 @@ export const Sidebar = memo(() => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedMenus[item.id] || false;
     const isActive = isItemActive(item);
-    const hasActive = hasActiveChild(item);
     const isNavigating = navigatingItemId === item.id;
+    // Full active style only for the single winning item; the winner's ancestors get a
+    // subtle context tint (parent expansion already signals hierarchy).
+    const isHighlighted = (item.id || item.path) === activeNav.id;
+    const isAncestorOfActive = !isHighlighted && activeNav.ancestorIds.has(item.id);
 
     const handleItemClick = (e: React.MouseEvent) => {
       // Check if Ctrl (or Cmd on Mac) is pressed or if it's a middle-click
@@ -809,6 +771,7 @@ export const Sidebar = memo(() => {
           return;
         }
         navigationSourceRef.current = "menu";
+        recordNavClick(item.id, item.path);
         startNavigation(item.id, fixNavigationPath(item.path));
         flyout.close();
         return;
@@ -816,6 +779,10 @@ export const Sidebar = memo(() => {
 
       // If we have a path
       if (item.path) {
+        // Record the clicked entry even when already on its page — clicking a section's
+        // own entry re-anchors highlight/expansion to THAT section when several
+        // sections share the same path.
+        recordNavClick(item.id, item.path);
         // Navigate if we're not on the exact same page
         if (!isActive) {
           navigationSourceRef.current = "menu";
@@ -851,9 +818,9 @@ export const Sidebar = memo(() => {
           className={cn(
             "group relative flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 min-h-[40px]",
             isNavigating && "bg-primary text-primary-foreground scale-[0.98]",
-            !isNavigating && isActive && "bg-primary text-primary-foreground hover:bg-primary/90",
-            !isNavigating && !isActive && (hasActive || isPathUnderItem(item)) && "bg-primary text-primary-foreground hover:bg-primary/90",
-            !isNavigating && !isActive && !hasActive && !isPathUnderItem(item) && "hover:bg-muted/50",
+            !isNavigating && isHighlighted && "bg-primary text-primary-foreground hover:bg-primary/90",
+            !isNavigating && !isHighlighted && isAncestorOfActive && "bg-muted/60 hover:bg-muted",
+            !isNavigating && !isHighlighted && !isAncestorOfActive && "hover:bg-muted/50",
           )}
           onClick={handleItemClick}
           onContextMenu={handleContextMenu}
@@ -1038,6 +1005,7 @@ export const Sidebar = memo(() => {
                             window.open(fav.path, '_blank');
                           } else {
                             navigationSourceRef.current = "favorite";
+                            clearNavContext(); // favorites are section-less jumps
                             navigate(fav.path);
                           }
                         }}
@@ -1071,7 +1039,7 @@ export const Sidebar = memo(() => {
       {flyout.state && !isOpen && (
         <SidebarFlyout
           state={flyout.state}
-          isItemActive={isItemActive}
+          isItemActive={isFlyoutItemActive}
           getIcon={getIconComponent}
           renderFavoriteIcon={renderFavoriteIcon}
           onNavigate={handleFlyoutNavigate}

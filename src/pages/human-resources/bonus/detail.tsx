@@ -274,7 +274,7 @@ export default function BonusDetailPage() {
   // Validation — hard error out only when we truly have no id.
   if (!id) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <Alert variant="destructive">
           <IconAlertCircle className="h-4 w-4" />
           <AlertDescription>ID do bônus não fornecido</AlertDescription>
@@ -286,7 +286,7 @@ export default function BonusDetailPage() {
   // Hard error only when the live fetch explicitly failed AND we have no cache.
   if (bonusError && !cachedBonus) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <Alert variant="destructive">
           <IconAlertCircle className="h-4 w-4" />
           <AlertDescription>{errorMessage || 'Erro ao carregar bônus.'}</AlertDescription>
@@ -298,7 +298,7 @@ export default function BonusDetailPage() {
   // Not found only after load completed with nothing returned.
   if (!isBonusLoading && !bonus && !cachedBonus) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
         <Alert variant="destructive">
           <IconAlertCircle className="h-4 w-4" />
           <AlertDescription>Bônus não encontrado</AlertDescription>
@@ -380,7 +380,7 @@ export default function BonusDetailPage() {
   );
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="p-4 space-y-4 relative">
         {/* Freshness indicator — amber "atualizando…" when served from the stale
             SWR tier, otherwise a subtle "Atualizado às HH:mm" whenever we know

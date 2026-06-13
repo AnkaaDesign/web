@@ -104,7 +104,7 @@ import { getSectors } from '@/api-client/sector';
 import { getSkills } from '@/api-client/skill';
 import { getTopics } from '@/api-client/topic';
 import { getUsers } from '@/api-client/user';
-import { ASSESSMENT_STATUS, ASSESSMENT_STATUS_LABELS, FAVORITE_PAGES, routes, SECTOR_PRIVILEGES, USER_STATUS } from '@/constants';
+import { ASSESSMENT_STATUS, ASSESSMENT_STATUS_LABELS, FAVORITE_PAGES, routes, SECTOR_PRIVILEGES, CONTRACT_STATUS } from '@/constants';
 import { cn } from '@/lib/utils';
 import { z } from 'zod';
 import { useStatisticsPagePersistence } from '@/hooks/common/use-statistics-page-persistence';
@@ -501,7 +501,7 @@ function SkillStatsFilterSheet({
         // demitidos never appear in HR stats filters (same rule as every other
         // HR-derived screen).
         isActive: true,
-        status: { not: USER_STATUS.DISMISSED },
+        currentContractStatus: { not: CONTRACT_STATUS.DISMISSED },
         ...(narrowSectorIds ? { sectorId: { in: narrowSectorIds } } : {}),
         ...(narrowPositionIds ? { positionId: { in: narrowPositionIds } } : {}),
         ...(narrowAssessmentIds

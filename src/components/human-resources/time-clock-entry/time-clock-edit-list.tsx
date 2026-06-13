@@ -17,7 +17,7 @@ import type { TimeClockEntryTableRef } from "./time-clock-entry-table";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { ColumnVisibilityManager } from "@/components/integrations/secullum/calculations/list";
 import type { ColumnDef } from "@/components/integrations/secullum/calculations/list";
-import { USER_STATUS } from "../../../constants";
+import { CONTRACT_STATUS } from "../../../constants";
 import { PeriodControl } from "./period-control";
 import { TimeClockEntryEditExport } from "./time-clock-entry-edit-export";
 import type { EditExportRow } from "./time-clock-entry-edit-export";
@@ -243,11 +243,7 @@ export function TimeClockEntryEditList({
     isLoading: usersLoading,
     error: usersError,
   } = useUsers({
-    statuses: [
-      USER_STATUS.EXPERIENCE_PERIOD_1,
-      USER_STATUS.EXPERIENCE_PERIOD_2,
-      USER_STATUS.EFFECTED,
-    ],
+    statuses: [CONTRACT_STATUS.ACTIVE],
     where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,

@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { User } from "../../../../types";
 import { useUserBatchMutations } from "../../../../hooks";
-import { USER_STATUS, USER_STATUS_LABELS } from "../../../../constants";
+import { CONTRACT_TYPE, CONTRACT_TYPE_LABELS } from "../../../../constants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -32,9 +32,9 @@ const batchUpdateSchema = z
     positionId: z.string().uuid("ID do cargo inválido").nullable().optional(),
     sectorId: z.string().uuid("ID do setor inválido").nullable().optional(),
     ledSectorId: z.string().uuid("ID do setor liderado inválido").nullable().optional(),
-    status: z
-      .enum(Object.values(USER_STATUS) as [string, ...string[]], {
-        errorMap: () => ({ message: "status inválido" }),
+    contractType: z
+      .enum(Object.values(CONTRACT_TYPE) as [string, ...string[]], {
+        errorMap: () => ({ message: "tipo de contrato inválido" }),
       })
       .optional(),
   })
@@ -81,7 +81,7 @@ export function UserBatchEditDialog({ isOpen, onClose, selectedUsers, onSuccess 
       positionId: null,
       sectorId: null,
       ledSectorId: null,
-      status: undefined,
+      contractType: undefined,
     },
   });
 
@@ -296,22 +296,22 @@ export function UserBatchEditDialog({ isOpen, onClose, selectedUsers, onSuccess 
 
                       <FormField
                         control={form.control}
-                        name="status"
+                        name="contractType"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs">Status</FormLabel>
+                            <FormLabel className="text-xs">Tipo de Contrato</FormLabel>
                             <FormControl>
                               <Combobox
                                 value={field.value || "_no_change"}
                                 onValueChange={(value) => field.onChange(value === "_no_change" ? undefined : value)}
                                 options={[
                                   { value: "_no_change", label: "Não alterar" },
-                                  ...Object.entries(USER_STATUS_LABELS).map(([value, label]) => ({
+                                  ...Object.entries(CONTRACT_TYPE_LABELS).map(([value, label]) => ({
                                     value,
                                     label,
                                   })),
                                 ]}
-                                placeholder="Novo status"
+                                placeholder="Novo tipo de contrato"
                                 searchable={false}
                                 clearable={false}
                               />

@@ -22,6 +22,8 @@ interface NavigationUser {
 /**
  * Sort menu items alphabetically by title
  * Keeps "Inicio" (home) as the first item
+ * Items with an explicit `order` come first (ascending), before alphabetical siblings
+ * (spec-mandated sequences, e.g. Conciliação Bancária children).
  * Recursively sorts children as well
  */
 function sortMenuItemsAlphabetically(menuItems: MenuItem[]): MenuItem[] {
@@ -30,6 +32,12 @@ function sortMenuItemsAlphabetically(menuItems: MenuItem[]): MenuItem[] {
       // "Inicio" (home) always comes first
       if (a.id === 'home') return -1;
       if (b.id === 'home') return 1;
+
+      // Explicitly ordered items come before alphabetical ones
+      if (a.order != null || b.order != null) {
+        if (a.order != null && b.order != null) return a.order - b.order;
+        return a.order != null ? -1 : 1;
+      }
 
       // Sort alphabetically by title (case-insensitive)
       return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });

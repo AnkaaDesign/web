@@ -1,13 +1,14 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Order } from "../../../../types";
-import { routes, ORDER_STATUS } from "../../../../constants";
+import { routes, ORDER_STATUS, ORDER_PAYMENT_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditOrders, canDeleteOrders, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
+import { hasAnyPrivilege } from "@/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconExternalLink, IconAlertTriangle, IconShoppingCart, IconCheck, IconChecks, IconX, IconPlus } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconExternalLink, IconAlertTriangle, IconShoppingCart, IconCheck, IconChecks, IconX, IconPlus, IconCashBanknote, IconHourglass, IconCircleCheck } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
@@ -43,13 +44,23 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
   const navigate = useNavigate();
   const canViewPrices = useCanViewPrices();
   const { user, isLoading: _isAuthLoading } = useAuth();
-  const { delete: deleteOrder, updateAsync: updateOrder } = useOrderMutations();
-  const { batchDelete } = useOrderBatchMutations();
+  const {
+    delete: deleteOrder,
+    updateAsync: updateOrder,
+    requestPaymentAsync,
+    markAwaitingPaymentAsync,
+    markPaidAsync,
+  } = useOrderMutations();
+  const { batchDelete, batchRequestPaymentAsync, batchMarkAwaitingPaymentAsync, batchMarkPaidAsync } = useOrderBatchMutations();
 
   // Permission checks
   const canEdit = user ? canEditOrders(user) : false;
   const canDelete = user ? canDeleteOrders(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'order') : false;
+  // Payment workflow (contas a pagar) — warehouse requests, financial/accounting settle
+  const canManagePayments = user
+    ? hasAnyPrivilege(user, [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN])
+    : false;
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -361,6 +372,65 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
     }
   }, [contextMenu, handleMarkAsCancelled]);
 
+  // Payment actions (single + bulk). Bulk uses the dedicated batch endpoints so
+  // the API answers with ONE response (one interceptor toast) per operation;
+  // only the eligible orders are sent.
+  const handleRequestPaymentFromMenu = React.useCallback(async () => {
+    if (!contextMenu) return;
+    const eligible = contextMenu.orders.filter((o) => o.paymentStatus === ORDER_PAYMENT_STATUS.NOT_REQUESTED);
+    setContextMenu(null);
+    if (eligible.length === 0) return;
+
+    try {
+      if (contextMenu.isBulk && eligible.length > 1) {
+        await batchRequestPaymentAsync({ orderIds: eligible.map((o) => o.id) });
+      } else {
+        await requestPaymentAsync(eligible[0].id);
+      }
+      refetch();
+    } catch (error) {
+      // Error handled by API client
+    }
+  }, [contextMenu, batchRequestPaymentAsync, requestPaymentAsync, refetch]);
+
+  const handleMarkAwaitingPaymentFromMenu = React.useCallback(async () => {
+    if (!contextMenu) return;
+    const eligible = contextMenu.orders.filter(
+      (o) => o.paymentStatus === ORDER_PAYMENT_STATUS.NOT_REQUESTED || o.paymentStatus === ORDER_PAYMENT_STATUS.REQUESTED,
+    );
+    setContextMenu(null);
+    if (eligible.length === 0) return;
+
+    try {
+      if (contextMenu.isBulk && eligible.length > 1) {
+        await batchMarkAwaitingPaymentAsync({ orderIds: eligible.map((o) => o.id) });
+      } else {
+        await markAwaitingPaymentAsync(eligible[0].id);
+      }
+      refetch();
+    } catch (error) {
+      // Error handled by API client
+    }
+  }, [contextMenu, batchMarkAwaitingPaymentAsync, markAwaitingPaymentAsync, refetch]);
+
+  const handleMarkPaidFromMenu = React.useCallback(async () => {
+    if (!contextMenu) return;
+    const eligible = contextMenu.orders.filter((o) => o.paymentStatus !== ORDER_PAYMENT_STATUS.PAID);
+    setContextMenu(null);
+    if (eligible.length === 0) return;
+
+    try {
+      if (contextMenu.isBulk && eligible.length > 1) {
+        await batchMarkPaidAsync({ orderIds: eligible.map((o) => o.id) });
+      } else {
+        await markPaidAsync(eligible[0].id);
+      }
+      refetch();
+    } catch (error) {
+      // Error handled by API client
+    }
+  }, [contextMenu, batchMarkPaidAsync, markPaidAsync, refetch]);
+
   const handleDeleteFromMenu = React.useCallback(async () => {
     if (contextMenu) {
       if (contextMenu.isBulk) {
@@ -399,6 +469,16 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
   if (isLoading) {
     return <OrderTableSkeleton visibleColumns={visibleColumns} className={className} />;
   }
+
+  // Payment menu eligibility — for bulk, show the action when at least one
+  // selected order can transition (handler filters to the eligible subset).
+  const contextOrders = contextMenu?.orders ?? [];
+  const showRequestPayment = canManagePayments && contextOrders.some((o) => o.paymentStatus === ORDER_PAYMENT_STATUS.NOT_REQUESTED);
+  const showMarkAwaitingPayment =
+    canManagePayments &&
+    contextOrders.some((o) => o.paymentStatus === ORDER_PAYMENT_STATUS.NOT_REQUESTED || o.paymentStatus === ORDER_PAYMENT_STATUS.REQUESTED);
+  const showMarkPaid = canManagePayments && contextOrders.some((o) => o.paymentStatus !== ORDER_PAYMENT_STATUS.PAID);
+  const showPaymentSection = showRequestPayment || showMarkAwaitingPayment || showMarkPaid;
 
   const allSelected = isAllSelected(currentPageOrderIds);
   const someSelected = isPartiallySelected(currentPageOrderIds);
@@ -601,9 +681,33 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
                 </DropdownMenuItem>
               )}
 
-              {(canEdit || canDelete) && <DropdownMenuSeparator />}
+              {(canEdit || canDelete || showPaymentSection) && <DropdownMenuSeparator />}
             </>
           )}
+
+          {/* Payment workflow actions (single + bulk) */}
+          {showRequestPayment && (
+            <DropdownMenuItem onClick={handleRequestPaymentFromMenu} className="text-amber-700 dark:text-amber-400">
+              <IconCashBanknote className="mr-2 h-4 w-4" />
+              Solicitar Pagamento
+            </DropdownMenuItem>
+          )}
+
+          {showMarkAwaitingPayment && (
+            <DropdownMenuItem onClick={handleMarkAwaitingPaymentFromMenu} className="text-orange-700 dark:text-orange-400">
+              <IconHourglass className="mr-2 h-4 w-4" />
+              Marcar Aguardando Pagamento
+            </DropdownMenuItem>
+          )}
+
+          {showMarkPaid && (
+            <DropdownMenuItem onClick={handleMarkPaidFromMenu} className="text-green-700 dark:text-green-400">
+              <IconCircleCheck className="mr-2 h-4 w-4" />
+              Marcar como Pago
+            </DropdownMenuItem>
+          )}
+
+          {contextMenu?.isBulk && showPaymentSection && canDelete && <DropdownMenuSeparator />}
 
           {canDelete && (
             <DropdownMenuItem onClick={handleDeleteFromMenu} className="text-destructive">

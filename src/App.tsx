@@ -85,7 +85,12 @@ const ReconciliationFiscalDocumentsList = lazy(() => import("@/pages/financial/r
 const ReconciliationFiscalDocumentDetail = lazy(() => import("@/pages/financial/reconciliation/fiscal-document-detail").then((module) => ({ default: module.ReconciliationFiscalDocumentDetailPage })));
 const ReconciliationCategoriesList = lazy(() => import("@/pages/financial/reconciliation/categories-list").then((module) => ({ default: module.ReconciliationCategoriesListPage })));
 const ReconciliationRecurringForecast = lazy(() => import("@/pages/financial/reconciliation/recurring-forecast").then((module) => ({ default: module.ReconciliationRecurringForecastPage })));
+const ReconciliationStatement = lazy(() => import("@/pages/financial/reconciliation/statement").then((module) => ({ default: module.ReconciliationStatementPage })));
+const ReconciliationOutflows = lazy(() => import("@/pages/financial/reconciliation/outflows").then((module) => ({ default: module.ReconciliationOutflowsPage })));
+const ReconciliationInflows = lazy(() => import("@/pages/financial/reconciliation/inflows").then((module) => ({ default: module.ReconciliationInflowsPage })));
+const ReconciliationOutflowForecast = lazy(() => import("@/pages/financial/reconciliation/outflow-forecast").then((module) => ({ default: module.ReconciliationOutflowForecastPage })));
 const ReconciliationStatistics = lazy(() => import("@/pages/financial/statistics/reconciliation").then((module) => ({ default: module.ReconciliationStatisticsPage })));
+const AccountsPayableListPage = lazy(() => import("@/pages/financial/accounts-payable/list"));
 const FinancialCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
 const FinancialCustomersBatchEdit = lazy(() => import("@/pages/administration/customers/batch-edit").then((module) => ({ default: module.CustomerBatchEditPage })));
 
@@ -101,6 +106,43 @@ const HumanResourcesPayrollDetail = lazy(() => import("@/pages/human-resources/p
 const HumanResourcesBonusList = lazy(() => import("@/pages/human-resources/bonus/list").then((module) => ({ default: module.default })));
 const HumanResourcesBonusDetail = lazy(() => import("@/pages/human-resources/bonus/detail").then((module) => ({ default: module.default })));
 const HumanResourcesBonusSimulation = lazy(() => import("@/pages/human-resources/simulacao-bonus").then((module) => ({ default: module.default })));
+
+// Personnel Department - Salários e Cargos (W3A)
+const PersonnelDepartmentSalaryAdjustmentsList = lazy(() => import("@/pages/personnel-department/salary-adjustments/list").then((module) => ({ default: module.SalaryAdjustmentListPage })));
+const PersonnelDepartmentSalaryAdjustmentDetails = lazy(() => import("@/pages/personnel-department/salary-adjustments/details/[id]").then((module) => ({ default: module.SalaryAdjustmentDetailPage })));
+const PersonnelDepartmentPromotionsList = lazy(() => import("@/pages/personnel-department/promotions/list").then((module) => ({ default: module.PromotionListPage })));
+const PersonnelDepartmentSalaryRangesList = lazy(() => import("@/pages/personnel-department/salary-ranges/list").then((module) => ({ default: module.SalaryRangeListPage })));
+
+// Personnel Department - Admissões + Rescisões (W3B)
+const PersonnelDepartmentAdmissionsList = lazy(() => import("@/pages/personnel-department/admissions/list"));
+const PersonnelDepartmentAdmissionsCreate = lazy(() => import("@/pages/personnel-department/admissions/create").then((module) => ({ default: module.AdmissionCreatePage })));
+const PersonnelDepartmentAdmissionsEdit = lazy(() => import("@/pages/personnel-department/admissions/edit/[id]").then((module) => ({ default: module.AdmissionEditPage })));
+const PersonnelDepartmentAdmissionsDetails = lazy(() => import("@/pages/personnel-department/admissions/details/[id]").then((module) => ({ default: module.AdmissionDetailPage })));
+const PersonnelDepartmentTerminationsList = lazy(() => import("@/pages/personnel-department/terminations/list"));
+const PersonnelDepartmentTerminationsCreate = lazy(() => import("@/pages/personnel-department/terminations/create").then((module) => ({ default: module.TerminationCreatePage })));
+const PersonnelDepartmentTerminationsEdit = lazy(() => import("@/pages/personnel-department/terminations/edit/[id]").then((module) => ({ default: module.TerminationEditPage })));
+const PersonnelDepartmentTerminationsDetails = lazy(() => import("@/pages/personnel-department/terminations/details/[id]").then((module) => ({ default: module.TerminationDetailPage })));
+
+// Occupational Health - Medicina do Trabalho (W3C)
+const OccupationalHealthMedicalExamsList = lazy(() => import("@/pages/occupational-health/medical-exams/list").then((module) => ({ default: module.MedicalExamListPage })));
+const OccupationalHealthMedicalExamsCreate = lazy(() => import("@/pages/occupational-health/medical-exams/create").then((module) => ({ default: module.MedicalExamCreatePage })));
+const OccupationalHealthMedicalExamsEdit = lazy(() => import("@/pages/occupational-health/medical-exams/edit/[id]").then((module) => ({ default: module.MedicalExamEditPage })));
+const OccupationalHealthMedicalExamsDetails = lazy(() => import("@/pages/occupational-health/medical-exams/details/[id]").then((module) => ({ default: module.MedicalExamDetailPage })));
+const OccupationalHealthPeriodicExams = lazy(() => import("@/pages/occupational-health/periodic-exams/list").then((module) => ({ default: module.PeriodicExamsPage })));
+const OccupationalHealthLeavesList = lazy(() => import("@/pages/occupational-health/leaves/list").then((module) => ({ default: module.LeaveListPage })));
+const OccupationalHealthLeavesCreate = lazy(() => import("@/pages/occupational-health/leaves/create").then((module) => ({ default: module.LeaveCreatePage })));
+const OccupationalHealthLeavesEdit = lazy(() => import("@/pages/occupational-health/leaves/edit/[id]").then((module) => ({ default: module.LeaveEditPage })));
+const OccupationalHealthLeavesDetails = lazy(() => import("@/pages/occupational-health/leaves/details/[id]").then((module) => ({ default: module.LeaveDetailPage })));
+
+// Personnel Department - Benefícios / Adesões (W3C)
+const PersonnelDepartmentBenefitsList = lazy(() => import("@/pages/personnel-department/benefits/list").then((module) => ({ default: module.BenefitListPage })));
+const PersonnelDepartmentBenefitsCreate = lazy(() => import("@/pages/personnel-department/benefits/create").then((module) => ({ default: module.BenefitCreatePage })));
+const PersonnelDepartmentBenefitsEdit = lazy(() => import("@/pages/personnel-department/benefits/edit/[id]").then((module) => ({ default: module.BenefitEditPage })));
+const PersonnelDepartmentBenefitsDetails = lazy(() => import("@/pages/personnel-department/benefits/details/[id]").then((module) => ({ default: module.BenefitDetailPage })));
+const PersonnelDepartmentBenefitEnrollmentsList = lazy(() => import("@/pages/personnel-department/benefits/enrollments/list").then((module) => ({ default: module.UserBenefitListPage })));
+const PersonnelDepartmentBenefitEnrollmentsCreate = lazy(() => import("@/pages/personnel-department/benefits/enrollments/create").then((module) => ({ default: module.UserBenefitCreatePage })));
+const PersonnelDepartmentBenefitEnrollmentsEdit = lazy(() => import("@/pages/personnel-department/benefits/enrollments/edit/[id]").then((module) => ({ default: module.UserBenefitEditPage })));
+const PersonnelDepartmentBenefitEnrollmentsDetails = lazy(() => import("@/pages/personnel-department/benefits/enrollments/details/[id]").then((module) => ({ default: module.UserBenefitDetailPage })));
 
 const AdministrationSectorsList = lazy(() => import("@/pages/administration/sectors/list").then((module) => ({ default: module.SectorListPage })));
 const AdministrationSectorsCreate = lazy(() => import("@/pages/administration/sectors/create").then((module) => ({ default: module.SectorCreatePage })));
@@ -440,8 +482,11 @@ const ServerRateLimiting = lazy(() => import("@/pages/server/rate-limiting").the
 // Tools
 const ToolsHubPage = lazy(() => import("@/pages/tools").then((module) => ({ default: module.ToolsHubPage })));
 const QrCodeToolPage = lazy(() => import("@/pages/tools/qr-code").then((module) => ({ default: module.QrCodeToolPage })));
+const CalculatorPage = lazy(() => import("@/pages/tools/calculator"));
 const TimeCalculatorPage = lazy(() => import("@/pages/tools/time-calculator"));
 const OvertimeCostCalculatorPage = lazy(() => import("@/pages/tools/overtime-cost-calculator"));
+const EmployeeCostCalculatorPage = lazy(() => import("@/pages/tools/employee-cost-calculator"));
+const PostItsPage = lazy(() => import("@/pages/tools/post-its"));
 const PaintMixCalculatorPage = lazy(() => import("@/pages/tools/paint-mix-calculator"));
 const WasteCertificateToolPage = lazy(() => import("@/pages/tools/waste-certificate").then((module) => ({ default: module.WasteCertificateToolPage })));
 
@@ -1439,7 +1484,39 @@ function App() {
                 />
                 <Route
                   path="/financeiro/conciliacao/extratos"
-                  element={<Navigate to={routes.financial.reconciliation.transactions} replace />}
+                  element={<Navigate to={routes.financial.reconciliation.statement} replace />}
+                />
+                <Route
+                  path={routes.financial.reconciliation.statement}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationStatement />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.reconciliation.outflows}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationOutflows />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.reconciliation.inflows}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationInflows />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.reconciliation.outflowForecast}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationOutflowForecast />
+                    </Suspense>
+                  }
                 />
                 <Route
                   path={routes.financial.reconciliation.transactions}
@@ -1486,6 +1563,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ReconciliationRecurringForecast />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.accountsPayable.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AccountsPayableListPage />
                     </Suspense>
                   }
                 />
@@ -2786,6 +2871,247 @@ function App() {
                   }
                 />
 
+                {/* Departamento Pessoal — Admissões */}
+                <Route
+                  path={routes.personnelDepartment.admissions.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentAdmissionsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.admissions.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentAdmissionsCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.admissions.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentAdmissionsDetails />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.admissions.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentAdmissionsEdit />
+                    </Suspense>
+                  }
+                />
+                {/* Departamento Pessoal — Rescisões */}
+                <Route
+                  path={routes.personnelDepartment.terminations.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentTerminationsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.terminations.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentTerminationsCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.terminations.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentTerminationsDetails />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.terminations.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentTerminationsEdit />
+                    </Suspense>
+                  }
+                />
+                {/* Departamento Pessoal — Salários e Cargos */}
+                <Route
+                  path={routes.personnelDepartment.salaryAdjustments.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentSalaryAdjustmentsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.salaryAdjustments.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentSalaryAdjustmentDetails />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.promotions.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentPromotionsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.salaryRanges.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentSalaryRangesList />
+                    </Suspense>
+                  }
+                />
+                {/* Departamento Pessoal — Benefícios */}
+                <Route
+                  path={routes.personnelDepartment.benefits.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentBenefitsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.benefits.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentBenefitsCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.benefits.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentBenefitsEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.benefits.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentBenefitsDetails />
+                    </Suspense>
+                  }
+                />
+                {/* Departamento Pessoal — Adesões de Benefícios */}
+                <Route
+                  path={routes.personnelDepartment.benefits.enrollments.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentBenefitEnrollmentsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.benefits.enrollments.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentBenefitEnrollmentsCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.benefits.enrollments.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentBenefitEnrollmentsEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.benefits.enrollments.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentBenefitEnrollmentsDetails />
+                    </Suspense>
+                  }
+                />
+                {/* Medicina do Trabalho — ASO */}
+                <Route
+                  path={routes.occupationalHealth.medicalExams.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthMedicalExamsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.medicalExams.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthMedicalExamsCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.medicalExams.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthMedicalExamsEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.medicalExams.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthMedicalExamsDetails />
+                    </Suspense>
+                  }
+                />
+                {/* Medicina do Trabalho — Exames Periódicos */}
+                <Route
+                  path={routes.occupationalHealth.periodicExams.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthPeriodicExams />
+                    </Suspense>
+                  }
+                />
+                {/* Medicina do Trabalho — Afastamentos */}
+                <Route
+                  path={routes.occupationalHealth.leaves.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthLeavesList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.leaves.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthLeavesCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.leaves.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthLeavesEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.leaves.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthLeavesDetails />
+                    </Suspense>
+                  }
+                />
+
                 {/* Catalog routes */}
                 <Route
                   path={routes.catalog.root}
@@ -3020,6 +3346,14 @@ function App() {
                   }
                 />
                 <Route
+                  path={routes.tools.calculator.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <CalculatorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path={routes.tools.timeCalculator.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -3036,6 +3370,14 @@ function App() {
                   }
                 />
                 <Route
+                  path={routes.tools.employeeCost.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <EmployeeCostCalculatorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path={routes.tools.paintMix.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -3048,6 +3390,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <WasteCertificateToolPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.tools.postIts.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PostItsPage />
                     </Suspense>
                   }
                 />

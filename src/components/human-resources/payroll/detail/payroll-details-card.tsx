@@ -9,7 +9,7 @@ import {
   IconCalculator,
   IconChartLine
 } from "@tabler/icons-react";
-import { USER_STATUS } from "../../../../constants";
+import { CONTRACT_TYPE } from "../../../../constants";
 
 interface PayrollDetailsCardProps {
   users: PayrollUserRow[];
@@ -51,7 +51,7 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
       // the eligible count and skewing the average-bonus denominator.
       const u = user as typeof user & { performanceLevel?: number | null; secullumEmployeeId?: number | null };
       const isEligible =
-        u.status === USER_STATUS.EFFECTED &&
+        u.currentContractType === CONTRACT_TYPE.EFFECTED &&
         u.position?.bonifiable === true &&
         (u.performanceLevel ?? 0) > 0 &&
         u.secullumEmployeeId != null;

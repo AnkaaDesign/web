@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { IconFilter } from "@tabler/icons-react";
 
-import { WARNING_SEVERITY, WARNING_SEVERITY_LABELS, WARNING_CATEGORY, WARNING_CATEGORY_LABELS, USER_STATUS } from "../../../../constants";
+import { WARNING_SEVERITY, WARNING_SEVERITY_LABELS, WARNING_CATEGORY, WARNING_CATEGORY_LABELS, CONTRACT_STATUS } from "../../../../constants";
 import { useUsers } from "../../../../hooks";
 
 import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
@@ -53,7 +53,7 @@ export function WarningFilters({
   const { data: usersData } = useUsers({
     limit: 100,
     orderBy: { name: "asc" },
-    statuses: [USER_STATUS.EXPERIENCE_PERIOD_1, USER_STATUS.EXPERIENCE_PERIOD_2, USER_STATUS.EFFECTED],
+    statuses: [CONTRACT_STATUS.ACTIVE],
   });
   const users = usersData?.data || [];
 

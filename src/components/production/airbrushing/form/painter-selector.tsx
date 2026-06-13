@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
 import { getUsers } from "@/api-client";
-import { SECTOR_PRIVILEGES, USER_STATUS } from "@/constants";
+import { SECTOR_PRIVILEGES, CONTRACT_STATUS } from "@/constants";
 
 interface PainterSelectorProps {
   value?: string;
@@ -11,7 +11,7 @@ interface PainterSelectorProps {
   disabled?: boolean;
   required?: boolean;
   loading?: boolean;
-  initialUser?: { id: string; name: string; email?: string | null; status?: string | null };
+  initialUser?: { id: string; name: string; email?: string | null; currentContractStatus?: string | null };
 }
 
 /**
@@ -38,7 +38,7 @@ export function PainterSelector({
         value: initialUser.id,
         label: initialUser.name,
         description: initialUser.email ?? undefined,
-        metadata: { status: initialUser.status ?? undefined },
+        metadata: { status: initialUser.currentContractStatus ?? undefined },
       },
     ];
   }, [initialUser]);
@@ -70,6 +70,7 @@ export function PainterSelector({
           name: true,
           email: true,
           status: true,
+          currentContractStatus: true,
         },
       });
 
@@ -82,7 +83,7 @@ export function PainterSelector({
           value: user.id,
           label: user.name,
           description: user.email,
-          metadata: { status: user.status },
+          metadata: { status: user.currentContractStatus },
         })) as ComboboxOption[],
         hasMore,
         total,
@@ -101,7 +102,7 @@ export function PainterSelector({
   // Render painter options with a "Desligado" badge for dismissed users
   // (they stay selectable so they can still be paid, but should be visually flagged)
   const renderPainterOption = useCallback((option: ComboboxOption) => {
-    const isDismissed = option.metadata?.status === USER_STATUS.DISMISSED;
+    const isDismissed = option.metadata?.status === CONTRACT_STATUS.DISMISSED;
     return (
       <div className="flex items-center justify-between gap-2 w-full">
         <div className="flex flex-col min-w-0">

@@ -1,7 +1,7 @@
 // packages/interfaces/src/user.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, BaseMergeResponse } from "./common";
-import type { ORDER_BY_DIRECTION, USER_STATUS } from '@constants';
+import type { ORDER_BY_DIRECTION, CONTRACT_TYPE, CONTRACT_STATUS, EMPLOYEE_TYPE } from '@constants';
 import type { PpeSize, PpeDelivery, PpeDeliverySchedule, PpeSizeIncludes, PpeDeliveryIncludes, PpeDeliveryScheduleIncludes } from "./ppe";
 import type { SeenNotification, Notification, SeenNotificationIncludes, NotificationIncludes } from "./notification";
 import type { Position, PositionIncludes, PositionOrderBy } from "./position";
@@ -14,6 +14,8 @@ import type { Borrow, BorrowIncludes } from "./borrow";
 import type { ChangeLog, ChangeLogIncludes } from "./changelog";
 import type { Bonus, BonusIncludes } from "./bonus";
 import type { File } from "./file";
+import type { EmploymentContract } from "./employment-contract";
+import type { Admission } from "./admission";
 
 // =====================
 // Main Entity Interface
@@ -23,8 +25,12 @@ export interface User extends BaseEntity {
   email: string | null;
   name: string;
   avatarId: string | null;
-  status: USER_STATUS;
-  statusOrder: number; // 1=Ativo, 2=Inativo, 3=Suspenso
+  // DERIVED cache of the user's CURRENT EmploymentContract (vínculo). Never the
+  // source of truth — kept in sync by the server. The contract is authoritative.
+  currentContractId: string | null;
+  currentContractType: CONTRACT_TYPE | null;
+  currentContractStatus: CONTRACT_STATUS | null;
+  currentEmployeeType: EMPLOYEE_TYPE | null;
   isActive: boolean;
   phone: string | null;
   password?: string | null;
@@ -53,16 +59,19 @@ export interface User extends BaseEntity {
   secullumId: string | null;
   payrollNumber: number | null;
 
-  // Status timestamp tracking
-  effectedAt: Date | null; // When user became permanently effected/hired
-  exp1StartAt: Date | null; // Start of first experience period (30 days)
-  exp1EndAt: Date | null; // End of first experience period
-  exp2StartAt: Date | null; // Start of second experience period (50 days)
-  exp2EndAt: Date | null; // End of second experience period
-  dismissedAt: Date | null; // When user was dismissed/terminated
+  // Payroll-related fields (available when fetched directly)
+  unionMember?: boolean;
+  unionAuthorizationDate?: Date | null;
+  dependentsCount?: number;
+  hasSimplifiedDeduction?: boolean;
 
   // Relations
   avatar?: File;
+  // Employment contracts (vínculos). `currentContract` mirrors the current one
+  // (isCurrent=true); `contracts` is the full history; `admissions` the onboardings.
+  currentContract?: EmploymentContract;
+  contracts?: EmploymentContract[];
+  admissions?: Admission[];
   ppeSize?: PpeSize;
   preference?: Preferences;
   position?: Position;
@@ -108,6 +117,9 @@ export interface User extends BaseEntity {
 
 export interface UserIncludes {
   avatar?: boolean;
+  currentContract?: boolean | { include?: any; select?: any };
+  contracts?: boolean | { include?: any; where?: any; orderBy?: any };
+  admissions?: boolean | { include?: any; where?: any; orderBy?: any };
   ppeSize?:
     | boolean
     | {
@@ -215,8 +227,10 @@ export interface UserOrderBy {
   name?: ORDER_BY_DIRECTION;
   avatarId?: ORDER_BY_DIRECTION;
   token?: ORDER_BY_DIRECTION;
-  status?: ORDER_BY_DIRECTION;
-  statusOrder?: ORDER_BY_DIRECTION;
+  currentContractId?: ORDER_BY_DIRECTION;
+  currentContractType?: ORDER_BY_DIRECTION;
+  currentContractStatus?: ORDER_BY_DIRECTION;
+  currentEmployeeType?: ORDER_BY_DIRECTION;
   isActive?: ORDER_BY_DIRECTION;
   phone?: ORDER_BY_DIRECTION;
   password?: ORDER_BY_DIRECTION;
@@ -225,12 +239,6 @@ export interface UserOrderBy {
   verified?: ORDER_BY_DIRECTION;
   payrollNumber?: ORDER_BY_DIRECTION;
   birth?: ORDER_BY_DIRECTION;
-  effectedAt?: ORDER_BY_DIRECTION;
-  exp1StartAt?: ORDER_BY_DIRECTION;
-  exp1EndAt?: ORDER_BY_DIRECTION;
-  exp2StartAt?: ORDER_BY_DIRECTION;
-  exp2EndAt?: ORDER_BY_DIRECTION;
-  dismissedAt?: ORDER_BY_DIRECTION;
   performanceLevel?: ORDER_BY_DIRECTION;
   address?: ORDER_BY_DIRECTION;
   addressNumber?: ORDER_BY_DIRECTION;

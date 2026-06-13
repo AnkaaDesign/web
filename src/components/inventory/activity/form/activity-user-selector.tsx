@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from "react";
 import type { User } from "../../../../types";
-import { USER_STATUS } from "../../../../constants";
+import { CONTRACT_STATUS } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 import { getUsers } from "../../../../api-client";
@@ -34,7 +34,7 @@ export const ActivityUserSelector = ({
     if (initialUser.sector?.name) {
       parts.push(initialUser.sector.name);
     }
-    if (initialUser.status === USER_STATUS.DISMISSED) {
+    if (initialUser.currentContractStatus === CONTRACT_STATUS.DISMISSED) {
       parts.push("(Desligado)");
     }
 
@@ -69,6 +69,7 @@ export const ActivityUserSelector = ({
         id: true,
         name: true,
         status: true,
+        currentContractStatus: true,
         sector: {
           select: {
             id: true,
@@ -88,7 +89,7 @@ export const ActivityUserSelector = ({
         if (user.sector?.name) {
           parts.push(user.sector.name);
         }
-        if (user.status === USER_STATUS.DISMISSED) {
+        if (user.currentContractStatus === CONTRACT_STATUS.DISMISSED) {
           parts.push("(Desligado)");
         }
 
