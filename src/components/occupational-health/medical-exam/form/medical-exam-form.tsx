@@ -25,6 +25,10 @@ interface CreateModeProps {
   mode: "create";
   onSubmit: (data: MedicalExamCreateFormData) => Promise<void>;
   defaultValues?: Partial<MedicalExamCreateFormData>;
+  /** Lock (disable) the Colaborador + Tipo fields — used when pre-filling from an admission/termination process. */
+  lockIdentityFields?: boolean;
+  /** Pre-loaded collaborator so the locked Colaborador field shows the name (avoids an extra fetch). */
+  initialUser?: User | null;
 }
 
 interface UpdateModeProps {
@@ -70,9 +74,15 @@ export function MedicalExamForm(props: MedicalExamFormProps) {
   });
 
   const isSubmitting = props.isSubmitting || form.formState.isSubmitting;
+  // When pre-filled from an admission/termination, lock the identity fields so
+  // the exam can only be created for the intended collaborator/type.
+  const lockIdentityFields = props.mode === "create" && !!props.lockIdentityFields;
 
   // Async user combobox helpers
-  const initialUserOptions = useMemo(() => (props.mode === "update" && props.exam.user ? [props.exam.user] : []), [props.mode === "update" ? props.exam.user?.id : null]);
+  const initialUserOptions = useMemo(
+    () => (props.mode === "update" && props.exam.user ? [props.exam.user] : props.mode === "create" && props.initialUser ? [props.initialUser] : []),
+    [props.mode === "update" ? props.exam.user?.id : null, props.mode === "create" ? props.initialUser?.id : null],
+  );
   const getOptionLabel = useCallback((user: User) => user.name, []);
   const getOptionValue = useCallback((user: User) => user.id, []);
 
@@ -161,7 +171,7 @@ export function MedicalExamForm(props: MedicalExamFormProps) {
                         <Combobox<User>
                           value={field.value}
                           onValueChange={field.onChange}
-                          disabled={isSubmitting}
+                          disabled={isSubmitting || lockIdentityFields}
                           placeholder="Selecione o colaborador"
                           emptyText="Nenhum colaborador encontrado"
                           searchPlaceholder="Buscar colaborador..."
@@ -202,7 +212,7 @@ export function MedicalExamForm(props: MedicalExamFormProps) {
                           value={field.value}
                           onValueChange={field.onChange}
                           options={typeOptions}
-                          disabled={isSubmitting}
+                          disabled={isSubmitting || lockIdentityFields}
                           placeholder="Selecione o tipo"
                           emptyText="Nenhum tipo encontrado"
                           searchable={false}

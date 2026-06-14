@@ -1,7 +1,13 @@
 import React from "react";
 import { formatDate } from "../../../../utils";
-import { ADMISSION_STATUS_LABELS, CONTRACT_TYPE_LABELS } from "../../../../constants";
-import type { ADMISSION_STATUS, CONTRACT_TYPE } from "../../../../constants";
+import {
+  ADMISSION_STATUS_LABELS,
+  CONTRACT_TYPE_LABELS,
+  MEDICAL_EXAM_RESULT,
+  MEDICAL_EXAM_RESULT_LABELS,
+  MEDICAL_EXAM_STATUS_LABELS,
+} from "../../../../constants";
+import type { ADMISSION_STATUS, CONTRACT_TYPE, MEDICAL_EXAM_RESULT as MEDICAL_EXAM_RESULT_TYPE, MEDICAL_EXAM_STATUS } from "../../../../constants";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import type { Admission } from "../../../../types/admission";
 import { getDocumentProgress } from "../utils";
@@ -27,7 +33,29 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
     ),
     sortable: true,
     // table-layout:fixed ignora min-width — é o `w-` que define a largura da coluna.
-    className: "w-[360px] min-w-[360px]",
+    className: "w-[480px] min-w-[480px]",
+    align: "left",
+  },
+
+  // Setor / Cargo (do colaborador)
+  {
+    key: "user.sectorPosition",
+    header: "SETOR / CARGO",
+    accessor: (admission: Admission) => {
+      const sector = admission.user?.sector?.name;
+      const position = admission.user?.position?.name;
+      if (!sector && !position) return <span className="text-muted-foreground">-</span>;
+      return (
+        <div className="truncate">
+          <p className="text-sm truncate" title={sector ?? undefined}>
+            {sector || <span className="text-muted-foreground">-</span>}
+          </p>
+          {position && <p className="text-xs text-muted-foreground truncate" title={position}>{position}</p>}
+        </div>
+      );
+    },
+    sortable: false,
+    className: "min-w-[200px]",
     align: "left",
   },
 
@@ -72,6 +100,34 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
     ),
     sortable: true,
     className: "min-w-[160px]",
+    align: "left",
+  },
+
+  // Exame admissional (ASO) vinculado
+  {
+    key: "admissionExam",
+    header: "EXAME",
+    accessor: (admission: Admission) => {
+      const exam = admission.admissionExam;
+      if (!exam) return <span className="text-sm text-muted-foreground">-</span>;
+      // Prefer the result badge once it is meaningful (Apto/Inapto…); otherwise
+      // fall back to the exam status (Agendado/Concluído…).
+      const hasResult = !!exam.result && exam.result !== MEDICAL_EXAM_RESULT.PENDING;
+      if (hasResult) {
+        return (
+          <Badge variant={getBadgeVariantFromStatus(exam.result, "MEDICAL_EXAM_RESULT")} className="text-xs whitespace-nowrap">
+            {MEDICAL_EXAM_RESULT_LABELS[exam.result as MEDICAL_EXAM_RESULT_TYPE] || exam.result}
+          </Badge>
+        );
+      }
+      return (
+        <Badge variant={getBadgeVariantFromStatus(exam.status, "MEDICAL_EXAM")} className="text-xs whitespace-nowrap">
+          {MEDICAL_EXAM_STATUS_LABELS[exam.status as MEDICAL_EXAM_STATUS] || exam.status}
+        </Badge>
+      );
+    },
+    sortable: false,
+    className: "min-w-[140px]",
     align: "left",
   },
 
@@ -124,4 +180,13 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
 ];
 
 // Export the default visible columns
-export const DEFAULT_ADMISSION_VISIBLE_COLUMNS = new Set(["user.name", "user.currentContractType", "status", "hireDate", "documents", "createdBy.name"]);
+export const DEFAULT_ADMISSION_VISIBLE_COLUMNS = new Set([
+  "user.name",
+  "user.sectorPosition",
+  "user.currentContractType",
+  "status",
+  "hireDate",
+  "admissionExam",
+  "documents",
+  "createdBy.name",
+]);

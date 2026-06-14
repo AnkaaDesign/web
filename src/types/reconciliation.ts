@@ -612,9 +612,27 @@ export interface OutflowForecast {
   impostos: {
     basis: string;
     lookbackMonths: string[];
-    totalForecast: number;
+    /** Forward tax forecast = taxes on this month's faturamento (invoicedServices). */
+    headlineForecast: number;
+    /** Realized taxes/fees averaged over the lookback — context only, not the forecast. */
+    historicalMonthlyAverage: number;
     totalPaidThisMonth: number;
     items: OutflowForecastTaxRow[];
+    /**
+     * Forward estimate of taxes on services invoiced this month (NFS-e issued):
+     * ISS on the invoiced base + federal retentions. Informational — clearly an estimate.
+     */
+    invoicedServices?: {
+      basis: string; // "faturamento-do-mes"
+      invoiceCount: number;
+      invoicedBase: number;
+      issRatePercent: number;
+      iss: number;
+      federalRates: { ir: number; inss: number; csll: number; pis: number; cofins: number };
+      federalRetentions: { ir: number; inss: number; csll: number; pis: number; cofins: number };
+      federalTotal: number;
+      totalEstimated: number;
+    };
   };
   folha: {
     available: boolean;

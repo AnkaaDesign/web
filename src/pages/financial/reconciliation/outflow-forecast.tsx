@@ -27,6 +27,7 @@ import {
   parseMonthKey,
 } from "@/components/financial/reconciliation/month-nav";
 import { useOutflowForecast } from "@/hooks/financial/use-reconciliation";
+import { useOrderScheduleExpectedTotals } from "@/hooks/inventory/use-order-schedule";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
   ORDER_PAYMENT_STATUS,
@@ -39,7 +40,6 @@ import { formatCurrency, formatDate } from "@/utils";
 import type {
   OutflowForecastOrderRow,
   OutflowForecastScheduleRow,
-  OutflowForecastTaxRow,
   RecurringForecastItem,
 } from "@/types/reconciliation";
 
@@ -47,14 +47,8 @@ import type {
  *  Contas a Pagar). Totals always cover every open order. */
 const ORDER_DISPLAY_CAP = 50;
 
-/** "2026-03" → "mar/26" for the tax-basis column headers. */
-function shortMonthLabel(key: string): string {
-  const [y, m] = key.split("-").map(Number);
-  const label = new Date(y, m - 1, 1).toLocaleDateString("pt-BR", {
-    month: "short",
-  });
-  return `${label.replace(".", "")}/${String(y).slice(-2)}`;
-}
+/** A simple label/value row for the aggregate (folha) tables. */
+type KvRow = { id: string; label: string; value: string; emphasized?: boolean };
 
 /**
  * Previsão de Saídas (spec §4.3) — composite forward view for one competence
@@ -142,6 +136,21 @@ export const ReconciliationOutflowForecastPage = () => {
     [],
   );
 
+  // Expected value per scheduled order (recomputed from the forecast calculation).
+  // Declared before scheduleColumns since the column reads from this map.
+  const scheduleIds = useMemo(
+    () => (data?.pedidos?.schedules ?? []).map(s => s.id),
+    [data],
+  );
+  const { data: expectedTotalsResp } = useOrderScheduleExpectedTotals(scheduleIds, {
+    enabled: scheduleIds.length > 0,
+  });
+  const expectedByScheduleId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of expectedTotalsResp?.data ?? []) map.set(e.id, e.expectedTotal);
+    return map;
+  }, [expectedTotalsResp]);
+
   const scheduleColumns: StandardizedColumn<OutflowForecastScheduleRow>[] =
     useMemo(
       () => [
@@ -181,68 +190,47 @@ export const ReconciliationOutflowForecastPage = () => {
           align: "center",
           render: s => <span className="tabular-nums text-sm">{s.itemCount}</span>,
         },
+        {
+          key: "expected",
+          header: "Valor estimado",
+          width: "150px",
+          align: "right",
+          render: s => {
+            const v = expectedByScheduleId.get(s.id);
+            return v != null ? (
+              <span className="tabular-nums text-sm font-medium">{formatCurrency(v)}</span>
+            ) : (
+              <span className="text-muted-foreground text-xs">—</span>
+            );
+          },
+        },
       ],
-      [],
+      [expectedByScheduleId],
     );
 
-  const lookbackMonths = data?.impostos.lookbackMonths ?? [];
-  const taxColumns: StandardizedColumn<OutflowForecastTaxRow>[] = useMemo(
+  // Shared label/value columns for the aggregate (folha / folha programada) tables,
+  // so they match the look of the other StandardizedTables on the page.
+  const kvColumns: StandardizedColumn<KvRow>[] = useMemo(
     () => [
       {
-        key: "category",
-        header: "Categoria",
-        render: t => (
-          <div className="flex items-center gap-2 min-w-0">
-            {t.category.color && (
-              <span
-                className="h-3 w-3 rounded-full flex-shrink-0 border border-border"
-                style={{ backgroundColor: t.category.color }}
-              />
-            )}
-            <span className="truncate text-sm font-medium">{t.category.name}</span>
-          </div>
-        ),
-      },
-      ...lookbackMonths.map((m, idx) => ({
-        key: `m-${m}`,
-        header: shortMonthLabel(m),
-        width: "120px",
-        align: "right" as const,
-        render: (t: OutflowForecastTaxRow) => (
-          <span className="tabular-nums text-sm text-muted-foreground">
-            {formatCurrency(t.perMonth[idx]?.amount ?? 0)}
-          </span>
-        ),
-      })),
-      {
-        key: "average",
-        header: "Média mensal",
-        width: "150px",
-        align: "right",
-        render: t => (
-          <span className="font-semibold tabular-nums text-sm">
-            {formatCurrency(t.monthlyAverage)}
-          </span>
+        key: "label",
+        header: "Item",
+        render: r => (
+          <span className={cn("text-sm", r.emphasized && "font-semibold")}>{r.label}</span>
         ),
       },
       {
-        key: "paid",
-        header: "Pago no mês",
-        width: "140px",
+        key: "value",
+        header: "Valor",
         align: "right",
-        render: t => (
-          <span
-            className={cn(
-              "tabular-nums text-sm",
-              t.paidThisMonth > 0 ? "text-emerald-700" : "text-muted-foreground",
-            )}
-          >
-            {formatCurrency(t.paidThisMonth)}
+        render: r => (
+          <span className={cn("tabular-nums text-sm", r.emphasized && "font-semibold")}>
+            {r.value}
           </span>
         ),
       },
     ],
-    [lookbackMonths],
+    [],
   );
 
   const recurringColumns: StandardizedColumn<RecurringForecastItem>[] = useMemo(
@@ -366,10 +354,6 @@ export const ReconciliationOutflowForecastPage = () => {
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Financeiro", href: routes.financial.root },
-            {
-              label: "Conciliação Bancária",
-              href: routes.financial.reconciliation.root,
-            },
             { label: "Previsão de Saídas" },
           ]}
           headerExtra={<MonthNav month={month} onChange={setMonth} />}
@@ -392,13 +376,15 @@ export const ReconciliationOutflowForecastPage = () => {
             tone="text-amber-600 bg-amber-500/10"
           />
           <KpiCard
-            label="Impostos (aprox.)"
+            label="Impostos (estimado)"
             value={
-              isLoading || !impostos ? null : formatCurrency(impostos.totalForecast)
+              isLoading || !impostos
+                ? null
+                : formatCurrency(impostos.invoicedServices?.totalEstimated ?? 0)
             }
             Icon={IconReceiptTax}
             tone="text-violet-600 bg-violet-500/10"
-            hint="Média dos últimos 3 meses"
+            hint="Estimado sobre o faturamento do mês (NFS-e emitidas)"
           />
           <KpiCard
             label="Folha (com bonificação)"
@@ -506,7 +492,7 @@ export const ReconciliationOutflowForecastPage = () => {
               {(pedidos?.schedules.length ?? 0) > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">
-                    Pedidos agendados para o mês (valor definido na geração)
+                    Pedidos agendados para o mês (valor estimado pela previsão)
                   </p>
                   <StandardizedTable<OutflowForecastScheduleRow>
                     columns={scheduleColumns}
@@ -525,30 +511,31 @@ export const ReconciliationOutflowForecastPage = () => {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
                 <IconReceiptTax className="h-5 w-5 text-muted-foreground" />
-                Impostos e tarifas — cálculo aproximado
+                Impostos — estimado sobre faturamento
               </CardTitle>
               <p className="flex items-start gap-1.5 text-xs text-muted-foreground pt-1">
                 <IconInfoCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                Base transparente: média simples das saídas classificadas como
-                Impostos/Tarifas nos últimos 3 meses (
-                {lookbackMonths.map(shortMonthLabel).join(", ")}). Não substitui a
-                apuração contábil.
+                Estimativa de impostos sobre o faturamento do mês (NFS-e emitidas).
+                Não substitui a apuração contábil.
               </p>
             </CardHeader>
-            <CardContent className="pt-0">
-              <StandardizedTable<OutflowForecastTaxRow>
-                columns={taxColumns}
-                data={impostos?.items ?? []}
-                getItemKey={t => t.category.id}
-                isLoading={isLoading}
-                emptyMessage="Nenhuma saída classificada como imposto/tarifa nos últimos meses"
-                emptyIcon={IconReceiptTax}
-                onRowClick={t =>
-                  navigate(
-                    `${routes.financial.reconciliation.transactions}?categoryIds=${t.category.id}`,
-                  )
-                }
-              />
+            <CardContent className="pt-0 space-y-3">
+              {/* Forward estimate (primary): taxes on services invoiced this month (NFS-e). */}
+              {impostos?.invoicedServices && impostos.invoicedServices.invoiceCount > 0 && (
+                <div className="rounded-md border border-violet-500/30 bg-violet-500/5 px-4 py-3 text-sm">
+                  <p className="flex items-center gap-2 font-medium text-foreground">
+                    <IconReceiptTax className="h-4 w-4 text-violet-600" />
+                    Impostos sobre serviços faturados (estimado):{" "}
+                    <span className="tabular-nums">{formatCurrency(impostos.invoicedServices.totalEstimated)}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    ISS {impostos.invoicedServices.issRatePercent}% sobre{" "}
+                    {formatCurrency(impostos.invoicedServices.invoicedBase)} ({impostos.invoicedServices.invoiceCount}{" "}
+                    {impostos.invoicedServices.invoiceCount === 1 ? "NFS-e" : "NFS-e"}) + retenções federais{" "}
+                    {formatCurrency(impostos.invoicedServices.federalTotal)}. Estimativa informativa — não substitui a apuração contábil.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -566,37 +553,32 @@ export const ReconciliationOutflowForecastPage = () => {
               </p>
             </CardHeader>
             <CardContent className="pt-0">
-              {isLoading || !folha ? (
-                <Skeleton className="h-20 w-full" />
-              ) : !folha.available ? (
+              {!isLoading && folha && !folha.available ? (
                 <p className="text-sm text-muted-foreground">
                   Não foi possível calcular a folha desta competência no momento.
                 </p>
               ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <StatBlock
-                    label="Total bruto (com bonificação)"
-                    value={formatCurrency(folha.total)}
-                    emphasized
-                  />
-                  <StatBlock
-                    label="Das quais bonificações"
-                    value={formatCurrency(folha.bonusTotal)}
-                  />
-                  <StatBlock
-                    label="Total líquido"
-                    value={formatCurrency(folha.netTotal)}
-                  />
-                  <StatBlock
-                    label="Colaboradores"
-                    value={String(folha.employeeCount)}
-                  />
-                </div>
+                <StandardizedTable<KvRow>
+                  columns={kvColumns}
+                  data={
+                    folha
+                      ? [
+                          { id: "bruto", label: "Total bruto (com bonificação)", value: formatCurrency(folha.total), emphasized: true },
+                          { id: "bonus", label: "Das quais bonificações", value: formatCurrency(folha.bonusTotal) },
+                          { id: "liquido", label: "Total líquido", value: formatCurrency(folha.netTotal) },
+                          { id: "colab", label: "Colaboradores", value: String(folha.employeeCount) },
+                        ]
+                      : []
+                  }
+                  getItemKey={r => r.id}
+                  isLoading={isLoading}
+                />
               )}
             </CardContent>
           </Card>
 
-          {/* (c2) Folha programada (13º e férias) */}
+          {/* (c2) Folha programada (13º e férias) — hidden when nothing is due this month */}
+          {(folhaProgramada?.total ?? 0) > 0 && (
           <Card className="shadow-sm border border-border">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
@@ -615,29 +597,16 @@ export const ReconciliationOutflowForecastPage = () => {
                 <Skeleton className="h-20 w-full" />
               ) : (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatBlock
-                      label="Total previsto no mês"
-                      value={formatCurrency(folhaProgramada.total)}
-                      emphasized
-                    />
-                    <StatBlock
-                      label="13º — 1ª parcela (nov)"
-                      value={formatCurrency(
-                        folhaProgramada.thirteenth.firstInstallmentNovember,
-                      )}
-                    />
-                    <StatBlock
-                      label="13º — 2ª parcela (dez)"
-                      value={formatCurrency(
-                        folhaProgramada.thirteenth.secondInstallmentDecember,
-                      )}
-                    />
-                    <StatBlock
-                      label="Férias (recibos no mês)"
-                      value={formatCurrency(folhaProgramada.vacation.dueThisMonth)}
-                    />
-                  </div>
+                  <StandardizedTable<KvRow>
+                    columns={kvColumns}
+                    data={[
+                      { id: "total", label: "Total previsto no mês", value: formatCurrency(folhaProgramada.total), emphasized: true },
+                      { id: "n1", label: "13º — 1ª parcela (nov)", value: formatCurrency(folhaProgramada.thirteenth.firstInstallmentNovember) },
+                      { id: "n2", label: "13º — 2ª parcela (dez)", value: formatCurrency(folhaProgramada.thirteenth.secondInstallmentDecember) },
+                      { id: "fer", label: "Férias (recibos no mês)", value: formatCurrency(folhaProgramada.vacation.dueThisMonth) },
+                    ]}
+                    getItemKey={r => r.id}
+                  />
                   <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     <span>
                       13º no mês:{" "}
@@ -660,6 +629,7 @@ export const ReconciliationOutflowForecastPage = () => {
               )}
             </CardContent>
           </Card>
+          )}
 
           {/* (d) Recorrentes e afins */}
           <Card className="shadow-sm border border-border">
@@ -747,30 +717,6 @@ function KpiCard({
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function StatBlock({
-  label,
-  value,
-  emphasized,
-}: {
-  label: string;
-  value: string;
-  emphasized?: boolean;
-}) {
-  return (
-    <div className="bg-muted/50 rounded-lg px-4 py-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p
-        className={cn(
-          "tabular-nums font-semibold",
-          emphasized ? "text-lg" : "text-base",
-        )}
-      >
-        {value}
-      </p>
-    </div>
   );
 }
 

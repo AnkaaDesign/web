@@ -41,11 +41,10 @@ export const createMedicalExamColumns = (): MedicalExamColumn[] => [
         <p className="font-medium truncate" title={exam.user?.name}>
           {exam.user?.name || <span className="text-muted-foreground">-</span>}
         </p>
-        {exam.user?.position?.name && <p className="text-xs text-muted-foreground truncate">{exam.user.position.name}</p>}
       </div>
     ),
     sortable: false,
-    className: "min-w-[220px]",
+    className: "min-w-[320px]",
     align: "left",
   },
 

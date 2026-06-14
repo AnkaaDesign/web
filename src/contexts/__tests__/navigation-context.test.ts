@@ -214,18 +214,24 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     expect(childTitles).toContain("Tamanhos");
   });
 
-  it("Financeiro: Contas a Pagar, Notas Fiscais, Conciliação Bancária in spec order", () => {
+  it("Financeiro: Contas a Pagar + Conciliação Bancária (Notas Fiscais now lives inside Conciliação)", () => {
     const fin = byId(ACCOUNTING, "financeiro")!;
-    expect((fin.children || []).map((c) => c.title)).toEqual(["Conciliação Bancária", "Contas a Pagar", "Notas Fiscais"]);
-    const notas = (fin.children || []).find((c) => c.id === "notas-fiscais-contabilidade")!;
-    expect(notas.path).toBe("/financeiro/conciliacao/notas");
+    // The top-level ACCOUNTING "Notas Fiscais" duplicate was removed; the fiscal
+    // documents list now lives only inside the Conciliação Bancária submenu.
+    // Previsão de Saídas now sits at the top level of Financeiro (a sibling of
+    // Conciliação Bancária, outside the conciliação domain). Sorted alphabetically.
+    expect((fin.children || []).map((c) => c.title)).toEqual([
+      "Conciliação Bancária",
+      "Contas a Pagar",
+      "Previsão de Saídas",
+    ]);
     const conc = (fin.children || []).find((c) => c.id === "conciliacao-bancaria")!;
     expect((conc.children || []).map((c) => ({ title: c.title, path: c.path }))).toEqual([
       { title: "Extrato", path: "/financeiro/conciliacao/extrato" },
       { title: "Saídas", path: "/financeiro/conciliacao/saidas" },
-      { title: "Previsão de Saídas", path: "/financeiro/conciliacao/previsao-de-saidas" },
       { title: "Entradas", path: "/financeiro/conciliacao/entradas" },
       { title: "Categorias", path: "/financeiro/conciliacao/categorias" },
+      { title: "Notas Fiscais", path: "/financeiro/conciliacao/notas" },
     ]);
   });
 

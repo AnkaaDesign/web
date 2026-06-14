@@ -13,6 +13,7 @@ import {
   batchUpdateOrders,
   batchDeleteOrders,
   getOrderPaymentSummary,
+  getOrderPayables,
   requestOrderPayment,
   markOrderAwaitingPayment,
   markOrderPaid,
@@ -134,6 +135,19 @@ export const useOrderPaymentSummary = (options?: { enabled?: boolean }) =>
   useQuery({
     queryKey: [...orderKeys.all, "payment-summary"] as const,
     queryFn: getOrderPaymentSummary,
+    staleTime: 1000 * 60, // 1 minute
+    enabled: options?.enabled ?? true,
+  });
+
+/**
+ * Unified Contas a Pagar list: open orders + airbrushing painter payments +
+ * scheduled/expected outflows, each carrying its own payment state, plus a
+ * per-state summary. Keyed under orderKeys.all so payment mutations invalidate it.
+ */
+export const useOrderPayables = (options?: { enabled?: boolean }) =>
+  useQuery({
+    queryKey: [...orderKeys.all, "payables"] as const,
+    queryFn: getOrderPayables,
     staleTime: 1000 * 60, // 1 minute
     enabled: options?.enabled ?? true,
   });

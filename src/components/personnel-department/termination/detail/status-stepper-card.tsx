@@ -1,6 +1,8 @@
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { IconCheck, IconProgress, IconBan, IconAlertTriangle, IconStethoscope } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
+import { IconCheck, IconProgress, IconBan, IconAlertTriangle, IconStethoscope, IconCalendarPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import {
   MEDICAL_EXAM_RESULT,
@@ -10,6 +12,7 @@ import {
   TERMINATION_STATUS,
   TERMINATION_STATUS_LABELS,
   TERMINATION_TYPE,
+  routes,
 } from "../../../../constants";
 import type { Termination } from "../../../../types/termination";
 import { LinkedExamStatus, useLinkedMedicalExam } from "@/components/occupational-health/medical-exam/detail/linked-exam-status";
@@ -56,6 +59,7 @@ interface StatusStepperCardProps {
 }
 
 export function StatusStepperCard({ termination, className }: StatusStepperCardProps) {
+  const navigate = useNavigate();
   const isCancelled = termination.status === TERMINATION_STATUS.CANCELLED;
   // Applicable steps for THIS termination (skips the notice period when the
   // notice is not worked and the dismissal exam for DEATH).
@@ -73,6 +77,20 @@ export function StatusStepperCard({ termination, className }: StatusStepperCardP
   const isExamCompleted = dismissalExam?.status === MEDICAL_EXAM_STATUS.COMPLETED;
   const awaitingExam = termination.status === TERMINATION_STATUS.MEDICAL_EXAM && !isExamLoading && !isExamCompleted;
   const isExamUnfit = isExamCompleted && dismissalExam?.result === MEDICAL_EXAM_RESULT.UNFIT;
+  // Offer scheduling when the medical step applies/was reached and no DISMISSAL
+  // exam exists yet (covers older processes without auto-creation).
+  const canScheduleExam = showExamSection && !isExamLoading && !dismissalExam && !isCancelled;
+
+  // Navigate to the ASO CREATE form, pre-filled and locked. The exam is created
+  // ONLY when the form is submitted — backing out leaves no orphan "Agendado".
+  const handleScheduleExam = () => {
+    const params = new URLSearchParams({
+      userId: termination.userId,
+      type: MEDICAL_EXAM_TYPE.DISMISSAL,
+      terminationId: termination.id,
+    });
+    navigate(`${routes.occupationalHealth.medicalExams.create}?${params.toString()}`);
+  };
 
   return (
     <Card className={cn("shadow-sm border border-border", className)}>
@@ -90,50 +108,61 @@ export function StatusStepperCard({ termination, className }: StatusStepperCardP
           </Alert>
         )}
 
-        <div className={cn("flex items-start", isCancelled && "opacity-50")}>
-          {chain.map((status, index) => {
-            const isDone = currentIndex > index || termination.status === TERMINATION_STATUS.COMPLETED;
-            const isCurrent = currentIndex === index && termination.status !== TERMINATION_STATUS.COMPLETED;
-
-            return (
-              <div key={status} className="flex-1 flex flex-col items-center relative">
-                {/* Connector line */}
-                {index > 0 && (
-                  <div
-                    className={cn(
-                      "absolute top-4 right-1/2 w-full h-0.5 -translate-y-1/2",
-                      currentIndex >= index || termination.status === TERMINATION_STATUS.COMPLETED ? "bg-primary" : "bg-border",
-                    )}
-                  />
-                )}
-
-                {/* Step circle */}
+        <div className="flex items-start gap-2">
+          {/* Full-width stepper: dots span edge to edge with a continuous
+              connector track behind them; labels centered under each dot. */}
+          <div className={cn("relative flex-1", isCancelled && "opacity-50")}>
+            {chain.length > 1 && (
+              <>
+                <div className="absolute top-4 left-4 right-4 h-0.5 -translate-y-1/2 bg-border" />
                 <div
-                  className={cn(
-                    "relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 text-xs font-semibold transition-colors bg-background",
-                    isDone && "bg-primary border-primary text-primary-foreground",
-                    isCurrent && "border-primary text-primary",
-                    !isDone && !isCurrent && "border-border text-muted-foreground",
-                  )}
-                >
-                  {isDone ? <IconCheck className="h-4 w-4" /> : index + 1}
-                </div>
+                  className="absolute top-4 left-4 h-0.5 -translate-y-1/2 bg-primary transition-all"
+                  style={{
+                    width: `calc((100% - 2rem) * ${
+                      termination.status === TERMINATION_STATUS.COMPLETED
+                        ? 1
+                        : Math.max(0, Math.min(currentIndex, chain.length - 1)) / (chain.length - 1)
+                    })`,
+                  }}
+                />
+              </>
+            )}
+            <div className="relative flex items-start justify-between">
+              {chain.map((status, index) => {
+                const isDone = currentIndex > index || termination.status === TERMINATION_STATUS.COMPLETED;
+                const isCurrent = currentIndex === index && termination.status !== TERMINATION_STATUS.COMPLETED;
 
-                {/* Label */}
-                <span
-                  className={cn(
-                    "mt-2 text-[11px] sm:text-xs text-center leading-tight px-1",
-                    isCurrent ? "font-semibold text-primary" : isDone ? "font-medium text-foreground" : "text-muted-foreground",
-                  )}
-                >
-                  {TERMINATION_STATUS_LABELS[status]}
-                </span>
-              </div>
-            );
-          })}
+                return (
+                  <div key={status} className="flex min-w-0 flex-1 flex-col items-center first:items-start last:items-end">
+                    {/* Step circle */}
+                    <div
+                      className={cn(
+                        "relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 text-xs font-semibold transition-colors bg-background",
+                        isDone && "bg-primary border-primary text-primary-foreground",
+                        isCurrent && "border-primary text-primary",
+                        !isDone && !isCurrent && "border-border text-muted-foreground",
+                      )}
+                    >
+                      {isDone ? <IconCheck className="h-4 w-4" /> : index + 1}
+                    </div>
+
+                    {/* Label */}
+                    <span
+                      className={cn(
+                        "mt-2 w-full text-[11px] sm:text-xs text-center leading-tight px-1 break-words first:text-left last:text-right",
+                        isCurrent ? "font-semibold text-primary" : isDone ? "font-medium text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {TERMINATION_STATUS_LABELS[status]}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           {isCancelled && (
-            <div className="flex flex-col items-center relative pl-2">
+            <div className="flex flex-shrink-0 flex-col items-center relative">
               <div className="relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 border-destructive bg-destructive text-destructive-foreground">
                 <IconBan className="h-4 w-4" />
               </div>
@@ -145,16 +174,30 @@ export function StatusStepperCard({ termination, className }: StatusStepperCardP
         {/* DISMISSAL exam (ASO demissional) linked to the medical step */}
         {showExamSection && (
           <div className="mt-4 rounded-md border border-border bg-muted/30 px-4 py-3 space-y-2">
-            <p className="flex items-center gap-2 text-sm font-medium">
-              <IconStethoscope className="h-4 w-4 text-muted-foreground" />
-              Exame Demissional (ASO)
-            </p>
-            <LinkedExamStatus
-              userId={termination.userId}
-              type={MEDICAL_EXAM_TYPE.DISMISSAL}
-              createdAfter={termination.createdAt}
-              emptyText="Nenhum exame demissional encontrado. Ele é criado automaticamente ao entrar na etapa de exame."
-            />
+            {/* Header row: title + status badge (inline) + "Agendar exame" (right) */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <IconStethoscope className="h-4 w-4 text-muted-foreground" />
+                Exame Demissional (ASO)
+              </p>
+              {canScheduleExam ? (
+                <Button size="sm" variant="outline" onClick={handleScheduleExam}>
+                  <IconCalendarPlus className="mr-2 h-4 w-4" />
+                  Agendar exame demissional
+                </Button>
+              ) : (
+                <LinkedExamStatus userId={termination.userId} type={MEDICAL_EXAM_TYPE.DISMISSAL} createdAfter={termination.createdAt} variant="inline" />
+              )}
+            </div>
+            {!canScheduleExam && (
+              <LinkedExamStatus
+                userId={termination.userId}
+                type={MEDICAL_EXAM_TYPE.DISMISSAL}
+                createdAfter={termination.createdAt}
+                variant="date"
+                emptyText="Nenhum exame demissional encontrado. Ele é criado automaticamente ao entrar na etapa de exame."
+              />
+            )}
           </div>
         )}
 

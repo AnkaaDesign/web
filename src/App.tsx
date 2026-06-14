@@ -1523,12 +1523,17 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.financial.reconciliation.outflowForecast}
+                  path={routes.financial.outflowForecast}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ReconciliationOutflowForecast />
                     </Suspense>
                   }
+                />
+                {/* Legacy path (Previsão moved out of the conciliação domain). */}
+                <Route
+                  path="/financeiro/conciliacao/previsao-de-saidas"
+                  element={<Navigate to={routes.financial.outflowForecast} replace />}
                 />
                 <Route
                   path={routes.financial.reconciliation.transactions}

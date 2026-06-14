@@ -13,6 +13,7 @@ import type {
 import type { ADMISSION_STATUS, ADMISSION_DOCUMENT_TYPE, ADMISSION_DOCUMENT_STATUS, ORDER_BY_DIRECTION } from "../constants";
 import type { User, UserIncludes } from "./user";
 import type { File, FileIncludes } from "./file";
+import type { MedicalExam } from "./medical-exam";
 
 // =====================
 // Main Entity Interfaces
@@ -30,6 +31,8 @@ export interface Admission extends BaseEntity {
   user?: User;
   createdBy?: User;
   documents?: AdmissionDocument[];
+  /** The admissional ASO linked to this process (1:1 via MedicalExam.admissionId). */
+  admissionExam?: MedicalExam | null;
 }
 
 export interface AdmissionDocument extends BaseEntity {
@@ -66,6 +69,7 @@ export interface AdmissionIncludes {
   user?: boolean | { include?: UserIncludes };
   createdBy?: boolean | { include?: UserIncludes };
   documents?: boolean | { include?: AdmissionDocumentIncludes; orderBy?: any };
+  admissionExam?: boolean | { include?: any };
 }
 
 export interface AdmissionDocumentIncludes {

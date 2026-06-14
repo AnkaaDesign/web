@@ -26,6 +26,9 @@ export interface MedicalExam extends BaseEntity {
   clinic: string | null;
   notes: string | null;
   fileId: string | null;
+  // Optional FKs linking the exam back to the admission/termination process.
+  admissionId: string | null;
+  terminationId: string | null;
 
   // Relations (optional, populated based on query)
   user?: User;

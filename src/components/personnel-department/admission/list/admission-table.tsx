@@ -62,6 +62,8 @@ export function AdmissionTable({ visibleColumns, className, onCancel, onDelete, 
       user: { include: { position: true, sector: true } },
       createdBy: true,
       documents: true,
+      // Linked admissional ASO — surfaces the exam status in the list "EXAME" column.
+      admissionExam: true,
     }),
     [],
   );

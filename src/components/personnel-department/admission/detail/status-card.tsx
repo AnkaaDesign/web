@@ -1,7 +1,9 @@
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconProgressCheck, IconCheck, IconBan, IconAlertTriangle, IconStethoscope } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
+import { IconProgressCheck, IconCheck, IconBan, IconAlertTriangle, IconStethoscope, IconCalendarPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { ADMISSION_STATUS, ADMISSION_STATUS_LABELS, MEDICAL_EXAM_RESULT, MEDICAL_EXAM_STATUS, MEDICAL_EXAM_TYPE } from "../../../../constants";
+import { ADMISSION_STATUS, ADMISSION_STATUS_LABELS, MEDICAL_EXAM_RESULT, MEDICAL_EXAM_STATUS, MEDICAL_EXAM_TYPE, routes } from "../../../../constants";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import type { Admission } from "../../../../types/admission";
 import { ADMISSION_STATUS_CHAIN, hasBlockingRequiredDocs } from "../utils";
@@ -27,6 +29,7 @@ const STEPPER_STEPS: { key: string; label: string }[] = [
 ];
 
 export function StatusCard({ admission, className }: StatusCardProps) {
+  const navigate = useNavigate();
   const isCancelled = admission.status === ADMISSION_STATUS.CANCELLED;
   const currentIndex = ADMISSION_STATUS_CHAIN.indexOf(admission.status);
   // Index within STEPPER_STEPS (offset by the always-done registration step)
@@ -41,6 +44,20 @@ export function StatusCard({ admission, className }: StatusCardProps) {
   const showExamSection = reachedMedicalStep || !!admissionExam;
   const isExamFitAndCompleted = admissionExam?.status === MEDICAL_EXAM_STATUS.COMPLETED && admissionExam?.result === MEDICAL_EXAM_RESULT.FIT;
   const awaitingExam = admission.status === ADMISSION_STATUS.MEDICAL_EXAM && !isExamLoading && !isExamFitAndCompleted;
+  // Offer scheduling when the process is at/past the medical step and no
+  // ADMISSION exam exists yet (covers older processes without auto-creation).
+  const canScheduleExam = showExamSection && !isExamLoading && !admissionExam && !isCancelled;
+
+  // Navigate to the ASO CREATE form, pre-filled and locked. The exam is created
+  // ONLY when the form is submitted — backing out leaves no orphan "Agendado".
+  const handleScheduleExam = () => {
+    const params = new URLSearchParams({
+      userId: admission.userId,
+      type: MEDICAL_EXAM_TYPE.ADMISSION,
+      admissionId: admission.id,
+    });
+    navigate(`${routes.occupationalHealth.medicalExams.create}?${params.toString()}`);
+  };
 
   return (
     <Card className={cn("shadow-sm border border-border", className)}>
@@ -65,28 +82,36 @@ export function StatusCard({ admission, className }: StatusCardProps) {
             </div>
           </div>
         ) : (
-          <div className="flex items-start">
-            {STEPPER_STEPS.map((step, index) => {
-              const isDone = index < stepperIndex || admission.status === ADMISSION_STATUS.COMPLETED;
-              const isCurrent = index === stepperIndex && admission.status !== ADMISSION_STATUS.COMPLETED;
-              const isFirst = index === 0;
-              const isLast = index === STEPPER_STEPS.length - 1;
-              // A connector segment is "filled" once the step it leads INTO has
-              // been reached/completed (green up to the current step).
-              const leftFilled = index <= stepperIndex || admission.status === ADMISSION_STATUS.COMPLETED;
-              const rightFilled = index < stepperIndex || admission.status === ADMISSION_STATUS.COMPLETED;
+          /* Full-width stepper: the dots row spans edge to edge (first dot flush
+             left, last dot flush right) with a continuous connector track behind
+             them; labels sit centered under their dot. */
+          <div className="relative">
+            {/* Connector track: a base line spanning the dot centers (h-4 = top of
+                an h-8 circle) inset by half a circle on each side, plus a filled
+                overlay up to the current step. */}
+            {STEPPER_STEPS.length > 1 && (
+              <>
+                <div className="absolute top-4 left-4 right-4 h-0.5 -translate-y-1/2 bg-border" />
+                <div
+                  className="absolute top-4 left-4 h-0.5 -translate-y-1/2 bg-primary transition-all"
+                  style={{
+                    width: `calc((100% - 2rem) * ${
+                      admission.status === ADMISSION_STATUS.COMPLETED ? 1 : Math.min(stepperIndex, STEPPER_STEPS.length - 1) / (STEPPER_STEPS.length - 1)
+                    })`,
+                  }}
+                />
+              </>
+            )}
+            <div className="relative flex items-start justify-between">
+              {STEPPER_STEPS.map((step, index) => {
+                const isDone = index < stepperIndex || admission.status === ADMISSION_STATUS.COMPLETED;
+                const isCurrent = index === stepperIndex && admission.status !== ADMISSION_STATUS.COMPLETED;
 
-              return (
-                // Equal-width columns keep circles evenly spaced and labels
-                // centered under their circle regardless of label length.
-                <div key={step.key} className="flex min-w-0 flex-1 flex-col items-center">
-                  {/* Circle + connector row: half-width connectors on each side
-                      meet at the vertical center of the circle. */}
-                  <div className="flex w-full items-center">
-                    <div className={cn("h-0.5 flex-1", isFirst ? "bg-transparent" : leftFilled ? "bg-primary" : "bg-border")} />
+                return (
+                  <div key={step.key} className="flex min-w-0 flex-1 flex-col items-center first:items-start last:items-end">
                     <div
                       className={cn(
-                        "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors",
+                        "z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors",
                         isDone && "border-primary bg-primary text-primary-foreground",
                         isCurrent && "border-primary bg-background text-primary",
                         !isDone && !isCurrent && "border-border bg-muted/30 text-muted-foreground",
@@ -94,34 +119,47 @@ export function StatusCard({ admission, className }: StatusCardProps) {
                     >
                       {isDone ? <IconCheck className="h-4 w-4" /> : index + 1}
                     </div>
-                    <div className={cn("h-0.5 flex-1", isLast ? "bg-transparent" : rightFilled ? "bg-primary" : "bg-border")} />
+                    <span
+                      className={cn(
+                        "mt-2 w-full px-1 text-center text-xs leading-tight break-words first:text-left last:text-right",
+                        isCurrent ? "font-semibold text-foreground" : isDone ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {step.label}
+                    </span>
                   </div>
-                  <span
-                    className={cn(
-                      "mt-2 w-full px-1 text-center text-xs leading-tight break-words",
-                      isCurrent ? "font-semibold text-foreground" : isDone ? "text-foreground" : "text-muted-foreground",
-                    )}
-                  >
-                    {step.label}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
 
         {/* ADMISSION exam (ASO) linked to the medical step */}
         {showExamSection && (
           <div className="rounded-md border border-border bg-muted/30 px-4 py-3 space-y-2">
-            <p className="flex items-center gap-2 text-sm font-medium">
-              <IconStethoscope className="h-4 w-4 text-muted-foreground" />
-              Exame Admissional (ASO)
-            </p>
-            <LinkedExamStatus
-              userId={admission.userId}
-              type={MEDICAL_EXAM_TYPE.ADMISSION}
-              emptyText="Nenhum exame admissional encontrado. Ele é criado automaticamente ao entrar na etapa de exame."
-            />
+            {/* Header row: title + status badge (inline) + "Agendar exame" (right) */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <IconStethoscope className="h-4 w-4 text-muted-foreground" />
+                Exame Admissional (ASO)
+              </p>
+              {canScheduleExam ? (
+                <Button size="sm" variant="outline" onClick={handleScheduleExam}>
+                  <IconCalendarPlus className="mr-2 h-4 w-4" />
+                  Agendar exame admissional
+                </Button>
+              ) : (
+                <LinkedExamStatus userId={admission.userId} type={MEDICAL_EXAM_TYPE.ADMISSION} variant="inline" />
+              )}
+            </div>
+            {!canScheduleExam && (
+              <LinkedExamStatus
+                userId={admission.userId}
+                type={MEDICAL_EXAM_TYPE.ADMISSION}
+                variant="date"
+                emptyText="Nenhum exame admissional encontrado. Ele é criado automaticamente ao entrar na etapa de exame."
+              />
+            )}
           </div>
         )}
 

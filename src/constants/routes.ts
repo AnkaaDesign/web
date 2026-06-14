@@ -199,8 +199,9 @@ export const routes = {
       statement: "/financeiro/conciliacao/extrato",
       outflows: "/financeiro/conciliacao/saidas",
       inflows: "/financeiro/conciliacao/entradas",
-      outflowForecast: "/financeiro/conciliacao/previsao-de-saidas",
     },
+    // Top-level (outside the conciliação domain) — a forward forecast page.
+    outflowForecast: "/financeiro/previsao-de-saidas",
     accountsPayable: {
       root: "/financeiro/contas-a-pagar",
     },

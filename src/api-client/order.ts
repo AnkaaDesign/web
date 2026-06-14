@@ -60,6 +60,7 @@ import type {
   OrderScheduleExpectedTotalsResponse,
   OrderScheduleCascadeMode,
   OrderPaymentSummaryResponse,
+  PayablesResponse,
 } from "../types";
 
 // =====================
@@ -96,6 +97,12 @@ export class OrderService {
   /** Per-paymentStatus aggregates for the Contas a Pagar summary cards (PAID windowed to 90 days, server-side). */
   async getPaymentSummary(): Promise<OrderPaymentSummaryResponse> {
     const response = await apiClient.get<OrderPaymentSummaryResponse>(`${this.basePath}/payment-summary`);
+    return response.data;
+  }
+
+  /** Unified Contas a Pagar list: open orders + airbrushing painter payments + scheduled/expected outflows, plus per-state summary. */
+  async getPayables(): Promise<PayablesResponse> {
+    const response = await apiClient.get<PayablesResponse>(`${this.basePath}/payables`);
     return response.data;
   }
 
@@ -361,6 +368,7 @@ export const batchDeleteOrders = (data: OrderBatchDeleteFormData) => orderServic
 
 // Order payment exports (contas a pagar)
 export const getOrderPaymentSummary = () => orderService.getPaymentSummary();
+export const getOrderPayables = () => orderService.getPayables();
 export const requestOrderPayment = (id: string, query?: OrderQueryFormData) => orderService.requestPayment(id, query);
 export const markOrderAwaitingPayment = (id: string, query?: OrderQueryFormData) => orderService.markAwaitingPayment(id, query);
 export const markOrderPaid = (id: string, query?: OrderQueryFormData) => orderService.markPaid(id, query);

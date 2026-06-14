@@ -1,8 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useOrder, useOrderMutations, useCanViewPrices } from "../../../../hooks";
-import { routes, ORDER_STATUS, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
+import { routes, ORDER_STATUS, ORDER_PAYMENT_STATUS, CHANGE_LOG_ENTITY_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
+import { hasAnyPrivilege } from "@/utils/user";
 import { Button } from "@/components/ui/button";
-import { IconAlertTriangle, IconShoppingCart, IconTrash, IconRefresh, IconEdit, IconLoader2, IconCheck } from "@tabler/icons-react";
+import { IconAlertTriangle, IconShoppingCart, IconTrash, IconRefresh, IconEdit, IconLoader2, IconCheck, IconCashBanknote } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import type { PageAction } from "@/components/ui/page-header";
 import { OrderInfoCard, OrderItemsCard, OrderDocumentsCard } from "@/components/inventory/order/detail";
@@ -22,7 +23,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES } from "../../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { OrderTotalBadge } from "@/components/inventory/order/common/order-total-calculator";
 
@@ -31,10 +31,20 @@ const OrderDetailsPage = () => {
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [showRequestPaymentDialog, setShowRequestPaymentDialog] = useState(false);
   const { user } = useAuth();
   const canViewPrices = useCanViewPrices();
   const canManageWarehouse = canEditOrders(user);
-  const { deleteMutation, updateAsync } = useOrderMutations();
+  const { deleteMutation, updateAsync, requestPaymentAsync } = useOrderMutations();
+
+  // Request-payment is gated to the same privileges the API endpoint allows
+  // (WAREHOUSE / FINANCIAL / ACCOUNTING / ADMIN).
+  const canRequestPayment = hasAnyPrivilege(user as any, [
+    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.FINANCIAL,
+    SECTOR_PRIVILEGES.ACCOUNTING,
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
 
   // Track page access
   usePageTracker({
@@ -156,6 +166,18 @@ const OrderDetailsPage = () => {
     }
   };
 
+  const handleRequestPayment = async () => {
+    try {
+      await requestPaymentAsync(order.id);
+      setShowRequestPaymentDialog(false);
+      refetch();
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error requesting payment:", error);
+      }
+    }
+  };
+
   // Custom actions for the header
   const customActions = [];
 
@@ -242,6 +264,17 @@ const OrderDetailsPage = () => {
       label: "Marcar como Recebido",
       icon: IconCheck,
       onClick: () => setShowCompleteDialog(true),
+    });
+  }
+
+  // Show "Solicitar Pagamento" when the order's payment was not yet requested
+  // (finance pipeline trigger; the rest of the pipeline stays in finance hands).
+  if (canRequestPayment && order.paymentStatus === ORDER_PAYMENT_STATUS.NOT_REQUESTED) {
+    orderActions.push({
+      key: "request-payment",
+      label: "Solicitar Pagamento",
+      icon: IconCashBanknote,
+      onClick: () => setShowRequestPaymentDialog(true),
     });
   }
 
@@ -373,6 +406,34 @@ const OrderDetailsPage = () => {
                     Confirmar Recebimento
                   </>
                 )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Request Payment Confirmation Dialog */}
+        <AlertDialog open={showRequestPaymentDialog} onOpenChange={setShowRequestPaymentDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Solicitar Pagamento</AlertDialogTitle>
+              <AlertDialogDescription>
+                Deseja solicitar o pagamento deste pedido? O pedido passará para a etapa de solicitação no pipeline de Contas a Pagar.
+                <br />
+                <br />
+                <strong>Fornecedor:</strong> {order.supplier?.fantasyName || "Não especificado"}
+                {canViewPrices && (
+                  <>
+                    <br />
+                    <strong>Valor Total:</strong> <OrderTotalBadge orderItems={order.items} discount={order.discount} />
+                  </>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleRequestPayment}>
+                <IconCashBanknote className="mr-2 h-4 w-4" />
+                Solicitar Pagamento
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

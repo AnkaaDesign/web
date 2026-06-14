@@ -688,21 +688,12 @@ export const NAVIGATION_MENU: MenuItem[] = [
       },
       {
         // Elotech NFS-e issuance pages — NOT what accounting needs (they use the
-        // reconciliation fiscal documents below).
+        // reconciliation fiscal documents inside Conciliação Bancária).
         id: "notas-fiscais",
-        title: "Notas Fiscais",
+        title: "NFS-e Emitidas",
         icon: "receipt",
         path: "/financeiro/notas-fiscais",
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
-      },
-      {
-        // Accounting's "Notas Fiscais" = reconciliation fiscal documents list.
-        // ACCOUNTING-only: ADMIN/FINANCIAL already reach it via Conciliação Bancária > Notas Fiscais.
-        id: "notas-fiscais-contabilidade",
-        title: "Notas Fiscais",
-        icon: "receipt",
-        path: "/financeiro/conciliacao/notas",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
       },
       {
         id: "orcamento",
@@ -741,19 +732,11 @@ export const NAVIGATION_MENU: MenuItem[] = [
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
           },
           {
-            id: "conciliacao-previsao-saidas",
-            title: "Previsão de Saídas",
-            icon: "calendarDollar",
-            path: "/financeiro/conciliacao/previsao-de-saidas",
-            order: 3,
-            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
-          },
-          {
             id: "conciliacao-entradas",
             title: "Entradas",
             icon: "arrowsExchange",
             path: "/financeiro/conciliacao/entradas",
-            order: 4,
+            order: 3,
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
           },
           {
@@ -765,14 +748,14 @@ export const NAVIGATION_MENU: MenuItem[] = [
             requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL],
           },
           {
-            // ACCOUNTING excluded here on purpose: it already has the root-level
-            // "Notas Fiscais" entry pointing at this same page — keeping both would
-            // create two menu entries with the same path (double highlight).
+            // Reconciliation fiscal-documents list. Now the single home for
+            // "Notas Fiscais" (the top-level ACCOUNTING duplicate was removed), so
+            // ACCOUNTING is included here alongside ADMIN/FINANCIAL.
             id: "conciliacao-notas",
             title: "Notas Fiscais",
             icon: "receipt",
             path: "/financeiro/conciliacao/notas",
-            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL],
+            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
           },
           {
             // Kept for ACCOUNTING as a utility entry: the four reconciliation pages
@@ -792,6 +775,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
             requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL],
           },
         ],
+      },
+      {
+        // Top-level (outside the Conciliação Bancária domain) — a forward forecast
+        // that spans pedidos + impostos + folha, not a reconciliation sub-page.
+        id: "previsao-de-saidas",
+        title: "Previsão de Saídas",
+        icon: "calendarDollar",
+        path: "/financeiro/previsao-de-saidas",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
       },
       {
         id: "contas-a-pagar",

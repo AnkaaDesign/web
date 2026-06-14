@@ -382,6 +382,7 @@ export function useOutflowForecast(reference?: string) {
         .getOutflowForecast(reference ? { reference } : undefined)
         .then((r) => r.data),
     staleTime: 60_000,
+    refetchOnMount: "always",
     placeholderData: (previous) => previous,
   });
 }

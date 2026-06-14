@@ -1,9 +1,11 @@
-import { useNavigate } from "react-router-dom";
+import { useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconStethoscope, IconCheck } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { MEDICAL_EXAM_TYPE, routes, SECTOR_PRIVILEGES } from "../../../constants";
 import type { MedicalExamCreateFormData } from "@/schemas/medical-exam";
 import { useMedicalExamMutations } from "@/hooks/occupational-health/use-medical-exams";
+import { useUser } from "@/hooks/human-resources/use-user";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { MedicalExamForm } from "@/components/occupational-health/medical-exam/form";
@@ -11,7 +13,31 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const MedicalExamCreatePage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { createAsync, createMutation } = useMedicalExamMutations();
+
+  // Pre-fill from an admission / termination process (no mutation happens until
+  // the form is actually submitted — backing out leaves no orphan exam).
+  const prefillUserId = searchParams.get("userId") || undefined;
+  const prefillTypeRaw = searchParams.get("type") || undefined;
+  const prefillType = prefillTypeRaw && (Object.values(MEDICAL_EXAM_TYPE) as string[]).includes(prefillTypeRaw) ? (prefillTypeRaw as MedicalExamCreateFormData["type"]) : undefined;
+  const prefillAdmissionId = searchParams.get("admissionId") || undefined;
+  const prefillTerminationId = searchParams.get("terminationId") || undefined;
+  const hasPrefill = !!prefillUserId && !!prefillType;
+
+  const prefillDefaults = useMemo<Partial<MedicalExamCreateFormData> | undefined>(() => {
+    if (!hasPrefill) return undefined;
+    return {
+      userId: prefillUserId,
+      type: prefillType,
+      admissionId: prefillAdmissionId ?? null,
+      terminationId: prefillTerminationId ?? null,
+    };
+  }, [hasPrefill, prefillUserId, prefillType, prefillAdmissionId, prefillTerminationId]);
+
+  // Load the collaborator so the locked Colaborador field shows the name.
+  const { data: userResponse } = useUser(prefillUserId ?? "", { include: { position: true }, enabled: hasPrefill });
+  const prefillUser = userResponse?.data ?? null;
 
   usePageTracker({
     title: "Novo Exame (ASO)",
@@ -73,7 +99,14 @@ export const MedicalExamCreatePage = () => {
           />
         </div>
         <div className="flex-1 overflow-y-auto pb-6">
-          <MedicalExamForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
+          <MedicalExamForm
+            mode="create"
+            onSubmit={handleSubmit}
+            isSubmitting={createMutation.isPending}
+            defaultValues={prefillDefaults}
+            lockIdentityFields={hasPrefill}
+            initialUser={prefillUser}
+          />
         </div>
       </div>
     </PrivilegeRoute>

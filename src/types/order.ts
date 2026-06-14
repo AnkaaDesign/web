@@ -454,6 +454,49 @@ export interface OrderPaymentSummaryResponse {
   message: string;
   data: OrderPaymentSummaryData;
 }
+
+// =====================
+// Unified payables (Contas a Pagar) — mirrors api/src/types/order.ts
+// =====================
+
+export type PayableSource = "ORDER" | "AIRBRUSHING" | "SCHEDULED";
+
+export type PayableState = "NOT_REQUESTED" | "REQUESTED" | "AWAITING_PAYMENT" | "PARTIALLY_PAID" | "EXPECTED";
+
+/** One normalized payable row: an open order, an airbrushing painter payment, or a scheduled/expected outflow. */
+export interface PayableRow {
+  source: PayableSource;
+  /** Source entity id (orderId / airbrushingId / scheduleId). */
+  id: string;
+  /** Grouping key — supplier id, painter id, or schedule supplier id. May be null. */
+  payeeId: string | null;
+  payeeName: string;
+  description: string;
+  amount: number;
+  paymentState: PayableState;
+  dueDate: string | null;
+  method: string | null;
+  requestedAt: string | null;
+  /** Convenience link back to the originating task (airbrushing rows). */
+  taskId?: string | null;
+}
+
+export interface PayablesSummary {
+  NOT_REQUESTED: OrderPaymentSummaryBucket;
+  REQUESTED: OrderPaymentSummaryBucket;
+  AWAITING_PAYMENT: OrderPaymentSummaryBucket;
+  PARTIALLY_PAID: OrderPaymentSummaryBucket;
+  EXPECTED: OrderPaymentSummaryBucket;
+}
+
+export interface PayablesResponse {
+  success: boolean;
+  message: string;
+  data: {
+    rows: PayableRow[];
+    summary: PayablesSummary;
+  };
+}
 export interface OrderCreateResponse extends BaseCreateResponse<Order> {}
 export interface OrderUpdateResponse extends BaseUpdateResponse<Order> {}
 export interface OrderDeleteResponse extends BaseDeleteResponse {}

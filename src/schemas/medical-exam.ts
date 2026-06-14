@@ -236,6 +236,10 @@ export const medicalExamCreateSchema = z.object({
   clinic: z.string().max(200).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   fileId: z.string().uuid({ message: "Arquivo inválido" }).nullable().optional(),
+  // Optional FK back to the admission / termination process that this exam belongs to
+  // (set when scheduling an ASO directly from the admission/termination detail page).
+  admissionId: z.string().uuid({ message: "Admissão inválida" }).nullable().optional(),
+  terminationId: z.string().uuid({ message: "Rescisão inválida" }).nullable().optional(),
 });
 
 export const medicalExamUpdateSchema = z.object({
@@ -265,6 +269,8 @@ export const medicalExamUpdateSchema = z.object({
   clinic: z.string().max(200).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   fileId: z.string().uuid({ message: "Arquivo inválido" }).nullable().optional(),
+  admissionId: z.string().uuid({ message: "Admissão inválida" }).nullable().optional(),
+  terminationId: z.string().uuid({ message: "Rescisão inválida" }).nullable().optional(),
 });
 
 export const medicalExamCompleteSchema = z.object({

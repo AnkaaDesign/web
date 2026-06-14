@@ -70,8 +70,9 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // access vs the "/financeiro/*" wildcard (COMMERCIAL excluded here).
   "/financeiro/conciliacao/extrato": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
   "/financeiro/conciliacao/saidas": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
-  "/financeiro/conciliacao/previsao-de-saidas": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
   "/financeiro/conciliacao/entradas": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
+  // Previsão de Saídas — moved out of the conciliação domain to top-level Financeiro.
+  "/financeiro/previsao-de-saidas": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
   "/financeiro/producao": "FINANCIAL", // Redirects to /producao
   "/financeiro/producao/aerografia": "FINANCIAL", // Redirects to /producao/aerografia/listar
   "/financeiro/producao/cronograma": "FINANCIAL", // Redirects to /producao/cronograma (tasks)
