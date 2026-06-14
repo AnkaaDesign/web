@@ -9,6 +9,7 @@ import type {
   TurnoverResponse,
   AbsenteeismFilters,
   AbsenteeismResponse,
+  SalaryCostResponse,
 } from '../types/hr-analytics';
 
 export class HrAnalyticsService {
@@ -51,6 +52,14 @@ export class HrAnalyticsService {
     );
     return response.data;
   }
+
+  async getSalaryCost(filters: HeadcountFilters): Promise<SalaryCostResponse> {
+    const response = await apiClient.post<SalaryCostResponse>(
+      '/human-resources/analytics/salary-cost',
+      filters,
+    );
+    return response.data;
+  }
 }
 
 export const hrAnalyticsService = new HrAnalyticsService();
@@ -69,3 +78,6 @@ export const getTurnover = (filters: TurnoverFilters) =>
 
 export const getAbsenteeism = (filters: AbsenteeismFilters) =>
   hrAnalyticsService.getAbsenteeism(filters);
+
+export const getSalaryCost = (filters: HeadcountFilters) =>
+  hrAnalyticsService.getSalaryCost(filters);

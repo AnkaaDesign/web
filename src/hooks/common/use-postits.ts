@@ -43,10 +43,40 @@ export function usePostitMutations() {
     onSuccess: invalidate,
   });
 
+  // Postit edits (cor, conteúdo, arquivar, ordem) NÃO disparam toast — o
+  // api-client toasta toda escrita por padrão, mas para post-its isso é ruído.
+  // Mantemos a invalidação para refletir arquivar/restaurar nas listas.
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: PostitUpdateFormData }) =>
-      updatePostit(id, data),
+      updatePostit(id, data, undefined, { suppressToast: true }),
     onSuccess: invalidate,
+  });
+
+  // Canvas livre: saves de posição/tamanho. Otimista (atualiza o cache na hora),
+  // sem toast (frequentes) e SEM invalidar — invalidar refetcharia e atropelaria
+  // um arraste/redimensionamento em andamento. A persistência fica garantida no
+  // servidor; o cache já reflete o valor final.
+  const quietUpdateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: PostitUpdateFormData }) =>
+      updatePostit(id, data, undefined, { suppressToast: true }),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: postitKeys.all });
+      const snapshots = queryClient.getQueriesData<any>({ queryKey: postitKeys.all });
+      for (const [key, value] of snapshots) {
+        if (!value?.data) continue;
+        queryClient.setQueryData(key, {
+          ...value,
+          data: value.data.map((p: any) => (p.id === id ? { ...p, ...data } : p)),
+        });
+      }
+      return { snapshots };
+    },
+    onError: (_err, _vars, context) => {
+      // Reverte o cache otimista em caso de falha.
+      context?.snapshots?.forEach(([key, value]: [any, any]) => {
+        queryClient.setQueryData(key, value);
+      });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -62,6 +92,7 @@ export function usePostitMutations() {
   return {
     create: createMutation,
     update: updateMutation,
+    quietUpdate: quietUpdateMutation,
     delete: deleteMutation,
     reorder: reorderMutation,
   };

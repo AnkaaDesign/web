@@ -3,7 +3,7 @@ import { useFormContext } from "react-hook-form";
 import { IconCalendar } from "@tabler/icons-react";
 import { FormField } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { CONTRACT_TYPE } from "../../../../constants";
+import { CONTRACT_STATUS } from "../../../../constants";
 import { addDays, startOfDay, getDay, subDays } from "date-fns";
 
 interface StatusDatesSectionProps {
@@ -49,12 +49,19 @@ function calculateStatusDates(admissionDate: Date | null) {
 
 /**
  * CLT period dates bound to the current vínculo. `exp1StartAt` doubles as the
- * admission date and drives the auto-calculated exp1/exp2/effected dates. The
- * dismissal date is NOT editable here — it is set by the termination flow.
+ * admission date and drives the auto-calculated exp1/exp2/effected dates.
+ *
+ * Post-Part-A model: the dates shown are driven by the lifecycle STATUS
+ * (`contractStatus`), NOT by the contract modality (`contractType`):
+ *   - EXPERIENCE → admissão + experiência 1/2 dates (the phase 1 vs 2 is derived
+ *     from whether exp2StartAt is set);
+ *   - ACTIVE (efetivado) → admissão + data de efetivação;
+ *   - everything else → admissão only.
+ * The termination date is NOT editable here — it is set by the termination flow.
  */
 export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
   const form = useFormContext();
-  const status = form.watch("contractType") as CONTRACT_TYPE | undefined;
+  const status = form.watch("contractStatus") as CONTRACT_STATUS | undefined;
   const exp1StartAt = form.watch("exp1StartAt") as Date | null | undefined;
 
   const prevExp1StartAtRef = useRef<Date | null | undefined>(undefined);
@@ -90,7 +97,8 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
     }
   }, [exp1StartAt, form]);
 
-  // Clear dates not applicable to the new contract type; stamp the entering one.
+  // When the lifecycle status changes, stamp the effective date on efetivação
+  // (ACTIVE). Experiência dates are always derived from the admission date.
   useEffect(() => {
     if (prevStatusRef.current === undefined) {
       prevStatusRef.current = status;
@@ -100,22 +108,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
     if (!hasChanged) return;
     prevStatusRef.current = status;
 
-    const tier =
-      status === CONTRACT_TYPE.EFFECTED || status === CONTRACT_TYPE.APPRENTICE || status === CONTRACT_TYPE.INTERMITTENT
-        ? 3
-        : status === CONTRACT_TYPE.EXPERIENCE_PERIOD_2
-          ? 2
-          : status === CONTRACT_TYPE.EXPERIENCE_PERIOD_1
-            ? 1
-            : 0;
-
-    if (tier < 3) form.setValue("effectedAt", null, { shouldDirty: true, shouldValidate: true });
-    if (tier < 2) {
-      form.setValue("exp2StartAt", null, { shouldDirty: true, shouldValidate: true });
-      form.setValue("exp2EndAt", null, { shouldDirty: true, shouldValidate: true });
-    }
-
-    if (status === CONTRACT_TYPE.EFFECTED && !form.getValues("effectedAt")) {
+    if (status === CONTRACT_STATUS.ACTIVE && !form.getValues("effectedAt")) {
       form.setValue("effectedAt", startOfDay(new Date()), { shouldValidate: false, shouldDirty: true });
     }
   }, [status, form]);
@@ -124,37 +117,33 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
     return null;
   }
 
-  const showExp1Dates = [
-    CONTRACT_TYPE.EXPERIENCE_PERIOD_1,
-    CONTRACT_TYPE.EXPERIENCE_PERIOD_2,
-    CONTRACT_TYPE.EFFECTED,
-    CONTRACT_TYPE.APPRENTICE,
-    CONTRACT_TYPE.INTERMITTENT,
-    CONTRACT_TYPE.FIXED_TERM,
-    CONTRACT_TYPE.TEMPORARY,
-  ].includes(status as CONTRACT_TYPE);
+  // Experiência dates are shown while the bond is in EXPERIENCE status. The
+  // phase (1 vs 2) is derived from whether the exp2 window is set.
+  const isExperience = status === CONTRACT_STATUS.EXPERIENCE;
+  const inPhase2 = isExperience && !!(form.watch("exp2StartAt") as Date | null | undefined);
 
-  const showExp2Dates = [
-    CONTRACT_TYPE.EXPERIENCE_PERIOD_2,
-    CONTRACT_TYPE.EFFECTED,
-    CONTRACT_TYPE.APPRENTICE,
-    CONTRACT_TYPE.INTERMITTENT,
-  ].includes(status as CONTRACT_TYPE);
+  // The effective-hire date is relevant once the bond is ACTIVE (efetivado).
+  const showContractedDate = status === CONTRACT_STATUS.ACTIVE;
 
-  const showContractedDate = status === CONTRACT_TYPE.EFFECTED;
-
-  if (!showExp1Dates && !showContractedDate) {
-    return null;
-  }
+  // Admission is always shown; experiência windows only while in experiência.
+  const showExp1Dates = true;
+  const showExp2Dates = isExperience;
 
   return (
     <div className="space-y-6 border-t border-border/30 pt-6">
+      {/* Experiência fase atual (derivada das datas) */}
+      {isExperience && (
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          Em experiência — fase {inPhase2 ? "2" : "1"} (a fase é derivada das datas de experiência).
+        </div>
+      )}
+
       {/* Experience Period 1 (doubles as admission date) */}
       {showExp1Dates && (
         <div className="space-y-4">
           <h4 className="text-sm font-semibold flex items-center gap-2">
             <IconCalendar className="h-4 w-4" />
-            Admissão / Experiência 1 (30 dias)
+            {isExperience ? "Admissão / Experiência 1" : "Admissão"}
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
             <FormField
@@ -176,18 +165,20 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="exp1EndAt"
-              render={({ field }) => (
-                <DateTimeInput
-                  field={{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null, name: field.name }}
-                  label="Fim da Experiência 1"
-                  disabled={true}
-                  mode="date"
-                />
-              )}
-            />
+            {isExperience && (
+              <FormField
+                control={form.control}
+                name="exp1EndAt"
+                render={({ field }) => (
+                  <DateTimeInput
+                    field={{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null, name: field.name }}
+                    label="Fim da Experiência 1"
+                    disabled={true}
+                    mode="date"
+                  />
+                )}
+              />
+            )}
           </div>
         </div>
       )}
@@ -197,7 +188,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
         <div className="space-y-4">
           <h4 className="text-sm font-semibold flex items-center gap-2">
             <IconCalendar className="h-4 w-4" />
-            Experiência 2 (50 dias)
+            Experiência 2
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
             <FormField

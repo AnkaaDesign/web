@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DetailRow } from "@/components/ui/detail-row";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 const REQUIRED_PRIVILEGES = [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN];
@@ -148,41 +149,26 @@ export const SalaryAdjustmentDetailPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-muted-foreground">Tipo</span>
-                      <Badge variant="secondary">{SALARY_ADJUSTMENT_TYPE_LABELS[adjustment.type as SALARY_ADJUSTMENT_TYPE] || adjustment.type}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-muted-foreground">Percentual</span>
-                      {adjustment.percentage !== null && adjustment.percentage !== undefined ? (
-                        <span className="font-medium">{formatPercentage(adjustment.percentage)}</span>
-                      ) : (
-                        <Badge variant="outline">Valores personalizados</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-muted-foreground">Data de Vigência</span>
-                      <span className="font-medium">{formatDate(new Date(adjustment.effectiveDate))}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-muted-foreground">Cargos Afetados</span>
-                      <Badge variant="default">{items.length}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-muted-foreground">Aplicado Por</span>
-                      <span className="font-medium truncate">{adjustment.appliedBy?.name || "-"}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-muted-foreground">Criado Em</span>
-                      <span className="font-medium">{adjustment.createdAt ? formatDateTime(new Date(adjustment.createdAt)) : "-"}</span>
-                    </div>
-                    {adjustment.note && (
-                      <div className="pt-2 border-t border-border">
-                        <div className="text-muted-foreground mb-1">Observação</div>
-                        <div className="whitespace-pre-wrap break-words">{adjustment.note}</div>
-                      </div>
-                    )}
+                  <div className="space-y-2">
+                    <DetailRow
+                      label="Tipo"
+                      value={<Badge variant="secondary">{SALARY_ADJUSTMENT_TYPE_LABELS[adjustment.type as SALARY_ADJUSTMENT_TYPE] || adjustment.type}</Badge>}
+                    />
+                    <DetailRow
+                      label="Percentual"
+                      value={
+                        adjustment.percentage !== null && adjustment.percentage !== undefined ? (
+                          formatPercentage(adjustment.percentage)
+                        ) : (
+                          <Badge variant="outline">Valores personalizados</Badge>
+                        )
+                      }
+                    />
+                    <DetailRow label="Data de Vigência" value={formatDate(new Date(adjustment.effectiveDate))} />
+                    <DetailRow label="Cargos Afetados" value={<Badge variant="default">{items.length}</Badge>} />
+                    <DetailRow label="Aplicado Por" value={adjustment.appliedBy?.name || "-"} />
+                    <DetailRow label="Criado Em" value={adjustment.createdAt ? formatDateTime(new Date(adjustment.createdAt)) : "-"} />
+                    {adjustment.note && <DetailRow label="Observação" value={<span className="break-words">{adjustment.note}</span>} block />}
                   </div>
                 </CardContent>
               </Card>

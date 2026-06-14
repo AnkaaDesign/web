@@ -33,7 +33,7 @@ import { useUsers, useSectors } from "../../../hooks";
 import { bonusService } from "../../../api-client";
 import { useBonusSimulation, usePeriodAdjustment } from "../../../hooks/human-resources/use-bonus";
 import { cn } from "@/lib/utils";
-import { CONTRACT_TYPE } from "../../../constants";
+import { CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../constants";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
 import { toast } from "@/components/ui/sonner";
@@ -244,7 +244,10 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   // Client-side filters will handle eligibility, sectors, positions, etc.
   const { data: usersData } = useUsers({
     where: {
-      currentContractType: CONTRACT_TYPE.EFFECTED, // Only EFFECTED users (not dismissed, not inactive)
+      // Bonus eligibility = confirmed CLT bond (CLT + ACTIVE). Client-side
+      // filters still apply the full eligibility predicate on top of this.
+      currentEmployeeType: EMPLOYEE_TYPE.CLT,
+      currentContractStatus: CONTRACT_STATUS.ACTIVE,
       secullumEmployeeId: { not: null }, // Only users registered in Secullum
     },
     include: {

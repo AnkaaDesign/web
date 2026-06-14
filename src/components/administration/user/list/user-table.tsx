@@ -261,14 +261,14 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             // Bulk mark as effected
             const users = contextMenu.users.map((user) => ({
               id: user.id,
-              data: { contractType: CONTRACT_TYPE.EFFECTED },
+              data: { contractType: CONTRACT_TYPE.INDETERMINATE, contractStatus: CONTRACT_STATUS.ACTIVE, effectedAt: new Date() },
             }));
             await batchUpdate({ users });
           } else {
             // Single mark as effected
             await updateUser({
               id: contextMenu.users[0].id,
-              data: { contractType: CONTRACT_TYPE.EFFECTED },
+              data: { contractType: CONTRACT_TYPE.INDETERMINATE, contractStatus: CONTRACT_STATUS.ACTIVE, effectedAt: new Date() },
             });
           }
         }
@@ -292,7 +292,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             // Bulk mark as dismissed
             const users = contextMenu.users.map((user) => ({
               id: user.id,
-              data: { contractStatus: CONTRACT_STATUS.DISMISSED, terminationDate: new Date() },
+              data: { contractStatus: CONTRACT_STATUS.TERMINATED, terminationDate: new Date() },
             }));
             await batchUpdate({ users });
           } else {
@@ -301,7 +301,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             // funcionario. Same shape as the edit page.
             const response = (await updateUser({
               id: contextMenu.users[0].id,
-              data: { contractStatus: CONTRACT_STATUS.DISMISSED, terminationDate: new Date() },
+              data: { contractStatus: CONTRACT_STATUS.TERMINATED, terminationDate: new Date() },
             })) as { secullumSync?: { status: "synced" | "skipped" | "error"; reason?: string; funcionarioId?: number } };
             const sync = response?.secullumSync;
             if (sync) {
@@ -594,16 +594,16 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             <>
               <DropdownMenuSeparator />
 
-              {/* Show efetivar option if any user is in experience period */}
-              {contextMenu?.users.some((user) => user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_1 || user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_2) && (
+              {/* Show efetivar option if any user is currently in experiência */}
+              {contextMenu?.users.some((user) => user.currentContractStatus === CONTRACT_STATUS.EXPERIENCE) && (
                 <DropdownMenuItem onClick={handleMarkAsContracted}>
                   <IconUserCheck className="mr-2 h-4 w-4" />
                   {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Efetivar selecionados" : "Efetivar"}
                 </DropdownMenuItem>
               )}
 
-              {/* Show dismiss option if any user is not dismissed */}
-              {contextMenu?.users.some((user) => user.currentContractStatus !== CONTRACT_STATUS.DISMISSED) && (
+              {/* Show dismiss option if any user is not yet terminated */}
+              {contextMenu?.users.some((user) => user.currentContractStatus !== CONTRACT_STATUS.TERMINATED) && (
                 <DropdownMenuItem onClick={handleMarkAsDismissed}>
                   <IconUserX className="mr-2 h-4 w-4" />
                   {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Demitir selecionados" : "Demitir"}

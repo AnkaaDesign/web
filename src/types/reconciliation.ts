@@ -598,7 +598,7 @@ export interface OutflowForecast {
   reference: string; // YYYY-MM
   from: string;
   to: string;
-  /** pedidos.totalOpen + impostos.totalForecast + folha.total + recorrentes.totalForecast */
+  /** pedidos.totalOpen + impostos.totalForecast + folha.total + folhaProgramada.total + recorrentes.totalForecast */
   total: number;
   pedidos: {
     totalOpen: number;
@@ -623,6 +623,30 @@ export interface OutflowForecast {
     bonusTotal: number;
     netTotal: number;
     employeeCount: number;
+  };
+  /**
+   * Folha programada (13º + férias) — ADDITIVE and distinct from `folha`
+   * (which only covers the reference month's base wages). Aggregate-only,
+   * with a per-source breakdown for auditing.
+   */
+  folhaProgramada: {
+    /** thirteenth.dueThisMonth + vacation.dueThisMonth */
+    total: number;
+    thirteenth: {
+      available: boolean;
+      year: number;
+      /** Full-year split (always exposed for auditing). */
+      firstInstallmentNovember: number;
+      secondInstallmentDecember: number;
+      /** The 13º slice that actually lands in the reference month total. */
+      dueThisMonth: number;
+      recordCount: number;
+    };
+    vacation: {
+      available: boolean;
+      dueThisMonth: number;
+      recordCount: number;
+    };
   };
   recorrentes: {
     totalPaid: number;

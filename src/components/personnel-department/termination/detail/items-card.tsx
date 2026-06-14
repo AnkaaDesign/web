@@ -14,12 +14,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { IconCalculator, IconPlus, IconPencil, IconTrash, IconLoader2, IconReceipt2 } from "@tabler/icons-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { IconCalculator, IconPlus, IconPencil, IconTrash, IconLoader2, IconReceipt2, IconCoin, IconInfoCircle } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { TERMINATION_ITEM_TYPE_LABELS } from "../../../../constants";
 import { formatCurrency } from "../../../../utils";
-import type { Termination, TerminationItem } from "../../../../types/termination";
-import { useTerminationCalculate, useTerminationItemDelete } from "../../../../hooks/personnel-department/use-terminations";
+import type { Termination, TerminationItem, TaxAssistResult } from "../../../../types/termination";
+import { useTerminationCalculate, useTerminationComputeTaxes, useTerminationItemDelete } from "../../../../hooks/personnel-department/use-terminations";
 import { ItemFormDialog } from "./item-form-dialog";
 
 interface ItemsCardProps {
@@ -31,11 +32,13 @@ interface ItemsCardProps {
 
 export function ItemsCard({ termination, disabled = false, className }: ItemsCardProps) {
   const calculate = useTerminationCalculate();
+  const computeTaxes = useTerminationComputeTaxes();
   const deleteItem = useTerminationItemDelete();
 
   const [itemDialog, setItemDialog] = useState<{ open: boolean; item: TerminationItem | null }>({ open: false, item: null });
   const [showRecalculateDialog, setShowRecalculateDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<TerminationItem | null>(null);
+  const [taxResult, setTaxResult] = useState<TaxAssistResult | null>(null);
 
   const items = termination.items || [];
 
@@ -65,6 +68,18 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
     }
   };
 
+  const runComputeTaxes = async () => {
+    try {
+      const response = await computeTaxes.mutateAsync(termination.id);
+      setTaxResult(response.data ?? null);
+    } catch (error) {
+      // Error is handled by the API client with detailed message
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error computing termination taxes:", error);
+      }
+    }
+  };
+
   const confirmDeleteItem = async () => {
     if (!deleteDialog) return;
     try {
@@ -82,6 +97,13 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
     <Button variant="outline" size="sm" onClick={handleCalculateClick} disabled={disabled || calculate.isPending}>
       {calculate.isPending ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCalculator className="h-4 w-4 mr-2" />}
       Calcular
+    </Button>
+  );
+
+  const computeTaxesButton = (
+    <Button variant="outline" size="sm" onClick={runComputeTaxes} disabled={disabled || computeTaxes.isPending}>
+      {computeTaxes.isPending ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCoin className="h-4 w-4 mr-2" />}
+      Calcular impostos
     </Button>
   );
 
@@ -111,6 +133,12 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
+                    <span tabIndex={0}>{computeTaxesButton}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>Rescisões concluídas ou canceladas não podem ser recalculadas.</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <span tabIndex={0}>{addButton}</span>
                   </TooltipTrigger>
                   <TooltipContent>Não é possível adicionar verbas a rescisões concluídas ou canceladas.</TooltipContent>
@@ -119,6 +147,7 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
             ) : (
               <>
                 {calculateButton}
+                {computeTaxesButton}
                 {addButton}
               </>
             )}
@@ -126,6 +155,63 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
         </div>
       </CardHeader>
       <CardContent className="pt-0 flex-1">
+        {/* Tax/FGTS assist result — INSS/IRRF on the TAXABLE verbas + FGTS-multa base.
+            Manual override stays available via "Adicionar Verba" (INSS/IRRF). */}
+        {taxResult && (
+          <Alert className="mb-4">
+            <AlertTitle className="flex items-center gap-2">
+              <IconCoin className="h-4 w-4" />
+              Impostos calculados (sugestão)
+            </AlertTitle>
+            <AlertDescription>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Base INSS (saldo + aviso trabalhado)</span>
+                  <span className="tabular-nums">{formatCurrency(taxResult.monthlyInssBase)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">INSS sobre verbas mensais</span>
+                  <span className="tabular-nums">{formatCurrency(taxResult.monthlyInss)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">IRRF sobre verbas mensais</span>
+                  <span className="tabular-nums">{formatCurrency(taxResult.monthlyIrrf)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Base INSS 13º</span>
+                  <span className="tabular-nums">{formatCurrency(taxResult.thirteenthInssBase)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">INSS sobre 13º</span>
+                  <span className="tabular-nums">{formatCurrency(taxResult.thirteenthInss)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">IRRF sobre 13º</span>
+                  <span className="tabular-nums">{formatCurrency(taxResult.thirteenthIrrf)}</span>
+                </div>
+                <div className="flex items-center justify-between font-medium">
+                  <span>Total INSS</span>
+                  <span className="tabular-nums">{formatCurrency(taxResult.totalInss)}</span>
+                </div>
+                <div className="flex items-center justify-between font-medium">
+                  <span>Total IRRF</span>
+                  <span className="tabular-nums">{formatCurrency(taxResult.totalIrrf)}</span>
+                </div>
+                <div className="flex items-center justify-between sm:col-span-2 pt-1 border-t mt-1">
+                  <span className="text-muted-foreground">Base da multa do FGTS (inclui projeção do aviso indenizado + 13º)</span>
+                  <span className="tabular-nums">{formatCurrency(taxResult.fgtsFineBase)}</span>
+                </div>
+              </div>
+              <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
+                <IconInfoCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                INSS/IRRF incidem apenas sobre as verbas tributáveis (saldo de salário, 13º e aviso prévio trabalhado). Férias indenizadas, aviso prévio indenizado e a
+                multa do FGTS são <strong>isentos</strong> e não entram na base. Os valores são uma sugestão — ajuste manualmente em "Adicionar Verba" (INSS/IRRF) se
+                necessário.
+              </p>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
             <IconCalculator className="h-10 w-10 text-muted-foreground/50 mb-3" />

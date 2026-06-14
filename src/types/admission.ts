@@ -41,9 +41,21 @@ export interface AdmissionDocument extends BaseEntity {
   expiresAt: Date | null;
   note: string | null;
 
+  // ---- In-app electronic signature (mobile/biometric) ----
+  // Populated when a signable document (e.g. LGPD_TERM) is signed in the app.
+  // The signed/sealed PDF (≠ fileId, which is the original uploaded document).
+  signedFileId: string | null;
+  signedByUserId: string | null;
+  signedAt: Date | null;
+  // PAdES (ICP-Brasil) server-side seal applied over the signed PDF.
+  padesSealed: boolean;
+  padesSealedAt: Date | null;
+
   // Relations (optional, populated based on query)
   admission?: Admission;
   file?: File;
+  signedFile?: File;
+  signedBy?: User;
 }
 
 // =====================
@@ -59,6 +71,8 @@ export interface AdmissionIncludes {
 export interface AdmissionDocumentIncludes {
   admission?: boolean | { include?: AdmissionIncludes };
   file?: boolean | { include?: FileIncludes };
+  signedFile?: boolean | { include?: FileIncludes };
+  signedBy?: boolean | { include?: UserIncludes };
 }
 
 // =====================

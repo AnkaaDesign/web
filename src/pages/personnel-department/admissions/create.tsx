@@ -58,23 +58,28 @@ export const AdmissionCreatePage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <div className="container mx-auto max-w-4xl flex-shrink-0">
-          <PageHeader
-            title="Nova Admissão"
-            icon={IconUserPlus}
-            favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_ADMISSOES_LISTAR}
-            breadcrumbs={[
-              { label: "Início", href: "/" },
-              { label: "Departamento Pessoal" },
-              { label: "Admissões", href: routes.personnelDepartment.admissions.root },
-              { label: "Nova" },
-            ]}
-            actions={actions}
-          />
-        </div>
-        <div className="flex-1 overflow-y-auto pb-6">
-          <AdmissionForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
+      <div className="h-full flex flex-col bg-background px-4 pt-4">
+        {/* Header + form share ONE scroll container and ONE max-w-4xl column, so their
+            widths match exactly. The header is `sticky top-0` so it stays pinned while the
+            form scrolls beneath it (it no longer scrolls away with the body). */}
+        <div className="flex-1 overflow-y-auto pb-6 [scrollbar-gutter:stable]">
+          <div className="container mx-auto max-w-4xl flex flex-col gap-4">
+            <div className="sticky top-0 z-20 bg-background pb-1">
+              <PageHeader
+                title="Nova Admissão"
+                icon={IconUserPlus}
+                favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_ADMISSOES_LISTAR}
+                breadcrumbs={[
+                  { label: "Início", href: "/" },
+                  { label: "Departamento Pessoal" },
+                  { label: "Admissões", href: routes.personnelDepartment.admissions.root },
+                  { label: "Nova" },
+                ]}
+                actions={actions}
+              />
+            </div>
+            <AdmissionForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
+          </div>
         </div>
       </div>
     </PrivilegeRoute>

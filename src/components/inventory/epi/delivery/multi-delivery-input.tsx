@@ -232,6 +232,13 @@ export const MultiDeliveryInput = forwardRef<MultiDeliveryInputRef, MultiDeliver
             </AlertDescription>
           </Alert>
         )}
+
+        {/* NR-6: EPIs com CA vencido aparecem desabilitados e não podem ser entregues. */}
+        <Alert variant="warning">
+          <AlertDescription>
+            EPIs com Certificado de Aprovação (CA) vencido não podem ser entregues (NR-6) e aparecem desabilitados na lista. Atualize o CA do EPI antes de entregá-lo.
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }

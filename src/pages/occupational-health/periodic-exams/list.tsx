@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { differenceInCalendarDays } from "date-fns";
+import { differenceInCalendarDays, addMonths } from "date-fns";
 import {
   IconAlertTriangle,
   IconCalendarDue,
@@ -182,6 +182,7 @@ export const PeriodicExamsPage = () => {
                           <TableHead className="text-foreground font-bold uppercase text-xs">Cargo</TableHead>
                           <TableHead className="text-foreground font-bold uppercase text-xs">Último Exame</TableHead>
                           <TableHead className="text-foreground font-bold uppercase text-xs">Validade</TableHead>
+                          <TableHead className="text-foreground font-bold uppercase text-xs">Próximo (auto)</TableHead>
                           <TableHead className="text-foreground font-bold uppercase text-xs">Prazo</TableHead>
                           <TableHead className="text-foreground font-bold uppercase text-xs text-right">Ações</TableHead>
                         </TableRow>
@@ -190,6 +191,10 @@ export const PeriodicExamsPage = () => {
                         {exams.map((exam, index) => {
                           const isOverdue = exam.expiresAt ? differenceInCalendarDays(new Date(exam.expiresAt), new Date()) < 0 : false;
 
+                          // Próximo periódico (auto-followup): expiresAt é a próxima data-base;
+                          // se houver periodicidade definida, exibimos também a janela em meses.
+                          const nextDue = exam.expiresAt ? new Date(exam.expiresAt) : exam.examDate && exam.periodicityMonths ? addMonths(new Date(exam.examDate), exam.periodicityMonths) : null;
+
                           return (
                             <TableRow key={exam.id} className={cn("border-b border-border", index % 2 === 1 && "bg-muted/10", "hover:bg-muted/20")}>
                               <TableCell className="font-medium">{exam.user?.name || "-"}</TableCell>
@@ -197,6 +202,18 @@ export const PeriodicExamsPage = () => {
                               <TableCell className="text-sm">{exam.examDate ? formatDate(new Date(exam.examDate)) : "-"}</TableCell>
                               <TableCell className={cn("text-sm", isOverdue && "text-destructive font-semibold")}>
                                 {exam.expiresAt ? formatDate(new Date(exam.expiresAt)) : "-"}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {nextDue ? (
+                                  <div className="flex flex-col">
+                                    <span>{formatDate(nextDue)}</span>
+                                    {exam.periodicityMonths != null && (
+                                      <span className="text-xs text-muted-foreground">a cada {exam.periodicityMonths} {exam.periodicityMonths === 1 ? "mês" : "meses"}</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
                               </TableCell>
                               <TableCell>{exam.expiresAt ? getDaysLeftBadge(exam.expiresAt) : "-"}</TableCell>
                               <TableCell className="text-right">

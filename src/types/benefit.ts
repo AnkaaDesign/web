@@ -35,6 +35,10 @@ export interface UserBenefit extends BaseEntity {
   employeeDiscountValue: number | null;
   employeeDiscountPercent: number | null;
   dailyTickets: number | null;
+  /** Parcelamento de convênio (espelha LOAN/ADVANCE): total de parcelas contratadas. */
+  totalInstallments: number | null;
+  /** Parcela corrente (1-based); avança a cada folha; encerra ao exceder totalInstallments. */
+  currentInstallment: number | null;
   declarationFileId: string | null;
   notes: string | null;
 

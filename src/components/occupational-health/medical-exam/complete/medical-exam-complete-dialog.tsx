@@ -3,7 +3,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconClipboardCheck, IconLoader2, IconPaperclip, IconX } from "@tabler/icons-react";
 
-import { MEDICAL_EXAM_RESULT, MEDICAL_EXAM_RESULT_LABELS } from "../../../../constants";
+import { MEDICAL_EXAM_RESULT, MEDICAL_EXAM_RESULT_LABELS, MEDICAL_EXAM_TYPE } from "../../../../constants";
 import { medicalExamCompleteSchema, type MedicalExamCompleteFormData } from "@/schemas/medical-exam";
 import { useCompleteMedicalExam, useUploadMedicalExamDocument } from "@/hooks/occupational-health/use-medical-exams";
 import type { MedicalExam } from "@/types/medical-exam";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 
 interface MedicalExamCompleteDialogProps {
@@ -24,6 +25,7 @@ interface MedicalExamCompleteDialogProps {
 
 const resultOptions = [
   { value: MEDICAL_EXAM_RESULT.FIT, label: MEDICAL_EXAM_RESULT_LABELS[MEDICAL_EXAM_RESULT.FIT] },
+  { value: MEDICAL_EXAM_RESULT.FIT_WITH_RESTRICTIONS, label: MEDICAL_EXAM_RESULT_LABELS[MEDICAL_EXAM_RESULT.FIT_WITH_RESTRICTIONS] },
   { value: MEDICAL_EXAM_RESULT.UNFIT, label: MEDICAL_EXAM_RESULT_LABELS[MEDICAL_EXAM_RESULT.UNFIT] },
 ];
 
@@ -45,6 +47,8 @@ export function MedicalExamCompleteDialog({ exam, open, onOpenChange, onComplete
     defaultValues: {
       examDate: new Date(),
       result: "" as any,
+      restrictions: "",
+      periodicityMonths: null,
       expiresAt: null,
       physicianName: exam?.physicianName ?? "",
       crm: exam?.crm ?? "",
@@ -58,6 +62,8 @@ export function MedicalExamCompleteDialog({ exam, open, onOpenChange, onComplete
       form.reset({
         examDate: exam.examDate ? new Date(exam.examDate) : exam.scheduledAt ? new Date(exam.scheduledAt) : new Date(),
         result: "" as any,
+        restrictions: exam.restrictions ?? "",
+        periodicityMonths: exam.periodicityMonths ?? null,
         expiresAt: exam.expiresAt ? new Date(exam.expiresAt) : null,
         physicianName: exam.physicianName ?? "",
         crm: exam.crm ?? "",
@@ -70,10 +76,20 @@ export function MedicalExamCompleteDialog({ exam, open, onOpenChange, onComplete
 
   const isSubmitting = completeMutation.isPending || uploadMutation.isPending;
 
-  /** Validade = data do exame + 12/24 meses (periodicidade definida pelo usuário). */
+  const selectedResult = form.watch("result");
+  const requiresRestrictions = selectedResult === MEDICAL_EXAM_RESULT.FIT_WITH_RESTRICTIONS;
+  const isPeriodic = exam?.type === MEDICAL_EXAM_TYPE.PERIODIC;
+
+  /**
+   * Validade = data do exame + 12/24 meses. Também grava a periodicidade (em meses)
+   * para que o próximo periódico seja agendado automaticamente pelo backend.
+   */
   const applyExpiresPreset = (months: number) => {
     const baseDate = form.getValues("examDate");
     form.setValue("expiresAt", addMonths(baseDate ? new Date(baseDate) : new Date(), months), { shouldDirty: true });
+    if (isPeriodic) {
+      form.setValue("periodicityMonths", months, { shouldDirty: true });
+    }
   };
 
   const handleAsoFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,11 +101,19 @@ export function MedicalExamCompleteDialog({ exam, open, onOpenChange, onComplete
   const handleSubmit = async (data: MedicalExamCompleteFormData) => {
     if (!exam) return;
 
+    // Restrições são obrigatórias quando o resultado é "Apto com restrições".
+    if (data.result === MEDICAL_EXAM_RESULT.FIT_WITH_RESTRICTIONS && !data.restrictions?.trim()) {
+      form.setError("restrictions", { type: "manual", message: "Descreva as restrições para o resultado 'Apto com restrições'" });
+      return;
+    }
+
     try {
       await completeMutation.mutateAsync({
         id: exam.id,
         data: {
           ...data,
+          restrictions: data.result === MEDICAL_EXAM_RESULT.FIT_WITH_RESTRICTIONS ? data.restrictions?.trim() || null : null,
+          periodicityMonths: isPeriodic ? data.periodicityMonths ?? null : null,
           physicianName: data.physicianName || null,
           crm: data.crm || null,
           clinic: data.clinic || null,
@@ -162,6 +186,64 @@ export function MedicalExamCompleteDialog({ exam, open, onOpenChange, onComplete
                 )}
               />
             </div>
+
+            {/* Restrições — obrigatórias quando "Apto com restrições" */}
+            {requiresRestrictions && (
+              <FormField
+                control={form.control}
+                name="restrictions"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Restrições <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        placeholder="Descreva as restrições (ex.: não operar máquinas, evitar esforço físico...)"
+                        disabled={isSubmitting}
+                        rows={3}
+                        className="resize-none"
+                        maxLength={2000}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Periodicidade do próximo exame (apenas para periódicos) */}
+            {isPeriodic && (
+              <FormField
+                control={form.control}
+                name="periodicityMonths"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Periodicidade do próximo exame (meses)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={120}
+                        value={field.value ?? ""}
+                        onChange={(value) => {
+                          const num = value === null || value === "" ? null : Number(value);
+                          field.onChange(num !== null && !Number.isNaN(num) ? num : null);
+                        }}
+                        placeholder="12 (risco) ou 24"
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <FormDescription>Define quando o próximo exame periódico será agendado automaticamente.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}

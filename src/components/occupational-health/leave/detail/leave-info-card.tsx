@@ -10,32 +10,23 @@ import {
   IconCalendarTime,
   IconFileDescription,
   IconHash,
+  IconShieldCheck,
   IconNotes,
 } from "@tabler/icons-react";
 
 import type { Leave } from "../../../../types/leave";
-import { LEAVE_TYPE, LEAVE_STATUS, LEAVE_TYPE_LABELS, LEAVE_STATUS_LABELS } from "../../../../constants";
+import { LEAVE_TYPE, LEAVE_STATUS, LEAVE_TYPE_LABELS, LEAVE_STATUS_LABELS, INSS_BENEFIT_SPECIES_LABELS } from "../../../../constants";
+import type { INSS_BENEFIT_SPECIES } from "../../../../constants";
 import { formatDate, formatDateTime } from "../../../../utils";
 import { cn } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
+import { DetailRow } from "@/components/ui/detail-row";
 
 interface LeaveInfoCardProps {
   leave: Leave;
   className?: string;
-}
-
-function InfoRow({ icon: Icon, label, children }: { icon: React.ComponentType<{ className?: string }>; label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
-      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-        <Icon className="h-4 w-4" />
-        {label}
-      </span>
-      <div className="text-sm font-semibold text-foreground text-right">{children}</div>
-    </div>
-  );
 }
 
 export function LeaveInfoCard({ leave, className }: LeaveInfoCardProps) {
@@ -52,57 +43,72 @@ export function LeaveInfoCard({ leave, className }: LeaveInfoCardProps) {
           {/* Basic Information */}
           <div>
             <h3 className="text-base font-semibold mb-4 text-foreground">Informações Básicas</h3>
-            <div className="space-y-4">
-              <InfoRow icon={IconId} label="Tipo">
-                <Badge variant="secondary" className="font-normal">
-                  {LEAVE_TYPE_LABELS[leave.type as LEAVE_TYPE] || leave.type}
-                </Badge>
-              </InfoRow>
-              <InfoRow icon={IconProgressCheck} label="Status">
-                <Badge variant={getBadgeVariantFromStatus(leave.status, "LEAVE")} className="font-normal">
-                  {LEAVE_STATUS_LABELS[leave.status as LEAVE_STATUS] || leave.status}
-                </Badge>
-              </InfoRow>
-              <InfoRow icon={IconStethoscope} label="Exame de Retorno">
-                {leave.returnExamRequired ? (
-                  <Badge variant="amber" className="font-normal">
-                    Obrigatório
-                  </Badge>
-                ) : (
+            <div className="space-y-2">
+              <DetailRow
+                icon={IconId}
+                label="Tipo"
+                value={
                   <Badge variant="secondary" className="font-normal">
-                    Não obrigatório
+                    {LEAVE_TYPE_LABELS[leave.type as LEAVE_TYPE] || leave.type}
                   </Badge>
-                )}
-              </InfoRow>
+                }
+              />
+              <DetailRow
+                icon={IconProgressCheck}
+                label="Status"
+                value={
+                  <Badge variant={getBadgeVariantFromStatus(leave.status, "LEAVE")} className="font-normal">
+                    {LEAVE_STATUS_LABELS[leave.status as LEAVE_STATUS] || leave.status}
+                  </Badge>
+                }
+              />
+              <DetailRow
+                icon={IconStethoscope}
+                label="Exame de Retorno"
+                value={
+                  leave.returnExamRequired ? (
+                    <Badge variant="amber" className="font-normal">
+                      Obrigatório
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="font-normal">
+                      Não obrigatório
+                    </Badge>
+                  )
+                }
+              />
             </div>
           </div>
 
           {/* Dates */}
           <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Datas</h3>
-            <div className="space-y-4">
-              <InfoRow icon={IconCalendarEvent} label="Início">
-                {formatDate(leave.startDate)}
-              </InfoRow>
-              <InfoRow icon={IconCalendarDue} label="Término Previsto">
-                {leave.expectedEndDate ? formatDate(leave.expectedEndDate) : "-"}
-              </InfoRow>
-              <InfoRow icon={IconCalendarCheck} label="Retorno Efetivo">
-                {leave.actualEndDate ? formatDate(leave.actualEndDate) : "-"}
-              </InfoRow>
+            <div className="space-y-2">
+              <DetailRow icon={IconCalendarEvent} label="Início" value={formatDate(leave.startDate)} />
+              <DetailRow icon={IconCalendarDue} label="Término Previsto" value={leave.expectedEndDate ? formatDate(leave.expectedEndDate) : "-"} />
+              <DetailRow icon={IconCalendarCheck} label="Retorno Efetivo" value={leave.actualEndDate ? formatDate(leave.actualEndDate) : "-"} />
             </div>
           </div>
 
           {/* Restricted information */}
           <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Informações Restritas</h3>
-            <div className="space-y-4">
-              <InfoRow icon={IconFileDescription} label="CID">
-                {leave.cid || "-"}
-              </InfoRow>
-              <InfoRow icon={IconHash} label="Nº do Benefício INSS">
-                {leave.inssBenefitNumber || "-"}
-              </InfoRow>
+            <div className="space-y-2">
+              <DetailRow icon={IconFileDescription} label="CID" value={leave.cid || "-"} />
+              <DetailRow
+                icon={IconShieldCheck}
+                label="Espécie do Benefício"
+                value={
+                  leave.inssBenefitSpecies ? (
+                    <Badge variant="secondary" className="font-normal">
+                      {INSS_BENEFIT_SPECIES_LABELS[leave.inssBenefitSpecies as INSS_BENEFIT_SPECIES] || leave.inssBenefitSpecies}
+                    </Badge>
+                  ) : (
+                    "-"
+                  )
+                }
+              />
+              <DetailRow icon={IconHash} label="Nº do Benefício INSS" value={leave.inssBenefitNumber || "-"} />
             </div>
           </div>
 
@@ -122,13 +128,9 @@ export function LeaveInfoCard({ leave, className }: LeaveInfoCardProps) {
           {/* System Dates */}
           <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Datas do Sistema</h3>
-            <div className="space-y-4">
-              <InfoRow icon={IconCalendarPlus} label="Criado em">
-                {leave.createdAt ? formatDateTime(leave.createdAt) : "-"}
-              </InfoRow>
-              <InfoRow icon={IconCalendarTime} label="Atualizado em">
-                {leave.updatedAt ? formatDateTime(leave.updatedAt) : "-"}
-              </InfoRow>
+            <div className="space-y-2">
+              <DetailRow icon={IconCalendarPlus} label="Criado em" value={leave.createdAt ? formatDateTime(leave.createdAt) : "-"} />
+              <DetailRow icon={IconCalendarTime} label="Atualizado em" value={leave.updatedAt ? formatDateTime(leave.updatedAt) : "-"} />
             </div>
           </div>
         </div>

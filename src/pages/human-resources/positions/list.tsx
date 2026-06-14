@@ -1,4 +1,4 @@
-import { IconPlus, IconArrowsSort } from "@tabler/icons-react";
+import { IconPlus, IconArrowsSort, IconPercentage } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
 import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
@@ -20,6 +20,13 @@ export const PositionListPage = () => {
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.humanResources.root }, { label: "Cargos" }]}
           actions={[
+            {
+              key: "adjustments",
+              label: "Reajustes",
+              icon: IconPercentage,
+              onClick: () => navigate(routes.personnelDepartment.salaryAdjustments.root),
+              variant: "outline",
+            },
             {
               key: "hierarchy",
               label: "Hierarquia",

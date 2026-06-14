@@ -34,7 +34,7 @@ export const ActivityUserSelector = ({
     if (initialUser.sector?.name) {
       parts.push(initialUser.sector.name);
     }
-    if (initialUser.currentContractStatus === CONTRACT_STATUS.DISMISSED) {
+    if (initialUser.currentContractStatus === CONTRACT_STATUS.TERMINATED) {
       parts.push("(Desligado)");
     }
 
@@ -89,7 +89,7 @@ export const ActivityUserSelector = ({
         if (user.sector?.name) {
           parts.push(user.sector.name);
         }
-        if (user.currentContractStatus === CONTRACT_STATUS.DISMISSED) {
+        if (user.currentContractStatus === CONTRACT_STATUS.TERMINATED) {
           parts.push("(Desligado)");
         }
 

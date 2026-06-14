@@ -1,10 +1,46 @@
-import { formatDateTime, formatCurrency } from "../../../../utils";
+import { differenceInCalendarDays } from "date-fns";
+
+import { formatDate, formatDateTime, formatCurrency } from "../../../../utils";
 import { MEASURE_TYPE_LABELS, MEASURE_UNIT_LABELS, MEASURE_TYPE } from "../../../../constants";
 import type { Item } from "../../../../types";
 import type { PpeColumn } from "./types";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 // Import the stock status indicator
 import { StockStatusIndicator } from "../../item/list/stock-status-indicator";
+
+/**
+ * Validade do CA (Certificado de Aprovação, NR-6): a entrega do EPI é bloqueada
+ * uma vez que o CA esteja vencido. Vermelho = vencido; âmbar = vence em ≤30 dias.
+ */
+export function isCAExpired(item: Pick<Item, "ppeCAExpiry">): boolean {
+  if (!item.ppeCAExpiry) return false;
+  return differenceInCalendarDays(new Date(item.ppeCAExpiry), new Date()) < 0;
+}
+
+function renderCAValidity(item: Item) {
+  if (!item.ppeCAExpiry) {
+    return <div className="text-sm text-muted-foreground text-center">-</div>;
+  }
+  const daysLeft = differenceInCalendarDays(new Date(item.ppeCAExpiry), new Date());
+  const expired = daysLeft < 0;
+  const expiring = daysLeft >= 0 && daysLeft <= 30;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span className={cn("text-sm tabular-nums", expired && "text-destructive font-semibold", expiring && "text-amber-600 dark:text-amber-500 font-semibold")}>{formatDate(new Date(item.ppeCAExpiry))}</span>
+      {expired ? (
+        <Badge variant="destructive" className="text-[10px] whitespace-nowrap">
+          CA vencido
+        </Badge>
+      ) : expiring ? (
+        <Badge variant="amber" className="text-[10px] whitespace-nowrap">
+          Vence em {daysLeft}d
+        </Badge>
+      ) : null}
+    </div>
+  );
+}
 
 // Helper function to render PPE measures
 const renderPpeMeasures = (item: Item) => {
@@ -125,6 +161,14 @@ export const createPpeColumns = (canViewPrices: boolean = true): PpeColumn[] => 
     align: "center",
   },
   {
+    key: "ppeCAValidity",
+    header: "VALIDADE CA",
+    accessor: (item) => renderCAValidity(item),
+    sortable: true,
+    className: "w-32",
+    align: "center",
+  },
+  {
     key: "quantity",
     header: "QUANTIDADE",
     accessor: (item) => (
@@ -223,5 +267,5 @@ export const createPpeColumns = (canViewPrices: boolean = true): PpeColumn[] => 
 
 // Default visible columns
 export const getDefaultVisibleColumns = (): Set<string> => {
-  return new Set(["uniCode", "name", "brand.name", "category.name", "ppeCA", "quantity", "measures"]);
+  return new Set(["uniCode", "name", "brand.name", "category.name", "ppeCA", "ppeCAValidity", "quantity", "measures"]);
 };

@@ -5,6 +5,7 @@ import {
   getHeadcount,
   getTurnover,
   getAbsenteeism,
+  getSalaryCost,
 } from '@/api-client/hr-analytics';
 import type {
   HrAnalyticsFilters,
@@ -16,6 +17,7 @@ import type {
   TurnoverResponse,
   AbsenteeismFilters,
   AbsenteeismResponse,
+  SalaryCostResponse,
 } from '@/types/hr-analytics';
 
 export const hrAnalyticsKeys = {
@@ -25,6 +27,7 @@ export const hrAnalyticsKeys = {
   headcount: (filters: HeadcountFilters) => [...hrAnalyticsKeys.all, 'headcount', filters] as const,
   turnover: (filters: TurnoverFilters) => [...hrAnalyticsKeys.all, 'turnover', filters] as const,
   absenteeism: (filters: AbsenteeismFilters) => [...hrAnalyticsKeys.all, 'absenteeism', filters] as const,
+  salaryCost: (filters: HeadcountFilters) => [...hrAnalyticsKeys.all, 'salary-cost', filters] as const,
 };
 
 export function usePayrollTrends(filters: HrAnalyticsFilters) {
@@ -84,5 +87,17 @@ export function useAbsenteeismAnalytics(filters: AbsenteeismFilters) {
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     retry: 1,
+  });
+}
+
+// Custo de folha / salário ao longo do tempo (Part F) — resolve salários
+// históricos por colaborador (UserPositionHistory × valor do cargo na data).
+export function useSalaryCostAnalytics(filters: HeadcountFilters) {
+  return useQuery<SalaryCostResponse, Error>({
+    queryKey: hrAnalyticsKeys.salaryCost(filters),
+    queryFn: () => getSalaryCost(filters),
+    staleTime: 3 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 2,
   });
 }

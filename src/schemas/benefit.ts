@@ -467,6 +467,9 @@ export const userBenefitCreateSchema = z.object({
   employeeDiscountValue: z.number().min(0, "O desconto do colaborador não pode ser negativo").nullable().optional(),
   employeeDiscountPercent: z.number().min(0, "O percentual de desconto não pode ser negativo").max(100, "O percentual de desconto não pode exceder 100%").nullable().optional(),
   dailyTickets: z.number().int("A quantidade de passagens diárias deve ser um número inteiro").min(0).nullable().optional(),
+  // Convênios parcelados (espelha LOAN/ADVANCE).
+  totalInstallments: z.number().int("O número de parcelas deve ser inteiro").min(1, "O número de parcelas deve ser ao menos 1").nullable().optional(),
+  currentInstallment: z.number().int("A parcela corrente deve ser inteira").min(1, "A parcela corrente deve ser ao menos 1").nullable().optional(),
   declarationFileId: z.string().uuid({ message: "Arquivo inválido" }).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
 });
@@ -485,6 +488,9 @@ export const userBenefitUpdateSchema = z.object({
   employeeDiscountValue: z.number().min(0, "O desconto do colaborador não pode ser negativo").nullable().optional(),
   employeeDiscountPercent: z.number().min(0, "O percentual de desconto não pode ser negativo").max(100, "O percentual de desconto não pode exceder 100%").nullable().optional(),
   dailyTickets: z.number().int("A quantidade de passagens diárias deve ser um número inteiro").min(0).nullable().optional(),
+  // Convênios parcelados (espelha LOAN/ADVANCE).
+  totalInstallments: z.number().int("O número de parcelas deve ser inteiro").min(1, "O número de parcelas deve ser ao menos 1").nullable().optional(),
+  currentInstallment: z.number().int("A parcela corrente deve ser inteira").min(1, "A parcela corrente deve ser ao menos 1").nullable().optional(),
   declarationFileId: z.string().uuid({ message: "Arquivo inválido" }).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
 });

@@ -6,3 +6,5 @@ export * from "./use-terminations";
 export * from "./use-employment-contracts";
 export * from "./use-benefits";
 export * from "./use-user-benefits";
+export * from "./use-vacations";
+export * from "./use-thirteenths";

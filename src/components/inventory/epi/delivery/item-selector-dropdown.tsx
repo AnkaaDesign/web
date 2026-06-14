@@ -1,11 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
+import { differenceInCalendarDays } from "date-fns";
 import { useUsers } from "../../../../hooks";
 import { getItems } from "../../../../api-client";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import type { Item } from "../../../../types";
 import { PPE_TYPE, PPE_TYPE_ORDER, BOOT_SIZE_ORDER, PANTS_SIZE_ORDER, SHIRT_SIZE_ORDER, MASK_SIZE_ORDER } from "../../../../constants";
 import { getPpeSizeFromMeasures } from "@/utils/ppe-size-helpers";
+
+// CA (NR-6): a entrega de um EPI com CA vencido é bloqueada.
+function caDaysLeft(ppeCAExpiry: Date | string | null | undefined): number | null {
+  if (!ppeCAExpiry) return null;
+  return differenceInCalendarDays(new Date(ppeCAExpiry), new Date());
+}
 
 interface ItemSelectorDropdownProps {
   value?: string;
@@ -194,9 +202,13 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
           const typeOrder = item.ppeType ? PPE_TYPE_ORDER[item.ppeType as keyof typeof PPE_TYPE_ORDER] || 999 : 999;
           const sizeOrder = getSizeOrder(item.ppeType, itemSize);
 
+          const daysLeftCA = caDaysLeft(item.ppeCAExpiry);
+
           return {
             value: item.id,
             label: label,
+            // EPI com CA vencido não pode ser entregue (NR-6) → desabilita a opção.
+            disabled: daysLeftCA !== null && daysLeftCA < 0,
             metadata: {
               displayName: item.name,
               uniCode: item.uniCode || "",
@@ -208,6 +220,8 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
               isMatchingSize,
               typeOrder,
               sizeOrder,
+              ppeCA: item.ppeCA || null,
+              caDaysLeft: daysLeftCA,
             },
           };
         });
@@ -268,11 +282,25 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
           const labelParts = [meta.displayName, meta.brandName, displaySize].filter(Boolean);
           const label = labelParts.join(" - ") || '';
 
+          const days = meta.caDaysLeft as number | null;
+          const caExpired = days !== null && days < 0;
+          const caExpiring = days !== null && days >= 0 && days <= 30;
+
           return (
             <div className="flex items-center justify-between w-full gap-2">
               {/* Left side with item info in single row */}
-              <div className="flex items-center gap-1 flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
                 <span className="font-medium truncate">{label}</span>
+                {caExpired && (
+                  <Badge variant="destructive" className="text-[10px] whitespace-nowrap">
+                    CA vencido
+                  </Badge>
+                )}
+                {caExpiring && (
+                  <Badge variant="amber" className="text-[10px] whitespace-nowrap">
+                    CA vence em {days}d
+                  </Badge>
+                )}
               </div>
               {/* Right side with stock quantity */}
               <div className="flex items-center min-w-[110px]">

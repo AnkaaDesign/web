@@ -183,6 +183,14 @@ export class UserBenefitService {
     return response.data;
   }
 
+  // Convênios parcelados (Part H) — advance the installment counter.
+  async advanceUserBenefitInstallment(id: string, query?: any): Promise<UserBenefitUpdateResponse> {
+    const response = await apiClient.put<UserBenefitUpdateResponse>(`${this.basePath}/${id}/advance-installment`, undefined, {
+      params: query,
+    });
+    return response.data;
+  }
+
   // Declaração assinada (renúncia VT / autorização de desconto — multipart, field "declaration")
   async uploadUserBenefitDeclaration(id: string, file: globalThis.File, query?: any): Promise<UserBenefitUpdateResponse> {
     const formData = new FormData();
@@ -261,6 +269,7 @@ export const deleteUserBenefit = (id: string) => userBenefitService.deleteUserBe
 export const suspendUserBenefit = (id: string, query?: any) => userBenefitService.suspendUserBenefit(id, query);
 export const reactivateUserBenefit = (id: string, query?: any) => userBenefitService.reactivateUserBenefit(id, query);
 export const terminateUserBenefit = (id: string, data: { endDate: Date }, query?: any) => userBenefitService.terminateUserBenefit(id, data, query);
+export const advanceUserBenefitInstallment = (id: string, query?: any) => userBenefitService.advanceUserBenefitInstallment(id, query);
 export const uploadUserBenefitDeclaration = (id: string, file: globalThis.File, query?: any) => userBenefitService.uploadUserBenefitDeclaration(id, file, query);
 
 // Batch Operations

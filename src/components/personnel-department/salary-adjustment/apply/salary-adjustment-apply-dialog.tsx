@@ -3,6 +3,16 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -12,11 +22,13 @@ import { FormMoneyInput } from "@/components/ui/form-money-input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { IconPercentage, IconAlertTriangle, IconCalendar, IconTag, IconBriefcase, IconNotes, IconLoader2 } from "@tabler/icons-react";
+import { IconPercentage, IconAlertTriangle, IconCalendar, IconTag, IconBriefcase, IconNotes, IconLoader2, IconGift } from "@tabler/icons-react";
 import { getPositions } from "../../../../api-client";
 import { formatCurrency } from "../../../../utils";
 import { SALARY_ADJUSTMENT_TYPE, SALARY_ADJUSTMENT_TYPE_LABELS } from "../../../../constants";
 import { useSalaryAdjustmentMutations } from "../../../../hooks/personnel-department/use-salary-adjustment";
+import { useApplyPeriodAdjustment } from "../../../../hooks/human-resources/use-bonus";
+import { toast } from "@/components/ui/sonner";
 import type { SalaryAdjustmentApplyFormData } from "../../../../schemas/salary-adjustment";
 import type { Position } from "../../../../types";
 
@@ -47,6 +59,14 @@ const applyFormSchema = z
       .optional(),
     effectiveDate: z.date().nullable().optional(),
     note: z.string().max(1000, "Observação deve ter no máximo 1000 caracteres").optional(),
+    // Bonificação: percentual + data de vigência (espelham os campos de salário).
+    bonusPercentage: z
+      .number({ invalid_type_error: "Percentual inválido" })
+      .min(-100, "Percentual não pode ser menor que -100%")
+      .max(100, "Percentual não pode ser maior que 100%")
+      .nullable()
+      .optional(),
+    bonusEffectiveDate: z.date().nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.mode === "percentage") {
@@ -75,11 +95,37 @@ interface SalaryAdjustmentApplyDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// O service da api não lança quando um valor fica abaixo do piso efetivo:
+// devolve, por item, success=false com uma mensagem contendo "abaixo do piso"
+// / "salário-mínimo" e o sufixo "Confirme para aplicar mesmo assim.". O front
+// detecta esses itens e reapresenta com allowBelowFloor=true.
+const isBelowFloorError = (message?: string): boolean => {
+  if (!message) return false;
+  const normalized = message.toLowerCase();
+  return normalized.includes("abaixo do piso") || normalized.includes("salário-mínimo") || normalized.includes("salario-minimo");
+};
+
+// Alvos do reajuste. A página de Reajustes aplica reajuste de SALÁRIO (cargos)
+// e/ou de BONIFICAÇÃO (período do bônus). O motor de bonificação já existe —
+// BonusPeriodConfig.adjustment via POST /bonus/period-adjustment/:year/:month —
+// então aqui apenas o reutilizamos (sem sistema paralelo, sem migração).
+type AdjustmentTarget = "salary" | "bonus";
+
 export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjustmentApplyDialogProps) {
   const { applyAsync, isApplying } = useSalaryAdjustmentMutations();
+  const applyPeriodAdjustment = useApplyPeriodAdjustment();
+
+  // Alvo do reajuste (mutuamente exclusivo): salário OU bonificação. Padrão: salário.
+  const [target, setTarget] = useState<AdjustmentTarget>("salary");
 
   // Cache of full Position objects (for names + current remuneration preview)
   const [positionCache, setPositionCache] = useState<Record<string, Position>>({});
+
+  // Below-floor confirmation: hold the payload while we ask the user to confirm.
+  const [belowFloorConfirm, setBelowFloorConfirm] = useState<{
+    payload: SalaryAdjustmentApplyFormData;
+    messages: string[];
+  } | null>(null);
 
   const form = useForm<ApplyFormData>({
     resolver: zodResolver(applyFormSchema),
@@ -91,6 +137,8 @@ export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjust
       customValues: [],
       effectiveDate: null,
       note: "",
+      bonusPercentage: null,
+      bonusEffectiveDate: new Date(),
     },
   });
 
@@ -102,7 +150,9 @@ export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjust
   React.useEffect(() => {
     if (!open) {
       form.reset();
+      setTarget("salary");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, form]);
 
   // Keep customValues rows in sync with the selected positions
@@ -214,7 +264,108 @@ export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjust
   });
   const hasPositionsWithoutSalary = previewSalaries.some((preview) => preview.currentSalary === 0);
 
-  const handleSubmit = async (data: ApplyFormData) => {
+  // Runs the salary apply mutation. If any position is rejected for being below
+  // the effective floor (and we have NOT yet confirmed), surface a confirmation
+  // dialog so the user can re-submit with allowBelowFloor=true.
+  // Returns true if the apply completed (or no salary target was requested);
+  // false if it stopped to ask for below-floor confirmation, so the caller does
+  // NOT close the dialog prematurely.
+  const runApply = async (payload: SalaryAdjustmentApplyFormData): Promise<boolean> => {
+    try {
+      const response = await applyAsync(payload);
+
+      if (!payload.allowBelowFloor) {
+        const floorFailures = (response?.data?.results || []).filter((item) => !item.success && isBelowFloorError(item.error));
+        if (floorFailures.length > 0) {
+          setBelowFloorConfirm({
+            payload: { ...payload, allowBelowFloor: true },
+            messages: floorFailures.map((item) => `${item.positionName}: ${item.error}`),
+          });
+          return false;
+        }
+      }
+      return true;
+    } catch (error) {
+      // Error toast handled by the API client interceptor
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error applying salary adjustment:", error);
+      }
+      return false;
+    }
+  };
+
+  // Applies the BONIFICATION reajuste by reusing the existing bonus engine
+  // (POST /bonus/period-adjustment/:year/:month). Like a salary dissídio: a
+  // single percentage applied to the bonus period of the chosen "Data de
+  // Vigência" and ONWARD (the API carries the adjustment forward to later
+  // periods). The percentage + vigência date live on the same RHF form as the
+  // salary fields so they share styling.
+  const runBonusApply = async (): Promise<boolean> => {
+    const parsed = form.getValues("bonusPercentage");
+    if (parsed === null || parsed === undefined || !Number.isFinite(parsed)) {
+      toast.error("Informe um percentual de bonificação válido.");
+      return false;
+    }
+    if (parsed < -100 || parsed > 100) {
+      toast.error("Reajuste de bonificação deve estar entre -100% e +100%.");
+      return false;
+    }
+    const vigencia = form.getValues("bonusEffectiveDate");
+    if (!vigencia) {
+      toast.error("Informe a data de vigência da bonificação.");
+      return false;
+    }
+    // Período do bônus da data de vigência: o ciclo vai do dia 26 do mês
+    // anterior ao dia 25 do mês/ano de referência. Se a vigência cai no dia
+    // 26+, o período pertence ao PRÓXIMO mês civil (virada de ano dez→jan).
+    let year = vigencia.getFullYear();
+    let month = vigencia.getMonth() + 1; // 1..12
+    if (vigencia.getDate() >= 26) {
+      month += 1;
+      if (month > 12) {
+        month = 1;
+        year += 1;
+      }
+    }
+    try {
+      await applyPeriodAdjustment.mutateAsync({ year, month, percentage: parsed });
+      return true;
+    } catch (error) {
+      // Error toast handled by the API client interceptor
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error applying bonus adjustment:", error);
+      }
+      return false;
+    }
+  };
+
+  // Orchestrates the selected target (mutually exclusive). Salary runs through
+  // RHF validation (handleSalary); bonus runs via runBonusApply. The dialog only
+  // closes when the requested target succeeds.
+  const onApply = async () => {
+    if (target === "salary") {
+      // Validate + run the salary form. handleSalary returns whether it ran clean.
+      const salaryOk = await new Promise<boolean>((resolve) => {
+        form.handleSubmit(
+          async (data) => resolve(await handleSalary(data)),
+          () => resolve(false),
+        )();
+      });
+      if (salaryOk) {
+        onOpenChange(false);
+        form.reset();
+      }
+      return;
+    }
+
+    const bonusOk = await runBonusApply();
+    if (bonusOk) {
+      onOpenChange(false);
+      form.reset();
+    }
+  };
+
+  const handleSalary = async (data: ApplyFormData): Promise<boolean> => {
     const payload: SalaryAdjustmentApplyFormData = {
       type: data.type,
       positionIds: data.positionIds,
@@ -228,31 +379,49 @@ export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjust
           : undefined,
       effectiveDate: data.effectiveDate ?? undefined,
       note: data.note && data.note.trim().length > 0 ? data.note.trim() : undefined,
+      allowBelowFloor: false,
     };
 
-    try {
-      await applyAsync(payload);
-      // Success toast handled by the API client interceptor
-      onOpenChange(false);
-      form.reset();
-    } catch (error) {
-      // Error toast handled by the API client interceptor
-      if (process.env.NODE_ENV !== "production") {
-        console.error("Error applying salary adjustment:", error);
-      }
-    }
+    return runApply(payload);
+  };
+
+  const handleConfirmBelowFloor = async () => {
+    if (!belowFloorConfirm) return;
+    const { payload } = belowFloorConfirm;
+    setBelowFloorConfirm(null);
+    const salaryOk = await runApply(payload);
+    if (!salaryOk) return;
+    // Salary confirmed below floor — close.
+    onOpenChange(false);
+    form.reset();
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Aplicar Reajuste Salarial</DialogTitle>
-          <DialogDescription>Reajuste a remuneração dos cargos selecionados por percentual ou com valores personalizados por cargo.</DialogDescription>
+          <DialogTitle>Aplicar Reajuste</DialogTitle>
+          <DialogDescription>Reajuste o salário dos cargos selecionados e/ou a bonificação de um período.</DialogDescription>
         </DialogHeader>
 
+        {/* Alvo do reajuste: salário (cargos) e/ou bonificação (período do bônus) */}
+        <div className="space-y-2">
+          <Label>O que reajustar?</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" variant={target === "salary" ? "default" : "outline"} onClick={() => setTarget("salary")}>
+              <IconBriefcase className="h-4 w-4 mr-2" />
+              Salário
+            </Button>
+            <Button type="button" variant={target === "bonus" ? "default" : "outline"} onClick={() => setTarget("bonus")}>
+              <IconGift className="h-4 w-4 mr-2" />
+              Bonificação
+            </Button>
+          </div>
+        </div>
+
+        {target === "salary" && (
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-2">
+          <form onSubmit={form.handleSubmit(handleSalary)} className="space-y-4 py-2">
             {/* Type */}
             <FormCombobox
               name="type"
@@ -417,13 +586,73 @@ export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjust
             />
           </form>
         </Form>
+        )}
+
+        {/* Bonificação — reaproveita o motor de reajuste de bônus por período
+            (BonusPeriodConfig). Como um dissídio: um percentual + data de
+            vigência; aplica à bonificação do período da vigência em diante.
+            Os campos espelham EXATAMENTE os de salário (FormInput percentage +
+            DateTimeInput de Data de Vigência). */}
+        {target === "bonus" && (
+          <Form {...form}>
+            <div className="space-y-4 py-2 border-t pt-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <IconGift className="h-4 w-4 text-muted-foreground" />
+                Reajuste de Bonificação
+              </div>
+
+              <FormInput<ApplyFormData>
+                name="bonusPercentage"
+                label={
+                  <span className="flex items-center gap-2">
+                    <IconPercentage className="h-4 w-4 text-muted-foreground" />
+                    Percentual de Reajuste
+                  </span>
+                }
+                type="percentage"
+                placeholder="0"
+                decimals={2}
+                description="Use valores positivos para aumentar e negativos para reduzir"
+              />
+
+              {/* Data de Vigência (idêntica à de salário) */}
+              <FormField
+                control={form.control}
+                name="bonusEffectiveDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                      Data de Vigência
+                    </FormLabel>
+                    <FormControl>
+                      <DateTimeInput
+                        mode="date"
+                        value={field.value ?? null}
+                        onChange={(date) => field.onChange(date instanceof Date ? date : null)}
+                        hideLabel
+                        placeholder="Hoje (padrão)"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <p className="text-xs text-muted-foreground">Aumenta a bonificação a partir do período da data de vigência.</p>
+            </div>
+          </Form>
+        )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isApplying}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isApplying || applyPeriodAdjustment.isPending}>
             Cancelar
           </Button>
-          <Button onClick={form.handleSubmit(handleSubmit)} disabled={isApplying || positionIds.length === 0}>
-            {isApplying ? (
+          <Button
+            onClick={onApply}
+            disabled={isApplying || applyPeriodAdjustment.isPending || (target === "salary" && positionIds.length === 0)}
+          >
+            {isApplying || applyPeriodAdjustment.isPending ? (
               <>
                 <IconLoader2 className="h-4 w-4 mr-2 animate-spin" />
                 Aplicando...
@@ -434,6 +663,35 @@ export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjust
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Below-floor confirmation (piso / salário-mínimo) */}
+      <AlertDialog open={belowFloorConfirm !== null} onOpenChange={(value) => !value && setBelowFloorConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <IconAlertTriangle className="h-5 w-5 text-warning" />
+              Remuneração abaixo do piso
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>Os valores abaixo ficam abaixo do piso efetivo (maior entre o salário-mínimo nacional e o piso da categoria):</p>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  {(belowFloorConfirm?.messages || []).map((message, index) => (
+                    <li key={index}>{message}</li>
+                  ))}
+                </ul>
+                <p>Deseja aplicar o reajuste mesmo assim?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isApplying}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmBelowFloor} disabled={isApplying}>
+              Aplicar mesmo assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

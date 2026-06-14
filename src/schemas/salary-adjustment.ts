@@ -289,6 +289,11 @@ export const salaryAdjustmentApplySchema = z
     positionIds: z.array(z.string().uuid({ message: "Cargo inválido" })).min(1, "Pelo menos um cargo deve ser selecionado"),
     effectiveDate: z.coerce.date().optional(),
     note: noteSchema,
+    // Piso/salário-mínimo (Part F): por padrão o reajuste é BLOQUEADO quando o
+    // novo valor fica abaixo do piso efetivo (max(salário-mínimo, piso da
+    // categoria)). Quando o usuário confirma explicitamente, o front reenvia
+    // com allowBelowFloor=true e o reajuste é aplicado mesmo abaixo do piso.
+    allowBelowFloor: z.boolean().optional().default(false),
   })
   .refine(
     (data) => (data.percentage !== null && data.percentage !== undefined) || (Array.isArray(data.customValues) && data.customValues.length > 0),

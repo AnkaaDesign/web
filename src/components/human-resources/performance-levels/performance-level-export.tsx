@@ -2,7 +2,7 @@ import { BaseExportPopover, type ExportColumn, type ExportFormat } from "@/compo
 import { toast } from "@/components/ui/sonner";
 import { formatDate, formatDateTime } from "../../../utils";
 import { userService } from "../../../api-client";
-import { CONTRACT_TYPE_LABELS, CONTRACT_TYPE } from "../../../constants";
+import { CONTRACT_TYPE_LABELS, CONTRACT_STATUS } from "../../../constants";
 import type { User } from "../../../types";
 
 const EXPORT_COLUMNS: ExportColumn<User>[] = [
@@ -241,7 +241,7 @@ export function PerformanceLevelExport({
                       // Apply formatting based on column
                       switch (col.id) {
                         case "contractType":
-                          const statusClass = item.currentContractType === CONTRACT_TYPE.EFFECTED ? "badge-active" : "badge-inactive";
+                          const statusClass = item.currentContractStatus === CONTRACT_STATUS.ACTIVE ? "badge-active" : "badge-inactive";
                           value = `<span class="badge ${statusClass}">${value}</span>`;
                           break;
                         case "performanceLevel":

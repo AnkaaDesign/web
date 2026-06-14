@@ -73,7 +73,7 @@ export function AgendaEventDialog({ open, onOpenChange, editing, defaultDate }: 
   const { data: usersData } = useUsers({
     statuses: [CONTRACT_STATUS.ACTIVE],
     orderBy: { name: "asc" },
-    limit: 200,
+    limit: 100,
   } as any);
 
   const sectorOptions = useMemo<ComboboxOption[]>(

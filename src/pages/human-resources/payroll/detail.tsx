@@ -7,21 +7,19 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { formatCurrency } from "../../../utils";
 import { formatCPF, formatPIS } from "../../../utils/formatters";
 import { cn } from "@/lib/utils";
 import { generatePayrollPDF } from "@/utils/payroll-pdf-generator";
-import { LoanDialog, type LoanDiscountRow } from "@/components/human-resources/payroll/loan-dialog";
+import { HoleriteBreakdownCard } from "@/components/human-resources/payroll/detail/holerite-breakdown-card";
+import type { CompletePayrollCalculation } from "../../../types/payroll";
 import {
   IconAlertCircle,
   IconRefresh,
   IconFileDownload,
   IconUser,
   IconCurrencyReal,
-  IconCreditCard,
-  IconPencil,
 } from "@tabler/icons-react";
 
 interface PayrollDetailPageParams extends Record<string, string | undefined> {
@@ -128,10 +126,9 @@ export default function PayrollDetailPage() {
   const [payroll, setPayroll] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Loan (consignado) dialog state
-  const [loanDialogOpen, setLoanDialogOpen] = useState(false);
-  const [editingLoan, setEditingLoan] = useState<LoanDiscountRow | null>(null);
+  // Live CompletePayrollCalculation used to render the full holerite breakdown
+  // card (proventos/descontos + warnings). Best-effort: failures leave it null.
+  const [liveCalculation, setLiveCalculation] = useState<CompletePayrollCalculation | null>(null);
 
   // Track page access
   usePageTracker({
@@ -217,6 +214,31 @@ export default function PayrollDetailPage() {
   useEffect(() => {
     fetchPayroll();
   }, [fetchPayroll]);
+
+  // Fetch the live CompletePayrollCalculation for the full holerite breakdown.
+  // Best-effort: any failure (or missing user/period) simply hides the card.
+  useEffect(() => {
+    const userId = payroll?.user?.id ?? payroll?.userId;
+    const calcYear = payroll?.year;
+    const calcMonth = payroll?.month;
+    if (!userId || !calcYear || !calcMonth) {
+      setLiveCalculation(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await payrollService.getLiveCalculation(userId, calcYear, calcMonth);
+        const calc = (response?.data as any)?.data?.calculations ?? null;
+        if (!cancelled) setLiveCalculation(calc ?? null);
+      } catch {
+        if (!cancelled) setLiveCalculation(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [payroll?.user?.id, payroll?.userId, payroll?.year, payroll?.month]);
 
   // Calculate values
   const calculations = useMemo(() => {
@@ -552,19 +574,11 @@ export default function PayrollDetailPage() {
 
   // Live payrolls (id "live-{userId}-{year}-{month}" or isLive flag) have no
   // database record yet, so persistent discounts (loans) can't be attached.
-  const isLivePayroll = payroll.isLive === true || (typeof payroll.id === 'string' && payroll.id.startsWith('live-'));
-  const canManageLoans = !isLivePayroll && !!payroll.id;
-
   // Employee discounts grouped for display
   const groupedDiscounts = DISCOUNT_GROUPS.map((group) => ({
     ...group,
     discounts: calculations.employeeDiscounts.filter((d: any) => getDiscountGroupKey(d) === group.key),
   })).filter((group) => group.discounts.length > 0);
-
-  const openLoanDialog = (loan: LoanDiscountRow | null) => {
-    setEditingLoan(loan);
-    setLoanDialogOpen(true);
-  };
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
@@ -579,13 +593,6 @@ export default function PayrollDetailPage() {
               label: "Atualizar",
               icon: IconRefresh,
               onClick: handleRefresh,
-            },
-            {
-              key: "register-loan",
-              label: "Registrar Empréstimo",
-              icon: IconCreditCard,
-              onClick: () => openLoanDialog(null),
-              disabled: !canManageLoans,
             },
             {
               key: "export",
@@ -818,18 +825,6 @@ export default function PayrollDetailPage() {
                             <td className="py-2 px-0 text-right font-semibold text-destructive">
                               <span className="inline-flex items-center gap-1.5 justify-end">
                                 -{formatAmount(discountValue)}
-                                {isLoanRow && canManageLoans && discount.id && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-muted-foreground"
-                                    title="Editar empréstimo"
-                                    onClick={() => openLoanDialog(discount as LoanDiscountRow)}
-                                  >
-                                    <IconPencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
                               </span>
                             </td>
                           </tr>
@@ -898,19 +893,14 @@ export default function PayrollDetailPage() {
           </Card>
         </div>
 
-        {/* Loan (consignado) registration/edit dialog */}
-        {canManageLoans && (
-          <LoanDialog
-            open={loanDialogOpen}
-            onOpenChange={(open) => {
-              setLoanDialogOpen(open);
-              if (!open) setEditingLoan(null);
-            }}
-            payrollId={payroll.id}
-            loan={editingLoan}
-            onSaved={() => fetchPayroll(false)}
-          />
+        {/* Full holerite breakdown (live calculation) — every legal provento/
+            desconto plus calculator warnings. Rendered when the live calc loads. */}
+        {liveCalculation && (
+          <div className="mt-4">
+            <HoleriteBreakdownCard calculation={liveCalculation} />
+          </div>
         )}
+
       </div>
     </PrivilegeRoute>
   );

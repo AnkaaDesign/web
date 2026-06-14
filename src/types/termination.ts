@@ -153,6 +153,21 @@ export interface TerminationDeleteResponse extends BaseDeleteResponse {}
 
 export interface TerminationCalculateResponse extends BaseCreateResponse<TerminationCalculationResult> {}
 
+// Tax/FGTS assist (Part G) — POST :id/compute-taxes.
+export interface TaxAssistResult {
+  monthlyInssBase: number;
+  monthlyInss: number;
+  monthlyIrrf: number;
+  thirteenthInssBase: number;
+  thirteenthInss: number;
+  thirteenthIrrf: number;
+  totalInss: number;
+  totalIrrf: number;
+  fgtsFineBase: number;
+}
+
+export interface TerminationComputeTaxesResponse extends BaseGetUniqueResponse<TaxAssistResult> {}
+
 export interface TerminationDocumentUpdateResponse extends BaseUpdateResponse<TerminationDocument> {}
 export interface TerminationItemCreateResponse extends BaseCreateResponse<TerminationItem> {}
 export interface TerminationItemUpdateResponse extends BaseUpdateResponse<TerminationItem> {}

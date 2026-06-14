@@ -93,9 +93,11 @@ export function UserForm(props: UserFormProps) {
     // Current vínculo (EmploymentContract). The collaborator-create flow nests
     // these into `contract` on submit; the flat date fields below drive the
     // shared StatusDatesSection + admission date.
+    // New CLT hires start in experiência: a FIXED_TERM modality in EXPERIENCE
+    // status (efetivação later converts it to INDETERMINATE + ACTIVE).
     employeeType: EMPLOYEE_TYPE.CLT as any,
-    contractType: CONTRACT_TYPE.EXPERIENCE_PERIOD_1 as any,
-    contractStatus: CONTRACT_STATUS.ACTIVE as any,
+    contractType: CONTRACT_TYPE.FIXED_TERM as any,
+    contractStatus: CONTRACT_STATUS.EXPERIENCE as any,
     unionMember: false,
     dependentsCount: 0,
     hasSimplifiedDeduction: true,
@@ -242,12 +244,15 @@ export function UserForm(props: UserFormProps) {
   const buildCreatePayload = (data: any): UserCreateFormData => {
     const { contractType, employeeType, contractStatus, exp1StartAt, providerName, providerCnpj, ...rest } = data;
     const admissionDate = exp1StartAt ?? data.admissionDate ?? null;
+    const isOffPayroll = !!employeeType && employeeType !== EMPLOYEE_TYPE.CLT;
     return {
       ...rest,
       admissionDate,
       contract: {
         employeeType: employeeType ?? EMPLOYEE_TYPE.CLT,
-        contractType: employeeType && employeeType !== EMPLOYEE_TYPE.CLT ? null : (contractType ?? CONTRACT_TYPE.EXPERIENCE_PERIOD_1),
+        // Off-folha categories (TERCEIRIZADO/PJ/AUTÔNOMO) carry no legal modality.
+        contractType: isOffPayroll ? null : (contractType ?? CONTRACT_TYPE.FIXED_TERM),
+        contractStatus: contractStatus ?? CONTRACT_STATUS.EXPERIENCE,
         admissionDate,
         positionId: data.positionId ?? null,
         sectorId: data.sectorId ?? null,

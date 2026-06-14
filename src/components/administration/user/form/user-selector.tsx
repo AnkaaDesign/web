@@ -129,7 +129,7 @@ export function AdminUserSelector<_T extends FieldValues = FieldValues>({
         admissionDate: new Date() as any,
         contract: {
           employeeType: EMPLOYEE_TYPE.CLT,
-          contractType: CONTRACT_TYPE.EXPERIENCE_PERIOD_1,
+          contractType: CONTRACT_TYPE.FIXED_TERM,
         },
         verified: false,
         performanceLevel: 0,

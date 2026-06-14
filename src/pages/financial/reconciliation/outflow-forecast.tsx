@@ -4,6 +4,7 @@ import {
   IconCalendarRepeat,
   IconCheck,
   IconClockHour4,
+  IconGift,
   IconInfoCircle,
   IconPackage,
   IconReceiptTax,
@@ -345,6 +346,7 @@ export const ReconciliationOutflowForecastPage = () => {
   const hiddenOrderCount = (pedidos?.orders.length ?? 0) - displayedOrders.length;
   const impostos = data?.impostos;
   const folha = data?.folha;
+  const folhaProgramada = data?.folhaProgramada;
   const recorrentes = data?.recorrentes;
   const learned = data?.learned;
 
@@ -375,13 +377,13 @@ export const ReconciliationOutflowForecastPage = () => {
         />
 
         {/* Composite month total + the four slices that build it. */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
           <KpiCard
             label="Total previsto no mês"
             value={isLoading || !data ? null : formatCurrency(data.total)}
             Icon={IconTrendingDown}
             tone="text-red-600 bg-red-500/10"
-            hint="Pedidos em aberto + impostos (aprox.) + folha + recorrentes"
+            hint="Pedidos em aberto + impostos (aprox.) + folha + folha programada (13º e férias) + recorrentes"
           />
           <KpiCard
             label="Pedidos em aberto"
@@ -409,6 +411,17 @@ export const ReconciliationOutflowForecastPage = () => {
             }
             Icon={IconUsers}
             tone="text-blue-600 bg-blue-500/10"
+          />
+          <KpiCard
+            label="Folha programada (13º e férias)"
+            value={
+              isLoading || !folhaProgramada
+                ? null
+                : formatCurrency(folhaProgramada.total)
+            }
+            Icon={IconGift}
+            tone="text-pink-600 bg-pink-500/10"
+            hint="13º (parcela do mês) + recibos de férias com vencimento no mês"
           />
           <KpiCard
             label="Recorrentes"
@@ -578,6 +591,71 @@ export const ReconciliationOutflowForecastPage = () => {
                     label="Colaboradores"
                     value={String(folha.employeeCount)}
                   />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* (c2) Folha programada (13º e férias) */}
+          <Card className="shadow-sm border border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <IconGift className="h-5 w-5 text-muted-foreground" />
+                Folha programada (13º e férias)
+              </CardTitle>
+              <p className="flex items-start gap-1.5 text-xs text-muted-foreground pt-1">
+                <IconInfoCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                Aditiva à folha mensal — sem sobreposição. Só a parcela com
+                vencimento neste mês entra no total: 13º 1ª parcela em novembro,
+                2ª parcela em dezembro, e recibos de férias com vencimento no mês.
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {isLoading || !folhaProgramada ? (
+                <Skeleton className="h-20 w-full" />
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <StatBlock
+                      label="Total previsto no mês"
+                      value={formatCurrency(folhaProgramada.total)}
+                      emphasized
+                    />
+                    <StatBlock
+                      label="13º — 1ª parcela (nov)"
+                      value={formatCurrency(
+                        folhaProgramada.thirteenth.firstInstallmentNovember,
+                      )}
+                    />
+                    <StatBlock
+                      label="13º — 2ª parcela (dez)"
+                      value={formatCurrency(
+                        folhaProgramada.thirteenth.secondInstallmentDecember,
+                      )}
+                    />
+                    <StatBlock
+                      label="Férias (recibos no mês)"
+                      value={formatCurrency(folhaProgramada.vacation.dueThisMonth)}
+                    />
+                  </div>
+                  <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span>
+                      13º no mês:{" "}
+                      <strong className="tabular-nums">
+                        {formatCurrency(folhaProgramada.thirteenth.dueThisMonth)}
+                      </strong>{" "}
+                      · {folhaProgramada.thirteenth.recordCount} colaborador(es)
+                    </span>
+                    <span>
+                      Férias: {folhaProgramada.vacation.recordCount} recibo(s)
+                    </span>
+                    {(!folhaProgramada.thirteenth.available ||
+                      !folhaProgramada.vacation.available) && (
+                      <span className="text-amber-600">
+                        Projeção parcial — alguma fonte indisponível.
+                      </span>
+                    )}
+                  </p>
                 </div>
               )}
             </CardContent>

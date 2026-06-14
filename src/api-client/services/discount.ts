@@ -27,6 +27,20 @@ interface BatchDiscountCreateFormData {
   discounts: DiscountCreateSchema[];
 }
 
+// Employee-anchored loan/advance registration (POST /discount/loan).
+// Creates a master persistent PayrollDiscount (payrollId=null) that the API
+// auto-applies to every future folha and auto-advances the installments.
+interface LoanRegisterFormData {
+  userId: string;
+  value: number; // monthly installment, > 0
+  totalInstallments: number; // 1..120
+  startCompetence: string; // "YYYY-MM"
+  discountType?: "LOAN" | "ADVANCE"; // default LOAN
+  loanKind?: "COMPANY" | "PAYROLL_CONSIGNED"; // default COMPANY
+  lenderName?: string; // bank/credor, only meaningful for PAYROLL_CONSIGNED
+  description?: string;
+}
+
 interface BatchDiscountResult {
   success: boolean;
   created: Discount[];
@@ -38,7 +52,8 @@ export const discountService = {
     page?: number;
     limit?: number;
     where?: {
-      payrollId?: string;
+      payrollId?: string | null;
+      userId?: string;
       reference?: string;
       discountType?: string | { in?: string[] };
       isPersistent?: boolean;
@@ -50,6 +65,7 @@ export const discountService = {
     };
     include?: {
       payroll?: boolean;
+      user?: boolean;
     };
   }) =>
     apiClient.get<DiscountGetManyResponse>("/discount", { params }),
@@ -64,6 +80,14 @@ export const discountService = {
 
   create: (data: DiscountCreateSchema) =>
     apiClient.post<Discount>("/discount", data),
+
+  // Employee-anchored loan/advance registration. The master discount
+  // auto-applies to future folhas; 35% consignável is enforced server-side.
+  registerLoan: (data: LoanRegisterFormData) =>
+    apiClient.post<{ success: boolean; message: string; data?: Discount }>(
+      "/discount/loan",
+      data,
+    ),
 
   update: (id: string, data: DiscountUpdateSchema) =>
     apiClient.put<Discount>(`/discount/${id}`, data),
@@ -84,4 +108,5 @@ export type {
   DiscountQueryFormData,
   BatchDiscountCreateFormData,
   BatchDiscountResult,
+  LoanRegisterFormData,
 };

@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, createNameSchema } from "./common";
+import { INSALUBRITY_DEGREE } from "../constants";
 import type { Position, PositionRemuneration } from "../types";
 
 // =====================
@@ -497,6 +498,18 @@ export const positionCreateSchema = z
     hierarchy: z.number().int("Hierarquia deve ser um número inteiro").min(0, "Hierarquia deve ser maior ou igual a zero").max(999, "Hierarquia deve ser menor que 1000").optional().nullable(),
     remuneration: z.number().min(0, "Remuneração deve ser maior ou igual a zero").max(999999.99, "Remuneração deve ser menor que R$ 1.000.000,00"),
     bonifiable: z.boolean().optional(),
+    // Piso salarial da categoria/sindicato (Part F). NULL = usa o salário-mínimo
+    // nacional. A remuneração é validada contra max(piso, salário-mínimo).
+    salaryFloor: z.number().min(0, "Piso salarial deve ser maior ou igual a zero").max(999999.99, "Piso salarial deve ser menor que R$ 1.000.000,00").nullable().optional(),
+    // Confirmação explícita para aplicar remuneração abaixo do piso efetivo.
+    allowBelowFloor: z.boolean().optional().default(false),
+    // Insalubridade (NR-15) — grau do adicional. Default NONE. Mutuamente
+    // exclusivo com periculosidade (validação no service).
+    insalubrityDegree: z.nativeEnum(INSALUBRITY_DEGREE).optional(),
+    // Periculosidade (NR-16) — adicional de 30% sobre o salário-base.
+    hazardPay: z.boolean().optional(),
+    // Periodicidade do exame médico periódico (meses). NULL = cadência legal.
+    examPeriodicityMonths: z.number().int("Periodicidade deve ser um número inteiro de meses").min(1, "Periodicidade deve ser de pelo menos 1 mês").max(60, "Periodicidade deve ser menor ou igual a 60 meses").nullable().optional(),
   })
   .transform(toFormData);
 
@@ -506,6 +519,11 @@ export const positionUpdateSchema = z
     hierarchy: z.number().int("Hierarquia deve ser um número inteiro").min(0, "Hierarquia deve ser maior ou igual a zero").max(999, "Hierarquia deve ser menor que 1000").optional().nullable(),
     remuneration: z.number().min(0, "Remuneração deve ser maior ou igual a zero").max(999999.99, "Remuneração deve ser menor que R$ 1.000.000,00").optional(),
     bonifiable: z.boolean().optional(),
+    salaryFloor: z.number().min(0, "Piso salarial deve ser maior ou igual a zero").max(999999.99, "Piso salarial deve ser menor que R$ 1.000.000,00").nullable().optional(),
+    allowBelowFloor: z.boolean().optional().default(false),
+    insalubrityDegree: z.nativeEnum(INSALUBRITY_DEGREE).optional(),
+    hazardPay: z.boolean().optional(),
+    examPeriodicityMonths: z.number().int("Periodicidade deve ser um número inteiro de meses").min(1, "Periodicidade deve ser de pelo menos 1 mês").max(60, "Periodicidade deve ser menor ou igual a 60 meses").nullable().optional(),
   })
   .transform(toFormData);
 
@@ -723,6 +741,7 @@ export const mapPositionToFormData = createMapToFormDataHelper<Position, Positio
   hierarchy: position.hierarchy,
   remuneration: position.remuneration,
   bonifiable: position.bonifiable,
+  allowBelowFloor: false,
 }));
 
 export const mapPositionRemunerationToFormData = createMapToFormDataHelper<PositionRemuneration, PositionRemunerationUpdateFormData>((remuneration) => ({

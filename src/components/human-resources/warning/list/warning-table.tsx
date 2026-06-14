@@ -296,6 +296,9 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
         accessor: (warning: Warning) => (
           <Badge variant="secondary" className="font-normal">
             {WARNING_SEVERITY_LABELS[warning.severity]}
+            {warning.severity === "SUSPENSION" && warning.suspensionDays
+              ? ` (${warning.suspensionDays} ${warning.suspensionDays === 1 ? "dia" : "dias"})`
+              : ""}
           </Badge>
         ),
       },

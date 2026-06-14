@@ -10,7 +10,7 @@ import {
   IconUserMinus,
 } from "@tabler/icons-react";
 import { useUsers, usePositions } from "../../../hooks";
-import { CONTRACT_TYPE } from "../../../constants";
+import { CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../constants";
 
 interface BonusSimulationFiltersProps {
   open: boolean;
@@ -49,7 +49,10 @@ export function BonusSimulationFilters({
   const { data: allUsersData } = useUsers({
     include: { position: true, sector: true },
     where: {
-      currentContractType: CONTRACT_TYPE.EFFECTED, // Only effected users (not dismissed, not inactive)
+      // Bonus eligibility = confirmed CLT bond (CLT + ACTIVE), replacing the old
+      // EFFECTED modality check. Mirrors isUserEligibleForBonus / api isBonifiable.
+      currentEmployeeType: EMPLOYEE_TYPE.CLT,
+      currentContractStatus: CONTRACT_STATUS.ACTIVE,
       secullumEmployeeId: { not: null }, // Only users registered in Secullum
     },
     orderBy: { name: "asc" },

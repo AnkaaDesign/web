@@ -241,7 +241,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/recursos-humanos/ferias": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
   "/recursos-humanos/calendario": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
   "/recursos-humanos/feriados": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/recursos-humanos/advertencias": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
+  "/recursos-humanos/avisos": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
   "/recursos-humanos/ppe": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
   "/recursos-humanos/ppe/entregas": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
   "/recursos-humanos/ppe/entregas/cadastrar": ["HUMAN_RESOURCES", "WAREHOUSE", "ACCOUNTING", "ADMIN"], // HR, Warehouse, Accounting, and Admin can create (matches API)

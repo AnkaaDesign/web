@@ -73,6 +73,7 @@ export const TABLER_ICONS = {
   // Documentation
   clipboard: "IconClipboard",
   clipboardList: "IconClipboardList",
+  gift: "IconGift",
   note: "IconNote",
   history: "IconHistory",
   file: "IconFile", // Generic file icon (for favorites fallback)

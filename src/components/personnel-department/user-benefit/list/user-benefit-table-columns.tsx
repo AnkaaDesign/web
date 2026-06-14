@@ -52,7 +52,8 @@ export const createUserBenefitColumns = (): UserBenefitColumn[] => [
       </div>
     ),
     sortable: false,
-    className: "min-w-[200px]",
+    // table-layout:fixed ignora min-width — é o `w-` que define a largura da coluna.
+    className: "w-[360px] min-w-[360px]",
     align: "left",
   },
 
@@ -62,17 +63,13 @@ export const createUserBenefitColumns = (): UserBenefitColumn[] => [
     header: "BENEFÍCIO",
     accessor: (userBenefit: UserBenefit) =>
       userBenefit.benefit ? (
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-medium truncate">{userBenefit.benefit.name}</span>
-          <Badge variant="secondary" className="text-xs whitespace-nowrap shrink-0">
-            {BENEFIT_KIND_LABELS[userBenefit.benefit.kind] || userBenefit.benefit.kind}
-          </Badge>
-        </div>
+        <Badge variant="secondary" className="text-xs whitespace-nowrap">
+          {BENEFIT_KIND_LABELS[userBenefit.benefit.kind] || userBenefit.benefit.kind}
+        </Badge>
       ) : (
         <span className="text-sm text-muted-foreground">-</span>
       ),
     sortable: false,
-    className: "min-w-[260px]",
     align: "left",
   },
 
@@ -139,28 +136,27 @@ export const createUserBenefitColumns = (): UserBenefitColumn[] => [
     header: "COLABORADOR PAGA",
     accessor: (userBenefit: UserBenefit) => {
       const split = getRowSplit(userBenefit);
-      const isPercentRule =
-        (userBenefit.employeeDiscountValue === null || userBenefit.employeeDiscountValue === undefined) &&
-        userBenefit.employeeDiscountPercent !== null &&
-        userBenefit.employeeDiscountPercent !== undefined;
+      const hasPercentRule = userBenefit.employeeDiscountPercent !== null && userBenefit.employeeDiscountPercent !== undefined;
+      const hasFixedRule = userBenefit.employeeDiscountValue !== null && userBenefit.employeeDiscountValue !== undefined;
+
+      let display: React.ReactNode;
+      if (hasPercentRule) {
+        // Stored percent: keep the "do salário"/"do custo" qualifier.
+        const qualifier = split.dependsOnSalary ? " do salário" : " do custo";
+        display = `${formatPercent(userBenefit.employeeDiscountPercent!)}${qualifier}`;
+      } else if (hasFixedRule) {
+        // Fixed R$ value: no stored percent, derive percentage of cost.
+        const pct = userBenefit.monthlyValue > 0 ? Math.round((split.employeeShare / userBenefit.monthlyValue) * 100) : 0;
+        display = `${formatPercent(pct)} do custo`;
+      } else {
+        // No discount: company pays all.
+        display = <span className="text-muted-foreground">0%</span>;
+      }
+
       return (
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="text-sm truncate cursor-help">
-              {split.salaryKnown ? (
-                <>
-                  {formatCurrency(split.employeeShare)}
-                  {isPercentRule && (
-                    <span className="text-xs text-muted-foreground ml-1">
-                      ({formatPercent(userBenefit.employeeDiscountPercent!)}
-                      {split.dependsOnSalary ? " do salário" : " do custo"})
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span className="text-muted-foreground">{formatPercent(userBenefit.employeeDiscountPercent!)} do salário</span>
-              )}
-            </div>
+            <div className="text-sm truncate cursor-help">{display}</div>
           </TooltipTrigger>
           <TooltipContent>
             <p className="max-w-xs">{getKindSplitTooltip(userBenefit.benefit?.kind)}</p>
@@ -169,7 +165,7 @@ export const createUserBenefitColumns = (): UserBenefitColumn[] => [
       );
     },
     sortable: false,
-    className: "min-w-[150px]",
+    className: "min-w-[110px]",
     align: "left",
   },
 
@@ -213,6 +209,23 @@ export const createUserBenefitColumns = (): UserBenefitColumn[] => [
     },
     sortable: true,
     className: "min-w-[130px]",
+    align: "left",
+  },
+
+  // Parcelas (convênios parcelados) — opcional, não visível por padrão
+  {
+    key: "installments",
+    header: "PARCELAS",
+    accessor: (userBenefit: UserBenefit) =>
+      userBenefit.totalInstallments != null ? (
+        <div className="text-sm truncate">
+          {userBenefit.currentInstallment ?? 1}/{userBenefit.totalInstallments}
+        </div>
+      ) : (
+        <span className="text-sm text-muted-foreground">—</span>
+      ),
+    sortable: false,
+    className: "min-w-[100px]",
     align: "left",
   },
 

@@ -67,9 +67,7 @@ export const TEAM_LEADER = 'TEAM_LEADER' as const;
 
 // The legal KIND of an employment bond (vínculo). Only meaningful for on-folha CLT-family types.
 export enum CONTRACT_TYPE {
-  EXPERIENCE_PERIOD_1 = "EXPERIENCE_PERIOD_1",
-  EXPERIENCE_PERIOD_2 = "EXPERIENCE_PERIOD_2",
-  EFFECTED = "EFFECTED",
+  INDETERMINATE = "INDETERMINATE",
   FIXED_TERM = "FIXED_TERM",
   INTERMITTENT = "INTERMITTENT",
   APPRENTICE = "APPRENTICE",
@@ -78,8 +76,11 @@ export enum CONTRACT_TYPE {
 
 // The LIFECYCLE status (situação) of an employment bond. Orthogonal to CONTRACT_TYPE.
 export enum CONTRACT_STATUS {
+  EXPERIENCE = "EXPERIENCE",
   ACTIVE = "ACTIVE",
-  DISMISSED = "DISMISSED",
+  NOTICE_PERIOD = "NOTICE_PERIOD",
+  ON_LEAVE = "ON_LEAVE",
+  TERMINATED = "TERMINATED",
 }
 
 // Worker CATEGORY — gates payroll/folha inclusion (eSocial S-2200 vs S-2300 split).
@@ -176,8 +177,9 @@ export const STREET_TYPE_MIGRATION_MAP = {
 // Worker categories that belong on the CLT payroll (folha).
 export const PAYROLL_EMPLOYEE_TYPES = [EMPLOYEE_TYPE.CLT] as const;
 
-// Contract types eligible for bonification (only the permanent, effected bond).
-export const BONIFIABLE_CONTRACT_TYPES = [CONTRACT_TYPE.EFFECTED] as const;
+// Bonification eligibility is now a STATUS/eligibility predicate, not a modality list.
+// eligible = employeeType CLT && status ACTIVE. The former BONIFIABLE_CONTRACT_TYPES
+// modality list has been RETIRED (Part A).
 
 export enum TASK_STATUS {
   PREPARATION = "PREPARATION",
@@ -292,6 +294,10 @@ export enum SALARY_ADJUSTMENT_TYPE {
   OTHER = "OTHER",
 }
 
+// CLT: rebaixamento unilateral é ilegal (CF art.7º VI + CLT art.468), por isso
+// não é ofertado. Os valores abaixo são reaproveitados (sem migração) como os
+// movimentos lícitos: DEMOTION=Reversão (art.468 §único), ADJUSTMENT=Readaptação
+// (art.461 §4º), CORRECTION=Reenquadramento (plano de cargos).
 export enum POSITION_CHANGE_REASON {
   ADMISSION = "ADMISSION",
   PROMOTION = "PROMOTION",
@@ -366,6 +372,10 @@ export enum TERMINATION_TYPE {
   EXPERIENCE_EARLY_EMPLOYEE = "EXPERIENCE_EARLY_EMPLOYEE",
   INDIRECT = "INDIRECT",
   DEATH = "DEATH",
+  // Art. 480 CLT — rescisão antecipada de contrato a prazo PELO EMPREGADO.
+  FIXED_TERM_EARLY_EMPLOYEE = "FIXED_TERM_EARLY_EMPLOYEE",
+  // Encerramento de contrato intermitente.
+  INTERMITTENT_END = "INTERMITTENT_END",
 }
 
 export enum TERMINATION_STATUS {
@@ -375,6 +385,7 @@ export enum TERMINATION_STATUS {
   MEDICAL_EXAM = "MEDICAL_EXAM",
   CALCULATION = "CALCULATION",
   PAYMENT = "PAYMENT",
+  HOMOLOGATION = "HOMOLOGATION",
   COMPLETED = "COMPLETED",
   CANCELLED = "CANCELLED",
 }
@@ -411,7 +422,10 @@ export enum TERMINATION_ITEM_TYPE {
 
 export enum TERMINATION_DOCUMENT_TYPE {
   NOTICE_LETTER = "NOTICE_LETTER",
+  WARNING_LETTER = "WARNING_LETTER",
   TRCT = "TRCT",
+  TERM_484A = "TERM_484A",
+  HOMOLOGATION_TERM = "HOMOLOGATION_TERM",
   FGTS_GUIDE = "FGTS_GUIDE",
   FGTS_STATEMENT = "FGTS_STATEMENT",
   UNEMPLOYMENT_INSURANCE_FORM = "UNEMPLOYMENT_INSURANCE_FORM",
@@ -447,6 +461,7 @@ export enum MEDICAL_EXAM_STATUS {
 export enum MEDICAL_EXAM_RESULT {
   PENDING = "PENDING",
   FIT = "FIT",
+  FIT_WITH_RESTRICTIONS = "FIT_WITH_RESTRICTIONS",
   UNFIT = "UNFIT",
 }
 
@@ -482,6 +497,92 @@ export enum DEPENDENT_RELATIONSHIP {
   WARD = "WARD",
   DISABLED_ANY_AGE = "DISABLED_ANY_AGE",
   OTHER = "OTHER",
+}
+
+// ============================================================================
+// Área Andressa — new enums (Parts B/C/D/E)
+// ============================================================================
+
+// Grau de insalubridade (NR-15) → % do adicional sobre o salário-mínimo.
+export enum INSALUBRITY_DEGREE {
+  NONE = "NONE", // 0%
+  MIN = "MIN", // 10%
+  MED = "MED", // 20%
+  MAX = "MAX", // 40%
+}
+
+// Tipo de janela de estabilidade (estabilidade) que bloqueia o desligamento.
+export enum STABILITY_TYPE {
+  ACCIDENT = "ACCIDENT",
+  PREGNANCY = "PREGNANCY",
+  UNION = "UNION",
+  CIPA = "CIPA",
+  OTHER = "OTHER",
+}
+
+// Espécie de benefício INSS (afastamento).
+export enum INSS_BENEFIT_SPECIES {
+  B31 = "B31", // auxílio-doença previdenciário
+  B91 = "B91", // auxílio-doença acidentário (gera estabilidade)
+  B32 = "B32", // aposentadoria por invalidez previdenciária
+  B92 = "B92", // aposentadoria por invalidez acidentária
+  B80 = "B80", // salário-maternidade
+  B36 = "B36", // auxílio-acidente
+  OTHER = "OTHER",
+}
+
+// Status de um período de férias.
+export enum VACATION_STATUS {
+  OPEN = "OPEN",
+  SCHEDULED = "SCHEDULED",
+  IN_PROGRESS = "IN_PROGRESS",
+  PAID = "PAID",
+  EXPIRED = "EXPIRED",
+}
+
+// Status do 13º salário.
+export enum THIRTEENTH_STATUS {
+  OPEN = "OPEN",
+  FIRST_PAID = "FIRST_PAID",
+  SECOND_PAID = "SECOND_PAID",
+  PAID = "PAID",
+  CANCELLED = "CANCELLED",
+}
+
+// Tipo de CAT (Comunicação de Acidente de Trabalho).
+export enum WORK_ACCIDENT_REPORT_TYPE {
+  INITIAL = "INITIAL",
+  REOPENING = "REOPENING",
+  DEATH = "DEATH",
+}
+
+// Tipos de lançamento da folha (descontos e proventos). Espelha o enum Prisma
+// PayrollDiscountType (que carrega ambos os lados do holerite).
+export enum PAYROLL_DISCOUNT_TYPE {
+  INSS = "INSS",
+  IRRF = "IRRF",
+  FGTS = "FGTS",
+  ABSENCE = "ABSENCE",
+  PARTIAL_ABSENCE = "PARTIAL_ABSENCE",
+  DSR_ABSENCE = "DSR_ABSENCE",
+  LATE_ARRIVAL = "LATE_ARRIVAL",
+  SICK_LEAVE = "SICK_LEAVE",
+  UNION = "UNION",
+  ALIMONY = "ALIMONY",
+  GARNISHMENT = "GARNISHMENT",
+  HEALTH_INSURANCE = "HEALTH_INSURANCE",
+  DENTAL_INSURANCE = "DENTAL_INSURANCE",
+  MEAL_VOUCHER = "MEAL_VOUCHER",
+  TRANSPORT_VOUCHER = "TRANSPORT_VOUCHER",
+  LOAN = "LOAN",
+  ADVANCE = "ADVANCE",
+  AUTHORIZED_DISCOUNT = "AUTHORIZED_DISCOUNT",
+  CUSTOM = "CUSTOM",
+  // Proventos (earnings)
+  FAMILY_ALLOWANCE = "FAMILY_ALLOWANCE",
+  INSALUBRIDADE = "INSALUBRIDADE",
+  PERICULOSIDADE = "PERICULOSIDADE",
+  HABITUAL_GRATIFICATION = "HABITUAL_GRATIFICATION",
 }
 
 export enum ORDER_PAYMENT_STATUS {
@@ -1238,6 +1339,7 @@ export enum ENTITY_TYPE {
   TRUCK = "TRUCK",
   USER = "USER",
   VACATION = "VACATION",
+  THIRTEENTH = "THIRTEENTH",
   VERIFICATION = "VERIFICATION",
   SALARY_ADJUSTMENT = "SALARY_ADJUSTMENT",
   USER_POSITION_HISTORY = "USER_POSITION_HISTORY",
@@ -1871,6 +1973,7 @@ export enum CHANGE_LOG_ENTITY_TYPE {
   TRUCK = "TRUCK",
   USER = "USER",
   VACATION = "VACATION",
+  THIRTEENTH = "THIRTEENTH",
   VERIFICATION = "VERIFICATION",
   WARNING = "WARNING",
   SALARY_ADJUSTMENT = "SALARY_ADJUSTMENT",
@@ -2419,7 +2522,6 @@ export enum FAVORITE_PAGES {
   DEPARTAMENTO_PESSOAL_RESCISOES_LISTAR = "/departamento-pessoal/rescisoes",
   DEPARTAMENTO_PESSOAL_REAJUSTES_LISTAR = "/departamento-pessoal/reajustes",
   DEPARTAMENTO_PESSOAL_PROMOCOES_LISTAR = "/departamento-pessoal/promocoes",
-  DEPARTAMENTO_PESSOAL_FAIXAS_SALARIAIS_LISTAR = "/departamento-pessoal/faixas-salariais",
   DEPARTAMENTO_PESSOAL_BENEFICIOS_LISTAR = "/departamento-pessoal/beneficios",
   DEPARTAMENTO_PESSOAL_BENEFICIOS_ADESOES_LISTAR = "/departamento-pessoal/beneficios/adesoes",
 

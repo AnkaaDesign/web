@@ -19,6 +19,10 @@ export interface Dependent extends BaseEntity {
   irrfDeduction: boolean;
   /** Elegível ao salário-família (filho <= 14 anos ou inválido; teto de remuneração aplica) */
   salarioFamilia: boolean;
+  /** Plano de saúde (UserBenefit) ao qual o dependente está inscrito; NULL = não inscrito. */
+  healthPlanBenefitId: string | null;
+  /** Valor mensal atribuído a este dependente no plano (compõe a dedução de IRRF). */
+  healthPlanValue: number | null;
   notes: string | null;
 
   // Relations (optional, populated based on query)

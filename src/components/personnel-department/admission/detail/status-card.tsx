@@ -69,13 +69,21 @@ export function StatusCard({ admission, className }: StatusCardProps) {
             {STEPPER_STEPS.map((step, index) => {
               const isDone = index < stepperIndex || admission.status === ADMISSION_STATUS.COMPLETED;
               const isCurrent = index === stepperIndex && admission.status !== ADMISSION_STATUS.COMPLETED;
+              const isFirst = index === 0;
               const isLast = index === STEPPER_STEPS.length - 1;
+              // A connector segment is "filled" once the step it leads INTO has
+              // been reached/completed (green up to the current step).
+              const leftFilled = index <= stepperIndex || admission.status === ADMISSION_STATUS.COMPLETED;
+              const rightFilled = index < stepperIndex || admission.status === ADMISSION_STATUS.COMPLETED;
 
               return (
-                <div key={step.key} className={cn("flex flex-col items-center", !isLast && "flex-1")}>
-                  <div className="flex items-center w-full">
-                    {/* Left connector spacer keeps the circle centered */}
-                    <div className={cn("h-0.5 flex-1", index === 0 ? "bg-transparent" : isDone || isCurrent ? "bg-primary" : "bg-border")} />
+                // Equal-width columns keep circles evenly spaced and labels
+                // centered under their circle regardless of label length.
+                <div key={step.key} className="flex min-w-0 flex-1 flex-col items-center">
+                  {/* Circle + connector row: half-width connectors on each side
+                      meet at the vertical center of the circle. */}
+                  <div className="flex w-full items-center">
+                    <div className={cn("h-0.5 flex-1", isFirst ? "bg-transparent" : leftFilled ? "bg-primary" : "bg-border")} />
                     <div
                       className={cn(
                         "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors",
@@ -86,11 +94,11 @@ export function StatusCard({ admission, className }: StatusCardProps) {
                     >
                       {isDone ? <IconCheck className="h-4 w-4" /> : index + 1}
                     </div>
-                    <div className={cn("h-0.5 flex-1", isLast ? "bg-transparent" : isDone ? "bg-primary" : "bg-border")} />
+                    <div className={cn("h-0.5 flex-1", isLast ? "bg-transparent" : rightFilled ? "bg-primary" : "bg-border")} />
                   </div>
                   <span
                     className={cn(
-                      "mt-2 px-1 text-center text-xs leading-tight",
+                      "mt-2 w-full px-1 text-center text-xs leading-tight break-words",
                       isCurrent ? "font-semibold text-foreground" : isDone ? "text-foreground" : "text-muted-foreground",
                     )}
                   >

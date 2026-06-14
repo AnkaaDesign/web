@@ -1,4 +1,4 @@
-import { IconUser, IconGift, IconCurrencyReal, IconCalendar } from "@tabler/icons-react";
+import { IconUser, IconGift, IconCurrencyReal, IconCalendar, IconAlertTriangle } from "@tabler/icons-react";
 
 import type { UserBenefit } from "../../../../types/benefit";
 import {
@@ -15,6 +15,7 @@ import { getPositionMonthlySalary } from "../../../../utils/overtime-cost";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DetailRow } from "@/components/ui/detail-row";
 import { cn } from "@/lib/utils";
 
 const formatPercent = (percentage: number): string => {
@@ -25,15 +26,6 @@ const formatPercent = (percentage: number): string => {
 interface CardProps {
   userBenefit: UserBenefit;
   className?: string;
-}
-
-function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="text-sm font-medium text-right">{children}</dd>
-    </div>
-  );
 }
 
 export function UserBenefitUserCard({ userBenefit, className }: CardProps) {
@@ -48,11 +40,11 @@ export function UserBenefitUserCard({ userBenefit, className }: CardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="space-y-4">
-          <InfoRow label="Nome">{user?.name || <span className="text-muted-foreground">-</span>}</InfoRow>
-          <InfoRow label="Cargo">{user?.position?.name || <span className="text-muted-foreground">-</span>}</InfoRow>
-          <InfoRow label="Setor">{user?.sector?.name || <span className="text-muted-foreground">-</span>}</InfoRow>
-        </dl>
+        <div className="space-y-2">
+          <DetailRow label="Nome" value={user?.name || undefined} />
+          <DetailRow label="Cargo" value={user?.position?.name || undefined} />
+          <DetailRow label="Setor" value={user?.sector?.name || undefined} />
+        </div>
       </CardContent>
     </Card>
   );
@@ -70,22 +62,20 @@ export function UserBenefitBenefitCard({ userBenefit, className }: CardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="space-y-4">
-          <InfoRow label="Nome">{benefit?.name || <span className="text-muted-foreground">-</span>}</InfoRow>
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-sm text-muted-foreground">Tipo</dt>
-            <dd>
-              {benefit ? (
+        <div className="space-y-2">
+          <DetailRow label="Nome" value={benefit?.name || undefined} />
+          <DetailRow
+            label="Tipo"
+            value={
+              benefit ? (
                 <Badge variant="secondary" className="text-xs whitespace-nowrap">
                   {BENEFIT_KIND_LABELS[benefit.kind] || benefit.kind}
                 </Badge>
-              ) : (
-                <span className="text-sm text-muted-foreground">-</span>
-              )}
-            </dd>
-          </div>
-          <InfoRow label="Fornecedor">{benefit?.provider || <span className="text-muted-foreground">-</span>}</InfoRow>
-        </dl>
+              ) : undefined
+            }
+          />
+          <DetailRow label="Fornecedor" value={benefit?.provider || undefined} />
+        </div>
       </CardContent>
     </Card>
   );
@@ -121,33 +111,53 @@ export function UserBenefitValuesCard({ userBenefit, className }: CardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="space-y-4">
-          <InfoRow label="Custo Total (Valor Mensal)">{formatCurrency(split.monthlyValue)}</InfoRow>
-          <InfoRow label="Empresa Paga">
-            {salaryKnown ? formatCurrency(split.companyShare) : <span className="text-muted-foreground">depende do salário</span>}
-          </InfoRow>
-          <InfoRow label="Colaborador Paga">
-            <>
-              {salaryKnown ? formatCurrency(split.employeeShare) : <span className="text-muted-foreground">—</span>}
-              {isPercentRule && (
-                <span className="text-xs text-muted-foreground ml-1">
-                  ({formatPercent(userBenefit.employeeDiscountPercent!)} {split.dependsOnSalary ? "do salário" : "do custo"})
-                </span>
-              )}
-            </>
-          </InfoRow>
+        <div className="space-y-2">
+          <DetailRow label="Custo Total (Valor Mensal)" value={formatCurrency(split.monthlyValue)} />
+          <DetailRow
+            label="Empresa Paga"
+            value={salaryKnown ? formatCurrency(split.companyShare) : <span className="text-muted-foreground">depende do salário</span>}
+          />
+          <DetailRow
+            label="Colaborador Paga"
+            value={
+              <>
+                {salaryKnown ? formatCurrency(split.employeeShare) : <span className="text-muted-foreground">—</span>}
+                {isPercentRule && (
+                  <span className="text-xs text-muted-foreground ml-1">
+                    ({formatPercent(userBenefit.employeeDiscountPercent!)} {split.dependsOnSalary ? "do salário" : "do custo"})
+                  </span>
+                )}
+              </>
+            }
+          />
           {split.dependsOnSalary && (
-            <InfoRow label="Salário-Base (cálculo VT)">
-              {baseSalary !== null ? formatCurrency(baseSalary) : <span className="text-muted-foreground">não disponível</span>}
-            </InfoRow>
+            <DetailRow
+              label="Salário-Base (cálculo VT)"
+              value={baseSalary !== null ? formatCurrency(baseSalary) : <span className="text-muted-foreground">não disponível</span>}
+            />
           )}
           {userBenefit.benefit?.kind === BENEFIT_KIND.TRANSPORT_VOUCHER && (
-            <InfoRow label="Passagens por Dia">
-              {userBenefit.dailyTickets !== null && userBenefit.dailyTickets !== undefined ? userBenefit.dailyTickets : <span className="text-muted-foreground">-</span>}
-            </InfoRow>
+            <DetailRow
+              label="Passagens por Dia"
+              value={userBenefit.dailyTickets !== null && userBenefit.dailyTickets !== undefined ? userBenefit.dailyTickets : undefined}
+            />
+          )}
+          {userBenefit.totalInstallments != null && (
+            <DetailRow label="Parcelas" value={`${userBenefit.currentInstallment ?? 1}/${userBenefit.totalInstallments}`} />
           )}
           {showCapNote && <p className="text-xs text-muted-foreground">{getKindDiscountHelper(kind)}</p>}
-        </dl>
+          {/* Guard de VT: o desconto depende do salário-base que está desconhecido/zero.
+              NÃO exibimos R$ 0,00 como se fosse o valor real — sinalizamos a pendência. */}
+          {split.salaryUnknownWarning && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+              <IconAlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>
+                O desconto do Vale Transporte é {formatPercent(userBenefit.employeeDiscountPercent!)} do salário-base, mas o salário deste colaborador não está
+                cadastrado. O valor não foi zerado por engano — cadastre o salário do cargo para calcular o desconto correto.
+              </span>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -163,25 +173,20 @@ export function UserBenefitDatesCard({ userBenefit, className }: CardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-sm text-muted-foreground">Status</dt>
-            <dd>
+        <div className="space-y-2">
+          <DetailRow
+            label="Status"
+            value={
               <Badge variant={getBadgeVariant(userBenefit.status, "BENEFIT_ENROLLMENT")} className="text-xs whitespace-nowrap">
                 {BENEFIT_ENROLLMENT_STATUS_LABELS[userBenefit.status as BENEFIT_ENROLLMENT_STATUS] || userBenefit.status}
               </Badge>
-            </dd>
-          </div>
-          <InfoRow label="Data de Início">{userBenefit.startDate ? formatDate(new Date(userBenefit.startDate)) : <span className="text-muted-foreground">-</span>}</InfoRow>
-          <InfoRow label="Data de Fim">{userBenefit.endDate ? formatDate(new Date(userBenefit.endDate)) : <span className="text-muted-foreground">—</span>}</InfoRow>
-          <InfoRow label="Criado em">{userBenefit.createdAt ? formatDate(new Date(userBenefit.createdAt)) : <span className="text-muted-foreground">-</span>}</InfoRow>
-          {userBenefit.notes && (
-            <div className="space-y-1">
-              <dt className="text-sm text-muted-foreground">Observações</dt>
-              <dd className="text-sm whitespace-pre-wrap">{userBenefit.notes}</dd>
-            </div>
-          )}
-        </dl>
+            }
+          />
+          <DetailRow label="Data de Início" value={userBenefit.startDate ? formatDate(new Date(userBenefit.startDate)) : undefined} />
+          <DetailRow label="Data de Fim" value={userBenefit.endDate ? formatDate(new Date(userBenefit.endDate)) : <span className="text-muted-foreground">—</span>} />
+          <DetailRow label="Criado em" value={userBenefit.createdAt ? formatDate(new Date(userBenefit.createdAt)) : undefined} />
+          {userBenefit.notes && <DetailRow label="Observações" value={userBenefit.notes} block />}
+        </div>
       </CardContent>
     </Card>
   );

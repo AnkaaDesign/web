@@ -7,6 +7,7 @@ import type { CONTRACT_TYPE } from "../../../../constants";
 import { formatCPF, formatDate, formatDateTime } from "../../../../utils";
 import type { Admission } from "../../../../types/admission";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
+import { DetailRow } from "@/components/ui/detail-row";
 
 interface UserCardProps {
   admission: Admission;
@@ -28,63 +29,43 @@ export function UserCard({ admission, className }: UserCardProps) {
         {!user ? (
           <div className="py-4 text-center text-sm text-muted-foreground">Colaborador não encontrado.</div>
         ) : (
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Nome</span>
-              <span className="font-medium truncate" title={user.name}>
-                {user.name}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">CPF</span>
-              <span className="font-medium">{user.cpf ? formatCPF(user.cpf) : "-"}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Nº Folha</span>
-              <span className="font-medium">{user.payrollNumber || "-"}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Cargo</span>
-              <span className="font-medium truncate">{user.position?.name || "-"}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Setor</span>
-              <span className="font-medium truncate">{user.sector?.name || "-"}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Tipo de Contrato</span>
-              {user.currentContractType ? (
-                <Badge variant={getBadgeVariantFromStatus(user.currentContractType, "USER")} className="text-xs whitespace-nowrap">
-                  {CONTRACT_TYPE_LABELS[user.currentContractType as CONTRACT_TYPE] || user.currentContractType}
-                </Badge>
-              ) : (
-                <span className="font-medium">-</span>
-              )}
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Data de Admissão</span>
-              <span className="font-medium">{admission.hireDate ? formatDate(new Date(admission.hireDate)) : "-"}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Criado por</span>
-              <span className="font-medium truncate">{admission.createdBy?.name || "-"}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Criado em</span>
-              <span className="font-medium">{admission.createdAt ? formatDateTime(new Date(admission.createdAt)) : "-"}</span>
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2">
+              <DetailRow
+                label="Nome"
+                value={
+                  <span className="truncate" title={user.name}>
+                    {user.name}
+                  </span>
+                }
+              />
+              <DetailRow label="CPF" value={user.cpf ? formatCPF(user.cpf) : "-"} />
+              <DetailRow label="Nº Folha" value={user.payrollNumber || "-"} />
+              <DetailRow label="Cargo" value={<span className="truncate">{user.position?.name || "-"}</span>} />
+              <DetailRow label="Setor" value={<span className="truncate">{user.sector?.name || "-"}</span>} />
+              <DetailRow
+                label="Tipo de Contrato"
+                value={
+                  user.currentContractType ? (
+                    <Badge variant={getBadgeVariantFromStatus(user.currentContractType, "USER")} className="text-xs whitespace-nowrap">
+                      {CONTRACT_TYPE_LABELS[user.currentContractType as CONTRACT_TYPE] || user.currentContractType}
+                    </Badge>
+                  ) : (
+                    "-"
+                  )
+                }
+              />
+              <DetailRow label="Data de Admissão" value={admission.hireDate ? formatDate(new Date(admission.hireDate)) : "-"} />
+              <DetailRow label="Criado por" value={<span className="truncate">{admission.createdBy?.name || "-"}</span>} />
+              <DetailRow label="Criado em" value={admission.createdAt ? formatDateTime(new Date(admission.createdAt)) : "-"} />
             </div>
 
-            {admission.notes && (
-              <div className="pt-2 border-t border-border">
-                <div className="text-muted-foreground mb-1">Observações</div>
-                <div className="whitespace-pre-wrap break-words">{admission.notes}</div>
-              </div>
-            )}
+            {admission.notes && <DetailRow label="Observações" value={<span className="break-words">{admission.notes}</span>} block />}
 
-            <div className="pt-2 border-t border-border">
+            <div className="pt-2">
               <Link
                 to={routes.administration.collaborators.details(user.id)}
-                className="inline-flex items-center gap-1 text-green-600 hover:text-green-700 dark:text-green-600 dark:hover:text-green-500 hover:underline"
+                className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700 dark:text-green-600 dark:hover:text-green-500 hover:underline"
               >
                 Ver colaborador
                 <IconExternalLink className="h-4 w-4" />

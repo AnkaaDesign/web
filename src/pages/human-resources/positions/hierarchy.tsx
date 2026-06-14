@@ -124,7 +124,9 @@ export const PositionHierarchyPage = () => {
       const result = await batchUpdateAsync({
         positions: positions.map((position, index) => ({
           id: position.id,
-          data: { hierarchy: index + 1 },
+          // allowBelowFloor: flag de validação transitório exigido pelo schema
+          // de atualização (a reordenação não altera remuneração/piso).
+          data: { hierarchy: index + 1, allowBelowFloor: false },
         })),
       });
 

@@ -497,11 +497,11 @@ function SkillStatsFilterSheet({
     const res = await getUsers({
       where: {
         // `isActive` is the account-enabled flag, NOT employment status — a
-        // dismissed user can still be isActive. Exclude DISMISSED explicitly so
+        // dismissed user can still be isActive. Exclude TERMINATED explicitly so
         // demitidos never appear in HR stats filters (same rule as every other
         // HR-derived screen).
         isActive: true,
-        currentContractStatus: { not: CONTRACT_STATUS.DISMISSED },
+        currentContractStatus: { not: CONTRACT_STATUS.TERMINATED },
         ...(narrowSectorIds ? { sectorId: { in: narrowSectorIds } } : {}),
         ...(narrowPositionIds ? { positionId: { in: narrowPositionIds } } : {}),
         ...(narrowAssessmentIds

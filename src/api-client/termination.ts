@@ -26,6 +26,7 @@ import type {
   TerminationBatchUpdateResponse,
   TerminationBatchDeleteResponse,
   TerminationCalculateResponse,
+  TerminationComputeTaxesResponse,
   TerminationDocumentUpdateResponse,
   TerminationItemCreateResponse,
   TerminationItemUpdateResponse,
@@ -93,6 +94,12 @@ export class TerminationService {
     const response = await apiClient.put<TerminationUpdateResponse>(`${this.basePath}/${id}/advance`, data, {
       params: query,
     });
+    return response.data;
+  }
+
+  /** POST /terminations/:id/compute-taxes — auto-compute INSS/IRRF + FGTS-multa base. */
+  async computeTerminationTaxes(id: string): Promise<TerminationComputeTaxesResponse> {
+    const response = await apiClient.post<TerminationComputeTaxesResponse>(`${this.basePath}/${id}/compute-taxes`);
     return response.data;
   }
 
@@ -187,6 +194,7 @@ export const deleteTermination = (id: string) => terminationService.deleteTermin
 // Verbas Engine / Status Machine
 export const calculateTermination = (id: string) => terminationService.calculateTermination(id);
 export const advanceTermination = (id: string, data?: TerminationAdvanceFormData, query?: any) => terminationService.advanceTermination(id, data, query);
+export const computeTerminationTaxes = (id: string) => terminationService.computeTerminationTaxes(id);
 
 // Document Operations
 export const uploadTerminationDocument = (id: string, data: TerminationDocumentUploadFormData, file: File) => terminationService.uploadTerminationDocument(id, data, file);

@@ -3,9 +3,9 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UseQueryOptions } from "@tanstack/react-query";
-import { getUserPositionHistories, getUserPositionHistoryById, promoteUser } from "../../api-client/user-position-history";
+import { getUserPositionHistories, getUserPositionHistoryById, getUserSalaryAt, promoteUser } from "../../api-client/user-position-history";
 import type { UserPositionHistoryGetManyFormData, UserPositionHistoryPromoteFormData } from "../../schemas/user-position-history";
-import type { UserPositionHistoryGetManyResponse, UserPositionHistoryGetUniqueResponse } from "../../types/user-position-history";
+import type { UserPositionHistoryGetManyResponse, UserPositionHistoryGetUniqueResponse, UserSalaryAtResponse } from "../../types/user-position-history";
 import { userPositionHistoryKeys, userKeys, changeLogKeys } from "../common/query-keys";
 
 // =====================================================
@@ -54,6 +54,26 @@ export function useUserPositionHistory(
   };
 
   return { ...query, refresh };
+}
+
+/**
+ * GET /user-position-history/salary-at — resolve the historical salary a user
+ * (or users) had at a given date (Part F). Pass `userId` OR `userIds`
+ * (comma-separated) + `date`.
+ */
+export function useUserSalaryAt(
+  params: { userId?: string; userIds?: string; date?: string },
+  options?: { enabled?: boolean } & Omit<UseQueryOptions<UserSalaryAtResponse>, "queryKey" | "queryFn">,
+) {
+  const { enabled = true, ...queryOptions } = options || {};
+  return useQuery({
+    queryKey: [...userPositionHistoryKeys.all, "salary-at", params] as const,
+    queryFn: () => getUserSalaryAt(params),
+    enabled: enabled && (!!params.userId || !!params.userIds),
+    staleTime: 1000 * 60 * 5,
+    retry: 2,
+    ...queryOptions,
+  });
 }
 
 // =====================================================

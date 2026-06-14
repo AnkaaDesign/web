@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { FormInput } from "@/components/ui/form-input";
 import { Switch } from "@/components/ui/switch";
+import { Combobox } from "@/components/ui/combobox";
+import { INSALUBRITY_DEGREE, INSALUBRITY_DEGREE_LABELS } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -27,6 +29,17 @@ const positionBatchEditSchema = z.object({
           name: z.string().min(1, "Nome do cargo é obrigatório").max(100, "Nome do cargo deve ter no máximo 100 caracteres").optional(),
           remuneration: z.number().min(0, "Remuneração deve ser maior ou igual a zero").max(999999.99, "Remuneração deve ser menor que R$ 1.000.000,00").optional(),
           bonifiable: z.boolean().optional(),
+          // Part F — encargos e saúde
+          salaryFloor: z.number().min(0, "Piso salarial deve ser maior ou igual a zero").max(999999.99, "Piso salarial deve ser menor que R$ 1.000.000,00").nullable().optional(),
+          insalubrityDegree: z.nativeEnum(INSALUBRITY_DEGREE).optional(),
+          hazardPay: z.boolean().optional(),
+          examPeriodicityMonths: z
+            .number()
+            .int("Periodicidade deve ser um número inteiro de meses")
+            .min(1, "Periodicidade deve ser de pelo menos 1 mês")
+            .max(60, "Periodicidade deve ser menor ou igual a 60 meses")
+            .nullable()
+            .optional(),
         })
         .partial(),
     }),
@@ -57,6 +70,10 @@ export function PositionBatchEditTable({ positions, onCancel: _onCancel, onSubmi
           name: position.name,
           remuneration: position.remuneration,
           bonifiable: position.bonifiable,
+          salaryFloor: position.salaryFloor ?? null,
+          insalubrityDegree: position.insalubrityDegree ?? INSALUBRITY_DEGREE.NONE,
+          hazardPay: position.hazardPay ?? false,
+          examPeriodicityMonths: position.examPeriodicityMonths ?? null,
         },
       })),
     },
@@ -76,7 +93,11 @@ export function PositionBatchEditTable({ positions, onCancel: _onCancel, onSubmi
       const hasChanges =
         position.data.name !== originalPosition.name ||
         position.data.remuneration !== originalPosition.remuneration ||
-        position.data.bonifiable !== originalPosition.bonifiable;
+        position.data.bonifiable !== originalPosition.bonifiable ||
+        (position.data.salaryFloor ?? null) !== (originalPosition.salaryFloor ?? null) ||
+        (position.data.insalubrityDegree ?? INSALUBRITY_DEGREE.NONE) !== (originalPosition.insalubrityDegree ?? INSALUBRITY_DEGREE.NONE) ||
+        (position.data.hazardPay ?? false) !== (originalPosition.hazardPay ?? false) ||
+        (position.data.examPeriodicityMonths ?? null) !== (originalPosition.examPeriodicityMonths ?? null);
 
       return hasChanges;
     });
@@ -86,13 +107,20 @@ export function PositionBatchEditTable({ positions, onCancel: _onCancel, onSubmi
       return;
     }
 
-    const batchPayload = { positions: updatedPositions };
+    // allowBelowFloor é um flag de validação transitório exigido pelo schema de
+    // atualização (default false na api). O batch edit nunca confirma piso.
+    const batchPayload = {
+      positions: updatedPositions.map((position: any) => ({
+        id: position.id,
+        data: { ...position.data, allowBelowFloor: false },
+      })),
+    };
     setIsSubmitting(true);
     try {
-      const result = await batchUpdateAsync(batchPayload);
+      const result = await batchUpdateAsync(batchPayload as any);
       if (result?.data) {
         // Show the detailed result dialog
-        setBatchResult(result.data as BatchOperationResult<Position, Position>);
+        setBatchResult(result.data as unknown as BatchOperationResult<Position, Position>);
         setShowResultDialog(true);
       } else {
         // Even if we don't have detailed results, navigate back on apparent success
@@ -142,17 +170,37 @@ export function PositionBatchEditTable({ positions, onCancel: _onCancel, onSubmi
 
           {/* Positions Table */}
           <div className="border border-border rounded-lg overflow-x-auto overflow-y-auto flex-1">
-            <Table className={cn("w-full min-w-[800px] [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
+            <Table className={cn("w-full min-w-[1200px] [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
               <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted sticky top-0 z-10">
                 <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-96">
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-80">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
                       <span className="truncate">Nome do Cargo</span>
                     </div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-48">
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-40">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
                       <span className="truncate">Remuneração</span>
+                    </div>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-40">
+                    <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
+                      <span className="truncate">Piso da Categoria</span>
+                    </div>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-48">
+                    <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
+                      <span className="truncate">Insalubridade</span>
+                    </div>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-40">
+                    <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
+                      <span className="truncate">Periodicidade Exame</span>
+                    </div>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-32">
+                    <div className="flex items-center justify-center h-full min-h-[2.5rem] px-4 py-2">
+                      <span className="truncate">Periculosidade</span>
                     </div>
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-32">
@@ -176,14 +224,14 @@ export function PositionBatchEditTable({ positions, onCancel: _onCancel, onSubmi
                       )}
                     >
                       {/* Nome do Cargo */}
-                      <TableCell className="w-96 p-4 !border-r-0 h-16">
+                      <TableCell className="w-80 p-4 !border-r-0 h-16">
                         <div className="flex items-center h-full">
                           <FormInput name={`positions.${index}.data.name`} placeholder="Nome do cargo" className="h-8 border-muted-foreground/20 w-full" disabled={isSubmitting} />
                         </div>
                       </TableCell>
 
                       {/* Remuneração */}
-                      <TableCell className="w-48 p-4 !border-r-0 h-16">
+                      <TableCell className="w-40 p-4 !border-r-0 h-16">
                         <div className="flex items-center h-full">
                           <FormInput
                             name={`positions.${index}.data.remuneration`}
@@ -191,6 +239,79 @@ export function PositionBatchEditTable({ positions, onCancel: _onCancel, onSubmi
                             placeholder="R$ 0,00"
                             className="h-8 border-muted-foreground/20 w-full"
                             disabled={isSubmitting}
+                          />
+                        </div>
+                      </TableCell>
+
+                      {/* Piso da Categoria */}
+                      <TableCell className="w-40 p-4 !border-r-0 h-16">
+                        <div className="flex items-center h-full">
+                          <FormInput
+                            name={`positions.${index}.data.salaryFloor`}
+                            type="currency"
+                            placeholder="Salário-mínimo"
+                            className="h-8 border-muted-foreground/20 w-full"
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                      </TableCell>
+
+                      {/* Insalubridade */}
+                      <TableCell className="w-48 p-4 !border-r-0 h-16">
+                        <div className="flex items-center h-full">
+                          <FormField
+                            control={form.control}
+                            name={`positions.${index}.data.insalubrityDegree`}
+                            render={({ field }) => (
+                              <FormItem className="w-full">
+                                <FormControl>
+                                  <Combobox
+                                    mode="single"
+                                    value={field.value ?? INSALUBRITY_DEGREE.NONE}
+                                    onValueChange={field.onChange}
+                                    options={Object.values(INSALUBRITY_DEGREE).map((value) => ({
+                                      value,
+                                      label: INSALUBRITY_DEGREE_LABELS[value],
+                                    }))}
+                                    disabled={isSubmitting}
+                                    searchable={false}
+                                    className="h-8"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </TableCell>
+
+                      {/* Periodicidade do Exame */}
+                      <TableCell className="w-40 p-4 !border-r-0 h-16">
+                        <div className="flex items-center h-full">
+                          <FormInput
+                            name={`positions.${index}.data.examPeriodicityMonths`}
+                            type="number"
+                            placeholder="Cadência legal"
+                            className="h-8 border-muted-foreground/20 w-full"
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                      </TableCell>
+
+                      {/* Periculosidade */}
+                      <TableCell className="w-32 p-4 !border-r-0 h-16">
+                        <div className="flex items-center justify-center h-full">
+                          <FormField
+                            control={form.control}
+                            name={`positions.${index}.data.hazardPay`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Switch checked={field.value || false} onCheckedChange={field.onChange} disabled={isSubmitting} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
                           />
                         </div>
                       </TableCell>

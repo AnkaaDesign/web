@@ -14,6 +14,7 @@ import type {
   UserPositionHistoryGetUniqueResponse,
   UserPositionHistoryGetManyResponse,
   UserPositionHistoryPromoteResponse,
+  UserSalaryAtResponse,
 } from "../types/user-position-history";
 
 // =====================
@@ -41,6 +42,18 @@ export class UserPositionHistoryService {
     return response.data;
   }
 
+  /**
+   * GET /user-position-history/salary-at — resolve the salary a user (or users)
+   * had at a given date, composed from UserPositionHistory × position value
+   * history. Pass `userId` OR `userIds` (comma-separated) + `date`.
+   */
+  async getSalaryAt(params: { userId?: string; userIds?: string; date?: string }): Promise<UserSalaryAtResponse> {
+    const response = await apiClient.get<UserSalaryAtResponse>(`${this.basePath}/salary-at`, {
+      params,
+    });
+    return response.data;
+  }
+
   // =====================
   // Mutation Operations
   // =====================
@@ -63,6 +76,8 @@ export const userPositionHistoryService = new UserPositionHistoryService();
 export const getUserPositionHistories = (params?: UserPositionHistoryGetManyFormData) => userPositionHistoryService.getUserPositionHistories(params);
 export const getUserPositionHistoryById = (id: string, params?: Omit<UserPositionHistoryGetByIdFormData, "id">) =>
   userPositionHistoryService.getUserPositionHistoryById(id, params);
+
+export const getUserSalaryAt = (params: { userId?: string; userIds?: string; date?: string }) => userPositionHistoryService.getSalaryAt(params);
 
 // Mutation exports
 export const promoteUser = (data: UserPositionHistoryPromoteFormData, queryParams?: UserPositionHistoryQueryFormData) =>

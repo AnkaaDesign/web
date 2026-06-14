@@ -13,6 +13,7 @@ export default function TimeClockAusenciasPage() {
       requiredPrivilege={[
         SECTOR_PRIVILEGES.HUMAN_RESOURCES,
         SECTOR_PRIVILEGES.ADMIN,
+        SECTOR_PRIVILEGES.ACCOUNTING,
         SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
         SECTOR_PRIVILEGES.FINANCIAL,
       ]}

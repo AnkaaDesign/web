@@ -347,7 +347,7 @@ export function UserList({ className, teamScope }: UserListProps) {
     } else if (hasDismissedAtFilter) {
       // Filtering by dismissal date without an explicit contract type filter:
       // restrict to dismissed vínculos via the status cache.
-      result.statuses = [CONTRACT_STATUS.DISMISSED];
+      result.statuses = [CONTRACT_STATUS.TERMINATED];
     } else if (result.isActive === undefined && result.statuses === undefined) {
       // No explicit filter - default to active users only
       result.isActive = true;
@@ -472,7 +472,10 @@ export function UserList({ className, teamScope }: UserListProps) {
       const updateUsers = contractDialog.items.map((user) => ({
         id: user.id,
         data: {
-          contractType: CONTRACT_TYPE.EFFECTED,
+          // Efetivação (CLT art. 451): converts the bond to prazo indeterminado
+          // and flips its lifecycle status to ACTIVE.
+          contractType: CONTRACT_TYPE.INDETERMINATE,
+          contractStatus: CONTRACT_STATUS.ACTIVE,
           effectedAt: new Date(),
         },
       }));
@@ -493,7 +496,7 @@ export function UserList({ className, teamScope }: UserListProps) {
     try {
       const updateUsers = dismissDialog.items.map((user) => ({
         id: user.id,
-        data: { contractStatus: CONTRACT_STATUS.DISMISSED, terminationDate: new Date() },
+        data: { contractStatus: CONTRACT_STATUS.TERMINATED, terminationDate: new Date() },
       }));
 
       await batchUpdateAsync({ users: updateUsers });

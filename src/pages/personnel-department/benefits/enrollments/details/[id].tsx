@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
-import { IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle, IconPlayerPause, IconPlayerPlay, IconCircleX } from "@tabler/icons-react";
+import { IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle, IconPlayerPause, IconPlayerPlay, IconCircleX, IconPlayerTrackNext } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, BENEFIT_ENROLLMENT_STATUS } from "../../../../../constants";
 import {
@@ -20,7 +20,7 @@ import {
   UserBenefitDatesCard,
   UserBenefitDeclarationCard,
 } from "@/components/personnel-department/user-benefit/detail";
-import { UserBenefitTerminateDialog } from "@/components/personnel-department/user-benefit/dialogs";
+import { UserBenefitTerminateDialog, UserBenefitAdvanceInstallmentDialog } from "@/components/personnel-department/user-benefit/dialogs";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -34,6 +34,7 @@ export const UserBenefitDetailPage = () => {
   const navigate = useNavigate();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [terminateDialog, setTerminateDialog] = useState<UserBenefit | null>(null);
+  const [advanceDialog, setAdvanceDialog] = useState<UserBenefit | null>(null);
 
   const { user } = useAuth();
   const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
@@ -100,6 +101,10 @@ export const UserBenefitDetailPage = () => {
   const canReactivate = userBenefit.status === BENEFIT_ENROLLMENT_STATUS.SUSPENDED;
   const canTerminate = userBenefit.status === BENEFIT_ENROLLMENT_STATUS.ACTIVE || userBenefit.status === BENEFIT_ENROLLMENT_STATUS.SUSPENDED;
   const canEdit = userBenefit.status !== BENEFIT_ENROLLMENT_STATUS.TERMINATED;
+  const canAdvanceInstallment =
+    userBenefit.status === BENEFIT_ENROLLMENT_STATUS.ACTIVE &&
+    userBenefit.totalInstallments != null &&
+    (userBenefit.currentInstallment ?? 1) < userBenefit.totalInstallments;
 
   const handleSuspend = async () => {
     try {
@@ -186,6 +191,16 @@ export const UserBenefitDetailPage = () => {
                   },
                 ]
               : []),
+            ...(canAdvanceInstallment
+              ? [
+                  {
+                    key: "advance-installment",
+                    label: "Avançar parcela",
+                    icon: IconPlayerTrackNext,
+                    onClick: () => setAdvanceDialog(userBenefit),
+                  },
+                ]
+              : []),
             ...(canEdit
               ? [
                   {
@@ -213,7 +228,7 @@ export const UserBenefitDetailPage = () => {
         <div className="flex-1 overflow-y-auto pb-6">
           <div className="space-y-4">
             {/* Info Cards Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
               <UserBenefitUserCard userBenefit={userBenefit} />
               <UserBenefitBenefitCard userBenefit={userBenefit} />
               <UserBenefitValuesCard userBenefit={userBenefit} />
@@ -236,6 +251,9 @@ export const UserBenefitDetailPage = () => {
 
         {/* Terminate Dialog */}
         <UserBenefitTerminateDialog userBenefit={terminateDialog} onOpenChange={(open) => !open && setTerminateDialog(null)} />
+
+        {/* Advance Installment Dialog */}
+        <UserBenefitAdvanceInstallmentDialog userBenefit={advanceDialog} onOpenChange={(open) => !open && setAdvanceDialog(null)} />
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

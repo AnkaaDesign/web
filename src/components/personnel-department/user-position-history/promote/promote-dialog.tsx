@@ -20,9 +20,21 @@ import type { UserPositionHistoryPromoteFormData } from "../../../../schemas/use
 const promoteFormSchema = z.object({
   userId: z.string().uuid({ message: "Selecione o colaborador" }),
   toPositionId: z.string().uuid({ message: "Selecione o cargo de destino" }),
-  reason: z.enum([POSITION_CHANGE_REASON.PROMOTION, POSITION_CHANGE_REASON.TRANSFER, POSITION_CHANGE_REASON.DEMOTION] as [string, ...string[]], {
-    errorMap: () => ({ message: "Selecione o motivo" }),
-  }),
+  // Motivos lícitos (CLT): rebaixamento unilateral é ilegal (CF art.7º VI + CLT
+  // art.468). DEMOTION=Reversão (art.468 §único), ADJUSTMENT=Readaptação
+  // (art.461 §4º), CORRECTION=Reenquadramento.
+  reason: z.enum(
+    [
+      POSITION_CHANGE_REASON.PROMOTION,
+      POSITION_CHANGE_REASON.TRANSFER,
+      POSITION_CHANGE_REASON.DEMOTION,
+      POSITION_CHANGE_REASON.ADJUSTMENT,
+      POSITION_CHANGE_REASON.CORRECTION,
+    ] as [string, ...string[]],
+    {
+      errorMap: () => ({ message: "Selecione o motivo" }),
+    },
+  ),
   note: z.string().max(1000, "Observação deve ter no máximo 1000 caracteres").optional(),
 });
 
@@ -106,7 +118,13 @@ export function PromoteDialog({ open, onOpenChange }: PromoteDialogProps) {
 
   const reasonOptions = useMemo(
     () =>
-      [POSITION_CHANGE_REASON.PROMOTION, POSITION_CHANGE_REASON.TRANSFER, POSITION_CHANGE_REASON.DEMOTION].map((reason) => ({
+      [
+        POSITION_CHANGE_REASON.PROMOTION,
+        POSITION_CHANGE_REASON.TRANSFER,
+        POSITION_CHANGE_REASON.DEMOTION,
+        POSITION_CHANGE_REASON.ADJUSTMENT,
+        POSITION_CHANGE_REASON.CORRECTION,
+      ].map((reason) => ({
         value: reason,
         label: POSITION_CHANGE_REASON_LABELS[reason],
       })),

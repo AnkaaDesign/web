@@ -26,7 +26,8 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
       </div>
     ),
     sortable: true,
-    className: "min-w-[250px]",
+    // table-layout:fixed ignora min-width — é o `w-` que define a largura da coluna.
+    className: "w-[360px] min-w-[360px]",
     align: "left",
   },
 

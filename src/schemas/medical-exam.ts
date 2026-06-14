@@ -226,6 +226,8 @@ export const medicalExamCreateSchema = z.object({
       errorMap: () => ({ message: "resultado de exame inválido" }),
     })
     .default(MEDICAL_EXAM_RESULT.PENDING),
+  restrictions: z.string().max(2000).nullable().optional(),
+  periodicityMonths: z.coerce.number().int().min(1).max(120).nullable().optional(),
   scheduledAt: z.coerce.date().nullable().optional(),
   examDate: z.coerce.date().nullable().optional(),
   expiresAt: z.coerce.date().nullable().optional(),
@@ -253,6 +255,8 @@ export const medicalExamUpdateSchema = z.object({
       errorMap: () => ({ message: "resultado de exame inválido" }),
     })
     .optional(),
+  restrictions: z.string().max(2000).nullable().optional(),
+  periodicityMonths: z.coerce.number().int().min(1).max(120).nullable().optional(),
   scheduledAt: z.coerce.date().nullable().optional(),
   examDate: z.coerce.date().nullable().optional(),
   expiresAt: z.coerce.date().nullable().optional(),
@@ -268,6 +272,10 @@ export const medicalExamCompleteSchema = z.object({
   result: z.enum(Object.values(MEDICAL_EXAM_RESULT) as [string, ...string[]], {
     errorMap: () => ({ message: "resultado de exame inválido" }),
   }),
+  // Obrigatório (via service) quando result = FIT_WITH_RESTRICTIONS.
+  restrictions: z.string().max(2000).nullable().optional(),
+  // Periodicidade do próximo periódico (meses). Só usada quando type = PERIODIC.
+  periodicityMonths: z.coerce.number().int().min(1).max(120).nullable().optional(),
   expiresAt: z.coerce.date().nullable().optional(),
   physicianName: z.string().max(200).nullable().optional(),
   crm: z.string().max(50).nullable().optional(),

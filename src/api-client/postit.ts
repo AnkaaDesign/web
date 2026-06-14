@@ -53,10 +53,16 @@ export class PostitService {
     return response.data;
   }
 
-  async updatePostit(id: string, data: PostitUpdateFormData, query?: any): Promise<PostitUpdateResponse> {
-    const response = await apiClient.put<PostitUpdateResponse>(`${this.basePath}/${id}`, data, {
-      params: query,
-    });
+  async updatePostit(
+    id: string,
+    data: PostitUpdateFormData,
+    query?: any,
+    options?: { suppressToast?: boolean },
+  ): Promise<PostitUpdateResponse> {
+    // Saves de posição/tamanho do canvas são frequentes — silenciamos o toast.
+    const config: any = { params: query };
+    if (options?.suppressToast) config.metadata = { suppressToast: true };
+    const response = await apiClient.put<PostitUpdateResponse>(`${this.basePath}/${id}`, data, config);
     return response.data;
   }
 
@@ -88,6 +94,7 @@ export const getPostitById = (id: string, params?: any) => postitService.getPost
 
 // Mutation Operations
 export const createPostit = (data: PostitCreateFormData, query?: any) => postitService.createPostit(data, query);
-export const updatePostit = (id: string, data: PostitUpdateFormData, query?: any) => postitService.updatePostit(id, data, query);
+export const updatePostit = (id: string, data: PostitUpdateFormData, query?: any, options?: { suppressToast?: boolean }) =>
+  postitService.updatePostit(id, data, query, options);
 export const deletePostit = (id: string) => postitService.deletePostit(id);
 export const reorderPostits = (data: PostitReorderFormData) => postitService.reorderPostits(data);

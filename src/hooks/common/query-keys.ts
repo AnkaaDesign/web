@@ -1119,6 +1119,14 @@ export const leaveKeys = createQueryKeyStore<Record<string, any>>("leaves");
 
 export const dependentKeys = createQueryKeyStore<Record<string, any>>("dependents");
 
+// Área Andressa — Phase 3 new HR modules
+export const vacationKeys = createQueryKeyStore<Record<string, any>>("vacations");
+
+export const thirteenthKeys = createQueryKeyStore<Record<string, any>>("thirteenths");
+
+
+export const workAccidentKeys = createQueryKeyStore<Record<string, any>>("workAccidents");
+
 // Calendário/agenda + post-its (a5-calendar)
 export const agendaEventKeys = createQueryKeyStore<Record<string, any>>("agendaEvents");
 

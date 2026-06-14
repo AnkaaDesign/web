@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { IconUserOff, IconUser, IconTag, IconBellRinging, IconCalendar, IconGavel, IconFileDescription, IconCash } from "@tabler/icons-react";
+import { IconUserOff, IconUser, IconTag, IconBellRinging, IconCalendar, IconGavel, IconFileDescription, IconCash, IconShieldLock } from "@tabler/icons-react";
 
 import {
   terminationCreateSchema,
@@ -11,6 +11,7 @@ import {
 } from "../../../../schemas/termination";
 import type { Termination } from "../../../../types/termination";
 import type { User } from "../../../../types";
+import type { EmploymentContract } from "../../../../types/employment-contract";
 import {
   TERMINATION_TYPE,
   TERMINATION_TYPE_LABELS,
@@ -18,8 +19,11 @@ import {
   NOTICE_TYPE_LABELS,
   NOTICE_REDUCTION_LABELS,
   CONTRACT_STATUS,
+  STABILITY_TYPE_LABELS,
 } from "../../../../constants";
 import { getUsers } from "../../../../api-client";
+import { formatDate } from "../../../../utils";
+import { useUser } from "../../../../hooks/human-resources/use-user";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,6 +41,32 @@ const NOTICE_APPLICABLE_TYPES: string[] = [
   TERMINATION_TYPE.RESIGNATION,
   TERMINATION_TYPE.MUTUAL_AGREEMENT,
 ];
+
+// Termination modalities that, when the contract has NO art. 481 clause, do NOT
+// carry an aviso prévio regime (fixed-term / experiência / intermitente endings).
+const FIXED_TERM_MODALITIES: string[] = [
+  TERMINATION_TYPE.EXPERIENCE_END,
+  TERMINATION_TYPE.EXPERIENCE_EARLY_EMPLOYER,
+  TERMINATION_TYPE.EXPERIENCE_EARLY_EMPLOYEE,
+  TERMINATION_TYPE.FIXED_TERM_EARLY_EMPLOYEE,
+];
+
+// SEM justa causa — the estabilidade guard blocks these (the api enforces it;
+// WITH_CAUSE and DEATH are the legal exceptions).
+const STABILITY_EXEMPT_TYPES: string[] = [TERMINATION_TYPE.WITH_CAUSE, TERMINATION_TYPE.DEATH];
+
+/**
+ * Mirror of the api `isUnderStability` (api/src/utils/contract-stability.ts):
+ * the contract carries an active estabilidade window covering `date`.
+ * Open start/end are treated as already-begun / indefinite; window is inclusive.
+ */
+function isContractUnderStability(contract: EmploymentContract | null | undefined, date: Date): boolean {
+  if (!contract || !contract.stabilityType) return false;
+  const ref = date.getTime();
+  if (contract.stabilityStart && ref < new Date(contract.stabilityStart).getTime()) return false;
+  if (contract.stabilityEnd && ref > new Date(contract.stabilityEnd).getTime()) return false;
+  return true;
+}
 
 interface CreateModeProps {
   mode: "create";
@@ -99,9 +129,34 @@ export function TerminationForm(props: TerminationFormProps) {
   const watchedType = useWatch({ control: form.control, name: "type" as any });
   const currentType: string | undefined = props.mode === "update" ? termination?.type : watchedType;
   const watchedNoticeType = useWatch({ control: form.control, name: "noticeType" as any });
+  const watchedTerminationDate = useWatch({ control: form.control, name: "terminationDate" as any });
+  const watchedUserId = useWatch({ control: form.control, name: "userId" as any });
 
-  const showNoticeFields = !!currentType && NOTICE_APPLICABLE_TYPES.includes(currentType);
+  // Fetch the selected collaborator's current vínculo (create mode) so the form
+  // can surface the art. 481 clause and the estabilidade guard. In update mode
+  // the termination already carries the user via the detail query include.
+  const userIdForContract = props.mode === "create" ? (watchedUserId as string | undefined) : termination?.userId;
+  const { data: userResponse } = useUser(userIdForContract || "", {
+    include: { currentContract: true },
+    enabled: !!userIdForContract,
+  });
+
+  // Current vínculo of the collaborator (drives art. 481 + estabilidade guard).
+  const currentContract: EmploymentContract | null | undefined =
+    userResponse?.data?.currentContract ?? (props.mode === "update" ? props.termination.user?.currentContract : undefined);
+  const hasArt481Clause = !!currentContract?.hasArt481Clause;
+
+  // art. 481 converts a fixed-term/experiência bond to the rescisão-antecipada
+  // regime (aviso prévio applies like an indeterminate contract).
+  const isFixedTermModality = !!currentType && FIXED_TERM_MODALITIES.includes(currentType);
+  const showNoticeFields = !!currentType && (NOTICE_APPLICABLE_TYPES.includes(currentType) || (isFixedTermModality && hasArt481Clause));
   const showJustCauseArticle = currentType === TERMINATION_TYPE.WITH_CAUSE;
+
+  // Estabilidade guard (mirrors the server; the api enforces it on submit).
+  const stabilityRefDate = watchedTerminationDate instanceof Date ? watchedTerminationDate : new Date();
+  const isUnderStability = isContractUnderStability(currentContract, stabilityRefDate);
+  const stabilityExempt = !!currentType && STABILITY_EXEMPT_TYPES.includes(currentType);
+  const stabilityBlocks = props.mode === "create" && isUnderStability && !!currentType && !stabilityExempt;
 
   // Type options
   const typeOptions = useMemo(() => Object.entries(TERMINATION_TYPE_LABELS).map(([value, label]) => ({ value, label })), []);
@@ -113,7 +168,7 @@ export function TerminationForm(props: TerminationFormProps) {
     const queryParams: any = {
       page,
       take: 50,
-      where: { currentContractStatus: { not: CONTRACT_STATUS.DISMISSED } },
+      where: { currentContractStatus: { not: CONTRACT_STATUS.TERMINATED } },
       orderBy: { name: "asc" },
       include: { position: true },
     };
@@ -365,6 +420,86 @@ export function TerminationForm(props: TerminationFormProps) {
                   />
                 )}
               </div>
+
+              {/* Estabilidade guard — block dispensa SEM justa causa inside a
+                  stability window. The api enforces this; surface it here. */}
+              {stabilityBlocks && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    <span className="flex items-center gap-2 font-medium">
+                      <IconShieldLock className="h-4 w-4 flex-shrink-0" />
+                      Colaborador em período de estabilidade
+                    </span>
+                    <span className="mt-1 block">
+                      {currentContract?.stabilityType ? `${STABILITY_TYPE_LABELS[currentContract.stabilityType]} — ` : ""}
+                      vigente
+                      {currentContract?.stabilityStart ? ` de ${formatDate(new Date(currentContract.stabilityStart))}` : ""}
+                      {currentContract?.stabilityEnd ? ` até ${formatDate(new Date(currentContract.stabilityEnd))}` : ""}.
+                      Não é possível registrar este desligamento: durante a estabilidade só são permitidas demissão por justa causa ou rescisão por falecimento. O
+                      cadastro será recusado pelo servidor.
+                    </span>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Estabilidade informativa quando o tipo é isento (justa causa / falecimento) */}
+              {isUnderStability && stabilityExempt && (
+                <Alert variant="warning">
+                  <AlertDescription>
+                    O colaborador está em período de estabilidade
+                    {currentContract?.stabilityType ? ` (${STABILITY_TYPE_LABELS[currentContract.stabilityType]})` : ""}. Este tipo de rescisão é uma exceção legal e
+                    pode prosseguir — confirme a fundamentação antes de avançar.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* art. 481 — cláusula assecuratória do direito recíproco de rescisão */}
+              {isFixedTermModality && hasArt481Clause && (
+                <Alert>
+                  <AlertDescription>
+                    <span className="flex items-center gap-2 font-medium">
+                      <IconGavel className="h-4 w-4 flex-shrink-0" />
+                      Cláusula assecuratória (CLT art. 481)
+                    </span>
+                    <span className="mt-1 block">
+                      O contrato a prazo deste colaborador contém a cláusula assecuratória do direito recíproco de rescisão antecipada. A rescisão antecipada segue,
+                      portanto, as regras do contrato por prazo <strong>indeterminado</strong> (aviso prévio aplicável e multa de 40% do FGTS), e não a indenização dos
+                      arts. 479/480.
+                    </span>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* art. 480 — rescisão antecipada de contrato a prazo PELO EMPREGADO */}
+              {currentType === TERMINATION_TYPE.FIXED_TERM_EARLY_EMPLOYEE && !hasArt481Clause && (
+                <Alert variant="warning">
+                  <AlertDescription>
+                    Rescisão antecipada do contrato a prazo por iniciativa do <strong>empregado</strong> (CLT art. 480): será lançada a indenização devida{" "}
+                    <strong>pelo colaborador</strong> à empresa, limitada à metade da remuneração a que teria direito até o término do contrato. Não há aviso prévio nem
+                    multa de 40% do FGTS.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* art. 479 — rescisão antecipada pelo EMPREGADOR (experiência) */}
+              {currentType === TERMINATION_TYPE.EXPERIENCE_EARLY_EMPLOYER && !hasArt481Clause && (
+                <Alert>
+                  <AlertDescription>
+                    Rescisão antecipada da experiência por iniciativa do <strong>empregador</strong> (CLT art. 479): a empresa indeniza o colaborador em metade da
+                    remuneração devida até o término do período de experiência.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Encerramento de contrato intermitente */}
+              {currentType === TERMINATION_TYPE.INTERMITTENT_END && (
+                <Alert>
+                  <AlertDescription>
+                    Encerramento de contrato de trabalho intermitente (CLT art. 452-A): as verbas são apuradas sobre os períodos efetivamente trabalhados. Não há aviso
+                    prévio nas regras gerais do vínculo intermitente; confira as parcelas calculadas.
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 

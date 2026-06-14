@@ -69,6 +69,9 @@ export * from "./medical-exam";
 export * from "./leave";
 export * from "./benefit";
 export * from "./dependent";
+export * from "./vacation";
+export * from "./thirteenth";
+export * from "./work-accident";
 // Calendário/agenda + post-its (a5-calendar)
 export * from "./agenda-event";
 export * from "./postit";

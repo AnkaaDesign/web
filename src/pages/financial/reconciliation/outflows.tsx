@@ -5,7 +5,7 @@ import { SECTOR_PRIVILEGES } from "@/constants";
 
 /** Saídas — the DEBIT-side conciliation workspace (spec §4.2). */
 export const ReconciliationOutflowsPage = () => {
-  usePageTracker({ title: "Saídas - Conciliação", icon: "arrow-up-right" });
+  usePageTracker({ title: "Saídas", icon: "arrow-up-right" });
   return (
     <PrivilegeRoute
       requiredPrivilege={[

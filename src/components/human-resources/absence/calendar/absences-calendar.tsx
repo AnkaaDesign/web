@@ -29,7 +29,6 @@ import {
 } from "@tabler/icons-react";
 
 import {
-  CONTRACT_STATUS,
   LEAVE_STATUS,
   LEAVE_TYPE_LABELS,
   VACATION_JUSTIFICATIVA_ID,
@@ -77,6 +76,7 @@ import {
 import { AgendaEventDialog } from "../../calendar/agenda-event-dialog";
 import {
   getCommemorativesForDay,
+  dedupeAgainstHolidays,
   type CommemorativeDate,
 } from "../../calendar/commemorative-dates";
 
@@ -233,17 +233,27 @@ export function AbsencesCalendar() {
   );
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" }, take: 100 } as any);
   const { data: usersData, isLoading: usersLoading } = useUsers({
-    statuses: [CONTRACT_STATUS.ACTIVE],
+    // `isActive: true` = currentContractStatus não-TERMINATED — todos os
+    // colaboradores ainda empregados (inclui experiência / aviso / afastado),
+    // só exclui desligados. Mesma convenção dos aniversários acima.
+    isActive: true,
     where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,
   } as any);
 
   // ---- Unified-calendar overlays --------------------------------------
-  // Aniversários: every active collaborator (no Secullum link required) —
+  // Aniversários: every ACTIVE collaborator (no Secullum link required) —
   // birthdays recur yearly, so the list is range-independent.
+  // `isActive: true` is the app's canonical "ainda empregado" filter — maps
+  // server-side to currentContractStatus: { not: TERMINATED } (ver
+  // schemas/user.ts), so colaboradores desligados NÃO aparecem nos
+  // aniversários, mas quem está em experiência / aviso prévio / afastado
+  // (ainda vínculados) continua aparecendo. Usar statuses:[ACTIVE] aqui
+  // excluía erroneamente esses estados — e deixava entrar desligados quando
+  // o cache de status não batia.
   const { data: birthdayUsersData } = useUsers({
-    statuses: [CONTRACT_STATUS.ACTIVE],
+    isActive: true,
     orderBy: { name: "asc" },
     // 100 é o teto do paginationSchema da API — limit: 200 era REJEITADO
     // pelo zod (400) e os aniversários nunca carregavam.
@@ -465,10 +475,16 @@ export function AbsencesCalendar() {
     }
 
     // Datas comemorativas no período (dataset estático — qualquer dia).
+    // Conta APÓS o dedupe contra feriados, para o tile "Comemorativas" bater
+    // com as barras realmente renderizadas (Corpus Christi etc. não conta
+    // duas vezes).
     let commemorativeCount = 0;
     if (showCommemorative) {
       for (const d of days) {
-        commemorativeCount += getCommemorativesForDay(d).length;
+        commemorativeCount += getCommemorativesForDayDeduped(
+          d,
+          getHolidaysForDay(holidays, d),
+        ).length;
       }
     }
 
@@ -679,6 +695,9 @@ export function AbsencesCalendar() {
           onToggleCommemorative={() => setShowCommemorative((v) => !v)}
         />
 
+        {/* Color legend — labels the category colors used by the bars/dots/tiles.
+            Shown in both month and year views (purely presentational). */}
+        <Legend />
 
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center">
@@ -720,6 +739,10 @@ export function AbsencesCalendar() {
             year={refMonth.getFullYear()}
             absences={absences}
             holidays={holidays}
+            leaves={leaves}
+            birthdayUsers={birthdayUsers}
+            agendaEvents={agendaEvents}
+            showCommemoratives={showCommemorative}
             onMonthClick={(monthIdx) => {
               setRefMonth(new Date(refMonth.getFullYear(), monthIdx, 1));
               setViewMode("month");
@@ -738,6 +761,33 @@ export function AbsencesCalendar() {
         />
       </CardContent>
     </Card>
+  );
+}
+
+// ===== LEGEND =========================================================
+// Purely presentational color key shown in both month and year views so the
+// dots/bars/tiles have a labeling. Reuses the canonical category color classes
+// literally so it always matches the rest of the calendar.
+function Legend() {
+  const items: Array<{ label: string; cls: string }> = [
+    { label: "Férias", cls: "bg-purple-600" },
+    { label: "Falta justificada", cls: "bg-amber-600" },
+    { label: "Falta não justificada", cls: "bg-red-700" },
+    { label: "Feriado", cls: "bg-cyan-600" },
+    { label: "Afastamento", cls: "bg-orange-600" },
+    { label: "Aniversário", cls: "bg-pink-600" },
+    { label: "Evento", cls: "bg-indigo-600" },
+    { label: "Comemorativa", cls: "bg-fuchsia-600" },
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 py-2 text-xs text-muted-foreground">
+      {items.map((it) => (
+        <span key={it.label} className="inline-flex items-center gap-1.5">
+          <span className={cn("inline-block h-2 w-2 rounded-full", it.cls)} />
+          {it.label}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -1038,7 +1088,9 @@ function MonthView({
           const dayLeaves = getLeavesForDay(leaves, date);
           const dayBirthdays = getBirthdaysForDay(birthdayUsers, date);
           const dayEvents = getEventsForDay(agendaEvents, date);
-          const dayCommemoratives = showCommemoratives ? getCommemorativesForDay(date) : [];
+          const dayCommemoratives = showCommemoratives
+            ? getCommemorativesForDayDeduped(date, dayHolidays)
+            : [];
           const isToday = isSameDay(date, new Date());
           const isSelected = selectedDay ? isSameDay(date, selectedDay) : false;
           const dow = date.getDay();
@@ -1255,7 +1307,9 @@ function DayDetailPanel({
   const dayBirthdays = selectedDay ? getBirthdaysForDay(birthdayUsers, selectedDay) : [];
   const dayEvents = selectedDay ? getEventsForDay(agendaEvents, selectedDay) : [];
   const dayCommemoratives =
-    selectedDay && showCommemoratives ? getCommemorativesForDay(selectedDay) : [];
+    selectedDay && showCommemoratives
+      ? getCommemorativesForDayDeduped(selectedDay, dayHolidays)
+      : [];
   const isWeekend =
     !!selectedDay && (selectedDay.getDay() === 0 || selectedDay.getDay() === 6);
 
@@ -1572,11 +1626,19 @@ function YearView({
   year,
   absences,
   holidays,
+  leaves,
+  birthdayUsers,
+  agendaEvents,
+  showCommemoratives,
   onMonthClick,
 }: {
   year: number;
   absences: SecullumAggregatedAbsence[];
   holidays: any[];
+  leaves: Leave[];
+  birthdayUsers: User[];
+  agendaEvents: AgendaEvent[];
+  showCommemoratives: boolean;
   onMonthClick: (monthIdx: number) => void;
 }) {
   const months = useMemo(
@@ -1593,6 +1655,10 @@ function YearView({
             monthDate={monthDate}
             absences={absences}
             holidays={holidays}
+            leaves={leaves}
+            birthdayUsers={birthdayUsers}
+            agendaEvents={agendaEvents}
+            showCommemoratives={showCommemoratives}
             onClick={() => onMonthClick(idx)}
           />
         ))}
@@ -1605,11 +1671,19 @@ function MiniMonth({
   monthDate,
   absences,
   holidays,
+  leaves,
+  birthdayUsers,
+  agendaEvents,
+  showCommemoratives,
   onClick,
 }: {
   monthDate: Date;
   absences: SecullumAggregatedAbsence[];
   holidays: any[];
+  leaves: Leave[];
+  birthdayUsers: User[];
+  agendaEvents: AgendaEvent[];
+  showCommemoratives: boolean;
   onClick: () => void;
 }) {
   // Each mini-month renders the standard calendar month so the year overview
@@ -1635,6 +1709,10 @@ function MiniMonth({
   let justifiedFaltaDays = 0;
   let unjustifiedFaltaDays = 0;
   let holidayDays = 0;
+  let leaveDays = 0;
+  let birthdayDays = 0;
+  let eventDays = 0;
+  let commemorativeDays = 0;
   const holidayKeys = new Set<string>();
   for (const h of holidays) {
     const raw = (h as any).Data || (h as any).data || (h as any).date;
@@ -1671,7 +1749,35 @@ function MiniMonth({
       }
     }
   }
-  const totalEvents = vacationDays + justifiedFaltaDays + unjustifiedFaltaDays + holidayDays;
+  // Overlay categories (afastamentos, aniversários, eventos, comemorativas) are
+  // tallied per-day mirroring the mini-day dot logic below: afastamentos only
+  // count on work days (no weekends/holidays), while aniversários/eventos/
+  // comemorativas always count. This keeps the header chips in sync with the
+  // dots so a month with only these categories no longer reads "sem registros".
+  for (const date of naturalDays) {
+    if (date < periodStart || date > periodEnd) continue;
+    const dow = date.getDay();
+    const isWeekend = dow === 0 || dow === 6;
+    const dayHolidays = getHolidaysForDay(holidays, date);
+    const isWorkDay = !isWeekend && dayHolidays.length === 0;
+    if (isWorkDay && getLeavesForDay(leaves, date).length > 0) leaveDays++;
+    if (getBirthdaysForDay(birthdayUsers, date).length > 0) birthdayDays++;
+    if (getEventsForDay(agendaEvents, date).length > 0) eventDays++;
+    if (
+      showCommemoratives &&
+      getCommemorativesForDayDeduped(date, dayHolidays).length > 0
+    )
+      commemorativeDays++;
+  }
+  const totalEvents =
+    vacationDays +
+    justifiedFaltaDays +
+    unjustifiedFaltaDays +
+    holidayDays +
+    leaveDays +
+    birthdayDays +
+    eventDays +
+    commemorativeDays;
 
   return (
     <button
@@ -1713,6 +1819,30 @@ function MiniMonth({
                 <span className="inline-flex items-center gap-1 text-cyan-600 dark:text-cyan-400">
                   <IconConfetti className="h-3.5 w-3.5" strokeWidth={2.5} />
                   {holidayDays}
+                </span>
+              )}
+              {leaveDays > 0 && (
+                <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                  <IconStethoscope className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  {leaveDays}
+                </span>
+              )}
+              {birthdayDays > 0 && (
+                <span className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400">
+                  <IconCake className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  {birthdayDays}
+                </span>
+              )}
+              {eventDays > 0 && (
+                <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                  <IconCalendarEvent className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  {eventDays}
+                </span>
+              )}
+              {commemorativeDays > 0 && (
+                <span className="inline-flex items-center gap-1 text-fuchsia-600 dark:text-fuchsia-400">
+                  <IconStar className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  {commemorativeDays}
                 </span>
               )}
             </>
@@ -1763,6 +1893,12 @@ function MiniMonth({
 
             const dayAbsences = getAbsencesForDay(absences, date);
             const dayHolidays = getHolidaysForDay(holidays, date);
+            const dayLeaves = getLeavesForDay(leaves, date);
+            const dayBirthdays = getBirthdaysForDay(birthdayUsers, date);
+            const dayEvents = getEventsForDay(agendaEvents, date);
+            const dayCommemoratives = showCommemoratives
+              ? getCommemorativesForDayDeduped(date, dayHolidays)
+              : [];
             const isToday = isSameDay(date, new Date());
             const dow = date.getDay();
             const isWeekend = dow === 0 || dow === 6;
@@ -1781,19 +1917,27 @@ function MiniMonth({
                 isUnjustifiedFalta(a),
             ).length;
 
-            // Icon-driven event indicators (matches the StatsRow tile icons:
-            // beach = férias, user-off = falta justificada, user-exclamation =
-            // falta não justificada, confetti = feriado).
-            // Holidays win — same rule as the month view.
-            const showHoliday = dayHolidays.length > 0;
-            const showAusencia = !showHoliday && !isWeekend && ausencias > 0;
-            const showJustifiedFalta = !showHoliday && !isWeekend && justifiedFaltas > 0;
-            const showUnjustifiedFalta = !showHoliday && !isWeekend && unjustifiedFaltas > 0;
+            // Compact per-category dots — cells are tiny so we drop one colored
+            // dot per category present that day rather than full icons. Colors
+            // mirror the month-view bars / legend exactly. Absence-style
+            // categories (férias, faltas, afastamento) only count on work days
+            // (no weekends/holidays — same noise rule the month view applies);
+            // holidays, comemorativas, aniversários and eventos always show.
+            const isWorkDay = !isWeekend && dayHolidays.length === 0;
+            const dots: Array<{ key: string; cls: string }> = [];
+            if (dayHolidays.length > 0) dots.push({ key: "holiday", cls: "bg-cyan-600" });
+            if (dayCommemoratives.length > 0) dots.push({ key: "commem", cls: "bg-fuchsia-600" });
+            if (dayEvents.length > 0) dots.push({ key: "event", cls: "bg-indigo-600" });
+            if (dayBirthdays.length > 0) dots.push({ key: "birthday", cls: "bg-pink-600" });
+            if (isWorkDay && dayLeaves.length > 0) dots.push({ key: "leave", cls: "bg-orange-600" });
+            if (isWorkDay && ausencias > 0) dots.push({ key: "ausencia", cls: "bg-purple-600" });
+            if (isWorkDay && justifiedFaltas > 0) dots.push({ key: "jfalta", cls: "bg-amber-600" });
+            if (isWorkDay && unjustifiedFaltas > 0) dots.push({ key: "ufalta", cls: "bg-red-700" });
 
             const cellNode = (
               <div
                 className={cn(
-                  "relative aspect-square flex items-center justify-center text-[13px] font-medium tabular-nums transition-colors border-border",
+                  "relative aspect-square flex flex-col items-center justify-center text-[13px] font-medium tabular-nums transition-colors border-border",
                   !isLastCol && "border-r",
                   !isLastRow && "border-b",
                   isWeekend && !isToday && "bg-blue-50/40 dark:bg-blue-950/20 text-blue-600/80 dark:text-blue-400/80",
@@ -1801,42 +1945,29 @@ function MiniMonth({
                   isToday && "ring-2 ring-primary ring-inset font-bold text-primary",
                 )}
               >
-                <span>{format(date, "d")}</span>
-                {!isToday &&
-                  (showHoliday || showAusencia || showJustifiedFalta || showUnjustifiedFalta) && (
-                    <div className="absolute top-0.5 right-0.5 flex items-center gap-0.5">
-                      {showHoliday && (
-                        <IconConfetti
-                          className="h-4 w-4 text-cyan-600 dark:text-cyan-400"
-                          strokeWidth={2.5}
-                        />
-                      )}
-                      {showAusencia && (
-                        <IconBeach
-                          className="h-4 w-4 text-purple-600 dark:text-purple-400"
-                          strokeWidth={2.5}
-                        />
-                      )}
-                      {showJustifiedFalta && (
-                        <IconUserOff
-                          className="h-4 w-4 text-amber-600 dark:text-amber-400"
-                          strokeWidth={2.5}
-                        />
-                      )}
-                      {showUnjustifiedFalta && (
-                        <IconUserExclamation
-                          className="h-4 w-4 text-red-700 dark:text-red-300"
-                          strokeWidth={2.5}
-                        />
-                      )}
-                    </div>
-                  )}
+                <span className="leading-none">{format(date, "d")}</span>
+                {dots.length > 0 && (
+                  <div className="mt-0.5 flex items-center justify-center gap-[2px] flex-wrap max-w-full px-0.5">
+                    {dots.map((d) => (
+                      <span
+                        key={d.key}
+                        className={cn("inline-block h-1.5 w-1.5 rounded-full flex-shrink-0", d.cls)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             );
 
             // Tooltip only when there's something to show; else just render
             // the cell to keep the year-view grid lightweight (12 × 42 cells).
-            const hasContent = dayAbsences.length > 0 || dayHolidays.length > 0;
+            const hasContent =
+              dayAbsences.length > 0 ||
+              dayHolidays.length > 0 ||
+              dayLeaves.length > 0 ||
+              dayBirthdays.length > 0 ||
+              dayEvents.length > 0 ||
+              dayCommemoratives.length > 0;
             if (!hasContent) {
               return <div key={idx}>{cellNode}</div>;
             }
@@ -1855,8 +1986,12 @@ function MiniMonth({
                 <TooltipContent side="top" className="w-auto max-w-none">
                   <DayTooltip
                     date={date}
-                    absences={isWeekend ? [] : dayAbsences}
+                    absences={isWorkDay ? dayAbsences : []}
                     holidays={dayHolidays}
+                    leaves={isWorkDay ? dayLeaves : []}
+                    birthdays={dayBirthdays}
+                    events={dayEvents}
+                    commemoratives={dayCommemoratives}
                     isWeekend={isWeekend}
                     isInPeriod={true}
                   />
@@ -2078,19 +2213,52 @@ function getHolidaysForDay(holidays: any[], date: Date): any[] {
   });
 }
 
+// Extracts the human-readable description from a Secullum holiday record.
+function getHolidayName(h: any): string {
+  return String(h?.Descricao || h?.descricao || "").trim();
+}
+
+// Commemoratives for a day, MINUS any that duplicate an official Secullum
+// holiday on the same day (the feriado bar wins — see dedupeAgainstHolidays).
+// Single source of truth so the cell grid, the day-detail panel and the
+// summary stat all suppress the same duplicates (e.g. Corpus Christi).
+function getCommemorativesForDayDeduped(
+  date: Date,
+  dayHolidays: any[],
+): CommemorativeDate[] {
+  const commemoratives = getCommemorativesForDay(date);
+  if (commemoratives.length === 0 || dayHolidays.length === 0) return commemoratives;
+  return dedupeAgainstHolidays(commemoratives, dayHolidays.map(getHolidayName));
+}
+
 function DayTooltip({
   date,
   absences,
   holidays,
+  leaves = [],
+  birthdays = [],
+  events = [],
+  commemoratives = [],
   isWeekend,
   isInPeriod,
 }: {
   date: Date;
   absences: SecullumAggregatedAbsence[];
   holidays: any[];
+  leaves?: Leave[];
+  birthdays?: User[];
+  events?: AgendaEvent[];
+  commemoratives?: CommemorativeDate[];
   isWeekend: boolean;
   isInPeriod: boolean;
 }) {
+  const hasAnything =
+    holidays.length > 0 ||
+    absences.length > 0 ||
+    leaves.length > 0 ||
+    birthdays.length > 0 ||
+    events.length > 0 ||
+    commemoratives.length > 0;
   return (
     <div className="space-y-1.5">
       <p className="font-semibold capitalize">
@@ -2101,14 +2269,56 @@ function DayTooltip({
       )}
       {holidays.length > 0 && (
         <div className="text-sm">
-          <span className="font-medium text-red-600 dark:text-red-400">Feriado:</span>{" "}
+          <span className="font-medium text-cyan-600 dark:text-cyan-400">Feriado:</span>{" "}
           {holidays.map((h: any) => h.Descricao || h.descricao).join(", ")}
         </div>
+      )}
+      {commemoratives.length > 0 && (
+        <ul className="space-y-0.5">
+          {commemoratives.map((c, i) => (
+            <li key={`cm${i}`} className="text-xs flex items-center gap-2 whitespace-nowrap">
+              <span className="inline-block h-2 w-2 rounded-full flex-shrink-0 bg-fuchsia-600" />
+              <span className="font-medium">{c.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {events.length > 0 && (
+        <ul className="space-y-0.5">
+          {events.map((ev) => (
+            <li key={`e${ev.id}`} className="text-xs flex items-center gap-2 whitespace-nowrap">
+              <span className="inline-block h-2 w-2 rounded-full flex-shrink-0 bg-indigo-600" />
+              <span className="font-medium">{ev.title}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {birthdays.length > 0 && (
+        <ul className="space-y-0.5">
+          {birthdays.map((u) => (
+            <li key={`b${u.id}`} className="text-xs flex items-center gap-2 whitespace-nowrap">
+              <span className="inline-block h-2 w-2 rounded-full flex-shrink-0 bg-pink-600" />
+              <span className="font-medium">{u.name}</span>
+              <span className="text-muted-foreground">— Aniversário</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {leaves.length > 0 && (
+        <ul className="space-y-0.5">
+          {leaves.map((l) => (
+            <li key={`l${l.id}`} className="text-xs flex items-center gap-2 whitespace-nowrap">
+              <span className="inline-block h-2 w-2 rounded-full flex-shrink-0 bg-orange-600" />
+              <span className="font-medium">{l.user?.name ?? "Colaborador"}</span>
+              <span className="text-muted-foreground">— {getLeaveTypeLabel(l)}</span>
+            </li>
+          ))}
+        </ul>
       )}
       {!holidays.length && isWeekend && (
         <p className="text-xs text-muted-foreground">Fim de semana</p>
       )}
-      {!holidays.length && !isWeekend && absences.length === 0 && isInPeriod && (
+      {!hasAnything && !isWeekend && isInPeriod && (
         <p className="text-xs text-muted-foreground">Dia útil</p>
       )}
       {absences.length > 0 && (() => {

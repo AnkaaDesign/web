@@ -467,7 +467,7 @@ function PayrollEmployeesModal({
         if (!startDate) return true;
         // Active (not dismissed) employees always pass; dismissed ones only if
         // their termination date falls at or after the window start.
-        if (u.currentContractStatus !== CONTRACT_STATUS.DISMISSED) return true;
+        if (u.currentContractStatus !== CONTRACT_STATUS.TERMINATED) return true;
         const termination = u.currentContract?.terminationDate;
         if (!termination) return true;
         return new Date(termination).getTime() >= startDate.getTime();

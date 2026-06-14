@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { IconHeartHandshake, IconUser, IconGift, IconCalendar, IconTicket } from "@tabler/icons-react";
+import { IconHeartHandshake, IconUser, IconGift, IconCalendar, IconTicket, IconListNumbers } from "@tabler/icons-react";
 
 import type { User } from "../../../../types";
 import type { Benefit, UserBenefit } from "../../../../types/benefit";
@@ -108,6 +108,8 @@ export function UserBenefitForm(props: UserBenefitFormProps) {
             employeeDiscountValue: null,
             employeeDiscountPercent: null,
             dailyTickets: null,
+            totalInstallments: null,
+            currentInstallment: null,
             notes: null,
           }
         : {
@@ -120,6 +122,8 @@ export function UserBenefitForm(props: UserBenefitFormProps) {
             employeeDiscountValue: props.userBenefit.employeeDiscountValue,
             employeeDiscountPercent: props.userBenefit.employeeDiscountPercent,
             dailyTickets: props.userBenefit.dailyTickets,
+            totalInstallments: props.userBenefit.totalInstallments,
+            currentInstallment: props.userBenefit.currentInstallment,
             notes: props.userBenefit.notes,
           },
   });
@@ -428,6 +432,44 @@ export function UserBenefitForm(props: UserBenefitFormProps) {
                   selectedBenefitKind === BENEFIT_KIND.FOOD_VOUCHER) && (
                   <p className="text-xs text-muted-foreground mt-1">{discountHelper}</p>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconListNumbers className="h-5 w-5 text-muted-foreground" />
+                Parcelamento (convênio)
+              </CardTitle>
+              <CardDescription>
+                Parcelamento opcional para convênios (ex.: farmácia, óptica) descontados em N folhas. Deixe em branco para desconto recorrente sem fim.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormInput<UserBenefitCreateFormData>
+                  name="totalInstallments"
+                  label={
+                    <span className="flex items-center gap-2">
+                      <IconListNumbers className="h-4 w-4" />
+                      Total de Parcelas
+                    </span>
+                  }
+                  type="natural"
+                  min={1}
+                  description="Número de folhas em que o convênio será descontado"
+                  disabled={isSubmitting}
+                />
+
+                <FormInput<UserBenefitCreateFormData>
+                  name="currentInstallment"
+                  label="Parcela Atual"
+                  type="natural"
+                  min={1}
+                  description="Parcela atual do parcelamento (ex.: 3 de 12)"
+                  disabled={isSubmitting}
+                />
               </div>
             </CardContent>
           </Card>

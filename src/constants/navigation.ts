@@ -722,7 +722,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
         children: [
           // Spec-ordered children (Área Andressa §4): Extrato → Saídas → Previsão de
-          // Saídas → Conciliação de Entrada. `order` keeps them ahead of the
+          // Saídas → Entradas. `order` keeps them ahead of the
           // alphabetical FINANCIAL/ADMIN-only utilities below.
           {
             id: "conciliacao-extrato",
@@ -750,7 +750,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
           },
           {
             id: "conciliacao-entradas",
-            title: "Conciliação de Entrada",
+            title: "Entradas",
             icon: "arrowsExchange",
             path: "/financeiro/conciliacao/entradas",
             order: 4,
@@ -1449,38 +1449,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
   },
   {
-    // Commercial gets the view-only tabs (Colaborador, Dia, Ausências). Edição and
-    // Fechamento are intentionally omitted — they remain HR/ADMIN only.
-    id: "controle-ponto-commercial",
-    title: "Controle de Ponto",
-    icon: "fingerprint",
-    path: "/recursos-humanos/controle-ponto",
-    requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
-    children: [
-      {
-        id: "controle-ponto-colaborador-commercial",
-        title: "Visualização Colaborador",
-        icon: "user",
-        path: "/recursos-humanos/controle-ponto/colaborador",
-        requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
-      },
-      {
-        id: "controle-ponto-dia-commercial",
-        title: "Visualização Dia",
-        icon: "calendar",
-        path: "/recursos-humanos/controle-ponto/dia",
-        requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
-      },
-      {
-        id: "controle-ponto-ausencias-commercial",
-        title: "Ausências",
-        icon: "list",
-        path: "/recursos-humanos/controle-ponto/ausencias",
-        requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
-      },
-    ],
-  },
-  {
     id: "gerenciador-de-arquivos",
     title: "Gerenciador de Arquivos",
     icon: "fileManager",
@@ -1827,7 +1795,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         icon: "briefcase",
         path: "/recursos-humanos/cargos",
         children: [
-          { id: "cargos-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/cargos/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+          { id: "cargos-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/cargos/cadastrar", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
           { id: "cargos-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/cargos/detalhes/:id", isDynamic: true },
           { id: "cargos-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/cargos/editar/:id", isDynamic: true },
         ],
@@ -1862,7 +1830,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
             title: "Ausências",
             icon: "list",
             path: "/recursos-humanos/controle-ponto/ausencias",
-            requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+            requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING],
           },
           {
             id: "controle-ponto-fechamento",
@@ -2000,8 +1968,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       {
-        // ACCOUNTING gets the view tabs (Colaborador, Dia); Edição, Ausências and
-        // Fechamento remain HR/ADMIN-only (see the Recursos Humanos section).
+        // ACCOUNTING (Área Andressa) gets the FULL Controle de Ponto toolset here:
+        // the view tabs (Colaborador, Dia, Ausências) plus Edição and Fechamento,
+        // since folha closing/conferência is part of the accounting workflow.
         id: "dp-controle-ponto",
         title: "Controle de Ponto",
         icon: "fingerprint",
@@ -2010,6 +1979,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [
           { id: "dp-controle-ponto-colaborador", title: "Visualização Colaborador", icon: "user", path: "/recursos-humanos/controle-ponto/colaborador" },
           { id: "dp-controle-ponto-dia", title: "Visualização Dia", icon: "calendar", path: "/recursos-humanos/controle-ponto/dia" },
+          { id: "dp-controle-ponto-edicao", title: "Edição", icon: "edit", path: "/recursos-humanos/controle-ponto/edicao", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "dp-controle-ponto-ausencias", title: "Ausências", icon: "list", path: "/recursos-humanos/controle-ponto/ausencias", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "dp-controle-ponto-fechamento", title: "Fechamento", icon: "signature", path: "/recursos-humanos/controle-ponto/fechamento", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
         ],
       },
       {
@@ -2023,8 +1995,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "dp-ferias",
         title: "Férias",
         icon: "vacation",
-        path: "/recursos-humanos/ferias",
+        path: "/departamento-pessoal/ferias",
         requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          { id: "dp-ferias-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/ferias/cadastrar" },
+          { id: "dp-ferias-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/ferias/detalhes/:id", isDynamic: true },
+          { id: "dp-ferias-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/ferias/editar/:id", isDynamic: true },
+        ],
       },
       // NOTE (spec alignment 2026-06-11): "Feriados" and "Calendário" are NOT DP items.
       // Calendário moved under Ferramentas for ACCOUNTING (HR/ADMIN keep the
@@ -2061,19 +2038,19 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       {
+        id: "dp-emprestimos",
+        title: "Empréstimos",
+        icon: "payroll",
+        path: "/recursos-humanos/emprestimos",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+      },
+      {
         id: "dp-salarios-e-cargos",
         title: "Salários e Cargos",
         icon: "salary",
-        path: "/departamento-pessoal/faixas-salariais",
+        path: "/recursos-humanos/cargos",
         requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
         children: [
-          {
-            id: "dp-faixas-salariais",
-            title: "Faixas Salariais",
-            icon: "salary",
-            path: "/departamento-pessoal/faixas-salariais",
-            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-          },
           {
             id: "dp-reajustes",
             title: "Reajustes",
@@ -2238,6 +2215,18 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "mt-afastamentos-cadastrar", title: "Cadastrar", icon: "plus", path: "/medicina-do-trabalho/afastamentos/cadastrar" },
           { id: "mt-afastamentos-detalhes", title: "Detalhes", icon: "eye", path: "/medicina-do-trabalho/afastamentos/detalhes/:id", isDynamic: true },
           { id: "mt-afastamentos-editar", title: "Editar", icon: "edit", path: "/medicina-do-trabalho/afastamentos/editar/:id", isDynamic: true },
+        ],
+      },
+      {
+        id: "mt-cat",
+        title: "CAT",
+        icon: "clipboardList",
+        path: "/medicina-do-trabalho/cat",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          { id: "mt-cat-cadastrar", title: "Cadastrar", icon: "plus", path: "/medicina-do-trabalho/cat/cadastrar" },
+          { id: "mt-cat-detalhes", title: "Detalhes", icon: "eye", path: "/medicina-do-trabalho/cat/detalhes/:id", isDynamic: true },
+          { id: "mt-cat-editar", title: "Editar", icon: "edit", path: "/medicina-do-trabalho/cat/editar/:id", isDynamic: true },
         ],
       },
     ],

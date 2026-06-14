@@ -13,6 +13,8 @@ import { UserDocumentationCard } from "@/components/personnel-department/admissi
 import { UserPositionHistoryCard } from "@/components/personnel-department/user-position-history/detail/user-position-history-card";
 import { UserBenefitsCard } from "@/components/personnel-department/user-benefit/user-benefits-card";
 import { DependentsCard } from "@/components/human-resources/dependent/dependents-card";
+import { CollaboratorLoansCard } from "@/components/personnel-department/collaborator-loans-card";
+import { CollaboratorThirteenthCard } from "@/components/personnel-department/collaborator-thirteenth-card";
 import { UserDetailSkeleton } from "@/components/administration/user/detail/user-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
@@ -168,6 +170,12 @@ const CollaboratorDetailsPage = () => {
 
             {/* Dependentes (IRRF / Salário-Família) */}
             <DependentsCard userId={id} />
+
+            {/* Empréstimos / Adiantamentos (descontos consignados auto-aplicados) e 13º Salário */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <CollaboratorLoansCard userId={id} />
+              <CollaboratorThirteenthCard userId={id} />
+            </div>
 
             {/* Related Activities */}
             <RelatedActivitiesCard user={user} />

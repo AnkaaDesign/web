@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { IconFileText, IconUpload, IconLoader2, IconChevronDown } from "@tabler/icons-react";
+import { IconFileText, IconUpload, IconLoader2, IconChevronDown, IconDownload } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import {
   TERMINATION_DOCUMENT_STATUS,
@@ -14,6 +14,7 @@ import {
 import type { Termination, TerminationDocument } from "../../../../types/termination";
 import type { File as AnkaaFile } from "../../../../types";
 import { useTerminationDocumentUpload, useTerminationDocumentUpdate } from "../../../../hooks/personnel-department/use-terminations";
+import { downloadFile, downloadFileInBrowser } from "../../../../api-client";
 import { useContext } from "react";
 import { FileViewerContext } from "@/components/common/file";
 
@@ -45,8 +46,25 @@ export function DocumentsCard({ termination, disabled = false, className }: Docu
 
   const documents = termination.documents || [];
 
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+
   const handleFileClick = (file: AnkaaFile) => {
     fileViewerContext?.actions.viewFile(file);
+  };
+
+  const handleDownload = async (file: AnkaaFile) => {
+    try {
+      setDownloadingFileId(file.id);
+      const blob = await downloadFile(file.id);
+      downloadFileInBrowser(blob, file.filename);
+    } catch (error) {
+      // Error is handled by the API client with detailed message
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error downloading termination document:", error);
+      }
+    } finally {
+      setDownloadingFileId(null);
+    }
   };
 
   const handleUploadClick = (document: TerminationDocument) => {
@@ -108,6 +126,13 @@ export function DocumentsCard({ termination, disabled = false, className }: Docu
         {/* Hidden file input shared by every row */}
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
 
+        {documents.length > 0 && (
+          <p className="mb-3 text-xs text-muted-foreground">
+            O TRCT, a carta de aviso, o termo 484-A e o termo de homologação são gerados automaticamente em PDF ao entrar na etapa de Homologação. Use o botão de
+            download para baixar os arquivos gerados.
+          </p>
+        )}
+
         {documents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
             <IconFileText className="h-10 w-10 text-muted-foreground/50 mb-3" />
@@ -121,7 +146,7 @@ export function DocumentsCard({ termination, disabled = false, className }: Docu
                 <TableHead className="min-w-[200px]">Documento</TableHead>
                 <TableHead className="w-36">Status</TableHead>
                 <TableHead className="min-w-[180px]">Arquivo</TableHead>
-                <TableHead className="w-28 text-right">Ações</TableHead>
+                <TableHead className="w-36 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -179,16 +204,30 @@ export function DocumentsCard({ termination, disabled = false, className }: Docu
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUploadClick(document)}
-                        disabled={disabled || upload.isPending}
-                        title={disabled ? "Rescisões concluídas ou canceladas não podem ser alteradas." : document.file ? "Substituir arquivo" : "Anexar arquivo"}
-                      >
-                        {isUploadingThis ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconUpload className="h-4 w-4 mr-2" />}
-                        {document.file ? "Substituir" : "Anexar"}
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        {document.file && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleDownload(document.file!)}
+                            disabled={downloadingFileId === document.file.id}
+                            title="Baixar documento"
+                          >
+                            {downloadingFileId === document.file.id ? <IconLoader2 className="h-4 w-4 animate-spin" /> : <IconDownload className="h-4 w-4" />}
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUploadClick(document)}
+                          disabled={disabled || upload.isPending}
+                          title={disabled ? "Rescisões concluídas ou canceladas não podem ser alteradas." : document.file ? "Substituir arquivo" : "Anexar arquivo"}
+                        >
+                          {isUploadingThis ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconUpload className="h-4 w-4 mr-2" />}
+                          {document.file ? "Substituir" : "Anexar"}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

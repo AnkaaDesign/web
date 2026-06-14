@@ -7,7 +7,7 @@ import { IconCalendarOff, IconUser, IconNotes } from "@tabler/icons-react";
 import type { Leave } from "../../../../types/leave";
 import type { User } from "../../../../types";
 import { leaveCreateSchema, leaveUpdateSchema, type LeaveCreateFormData, type LeaveUpdateFormData } from "../../../../schemas/leave";
-import { routes, LEAVE_TYPE, LEAVE_STATUS, LEAVE_TYPE_LABELS } from "../../../../constants";
+import { routes, LEAVE_TYPE, LEAVE_STATUS, LEAVE_TYPE_LABELS, INSS_BENEFIT_SPECIES_LABELS } from "../../../../constants";
 import { useLeaveMutations } from "../../../../hooks/occupational-health/use-leaves";
 import { userService } from "../../../../api-client";
 
@@ -50,6 +50,7 @@ export function LeaveForm(props: LeaveFormProps) {
     expectedEndDate: null,
     cid: "",
     inssBenefitNumber: "",
+    inssBenefitSpecies: null,
     notes: "",
     ...(props.defaultValues || {}),
   };
@@ -63,6 +64,7 @@ export function LeaveForm(props: LeaveFormProps) {
           expectedEndDate: props.leave.expectedEndDate ? new Date(props.leave.expectedEndDate) : null,
           cid: props.leave.cid ?? "",
           inssBenefitNumber: props.leave.inssBenefitNumber ?? "",
+          inssBenefitSpecies: props.leave.inssBenefitSpecies ?? null,
           notes: props.leave.notes ?? "",
           ...(props.defaultValues || {}),
         }
@@ -83,6 +85,9 @@ export function LeaveForm(props: LeaveFormProps) {
 
   // Static options for the leave type select
   const typeOptions = useMemo(() => Object.entries(LEAVE_TYPE_LABELS).map(([value, label]) => ({ value, label })), []);
+
+  // Static options for the INSS benefit species select
+  const inssSpeciesOptions = useMemo(() => Object.entries(INSS_BENEFIT_SPECIES_LABELS).map(([value, label]) => ({ value, label })), []);
 
   // Async user combobox helpers
   const initialUserOptions = useMemo(() => (props.mode === "update" && props.leave.user ? [props.leave.user] : []), [props.mode === "update" ? props.leave.user?.id : undefined]);
@@ -127,6 +132,7 @@ export function LeaveForm(props: LeaveFormProps) {
         ...data,
         cid: data.cid?.trim() ? data.cid.trim() : null,
         inssBenefitNumber: showInssBenefitNumber && data.inssBenefitNumber?.trim() ? data.inssBenefitNumber.trim() : null,
+        inssBenefitSpecies: showInssBenefitNumber && data.inssBenefitSpecies ? data.inssBenefitSpecies : null,
         notes: data.notes?.trim() ? data.notes.trim() : null,
       };
 
@@ -270,6 +276,18 @@ export function LeaveForm(props: LeaveFormProps) {
                   />
                 )}
               </div>
+
+              {showInssBenefitNumber && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <FormCombobox
+                    name="inssBenefitSpecies"
+                    label="Espécie do Benefício INSS"
+                    placeholder="Selecione a espécie"
+                    options={inssSpeciesOptions}
+                    disabled={isSubmitting}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 

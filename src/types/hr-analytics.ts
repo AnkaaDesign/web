@@ -177,6 +177,36 @@ export interface HeadcountFilters {
 }
 
 // ---------------------------------------------------------------------------
+// Custo de Folha / Salário (Part F) — POST /human-resources/analytics/salary-cost
+// Reuses HeadcountFilters as the request body.
+// ---------------------------------------------------------------------------
+
+export interface SalaryCostSummary {
+  currentMonthlyCost: number;
+  averageMonthlyCost: number;
+  periodCount: number;
+}
+
+export interface SalaryCostTimeseriesItem {
+  period: string;
+  label: string;
+  monthlyCost: number;
+  headcount: number;
+  averageSalary: number;
+  resolvedCount: number;
+  unresolvedCount: number;
+}
+
+export interface SalaryCostData {
+  summary: SalaryCostSummary;
+  timeseries: SalaryCostTimeseriesItem[];
+}
+
+export interface SalaryCostResponse extends BaseResponse {
+  data: SalaryCostData;
+}
+
+// ---------------------------------------------------------------------------
 // Rotatividade (Turnover) Analytics
 // ---------------------------------------------------------------------------
 

@@ -79,3 +79,24 @@ export interface UserPositionHistoryOrderBy {
 export interface UserPositionHistoryGetUniqueResponse extends BaseGetUniqueResponse<UserPositionHistory> {}
 export interface UserPositionHistoryGetManyResponse extends BaseGetManyResponse<UserPositionHistory> {}
 export interface UserPositionHistoryPromoteResponse extends BaseCreateResponse<UserPositionHistory> {}
+
+// =====================
+// Salary-at-date resolver (Part F) — getUserSalaryAt
+// =====================
+
+export interface UserSalaryAtResult {
+  userId: string;
+  date: Date;
+  positionId: string | null;
+  positionName: string | null;
+  salary: number | null;
+  effectiveDate: Date | null;
+  source: "HISTORY" | "CURRENT_POSITION" | "NONE";
+  reason?: string;
+}
+
+export interface UserSalaryAtResponse {
+  success: boolean;
+  message: string;
+  data: UserSalaryAtResult | UserSalaryAtResult[] | null;
+}

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from "react";
-import { IconFilter } from "@tabler/icons-react";
+import { IconFilter, IconBriefcase, IconArrowDown, IconArrowUp, IconChartBar } from "@tabler/icons-react";
 
 import type { Position } from "../../../../types";
 import type { PositionGetManyFormData } from "../../../../schemas";
@@ -7,8 +7,9 @@ import { formatCurrency } from "../../../../utils";
 import { cn } from "@/lib/utils";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
+import { usePositions } from "../../../../hooks";
 
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
@@ -45,6 +46,26 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
     defaultPageSize: DEFAULT_PAGE_SIZE,
     resetSelectionOnPageChange: false,
   });
+
+  // Summary metrics across ALL positions (independent of pagination/filters).
+  // Single lightweight fetch — read-mostly aggregate for the salary-range cards.
+  const { data: summaryResponse } = usePositions({
+    orderBy: { hierarchy: "asc" },
+    limit: 100,
+  });
+
+  const summary = useMemo(() => {
+    const allPositions = summaryResponse?.data || [];
+    const values = allPositions.map((position) => position.remuneration ?? 0).filter((value) => value > 0);
+    const total = allPositions.length;
+    if (values.length === 0) {
+      return { total, min: 0, max: 0, avg: 0 };
+    }
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+    return { total, min, max, avg };
+  }, [summaryResponse?.data]);
 
   // Custom deserializer for position filters
   const deserializePositionFilters = useCallback((params: URLSearchParams): Partial<PositionGetManyFormData> => {
@@ -300,7 +321,56 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
   );
 
   return (
-    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+    <div className={cn("flex flex-col gap-4 min-h-0", className)}>
+      {/* Summary cards (merged from Faixas Salariais) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
+        <Card className="shadow-sm border border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <IconBriefcase className="h-4 w-4" />
+              Total de Cargos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{summary.total}</div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <IconArrowDown className="h-4 w-4" />
+              Menor Remuneração
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{summary.min > 0 ? formatCurrency(summary.min) : "—"}</div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <IconArrowUp className="h-4 w-4" />
+              Maior Remuneração
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{summary.max > 0 ? formatCurrency(summary.max) : "—"}</div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <IconChartBar className="h-4 w-4" />
+              Remuneração Média
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{summary.avg > 0 ? formatCurrency(summary.avg) : "—"}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="flex-1 flex flex-col shadow-sm border border-border min-h-0">
       <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -328,6 +398,7 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
           <PositionTable filters={queryFilters} className="h-full" onDataChange={handleTableDataChange} />
         </div>
       </CardContent>
+      </Card>
 
       {/* Enhanced Filter Modal */}
       <PositionFilters
@@ -339,6 +410,6 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
         currentBonifiable={currentBonifiable}
         currentHasUsers={currentHasUsers}
       />
-    </Card>
+    </div>
   );
 }

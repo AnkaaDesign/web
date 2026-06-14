@@ -2,6 +2,7 @@
 
 import { createEntityHooks } from "../common/create-entity-hooks";
 import { payrollService, discountService } from "../../api-client";
+import type { LoanRegisterFormData } from "../../api-client/services/discount";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import { payrollKeys, bonusKeys } from "../common/query-keys";
@@ -386,6 +387,73 @@ export const usePayrollDiscountMutations = () => {
     isLoading: addDiscount.isPending || removeDiscount.isPending || updateDiscount.isPending,
     error: addDiscount.error || removeDiscount.error || updateDiscount.error,
   };
+};
+
+// =====================================================
+// Employee-anchored loans / advances
+// =====================================================
+
+/**
+ * Lists a colaborador's persistent discounts (loans/advances). These are the
+ * master records (payrollId=null) the API auto-applies to every future folha.
+ */
+export const useUserLoans = (userId: string | undefined, options?: { enabled?: boolean }) => {
+  return useQuery({
+    queryKey: [...payrollKeys.all, "user-loans", userId],
+    queryFn: () =>
+      discountService
+        .getMany({ where: { userId: userId!, isPersistent: true }, orderBy: { createdAt: "desc" } })
+        .then((response) => response.data?.data ?? []),
+    enabled: (options?.enabled ?? true) && !!userId,
+    staleTime: 1000 * 60 * 2,
+  });
+};
+
+/**
+ * Lists ALL master loans/advances across every colaborador. A master record is
+ * `payrollId: null` with `discountType in (LOAN, ADVANCE)` — the persistent
+ * record the API auto-applies to future folhas. Includes the user relation so
+ * the list can show the colaborador's name. Ordered by createdAt desc.
+ */
+export const useLoanMasters = (options?: { enabled?: boolean }) => {
+  return useQuery({
+    queryKey: [...payrollKeys.all, "loan-masters"],
+    queryFn: () =>
+      discountService
+        .getMany({
+          where: { payrollId: null, discountType: { in: ["LOAN", "ADVANCE"] } },
+          include: { user: true },
+          orderBy: { createdAt: "desc" },
+        })
+        // Be resilient to the GET response shape (network vs cache path can differ):
+        // accept either the array directly or `{ data: [...] }`.
+        .then((response) => {
+          const body: any = response?.data;
+          if (Array.isArray(body)) return body;
+          if (Array.isArray(body?.data)) return body.data;
+          return [];
+        }),
+    enabled: options?.enabled ?? true,
+    staleTime: 1000 * 60 * 2,
+  });
+};
+
+/**
+ * Registers an employee-anchored loan/advance (POST /discount/loan). The master
+ * discount auto-applies to future folhas; 35% consignável is enforced server-side.
+ * Auto-toasts via the axios interceptor — no manual toast.
+ */
+export const useRegisterLoan = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: LoanRegisterFormData) =>
+      discountService.registerLoan(data).then((response) => response.data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
+      queryClient.invalidateQueries({ queryKey: [...payrollKeys.all, "user-loans", variables.userId] });
+      queryClient.invalidateQueries({ queryKey: [...payrollKeys.all, "loan-masters"] });
+    },
+  });
 };
 
 // =====================================================

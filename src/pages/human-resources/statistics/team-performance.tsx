@@ -564,7 +564,7 @@ function TeamDrillDownModal({
         ];
       }
     } else if (mode === 'dismissals') {
-      where.currentContractStatus = CONTRACT_STATUS.DISMISSED;
+      where.currentContractStatus = CONTRACT_STATUS.TERMINATED;
       if (startDate) {
         where.currentContract = {
           is: {
@@ -800,7 +800,7 @@ function TeamPeriodModal({
       where: {
         createdAt: { lte: range.to },
         OR: [
-          { currentContractStatus: { not: CONTRACT_STATUS.DISMISSED } },
+          { currentContractStatus: { not: CONTRACT_STATUS.TERMINATED } },
           { currentContract: { is: { terminationDate: { gte: range.from } } } },
         ],
       },
@@ -851,14 +851,22 @@ function TeamPeriodModal({
   }, [rawUsers, search, multiSector]);
 
   const statusLabel = (u: any): { label: string; tone: string } => {
-    // Dismissal is a lifecycle status orthogonal to the contract type — show it first.
-    if (u.currentContractStatus === CONTRACT_STATUS.DISMISSED) {
-      return { label: 'Desligado', tone: 'text-red-700 dark:text-red-400' };
+    // Lifecycle status (situação) is orthogonal to the contract modality. Show
+    // the situação first — it is what HR cares about — and only fall back to the
+    // legal modality when the bond is in a regular ACTIVE state.
+    switch (u.currentContractStatus) {
+      case CONTRACT_STATUS.TERMINATED:
+        return { label: 'Desligado', tone: 'text-red-700 dark:text-red-400' };
+      case CONTRACT_STATUS.EXPERIENCE:
+        return { label: 'Em experiência', tone: 'text-blue-700 dark:text-blue-400' };
+      case CONTRACT_STATUS.NOTICE_PERIOD:
+        return { label: 'Aviso prévio', tone: 'text-amber-700 dark:text-amber-400' };
+      case CONTRACT_STATUS.ON_LEAVE:
+        return { label: 'Afastado', tone: 'text-amber-700 dark:text-amber-400' };
     }
+    // ACTIVE (or unknown status): label by legal modality.
     switch (u.currentContractType) {
-      case CONTRACT_TYPE.EFFECTED: return { label: 'Efetivado', tone: 'text-emerald-700 dark:text-emerald-400' };
-      case CONTRACT_TYPE.EXPERIENCE_PERIOD_1: return { label: 'Experiência (30d)', tone: 'text-blue-700 dark:text-blue-400' };
-      case CONTRACT_TYPE.EXPERIENCE_PERIOD_2: return { label: 'Experiência (90d)', tone: 'text-blue-700 dark:text-blue-400' };
+      case CONTRACT_TYPE.INDETERMINATE: return { label: 'Efetivado', tone: 'text-emerald-700 dark:text-emerald-400' };
       case CONTRACT_TYPE.APPRENTICE: return { label: 'Aprendiz', tone: 'text-blue-700 dark:text-blue-400' };
       case CONTRACT_TYPE.FIXED_TERM: return { label: 'Prazo Determinado', tone: 'text-blue-700 dark:text-blue-400' };
       case CONTRACT_TYPE.INTERMITTENT: return { label: 'Intermitente', tone: 'text-violet-700 dark:text-violet-400' };

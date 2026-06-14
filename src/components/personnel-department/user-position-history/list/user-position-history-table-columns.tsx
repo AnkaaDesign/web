@@ -2,7 +2,6 @@ import React from "react";
 import { formatDate } from "../../../../utils";
 import { POSITION_CHANGE_REASON, POSITION_CHANGE_REASON_LABELS } from "../../../../constants";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { IconArrowRight, IconArrowUpRight, IconArrowDownRight, IconUserPlus, IconPencil } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
@@ -17,11 +16,14 @@ export interface UserPositionHistoryColumn {
   align?: "left" | "center" | "right";
 }
 
+// DEMOTION=Reversão, ADJUSTMENT=Readaptação e CORRECTION=Reenquadramento são
+// movimentos LÍCITOS (não punitivos), então usam variantes neutras — nada de
+// vermelho/"cancelled", que sugeriria rebaixamento.
 const REASON_BADGE_VARIANTS: Record<string, BadgeProps["variant"]> = {
   ADMISSION: "blue",
   PROMOTION: "active",
   TRANSFER: "secondary",
-  DEMOTION: "cancelled",
+  DEMOTION: "secondary",
   ADJUSTMENT: "muted",
   CORRECTION: "outline",
 };
@@ -60,7 +62,9 @@ export function PositionChangeSummary({ history, className }: { history: UserPos
 
   const arrowByReason: Record<string, React.ReactNode> = {
     [POSITION_CHANGE_REASON.PROMOTION]: <IconArrowUpRight className="h-4 w-4 flex-shrink-0 text-green-700 dark:text-green-500" />,
-    [POSITION_CHANGE_REASON.DEMOTION]: <IconArrowDownRight className="h-4 w-4 flex-shrink-0 text-red-700 dark:text-red-500" />,
+    // DEMOTION = Reversão (lícita, CLT art.468 §único): seta para baixo NEUTRA
+    // (não vermelha), pois não é punição/rebaixamento.
+    [POSITION_CHANGE_REASON.DEMOTION]: <IconArrowDownRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />,
   };
   const arrow = arrowByReason[history.reason] ?? <IconArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />;
 
@@ -74,7 +78,7 @@ export function PositionChangeSummary({ history, className }: { history: UserPos
         className={cn(
           "truncate font-medium",
           history.reason === POSITION_CHANGE_REASON.PROMOTION && "text-green-700 dark:text-green-500",
-          history.reason === POSITION_CHANGE_REASON.DEMOTION && "text-red-700 dark:text-red-500",
+          // Reversão (DEMOTION) é lícita — sem destaque vermelho.
         )}
         title={positionName}
       >
@@ -96,31 +100,20 @@ export function ChangedByLabel({ history, className }: { history: UserPositionHi
   );
 }
 
-const getInitials = (name?: string): string => {
-  if (!name) return "?";
-  const parts = name.trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-  return `${first}${last}`.toUpperCase() || "?";
-};
 
 export const createUserPositionHistoryColumns = (): UserPositionHistoryColumn[] => [
-  // Colaborador (avatar + name, same pattern used in user lists)
+  // Colaborador (apenas o nome — sem avatar, por decisão do owner)
   {
     key: "user.name",
     header: "COLABORADOR",
     accessor: (history: UserPositionHistory) => (
-      <div className="flex items-center gap-2 min-w-0">
-        <Avatar className="h-7 w-7 flex-shrink-0">
-          <AvatarFallback className="text-xs">{getInitials(history.user?.name)}</AvatarFallback>
-        </Avatar>
-        <div className="font-medium truncate" title={history.user?.name}>
-          {history.user?.name || <span className="text-muted-foreground">-</span>}
-        </div>
+      <div className="font-medium truncate" title={history.user?.name}>
+        {history.user?.name || <span className="text-muted-foreground">-</span>}
       </div>
     ),
     sortable: false,
-    className: "min-w-[220px]",
+    // table-layout:fixed ignora min-width — é o `w-` que define a largura da coluna.
+    className: "w-[340px] min-w-[340px]",
     align: "left",
   },
 

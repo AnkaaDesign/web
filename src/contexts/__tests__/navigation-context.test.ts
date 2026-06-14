@@ -224,7 +224,7 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
       { title: "Extrato", path: "/financeiro/conciliacao/extrato" },
       { title: "Saídas", path: "/financeiro/conciliacao/saidas" },
       { title: "Previsão de Saídas", path: "/financeiro/conciliacao/previsao-de-saidas" },
-      { title: "Conciliação de Entrada", path: "/financeiro/conciliacao/entradas" },
+      { title: "Entradas", path: "/financeiro/conciliacao/entradas" },
       { title: "Categorias", path: "/financeiro/conciliacao/categorias" },
     ]);
   });

@@ -15,19 +15,11 @@ import {
 import { formatDate } from "../../../../utils";
 import type { Termination } from "../../../../types/termination";
 import { isPaymentOverdue } from "../list/termination-table-columns";
+import { DetailRow } from "@/components/ui/detail-row";
 
 interface SummaryCardProps {
   termination: Termination;
   className?: string;
-}
-
-function SummaryRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-1.5">
-      <span className="text-sm text-muted-foreground shrink-0">{label}</span>
-      <span className="text-sm font-medium text-right">{children}</span>
-    </div>
-  );
 }
 
 export function SummaryCard({ termination, className }: SummaryCardProps) {
@@ -41,77 +33,86 @@ export function SummaryCard({ termination, className }: SummaryCardProps) {
           Resumo
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0 divide-y divide-border/50">
-        <SummaryRow label="Colaborador">
-          {termination.user ? (
-            <Link
-              to={routes.administration.collaborators.details(termination.userId)}
-              className="text-primary hover:underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {termination.user.name}
-            </Link>
-          ) : (
-            "-"
+      <CardContent className="pt-0">
+        <div className="space-y-2">
+          <DetailRow
+            label="Colaborador"
+            value={
+              termination.user ? (
+                <Link
+                  to={routes.administration.collaborators.details(termination.userId)}
+                  className="text-primary hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {termination.user.name}
+                </Link>
+              ) : (
+                "-"
+              )
+            }
+          />
+
+          {termination.user?.position?.name && <DetailRow label="Cargo" value={termination.user.position.name} />}
+          {termination.user?.sector?.name && <DetailRow label="Setor" value={termination.user.sector.name} />}
+
+          <DetailRow
+            label="Tipo"
+            value={
+              <Badge variant="secondary" className="text-xs">
+                {TERMINATION_TYPE_LABELS[termination.type] || termination.type}
+              </Badge>
+            }
+          />
+
+          <DetailRow
+            label="Status"
+            value={
+              <Badge variant={getBadgeVariantFromStatus(termination.status, "TERMINATION")} className="text-xs">
+                {TERMINATION_STATUS_LABELS[termination.status] || termination.status}
+              </Badge>
+            }
+          />
+
+          <DetailRow label="Aviso Prévio" value={termination.noticeType ? NOTICE_TYPE_LABELS[termination.noticeType] : "-"} />
+
+          <DetailRow label="Dias de Aviso" value={termination.noticeDays ?? "-"} />
+
+          {termination.noticeReduction && termination.noticeReduction !== NOTICE_REDUCTION.NONE && (
+            <DetailRow label="Redução do Aviso" value={NOTICE_REDUCTION_LABELS[termination.noticeReduction]} />
           )}
-        </SummaryRow>
 
-        {termination.user?.position?.name && <SummaryRow label="Cargo">{termination.user.position.name}</SummaryRow>}
-        {termination.user?.sector?.name && <SummaryRow label="Setor">{termination.user.sector.name}</SummaryRow>}
+          <DetailRow label="Início do Aviso" value={termination.noticeStartDate ? formatDate(new Date(termination.noticeStartDate)) : "-"} />
 
-        <SummaryRow label="Tipo">
-          <Badge variant="secondary" className="text-xs">
-            {TERMINATION_TYPE_LABELS[termination.type] || termination.type}
-          </Badge>
-        </SummaryRow>
+          <DetailRow label="Data da Rescisão" value={termination.terminationDate ? formatDate(new Date(termination.terminationDate)) : "-"} />
 
-        <SummaryRow label="Status">
-          <Badge variant={getBadgeVariantFromStatus(termination.status, "TERMINATION")} className="text-xs">
-            {TERMINATION_STATUS_LABELS[termination.status] || termination.status}
-          </Badge>
-        </SummaryRow>
+          <DetailRow label="Último Dia Trabalhado" value={termination.lastWorkingDate ? formatDate(new Date(termination.lastWorkingDate)) : "-"} />
 
-        <SummaryRow label="Aviso Prévio">{termination.noticeType ? NOTICE_TYPE_LABELS[termination.noticeType] : "-"}</SummaryRow>
+          <DetailRow label="Projeção do Contrato" value={termination.projectedEndDate ? formatDate(new Date(termination.projectedEndDate)) : "-"} />
 
-        <SummaryRow label="Dias de Aviso">{termination.noticeDays ?? "-"}</SummaryRow>
+          <DetailRow
+            label="Prazo de Pagamento"
+            value={
+              termination.paymentDueDate ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className={overdue ? "text-destructive font-medium" : undefined}>{formatDate(new Date(termination.paymentDueDate))}</span>
+                  {overdue && (
+                    <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                      Atrasado
+                    </Badge>
+                  )}
+                </span>
+              ) : (
+                "-"
+              )
+            }
+          />
 
-        {termination.noticeReduction && termination.noticeReduction !== NOTICE_REDUCTION.NONE && (
-          <SummaryRow label="Redução do Aviso">{NOTICE_REDUCTION_LABELS[termination.noticeReduction]}</SummaryRow>
-        )}
+          {termination.type === TERMINATION_TYPE.WITH_CAUSE && <DetailRow label="Artigo" value={termination.justCauseArticle || "-"} />}
 
-        <SummaryRow label="Início do Aviso">{termination.noticeStartDate ? formatDate(new Date(termination.noticeStartDate)) : "-"}</SummaryRow>
+          {termination.reason && <DetailRow label="Motivo" value={termination.reason} block />}
 
-        <SummaryRow label="Data da Rescisão">{termination.terminationDate ? formatDate(new Date(termination.terminationDate)) : "-"}</SummaryRow>
-
-        <SummaryRow label="Último Dia Trabalhado">{termination.lastWorkingDate ? formatDate(new Date(termination.lastWorkingDate)) : "-"}</SummaryRow>
-
-        <SummaryRow label="Projeção do Contrato">{termination.projectedEndDate ? formatDate(new Date(termination.projectedEndDate)) : "-"}</SummaryRow>
-
-        <SummaryRow label="Prazo de Pagamento">
-          {termination.paymentDueDate ? (
-            <span className="inline-flex items-center gap-2">
-              <span className={overdue ? "text-destructive font-medium" : undefined}>{formatDate(new Date(termination.paymentDueDate))}</span>
-              {overdue && (
-                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                  Atrasado
-                </Badge>
-              )}
-            </span>
-          ) : (
-            "-"
-          )}
-        </SummaryRow>
-
-        {termination.type === TERMINATION_TYPE.WITH_CAUSE && <SummaryRow label="Artigo">{termination.justCauseArticle || "-"}</SummaryRow>}
-
-        {termination.reason && (
-          <div className="py-1.5">
-            <span className="text-sm text-muted-foreground">Motivo</span>
-            <p className="text-sm font-medium mt-1 whitespace-pre-wrap">{termination.reason}</p>
-          </div>
-        )}
-
-        <SummaryRow label="Iniciada por">{termination.initiatedBy?.name || "-"}</SummaryRow>
+          <DetailRow label="Iniciada por" value={termination.initiatedBy?.name || "-"} />
+        </div>
       </CardContent>
     </Card>
   );

@@ -59,6 +59,19 @@ const pages: StatPage[] = [
     ],
   },
   {
+    title: "Custo de Folha",
+    description: "Custo total de pessoal com encargos, provisões e benefícios",
+    route: routes.statistics.humanResources.salaryCost,
+    icon: IconReportMoney,
+    tone: "cyan",
+    bullets: [
+      "Custo total com encargos (INSS, FGTS)",
+      "Provisões de férias e 13º",
+      "Custo de benefícios",
+      "Evolução e comparativos por período",
+    ],
+  },
+  {
     title: "Equipe",
     description: "Efetivo, admissões, desligamentos e taxa de rotatividade",
     route: routes.statistics.humanResources.teamPerformance,

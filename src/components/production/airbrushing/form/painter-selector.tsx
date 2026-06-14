@@ -102,7 +102,7 @@ export function PainterSelector({
   // Render painter options with a "Desligado" badge for dismissed users
   // (they stay selectable so they can still be paid, but should be visually flagged)
   const renderPainterOption = useCallback((option: ComboboxOption) => {
-    const isDismissed = option.metadata?.status === CONTRACT_STATUS.DISMISSED;
+    const isDismissed = option.metadata?.status === CONTRACT_STATUS.TERMINATED;
     return (
       <div className="flex items-center justify-between gap-2 w-full">
         <div className="flex flex-col min-w-0">

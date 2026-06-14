@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle, IconCalendarCheck } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, LEAVE_STATUS } from "../../../../constants";
+import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, LEAVE_STATUS, CONTRACT_STATUS } from "../../../../constants";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useLeave, useLeaveMutations } from "../../../../hooks/occupational-health/use-leaves";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
-import { CollaboratorCard, LeaveInfoCard, LeaveFilesCard, ScheduleReturnExamDialog, ReturnExamAlert } from "@/components/occupational-health/leave/detail";
+import { CollaboratorCard, LeaveInfoCard, LeavePayrollSplitCard, LeaveFilesCard, ScheduleReturnExamDialog, ReturnExamAlert } from "@/components/occupational-health/leave/detail";
 import { FinishLeaveDialog } from "@/components/occupational-health/leave/finish-leave-dialog";
 
 export const LeaveDetailPage = () => {
@@ -39,6 +40,7 @@ export const LeaveDetailPage = () => {
         include: {
           position: true,
           sector: true,
+          currentContract: true,
         },
       },
       files: true,
@@ -79,6 +81,7 @@ export const LeaveDetailPage = () => {
 
   const isFinishable = leave.status === LEAVE_STATUS.SCHEDULED || leave.status === LEAVE_STATUS.ACTIVE;
   const showReturnExamAlert = leave.returnExamRequired && leave.status !== LEAVE_STATUS.CANCELLED;
+  const isContractOnLeave = leave.user?.currentContract?.status === CONTRACT_STATUS.ON_LEAVE;
 
   const handleDelete = async () => {
     try {
@@ -150,6 +153,16 @@ export const LeaveDetailPage = () => {
             {/* Return exam alert (shows the auto-created exam's status when it exists) */}
             {showReturnExamAlert && <ReturnExamAlert leave={leave} onScheduleClick={() => setIsScheduleExamDialogOpen(true)} />}
 
+            {/* Vínculo ON_LEAVE linkage — o contrato do colaborador está marcado como afastado */}
+            {isContractOnLeave && (
+              <Alert variant="warning">
+                <AlertTitle>Vínculo afastado</AlertTitle>
+                <AlertDescription>
+                  O vínculo atual de {leave.user?.name || "este colaborador"} está com situação <strong>Afastado (ON_LEAVE)</strong>. A folha será proporcionalizada enquanto o afastamento estiver ativo.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Info cards grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
               <div className="space-y-4">
@@ -157,6 +170,7 @@ export const LeaveDetailPage = () => {
                 <LeaveInfoCard leave={leave} />
               </div>
               <div className="space-y-4">
+                <LeavePayrollSplitCard leave={leave} />
                 <LeaveFilesCard leave={leave} />
                 <ChangelogHistory
                   entityType={CHANGE_LOG_ENTITY_TYPE.LEAVE}

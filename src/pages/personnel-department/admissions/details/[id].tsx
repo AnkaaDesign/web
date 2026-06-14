@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
-import { IconEdit, IconTrash, IconRefresh, IconBan, IconPlayerTrackNext } from "@tabler/icons-react";
+import { IconEdit, IconTrash, IconRefresh, IconBan, IconPlayerTrackNext, IconFileText } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, ADMISSION_STATUS, ADMISSION_STATUS_LABELS } from "../../../../constants";
 import { useAdmission, useAdmissionMutations, useAdmissionAdvance } from "@/hooks/personnel-department/use-admissions";
 import { useAuth } from "@/hooks/common/use-auth";
+import { getPositionMonthlySalary } from "@/utils/overtime-cost";
+import { generateEmploymentContractPDF } from "@/utils/employment-contract-pdf-generator";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -44,9 +46,15 @@ export const AdmissionDetailPage = () => {
     isRefetching,
   } = useAdmission(id || "", {
     include: {
-      user: { include: { position: true, sector: true } },
+      user: {
+        include: {
+          position: { include: { remunerations: true } },
+          sector: true,
+          currentContract: true,
+        },
+      },
       createdBy: true,
-      documents: { include: { file: true }, orderBy: { type: "asc" } },
+      documents: { include: { file: true, signedFile: true, signedBy: true }, orderBy: { type: "asc" } },
     },
     enabled: !!id,
   });
@@ -123,6 +131,28 @@ export const AdmissionDetailPage = () => {
     setDeleteDialogOpen(false);
   };
 
+  const handleGenerateContract = () => {
+    const u = admission.user;
+    const contract = u?.currentContract;
+    generateEmploymentContractPDF({
+      employeeName: u?.name ?? "Colaborador",
+      cpf: u?.cpf ?? null,
+      position: u?.position?.name ?? null,
+      sector: u?.sector?.name ?? null,
+      monthlySalary: getPositionMonthlySalary(u?.position),
+      admissionDate: admission.hireDate ?? contract?.admissionDate ?? null,
+      employeeType: u?.currentEmployeeType ?? contract?.employeeType ?? null,
+      contractType: u?.currentContractType ?? contract?.contractType ?? null,
+      contractStatus: u?.currentContractStatus ?? contract?.status ?? null,
+      exp1StartAt: contract?.exp1StartAt ?? null,
+      exp1EndAt: contract?.exp1EndAt ?? null,
+      exp2StartAt: contract?.exp2StartAt ?? null,
+      exp2EndAt: contract?.exp2EndAt ?? null,
+      providerName: contract?.providerName ?? null,
+      providerCnpj: contract?.providerCnpj ?? null,
+    });
+  };
+
   const actions = [
     {
       key: "refresh",
@@ -145,6 +175,12 @@ export const AdmissionDetailPage = () => {
           },
         ]
       : []),
+    {
+      key: "employment-contract",
+      label: "Gerar Contrato de Trabalho",
+      icon: IconFileText,
+      onClick: handleGenerateContract,
+    },
     {
       key: "edit",
       label: "Editar",
@@ -197,25 +233,20 @@ export const AdmissionDetailPage = () => {
             {/* Status stepper */}
             <StatusCard admission={admission} />
 
-            {/* Documentação (spec stage 2) is the centerpiece while the
-                process is collecting documents (DOCS_PENDING); afterwards it
-                moves below the summary/changelog grid. */}
-            {admission.status === ADMISSION_STATUS.DOCS_PENDING && <DocumentsCard admission={admission} />}
-
-            {/* User summary and Changelog Grid */}
+            {/* Colaborador (resumo) e Documentação lado a lado — cada um ocupa
+                metade da largura em telas grandes; empilham no mobile. */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
               <UserCard admission={admission} className="h-full" />
-              <ChangelogHistory
-                entityType={CHANGE_LOG_ENTITY_TYPE.ADMISSION}
-                entityId={id}
-                entityName={title}
-                entityCreatedAt={admission.createdAt}
-                className="h-full"
-              />
+              <DocumentsCard admission={admission} className="h-full" />
             </div>
 
-            {/* Documents checklist */}
-            {admission.status !== ADMISSION_STATUS.DOCS_PENDING && <DocumentsCard admission={admission} />}
+            {/* Changelog — always the last section on the page. */}
+            <ChangelogHistory
+              entityType={CHANGE_LOG_ENTITY_TYPE.ADMISSION}
+              entityId={id}
+              entityName={title}
+              entityCreatedAt={admission.createdAt}
+            />
           </div>
         </div>
 

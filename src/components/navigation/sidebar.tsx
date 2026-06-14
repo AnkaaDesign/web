@@ -818,8 +818,9 @@ export const Sidebar = memo(() => {
           className={cn(
             "group relative flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 min-h-[40px]",
             isNavigating && "bg-primary text-primary-foreground scale-[0.98]",
-            !isNavigating && isHighlighted && "bg-primary text-primary-foreground hover:bg-primary/90",
-            !isNavigating && !isHighlighted && isAncestorOfActive && "bg-muted/60 hover:bg-muted",
+            // The active leaf AND its ancestor section both get the SAME full active style,
+            // so the parent (e.g. "Financeiro") is highlighted exactly like the active page.
+            !isNavigating && (isHighlighted || isAncestorOfActive) && "bg-primary text-primary-foreground hover:bg-primary/90",
             !isNavigating && !isHighlighted && !isAncestorOfActive && "hover:bg-muted/50",
           )}
           onClick={handleItemClick}

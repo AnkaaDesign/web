@@ -11,6 +11,7 @@ import {
   suspendUserBenefit,
   reactivateUserBenefit,
   terminateUserBenefit,
+  advanceUserBenefitInstallment,
   uploadUserBenefitDeclaration,
   batchCreateUserBenefits,
   batchUpdateUserBenefits,
@@ -123,6 +124,15 @@ export function useUploadUserBenefitDeclaration() {
   const invalidate = useInvalidateUserBenefits();
   return useMutation({
     mutationFn: ({ id, file, include }: { id: string; file: globalThis.File; include?: any }) => uploadUserBenefitDeclaration(id, file, include ? { include } : undefined),
+    onSuccess: invalidate,
+  });
+}
+
+/** PUT /user-benefits/:id/advance-installment — convênios parcelados (Part H). */
+export function useAdvanceUserBenefitInstallment() {
+  const invalidate = useInvalidateUserBenefits();
+  return useMutation({
+    mutationFn: ({ id, include }: { id: string; include?: any }) => advanceUserBenefitInstallment(id, include ? { include } : undefined),
     onSuccess: invalidate,
   });
 }

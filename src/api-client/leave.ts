@@ -13,6 +13,7 @@ import type {
   LeaveBatchCreateResponse,
   LeaveBatchUpdateResponse,
   LeaveBatchDeleteResponse,
+  LeavePayrollSplitResponse,
 } from "../types/leave";
 
 // =====================
@@ -68,6 +69,12 @@ export class LeaveService {
     const response = await apiClient.put<LeaveUpdateResponse>(`${this.basePath}/${id}/finish`, data, {
       params: query,
     });
+    return response.data;
+  }
+
+  // GET :id/payroll-split — first-15-days-employer / 16th-day-INSS split for folha.
+  async getLeavePayrollSplit(id: string): Promise<LeavePayrollSplitResponse> {
+    const response = await apiClient.get<LeavePayrollSplitResponse>(`${this.basePath}/${id}/payroll-split`);
     return response.data;
   }
 
@@ -130,6 +137,7 @@ export const createLeave = (data: LeaveCreateFormData, query?: any) => leaveServ
 export const updateLeave = (id: string, data: LeaveUpdateFormData, query?: any) => leaveService.updateLeave(id, data, query);
 export const deleteLeave = (id: string) => leaveService.deleteLeave(id);
 export const finishLeave = (id: string, data: { actualEndDate: Date }, query?: any) => leaveService.finishLeave(id, data, query);
+export const getLeavePayrollSplit = (id: string) => leaveService.getLeavePayrollSplit(id);
 export const uploadLeaveFiles = (id: string, files: globalThis.File[], query?: any) => leaveService.uploadLeaveFiles(id, files, query);
 
 // Batch Operations

@@ -175,9 +175,5 @@ export function AdmissionForm(props: AdmissionFormProps) {
     return <AdmissionUpdateForm admission={props.admission} onSubmit={props.onSubmit} isSubmitting={props.isSubmitting} />;
   }
 
-  return (
-    <div className="container mx-auto max-w-4xl">
-      <AdmissionNewUserForm onSubmit={props.onSubmit} isSubmitting={props.isSubmitting} />
-    </div>
-  );
+  return <AdmissionNewUserForm onSubmit={props.onSubmit} isSubmitting={props.isSubmitting} />;
 }

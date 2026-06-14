@@ -4,12 +4,12 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { SECTOR_PRIVILEGES } from "@/constants";
 
 /**
- * Conciliação de Entrada — the CREDIT-side workspace (spec §4.4). Receipts are
+ * Entradas — the CREDIT-side workspace (spec §4.4). Receipts are
  * matched against issued bank slips (ponte de boleto) and outbound NFs via the
  * same candidate/matching flow as Saídas.
  */
 export const ReconciliationInflowsPage = () => {
-  usePageTracker({ title: "Entradas - Conciliação", icon: "arrow-down-left" });
+  usePageTracker({ title: "Entradas", icon: "arrow-down-left" });
   return (
     <PrivilegeRoute
       requiredPrivilege={[

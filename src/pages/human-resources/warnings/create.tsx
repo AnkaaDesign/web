@@ -1,8 +1,9 @@
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconAlertTriangle, IconX, IconCheck } from "@tabler/icons-react";
-import { routes, FAVORITE_PAGES } from "../../../constants";
+import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../constants";
 import { PageHeader } from "@/components/ui/page-header";
+import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { WarningForm } from "@/components/human-resources/warning/form";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
@@ -24,7 +25,8 @@ export const WarningCreatePage = () => {
   };
 
   return (
-    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
         title="Nova Advertência"
         icon={IconAlertTriangle}
@@ -57,6 +59,7 @@ export const WarningCreatePage = () => {
       <div className="flex-1 overflow-y-auto pb-6">
         <WarningForm mode="create" ref={formRef} />
       </div>
-    </div>
+      </div>
+    </PrivilegeRoute>
   );
 };

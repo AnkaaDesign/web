@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { IconBriefcase, IconAlertTriangle } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { formatDate } from "../../../../utils";
-import { CONTRACT_TYPE_LABELS, CONTRACT_STATUS, CONTRACT_STATUS_LABELS, EMPLOYEE_TYPE_LABELS } from "../../../../constants";
+import { CONTRACT_TYPE_LABELS, CONTRACT_STATUS, CONTRACT_STATUS_LABELS, EMPLOYEE_TYPE_LABELS, STABILITY_TYPE_LABELS } from "../../../../constants";
 import { useEmploymentContracts } from "../../../../hooks/personnel-department/use-employment-contracts";
 import type { EmploymentContract } from "../../../../types/employment-contract";
 
@@ -62,8 +62,20 @@ export function EmploymentHistoryCard({ userId, className, maxHeight }: Employme
         ) : (
           <ol className="space-y-3">
             {contracts.map((contract) => {
-              const isDismissed = contract.status === CONTRACT_STATUS.DISMISSED;
+              const isExperience = contract.status === CONTRACT_STATUS.EXPERIENCE;
+              const isTerminated = contract.status === CONTRACT_STATUS.TERMINATED;
+              const isOnLeave = contract.status === CONTRACT_STATUS.ON_LEAVE;
+              const isNoticePeriod = contract.status === CONTRACT_STATUS.NOTICE_PERIOD;
               const admission = contract.admissionDate ?? contract.exp1StartAt ?? null;
+
+              // Experiência phase is derived from the dates unless explicitly set.
+              const experiencePhase = isExperience
+                ? contract.experiencePhase ?? (contract.exp2StartAt ? 2 : 1)
+                : null;
+
+              const hasStability =
+                !!contract.stabilityType && (!!contract.stabilityStart || !!contract.stabilityEnd);
+
               return (
                 <li
                   key={contract.id}
@@ -83,6 +95,7 @@ export function EmploymentHistoryCard({ userId, className, maxHeight }: Employme
                         )}
                         <Badge variant={getBadgeVariantFromStatus(contract.status, "CONTRACT_STATUS")} className="text-xs">
                           {CONTRACT_STATUS_LABELS[contract.status] || contract.status}
+                          {experiencePhase ? ` ${experiencePhase}` : ""}
                         </Badge>
                         {contract.isCurrent && <span className="text-xs text-primary font-medium">Atual</span>}
                       </div>
@@ -91,10 +104,21 @@ export function EmploymentHistoryCard({ userId, className, maxHeight }: Employme
                         {contract.position?.name ? ` · ${contract.position.name}` : ""}
                         {contract.sector?.name ? ` · ${contract.sector.name}` : ""}
                       </div>
+                      {hasStability && (
+                        <div className="text-xs text-amber-600 dark:text-amber-500">
+                          Estabilidade: {contract.stabilityType ? STABILITY_TYPE_LABELS[contract.stabilityType] : "-"}
+                          {contract.stabilityStart || contract.stabilityEnd
+                            ? ` (${contract.stabilityStart ? formatDate(contract.stabilityStart) : "?"} – ${contract.stabilityEnd ? formatDate(contract.stabilityEnd) : "?"})`
+                            : ""}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right text-xs text-muted-foreground whitespace-nowrap">
                       <div>Admissão: {admission ? formatDate(admission) : "-"}</div>
-                      {isDismissed && <div>Desligamento: {contract.terminationDate ? formatDate(contract.terminationDate) : "-"}</div>}
+                      {contract.effectedAt && <div>Efetivado: {formatDate(contract.effectedAt)}</div>}
+                      {isNoticePeriod && <div>Em aviso prévio</div>}
+                      {isOnLeave && <div>Afastado</div>}
+                      {isTerminated && <div>Desligamento: {contract.terminationDate ? formatDate(contract.terminationDate) : "-"}</div>}
                     </div>
                   </div>
                 </li>

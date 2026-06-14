@@ -108,10 +108,10 @@ const HumanResourcesBonusDetail = lazy(() => import("@/pages/human-resources/bon
 const HumanResourcesBonusSimulation = lazy(() => import("@/pages/human-resources/simulacao-bonus").then((module) => ({ default: module.default })));
 
 // Personnel Department - Salários e Cargos (W3A)
+const PersonnelDepartmentLoansList = lazy(() => import("@/pages/personnel-department/loans/list").then((module) => ({ default: module.LoanListPage })));
 const PersonnelDepartmentSalaryAdjustmentsList = lazy(() => import("@/pages/personnel-department/salary-adjustments/list").then((module) => ({ default: module.SalaryAdjustmentListPage })));
 const PersonnelDepartmentSalaryAdjustmentDetails = lazy(() => import("@/pages/personnel-department/salary-adjustments/details/[id]").then((module) => ({ default: module.SalaryAdjustmentDetailPage })));
 const PersonnelDepartmentPromotionsList = lazy(() => import("@/pages/personnel-department/promotions/list").then((module) => ({ default: module.PromotionListPage })));
-const PersonnelDepartmentSalaryRangesList = lazy(() => import("@/pages/personnel-department/salary-ranges/list").then((module) => ({ default: module.SalaryRangeListPage })));
 
 // Personnel Department - Admissões + Rescisões (W3B)
 const PersonnelDepartmentAdmissionsList = lazy(() => import("@/pages/personnel-department/admissions/list"));
@@ -123,6 +123,12 @@ const PersonnelDepartmentTerminationsCreate = lazy(() => import("@/pages/personn
 const PersonnelDepartmentTerminationsEdit = lazy(() => import("@/pages/personnel-department/terminations/edit/[id]").then((module) => ({ default: module.TerminationEditPage })));
 const PersonnelDepartmentTerminationsDetails = lazy(() => import("@/pages/personnel-department/terminations/details/[id]").then((module) => ({ default: module.TerminationDetailPage })));
 
+// Personnel Department - Férias (Área Andressa)
+const PersonnelDepartmentVacationsList = lazy(() => import("@/pages/personnel-department/vacations/list"));
+const PersonnelDepartmentVacationsCreate = lazy(() => import("@/pages/personnel-department/vacations/create").then((module) => ({ default: module.VacationCreatePage })));
+const PersonnelDepartmentVacationsDetails = lazy(() => import("@/pages/personnel-department/vacations/details/[id]").then((module) => ({ default: module.VacationDetailPage })));
+const PersonnelDepartmentVacationsEdit = lazy(() => import("@/pages/personnel-department/vacations/edit/[id]").then((module) => ({ default: module.VacationEditPage })));
+
 // Occupational Health - Medicina do Trabalho (W3C)
 const OccupationalHealthMedicalExamsList = lazy(() => import("@/pages/occupational-health/medical-exams/list").then((module) => ({ default: module.MedicalExamListPage })));
 const OccupationalHealthMedicalExamsCreate = lazy(() => import("@/pages/occupational-health/medical-exams/create").then((module) => ({ default: module.MedicalExamCreatePage })));
@@ -133,6 +139,12 @@ const OccupationalHealthLeavesList = lazy(() => import("@/pages/occupational-hea
 const OccupationalHealthLeavesCreate = lazy(() => import("@/pages/occupational-health/leaves/create").then((module) => ({ default: module.LeaveCreatePage })));
 const OccupationalHealthLeavesEdit = lazy(() => import("@/pages/occupational-health/leaves/edit/[id]").then((module) => ({ default: module.LeaveEditPage })));
 const OccupationalHealthLeavesDetails = lazy(() => import("@/pages/occupational-health/leaves/details/[id]").then((module) => ({ default: module.LeaveDetailPage })));
+
+// Occupational Health - CAT / Acidentes de Trabalho (Área Andressa)
+const OccupationalHealthWorkAccidentsList = lazy(() => import("@/pages/occupational-health/work-accidents/list").then((module) => ({ default: module.WorkAccidentListPage })));
+const OccupationalHealthWorkAccidentsCreate = lazy(() => import("@/pages/occupational-health/work-accidents/create").then((module) => ({ default: module.WorkAccidentCreatePage })));
+const OccupationalHealthWorkAccidentsDetails = lazy(() => import("@/pages/occupational-health/work-accidents/details/[id]").then((module) => ({ default: module.WorkAccidentDetailPage })));
+const OccupationalHealthWorkAccidentsEdit = lazy(() => import("@/pages/occupational-health/work-accidents/edit/[id]").then((module) => ({ default: module.WorkAccidentEditPage })));
 
 // Personnel Department - Benefícios / Adesões (W3C)
 const PersonnelDepartmentBenefitsList = lazy(() => import("@/pages/personnel-department/benefits/list").then((module) => ({ default: module.BenefitListPage })));
@@ -284,6 +296,7 @@ const FinancialNfseStatistics = lazy(() => import("@/pages/financial/statistics/
 const HRPayrollStatistics = lazy(() => import("@/pages/human-resources/statistics/payroll").then((module) => ({ default: module.default })));
 const HRTeamPerformanceStatistics = lazy(() => import("@/pages/human-resources/statistics/team-performance").then((module) => ({ default: module.default })));
 const HRFaltasStatistics = lazy(() => import("@/pages/human-resources/statistics/faltas").then((module) => ({ default: module.default })));
+const HRSalaryCostStatistics = lazy(() => import("@/pages/human-resources/statistics/salary-cost").then((module) => ({ default: module.default })));
 const HRSkillAssessmentStatistics = lazy(() => import("@/pages/human-resources/statistics/skill-assessment").then((module) => ({ default: module.default })));
 
 // Statistics Hub Pages
@@ -433,7 +446,6 @@ const HumanResourcesHolidays = lazy(() => import("@/pages/human-resources/holida
 const HumanResourcesHolidaysCalendar = lazy(() => import("@/pages/human-resources/holidays/calendar").then((module) => ({ default: module.HolidayCalendarPage })));
 const HumanResourcesHolidaysCreate = lazy(() => import("@/pages/human-resources/holidays/cadastrar").then((module) => ({ default: module.HolidayCreatePage })));
 const HumanResourcesSchedules = lazy(() => import("@/pages/human-resources/schedules/list").then((module) => ({ default: module.SchedulesListPage })));
-const HumanResourcesVacations = lazy(() => import("@/pages/human-resources/vacations/list").then((module) => ({ default: module.VacationsListPage })));
 const HumanResourcesHRCalendar = lazy(() => import("@/pages/human-resources/calendar").then((module) => ({ default: module.HRCalendarPage })));
 const HumanResourcesTimeClock = lazy(() => import("@/pages/human-resources/time-clock/list"));
 const HumanResourcesTimeClockColaborador = lazy(
@@ -1658,6 +1670,10 @@ function App() {
                   element={<Suspense fallback={<PageLoader />}><HRPayrollStatistics /></Suspense>}
                 />
                 <Route
+                  path={routes.statistics.humanResources.salaryCost}
+                  element={<Suspense fallback={<PageLoader />}><HRSalaryCostStatistics /></Suspense>}
+                />
+                <Route
                   path={routes.statistics.humanResources.teamPerformance}
                   element={<Suspense fallback={<PageLoader />}><HRTeamPerformanceStatistics /></Suspense>}
                 />
@@ -2791,14 +2807,6 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.vacations.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesVacations />
-                    </Suspense>
-                  }
-                />
-                <Route
                   path={routes.humanResources.calendar.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -2937,6 +2945,48 @@ function App() {
                     </Suspense>
                   }
                 />
+                {/* Departamento Pessoal — Férias */}
+                <Route
+                  path={routes.personnelDepartment.vacations.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentVacationsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.vacations.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentVacationsCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.vacations.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentVacationsDetails />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.vacations.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentVacationsEdit />
+                    </Suspense>
+                  }
+                />
+                {/* Departamento Pessoal — Empréstimos */}
+                <Route
+                  path={routes.humanResources.loans.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentLoansList />
+                    </Suspense>
+                  }
+                />
                 {/* Departamento Pessoal — Salários e Cargos */}
                 <Route
                   path={routes.personnelDepartment.salaryAdjustments.root}
@@ -2959,14 +3009,6 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PersonnelDepartmentPromotionsList />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personnelDepartment.salaryRanges.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonnelDepartmentSalaryRangesList />
                     </Suspense>
                   }
                 />
@@ -3108,6 +3150,39 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <OccupationalHealthLeavesDetails />
+                    </Suspense>
+                  }
+                />
+                {/* Medicina do Trabalho — CAT (Acidentes de Trabalho) */}
+                <Route
+                  path={routes.occupationalHealth.workAccidents.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthWorkAccidentsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.workAccidents.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthWorkAccidentsCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.workAccidents.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthWorkAccidentsDetails />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.workAccidents.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthWorkAccidentsEdit />
                     </Suspense>
                   }
                 />

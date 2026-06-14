@@ -1,8 +1,8 @@
 // packages/hooks/src/useLeaves.ts
 // Afastamentos (Medicina do Trabalho)
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { getLeaves, getLeaveById, createLeave, updateLeave, deleteLeave, finishLeave, uploadLeaveFiles, batchCreateLeaves, batchUpdateLeaves, batchDeleteLeaves } from "../../api-client/leave";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getLeaves, getLeaveById, createLeave, updateLeave, deleteLeave, finishLeave, getLeavePayrollSplit, uploadLeaveFiles, batchCreateLeaves, batchUpdateLeaves, batchDeleteLeaves } from "../../api-client/leave";
 import type { LeaveGetManyFormData, LeaveCreateFormData, LeaveUpdateFormData, LeaveBatchCreateFormData, LeaveBatchUpdateFormData, LeaveBatchDeleteFormData } from "../../schemas/leave";
 import type {
   Leave,
@@ -93,5 +93,16 @@ export function useUploadLeaveFiles() {
       queryClient.invalidateQueries({ queryKey: leaveKeys.all });
       queryClient.invalidateQueries({ queryKey: changeLogKeys.all });
     },
+  });
+}
+
+// GET :id/payroll-split — primeiros 15 dias empregador / 16º dia INSS (Part E).
+export function useLeavePayrollSplit(id: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...leaveKeys.detail(id), "payroll-split"] as const,
+    queryFn: () => getLeavePayrollSplit(id),
+    enabled: (options?.enabled ?? true) && !!id,
+    staleTime: 1000 * 60 * 5,
+    retry: 2,
   });
 }

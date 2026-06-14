@@ -190,6 +190,8 @@ export const dependentCreateSchema = z.object({
   }),
   irrfDeduction: z.boolean().default(true),
   salarioFamilia: z.boolean().default(false),
+  healthPlanBenefitId: z.string().uuid({ message: "Plano inválido" }).nullable().optional(),
+  healthPlanValue: z.number({ invalid_type_error: "Valor inválido" }).min(0, "O valor do plano não pode ser negativo").nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
 });
 
@@ -205,6 +207,8 @@ export const dependentUpdateSchema = z.object({
     .optional(),
   irrfDeduction: z.boolean().optional(),
   salarioFamilia: z.boolean().optional(),
+  healthPlanBenefitId: z.string().uuid({ message: "Plano inválido" }).nullable().optional(),
+  healthPlanValue: z.number({ invalid_type_error: "Valor inválido" }).min(0, "O valor do plano não pode ser negativo").nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
 });
 

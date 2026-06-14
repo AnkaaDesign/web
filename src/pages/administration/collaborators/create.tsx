@@ -94,7 +94,7 @@ const CreateCollaboratorPage = () => {
             actions={actions}
           />
         </div>
-        <div className="flex-1 overflow-y-auto pb-6">
+        <div className="flex-1 overflow-y-auto pb-6 [scrollbar-gutter:stable_both-edges]">
           <UserForm mode="create" onSubmit={handleSubmit} isSubmitting={isCreating} onFormStateChange={setFormState} />
         </div>
       </div>

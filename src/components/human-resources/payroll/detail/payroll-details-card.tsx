@@ -9,7 +9,7 @@ import {
   IconCalculator,
   IconChartLine
 } from "@tabler/icons-react";
-import { CONTRACT_TYPE } from "../../../../constants";
+import { CONTRACT_STATUS } from "../../../../constants";
 
 interface PayrollDetailsCardProps {
   users: PayrollUserRow[];
@@ -46,12 +46,13 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
       totalRemuneration += remuneration;
 
       // Eligible for bonus = the canonical four predicates (must match the API
-      // live calc): EFFECTED + bonifiable + performanceLevel > 0 + registered in
-      // Secullum. Previously this only checked EFFECTED + bonifiable, inflating
-      // the eligible count and skewing the average-bonus denominator.
+      // live calc): confirmed bond (status ACTIVE) + bonifiable + performanceLevel > 0
+      // + registered in Secullum. The vínculo redesign moved "efetivado" from the
+      // CONTRACT_TYPE modality onto the orthogonal CONTRACT_STATUS lifecycle, so a
+      // confirmed bond is now status === ACTIVE (replaces the old EFFECTED type).
       const u = user as typeof user & { performanceLevel?: number | null; secullumEmployeeId?: number | null };
       const isEligible =
-        u.currentContractType === CONTRACT_TYPE.EFFECTED &&
+        u.currentContractStatus === CONTRACT_STATUS.ACTIVE &&
         u.position?.bonifiable === true &&
         (u.performanceLevel ?? 0) > 0 &&
         u.secullumEmployeeId != null;

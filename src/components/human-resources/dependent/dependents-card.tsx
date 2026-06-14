@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { IconUsers, IconPlus, IconEdit, IconTrash, IconLoader2, IconId, IconCake, IconReceiptTax, IconCoin } from "@tabler/icons-react";
+import { IconUsers, IconPlus, IconEdit, IconTrash, IconLoader2, IconId, IconCake, IconReceiptTax, IconCoin, IconHeartHandshake } from "@tabler/icons-react";
 
 import type { Dependent } from "../../../types/dependent";
 import { dependentCreateSchema, type DependentCreateFormData, type DependentUpdateFormData } from "../../../schemas/dependent";
-import { DEPENDENT_RELATIONSHIP_LABELS } from "../../../constants";
+import { DEPENDENT_RELATIONSHIP_LABELS, BENEFIT_KIND, BENEFIT_ENROLLMENT_STATUS } from "../../../constants";
 import { useDependents, useDependentMutations } from "../../../hooks/human-resources/use-dependents";
-import { formatCPF, formatDate } from "../../../utils";
+import { useUserBenefits } from "../../../hooks/personnel-department/use-user-benefits";
+import { formatCPF, formatCurrency, formatDate } from "../../../utils";
 import { cn } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { FormCombobox } from "@/components/ui/form-combobox";
+import { FormMoneyInput } from "@/components/ui/form-money-input";
 import { FormSwitch } from "@/components/ui/form-switch";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CPFInput } from "@/components/ui/cpf-input";
@@ -54,6 +56,27 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
   const dependents = response?.data || [];
   const mutations = useDependentMutations();
 
+  // Titular's ACTIVE health-plan enrollments — options for enrolling a dependent
+  const { data: benefitsResponse } = useUserBenefits(
+    {
+      userIds: [userId],
+      statuses: [BENEFIT_ENROLLMENT_STATUS.ACTIVE],
+      include: { benefit: true },
+      limit: 50,
+    },
+    { enabled: !!userId },
+  );
+
+  const healthPlanEnrollments = useMemo(
+    () => (benefitsResponse?.data || []).filter((e) => e.benefit?.kind === BENEFIT_KIND.HEALTH_PLAN),
+    [benefitsResponse],
+  );
+
+  const healthPlanOptions = useMemo(
+    () => healthPlanEnrollments.map((e) => ({ value: e.id, label: e.benefit?.name || "Plano de Saúde" })),
+    [healthPlanEnrollments],
+  );
+
   const relationshipOptions = useMemo(() => Object.entries(DEPENDENT_RELATIONSHIP_LABELS).map(([value, label]) => ({ value, label })), []);
 
   const form = useForm<DependentCreateFormData>({
@@ -70,10 +93,13 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
       irrfDeduction: true,
       salarioFamilia: false,
       notes: "",
+      healthPlanBenefitId: null,
+      healthPlanValue: null,
     },
   });
 
   const isSubmitting = form.formState.isSubmitting;
+  const selectedHealthPlanBenefitId = form.watch("healthPlanBenefitId");
 
   const openCreateDialog = () => {
     setEditingDependent(null);
@@ -86,6 +112,8 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
       irrfDeduction: true,
       salarioFamilia: false,
       notes: "",
+      healthPlanBenefitId: null,
+      healthPlanValue: null,
     });
     setIsFormOpen(true);
   };
@@ -101,6 +129,8 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
       irrfDeduction: dependent.irrfDeduction,
       salarioFamilia: dependent.salarioFamilia,
       notes: dependent.notes ?? "",
+      healthPlanBenefitId: dependent.healthPlanBenefitId ?? null,
+      healthPlanValue: dependent.healthPlanValue ?? null,
     });
     setIsFormOpen(true);
   };
@@ -113,6 +143,9 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
         userId,
         cpf: data.cpf?.trim() ? data.cpf : null,
         notes: data.notes?.trim() ? data.notes.trim() : null,
+        healthPlanBenefitId: data.healthPlanBenefitId || null,
+        // No plan selected → no per-dependent cost
+        healthPlanValue: data.healthPlanBenefitId ? (data.healthPlanValue ?? null) : null,
       };
 
       if (editingDependent) {
@@ -184,7 +217,7 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
                       </span>
                     )}
                   </div>
-                  {(dependent.irrfDeduction || dependent.salarioFamilia) && (
+                  {(dependent.irrfDeduction || dependent.salarioFamilia || dependent.healthPlanBenefitId) && (
                     <div className="flex flex-wrap items-center gap-2">
                       {dependent.irrfDeduction && (
                         <Badge variant="outline" className="gap-1">
@@ -196,6 +229,13 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
                         <Badge variant="outline" className="gap-1">
                           <IconCoin className="h-3 w-3" />
                           Salário-Família
+                        </Badge>
+                      )}
+                      {dependent.healthPlanBenefitId && (
+                        <Badge variant="outline" className="gap-1">
+                          <IconHeartHandshake className="h-3 w-3" />
+                          Plano de Saúde
+                          {dependent.healthPlanValue != null && ` · ${formatCurrency(dependent.healthPlanValue)}`}
                         </Badge>
                       )}
                     </div>
@@ -280,6 +320,22 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
               <div className="grid grid-cols-1 gap-3">
                 <FormSwitch<DependentCreateFormData> name="irrfDeduction" label="Dedução IRRF" description="Elegível à dedução de IRRF" disabled={isSubmitting} />
                 <FormSwitch<DependentCreateFormData> name="salarioFamilia" label="Salário-Família" description="Elegível ao salário-família" disabled={isSubmitting} />
+              </div>
+
+              {/* Plano de Saúde */}
+              <div className="space-y-4 rounded-lg border border-border p-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <IconHeartHandshake className="h-4 w-4 text-muted-foreground" />
+                  Plano de Saúde
+                </div>
+                <FormCombobox
+                  name="healthPlanBenefitId"
+                  label="Adesão ao plano"
+                  placeholder={healthPlanOptions.length === 0 ? "Nenhum plano de saúde ativo do titular" : "Não inscrito"}
+                  options={healthPlanOptions}
+                  disabled={isSubmitting || healthPlanOptions.length === 0}
+                />
+                {selectedHealthPlanBenefitId && <FormMoneyInput<DependentCreateFormData> name="healthPlanValue" label="Custo do dependente" disabled={isSubmitting} />}
               </div>
 
               {/* Notes */}

@@ -195,7 +195,7 @@ export const routes = {
       categories: "/financeiro/conciliacao/categorias",
       recurring: "/financeiro/conciliacao/recorrentes",
       // Conciliação Bancária workflow views (spec §4: Extrato, Saídas,
-      // Previsão de Saídas, Conciliação de Entrada).
+      // Previsão de Saídas, Entradas).
       statement: "/financeiro/conciliacao/extrato",
       outflows: "/financeiro/conciliacao/saidas",
       inflows: "/financeiro/conciliacao/entradas",
@@ -316,6 +316,10 @@ export const routes = {
       detail: (payrollId: string) => `/recursos-humanos/folha-de-pagamento/detalhe/${payrollId}`,
       create: "/recursos-humanos/folha-de-pagamento/criar",
       edit: (payrollId: string) => `/recursos-humanos/folha-de-pagamento/editar/${payrollId}`,
+    },
+    loans: {
+      root: "/recursos-humanos/emprestimos",
+      list: "/recursos-humanos/emprestimos",
     },
     bonus: {
       root: "/recursos-humanos/bonus",
@@ -494,6 +498,13 @@ export const routes = {
       edit: (id: string) => `/medicina-do-trabalho/afastamentos/editar/${id}`,
       root: "/medicina-do-trabalho/afastamentos",
     },
+    // CAT — Comunicação de Acidente de Trabalho (Part E)
+    workAccidents: {
+      create: "/medicina-do-trabalho/cat/cadastrar",
+      details: (id: string) => `/medicina-do-trabalho/cat/detalhes/${id}`,
+      edit: (id: string) => `/medicina-do-trabalho/cat/editar/${id}`,
+      root: "/medicina-do-trabalho/cat",
+    },
   },
 
   // Painting - Pintura - Paint Management
@@ -595,15 +606,18 @@ export const routes = {
       edit: (id: string) => `/departamento-pessoal/rescisoes/editar/${id}`,
       root: "/departamento-pessoal/rescisoes",
     },
+    vacations: {
+      create: "/departamento-pessoal/ferias/cadastrar",
+      details: (id: string) => `/departamento-pessoal/ferias/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/ferias/editar/${id}`,
+      root: "/departamento-pessoal/ferias",
+    },
     salaryAdjustments: {
       details: (id: string) => `/departamento-pessoal/reajustes/detalhes/${id}`,
       root: "/departamento-pessoal/reajustes",
     },
     promotions: {
       root: "/departamento-pessoal/promocoes",
-    },
-    salaryRanges: {
-      root: "/departamento-pessoal/faixas-salariais",
     },
     benefits: {
       create: "/departamento-pessoal/beneficios/cadastrar",
@@ -737,6 +751,7 @@ export const routes = {
     humanResources: {
       root: "/estatisticas/recursos-humanos",
       payroll: "/estatisticas/recursos-humanos/folha",
+      salaryCost: "/estatisticas/recursos-humanos/custo-folha",
       teamPerformance: "/estatisticas/recursos-humanos/equipe",
       absenteeism: "/estatisticas/recursos-humanos/faltas",
       skillAssessment: "/estatisticas/recursos-humanos/competencias",

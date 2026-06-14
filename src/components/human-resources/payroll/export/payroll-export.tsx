@@ -24,6 +24,17 @@ interface PayrollRow {
   nightDifferentialAmount?: number;
   nightHours?: number;
   dsrAmount?: number;
+  // Legal earnings added by the Área Andressa pipeline (optional per-row).
+  familyAllowanceAmount?: number;
+  insalubrityAmount?: number;
+  hazardPayAmount?: number;
+  habitualGratificationAmount?: number;
+  // Justified/unjustified absence split + proration metadata.
+  unjustifiedAbsenceDays?: number;
+  justifiedAbsenceDays?: number;
+  prorationFactor?: number;
+  // Calculator warnings (margem consignável 35% clamp, líquido pisado em zero).
+  warnings?: string[];
   totalDiscounts: number;
   netSalary: number;
   grossSalary: number;
@@ -145,11 +156,68 @@ const EXPORT_COLUMNS: ExportColumn<PayrollRow>[] = [
     }
   },
   {
+    id: "familyAllowance",
+    label: "Salário-família",
+    getValue: (row: PayrollRow) => {
+      const amount = row.familyAllowanceAmount || 0;
+      return amount > 0 ? formatCurrency(amount) : "-";
+    }
+  },
+  {
+    id: "insalubrity",
+    label: "Insalubridade",
+    getValue: (row: PayrollRow) => {
+      const amount = row.insalubrityAmount || 0;
+      return amount > 0 ? formatCurrency(amount) : "-";
+    }
+  },
+  {
+    id: "hazardPay",
+    label: "Periculosidade",
+    getValue: (row: PayrollRow) => {
+      const amount = row.hazardPayAmount || 0;
+      return amount > 0 ? formatCurrency(amount) : "-";
+    }
+  },
+  {
+    id: "habitualGratification",
+    label: "Gratificação Habitual",
+    getValue: (row: PayrollRow) => {
+      const amount = row.habitualGratificationAmount || 0;
+      return amount > 0 ? formatCurrency(amount) : "-";
+    }
+  },
+  {
     id: "bonus",
     label: "Bônus",
     getValue: (row: PayrollRow) => {
       const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
       return isEligible ? formatCurrency(row.bonusAmount || 0) : "Não elegível";
+    }
+  },
+  {
+    id: "absenceSplit",
+    label: "Faltas (Inj./Just.)",
+    getValue: (row: PayrollRow) => {
+      const inj = row.unjustifiedAbsenceDays || 0;
+      const jus = row.justifiedAbsenceDays || 0;
+      if (inj === 0 && jus === 0) return "-";
+      return `${inj} inj. / ${jus} just.`;
+    }
+  },
+  {
+    id: "proration",
+    label: "Proporcional",
+    getValue: (row: PayrollRow) => {
+      const f = row.prorationFactor;
+      return f != null && f < 1 ? `${Math.round(f * 100)}%` : "Mês cheio";
+    }
+  },
+  {
+    id: "warnings",
+    label: "Avisos",
+    getValue: (row: PayrollRow) => {
+      return row.warnings && row.warnings.length > 0 ? row.warnings.join(" | ") : "-";
     }
   },
   {
@@ -192,6 +260,10 @@ export function PayrollExport({
     const totalOvertime100 = data.reduce((sum, row) => sum + (row.overtime100Amount || 0), 0);
     const totalNightDifferential = data.reduce((sum, row) => sum + (row.nightDifferentialAmount || 0), 0);
     const totalDSR = data.reduce((sum, row) => sum + (row.dsrAmount || 0), 0);
+    const totalFamilyAllowance = data.reduce((sum, row) => sum + (row.familyAllowanceAmount || 0), 0);
+    const totalInsalubrity = data.reduce((sum, row) => sum + (row.insalubrityAmount || 0), 0);
+    const totalHazardPay = data.reduce((sum, row) => sum + (row.hazardPayAmount || 0), 0);
+    const totalHabitualGratification = data.reduce((sum, row) => sum + (row.habitualGratificationAmount || 0), 0);
     const totalBonus = data.reduce((sum, row) => sum + (row.bonusAmount || 0), 0);
     const totalGross = data.reduce((sum, row) => sum + (row.grossSalary || 0), 0);
     const totalNet = data.reduce((sum, row) => sum + (row.netSalary || 0), 0);
@@ -205,6 +277,10 @@ export function PayrollExport({
       totalOvertime100,
       totalNightDifferential,
       totalDSR,
+      totalFamilyAllowance,
+      totalInsalubrity,
+      totalHazardPay,
+      totalHabitualGratification,
       totalBonus,
       totalGross,
       totalNet,
@@ -268,6 +344,10 @@ export function PayrollExport({
       if (col.id === "overtime100") return formatCurrency(totals.totalOvertime100);
       if (col.id === "nightDifferential") return formatCurrency(totals.totalNightDifferential);
       if (col.id === "dsr") return formatCurrency(totals.totalDSR);
+      if (col.id === "familyAllowance") return formatCurrency(totals.totalFamilyAllowance);
+      if (col.id === "insalubrity") return formatCurrency(totals.totalInsalubrity);
+      if (col.id === "hazardPay") return formatCurrency(totals.totalHazardPay);
+      if (col.id === "habitualGratification") return formatCurrency(totals.totalHabitualGratification);
       if (col.id === "bonus") return formatCurrency(totals.totalBonus);
       if (col.id === "totalEarnings") return formatCurrency(totals.totalGross);
       if (col.id === "netSalary") return formatCurrency(totals.totalNet);
@@ -312,6 +392,10 @@ export function PayrollExport({
       if (col.id === "overtime100") return formatCurrency(totals.totalOvertime100);
       if (col.id === "nightDifferential") return formatCurrency(totals.totalNightDifferential);
       if (col.id === "dsr") return formatCurrency(totals.totalDSR);
+      if (col.id === "familyAllowance") return formatCurrency(totals.totalFamilyAllowance);
+      if (col.id === "insalubrity") return formatCurrency(totals.totalInsalubrity);
+      if (col.id === "hazardPay") return formatCurrency(totals.totalHazardPay);
+      if (col.id === "habitualGratification") return formatCurrency(totals.totalHabitualGratification);
       if (col.id === "bonus") return formatCurrency(totals.totalBonus);
       if (col.id === "totalEarnings") return formatCurrency(totals.totalGross);
       if (col.id === "netSalary") return formatCurrency(totals.totalNet);
@@ -340,6 +424,12 @@ export function PayrollExport({
     totals: ReturnType<typeof calculateTotals>
   ) => {
     const periodLabel = getPeriodLabel();
+
+    // Collect calculator warnings (margem consignável 35% clamp, líquido pisado
+    // em zero) so they are surfaced prominently in the holerite/folha PDF.
+    const warningEntries = items
+      .filter((item) => item.warnings && item.warnings.length > 0)
+      .map((item) => ({ name: item.userName, warnings: item.warnings as string[] }));
 
     // Calculate responsive font sizes
     const fontSize = "12px";
@@ -521,6 +611,10 @@ export function PayrollExport({
                   if (col.id === "overtime100") return `<td class="text-left">${formatCurrency(totals.totalOvertime100)}</td>`;
                   if (col.id === "nightDifferential") return `<td class="text-left">${formatCurrency(totals.totalNightDifferential)}</td>`;
                   if (col.id === "dsr") return `<td class="text-left">${formatCurrency(totals.totalDSR)}</td>`;
+                  if (col.id === "familyAllowance") return `<td class="text-left">${formatCurrency(totals.totalFamilyAllowance)}</td>`;
+                  if (col.id === "insalubrity") return `<td class="text-left">${formatCurrency(totals.totalInsalubrity)}</td>`;
+                  if (col.id === "hazardPay") return `<td class="text-left">${formatCurrency(totals.totalHazardPay)}</td>`;
+                  if (col.id === "habitualGratification") return `<td class="text-left">${formatCurrency(totals.totalHabitualGratification)}</td>`;
                   if (col.id === "bonus") return `<td class="text-left">${formatCurrency(totals.totalBonus)}</td>`;
                   if (col.id === "totalEarnings") return `<td class="text-left">${formatCurrency(totals.totalGross)}</td>`;
                   if (col.id === "netSalary") return `<td class="text-left">${formatCurrency(totals.totalNet)}</td>`;
@@ -529,6 +623,13 @@ export function PayrollExport({
               </tr>
             </tbody>
           </table>
+          ${warningEntries.length > 0 ? `
+          <div style="margin-top: 16px; padding: 12px; border: 1px solid #f59e0b; background: #fffbeb; border-radius: 6px;">
+            <p style="font-weight: 700; color: #92400e; margin-bottom: 6px;">⚠ Avisos do cálculo</p>
+            <ul style="margin: 0; padding-left: 18px; color: #92400e; font-size: 11px;">
+              ${warningEntries.map((e) => `<li><strong>${e.name}:</strong> ${e.warnings.join("; ")}</li>`).join("")}
+            </ul>
+          </div>` : ""}
         </div>
 
         <div class="footer">

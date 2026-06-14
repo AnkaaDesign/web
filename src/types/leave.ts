@@ -2,7 +2,7 @@
 // Afastamentos (Medicina do Trabalho)
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
-import type { LEAVE_TYPE, LEAVE_STATUS, ORDER_BY_DIRECTION } from "../constants";
+import type { LEAVE_TYPE, LEAVE_STATUS, INSS_BENEFIT_SPECIES, ORDER_BY_DIRECTION } from "../constants";
 import type { User, UserIncludes } from "./user";
 import type { File } from "./file";
 
@@ -21,6 +21,7 @@ export interface Leave extends BaseEntity {
   // Restricted field: only ACCOUNTING/HUMAN_RESOURCES/ADMIN routes expose it
   // (the whole leaves controller is gated to those roles).
   cid: string | null;
+  inssBenefitSpecies: INSS_BENEFIT_SPECIES | null;
   inssBenefitNumber: string | null;
   returnExamRequired: boolean;
   notes: string | null;
@@ -74,3 +75,21 @@ export interface LeaveDeleteResponse extends BaseDeleteResponse {}
 export interface LeaveBatchCreateResponse<T> extends BaseBatchResponse<Leave, T> {}
 export interface LeaveBatchUpdateResponse<T> extends BaseBatchResponse<Leave, T & { id: string }> {}
 export interface LeaveBatchDeleteResponse extends BaseBatchResponse<{ id: string; deleted: boolean }, { id: string }> {}
+
+// =====================
+// Payroll split (Part E) — GET :id/payroll-split
+// First 15 days employer-paid; 16th day onward INSS.
+// =====================
+
+export interface LeavePayrollSplit {
+  leaveId: string;
+  type: string;
+  startDate: Date;
+  endDate: Date;
+  totalDays: number;
+  employerPaidDays: number;
+  inssDays: number;
+  inssBenefitSpecies: string | null;
+}
+
+export interface LeavePayrollSplitResponse extends BaseGetUniqueResponse<LeavePayrollSplit> {}

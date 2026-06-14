@@ -17,6 +17,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { NameInput } from "./name-input";
 import { RemunerationInput } from "./remuneration-input";
 import { BonifiableToggle } from "./bonifiable-toggle";
+import { SalaryFloorInput } from "./salary-floor-input";
+import { InsalubrityDegreeSelect } from "./insalubrity-degree-select";
+import { HazardPayToggle } from "./hazard-pay-toggle";
+import { ExamPeriodicityInput } from "./exam-periodicity-input";
+import { INSALUBRITY_DEGREE } from "../../../../constants";
 
 interface CreateModeProps {
   mode: "create";
@@ -50,11 +55,19 @@ export function PositionForm(props: PositionFormProps) {
             name: "",
             remuneration: 0,
             bonifiable: false,
+            salaryFloor: null,
+            insalubrityDegree: INSALUBRITY_DEGREE.NONE,
+            hazardPay: false,
+            examPeriodicityMonths: null,
           }
         : {
             name: props.position.name,
             remuneration: undefined, // Remuneration is optional for updates
             bonifiable: props.position.bonifiable,
+            salaryFloor: props.position.salaryFloor ?? null,
+            insalubrityDegree: props.position.insalubrityDegree ?? INSALUBRITY_DEGREE.NONE,
+            hazardPay: props.position.hazardPay ?? false,
+            examPeriodicityMonths: props.position.examPeriodicityMonths ?? null,
           }),
   });
 
@@ -166,7 +179,16 @@ export function PositionForm(props: PositionFormProps) {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <SalaryFloorInput disabled={isSubmitting} />
+                <ExamPeriodicityInput disabled={isSubmitting} />
+              </div>
+
+              <InsalubrityDegreeSelect disabled={isSubmitting} />
+
               <BonifiableToggle control={form.control} disabled={isSubmitting} />
+
+              <HazardPayToggle control={form.control} disabled={isSubmitting} />
 
               {props.mode === "update" && (
                 <p className="text-sm text-muted-foreground">

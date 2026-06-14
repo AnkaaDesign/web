@@ -1,12 +1,29 @@
 // commemorative-dates.ts
-// Datas comemorativas pt-BR para o calendário unificado de RH.
+// ===========================================================================
+// FONTE ÚNICA das DATAS COMEMORATIVAS pt-BR do calendário unificado de RH.
+// (O calendário em /recursos-humanos/calendario lê este arquivo via
+//  getCommemorativesForDay(); não há cadastro no servidor — quem quiser
+//  adicionar/remover uma data comemorativa edita as tabelas abaixo.)
+//
 // Duas famílias:
-//   • FIXAS — recorrem todo ano no mesmo dia/mês;
-//   • MÓVEIS — derivadas do domingo de Páscoa (computus) ou de regras de
-//     calendário (2º domingo de maio/agosto para Dias das Mães/dos Pais).
-// Feriados oficiais continuam vindo do Secullum (categoria própria do
-// calendário); aqui entram as datas COMEMORATIVAS — algumas coincidem com
-// feriados (Natal, Ano Novo...) e nesses dias as duas barras aparecem.
+//   • FIXAS  — recorrem todo ano no mesmo dia/mês. Tabela FIXED_DATES, chave
+//     "MM-DD" → lista de nomes. Editar aqui para incluir/remover.
+//   • MÓVEIS — caem em dias diferentes a cada ano, então são CALCULADAS:
+//       – Carnaval, Sexta-feira Santa, Páscoa e Corpus Christi derivam do
+//         domingo de Páscoa (algoritmo computus de Butcher/Meeus em
+//         easterSunday()); ex.: Corpus Christi = Páscoa + 60 dias.
+//       – Dia das Mães / Dia dos Pais = 2º domingo de maio/agosto
+//         (nthSundayOfMonth()).
+//     Ver movableDatesForYear() — as datas são computadas e cacheadas por ano.
+//
+// FERIADOS OFICIAIS (Natal, Corpus Christi, Independência…) NÃO vêm daqui —
+// vêm do Secullum (useSecullumHolidays, categoria ciano própria). Como várias
+// comemorativas coincidem com feriados (Natal, Ano Novo, Corpus Christi,
+// Finados…), o calendário NÃO renderiza a comemorativa quando já existe um
+// feriado equivalente no mesmo dia: ver dedupeAgainstHolidays() / a barra de
+// feriado "vence". Assim 04/06 mostra só "CORPUS CHRISTI" (feriado), não a
+// duplicata "Corpus Christi" (comemorativa).
+// ===========================================================================
 
 export interface CommemorativeDate {
   name: string;
@@ -125,4 +142,39 @@ export function getCommemorativesForDay(date: Date): CommemorativeDate[] {
     result.push({ name: COMPANY_ANNIVERSARY_LABEL, isCompanyAnniversary: true });
   }
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Dedupe comemorativa × feriado
+// ---------------------------------------------------------------------------
+// Normaliza um rótulo para comparação tolerante: minúsculas, sem acentos,
+// sem pontuação e com espaços colapsados. Assim "CORPUS CHRISTI" (feriado
+// Secullum, caixa-alta) casa com "Corpus Christi" (comemorativa), e
+// "Nossa Senhora Aparecida" casa com "Nossa Sra. Aparecida", etc.
+function normalizeName(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // remove diacríticos
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ") // pontuação → espaço
+    .trim();
+}
+
+/**
+ * Remove as comemorativas que coincidem com um FERIADO oficial do mesmo dia
+ * (comparação por nome normalizado) — nesses dias o feriado "vence" e a barra
+ * comemorativa duplicada é suprimida. `holidayNames` são as descrições dos
+ * feriados Secullum que caem no dia (ex.: ["Corpus Christi"]).
+ *
+ * O aniversário da empresa NUNCA é deduplicado (não é feriado nacional).
+ */
+export function dedupeAgainstHolidays(
+  commemoratives: CommemorativeDate[],
+  holidayNames: string[],
+): CommemorativeDate[] {
+  if (holidayNames.length === 0) return commemoratives;
+  const holidaySet = new Set(holidayNames.map(normalizeName));
+  return commemoratives.filter(
+    (c) => c.isCompanyAnniversary || !holidaySet.has(normalizeName(c.name)),
+  );
 }

@@ -11,11 +11,9 @@ import {
   IconEqual,
   IconListDetails,
   IconRefresh,
-  IconSparkles,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -25,11 +23,7 @@ import {
 } from "@/components/ui/standardized-table";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import {
-  CategoryChips,
-  MatchStatusBadge,
-  getCategoryTextColor,
-} from "./match-status-badge";
+import { CategoryChips, MatchStatusBadge } from "./match-status-badge";
 import { MonthNav, monthBounds, monthKey, parseMonthKey } from "./month-nav";
 import { IgnoreTransactionDialog } from "./ignore-transaction-dialog";
 import { CategoryPickerDialog } from "./category-picker-dialog";
@@ -37,9 +31,7 @@ import {
   useBankTransaction,
   useBankTransactions,
   useChangeCategory,
-  useConfirmSuggestion,
   useIgnoreTransaction,
-  useReconciliationSuggestions,
   useRunAutoMatch,
 } from "@/hooks/financial/use-reconciliation";
 import { useUrlDialog } from "@/hooks/common/use-url-dialog";
@@ -111,17 +103,16 @@ function parseBuckets(raw: string | null): BucketKey[] {
 }
 
 interface ConciliationWorkspaceProps {
-  /** DEBIT → "Saídas" (pagamentos × NFs de entrada); CREDIT → "Conciliação de
-   *  Entrada" (recebimentos × boletos/NFs emitidas). */
+  /** DEBIT → "Saídas" (pagamentos × NFs de entrada); CREDIT → "Entradas"
+   *  (recebimentos × boletos/NFs emitidas). */
   direction: TransactionType;
 }
 
 /**
- * The conciliation WORKFLOW page, shared by Saídas (DEBIT) and Conciliação de
- * Entrada (CREDIT). Its goal is driving unmatched → matched: it opens on the
- * current month's pending rows, surfaces the learning layer's one-click
- * category suggestions, and funnels each row into the matching flow (detail
- * page with NF candidates), category assignment or ignore.
+ * The conciliation WORKFLOW page, shared by Saídas (DEBIT) and Entradas
+ * (CREDIT). Its goal is driving unmatched → matched: it opens on the
+ * current month's pending rows and funnels each row into the matching flow
+ * (detail page with NF candidates), category assignment or ignore.
  */
 export function ConciliationWorkspace({ direction }: ConciliationWorkspaceProps) {
   const isOutflow = direction === "DEBIT";
@@ -212,14 +203,6 @@ export function ConciliationWorkspace({ direction }: ConciliationWorkspaceProps)
     );
   }, []);
 
-  // ----- learning-layer suggestion inbox (filtered to this direction) -------
-  const { data: suggestions } = useReconciliationSuggestions();
-  const directionSuggestions = useMemo(
-    () => (suggestions ?? []).filter(s => s.type === direction && s.suggestedCategory),
-    [suggestions, direction],
-  );
-  const confirmMut = useConfirmSuggestion();
-
   // ----- row quick actions (URL-driven dialogs, same keys as transações) ----
   const ignoreDialog = useUrlDialog("ignore");
   const categoryDialog = useUrlDialog("editCategory");
@@ -254,7 +237,7 @@ export function ConciliationWorkspace({ direction }: ConciliationWorkspaceProps)
     tx: BankTransaction;
   } | null>(null);
 
-  const title = isOutflow ? "Saídas — Conciliação" : "Conciliação de Entrada";
+  const title = isOutflow ? "Saídas" : "Entradas";
   const TitleIcon = isOutflow ? IconArrowUpRight : IconArrowDownLeft;
 
   const columns: StandardizedColumn<BankTransaction>[] = useMemo(
@@ -436,14 +419,6 @@ export function ConciliationWorkspace({ direction }: ConciliationWorkspaceProps)
               <MonthNav month={month} onChange={setMonth} />
             </div>
 
-            {directionSuggestions.length > 0 && (
-              <SuggestionStrip
-                suggestions={directionSuggestions}
-                pendingId={confirmMut.isPending ? confirmMut.variables ?? null : null}
-                onConfirm={id => confirmMut.mutate(id)}
-              />
-            )}
-
             <div className="flex-1 min-h-0 overflow-auto">
               <StandardizedTable<BankTransaction>
                 columns={columns}
@@ -581,99 +556,4 @@ function LinkedDocCell({ tx }: { tx: BankTransaction }) {
     );
   }
   return <span className="text-muted-foreground text-xs">—</span>;
-}
-
-const SUGGESTION_DISPLAY_CAP = 5;
-
-function SuggestionStrip({
-  suggestions,
-  pendingId,
-  onConfirm,
-}: {
-  suggestions: Array<
-    BankTransaction & {
-      suggestionConfidence?: number | null;
-      suggestedCategory?: { id: string; name: string; color: string | null } | null;
-    }
-  >;
-  pendingId: string | null;
-  onConfirm: (transactionId: string) => void;
-}) {
-  const visible = suggestions.slice(0, SUGGESTION_DISPLAY_CAP);
-  const hidden = suggestions.length - visible.length;
-  return (
-    <div className="flex-shrink-0 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 space-y-2">
-      <p className="flex items-center gap-1.5 text-sm font-medium">
-        <IconSparkles className="h-4 w-4 text-amber-600" />
-        Sugestões de categoria ({suggestions.length})
-        <span className="text-xs font-normal text-muted-foreground">
-          — propostas da camada de aprendizado; aplicar também treina o sistema
-        </span>
-      </p>
-      <div className="space-y-1">
-        {visible.map(s => {
-          const color = s.suggestedCategory?.color ?? null;
-          return (
-            <div
-              key={s.id}
-              className="flex items-center gap-3 rounded-md bg-background/60 px-3 py-1.5"
-            >
-              <span className="tabular-nums text-xs text-muted-foreground whitespace-nowrap">
-                {formatDate(s.postedAt)}
-              </span>
-              <span className="flex-1 min-w-0 truncate text-sm">
-                {s.counterpartyName || s.memo || "—"}
-              </span>
-              <span
-                className={cn(
-                  "font-semibold tabular-nums text-xs whitespace-nowrap",
-                  s.type === "CREDIT" ? "text-emerald-700" : "text-red-700",
-                )}
-              >
-                {formatCurrency(s.amount)}
-              </span>
-              {s.suggestedCategory && (
-                <Badge
-                  variant={color ? undefined : "secondary"}
-                  size="sm"
-                  className="whitespace-nowrap border-transparent"
-                  style={
-                    color
-                      ? {
-                          backgroundColor: color,
-                          color: getCategoryTextColor(color) ?? "#fff",
-                        }
-                      : undefined
-                  }
-                >
-                  {s.suggestedCategory.name}
-                  {typeof s.suggestionConfidence === "number" && (
-                    <span className="ml-1 opacity-80">
-                      {Math.round(s.suggestionConfidence)}%
-                    </span>
-                  )}
-                </Badge>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7"
-                disabled={pendingId === s.id}
-                onClick={() => onConfirm(s.id)}
-              >
-                <IconCheck className="h-3.5 w-3.5 mr-1" />
-                Aplicar
-              </Button>
-            </div>
-          );
-        })}
-      </div>
-      {hidden > 0 && (
-        <p className="text-xs text-muted-foreground">
-          + {hidden} sugestão(ões) adicional(is) — aplique as visíveis para ver as
-          próximas.
-        </p>
-      )}
-    </div>
-  );
 }

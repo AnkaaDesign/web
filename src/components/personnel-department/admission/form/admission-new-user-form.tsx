@@ -47,7 +47,7 @@ import { PpeSizesSection } from "@/components/administration/user/form/ppe-sizes
 
 import { admissionCollaboratorFormSchema } from "../../../../schemas/admission";
 import type { AdmissionCreateFormData, AdmissionCollaboratorFormData } from "../../../../schemas/admission";
-import { CONTRACT_TYPE, EMPLOYEE_TYPE, SECTOR_PRIVILEGES, ADMISSION_DOCUMENT_TYPE, ADMISSION_DOCUMENT_TYPE_LABELS } from "../../../../constants";
+import { CONTRACT_TYPE, CONTRACT_STATUS, EMPLOYEE_TYPE, SECTOR_PRIVILEGES, ADMISSION_DOCUMENT_TYPE, ADMISSION_DOCUMENT_TYPE_LABELS } from "../../../../constants";
 import { useSector } from "../../../../hooks";
 import { getUsers } from "../../../../api-client";
 import { uploadSingleFile } from "../../../../api-client/file";
@@ -67,8 +67,6 @@ const DOCUMENT_CHECKLIST: ADMISSION_DOCUMENT_TYPE[] = [
   ADMISSION_DOCUMENT_TYPE.CTPS,
   ADMISSION_DOCUMENT_TYPE.PROOF_OF_RESIDENCE,
   ADMISSION_DOCUMENT_TYPE.ADMISSION_EXAM,
-  ADMISSION_DOCUMENT_TYPE.EMPLOYMENT_CONTRACT,
-  ADMISSION_DOCUMENT_TYPE.LGPD_TERM,
   ADMISSION_DOCUMENT_TYPE.PHOTO,
 ];
 
@@ -86,7 +84,9 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
       name: "",
       email: null,
       employeeType: EMPLOYEE_TYPE.CLT,
-      contractType: CONTRACT_TYPE.EXPERIENCE_PERIOD_1,
+      // New CLT hires start in experiência: a FIXED_TERM modality + EXPERIENCE status.
+      contractType: CONTRACT_TYPE.FIXED_TERM,
+      contractStatus: CONTRACT_STATUS.EXPERIENCE,
       phone: null,
       cpf: null as any,
       pis: null,
@@ -227,7 +227,7 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
 
       const contract = {
         employeeType: et ?? EMPLOYEE_TYPE.CLT,
-        contractType: et && et !== EMPLOYEE_TYPE.CLT ? null : ((ct as CONTRACT_TYPE) ?? CONTRACT_TYPE.EXPERIENCE_PERIOD_1),
+        contractType: et && et !== EMPLOYEE_TYPE.CLT ? null : ((ct as CONTRACT_TYPE) ?? CONTRACT_TYPE.FIXED_TERM),
         admissionDate,
         positionId: (userData.positionId as string) ?? null,
         sectorId: (userData.sectorId as string) ?? null,
@@ -264,7 +264,7 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
 
   return (
     <Form {...form}>
-      <form id="admission-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-4xl">
+      <form id="admission-form" onSubmit={form.handleSubmit(handleSubmit)} className="w-full">
         <button id="admission-form-submit" type="submit" className="hidden" disabled={submitting} />
 
         <div className="space-y-4">
@@ -277,7 +277,7 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
               </CardTitle>
               <CardDescription>Informe o CPF — se a pessoa já estiver cadastrada, um novo vínculo será criado para ela.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormInput<AdmissionCollaboratorFormData> type="cpf" name="cpf" label="CPF" placeholder="Digite o CPF do colaborador" disabled={submitting} required />
                 <FormInput<AdmissionCollaboratorFormData> type="pis" name="pis" label="PIS" disabled={submitting || !!matchedUser} />
@@ -453,8 +453,8 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
               </CardTitle>
               <CardDescription>Anexe os documentos do colaborador. Os arquivos serão vinculados à admissão ao salvar.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {DOCUMENT_CHECKLIST.map((type) => (
                   <div key={type} className="space-y-1.5">
                     <div className="text-sm font-medium">{ADMISSION_DOCUMENT_TYPE_LABELS[type]}</div>

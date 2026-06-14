@@ -10,6 +10,7 @@ import {
   deleteTermination,
   calculateTermination,
   advanceTermination,
+  computeTerminationTaxes,
   uploadTerminationDocument,
   updateTerminationDocument,
   addTerminationItem,
@@ -120,6 +121,15 @@ export function useTerminationAdvance() {
   const invalidate = useInvalidateTerminations();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data?: TerminationAdvanceFormData }) => advanceTermination(id, data ?? {}),
+    onSuccess: invalidate,
+  });
+}
+
+/** POST /terminations/:id/compute-taxes — auto-compute INSS/IRRF + FGTS-multa base. */
+export function useTerminationComputeTaxes() {
+  const invalidate = useInvalidateTerminations();
+  return useMutation({
+    mutationFn: (id: string) => computeTerminationTaxes(id),
     onSuccess: invalidate,
   });
 }

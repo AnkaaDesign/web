@@ -21,6 +21,8 @@ import { FollowUpDatePicker } from "./follow-up-date-picker";
 import { HrNotesTextarea } from "./hr-notes-textarea";
 import { ActiveSwitch } from "./active-switch";
 import { WitnessMultiSelect } from "./witness-multi-select";
+import { SuspensionDaysInput } from "./suspension-days-input";
+import { TerminationSelect } from "./termination-select";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 
 interface CreateModeProps {
@@ -69,6 +71,8 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
     hrNotes: "",
     witnessIds: [],
     attachmentIds: [],
+    suspensionDays: null,
+    terminationId: null,
     ...(props.defaultValues || {}),
   };
 
@@ -85,6 +89,8 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
     witnessIds: props.warning.witness?.map((w: any) => w.id) || [],
     attachmentIds: props.warning.attachments?.map((f: any) => f.id) || [],
     resolvedAt: props.warning.resolvedAt ? new Date(props.warning.resolvedAt) : undefined,
+    suspensionDays: props.warning.suspensionDays ?? null,
+    terminationId: props.warning.terminationId ?? null,
     ...(props.defaultValues || {}),
   } : {} as WarningUpdateFormData;
 
@@ -338,6 +344,9 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
                 <CategorySelect control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
               </div>
 
+              {/* Suspension days (only enabled when severity = SUSPENSION) */}
+              <SuspensionDaysInput control={form.control} disabled={isSubmitting} />
+
               {/* Description */}
               <DescriptionTextarea control={form.control} disabled={isSubmitting} />
             </CardContent>
@@ -400,6 +409,9 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
                   <ActiveSwitch control={form.control} disabled={isSubmitting} />
                 </div>
               )}
+
+              {/* Linked termination (justa-causa context) */}
+              <TerminationSelect disabled={isSubmitting} collaboratorId={form.watch("collaboratorId") || undefined} />
 
               {/* HR Notes */}
               <HrNotesTextarea control={form.control} disabled={isSubmitting} />

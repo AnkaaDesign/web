@@ -404,11 +404,9 @@ export const ENTITY_BADGE_CONFIG = {
     [MAINTENANCE_STATUS.OVERDUE]: "purple" as BadgeVariant,
   },
 
-  // User Contract Type (the legal kind/phase of the current vínculo)
+  // User Contract Type (the legal MODALITY of the current vínculo)
   USER: {
-    [CONTRACT_TYPE.EXPERIENCE_PERIOD_1]: "pending" as BadgeVariant,  // Amber - first trial period
-    [CONTRACT_TYPE.EXPERIENCE_PERIOD_2]: "created" as BadgeVariant,  // Blue - second trial period
-    [CONTRACT_TYPE.EFFECTED]: "green" as BadgeVariant,               // Entity-specific: use green
+    [CONTRACT_TYPE.INDETERMINATE]: "green" as BadgeVariant,          // Entity-specific: use green (efetivo)
     [CONTRACT_TYPE.FIXED_TERM]: "created" as BadgeVariant,           // Blue - fixed term
     [CONTRACT_TYPE.INTERMITTENT]: "purple" as BadgeVariant,          // Purple - intermittent contract
     [CONTRACT_TYPE.APPRENTICE]: "blue" as BadgeVariant,              // Blue - apprentice contract
@@ -417,8 +415,11 @@ export const ENTITY_BADGE_CONFIG = {
 
   // Employment contract lifecycle status
   CONTRACT_STATUS: {
+    [CONTRACT_STATUS.EXPERIENCE]: "pending" as BadgeVariant,         // Amber - em experiência
     [CONTRACT_STATUS.ACTIVE]: "green" as BadgeVariant,
-    [CONTRACT_STATUS.DISMISSED]: "red" as BadgeVariant,
+    [CONTRACT_STATUS.NOTICE_PERIOD]: "orange" as BadgeVariant,       // Aviso prévio
+    [CONTRACT_STATUS.ON_LEAVE]: "purple" as BadgeVariant,            // Afastado
+    [CONTRACT_STATUS.TERMINATED]: "red" as BadgeVariant,
   },
 
   // Worker category (on-folha vs off-folha)
@@ -811,8 +812,11 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
   CHARGED: "blue",
   RATE_LIMITED: "pending",
   BOUNCED: "bounced",
-  DISMISSED: "cancelled",
-  EFFECTED: "active",
+  // Contract statuses (EmploymentContract redesign — replaced DISMISSED/EFFECTED)
+  EXPERIENCE: "pending",
+  NOTICE_PERIOD: "orange",
+  ON_LEAVE: "purple",
+  TERMINATED: "red",
   REPROVED: "rejected",
 
   // Operations

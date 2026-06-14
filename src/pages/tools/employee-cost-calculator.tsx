@@ -7,25 +7,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES, BENEFIT_KIND, BENEFIT_ENROLLMENT_STATUS } from "@/constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { formatCurrency } from "@/utils";
-import { getUsers } from "@/api-client";
+import { getUsers, getUserBenefits } from "@/api-client";
 import { getPositionMonthlySalary } from "@/utils/overtime-cost";
+import { calculateBenefitSplit } from "@/utils/benefit-discount";
+import { COMPANY_FISCAL } from "@/config/company";
 import {
   EMPLOYEE_COST_TAX_REGIME,
-  EMPLOYEE_COST_TAX_REGIME_LABELS,
   DEFAULT_RAT_PCT,
   DEFAULT_FAP_FACTOR,
   DEFAULT_TERCEIROS_PCT,
   DEFAULT_DIAS_UTEIS,
   DEFAULT_DOMINGOS_FERIADOS,
-  VT_DISCOUNT_CAP_PCT,
   computeEmployeeCost,
   computeVtDiscountPreview,
   formatMultiplier,
@@ -50,20 +49,18 @@ function EmployeeCostCalculatorContent() {
   // --- Inputs ---------------------------------------------------------------
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [baseSalary, setBaseSalary] = useState<number>(0);
-  const [taxRegime, setTaxRegime] = useState<EMPLOYEE_COST_TAX_REGIME>(EMPLOYEE_COST_TAX_REGIME.LUCRO_PRESUMIDO_REAL);
-  const [ratPct, setRatPct] = useState<number>(DEFAULT_RAT_PCT);
-  const [fapFactor, setFapFactor] = useState<number>(DEFAULT_FAP_FACTOR);
-  const [terceirosPct, setTerceirosPct] = useState<number>(DEFAULT_TERCEIROS_PCT);
+  const taxRegime = EMPLOYEE_COST_TAX_REGIME.LUCRO_PRESUMIDO_REAL;
+  const [ratPct, setRatPct] = useState<number>(COMPANY_FISCAL.ratPct);
+  const [fapFactor, setFapFactor] = useState<number>(COMPANY_FISCAL.fapFactor);
+  const [terceirosPct, setTerceirosPct] = useState<number>(COMPANY_FISCAL.terceirosPct);
   const [he50Hours, setHe50Hours] = useState<number>(0);
   const [he100Hours, setHe100Hours] = useState<number>(0);
   const [benefitsMonthly, setBenefitsMonthly] = useState<number>(0);
-  const [vtMonthlyCost, setVtMonthlyCost] = useState<number>(0);
+  /** true once benefits + VT were auto-filled from the colaborador's active adesões. */
+  const [, setBenefitsAutoFilled] = useState<boolean>(false);
   const [includeFgtsFineProvision, setIncludeFgtsFineProvision] = useState<boolean>(true);
   const [diasUteis, setDiasUteis] = useState<number>(DEFAULT_DIAS_UTEIS);
   const [domingosFeriados, setDomingosFeriados] = useState<number>(DEFAULT_DOMINGOS_FERIADOS);
-
-  const isSimples = taxRegime === EMPLOYEE_COST_TAX_REGIME.SIMPLES || taxRegime === EMPLOYEE_COST_TAX_REGIME.SIMPLES_ANEXO_IV;
-  const isSimplesNonAnexoIV = taxRegime === EMPLOYEE_COST_TAX_REGIME.SIMPLES;
 
   // --- Collaborator prefill (same selection approach as the overtime tool) ----
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
@@ -111,8 +108,10 @@ function EmployeeCostCalculatorContent() {
   const handleUserSelected = useCallback(async (value: string | string[] | null | undefined) => {
     const userId = Array.isArray(value) ? value[0] : value;
     setSelectedUserId(userId ?? null);
+    setBenefitsAutoFilled(false);
     if (!userId) return;
 
+    let salary: number | null = null;
     try {
       const response = await getUsers({
         where: { id: { in: [userId] } },
@@ -127,13 +126,57 @@ function EmployeeCostCalculatorContent() {
         take: 1,
       });
       const user = response.data?.[0];
-      const salary = getPositionMonthlySalary(user?.position ?? null);
+      salary = getPositionMonthlySalary(user?.position ?? null);
       if (salary != null) {
         setBaseSalary(salary);
       }
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {
         console.error("Erro ao carregar salário do colaborador:", error);
+      }
+    }
+
+    // Auto-fill benefits + VT from the colaborador's ACTIVE adesões. The employer
+    // pays `companyShare` of each benefit (canonical split, benefit-discount.ts).
+    // VT (TRANSPORT_VOUCHER) goes to its own field for the discount preview; all
+    // other employer-paid benefits are summed into "Benefícios".
+    try {
+      const benefitsResponse = await getUserBenefits({
+        userIds: [userId],
+        statuses: [BENEFIT_ENROLLMENT_STATUS.ACTIVE],
+        include: { benefit: true },
+        limit: 100,
+      });
+      const adesoes = (benefitsResponse.data ?? []).filter((ub) => ub.endDate == null);
+
+      let nonVtEmployerCost = 0;
+      let vtCost = 0;
+      for (const ub of adesoes) {
+        const isVt = ub.benefit?.kind === BENEFIT_KIND.TRANSPORT_VOUCHER;
+        if (isVt) {
+          // VT field models the full monthly VT cost; the tool computes the
+          // employee discount preview (min 6% × salário, custo do VT) itself.
+          vtCost += Math.max(0, ub.monthlyValue ?? 0);
+        } else {
+          const split = calculateBenefitSplit(
+            {
+              monthlyValue: ub.monthlyValue,
+              employeeDiscountValue: ub.employeeDiscountValue,
+              employeeDiscountPercent: ub.employeeDiscountPercent,
+              benefitKind: ub.benefit?.kind,
+            },
+            salary,
+          );
+          nonVtEmployerCost += split.companyShare;
+        }
+      }
+
+      const vtNet = Math.max(0, vtCost - computeVtDiscountPreview(salary ?? 0, vtCost));
+      setBenefitsMonthly(nonVtEmployerCost + vtNet);
+      setBenefitsAutoFilled(adesoes.length > 0);
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Erro ao carregar benefícios do colaborador:", error);
       }
     }
   }, []);
@@ -149,7 +192,7 @@ function EmployeeCostCalculatorContent() {
         terceirosPct,
         he50Hours,
         he100Hours,
-        benefitsMonthly,
+        benefitsMonthly: benefitsMonthly,
         includeFgtsFineProvision,
         diasUteis,
         domingosFeriados,
@@ -157,30 +200,20 @@ function EmployeeCostCalculatorContent() {
     [baseSalary, taxRegime, ratPct, fapFactor, terceirosPct, he50Hours, he100Hours, benefitsMonthly, includeFgtsFineProvision, diasUteis, domingosFeriados],
   );
 
-  const vtDiscount = useMemo(() => computeVtDiscountPreview(baseSalary, vtMonthlyCost), [baseSalary, vtMonthlyCost]);
-
   const hasSalary = baseSalary > 0;
 
   // Breakdown rows (label / detail / monthly value)
   const rows: Array<{ label: string; detail?: string; value: number; emphasize?: boolean }> = [
     { label: "Remuneração (salário base)", value: baseSalary },
-    { label: "Horas extras 50%", detail: `${he50Hours}h × ${formatCurrency(breakdown.horaNormal * 1.5)}`, value: breakdown.he50 },
-    { label: "Horas extras 100%", detail: `${he100Hours}h × ${formatCurrency(breakdown.horaNormal * 2)}`, value: breakdown.he100 },
-    { label: "Reflexo DSR", detail: `(HE50 + HE100) ÷ ${diasUteis} × ${domingosFeriados}`, value: breakdown.reflexoDSR },
+    ...(he50Hours > 0 ? [{ label: "Horas extras 50%", detail: `${he50Hours}h × ${formatCurrency(breakdown.horaNormal * 1.5)}`, value: breakdown.he50 }] : []),
+    ...(he100Hours > 0 ? [{ label: "Horas extras 100%", detail: `${he100Hours}h × ${formatCurrency(breakdown.horaNormal * 2)}`, value: breakdown.he100 }] : []),
+    ...(he50Hours > 0 || he100Hours > 0 ? [{ label: "Reflexo DSR", detail: `(HE50 + HE100) ÷ ${diasUteis} × ${domingosFeriados}`, value: breakdown.reflexoDSR }] : []),
     { label: "Provisão 13º salário", detail: "remuneração ÷ 12", value: breakdown.provisao13 },
     { label: "Provisão férias + 1/3", detail: "remuneração ÷ 12 × 4/3", value: breakdown.provisaoFerias },
     { label: "FGTS (8%)", detail: "8% × base de incidência", value: breakdown.fgts },
     ...(includeFgtsFineProvision ? [{ label: "Provisão multa FGTS (40%)", detail: "40% × FGTS", value: breakdown.provisaoMultaFgts }] : []),
-    ...(!isSimplesNonAnexoIV
-      ? [
-          { label: "INSS patronal (20%)", detail: "20% × base de incidência", value: breakdown.inssPatronal20 },
-          { label: `INSS — RAT × FAP (${(ratPct * fapFactor).toLocaleString("pt-BR")}%)`, detail: `${ratPct}% × ${fapFactor.toLocaleString("pt-BR")}`, value: breakdown.inssRatFap },
-        ]
-      : []),
-    ...(taxRegime === EMPLOYEE_COST_TAX_REGIME.LUCRO_PRESUMIDO_REAL
-      ? [{ label: `INSS — Terceiros (${terceirosPct.toLocaleString("pt-BR")}%)`, detail: "Sistema S / salário-educação", value: breakdown.inssTerceiros }]
-      : []),
-    { label: "Benefícios", detail: "custo mensal do empregador", value: breakdown.beneficios },
+    { label: "INSS patronal", detail: `CPP 20% + RAT×FAP ${(ratPct * fapFactor).toLocaleString("pt-BR")}% + Terceiros ${terceirosPct.toLocaleString("pt-BR")}%`, value: breakdown.inssPatronalTotal },
+    { label: "Benefícios", detail: "custo do empregador (inclui VT líquido)", value: breakdown.beneficios },
   ];
 
   // --- Render -------------------------------------------------------------------
@@ -234,70 +267,47 @@ function EmployeeCostCalculatorContent() {
                   <Input id="ec-salary" type="currency" value={baseSalary || null} onChange={(v) => setBaseSalary(toNumber(v))} placeholder="R$ 0,00" />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Regime tributário</Label>
-                  <RadioGroup
-                    value={taxRegime}
-                    onValueChange={(v) => setTaxRegime(v as EMPLOYEE_COST_TAX_REGIME)}
-                    className="gap-2"
-                  >
-                    {Object.values(EMPLOYEE_COST_TAX_REGIME).map((regime) => (
-                      <div key={regime} className="group flex items-center gap-2">
-                        <RadioGroupItem value={regime} id={`ec-regime-${regime}`} />
-                        <Label htmlFor={`ec-regime-${regime}`} className="font-normal cursor-pointer">
-                          {EMPLOYEE_COST_TAX_REGIME_LABELS[regime]}
-                        </Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                  {isSimplesNonAnexoIV && (
-                    <p className="text-xs text-muted-foreground">No Simples (exceto Anexo IV) a CPP está incluída no DAS — INSS patronal zerado.</p>
-                  )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>RAT</Label>
+                    <Combobox
+                      options={RAT_OPTIONS}
+                      value={String(ratPct)}
+                      onValueChange={(v) => {
+                        const next = Array.isArray(v) ? v[0] : v;
+                        if (next) setRatPct(toNumber(next, DEFAULT_RAT_PCT));
+                      }}
+                      searchable={false}
+                      clearable={false}
+                    />
+                    <p className="text-xs text-muted-foreground">Riscos Ambientais do Trabalho — 1/2/3% conforme o grau de risco da atividade (CNAE).</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ec-fap">FAP (0,5 – 2,0)</Label>
+                    <Input
+                      id="ec-fap"
+                      type="decimal"
+                      value={fapFactor}
+                      onChange={(v) => {
+                        const parsed = toNumber(v, DEFAULT_FAP_FACTOR);
+                        setFapFactor(Math.min(2, Math.max(0.5, parsed)));
+                      }}
+                      placeholder="1,0"
+                    />
+                    <p className="text-xs text-muted-foreground">Fator Acidentário de Prevenção — multiplicador 0,5–2,0 sobre o RAT (1,0 = neutro).</p>
+                  </div>
                 </div>
 
-                {!isSimplesNonAnexoIV && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>RAT</Label>
-                      <Combobox
-                        options={RAT_OPTIONS}
-                        value={String(ratPct)}
-                        onValueChange={(v) => {
-                          const next = Array.isArray(v) ? v[0] : v;
-                          if (next) setRatPct(toNumber(next, DEFAULT_RAT_PCT));
-                        }}
-                        searchable={false}
-                        clearable={false}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="ec-fap">FAP (0,5 – 2,0)</Label>
-                      <Input
-                        id="ec-fap"
-                        type="decimal"
-                        value={fapFactor}
-                        onChange={(v) => {
-                          const parsed = toNumber(v, DEFAULT_FAP_FACTOR);
-                          setFapFactor(Math.min(2, Math.max(0.5, parsed)));
-                        }}
-                        placeholder="1,0"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {!isSimples && (
-                  <div className="space-y-2">
-                    <Label htmlFor="ec-terceiros">Terceiros (%)</Label>
-                    <Input
-                      id="ec-terceiros"
-                      type="percentage"
-                      value={terceirosPct}
-                      onChange={(v) => setTerceirosPct(toNumber(v, DEFAULT_TERCEIROS_PCT))}
-                      placeholder="5,8%"
-                    />
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="ec-terceiros">Terceiros (%)</Label>
+                  <Input
+                    id="ec-terceiros"
+                    type="percentage"
+                    value={terceirosPct}
+                    onChange={(v) => setTerceirosPct(toNumber(v, DEFAULT_TERCEIROS_PCT))}
+                    placeholder="5,8%"
+                  />
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
@@ -330,13 +340,17 @@ function EmployeeCostCalculatorContent() {
 
                 <div className="space-y-2">
                   <Label htmlFor="ec-benefits">Benefícios (custo mensal)</Label>
-                  <Input id="ec-benefits" type="currency" value={benefitsMonthly || null} onChange={(v) => setBenefitsMonthly(toNumber(v))} placeholder="R$ 0,00" />
-                  <p className="text-xs text-muted-foreground">Some VT, VR/VA, plano de saúde e demais benefícios pagos pela empresa.</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="ec-vt">Custo mensal de VT (para prévia de desconto)</Label>
-                  <Input id="ec-vt" type="currency" value={vtMonthlyCost || null} onChange={(v) => setVtMonthlyCost(toNumber(v))} placeholder="R$ 0,00" />
+                  <Input
+                    id="ec-benefits"
+                    type="currency"
+                    value={benefitsMonthly || null}
+                    onChange={(v) => {
+                      setBenefitsMonthly(toNumber(v));
+                      setBenefitsAutoFilled(false);
+                    }}
+                    placeholder="R$ 0,00"
+                  />
+                  <p className="text-xs text-muted-foreground">Soma dos benefícios pagos pela empresa, já incluindo o VT líquido (custo do VT − desconto de até 6% do colaborador) quando um colaborador é selecionado.</p>
                 </div>
 
                 <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
@@ -397,10 +411,6 @@ function EmployeeCostCalculatorContent() {
                             <TableCell className="font-semibold">Remuneração total (salário + HE + DSR)</TableCell>
                             <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(breakdown.remuneracao)}</TableCell>
                           </TableRow>
-                          <TableRow className="bg-muted/40 hover:bg-muted/40">
-                            <TableCell className="font-semibold">INSS patronal total</TableCell>
-                            <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(breakdown.inssPatronalTotal)}</TableCell>
-                          </TableRow>
                         </TableBody>
                       </Table>
                     </div>
@@ -417,17 +427,13 @@ function EmployeeCostCalculatorContent() {
                       </div>
                     </div>
 
-                    {/* VT discount preview */}
-                    {vtMonthlyCost > 0 && (
-                      <div className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                        <IconInfoCircle className="h-4 w-4 flex-shrink-0" stroke={1.5} />
-                        <span>
-                          Prévia de desconto de VT do colaborador: <strong className="text-foreground">{formatCurrency(vtDiscount)}</strong>{" "}
-                          (mínimo entre {VT_DISCOUNT_CAP_PCT}% do salário = {formatCurrency((VT_DISCOUNT_CAP_PCT / 100) * baseSalary)} e o custo do VT ={" "}
-                          {formatCurrency(vtMonthlyCost)}). Custo líquido de VT para a empresa: {formatCurrency(Math.max(0, vtMonthlyCost - vtDiscount))}.
-                        </span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                      <IconInfoCircle className="h-4 w-4 flex-shrink-0" stroke={1.5} />
+                      <span>
+                        O INSS e o IRRF do colaborador são retidos do salário (já inclusos na Remuneração) e não representam custo adicional. Os encargos de INSS
+                        acima são a parte patronal (CPP + RAT/FAP + Terceiros), paga pela empresa sobre a folha.
+                      </span>
+                    </div>
 
                     <div className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                       <IconInfoCircle className="h-4 w-4 flex-shrink-0" stroke={1.5} />

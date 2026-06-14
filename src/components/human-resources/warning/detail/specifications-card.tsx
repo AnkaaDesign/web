@@ -1,4 +1,4 @@
-import { IconInfoCircle, IconCalendar, IconHash, IconAlertTriangle, IconUser, IconUserShield } from "@tabler/icons-react";
+import { IconInfoCircle, IconCalendar, IconHash, IconAlertTriangle, IconUser, IconUserShield, IconCalendarOff, IconFileOff } from "@tabler/icons-react";
 
 import type { Warning } from "../../../../types";
 import { formatDate, formatDateTime } from "../../../../utils";
@@ -56,6 +56,28 @@ export function SpecificationsCard({ warning }: SpecificationsCardProps) {
               <span className="text-sm text-muted-foreground">Status</span>
               <Badge variant={warning.isActive ? "warning" : "success"}>{warning.isActive ? "Ativa" : "Resolvida"}</Badge>
             </div>
+            {warning.severity === "SUSPENSION" && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground flex items-center gap-2">
+                  <IconCalendarOff className="h-4 w-4" />
+                  Dias de Suspensão
+                </span>
+                <span className="text-sm font-medium">
+                  {warning.suspensionDays !== null && warning.suspensionDays !== undefined
+                    ? `${warning.suspensionDays} ${warning.suspensionDays === 1 ? "dia" : "dias"}`
+                    : "-"}
+                </span>
+              </div>
+            )}
+            {warning.terminationId && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground flex items-center gap-2">
+                  <IconFileOff className="h-4 w-4" />
+                  Rescisão Vinculada
+                </span>
+                <span className="text-xs font-mono text-foreground">{warning.terminationId}</span>
+              </div>
+            )}
           </div>
         </div>
 
