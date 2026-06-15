@@ -3,7 +3,11 @@ import { useUsers, usePositions } from "../../../../hooks";
 import { formatDate } from "../../../../utils";
 import type { UserPositionHistory } from "../../../../types/user-position-history";
 import type { UserPositionHistoryGetManyFormData } from "../../../../schemas/user-position-history";
-import { POSITION_CHANGE_REASON_LABELS, type POSITION_CHANGE_REASON } from "../../../../constants";
+import { POSITION_CHANGE_REASON_LABELS, POSITION_CHANGE_REASON } from "../../../../constants";
+
+// The Promoções page lists real position changes only — admissions (the first
+// "ADMISSION" history row of every colaborador) are not promotions.
+const PROMOTION_REASONS = Object.values(POSITION_CHANGE_REASON).filter((reason) => reason !== POSITION_CHANGE_REASON.ADMISSION);
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -104,12 +108,17 @@ export function UserPositionHistoryList({ className }: UserPositionHistoryListPr
   // Get all available columns for column visibility manager
   const allColumns = useMemo(() => createUserPositionHistoryColumns(), []);
 
-  // Query filters to pass to the paginated table
+  // Query filters to pass to the paginated table. Admissions are always excluded
+  // here — this is the Promoções list, not the full position history. When the
+  // user picks specific reasons we still strip ADMISSION from their selection.
   const queryFilters = useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
+    const selected = (filterWithoutOrderBy as { reasons?: string[] }).reasons;
+    const reasons = selected?.length ? selected.filter((reason) => reason !== POSITION_CHANGE_REASON.ADMISSION) : PROMOTION_REASONS;
 
     return {
       ...filterWithoutOrderBy,
+      reasons,
       limit: DEFAULT_PAGE_SIZE,
     } as Partial<UserPositionHistoryGetManyFormData>;
   }, [baseQueryFilters]);

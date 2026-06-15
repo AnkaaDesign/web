@@ -55,7 +55,7 @@ export function MonthNav({ month, onChange, className }: MonthNavProps) {
       >
         <IconChevronLeft className="h-4 w-4" />
       </Button>
-      <div className="h-10 px-3 min-w-[170px] flex items-center justify-center gap-1.5 rounded-md border border-input bg-background text-sm font-medium">
+      <div className="h-10 px-3 min-w-[170px] flex items-center justify-center gap-1.5 rounded-md border border-input bg-transparent text-sm font-medium">
         <IconCalendar className="h-4 w-4 text-muted-foreground" />
         <span className="whitespace-nowrap">{monthLabel(month)}</span>
       </div>

@@ -43,7 +43,7 @@ export function PpeSizesCard({ user, className }: PpeSizesCardProps) {
             Nenhum tamanho de EPI cadastrado
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-3">
             {user.ppeSize?.shirts && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">

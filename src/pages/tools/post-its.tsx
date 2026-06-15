@@ -262,11 +262,21 @@ export function PostItsPage() {
   // pela escala).
   const onBoardPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    const downTarget = e.target as HTMLElement;
+    // CRÍTICO: a barra de formatação e os menus de contexto são renderizados via
+    // PORTAL (fora do DOM do board), mas em React continuam DESCENDENTES do board,
+    // então o pointerdown deles BORBULHA (na árvore React) até este handler. Se
+    // chamarmos preventDefault aqui, o navegador suprime o mousedown/click desses
+    // elementos — era exatamente por isso que clicar na barra (B/P/N/G/GG) e no
+    // menu "Cor" não fazia nada (o pointerdown chegava, o mousedown nunca). Só
+    // fazemos pan quando o pointerdown ocorre REALMENTE dentro do board; conteúdo
+    // portado não está contido no DOM do board.
+    if (!(e.currentTarget as HTMLElement).contains(downTarget)) return;
     // Só faz pan no FUNDO — nunca quando o clique cai sobre uma nota (ou dentro
     // dela). Verificar o ancestral `[data-postit-card]` é mais robusto que
     // comparar target===currentTarget (que falha quando se clica numa área
     // interna da nota que não interrompe a propagação).
-    if ((e.target as HTMLElement).closest("[data-postit-card]")) return;
+    if (downTarget.closest("[data-postit-card]")) return;
     e.preventDefault();
     e.stopPropagation(); // evita pan duplicado (handler no board externo + no inner)
     const startX = e.clientX;
@@ -629,6 +639,10 @@ function PostitEditor({
   archivedView: boolean;
 }) {
   const editorRef = useRef<HTMLDivElement | null>(null);
+  // Guarda a seleção ativa quando o usuário interage com a barra. Sem isso, ao
+  // clicar num botão a seleção pode colapsar/perder o foco antes do onClick
+  // rodar, e execCommand acaba sem nada para formatar (clique "não funciona").
+  const savedRange = useRef<Range | null>(null);
   // Barra flutuante: posição (em coords de viewport, position: fixed) + visível.
   const [toolbar, setToolbar] = useState<{ top: number; left: number } | null>(null);
   // Estado do placeholder: contentEditable não tem placeholder nativo.
@@ -674,22 +688,58 @@ function PostitEditor({
       setToolbar(null);
       return;
     }
+    // Memoriza a seleção atual para restaurá-la na hora do clique no botão.
+    savedRange.current = range.cloneRange();
     setToolbar({
       top: rect.top - 8, // acima da seleção; transladado para cima no estilo
       left: rect.left + rect.width / 2,
     });
   };
 
-  const applyBold = () => {
-    document.execCommand("bold");
+  // Aplica um estilo inline à seleção atual envolvendo o conteúdo num <span>.
+  // Não usamos document.execCommand (obsoleto e que silenciosamente não faz
+  // nada em vários navegadores) — manipulamos o Range diretamente, o que é
+  // confiável. Roda no onMouseDown do botão (com preventDefault), quando a
+  // seleção de texto ainda está viva.
+  const applyStyle = (apply: (span: HTMLSpanElement) => void) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const sel = window.getSelection();
+    let range = sel && sel.rangeCount > 0 && !sel.isCollapsed ? sel.getRangeAt(0) : null;
+    // Fallback para a seleção memorizada se a atual tiver se perdido.
+    if ((!range || !el.contains(range.commonAncestorContainer)) && savedRange.current) {
+      range = savedRange.current;
+    }
+    if (!range || range.collapsed || !el.contains(range.commonAncestorContainer)) return;
+
+    const span = document.createElement("span");
+    apply(span);
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+
+    // Re-seleciona o conteúdo recém-formatado para encadear formatações.
+    if (sel) {
+      sel.removeAllRanges();
+      const next = document.createRange();
+      next.selectNodeContents(span);
+      sel.addRange(next);
+      savedRange.current = next.cloneRange();
+    }
+    setIsEmpty(!el.textContent?.trim());
     persist();
   };
 
-  // size: "2" (pequeno) | "4" (normal) | "6" (grande) | "7" (maior)
-  const applyFontSize = (size: string) => {
-    document.execCommand("styleWithCSS", false, "true");
-    document.execCommand("fontSize", false, size);
-    persist();
+  const applyBold = () => {
+    applyStyle((span) => {
+      span.style.fontWeight = "bold";
+    });
+  };
+
+  // px: "12" (pequeno) | "14" (normal) | "20" (grande) | "28" (maior)
+  const applyFontSize = (px: string) => {
+    applyStyle((span) => {
+      span.style.fontSize = `${px}px`;
+    });
   };
 
   // Leitura: arquivados renderizam o HTML salvo, sem edição.
@@ -724,7 +774,11 @@ function PostitEditor({
           }, 0);
         }}
         className={cn(
-          "flex-1 px-3 py-2 text-sm leading-snug text-neutral-900 cursor-text",
+          // select-text é OBRIGATÓRIO: o card tem `select-none` (user-select:none),
+          // que é herdado e torna a seleção de texto no contentEditable instável —
+          // ela colapsa antes do clique nos botões da barra, fazendo a formatação
+          // parecer "ignorada". Forçar user-select:text restaura a seleção real.
+          "flex-1 px-3 py-2 text-sm leading-snug text-neutral-900 cursor-text select-text",
           "outline-none whitespace-pre-wrap break-words overflow-auto",
         )}
       />
@@ -747,8 +801,12 @@ function PostitEditor({
         >
           <button
             type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={applyBold}
+            // Executa no onMouseDown (preventDefault preserva a seleção); o
+            // onClick chega tarde demais e pode rodar sem seleção ativa.
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyBold();
+            }}
             title="Negrito"
             className="inline-flex h-6 min-w-[24px] items-center justify-center rounded px-1.5 text-xs font-bold text-neutral-800 hover:bg-neutral-100"
           >
@@ -756,16 +814,18 @@ function PostitEditor({
           </button>
           <span className="mx-0.5 h-4 w-px bg-neutral-200" aria-hidden />
           {[
-            { label: "P", size: "2", title: "Pequeno" },
-            { label: "N", size: "4", title: "Normal" },
-            { label: "G", size: "6", title: "Grande" },
-            { label: "GG", size: "7", title: "Maior" },
+            { label: "P", size: "12", title: "Pequeno" },
+            { label: "N", size: "14", title: "Normal" },
+            { label: "G", size: "20", title: "Grande" },
+            { label: "GG", size: "28", title: "Maior" },
           ].map((opt) => (
             <button
               key={opt.label}
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => applyFontSize(opt.size)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                applyFontSize(opt.size);
+              }}
               title={opt.title}
               className="inline-flex h-6 min-w-[24px] items-center justify-center rounded px-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-100"
             >
@@ -773,7 +833,13 @@ function PostitEditor({
             </button>
           ))}
         </div>,
-        document.body,
+        // IMPORTANTE: portar para o #root (container do React), NÃO document.body.
+        // O React (v18) delega eventos no container raiz; um portal para body fica
+        // FORA da raiz, então cliques nos botões nunca chegam aos handlers React
+        // (onMouseDown/onClick não disparam — só o editor perde foco/blur). Portar
+        // para #root mantém os eventos funcionando E o position:fixed continua
+        // relativo à viewport, pois #root não tem CSS transform (só o canvas tem).
+        document.getElementById("root") ?? document.body,
       )}
     </div>
   );

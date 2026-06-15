@@ -1,4 +1,4 @@
-export { StatusStepperCard, TERMINATION_STATUS_CHAIN, getNextTerminationStatus } from "./status-stepper-card";
+export { StatusStepperCard, TERMINATION_STATUS_CHAIN, getNextTerminationStatus, getPreviousTerminationStatus } from "./status-stepper-card";
 export { SummaryCard } from "./summary-card";
 export { ItemsCard } from "./items-card";
 export { DocumentsCard } from "./documents-card";

@@ -1,8 +1,9 @@
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useRef } from "react";
-import { IconUser, IconInfoCircle, IconFileText, IconMapPin, IconBriefcase, IconShieldCheck } from "@tabler/icons-react";
+import { IconUser, IconInfoCircle, IconFileText, IconMapPin, IconBriefcase, IconShieldCheck, IconReceipt2, IconUsersGroup, IconKey } from "@tabler/icons-react";
 import { Form, FormField } from "@/components/ui/form";
+import { FormSwitch } from "@/components/ui/form-switch";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { userCreateSchema, userUpdateSchema, type UserCreateFormData, type UserUpdateFormData } from "../../../../schemas";
@@ -99,6 +100,7 @@ export function UserForm(props: UserFormProps) {
     contractType: CONTRACT_TYPE.FIXED_TERM as any,
     contractStatus: CONTRACT_STATUS.EXPERIENCE as any,
     unionMember: false,
+    unionAuthorizationDate: null,
     dependentsCount: 0,
     hasSimplifiedDeduction: true,
     admissionDate: null as any,
@@ -148,6 +150,9 @@ export function UserForm(props: UserFormProps) {
   const employeeType = useWatch({ control: form.control, name: "employeeType" as any }) as EMPLOYEE_TYPE | undefined;
   const isClt = !employeeType || employeeType === EMPLOYEE_TYPE.CLT;
   const isProvider = employeeType === EMPLOYEE_TYPE.TERCEIRIZADO || employeeType === EMPLOYEE_TYPE.PJ;
+
+  // Union membership gates the authorization-date picker.
+  const unionMember = useWatch({ control: form.control, name: "unionMember" as any }) as boolean | undefined;
 
   // Watch the selected sector to determine its privilege
   const selectedSectorId = useWatch({ control: form.control, name: "sectorId" });
@@ -417,6 +422,16 @@ export function UserForm(props: UserFormProps) {
                 <FormCityInput<UserCreateFormData | UserUpdateFormData> name="city" disabled={isSubmitting} required={false} />
                 <FormStateSelector<UserCreateFormData | UserUpdateFormData> name="state" disabled={isSubmitting} />
               </div>
+              <div className="grid grid-cols-1 gap-6">
+                <FormInput<UserCreateFormData | UserUpdateFormData>
+                  name="site"
+                  type="text"
+                  label="Site / Link"
+                  placeholder="https://"
+                  disabled={isSubmitting}
+                  required={false}
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -511,6 +526,51 @@ export function UserForm(props: UserFormProps) {
             </CardContent>
           </Card>
 
+          {/* Folha de Pagamento / Encargos */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconReceipt2 className="h-5 w-5 text-muted-foreground" />
+                Folha e Encargos
+              </CardTitle>
+              <CardDescription>Configurações de sindicato e tributação para a folha de pagamento</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <FormSwitch<UserCreateFormData | UserUpdateFormData>
+                name="unionMember"
+                label="Sindicalizado"
+                description="Colaborador é membro do sindicato (contribuição sindical em folha)"
+                icon={<IconUsersGroup className="h-4 w-4 text-muted-foreground" />}
+                disabled={isSubmitting}
+              />
+
+              {unionMember && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name={"unionAuthorizationDate" as any}
+                    render={({ field }) => (
+                      <DateTimeInput
+                        field={{ onChange: field.onChange, onBlur: field.onBlur, value: (field.value as Date | null) ?? null, name: field.name }}
+                        label="Data de Autorização Sindical"
+                        disabled={isSubmitting}
+                        mode="date"
+                      />
+                    )}
+                  />
+                </div>
+              )}
+
+              <FormSwitch<UserCreateFormData | UserUpdateFormData>
+                name="hasSimplifiedDeduction"
+                label="Desconto Simplificado (IRRF)"
+                description="Aplica o desconto simplificado do IRRF em vez das deduções legais detalhadas"
+                icon={<IconReceipt2 className="h-4 w-4 text-muted-foreground" />}
+                disabled={isSubmitting}
+              />
+            </CardContent>
+          </Card>
+
           {/* Access Control */}
           <Card>
             <CardHeader>
@@ -523,6 +583,15 @@ export function UserForm(props: UserFormProps) {
             <CardContent className="space-y-4">
               <ActiveSwitch disabled={isSubmitting} />
               <VerifiedSwitch disabled={isSubmitting} />
+              {mode === "update" && (
+                <FormSwitch<UserUpdateFormData>
+                  name="requirePasswordChange"
+                  label="Exigir Troca de Senha"
+                  description="O colaborador deverá definir uma nova senha no próximo acesso"
+                  icon={<IconKey className="h-4 w-4 text-muted-foreground" />}
+                  disabled={isSubmitting}
+                />
+              )}
             </CardContent>
           </Card>
 

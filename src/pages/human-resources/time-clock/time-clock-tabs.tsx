@@ -23,6 +23,7 @@ const TABS: TabDef[] = [
   { label: "Edição", menuTitle: "Edição", path: routes.humanResources.timeClock.edicao, hrOnly: true },
   { label: "Ausências", menuTitle: "Ausências", path: routes.humanResources.timeClock.ausencias, hrOnly: false },
   { label: "Fechamento", menuTitle: "Fechamento", path: routes.humanResources.timeClock.fechamento.list, hrOnly: true },
+  { label: "Requisições", menuTitle: "Requisições", path: routes.humanResources.requisicoes.list, hrOnly: true },
 ].sort((a, b) => a.menuTitle.localeCompare(b.menuTitle, "pt-BR", { sensitivity: "base" }));
 
 // The last Controle de Ponto subpage the user can access (used by the
@@ -47,6 +48,7 @@ export function TimeClockTabs() {
   const canEdit = hasAnyPrivilege(user as any, [
     SECTOR_PRIVILEGES.HUMAN_RESOURCES,
     SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.ACCOUNTING,
   ]);
   const tabs = TABS.filter((t) => !t.hrOnly || canEdit);
   const active = tabs.find((t) => pathname.startsWith(t.path));

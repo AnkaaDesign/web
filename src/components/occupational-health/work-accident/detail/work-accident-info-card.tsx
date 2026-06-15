@@ -12,11 +12,14 @@ import {
   IconShieldCheck,
   IconAlertTriangle,
   IconNotes,
+  IconFileText,
+  IconExternalLink,
 } from "@tabler/icons-react";
+import { Link } from "react-router-dom";
 
-import { WORK_ACCIDENT_REPORT_TYPE_LABELS, STABILITY_TYPE_LABELS, LEAVE_TYPE_LABELS } from "../../../../constants";
+import { WORK_ACCIDENT_REPORT_TYPE_LABELS, STABILITY_TYPE_LABELS, LEAVE_TYPE_LABELS, routes } from "../../../../constants";
 import type { WORK_ACCIDENT_REPORT_TYPE, STABILITY_TYPE, LEAVE_TYPE } from "../../../../constants";
-import { formatDate } from "../../../../utils";
+import { formatDate, getFileUrl } from "../../../../utils";
 import { cn } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,7 +78,27 @@ export function WorkAccidentInfoCard({ report, className }: WorkAccidentInfoCard
               <DetailRow icon={IconCalendarEvent} label="Data do acidente" value={report.accidentDate ? formatDate(new Date(report.accidentDate)) : "-"} />
               <DetailRow icon={IconCalendarPlus} label="Data de emissão" value={report.emissionDate ? formatDate(new Date(report.emissionDate)) : "-"} />
               {report.leave && (
-                <DetailRow icon={IconCalendarOff} label="Afastamento vinculado" value={LEAVE_TYPE_LABELS[report.leave.type as LEAVE_TYPE] || report.leave.type} />
+                <DetailRow
+                  icon={IconCalendarOff}
+                  label="Afastamento vinculado"
+                  value={
+                    <Link to={routes.occupationalHealth.leaves.details(report.leave.id)} className="text-primary hover:underline">
+                      {LEAVE_TYPE_LABELS[report.leave.type as LEAVE_TYPE] || report.leave.type}
+                    </Link>
+                  }
+                />
+              )}
+              {report.file && (
+                <DetailRow
+                  icon={IconFileText}
+                  label="Documento da CAT"
+                  value={
+                    <a href={getFileUrl(report.file)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                      Ver documento
+                      <IconExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  }
+                />
               )}
             </div>
           </div>

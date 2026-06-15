@@ -109,8 +109,9 @@ export function UserBenefitList({ className }: UserBenefitListProps) {
     { enabled: userIds.length > 0 },
   );
 
-  // Visible columns state with localStorage persistence
-  const { visibleColumns, setVisibleColumns } = useColumnVisibility("user-benefit-list-visible-columns", DEFAULT_USER_BENEFIT_VISIBLE_COLUMNS);
+  // Visible columns state with localStorage persistence.
+  // -v2: added SETOR + CARGO columns; bump the key so saved prefs include them.
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility("user-benefit-list-visible-columns-v2", DEFAULT_USER_BENEFIT_VISIBLE_COLUMNS);
 
   // Get all available columns for column visibility manager
   const allColumns = useMemo(() => createUserBenefitColumns(), []);

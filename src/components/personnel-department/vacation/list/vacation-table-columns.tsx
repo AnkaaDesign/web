@@ -68,8 +68,15 @@ export const createVacationColumns = (): VacationColumn[] => [
     header: "COLABORADOR",
     accessor: (vacation: Vacation) => (
       <div className="truncate">
-        <div className="font-medium truncate" title={vacation.user?.name}>
-          {vacation.user?.name || <span className="text-muted-foreground">-</span>}
+        <div className="flex items-center gap-1.5">
+          <div className="font-medium truncate" title={vacation.user?.name}>
+            {vacation.user?.name || <span className="text-muted-foreground">-</span>}
+          </div>
+          {vacation.groupId && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+              Coletiva
+            </Badge>
+          )}
         </div>
         {vacation.user?.position?.name && <div className="text-xs text-muted-foreground truncate">{vacation.user.position.name}</div>}
       </div>

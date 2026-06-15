@@ -26,6 +26,8 @@ export interface VacationPeriod extends BaseEntity {
 export interface Vacation extends BaseEntity {
   userId: string;
   contractId: string | null;
+  /** When set, this individual vacation was generated from a collective (férias coletivas) group. */
+  groupId?: string | null;
   acquisitiveStart: Date;
   acquisitiveEnd: Date;
   concessiveEnd: Date | null;

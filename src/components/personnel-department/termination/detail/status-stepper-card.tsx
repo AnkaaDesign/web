@@ -53,6 +53,17 @@ export function getNextTerminationStatus(termination: Pick<Termination, "status"
   return getTerminationStatusChain(termination).find((status) => TERMINATION_STATUS_CHAIN.indexOf(status) > currentIndex) ?? null;
 }
 
+export function getPreviousTerminationStatus(termination: Pick<Termination, "status" | "type" | "noticeType">): TERMINATION_STATUS | null {
+  const currentIndex = TERMINATION_STATUS_CHAIN.indexOf(termination.status);
+  if (currentIndex === -1) return null; // CANCELLED
+  // Last applicable status strictly before the current one in the full chain.
+  const applicable = getTerminationStatusChain(termination);
+  for (let i = applicable.length - 1; i >= 0; i--) {
+    if (TERMINATION_STATUS_CHAIN.indexOf(applicable[i]) < currentIndex) return applicable[i];
+  }
+  return null;
+}
+
 interface StatusStepperCardProps {
   termination: Termination;
   className?: string;
@@ -118,11 +129,18 @@ export function StatusStepperCard({ termination, className }: StatusStepperCardP
                 <div
                   className="absolute top-4 left-4 h-0.5 -translate-y-1/2 bg-primary transition-all"
                   style={{
-                    width: `calc((100% - 2rem) * ${
-                      termination.status === TERMINATION_STATUS.COMPLETED
-                        ? 1
-                        : Math.max(0, Math.min(currentIndex, chain.length - 1)) / (chain.length - 1)
-                    })`,
+                    // The fill must terminate exactly at the CURRENT circle's
+                    // center. Circles are not evenly interpolated: the first is
+                    // left-aligned (center 1rem), the last right-aligned (center
+                    // 100% - 1rem) and middle ones centered in equal n-columns
+                    // (center = (i + 0.5) * 100% / n). The track origin is at 1rem
+                    // (left-4), so the fill width is the current center minus 1rem.
+                    width:
+                      termination.status === TERMINATION_STATUS.COMPLETED || currentIndex >= chain.length - 1
+                        ? "calc(100% - 2rem)"
+                        : currentIndex <= 0
+                          ? "0px"
+                          : `calc((${currentIndex} + 0.5) * (100% / ${chain.length}) - 1rem)`,
                   }}
                 />
               </>
@@ -131,9 +149,14 @@ export function StatusStepperCard({ termination, className }: StatusStepperCardP
               {chain.map((status, index) => {
                 const isDone = currentIndex > index || termination.status === TERMINATION_STATUS.COMPLETED;
                 const isCurrent = currentIndex === index && termination.status !== TERMINATION_STATUS.COMPLETED;
+                const isFirst = index === 0;
+                const isLast = index === chain.length - 1;
 
                 return (
-                  <div key={status} className="flex min-w-0 flex-1 flex-col items-center first:items-start last:items-end">
+                  <div
+                    key={status}
+                    className={cn("flex min-w-0 flex-1 flex-col", isFirst ? "items-start" : isLast ? "items-end" : "items-center")}
+                  >
                     {/* Step circle */}
                     <div
                       className={cn(
@@ -146,10 +169,11 @@ export function StatusStepperCard({ termination, className }: StatusStepperCardP
                       {isDone ? <IconCheck className="h-4 w-4" /> : index + 1}
                     </div>
 
-                    {/* Label */}
+                    {/* Label — aligned to its circle: first left, last right, rest centered */}
                     <span
                       className={cn(
-                        "mt-2 w-full text-[11px] sm:text-xs text-center leading-tight px-1 break-words first:text-left last:text-right",
+                        "mt-2 w-full text-[11px] sm:text-xs leading-tight px-1 break-words",
+                        isFirst ? "text-left" : isLast ? "text-right" : "text-center",
                         isCurrent ? "font-semibold text-primary" : isDone ? "font-medium text-foreground" : "text-muted-foreground",
                       )}
                     >

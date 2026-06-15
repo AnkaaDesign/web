@@ -17,6 +17,13 @@ import {
   DISCOUNT_TYPE,
   PAYMENT_CONDITION,
   ORDER_PAYMENT_STATUS_LABELS,
+  TERMINATION_STATUS_LABELS,
+  TERMINATION_TYPE_LABELS,
+  NOTICE_TYPE_LABELS,
+  NOTICE_REDUCTION_LABELS,
+  TERMINATION_ITEM_TYPE_LABELS,
+  TERMINATION_DOCUMENT_TYPE_LABELS,
+  TERMINATION_DOCUMENT_STATUS_LABELS,
 } from '@constants';
 import { formatDateTime, formatDate } from "./date";
 import { formatCurrency } from "./number";
@@ -963,6 +970,28 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "user.position.name": "Cargo do Funcionário",
     "user.sector.name": "Setor do Funcionário",
   },
+  [CHANGE_LOG_ENTITY_TYPE.TERMINATION]: {
+    userId: "Colaborador",
+    status: "Status",
+    statusOrder: "Ordem do Status",
+    type: "Tipo",
+    noticeType: "Aviso Prévio",
+    noticeReduction: "Redução do Aviso",
+    noticeDays: "Dias de Aviso",
+    noticeStartDate: "Início do Aviso",
+    terminationDate: "Data da Rescisão",
+    lastWorkingDate: "Último Dia Trabalhado",
+    projectedEndDate: "Projeção do Contrato",
+    paymentDate: "Data de Pagamento",
+    paidAmount: "Valor Pago",
+    baseRemuneration: "Remuneração Base",
+    fgtsBalance: "Saldo FGTS",
+    accruedVacationPeriods: "Períodos de Férias Vencidas",
+    reason: "Motivo",
+    justCauseArticle: "Artigo (Justa Causa)",
+    // Nested relationship fields
+    "user.name": "Nome do Colaborador",
+  },
   // Add more entity-specific mappings as needed
 };
 
@@ -1351,6 +1380,43 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       OTHER: "Outro",
     };
     return vacationTypeLabels[value] || value;
+  }
+
+  // Handle termination fields
+  if (entityType === CHANGE_LOG_ENTITY_TYPE.TERMINATION) {
+    if ((field === "status" || field === "status_transition") && typeof value === "string") {
+      return TERMINATION_STATUS_LABELS[value as keyof typeof TERMINATION_STATUS_LABELS] || value;
+    }
+    if (field === "type" && typeof value === "string") {
+      return TERMINATION_TYPE_LABELS[value as keyof typeof TERMINATION_TYPE_LABELS] || value;
+    }
+    if (field === "noticeType" && typeof value === "string") {
+      return NOTICE_TYPE_LABELS[value as keyof typeof NOTICE_TYPE_LABELS] || value;
+    }
+    if (field === "noticeReduction" && typeof value === "string") {
+      return NOTICE_REDUCTION_LABELS[value as keyof typeof NOTICE_REDUCTION_LABELS] || value;
+    }
+    if (field === "itemType" && typeof value === "string") {
+      return TERMINATION_ITEM_TYPE_LABELS[value as keyof typeof TERMINATION_ITEM_TYPE_LABELS] || value;
+    }
+    if (field === "documentType" && typeof value === "string") {
+      return TERMINATION_DOCUMENT_TYPE_LABELS[value as keyof typeof TERMINATION_DOCUMENT_TYPE_LABELS] || value;
+    }
+    if (field === "documentStatus" && typeof value === "string") {
+      return TERMINATION_DOCUMENT_STATUS_LABELS[value as keyof typeof TERMINATION_DOCUMENT_STATUS_LABELS] || value;
+    }
+    if ((field === "paidAmount" || field === "baseRemuneration" || field === "fgtsBalance") && (typeof value === "number" || (typeof value === "string" && !isNaN(Number(value))))) {
+      return formatCurrency(Number(value));
+    }
+    if ((field === "noticeStartDate" || field === "terminationDate" || field === "lastWorkingDate" || field === "projectedEndDate" || field === "paymentDate") && value) {
+      const date = new Date(value as any);
+      if (!isNaN(date.getTime())) {
+        return formatDate(date);
+      }
+    }
+    if (field === "noticeDays" && typeof value === "number") {
+      return `${value} ${value === 1 ? "dia" : "dias"}`;
+    }
   }
 
   // Handle task quote fields

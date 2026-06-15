@@ -1831,6 +1831,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
             path: "/recursos-humanos/controle-ponto/fechamento",
             requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
           },
+          {
+            id: "controle-ponto-requisicoes",
+            title: "Requisições",
+            icon: "clipboardList",
+            path: "/recursos-humanos/requisicoes",
+            requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING],
+          },
         ],
       },
       {
@@ -1922,7 +1929,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
       },
       { id: "minhas-mensagens-rh", title: "Minhas Mensagens", icon: "message", path: "/pessoal/mensagens", requiredPrivilege: SECTOR_PRIVILEGES.HUMAN_RESOURCES },
-      { id: "requisicoes", title: "Requisições", icon: "clipboardList", path: "/recursos-humanos/requisicoes" },
     ],
   },
 
@@ -1974,14 +1980,8 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "dp-controle-ponto-edicao", title: "Edição", icon: "edit", path: "/recursos-humanos/controle-ponto/edicao", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
           { id: "dp-controle-ponto-ausencias", title: "Ausências", icon: "list", path: "/recursos-humanos/controle-ponto/ausencias", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
           { id: "dp-controle-ponto-fechamento", title: "Fechamento", icon: "signature", path: "/recursos-humanos/controle-ponto/fechamento", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "dp-controle-ponto-requisicoes", title: "Requisições", icon: "clipboardList", path: "/recursos-humanos/requisicoes", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
         ],
-      },
-      {
-        id: "dp-requisicoes",
-        title: "Requisições",
-        icon: "clipboardList",
-        path: "/recursos-humanos/requisicoes",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
       },
       {
         id: "dp-ferias",
@@ -1993,6 +1993,17 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "dp-ferias-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/ferias/cadastrar" },
           { id: "dp-ferias-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/ferias/detalhes/:id", isDynamic: true },
           { id: "dp-ferias-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/ferias/editar/:id", isDynamic: true },
+        ],
+      },
+      {
+        id: "dp-ferias-coletivas",
+        title: "Férias Coletivas",
+        icon: "vacation",
+        path: "/departamento-pessoal/ferias-coletivas",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          { id: "dp-ferias-coletivas-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/ferias-coletivas/cadastrar" },
+          { id: "dp-ferias-coletivas-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/ferias-coletivas/detalhes/:id", isDynamic: true },
         ],
       },
       // NOTE (spec alignment 2026-06-11): "Feriados" and "Calendário" are NOT DP items.
@@ -2255,14 +2266,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         icon: "palette",
         path: "/ferramentas/paleta",
         requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.EXTERNAL],
-      },
-      {
-        // General calculator with history (Área Andressa §5). Gateless = broad
-        // availability, inheriting the section audience like the other calculators.
-        id: "ferramentas-calculadora",
-        title: "Calculadora",
-        icon: "calculator",
-        path: "/ferramentas/calculadora",
       },
       {
         // ACCOUNTING-only placement (Área Andressa §5 puts Calendário under

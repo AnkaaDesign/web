@@ -39,7 +39,7 @@ export function WorkAccidentList({ className }: WorkAccidentListProps) {
 
   const { data: response, isLoading, error } = useWorkAccidentReports({
     orderBy: { accidentDate: "desc" },
-    include: { user: { include: { position: true } } },
+    include: { user: { include: { position: true, sector: true } } },
     ...(search.trim() ? { searchingFor: search.trim() } : {}),
     limit: 100,
   } as any);
@@ -88,6 +88,8 @@ export function WorkAccidentList({ className }: WorkAccidentListProps) {
                 <TableHeader>
                   <TableRow className="bg-muted hover:bg-muted">
                     <TableHead className="text-foreground font-bold uppercase text-xs">Colaborador</TableHead>
+                    <TableHead className="text-foreground font-bold uppercase text-xs">Setor</TableHead>
+                    <TableHead className="text-foreground font-bold uppercase text-xs">Cargo</TableHead>
                     <TableHead className="text-foreground font-bold uppercase text-xs">Tipo</TableHead>
                     <TableHead className="text-foreground font-bold uppercase text-xs">Nº da CAT</TableHead>
                     <TableHead className="text-foreground font-bold uppercase text-xs">Data do acidente</TableHead>
@@ -103,11 +105,10 @@ export function WorkAccidentList({ className }: WorkAccidentListProps) {
                       onClick={() => navigate(routes.occupationalHealth.workAccidents.details(report.id))}
                     >
                       <TableCell className="font-medium">
-                        <div>
-                          <p className="truncate">{report.user?.name || "-"}</p>
-                          {report.user?.position?.name && <p className="text-xs text-muted-foreground truncate">{report.user.position.name}</p>}
-                        </div>
+                        <p className="truncate">{report.user?.name || "-"}</p>
                       </TableCell>
+                      <TableCell className="text-sm">{report.user?.sector?.name || <span className="text-muted-foreground">-</span>}</TableCell>
+                      <TableCell className="text-sm">{report.user?.position?.name || <span className="text-muted-foreground">-</span>}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="text-xs whitespace-nowrap">
                           {WORK_ACCIDENT_REPORT_TYPE_LABELS[report.type as WORK_ACCIDENT_REPORT_TYPE] || report.type}

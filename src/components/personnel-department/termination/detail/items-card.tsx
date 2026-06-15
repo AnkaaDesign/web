@@ -14,8 +14,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { IconCalculator, IconPlus, IconPencil, IconTrash, IconLoader2, IconReceipt2, IconCoin, IconInfoCircle } from "@tabler/icons-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { IconCalculator, IconPlus, IconPencil, IconTrash, IconLoader2, IconReceipt2, IconCoin, IconInfoCircle, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { TERMINATION_ITEM_TYPE_LABELS } from "../../../../constants";
 import { formatCurrency } from "../../../../utils";
@@ -94,7 +94,7 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
   };
 
   const calculateButton = (
-    <Button variant="outline" size="sm" onClick={handleCalculateClick} disabled={disabled || calculate.isPending}>
+    <Button variant="default" size="sm" onClick={handleCalculateClick} disabled={disabled || calculate.isPending}>
       {calculate.isPending ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCalculator className="h-4 w-4 mr-2" />}
       Calcular
     </Button>
@@ -108,10 +108,71 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
   );
 
   const addButton = (
-    <Button variant="default" size="sm" onClick={() => setItemDialog({ open: true, item: null })} disabled={disabled}>
+    <Button variant="outline" size="sm" onClick={() => setItemDialog({ open: true, item: null })} disabled={disabled}>
       <IconPlus className="h-4 w-4 mr-2" />
       Adicionar Verba
     </Button>
+  );
+
+  const taxSuggestion = taxResult && (
+    <Popover open onOpenChange={(open) => !open && setTaxResult(null)}>
+      <PopoverTrigger asChild>
+        <span className="sr-only">Sugestão de impostos</span>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-96">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <IconCoin className="h-4 w-4" />
+            Impostos calculados (sugestão)
+          </div>
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 -mr-1 -mt-1" onClick={() => setTaxResult(null)} title="Fechar">
+            <IconX className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="mt-3 space-y-1 text-sm">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-muted-foreground">Base INSS (saldo + aviso trabalhado)</span>
+            <span className="tabular-nums">{formatCurrency(taxResult.monthlyInssBase)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-muted-foreground">INSS sobre verbas mensais</span>
+            <span className="tabular-nums">{formatCurrency(taxResult.monthlyInss)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-muted-foreground">IRRF sobre verbas mensais</span>
+            <span className="tabular-nums">{formatCurrency(taxResult.monthlyIrrf)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-muted-foreground">Base INSS 13º</span>
+            <span className="tabular-nums">{formatCurrency(taxResult.thirteenthInssBase)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-muted-foreground">INSS sobre 13º</span>
+            <span className="tabular-nums">{formatCurrency(taxResult.thirteenthInss)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-muted-foreground">IRRF sobre 13º</span>
+            <span className="tabular-nums">{formatCurrency(taxResult.thirteenthIrrf)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4 pt-1 mt-1 border-t font-medium">
+            <span>Total INSS</span>
+            <span className="tabular-nums">{formatCurrency(taxResult.totalInss)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4 font-medium">
+            <span>Total IRRF</span>
+            <span className="tabular-nums">{formatCurrency(taxResult.totalIrrf)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4 pt-1 mt-1 border-t">
+            <span className="text-muted-foreground">Base da multa do FGTS</span>
+            <span className="tabular-nums">{formatCurrency(taxResult.fgtsFineBase)}</span>
+          </div>
+        </div>
+        <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
+          <IconInfoCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          INSS/IRRF incidem apenas sobre verbas tributáveis. Valores são uma sugestão — ajuste em "Adicionar Verba" se necessário.
+        </p>
+      </PopoverContent>
+    </Popover>
   );
 
   return (
@@ -122,7 +183,7 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
             <IconReceipt2 className="h-5 w-5 text-muted-foreground" />
             Verbas Rescisórias
           </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="relative flex items-center gap-2">
             {disabled ? (
               <>
                 <Tooltip>
@@ -151,72 +212,15 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
                 {addButton}
               </>
             )}
+            <div className="absolute right-0 top-full">{taxSuggestion}</div>
           </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0 flex-1">
-        {/* Tax/FGTS assist result — INSS/IRRF on the TAXABLE verbas + FGTS-multa base.
-            Manual override stays available via "Adicionar Verba" (INSS/IRRF). */}
-        {taxResult && (
-          <Alert className="mb-4">
-            <AlertTitle className="flex items-center gap-2">
-              <IconCoin className="h-4 w-4" />
-              Impostos calculados (sugestão)
-            </AlertTitle>
-            <AlertDescription>
-              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Base INSS (saldo + aviso trabalhado)</span>
-                  <span className="tabular-nums">{formatCurrency(taxResult.monthlyInssBase)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">INSS sobre verbas mensais</span>
-                  <span className="tabular-nums">{formatCurrency(taxResult.monthlyInss)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">IRRF sobre verbas mensais</span>
-                  <span className="tabular-nums">{formatCurrency(taxResult.monthlyIrrf)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Base INSS 13º</span>
-                  <span className="tabular-nums">{formatCurrency(taxResult.thirteenthInssBase)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">INSS sobre 13º</span>
-                  <span className="tabular-nums">{formatCurrency(taxResult.thirteenthInss)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">IRRF sobre 13º</span>
-                  <span className="tabular-nums">{formatCurrency(taxResult.thirteenthIrrf)}</span>
-                </div>
-                <div className="flex items-center justify-between font-medium">
-                  <span>Total INSS</span>
-                  <span className="tabular-nums">{formatCurrency(taxResult.totalInss)}</span>
-                </div>
-                <div className="flex items-center justify-between font-medium">
-                  <span>Total IRRF</span>
-                  <span className="tabular-nums">{formatCurrency(taxResult.totalIrrf)}</span>
-                </div>
-                <div className="flex items-center justify-between sm:col-span-2 pt-1 border-t mt-1">
-                  <span className="text-muted-foreground">Base da multa do FGTS (inclui projeção do aviso indenizado + 13º)</span>
-                  <span className="tabular-nums">{formatCurrency(taxResult.fgtsFineBase)}</span>
-                </div>
-              </div>
-              <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
-                <IconInfoCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                INSS/IRRF incidem apenas sobre as verbas tributáveis (saldo de salário, 13º e aviso prévio trabalhado). Férias indenizadas, aviso prévio indenizado e a
-                multa do FGTS são <strong>isentos</strong> e não entram na base. Os valores são uma sugestão — ajuste manualmente em "Adicionar Verba" (INSS/IRRF) se
-                necessário.
-              </p>
-            </AlertDescription>
-          </Alert>
-        )}
-
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
-            <IconCalculator className="h-10 w-10 text-muted-foreground/50 mb-3" />
-            <div className="text-base font-medium mb-1">Nenhuma verba calculada</div>
-            <div className="text-sm">Use o botão "Calcular" para gerar as verbas automaticamente ou adicione verbas manuais.</div>
+            <IconCalculator className="h-10 w-10 text-muted-foreground/40 mb-3" />
+            <div className="text-sm font-medium">Nenhuma verba calculada</div>
           </div>
         ) : (
           <Table>
@@ -243,8 +247,12 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
                     </div>
                     {item.description && <div className="text-xs text-muted-foreground mt-0.5">{item.description}</div>}
                   </TableCell>
-                  <TableCell className="text-right text-sm tabular-nums">{item.referenceQuantity ?? "-"}</TableCell>
-                  <TableCell className="text-right text-sm tabular-nums">{item.baseValue != null ? formatCurrency(item.baseValue) : "-"}</TableCell>
+                  <TableCell className="text-right text-sm tabular-nums">
+                    {item.referenceQuantity ?? <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell className="text-right text-sm tabular-nums">
+                    {item.baseValue != null ? formatCurrency(item.baseValue) : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell className={cn("text-right text-sm font-medium tabular-nums", item.amount < 0 && "text-destructive")}>
                     {item.amount < 0 ? `-${formatCurrency(Math.abs(item.amount))}` : formatCurrency(item.amount)}
                   </TableCell>
@@ -278,25 +286,25 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
               ))}
             </TableBody>
             <TableFooter>
-              <TableRow>
-                <TableCell colSpan={3} className="text-right text-sm">
+              <TableRow className="border-t-0 hover:bg-transparent">
+                <TableCell colSpan={3} className="text-right text-sm text-muted-foreground">
                   Proventos
                 </TableCell>
-                <TableCell className="text-right text-sm font-medium tabular-nums">{formatCurrency(totals.earnings)}</TableCell>
+                <TableCell className="text-right text-sm tabular-nums">{formatCurrency(totals.earnings)}</TableCell>
                 <TableCell />
               </TableRow>
-              <TableRow>
-                <TableCell colSpan={3} className="text-right text-sm">
+              <TableRow className="border-t-0 hover:bg-transparent">
+                <TableCell colSpan={3} className="text-right text-sm text-muted-foreground">
                   Descontos
                 </TableCell>
-                <TableCell className="text-right text-sm font-medium tabular-nums text-destructive">-{formatCurrency(totals.discounts)}</TableCell>
+                <TableCell className="text-right text-sm tabular-nums text-destructive">-{formatCurrency(totals.discounts)}</TableCell>
                 <TableCell />
               </TableRow>
-              <TableRow>
-                <TableCell colSpan={3} className="text-right text-sm font-semibold">
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={3} className="text-right text-base font-bold">
                   Líquido
                 </TableCell>
-                <TableCell className={cn("text-right text-sm font-semibold tabular-nums", totals.net < 0 && "text-destructive")}>
+                <TableCell className={cn("text-right text-base font-bold tabular-nums", totals.net < 0 && "text-destructive")}>
                   {totals.net < 0 ? `-${formatCurrency(Math.abs(totals.net))}` : formatCurrency(totals.net)}
                 </TableCell>
                 <TableCell />

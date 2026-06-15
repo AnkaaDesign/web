@@ -124,6 +124,7 @@ export function UserBenefitFilters({ open, onOpenChange, filters, onFilterChange
         orderBy: { name: "asc" },
         page: page,
         take: 50,
+        isActive: true, // enrollments only apply to active collaborators
       };
 
       if (searchTerm && searchTerm.trim()) {

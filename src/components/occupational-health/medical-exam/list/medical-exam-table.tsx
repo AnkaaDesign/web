@@ -85,6 +85,7 @@ export function MedicalExamTable({ visibleColumns, className, onComplete, onCanc
       user: {
         include: {
           position: true,
+          sector: true,
         },
       },
       file: true,

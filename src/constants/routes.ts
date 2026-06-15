@@ -613,6 +613,11 @@ export const routes = {
       edit: (id: string) => `/departamento-pessoal/ferias/editar/${id}`,
       root: "/departamento-pessoal/ferias",
     },
+    vacationGroups: {
+      create: "/departamento-pessoal/ferias-coletivas/cadastrar",
+      details: (id: string) => `/departamento-pessoal/ferias-coletivas/detalhes/${id}`,
+      root: "/departamento-pessoal/ferias-coletivas",
+    },
     salaryAdjustments: {
       details: (id: string) => `/departamento-pessoal/reajustes/detalhes/${id}`,
       root: "/departamento-pessoal/reajustes",
@@ -786,9 +791,6 @@ export const routes = {
     },
     colorPalette: {
       root: "/ferramentas/paleta",
-    },
-    calculator: {
-      root: "/ferramentas/calculadora",
     },
     timeCalculator: {
       root: "/ferramentas/calculadora-de-horas",

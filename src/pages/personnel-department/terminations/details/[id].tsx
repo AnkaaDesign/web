@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
-import { IconEdit, IconTrash, IconRefresh, IconBan, IconPlayerTrackNext } from "@tabler/icons-react";
+import { IconEdit, IconTrash, IconBan, IconPlayerTrackNext, IconPlayerTrackPrev } from "@tabler/icons-react";
 
 import {
   routes,
@@ -9,15 +9,13 @@ import {
   TERMINATION_STATUS,
   TERMINATION_STATUS_LABELS,
 } from "../../../../constants";
-import { useTermination, useTerminationMutations, useTerminationAdvance } from "../../../../hooks/personnel-department/use-terminations";
+import { useTermination, useTerminationMutations, useTerminationAdvance, useTerminationRegress } from "../../../../hooks/personnel-department/use-terminations";
 import { useAuth } from "../../../../hooks/common/use-auth";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +34,7 @@ import {
   PaymentCard,
   TerminationDetailSkeleton,
   getNextTerminationStatus,
+  getPreviousTerminationStatus,
 } from "@/components/personnel-department/termination/detail";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
@@ -48,18 +47,18 @@ export const TerminationDetailPage = () => {
   const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
 
   const [showAdvanceDialog, setShowAdvanceDialog] = useState(false);
+  const [showRegressDialog, setShowRegressDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { deleteAsync, deleteMutation } = useTerminationMutations();
   const advance = useTerminationAdvance();
+  const regress = useTerminationRegress();
 
   const {
     data: response,
     isLoading,
     error,
-    refetch,
-    isRefetching,
   } = useTermination(id || "", {
     include: {
       user: { include: { position: true, sector: true } },
@@ -90,8 +89,10 @@ export const TerminationDetailPage = () => {
 
   const isFinal = termination.status === TERMINATION_STATUS.COMPLETED || termination.status === TERMINATION_STATUS.CANCELLED;
   const nextStatus = getNextTerminationStatus(termination);
+  const prevStatus = getPreviousTerminationStatus(termination);
   const items = termination.items || [];
   const nextIsCompleted = nextStatus === TERMINATION_STATUS.COMPLETED;
+  const canRegress = !isFinal && !!prevStatus;
 
   // Advance guards (mirror server-side rules)
   let advanceDisabledReason: string | null = null;
@@ -111,6 +112,18 @@ export const TerminationDetailPage = () => {
       // Error is handled by the API client with detailed message
       if (process.env.NODE_ENV !== "production") {
         console.error("Error advancing termination:", error);
+      }
+    }
+  };
+
+  const handleRegress = async () => {
+    try {
+      await regress.mutateAsync({ id });
+      setShowRegressDialog(false);
+    } catch (error) {
+      // Error is handled by the API client with detailed message
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error regressing termination:", error);
       }
     }
   };
@@ -140,25 +153,6 @@ export const TerminationDetailPage = () => {
     setShowDeleteDialog(false);
   };
 
-  // "Avançar" lives in headerExtra so it can carry a Tooltip with the guard message
-  const advanceButton = (
-    <Button variant="default" size="default" onClick={() => setShowAdvanceDialog(true)} disabled={!!advanceDisabledReason || advance.isPending}>
-      <IconPlayerTrackNext className="h-4 w-4 mr-2" />
-      Avançar
-    </Button>
-  );
-
-  const headerExtra = advanceDisabledReason ? (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span tabIndex={0}>{advanceButton}</span>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs">{advanceDisabledReason}</TooltipContent>
-    </Tooltip>
-  ) : (
-    advanceButton
-  );
-
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
@@ -171,15 +165,19 @@ export const TerminationDetailPage = () => {
             { label: "Rescisões", href: routes.personnelDepartment.terminations.root },
             { label: termination.user?.name || "Detalhes" },
           ]}
-          headerExtra={headerExtra}
           actions={[
-            {
-              key: "refresh",
-              label: "Atualizar",
-              icon: IconRefresh,
-              onClick: () => refetch(),
-              loading: isRefetching,
-            },
+            ...(canRegress
+              ? [
+                  {
+                    key: "regress",
+                    label: "Voltar etapa",
+                    icon: IconPlayerTrackPrev,
+                    onClick: () => setShowRegressDialog(true),
+                    variant: "outline" as const,
+                    disabled: regress.isPending,
+                  },
+                ]
+              : []),
             {
               key: "edit",
               label: "Editar",
@@ -190,11 +188,19 @@ export const TerminationDetailPage = () => {
             ...(!isFinal
               ? [
                   {
+                    key: "advance",
+                    label: "Avançar",
+                    icon: IconPlayerTrackNext,
+                    onClick: () => setShowAdvanceDialog(true),
+                    variant: "default" as const,
+                    disabled: !!advanceDisabledReason || advance.isPending,
+                  },
+                  {
                     key: "cancel",
                     label: "Cancelar",
                     icon: IconBan,
                     onClick: () => setShowCancelDialog(true),
-                    variant: "outline" as const,
+                    variant: "destructive" as const,
                   },
                 ]
               : []),
@@ -225,28 +231,35 @@ export const TerminationDetailPage = () => {
               </Alert>
             )}
 
+            {/* Why "Avançar" is blocked (covers cases not in the dismissal warning above) */}
+            {advanceDisabledReason && !isFinal && !nextIsCompleted && (
+              <Alert>
+                <AlertDescription>{advanceDisabledReason}</AlertDescription>
+              </Alert>
+            )}
+
             {/* Status stepper */}
             <StatusStepperCard termination={termination} />
 
-            {/* Summary + Payment */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            {/* Summary + Payment (Payment stretches to match the Summary height) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
               <SummaryCard termination={termination} />
-              <div className="space-y-4">
-                <PaymentCard termination={termination} disabled={isFinal} />
-                <ChangelogHistory
-                  entityType={CHANGE_LOG_ENTITY_TYPE.TERMINATION}
-                  entityId={id}
-                  entityName={termination.user?.name}
-                  entityCreatedAt={termination.createdAt}
-                />
-              </div>
+              <PaymentCard termination={termination} disabled={isFinal} className="h-full" />
             </div>
 
-            {/* Verbas */}
-            <ItemsCard termination={termination} disabled={isFinal} />
+            {/* Verbas + Documentos — half each */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+              <ItemsCard termination={termination} disabled={isFinal} />
+              <DocumentsCard termination={termination} disabled={isFinal} />
+            </div>
 
-            {/* Documentos */}
-            <DocumentsCard termination={termination} disabled={isFinal} />
+            {/* Histórico de Alterações — full width so the timeline has room */}
+            <ChangelogHistory
+              entityType={CHANGE_LOG_ENTITY_TYPE.TERMINATION}
+              entityId={id}
+              entityName={termination.user?.name}
+              entityCreatedAt={termination.createdAt}
+            />
           </div>
         </div>
 
@@ -267,6 +280,25 @@ export const TerminationDetailPage = () => {
               <AlertDialogCancel>Voltar</AlertDialogCancel>
               <AlertDialogAction onClick={handleAdvance} disabled={advance.isPending}>
                 Avançar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Regress (step back) Confirmation Dialog */}
+        <AlertDialog open={showRegressDialog} onOpenChange={setShowRegressDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Voltar etapa</AlertDialogTitle>
+              <AlertDialogDescription>
+                Retroceder o processo de {TERMINATION_STATUS_LABELS[termination.status]} para{" "}
+                <span className="font-medium">{prevStatus ? TERMINATION_STATUS_LABELS[prevStatus] : "-"}</span>?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Voltar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleRegress} disabled={regress.isPending}>
+                Voltar etapa
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

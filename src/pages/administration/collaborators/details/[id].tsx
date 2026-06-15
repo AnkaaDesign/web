@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
+import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, EMPLOYEE_TYPE } from "../../../../constants";
 import { useUser, useUserMutations } from "../../../../hooks";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -29,6 +29,7 @@ const CollaboratorDetailsPage = () => {
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
     data: response,
@@ -55,6 +56,13 @@ const CollaboratorDetailsPage = () => {
 
   const user = response?.data;
   const mutations = useUserMutations();
+
+  // 13º salário and payroll-loans only apply to CLT vínculos; off-payroll
+  // categories (terceirizado/PJ/autônomo/estagiário) don't accrue them, so we
+  // hide those cards to keep the page focused.
+  const isCltCollaborator =
+    (user?.currentContract?.employeeType ?? (user as unknown as { currentEmployeeType?: EMPLOYEE_TYPE })?.currentEmployeeType) ===
+    EMPLOYEE_TYPE.CLT;
 
   // Context-aware trail (shared page): "Departamento Pessoal" for accounting users,
   // "Administração" only when reached from that section. Must run before early returns.
@@ -94,6 +102,7 @@ const CollaboratorDetailsPage = () => {
   }
 
   const handleDelete = async () => {
+    setIsDeleting(true);
     try {
       await mutations.delete(id);
       navigate(routes.administration.collaborators.root);
@@ -101,8 +110,10 @@ const CollaboratorDetailsPage = () => {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error deleting collaborator:", error);
       }
+      setIsDeleteDialogOpen(false);
+    } finally {
+      setIsDeleting(false);
     }
-    setIsDeleteDialogOpen(false);
   };
 
   return (
@@ -137,48 +148,54 @@ const CollaboratorDetailsPage = () => {
           className="flex-shrink-0"
         />
         <div className="flex-1 overflow-y-auto pb-6">
+          {/* Identidade → Trabalho → Documentos/EPI → Históricos → Folha → Auditoria.
+              Cards são pareados em 2 colunas (lg+); tabelas largas (Benefícios,
+              Dependentes) ocupam a linha inteira. O grid usa o stretch padrão para
+              que cada card acompanhe a altura do irmão na mesma linha. */}
           <div className="space-y-4">
-            {/* Core Information Grid */}
+            {/* Identidade: Informações Básicas + Dados Profissionais */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <BasicInfoCard user={user} />
-              <AddressCard user={user} />
+              <ProfessionalInfoCard user={user} />
             </div>
 
-            {/* Professional and Login Info Grid */}
+            {/* Endereço + Informações de Login */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ProfessionalInfoCard user={user} />
+              <AddressCard user={user} />
               <LoginInfoCard user={user} />
             </div>
 
-            {/* Documentação (Admissão — DP/Contabilidade) */}
-            <UserDocumentationCard userId={user.id} />
+            {/* Documentação (Admissão) + Tamanho de EPI */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <UserDocumentationCard userId={user.id} />
+              <PpeSizesCard user={user} />
+            </div>
 
-            {/* Histórico de Vínculos (vínculos empregatícios) */}
-            <EmploymentHistoryCard userId={id} maxHeight="400px" />
+            {/* Registros / históricos lado a lado: Vínculos + Cargos */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <EmploymentHistoryCard userId={id} maxHeight="500px" className="h-[500px]" />
+              <UserPositionHistoryCard userId={id} maxHeight="500px" className="h-[500px]" />
+            </div>
 
-            {/* Histórico de Cargos (Departamento Pessoal) */}
-            <UserPositionHistoryCard userId={id} maxHeight="400px" />
-
-            {/* Benefícios ativos (Empresa × Colaborador) */}
+            {/* Benefícios ativos (Empresa × Colaborador) — tabela larga */}
             <UserBenefitsCard userId={id} />
 
-            {/* PPE Sizes and Changelog History - Side by Side */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <PpeSizesCard user={user} className="h-[700px]" />
-              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.USER} entityId={id} maxHeight="700px" className="h-[700px]" />
-            </div>
-
-            {/* Dependentes (IRRF / Salário-Família) */}
+            {/* Dependentes (IRRF / Salário-Família) — tabela larga */}
             <DependentsCard userId={id} />
 
-            {/* Empréstimos / Adiantamentos (descontos consignados auto-aplicados) e 13º Salário */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <CollaboratorLoansCard userId={id} />
-              <CollaboratorThirteenthCard userId={id} />
-            </div>
+            {/* Folha: Empréstimos / Adiantamentos + 13º Salário — somente CLT */}
+            {isCltCollaborator && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <CollaboratorLoansCard userId={id} />
+                <CollaboratorThirteenthCard userId={id} />
+              </div>
+            )}
 
-            {/* Related Activities */}
-            <RelatedActivitiesCard user={user} />
+            {/* Auditoria: Atividades + Histórico de Alterações (changelog) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <RelatedActivitiesCard user={user} maxHeight="700px" className="h-[700px]" />
+              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.USER} entityId={id} maxHeight="700px" className="h-[700px]" />
+            </div>
           </div>
         </div>
 
@@ -199,8 +216,8 @@ const CollaboratorDetailsPage = () => {
               <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button variant="destructive" onClick={handleDelete} disabled={false}>
-                {false ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconTrash className="h-4 w-4 mr-2" />}
+              <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+                {isDeleting ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconTrash className="h-4 w-4 mr-2" />}
                 Excluir
               </Button>
             </DialogFooter>

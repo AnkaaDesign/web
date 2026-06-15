@@ -540,6 +540,13 @@ export enum VACATION_STATUS {
   EXPIRED = "EXPIRED",
 }
 
+// Tipo de abrangência das férias coletivas.
+export enum VACATION_GROUP_TYPE {
+  ALL = "ALL",
+  SECTOR = "SECTOR",
+  POSITION = "POSITION",
+}
+
 // Status do 13º salário.
 export enum THIRTEENTH_STATUS {
   OPEN = "OPEN",
@@ -2536,7 +2543,6 @@ export enum FAVORITE_PAGES {
   // Ferramentas
   FERRAMENTAS_CUSTO_DE_FUNCIONARIO = "/ferramentas/custo-de-funcionario",
   FERRAMENTAS_POST_ITS = "/ferramentas/post-its",
-  FERRAMENTAS_CALCULADORA = "/ferramentas/calculadora",
 }
 
 export enum LAYOUT_SIDE {

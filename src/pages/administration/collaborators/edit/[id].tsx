@@ -33,6 +33,10 @@ const EditCollaboratorPage = () => {
     sector: true,
     ledSector: true,
     ppeSize: true, // CRITICAL: Include PPE sizes for form
+    // CRITICAL: the current vínculo carries admissionDate / effectedAt / exp1/exp2
+    // dates. Without this include `user.currentContract` is undefined and the
+    // "Data de Admissão" / "Data de Contratação" fields render empty.
+    currentContract: true,
     tasks: {
       orderBy: { createdAt: "desc" },
       take: 5,
@@ -161,6 +165,16 @@ const EditCollaboratorPage = () => {
       zipCode: user.zipCode ?? null,
       site: user.site ?? null,
       payrollNumber: user.payrollNumber ?? null,
+
+      // Payroll / tax settings (no dedicated UI elsewhere — surfaced in the form)
+      unionMember: (user as unknown as { unionMember?: boolean }).unionMember ?? false,
+      unionAuthorizationDate: parseLocalDate(
+        (user as unknown as { unionAuthorizationDate?: string | Date | null }).unionAuthorizationDate,
+      ),
+      hasSimplifiedDeduction:
+        (user as unknown as { hasSimplifiedDeduction?: boolean }).hasSimplifiedDeduction ?? true,
+      requirePasswordChange:
+        (user as unknown as { requirePasswordChange?: boolean }).requirePasswordChange ?? false,
 
       // Parse all dates to local timezone to avoid timezone shift bugs
       birth: parseLocalDate(user.birth),

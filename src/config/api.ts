@@ -30,10 +30,16 @@ export const getApiUrl = (): string => {
   const hostname = window.location.hostname;
   const port = import.meta.env.VITE_API_PORT || "3030";
 
-  // LAN access — API is on the same machine, use the browser's hostname
+  // LAN access — API is on the same machine, use the browser's hostname.
   // Note: window.__ANKAA_API_URL__ in index.html is the primary source for this;
   // this branch is a fallback if that script hasn't run yet.
   if (isPrivateNetworkHost(hostname)) {
+    // Dev (Vite dev server): hit the API directly on the same host:port so
+    // LAN devices reach it without an nginx proxy.
+    // Production (nginx on :80): route through the /api reverse proxy.
+    if (import.meta.env.DEV) {
+      return `http://${hostname}:${port}`;
+    }
     return `http://${hostname}/api`;
   }
 

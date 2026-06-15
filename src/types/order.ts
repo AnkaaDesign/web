@@ -459,9 +459,20 @@ export interface OrderPaymentSummaryResponse {
 // Unified payables (Contas a Pagar) — mirrors api/src/types/order.ts
 // =====================
 
-export type PayableSource = "ORDER" | "AIRBRUSHING" | "SCHEDULED";
+export type PayableSource = "ORDER" | "AIRBRUSHING" | "SCHEDULED" | "TAX" | "PAYROLL" | "PAYROLL_SCHEDULED" | "RECURRING";
 
-export type PayableState = "NOT_REQUESTED" | "REQUESTED" | "AWAITING_PAYMENT" | "PARTIALLY_PAID" | "EXPECTED";
+/** How a payable row is settled — lets the UI pick the action generically. */
+export type PayableSettleVia =
+  | "ORDER_LIFECYCLE"
+  | "AIRBRUSHING"
+  | "THIRTEENTH"
+  | "VACATION"
+  | "PAYROLL_MONTH"
+  | "SCHEDULE_TRIGGER"
+  | "RECONCILIATION"
+  | "NONE";
+
+export type PayableState = "NOT_REQUESTED" | "REQUESTED" | "AWAITING_PAYMENT" | "PARTIALLY_PAID" | "EXPECTED" | "PAID";
 
 /** One normalized payable row: an open order, an airbrushing painter payment, or a scheduled/expected outflow. */
 export interface PayableRow {
@@ -477,8 +488,20 @@ export interface PayableRow {
   dueDate: string | null;
   method: string | null;
   requestedAt: string | null;
+  /** When the row was settled (PAID rows only). */
+  paidAt?: string | null;
   /** Convenience link back to the originating task (airbrushing rows). */
   taskId?: string | null;
+  /** How to settle this row (drives the Contas a Pagar action menu). */
+  settleVia?: PayableSettleVia;
+  /** Estimated value (taxes / recurrents / schedules) — informational. */
+  isEstimate?: boolean;
+  /** Sub-label: installment ("1ª parcela"), Fixo/Variável, etc. */
+  subtype?: string | null;
+  /** Competence the row belongs to (YYYY-MM) — payroll/tax/recurring. */
+  competence?: string | null;
+  /** Deep-link target for RECONCILIATION/SCHEDULE settle actions. */
+  settleHref?: string | null;
 }
 
 export interface PayablesSummary {
@@ -487,6 +510,8 @@ export interface PayablesSummary {
   AWAITING_PAYMENT: OrderPaymentSummaryBucket;
   PARTIALLY_PAID: OrderPaymentSummaryBucket;
   EXPECTED: OrderPaymentSummaryBucket;
+  /** Settled this month. */
+  PAID: OrderPaymentSummaryBucket;
 }
 
 export interface PayablesResponse {

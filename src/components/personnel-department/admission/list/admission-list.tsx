@@ -99,8 +99,10 @@ export function AdmissionList({ className }: AdmissionListProps) {
     excludeFromUrl: ["limit", "orderBy"],
   });
 
-  // Visible columns state with localStorage persistence
-  const { visibleColumns, setVisibleColumns } = useColumnVisibility("admission-list-visible-columns", DEFAULT_ADMISSION_VISIBLE_COLUMNS);
+  // Visible columns state with localStorage persistence.
+  // -v2: "user.sectorPosition" was split into "user.sector" + "user.position";
+  // bump the key so stale saved preferences reset to the new defaults.
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility("admission-list-visible-columns-v2", DEFAULT_ADMISSION_VISIBLE_COLUMNS);
 
   // Get all available columns for column visibility manager
   const allColumns = useMemo(() => createAdmissionColumns(), []);

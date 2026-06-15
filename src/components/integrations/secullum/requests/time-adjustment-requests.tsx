@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { IconCircleCheck, IconCircleX, IconClock, IconUser, IconCalendar, IconClockEdit, IconFileDescription, IconArrowsExchange, IconWifiOff, IconDeviceTablet, IconCloudOff, IconPaperclip } from "@tabler/icons-react";
@@ -346,10 +346,6 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
   }, []);
 
   // Memoize the refetch callback
-  const handleRefresh = useCallback(() => {
-    refetch();
-  }, [refetch]);
-
   const handleApprove = useCallback(async () => {
     if (!selectedRequest) {
       toast.error("Nenhuma solicitação selecionada.");
@@ -445,34 +441,11 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
     }
   }, [selectedRequest, rejectReason, rejectRequest, refetch, onSelectedRequestChange]);
 
-  // Store latest action handlers in refs
-  const handleApproveRef = useRef(handleApprove);
-  const openRejectDialogRef = useRef(openRejectDialog);
-  const handleRefreshRef = useRef(handleRefresh);
-
+  // Approve/Reject now live inline in the detail header (next to the employee
+  // name), so we no longer surface them as page-header actions.
   useEffect(() => {
-    handleApproveRef.current = handleApprove;
-    openRejectDialogRef.current = openRejectDialog;
-    handleRefreshRef.current = handleRefresh;
-  });
-
-  // Create stable wrapper functions
-  const stableHandleApprove = useCallback(() => handleApproveRef.current(), []);
-  const stableOpenRejectDialog = useCallback(() => openRejectDialogRef.current(), []);
-  const stableHandleRefresh = useCallback(() => handleRefreshRef.current(), []);
-
-  // Update parent with current actions (using stable wrappers)
-  useEffect(() => {
-    if (selectedRequest) {
-      onActionsChange?.(
-        stableHandleApprove,
-        stableOpenRejectDialog,
-        stableHandleRefresh
-      );
-    } else {
-      onActionsChange?.(null, null, stableHandleRefresh);
-    }
-  }, [selectedRequest, onActionsChange, stableHandleApprove, stableOpenRejectDialog, stableHandleRefresh]);
+    onActionsChange?.(null, null, null);
+  }, [onActionsChange]);
 
   // Handle context menu
   useEffect(() => {
@@ -659,7 +632,7 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
             ) : (
               <>
                 <div className="px-8 py-6 border-b border-border flex-shrink-0">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-4">
                     <div className="space-y-2">
                       <div className="flex items-center gap-3">
                         <IconUser className="h-5 w-5 text-primary" />
@@ -674,6 +647,26 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
                         <span>•</span>
                         <span>{format(new Date(selectedRequest.Data), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
                       </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={openRejectDialog}
+                        disabled={rejectRequest.isPending || approveRequest.isPending}
+                        className="!bg-destructive !text-destructive-foreground !border-destructive font-semibold hover:!opacity-[var(--hover-opacity)]"
+                      >
+                        Rejeitar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="default"
+                        onClick={handleApprove}
+                        disabled={approveRequest.isPending || rejectRequest.isPending}
+                        className="font-semibold !text-primary-foreground"
+                      >
+                        Aprovar
+                      </Button>
                     </div>
                   </div>
                 </div>

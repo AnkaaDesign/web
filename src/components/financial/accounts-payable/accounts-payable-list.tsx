@@ -1,55 +1,120 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconAlertTriangle, IconReceipt2, IconRepeat, IconSpray } from "@tabler/icons-react";
+import {
+  IconReceipt2,
+  IconRepeat,
+  IconSpray,
+  IconCash,
+  IconClockDollar,
+  IconProgressCheck,
+  IconCoins,
+  IconPackage,
+  IconReceiptTax,
+  IconUsers,
+  IconGift,
+  IconArrowRight,
+} from "@tabler/icons-react";
 
 import type { PayableRow, PayableState } from "../../../types";
-import { routes } from "../../../constants";
-import { useOrderPayables } from "../../../hooks";
+import { routes, SECTOR_PRIVILEGES, ORDER_PAYMENT_STATUS, AIRBRUSHING_PAYMENT_STATUS, PAYMENT_METHOD, PAYMENT_METHOD_LABELS } from "../../../constants";
+import { useOrderPayables, useOrderMutations, useSettlePayrollMonth, useTriggerOrderSchedule } from "../../../hooks";
+import { useAirbrushingMutations } from "../../../hooks/production/use-airbrushing";
+import { usePrivileges } from "../../../hooks/common/use-privileges";
 import { formatCurrency, formatDate } from "../../../utils";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
+import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
+import { FinancialKpiCard } from "../common/financial-kpi-card";
 
-// --- Payable state metadata (5 states: the order request pipeline +
-// PARTIALLY_PAID + the EXPECTED/recurring bucket). ---------------------------
+// --- Per-row payment-state badge. NOT_REQUESTED/REQUESTED collapse to a single
+// "Em Aberto" reading — the request sub-step is no longer surfaced as its own
+// status. EXPECTED (previstos/recorrentes) is a forecast, not a real debt yet. --
 const PAYABLE_STATE_LABELS: Record<PayableState, string> = {
-  NOT_REQUESTED: "Não Solicitado",
-  REQUESTED: "Solicitado",
+  NOT_REQUESTED: "Em Aberto",
+  REQUESTED: "Em Aberto",
   AWAITING_PAYMENT: "Aguardando Pagamento",
   PARTIALLY_PAID: "Parcialmente Pago",
   EXPECTED: "Previsto/Recorrente",
+  PAID: "Pago",
 };
 
-const PAYABLE_STATE_BADGE: Record<PayableState, "default" | "secondary" | "warning" | "success" | "outline"> = {
-  NOT_REQUESTED: "secondary",
-  REQUESTED: "warning",
-  AWAITING_PAYMENT: "warning",
-  PARTIALLY_PAID: "success",
-  EXPECTED: "outline",
+const PAYABLE_STATE_BADGE: Record<PayableState, BadgeProps["variant"]> = {
+  NOT_REQUESTED: "secondary", // gray — open, awaiting action
+  REQUESTED: "secondary",
+  AWAITING_PAYMENT: "pending", // amber — queued by finance
+  PARTIALLY_PAID: "orange",
+  EXPECTED: "outline", // muted — forecast/recurrent, not a real debt yet
+  PAID: "completed", // green
 };
 
-// Summary card states per active view: real bills for "A Pagar", the single
-// forecast bucket for "Previstos / Recorrentes".
-const PAYABLE_SUMMARY_STATES: PayableState[] = ["NOT_REQUESTED", "REQUESTED", "AWAITING_PAYMENT", "PARTIALLY_PAID"];
-const EXPECTED_STATE: PayableState = "EXPECTED";
+// --- Summary cards double as clickable filter buckets (Conciliação pattern).
+// Each bucket maps to one or more underlying payment states; "Em Aberto" merges
+// NOT_REQUESTED + REQUESTED. ---------------------------------------------------
+type PayableBucketKey = "OPEN" | "AWAITING" | "PARTIAL" | "EXPECTED" | "PAID";
+
+const PAYABLE_BUCKETS: Record<
+  PayableBucketKey,
+  { label: string; Icon: React.ComponentType<{ className?: string }>; tone: string; states: PayableState[] }
+> = {
+  OPEN: { label: "Em Aberto", Icon: IconClockDollar, tone: "text-amber-600 bg-amber-500/10", states: ["NOT_REQUESTED", "REQUESTED"] },
+  AWAITING: { label: "Aguardando Pagamento", Icon: IconProgressCheck, tone: "text-blue-600 bg-blue-500/10", states: ["AWAITING_PAYMENT"] },
+  PARTIAL: { label: "Parcialmente Pago", Icon: IconCoins, tone: "text-orange-600 bg-orange-500/10", states: ["PARTIALLY_PAID"] },
+  EXPECTED: { label: "Previsto/Recorrente", Icon: IconRepeat, tone: "text-neutral-500 bg-neutral-500/10", states: ["EXPECTED"] },
+  PAID: { label: "Pago no mês", Icon: IconCash, tone: "text-emerald-600 bg-emerald-500/10", states: ["PAID"] },
+};
+
+const BUCKET_ORDER: PayableBucketKey[] = ["OPEN", "AWAITING", "PARTIAL", "EXPECTED", "PAID"];
+// Default view: every open/forecast obligation; paid-this-month is opt-in (click the card).
+const DEFAULT_BUCKETS: PayableBucketKey[] = ["OPEN", "AWAITING", "PARTIAL", "EXPECTED"];
+
+const STATE_TO_BUCKET: Record<PayableState, PayableBucketKey> = {
+  NOT_REQUESTED: "OPEN",
+  REQUESTED: "OPEN",
+  AWAITING_PAYMENT: "AWAITING",
+  PARTIALLY_PAID: "PARTIAL",
+  EXPECTED: "EXPECTED",
+  PAID: "PAID",
+};
+
+// Row ordering rank: open obligations first, then paid-this-month, then forecasts.
+function payableRank(state: PayableState): number {
+  if (state === "EXPECTED") return 2;
+  if (state === "PAID") return 1;
+  return 0;
+}
+
+// Routes that the production schedule (cronograma) detail requires — ACCOUNTING
+// is NOT among them, so an airbrushing row must not navigate there for finance users.
+const PRODUCTION_VIEW_PRIVILEGES: SECTOR_PRIVILEGES[] = [
+  SECTOR_PRIVILEGES.PRODUCTION,
+  SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  SECTOR_PRIVILEGES.WAREHOUSE,
+  SECTOR_PRIVILEGES.DESIGNER,
+  SECTOR_PRIVILEGES.FINANCIAL,
+  SECTOR_PRIVILEGES.LOGISTIC,
+  SECTOR_PRIVILEGES.PLOTTING,
+  SECTOR_PRIVILEGES.COMMERCIAL,
+  SECTOR_PRIVILEGES.ADMIN,
+];
+
+const PAYMENT_MANAGER_PRIVILEGES: SECTOR_PRIVILEGES[] = [
+  SECTOR_PRIVILEGES.WAREHOUSE,
+  SECTOR_PRIVILEGES.FINANCIAL,
+  SECTOR_PRIVILEGES.ACCOUNTING,
+  SECTOR_PRIVILEGES.ADMIN,
+];
 
 const SEARCH_PARAM = "search";
-const VIEW_PARAM = "view";
+const STATUS_PARAM = "status";
 
-type PayableView = "payable" | "expected";
-
-interface PayeeGroup {
-  payeeName: string;
-  rows: PayableRow[];
-  subtotal: number;
-  /** Earliest due date among the group's rows (for overdue-first sorting). */
-  earliestDue: number;
-  hasOverdue: boolean;
+function parseBuckets(raw: string | null): PayableBucketKey[] {
+  if (raw === null) return DEFAULT_BUCKETS;
+  return raw.split(",").filter((s): s is PayableBucketKey => (BUCKET_ORDER as string[]).includes(s));
 }
 
 function PayableStateBadge({ state }: { state: PayableState }) {
@@ -60,9 +125,70 @@ function PayableStateBadge({ state }: { state: PayableState }) {
   );
 }
 
+// Map the raw payment-method enum (any casing) to its PT label, falling back to
+// the raw value so an unknown method still shows something readable.
+function formatPaymentMethod(method: string | null): string {
+  if (!method) return "-";
+  return PAYMENT_METHOD_LABELS[method.toUpperCase() as PAYMENT_METHOD] ?? method;
+}
+
 function isOverdueRow(row: PayableRow): boolean {
   if (row.paymentState === "EXPECTED" || !row.dueDate) return false;
   return new Date(row.dueDate) < new Date();
+}
+
+function PayableTypeBadge({ row }: { row: PayableRow }) {
+  switch (row.source) {
+    case "AIRBRUSHING":
+      return (
+        <Badge variant="purple" className="whitespace-nowrap text-[10px]">
+          <IconSpray className="mr-1 h-3 w-3" />
+          Aerografia
+        </Badge>
+      );
+    case "SCHEDULED":
+      return (
+        <Badge variant="cyan" className="whitespace-nowrap text-[10px]">
+          <IconRepeat className="mr-1 h-3 w-3" />
+          Pedido programado
+        </Badge>
+      );
+    case "TAX":
+      return (
+        <Badge variant="orange" className="whitespace-nowrap text-[10px]">
+          <IconReceiptTax className="mr-1 h-3 w-3" />
+          Imposto
+        </Badge>
+      );
+    case "PAYROLL":
+      return (
+        <Badge variant="indigo" className="whitespace-nowrap text-[10px]">
+          <IconUsers className="mr-1 h-3 w-3" />
+          Folha
+        </Badge>
+      );
+    case "PAYROLL_SCHEDULED":
+      return (
+        <Badge variant="indigo" className="whitespace-nowrap text-[10px]">
+          <IconGift className="mr-1 h-3 w-3" />
+          {row.subtype || "Folha programada"}
+        </Badge>
+      );
+    case "RECURRING":
+      return (
+        <Badge variant="teal" className="whitespace-nowrap text-[10px]">
+          <IconRepeat className="mr-1 h-3 w-3" />
+          Recorrente{row.subtype ? ` · ${row.subtype}` : ""}
+        </Badge>
+      );
+    default:
+      return (
+        <Badge variant="blue" className="whitespace-nowrap text-[10px]">
+          <IconPackage className="mr-1 h-3 w-3" />
+          Pedido
+        </Badge>
+      );
+  }
 }
 
 interface AccountsPayableListProps {
@@ -72,31 +198,19 @@ interface AccountsPayableListProps {
 export function AccountsPayableList({ className }: AccountsPayableListProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { hasAnyPrivilegeAccess } = usePrivileges();
 
-  // --- URL state: view + debounced search -----------------------------------
-  const urlView = (searchParams.get(VIEW_PARAM) === "expected" ? "expected" : "payable") as PayableView;
-  const [view, setView] = useState<PayableView>(urlView);
+  const canManagePayments = hasAnyPrivilegeAccess(PAYMENT_MANAGER_PRIVILEGES);
+  const canViewProduction = hasAnyPrivilegeAccess(PRODUCTION_VIEW_PRIVILEGES);
 
+  // --- URL state: debounced search + active filter buckets ------------------
   const urlSearch = searchParams.get(SEARCH_PARAM) || "";
   const [searchText, setSearchText] = useState(urlSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(urlSearch);
+  const [buckets, setBuckets] = useState<PayableBucketKey[]>(() => parseBuckets(searchParams.get(STATUS_PARAM)));
 
-  const handleViewChange = (next: string) => {
-    const nextView = (next === "expected" ? "expected" : "payable") as PayableView;
-    setView(nextView);
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        if (nextView === "payable") {
-          params.delete(VIEW_PARAM);
-        } else {
-          params.set(VIEW_PARAM, nextView);
-        }
-        return params;
-      },
-      { replace: true },
-    );
-  };
+  // Right-click payment menu
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: PayableRow } | null>(null);
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -119,262 +233,320 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     return () => clearTimeout(handle);
   }, [searchText, setSearchParams]);
 
+  useEffect(() => {
+    const close = () => setContextMenu(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, []);
+
+  // Toggle a summary card on/off and mirror the selection into the URL.
+  const toggleBucket = (key: PayableBucketKey) => {
+    setBuckets((prev) => {
+      const next = prev.includes(key) ? prev.filter((b) => b !== key) : [...prev, key];
+      setSearchParams(
+        (p) => {
+          const params = new URLSearchParams(p);
+          // Default set → drop the param; anything else (incl. empty) → persist it.
+          if (next.length === DEFAULT_BUCKETS.length && DEFAULT_BUCKETS.every((b) => next.includes(b))) {
+            params.delete(STATUS_PARAM);
+          } else {
+            params.set(STATUS_PARAM, next.join(","));
+          }
+          return params;
+        },
+        { replace: true },
+      );
+      return next;
+    });
+  };
+
   // --- Unified payables endpoint (orders + airbrushing + scheduled) ---------
-  const { data: response, isLoading, error } = useOrderPayables();
+  const { data: response, isLoading, error, refetch } = useOrderPayables();
   const allRows = useMemo(() => response?.data?.rows ?? [], [response?.data?.rows]);
   const summary = response?.data?.summary;
 
-  // --- Split: real obligations vs forecasts (NEVER interleaved) -------------
-  const isExpectedView = view === "expected";
-  const viewRows = useMemo(
-    () => allRows.filter((row) => (isExpectedView ? row.source === "SCHEDULED" : row.source === "ORDER" || row.source === "AIRBRUSHING")),
-    [allRows, isExpectedView],
-  );
-
-  // --- Client-side search across payee / description ------------------------
-  const filteredRows = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase();
-    if (!term) return viewRows;
-    return viewRows.filter((row) => row.payeeName.toLowerCase().includes(term) || row.description.toLowerCase().includes(term));
-  }, [viewRows, debouncedSearch]);
-
-  // --- Group by payee -------------------------------------------------------
-  const payeeGroups = useMemo<PayeeGroup[]>(() => {
-    const groups = new Map<string, PayeeGroup>();
-    filteredRows.forEach((row) => {
-      const key = row.payeeId ?? `name:${row.payeeName}`;
-      if (!groups.has(key)) {
-        groups.set(key, { payeeName: row.payeeName, rows: [], subtotal: 0, earliestDue: Number.POSITIVE_INFINITY, hasOverdue: false });
+  // Card value/count come from the server summary, regrouped into buckets so the
+  // cards always show absolute totals regardless of the active filter.
+  const bucketSummary = (key: PayableBucketKey) => {
+    let count = 0;
+    let total = 0;
+    for (const state of PAYABLE_BUCKETS[key].states) {
+      const b = summary?.[state];
+      if (b) {
+        count += b.count;
+        total += b.total;
       }
-      const group = groups.get(key)!;
-      group.rows.push(row);
-      group.subtotal += row.amount;
-      if (row.dueDate) group.earliestDue = Math.min(group.earliestDue, new Date(row.dueDate).getTime());
-      if (isOverdueRow(row)) group.hasOverdue = true;
+    }
+    return { count, total };
+  };
+
+  // Payment mutations. Order transitions auto-invalidate the payables query
+  // (keyed under orderKeys.all); airbrushing settles via its own update, so we
+  // refetch the list manually afterward.
+  const { markAwaitingPaymentAsync, markPaidAsync } = useOrderMutations();
+  const { updateAsync: updateAirbrushingAsync } = useAirbrushingMutations();
+  const settlePayrollMonth = useSettlePayrollMonth();
+  const triggerSchedule = useTriggerOrderSchedule();
+
+  // --- Client-side filter: active buckets + search across tomador/description -
+  const filteredRows = useMemo(() => {
+    const active = new Set(buckets);
+    const term = debouncedSearch.trim().toLowerCase();
+    let base = allRows.filter((row) => active.has(STATE_TO_BUCKET[row.paymentState]));
+    if (term) base = base.filter((row) => row.payeeName.toLowerCase().includes(term) || row.description.toLowerCase().includes(term));
+    return base;
+  }, [allRows, buckets, debouncedSearch]);
+
+  // --- Flat ordering: real obligations first, overdue first, then due, then payee.
+  const sortedRows = useMemo(() => {
+    const rows = [...filteredRows];
+    rows.sort((a, b) => {
+      const rankA = payableRank(a.paymentState);
+      const rankB = payableRank(b.paymentState);
+      if (rankA !== rankB) return rankA - rankB;
+      const aOverdue = isOverdueRow(a);
+      const bOverdue = isOverdueRow(b);
+      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+      const da = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
+      const db = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
+      if (da !== db) return da - db;
+      const byPayee = a.payeeName.localeCompare(b.payeeName, "pt-BR");
+      if (byPayee !== 0) return byPayee;
+      return a.description.localeCompare(b.description, "pt-BR");
     });
+    return rows;
+  }, [filteredRows]);
 
-    const result = [...groups.values()];
-    if (isExpectedView) {
-      // Forecasts: simple alphabetical by payee.
-      result.sort((a, b) => a.payeeName.localeCompare(b.payeeName, "pt-BR"));
-    } else {
-      // Real bills: overdue groups first, then soonest due, then alphabetical.
-      result.sort((a, b) => {
-        if (a.hasOverdue !== b.hasOverdue) return a.hasOverdue ? -1 : 1;
-        if (a.earliestDue !== b.earliestDue) return a.earliestDue - b.earliestDue;
-        return a.payeeName.localeCompare(b.payeeName, "pt-BR");
-      });
-    }
-    // Within each group, sort overdue/soonest-due rows first for the real view.
-    if (!isExpectedView) {
-      result.forEach((group) =>
-        group.rows.sort((a, b) => {
-          const da = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
-          const db = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
-          return da - db;
-        }),
-      );
-    }
-    return result;
-  }, [filteredRows, isExpectedView]);
-
-  const grandTotal = useMemo(() => filteredRows.reduce((sum, row) => sum + row.amount, 0), [filteredRows]);
+  // "Em aberto" total excludes paid-this-month and forecast rows.
+  const grandTotal = useMemo(
+    () => filteredRows.filter((row) => row.paymentState !== "PAID" && row.paymentState !== "EXPECTED").reduce((sum, row) => sum + row.amount, 0),
+    [filteredRows],
+  );
 
   const handleRowClick = (row: PayableRow) => {
     if (row.source === "ORDER") {
       navigate(routes.inventory.orders.details(row.id));
-    } else if (row.source === "AIRBRUSHING" && row.taskId) {
+    } else if (row.source === "AIRBRUSHING" && row.taskId && canViewProduction) {
       navigate(routes.production.schedule.details(row.taskId));
     }
   };
 
+  const handleContextMenu = (e: React.MouseEvent, row: PayableRow) => {
+    if (!canManagePayments) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, row });
+  };
+
+  // --- Payment actions (dispatch by source) ---------------------------------
+  const runAction = async (fn: () => Promise<unknown>) => {
+    setContextMenu(null);
+    try {
+      await fn();
+    } catch {
+      // Errors are toasted by the API client.
+    }
+  };
+
+  const settleAirbrushing = (id: string, paymentStatus: string) => updateAirbrushingAsync({ id, data: { paymentStatus } }).then(() => refetch());
+
+  const parseCompetence = (c?: string | null): { year: number; month: number } | null => {
+    const m = /^(\d{4})-(\d{2})$/.exec(c ?? "");
+    return m ? { year: Number(m[1]), month: Number(m[2]) } : null;
+  };
+
+  // Settle dispatch for the non-order sources (folha, recorrentes, agendamentos).
+  const handleSettle = (row: PayableRow) => {
+    switch (row.settleVia) {
+      case "PAYROLL_MONTH": {
+        const c = parseCompetence(row.competence);
+        if (c) runAction(() => settlePayrollMonth.mutateAsync({ year: c.year, month: c.month, amount: row.amount }).then(() => refetch()));
+        break;
+      }
+      case "SCHEDULE_TRIGGER":
+        runAction(() => triggerSchedule.mutateAsync({ id: row.id, cascadeMode: "GAP_ONLY" }).then(() => refetch()));
+        break;
+      case "RECONCILIATION":
+        setContextMenu(null);
+        navigate(row.source === "RECURRING" && row.payeeId ? `${routes.financial.reconciliation.transactions}?categoryIds=${row.payeeId}` : routes.financial.reconciliation.transactions);
+        break;
+      default:
+        setContextMenu(null);
+    }
+  };
+
+  const ctxRow = contextMenu?.row;
+
+  // --- Table columns (StandardizedTable — matches Conciliação / Previsão) ----
+  const columns: StandardizedColumn<PayableRow>[] = [
+    {
+      key: "description",
+      header: "Descrição",
+      className: "min-w-[16rem]",
+      render: (row) => <TruncatedTextWithTooltip text={row.description || "-"} className={cn("text-sm", row.paymentState === "EXPECTED" && "italic text-muted-foreground")} />,
+    },
+    { key: "type", header: "Tipo", width: 176, render: (row) => <PayableTypeBadge row={row} /> },
+    { key: "payee", header: "Tomador", className: "min-w-[12rem]", render: (row) => <TruncatedTextWithTooltip text={row.payeeName || "-"} className="text-sm font-medium" /> },
+    { key: "amount", header: "Valor", width: 128, align: "right", render: (row) => <span className="text-sm font-medium tabular-nums">{formatCurrency(row.amount)}</span> },
+    { key: "payment", header: "Pagamento", width: 192, render: (row) => <PayableStateBadge state={row.paymentState} /> },
+    {
+      key: "dueDate",
+      header: "Vencimento",
+      width: 144,
+      render: (row) => {
+        const dueDate = row.dueDate ? new Date(row.dueDate) : null;
+        const overdue = isOverdueRow(row);
+        return dueDate ? (
+          <span className={cn("text-sm whitespace-nowrap", overdue ? "text-destructive font-medium" : "text-muted-foreground")}>
+            {formatDate(dueDate)}
+            {overdue && " (vencido)"}
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
+        );
+      },
+    },
+    { key: "method", header: "Forma", width: 144, render: (row) => <span className="text-sm text-muted-foreground">{formatPaymentMethod(row.method)}</span> },
+  ];
+
   // --- Render ---------------------------------------------------------------
   return (
-    <div className={cn("flex flex-col gap-4", className)}>
-      {/* View switch: real obligations vs forecasts — never interleaved. */}
-      <Tabs value={view} onValueChange={handleViewChange} className="flex-shrink-0">
-        <TabsList>
-          <TabsTrigger value="payable">A Pagar</TabsTrigger>
-          <TabsTrigger value="expected">Previstos / Recorrentes</TabsTrigger>
-        </TabsList>
-      </Tabs>
+    <div className={cn("flex flex-col gap-4 h-full min-h-0", className)}>
+      {/* Summary cards double as filter buckets — click to show only that status. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 flex-shrink-0">
+        {BUCKET_ORDER.map((key) => {
+          const meta = PAYABLE_BUCKETS[key];
+          const b = bucketSummary(key);
+          return (
+            <FinancialKpiCard
+              key={key}
+              label={meta.label}
+              value={isLoading || !summary ? null : formatCurrency(b.total)}
+              count={b.count}
+              Icon={meta.Icon}
+              tone={meta.tone}
+              active={buckets.includes(key)}
+              onClick={() => toggleBucket(key)}
+            />
+          );
+        })}
+      </div>
 
-      {/* Summary cards reflect the active view. */}
-      {isExpectedView ? (
-        <div className="grid grid-cols-1 gap-3 flex-shrink-0">
-          <Card className="border border-border border-dashed">
-            <CardContent className="p-4 space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <Badge variant="outline" className="font-medium whitespace-nowrap">
-                  <IconRepeat className="mr-1 h-3.5 w-3.5" />
-                  Previsto / Recorrente
-                </Badge>
-                <Badge variant="default" className="justify-center min-w-8">
-                  {isLoading || !summary ? "…" : summary[EXPECTED_STATE]?.count ?? 0}
-                </Badge>
-              </div>
-              <p className="text-xl font-bold tabular-nums">{isLoading || !summary ? "—" : formatCurrency(summary[EXPECTED_STATE]?.total ?? 0)}</p>
-              <p className="text-xs text-muted-foreground">Valores estimados / recorrentes no período</p>
-            </CardContent>
-          </Card>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 flex-shrink-0">
-          {PAYABLE_SUMMARY_STATES.map((state) => {
-            const bucket = summary?.[state];
-            return (
-              <Card key={state} className="border border-border">
-                <CardContent className="p-4 space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <PayableStateBadge state={state} />
-                    <Badge variant="default" className="justify-center min-w-8">
-                      {isLoading || !bucket ? "…" : bucket.count}
-                    </Badge>
-                  </div>
-                  <p className="text-xl font-bold tabular-nums">{isLoading || !bucket ? "—" : formatCurrency(bucket.total)}</p>
-                  <p className="text-xs text-muted-foreground">Total em aberto</p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Search + grouped list */}
+      {/* Search + flat list */}
       <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
         <CardContent className="flex-1 min-h-0 flex flex-col p-4 space-y-4 overflow-hidden">
-          {isExpectedView && (
-            <div className="flex items-start gap-2 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-              <IconRepeat className="mt-0.5 h-4 w-4 flex-shrink-0" />
-              <span>Estes são valores estimados / recorrentes previstos no período — ainda não são obrigações efetivas de pagamento.</span>
-            </div>
-          )}
-
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <TableSearchInput
               value={searchText}
               onChange={(value) => setSearchText(value)}
-              placeholder={isExpectedView ? "Buscar por fornecedor ou descrição..." : "Buscar por fornecedor, pintor ou descrição..."}
+              placeholder="Buscar por fornecedor, pintor ou descrição..."
               isPending={searchText !== debouncedSearch}
             />
             <div className="text-sm text-muted-foreground whitespace-nowrap sm:text-right">
               {filteredRows.length} {filteredRows.length === 1 ? "conta" : "contas"} •{" "}
-              <span className="font-semibold text-foreground tabular-nums">{formatCurrency(grandTotal)}</span>
+              <span className="font-semibold text-foreground tabular-nums">{formatCurrency(grandTotal)}</span> em aberto
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-border">
-            <Table className="w-full">
-              <TableHeader>
-                <TableRow className="bg-muted hover:bg-muted">
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs min-w-[18rem]">Descrição</TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs w-32 text-right">Valor</TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs w-48">Pagamento</TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs w-36">{isExpectedView ? "Próx. Vencimento" : "Vencimento"}</TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs w-36">Forma</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={5}>
-                        <Skeleton className="h-6 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : error ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="p-0">
-                      <div className="flex flex-col items-center justify-center p-8 text-center text-destructive">
-                        <IconAlertTriangle className="h-8 w-8 mb-4" />
-                        <div className="text-lg font-medium mb-2">Não foi possível carregar as contas a pagar</div>
-                        <div className="text-sm text-muted-foreground">Tente novamente mais tarde.</div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : payeeGroups.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="p-0">
-                      <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-                        <IconReceipt2 className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                        <div className="text-lg font-medium mb-2">
-                          {isExpectedView ? "Nenhum valor previsto / recorrente" : "Nenhuma conta a pagar encontrada"}
-                        </div>
-                        <div className="text-sm">Ajuste a busca para ver mais resultados.</div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  payeeGroups.map((group) => (
-                    <React.Fragment key={group.payeeName}>
-                      {/* Payee group header with subtotal */}
-                      <TableRow className="bg-muted/50 hover:bg-muted/50 border-b border-border">
-                        <TableCell colSpan={2} className="py-2 font-semibold">
-                          {group.payeeName}
-                          <span className="ml-2 text-xs font-normal text-muted-foreground">
-                            ({group.rows.length} {group.rows.length === 1 ? "conta" : "contas"})
-                          </span>
-                        </TableCell>
-                        <TableCell colSpan={3} className="py-2 text-right font-semibold tabular-nums">
-                          {formatCurrency(group.subtotal)}
-                        </TableCell>
-                      </TableRow>
-                      {group.rows.map((row, index) => {
-                        const dueDate = row.dueDate ? new Date(row.dueDate) : null;
-                        const overdue = isOverdueRow(row);
-                        const isAirbrushing = row.source === "AIRBRUSHING";
-                        const clickable = row.source === "ORDER" || (isAirbrushing && !!row.taskId);
-                        return (
-                          <TableRow
-                            key={`${row.source}-${row.id}`}
-                            className={cn(
-                              "transition-colors border-b border-border",
-                              index % 2 === 1 && "bg-muted/10",
-                              "hover:bg-muted/20",
-                              clickable && "cursor-pointer",
-                              isExpectedView && "italic text-muted-foreground",
-                            )}
-                            onClick={clickable ? () => handleRowClick(row) : undefined}
-                          >
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {isExpectedView && <IconRepeat className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
-                                <TruncatedTextWithTooltip text={row.description || "-"} className="text-sm" />
-                                {isAirbrushing && (
-                                  <Badge variant="purple" className="ml-1 whitespace-nowrap text-[10px]">
-                                    <IconSpray className="mr-1 h-3 w-3" />
-                                    Aerografia
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm font-medium tabular-nums text-right">{formatCurrency(row.amount)}</TableCell>
-                            <TableCell>
-                              <PayableStateBadge state={row.paymentState} />
-                            </TableCell>
-                            <TableCell>
-                              {dueDate ? (
-                                <span className={cn("text-sm whitespace-nowrap", overdue ? "text-destructive font-medium" : "text-muted-foreground")}>
-                                  {formatDate(dueDate)}
-                                  {overdue && " (vencido)"}
-                                </span>
-                              ) : (
-                                <span className="text-sm text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{row.method || "-"}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </React.Fragment>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+          {canManagePayments && (
+            <p className="text-xs text-muted-foreground">
+              Clique nos cartões acima para filtrar por situação. Clique com o botão direito em uma conta para registrar o pagamento. Pedidos: Em Aberto → (Aguardando) →
+              Pago; aerografia e folha são pagas direto; impostos e recorrentes são quitados pela conciliação bancária.
+            </p>
+          )}
+
+          <div className="flex-1 min-h-0 overflow-auto">
+            <StandardizedTable<PayableRow>
+              columns={columns}
+              data={sortedRows}
+              getItemKey={(row) => `${row.source}-${row.id}`}
+              isLoading={isLoading}
+              error={error}
+              emptyMessage="Nenhuma conta a pagar encontrada"
+              emptyIcon={IconReceipt2}
+              onRowClick={handleRowClick}
+              onContextMenu={handleContextMenu}
+            />
           </div>
         </CardContent>
       </Card>
+
+      {/* Payment context menu — dispatches by source. */}
+      <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+        <PositionedDropdownMenuContent position={contextMenu} isOpen={!!contextMenu} className="w-64 ![position:fixed]" onCloseAutoFocus={(e) => e.preventDefault()}>
+          {ctxRow && (
+            <>
+              <DropdownMenuLabel className="truncate">{ctxRow.payeeName}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+
+              {ctxRow.paymentState === "PAID" && (
+                <DropdownMenuItem disabled>
+                  <IconCash className="mr-2 h-4 w-4" />
+                  Pago{ctxRow.paidAt ? ` em ${formatDate(new Date(ctxRow.paidAt))}` : ""}
+                </DropdownMenuItem>
+              )}
+
+              {ctxRow.source === "ORDER" && ctxRow.paymentState !== "PAID" && (
+                <>
+                  {ctxRow.paymentState !== ORDER_PAYMENT_STATUS.AWAITING_PAYMENT && (
+                    <DropdownMenuItem onClick={() => runAction(() => markAwaitingPaymentAsync(ctxRow.id))}>
+                      <IconProgressCheck className="mr-2 h-4 w-4" />
+                      Marcar como aguardando pagamento
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => runAction(() => markPaidAsync(ctxRow.id))}>
+                    <IconCash className="mr-2 h-4 w-4" />
+                    Marcar como pago
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {ctxRow.source === "AIRBRUSHING" && ctxRow.paymentState !== "PAID" && (
+                <>
+                  {ctxRow.paymentState !== "PARTIALLY_PAID" && (
+                    <DropdownMenuItem onClick={() => runAction(() => settleAirbrushing(ctxRow.id, AIRBRUSHING_PAYMENT_STATUS.PARTIALLY_PAID))}>
+                      <IconProgressCheck className="mr-2 h-4 w-4" />
+                      Marcar como parcialmente pago
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => runAction(() => settleAirbrushing(ctxRow.id, AIRBRUSHING_PAYMENT_STATUS.PAID))}>
+                    <IconCash className="mr-2 h-4 w-4" />
+                    Marcar como pago
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {ctxRow.settleVia === "SCHEDULE_TRIGGER" && (
+                <DropdownMenuItem onClick={() => handleSettle(ctxRow)}>
+                  <IconPackage className="mr-2 h-4 w-4" />
+                  Gerar pedido (materializar)
+                </DropdownMenuItem>
+              )}
+
+              {ctxRow.settleVia === "PAYROLL_MONTH" && (
+                <DropdownMenuItem onClick={() => handleSettle(ctxRow)}>
+                  <IconCash className="mr-2 h-4 w-4" />
+                  Marcar folha como paga
+                </DropdownMenuItem>
+              )}
+
+              {ctxRow.settleVia === "RECONCILIATION" && (
+                <DropdownMenuItem onClick={() => handleSettle(ctxRow)}>
+                  <IconArrowRight className="mr-2 h-4 w-4" />
+                  Conciliar / categorizar
+                </DropdownMenuItem>
+              )}
+
+              {(ctxRow.settleVia === "THIRTEENTH" || ctxRow.settleVia === "VACATION") && (
+                <DropdownMenuItem disabled>
+                  <IconGift className="mr-2 h-4 w-4" />
+                  Pague em Recursos Humanos
+                </DropdownMenuItem>
+              )}
+            </>
+          )}
+        </PositionedDropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

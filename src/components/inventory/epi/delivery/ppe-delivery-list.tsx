@@ -148,8 +148,9 @@ export function PpeDeliveryList({ className, teamScope }: PpeDeliveryListProps) 
   // We'll get selection count from the table data callback
 
   // Column visibility state with localStorage persistence
+  // -v2: added SETOR + CARGO columns; bump the key so saved prefs include them.
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
-    "ppe-delivery-list-visible-columns",
+    "ppe-delivery-list-visible-columns-v2",
     getDefaultVisibleColumns()
   );
   const columns = createPpeDeliveryColumns();

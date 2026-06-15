@@ -53,7 +53,35 @@ export const createUserBenefitColumns = (): UserBenefitColumn[] => [
     ),
     sortable: false,
     // table-layout:fixed ignora min-width — é o `w-` que define a largura da coluna.
-    className: "w-[360px] min-w-[360px]",
+    className: "w-[260px] min-w-[260px]",
+    align: "left",
+  },
+
+  // Setor (do colaborador)
+  {
+    key: "user.sector",
+    header: "SETOR",
+    accessor: (userBenefit: UserBenefit) => {
+      const sector = userBenefit.user?.sector?.name;
+      if (!sector) return <span className="text-muted-foreground">-</span>;
+      return <TruncatedTextWithTooltip text={sector} className="text-sm" />;
+    },
+    sortable: false,
+    className: "w-[150px] min-w-[150px]",
+    align: "left",
+  },
+
+  // Cargo (do colaborador)
+  {
+    key: "user.position",
+    header: "CARGO",
+    accessor: (userBenefit: UserBenefit) => {
+      const position = userBenefit.user?.position?.name;
+      if (!position) return <span className="text-muted-foreground">-</span>;
+      return <TruncatedTextWithTooltip text={position} className="text-sm" />;
+    },
+    sortable: false,
+    className: "w-[170px] min-w-[170px]",
     align: "left",
   },
 
@@ -243,4 +271,4 @@ export const createUserBenefitColumns = (): UserBenefitColumn[] => [
 ];
 
 // Export the default visible columns
-export const DEFAULT_USER_BENEFIT_VISIBLE_COLUMNS = new Set(["user.name", "benefit.name", "status", "monthlyValue", "companyPays", "employeePays", "startDate", "endDate", "dailyTickets"]);
+export const DEFAULT_USER_BENEFIT_VISIBLE_COLUMNS = new Set(["user.name", "user.sector", "user.position", "benefit.name", "status", "monthlyValue", "companyPays", "employeePays", "startDate", "endDate", "dailyTickets"]);

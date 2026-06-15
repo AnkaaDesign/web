@@ -64,14 +64,14 @@ export function PaymentCard({ termination, disabled = false, className }: Paymen
   };
 
   return (
-    <Card className={cn("shadow-sm border border-border", className)}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2">
           <IconCash className="h-5 w-5 text-muted-foreground" />
           Pagamento
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0 space-y-4">
+      <CardContent className="pt-0 space-y-4 flex-1 flex flex-col">
         {/* CLT 477 §8º — overdue payment exposes the company to a fine */}
         {overdue && (
           <Alert variant="destructive">
@@ -135,7 +135,7 @@ export function PaymentCard({ termination, disabled = false, className }: Paymen
           </form>
         </FormProvider>
 
-        <Alert variant="warning">
+        <Alert variant="warning" className="mt-auto">
           <AlertDescription>Ao concluir a rescisão o colaborador será demitido (contrato marcado como Demitido).</AlertDescription>
         </Alert>
       </CardContent>

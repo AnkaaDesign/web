@@ -10,20 +10,53 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { LeaveColumn } from "./types";
 
 export const createLeaveColumns = (): LeaveColumn[] => [
-  // Colaborador (+ cargo)
+  // Colaborador
   {
     key: "user.name",
     header: "COLABORADOR",
     accessor: (leave: Leave) => (
-      <div className="min-w-0">
-        <div className="font-medium truncate" title={leave.user?.name}>
-          {leave.user?.name || <span className="text-muted-foreground">-</span>}
-        </div>
-        {leave.user?.position?.name && <div className="text-xs text-muted-foreground truncate">{leave.user.position.name}</div>}
+      <div className="font-medium truncate" title={leave.user?.name}>
+        {leave.user?.name || <span className="text-muted-foreground">-</span>}
       </div>
     ),
     sortable: false,
-    className: "min-w-[220px]",
+    className: "min-w-[200px]",
+    align: "left",
+  },
+
+  // Setor (do colaborador)
+  {
+    key: "user.sector",
+    header: "SETOR",
+    accessor: (leave: Leave) => {
+      const sector = leave.user?.sector?.name;
+      if (!sector) return <span className="text-muted-foreground">-</span>;
+      return (
+        <p className="text-sm truncate" title={sector}>
+          {sector}
+        </p>
+      );
+    },
+    sortable: false,
+    className: "min-w-[150px]",
+    align: "left",
+  },
+
+  // Cargo (do colaborador)
+  {
+    key: "user.position",
+    header: "CARGO",
+    accessor: (leave: Leave) => {
+      const position = leave.user?.position?.name;
+      if (!position) return <span className="text-muted-foreground">-</span>;
+      return (
+        <p className="text-sm truncate" title={position}>
+          {position}
+        </p>
+      );
+    },
+    sortable: false,
+    className: "min-w-[170px]",
     align: "left",
   },
 
@@ -131,4 +164,4 @@ export const createLeaveColumns = (): LeaveColumn[] => [
 ];
 
 // Export the default visible columns
-export const DEFAULT_VISIBLE_COLUMNS = new Set(["user.name", "type", "status", "startDate", "endDate", "returnExamRequired"]);
+export const DEFAULT_VISIBLE_COLUMNS = new Set(["user.name", "user.sector", "user.position", "type", "status", "startDate", "endDate", "returnExamRequired"]);

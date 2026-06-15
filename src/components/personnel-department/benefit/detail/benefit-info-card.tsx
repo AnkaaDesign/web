@@ -8,6 +8,7 @@ import { calculateBenefitSplit } from "../../../../utils/benefit-discount";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DetailRow } from "@/components/ui/detail-row";
 import { cn } from "@/lib/utils";
 
 interface BenefitInfoCardProps {
@@ -40,91 +41,68 @@ export function BenefitInfoCard({ benefit, className }: BenefitInfoCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-sm text-muted-foreground">Tipo</dt>
-            <dd>
+        <div className="space-y-2">
+          <DetailRow
+            label="Tipo"
+            value={
               <Badge variant="secondary" className="text-xs whitespace-nowrap">
                 {BENEFIT_KIND_LABELS[benefit.kind as BENEFIT_KIND] || benefit.kind}
               </Badge>
-            </dd>
-          </div>
+            }
+          />
 
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-sm text-muted-foreground">Nome</dt>
-            <dd className="text-sm font-medium text-right">{benefit.name}</dd>
-          </div>
+          <DetailRow label="Nome" value={benefit.name} />
 
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-sm text-muted-foreground">Fornecedor</dt>
-            <dd className="text-sm font-medium text-right">{benefit.provider || <span className="text-muted-foreground">-</span>}</dd>
-          </div>
+          <DetailRow label="Fornecedor" value={benefit.provider || undefined} />
 
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-sm text-muted-foreground">Custo Padrão (Empresa + Colaborador)</dt>
-            <dd className="text-sm font-medium text-right">
-              {benefit.defaultValue !== null && benefit.defaultValue !== undefined ? formatCurrency(benefit.defaultValue) : <span className="text-muted-foreground">-</span>}
-            </dd>
-          </div>
+          <DetailRow
+            label="Custo Padrão (Empresa + Colaborador)"
+            value={benefit.defaultValue !== null && benefit.defaultValue !== undefined ? formatCurrency(benefit.defaultValue) : undefined}
+          />
 
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-sm text-muted-foreground">Colaborador Paga (Padrão)</dt>
-            <dd className="text-sm font-medium text-right">
-              {benefit.defaultEmployeeDiscountPercent !== null && benefit.defaultEmployeeDiscountPercent !== undefined ? (
+          <DetailRow
+            label="Colaborador Paga (Padrão)"
+            value={
+              benefit.defaultEmployeeDiscountPercent !== null && benefit.defaultEmployeeDiscountPercent !== undefined ? (
                 <>
                   {formatPercent(benefit.defaultEmployeeDiscountPercent)}
                   {defaultSplit.dependsOnSalary ? (
-                    <span className="text-xs text-muted-foreground ml-1">do salário do colaborador</span>
+                    <span className="text-xs font-normal text-muted-foreground ml-1">do salário do colaborador</span>
                   ) : (
                     benefit.defaultValue !== null &&
-                    benefit.defaultValue !== undefined && <span className="text-xs text-muted-foreground ml-1">(≈ {formatCurrency(defaultSplit.employeeShare)})</span>
+                    benefit.defaultValue !== undefined && <span className="text-xs font-normal text-muted-foreground ml-1">(≈ {formatCurrency(defaultSplit.employeeShare)})</span>
                   )}
                 </>
-              ) : (
-                <span className="text-muted-foreground">-</span>
-              )}
-            </dd>
-          </div>
+              ) : undefined
+            }
+          />
 
           {benefit.defaultValue !== null && benefit.defaultValue !== undefined && (
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-sm text-muted-foreground">Empresa Paga (Padrão)</dt>
-              <dd className="text-sm font-medium text-right">
-                {defaultSplit.dependsOnSalary ? <span className="text-muted-foreground">custo − % do salário</span> : formatCurrency(defaultSplit.companyShare)}
-              </dd>
-            </div>
+            <DetailRow
+              label="Empresa Paga (Padrão)"
+              value={defaultSplit.dependsOnSalary ? <span className="font-normal text-muted-foreground">custo − % do salário</span> : formatCurrency(defaultSplit.companyShare)}
+            />
           )}
 
           {(benefit.kind === BENEFIT_KIND.TRANSPORT_VOUCHER || benefit.kind === BENEFIT_KIND.MEAL_VOUCHER || benefit.kind === BENEFIT_KIND.FOOD_VOUCHER) && (
-            <p className="text-xs text-muted-foreground">{getKindDiscountHelper(benefit.kind)}</p>
+            <p className="px-1 pt-1 text-xs text-muted-foreground">{getKindDiscountHelper(benefit.kind)}</p>
           )}
 
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-sm text-muted-foreground">Status</dt>
-            <dd>
+          <DetailRow
+            label="Status"
+            value={
               <Badge variant={benefit.isActive ? "active" : "inactive"} className="text-xs whitespace-nowrap">
                 {benefit.isActive ? "Ativo" : "Inativo"}
               </Badge>
-            </dd>
-          </div>
+            }
+          />
 
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-sm text-muted-foreground">Adesões</dt>
-            <dd className="text-sm font-medium text-right">{benefit._count?.enrollments ?? 0}</dd>
-          </div>
+          <DetailRow label="Adesões" value={benefit._count?.enrollments ?? 0} />
 
-          {benefit.notes && (
-            <div className="space-y-1">
-              <dt className="text-sm text-muted-foreground">Observações</dt>
-              <dd className="text-sm whitespace-pre-wrap">{benefit.notes}</dd>
-            </div>
-          )}
+          {benefit.notes && <DetailRow label="Observações" value={benefit.notes} block />}
 
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-sm text-muted-foreground">Criado em</dt>
-            <dd className="text-sm font-medium text-right">{benefit.createdAt ? formatDate(new Date(benefit.createdAt)) : "-"}</dd>
-          </div>
-        </dl>
+          <DetailRow label="Criado em" value={benefit.createdAt ? formatDate(new Date(benefit.createdAt)) : undefined} />
+        </div>
       </CardContent>
     </Card>
   );

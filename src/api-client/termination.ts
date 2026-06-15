@@ -97,6 +97,13 @@ export class TerminationService {
     return response.data;
   }
 
+  async regressTermination(id: string, query?: any): Promise<TerminationUpdateResponse> {
+    const response = await apiClient.put<TerminationUpdateResponse>(`${this.basePath}/${id}/regress`, undefined, {
+      params: query,
+    });
+    return response.data;
+  }
+
   /** POST /terminations/:id/compute-taxes — auto-compute INSS/IRRF + FGTS-multa base. */
   async computeTerminationTaxes(id: string): Promise<TerminationComputeTaxesResponse> {
     const response = await apiClient.post<TerminationComputeTaxesResponse>(`${this.basePath}/${id}/compute-taxes`);
@@ -194,6 +201,7 @@ export const deleteTermination = (id: string) => terminationService.deleteTermin
 // Verbas Engine / Status Machine
 export const calculateTermination = (id: string) => terminationService.calculateTermination(id);
 export const advanceTermination = (id: string, data?: TerminationAdvanceFormData, query?: any) => terminationService.advanceTermination(id, data, query);
+export const regressTermination = (id: string, query?: any) => terminationService.regressTermination(id, query);
 export const computeTerminationTaxes = (id: string) => terminationService.computeTerminationTaxes(id);
 
 // Document Operations

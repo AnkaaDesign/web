@@ -38,13 +38,25 @@
     <script>
       (function() {
         var h = window.location.hostname;
+        var pagePort = window.location.port;
         var envUrl = "%VITE_API_URL%";
-        // LAN access: route through nginx proxy on port 80 (/api/* → :3030 internally)
-        // Direct port 3030 is firewalled; nginx handles proxying.
-        if (h.indexOf("192.168.") === 0 || h.indexOf("10.") === 0 || /^172\.(1[6-9]|2\d|3[01])\./.test(h)) {
-          window.__ANKAA_API_URL__ = "http://" + h + "/api";
+        var isLan = h.indexOf("192.168.") === 0 || h.indexOf("10.") === 0 || /^172\.(1[6-9]|2\d|3[01])\./.test(h);
+        if (isLan) {
+          // Dev (Vite dev server on a non-80 port, e.g. :5173): hit the API
+          // directly on the SAME host the page loaded from, on the API port.
+          // This lets phones/tablets on the LAN reach the API at the same IP
+          // they used for the page — no nginx required.
+          // Production (served by nginx on :80): route through the /api proxy
+          // (/api/* → :3030 internally), since direct :3030 is firewalled there.
+          if (pagePort && pagePort !== "80") {
+            var m = /:(\d+)/.exec(envUrl);
+            var apiPort = m ? m[1] : "3030";
+            window.__ANKAA_API_URL__ = "http://" + h + ":" + apiPort;
+          } else {
+            window.__ANKAA_API_URL__ = "http://" + h + "/api";
+          }
         } else {
-          // Localhost or production: use the env var
+          // Localhost or production domain: use the env var
           window.__ANKAA_API_URL__ = envUrl;
         }
       })();

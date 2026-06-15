@@ -44,7 +44,43 @@ export const createMedicalExamColumns = (): MedicalExamColumn[] => [
       </div>
     ),
     sortable: false,
-    className: "min-w-[320px]",
+    className: "min-w-[220px]",
+    align: "left",
+  },
+
+  // Setor (do colaborador)
+  {
+    key: "user.sector",
+    header: "SETOR",
+    accessor: (exam: MedicalExam) => {
+      const sector = exam.user?.sector?.name;
+      if (!sector) return <span className="text-muted-foreground">-</span>;
+      return (
+        <p className="text-sm truncate" title={sector}>
+          {sector}
+        </p>
+      );
+    },
+    sortable: false,
+    className: "min-w-[150px]",
+    align: "left",
+  },
+
+  // Cargo (do colaborador)
+  {
+    key: "user.position",
+    header: "CARGO",
+    accessor: (exam: MedicalExam) => {
+      const position = exam.user?.position?.name;
+      if (!position) return <span className="text-muted-foreground">-</span>;
+      return (
+        <p className="text-sm truncate" title={position}>
+          {position}
+        </p>
+      );
+    },
+    sortable: false,
+    className: "min-w-[170px]",
     align: "left",
   },
 
@@ -180,4 +216,4 @@ export const createMedicalExamColumns = (): MedicalExamColumn[] => [
 ];
 
 // Default visible columns
-export const DEFAULT_VISIBLE_COLUMNS = new Set(["user.name", "type", "status", "result", "examDate", "expiresAt", "clinic"]);
+export const DEFAULT_VISIBLE_COLUMNS = new Set(["user.name", "user.sector", "user.position", "type", "status", "result", "examDate", "expiresAt", "clinic"]);

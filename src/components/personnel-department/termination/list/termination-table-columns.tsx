@@ -42,15 +42,48 @@ export const createTerminationColumns = (): TerminationColumn[] => [
     key: "user.name",
     header: "COLABORADOR",
     accessor: (termination: Termination) => (
-      <div className="truncate">
-        <div className="font-medium truncate" title={termination.user?.name}>
-          {termination.user?.name || <span className="text-muted-foreground">-</span>}
-        </div>
-        {termination.user?.position?.name && <div className="text-xs text-muted-foreground truncate">{termination.user.position.name}</div>}
+      <div className="font-medium truncate" title={termination.user?.name}>
+        {termination.user?.name || <span className="text-muted-foreground">-</span>}
       </div>
     ),
     sortable: true,
-    className: "min-w-[220px]",
+    className: "min-w-[200px]",
+    align: "left",
+  },
+
+  // Setor (do colaborador)
+  {
+    key: "user.sector",
+    header: "SETOR",
+    accessor: (termination: Termination) => {
+      const sector = termination.user?.sector?.name;
+      if (!sector) return <span className="text-muted-foreground">-</span>;
+      return (
+        <p className="text-sm truncate" title={sector}>
+          {sector}
+        </p>
+      );
+    },
+    sortable: false,
+    className: "min-w-[150px]",
+    align: "left",
+  },
+
+  // Cargo (do colaborador)
+  {
+    key: "user.position",
+    header: "CARGO",
+    accessor: (termination: Termination) => {
+      const position = termination.user?.position?.name;
+      if (!position) return <span className="text-muted-foreground">-</span>;
+      return (
+        <p className="text-sm truncate" title={position}>
+          {position}
+        </p>
+      );
+    },
+    sortable: false,
+    className: "min-w-[170px]",
     align: "left",
   },
 
@@ -149,4 +182,4 @@ export const createTerminationColumns = (): TerminationColumn[] => [
 ];
 
 // Default visible columns
-export const DEFAULT_TERMINATION_VISIBLE_COLUMNS = new Set(["user.name", "type", "statusOrder", "terminationDate", "paymentDueDate", "net"]);
+export const DEFAULT_TERMINATION_VISIBLE_COLUMNS = new Set(["user.name", "user.sector", "user.position", "type", "statusOrder", "terminationDate", "paymentDueDate", "net"]);

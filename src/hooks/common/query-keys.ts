@@ -1121,6 +1121,7 @@ export const dependentKeys = createQueryKeyStore<Record<string, any>>("dependent
 
 // Área Andressa — Phase 3 new HR modules
 export const vacationKeys = createQueryKeyStore<Record<string, any>>("vacations");
+export const vacationGroupKeys = createQueryKeyStore<Record<string, any>>("vacation-groups");
 
 export const thirteenthKeys = createQueryKeyStore<Record<string, any>>("thirteenths");
 

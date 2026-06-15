@@ -98,8 +98,10 @@ export function TerminationList({ className }: TerminationListProps) {
     excludeFromUrl: ["limit", "orderBy"],
   });
 
-  // Visible columns state with localStorage persistence
-  const { visibleColumns, setVisibleColumns } = useColumnVisibility("termination-list-visible-columns", DEFAULT_TERMINATION_VISIBLE_COLUMNS);
+  // Visible columns state with localStorage persistence.
+  // -v2: COLABORADOR no longer stacks the position; SETOR + CARGO are now their
+  // own columns. Bump the key so stale saved preferences reset to the new defaults.
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility("termination-list-visible-columns-v2", DEFAULT_TERMINATION_VISIBLE_COLUMNS);
 
   // Get all available columns for column visibility manager
   const allColumns = useMemo(() => createTerminationColumns(), []);

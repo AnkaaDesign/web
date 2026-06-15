@@ -4,6 +4,7 @@ import { TimeAdjustmentRequests } from "@/components/integrations/secullum/reque
 import { IconRefresh } from "@tabler/icons-react";
 import { routes } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { TimeClockTabs } from "../time-clock/time-clock-tabs";
 
 function RequisicosList() {
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
@@ -78,9 +79,11 @@ function RequisicosList() {
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Recursos Humanos", href: routes.humanResources.root },
+            { label: "Controle de Ponto", href: routes.humanResources.timeClock.root },
             { label: "Requisições" },
           ]}
           actions={getHeaderActions()}
+          headerExtra={<TimeClockTabs />}
         />
       </div>
       <div className="flex-1 overflow-y-auto pb-6">

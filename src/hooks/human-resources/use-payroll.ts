@@ -403,7 +403,14 @@ export const useUserLoans = (userId: string | undefined, options?: { enabled?: b
     queryFn: () =>
       discountService
         .getMany({ where: { userId: userId!, isPersistent: true }, orderBy: { createdAt: "desc" } })
-        .then((response) => response.data?.data ?? []),
+        // Resilient to the GET response shape (network vs cache path can differ):
+        // accept either the array directly or `{ data: [...] }` (see useLoanMasters).
+        .then((response) => {
+          const body: any = response?.data;
+          if (Array.isArray(body)) return body;
+          if (Array.isArray(body?.data)) return body.data;
+          return [];
+        }),
     enabled: (options?.enabled ?? true) && !!userId,
     staleTime: 1000 * 60 * 2,
   });

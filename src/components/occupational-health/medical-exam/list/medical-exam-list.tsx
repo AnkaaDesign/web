@@ -130,8 +130,9 @@ export function MedicalExamList({ className }: MedicalExamListProps) {
     excludeFromUrl: ["limit", "orderBy"],
   });
 
-  // Visible columns state with localStorage persistence
-  const { visibleColumns, setVisibleColumns } = useColumnVisibility("medical-exam-list-visible-columns", DEFAULT_VISIBLE_COLUMNS);
+  // Visible columns state with localStorage persistence.
+  // -v2: added SETOR + CARGO columns; bump the key so saved prefs include them.
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility("medical-exam-list-visible-columns-v2", DEFAULT_VISIBLE_COLUMNS);
 
   // Get all available columns for column visibility manager
   const allColumns = useMemo(() => createMedicalExamColumns(), []);

@@ -128,6 +128,9 @@ const PersonnelDepartmentVacationsList = lazy(() => import("@/pages/personnel-de
 const PersonnelDepartmentVacationsCreate = lazy(() => import("@/pages/personnel-department/vacations/create").then((module) => ({ default: module.VacationCreatePage })));
 const PersonnelDepartmentVacationsDetails = lazy(() => import("@/pages/personnel-department/vacations/details/[id]").then((module) => ({ default: module.VacationDetailPage })));
 const PersonnelDepartmentVacationsEdit = lazy(() => import("@/pages/personnel-department/vacations/edit/[id]").then((module) => ({ default: module.VacationEditPage })));
+const PersonnelDepartmentVacationGroupsList = lazy(() => import("@/pages/personnel-department/vacation-groups/list"));
+const PersonnelDepartmentVacationGroupsCreate = lazy(() => import("@/pages/personnel-department/vacation-groups/create").then((module) => ({ default: module.VacationGroupCreatePage })));
+const PersonnelDepartmentVacationGroupsDetails = lazy(() => import("@/pages/personnel-department/vacation-groups/details/[id]").then((module) => ({ default: module.VacationGroupDetailPage })));
 
 // Occupational Health - Medicina do Trabalho (W3C)
 const OccupationalHealthMedicalExamsList = lazy(() => import("@/pages/occupational-health/medical-exams/list").then((module) => ({ default: module.MedicalExamListPage })));
@@ -494,7 +497,6 @@ const ServerRateLimiting = lazy(() => import("@/pages/server/rate-limiting").the
 // Tools
 const ToolsHubPage = lazy(() => import("@/pages/tools").then((module) => ({ default: module.ToolsHubPage })));
 const QrCodeToolPage = lazy(() => import("@/pages/tools/qr-code").then((module) => ({ default: module.QrCodeToolPage })));
-const CalculatorPage = lazy(() => import("@/pages/tools/calculator"));
 const TimeCalculatorPage = lazy(() => import("@/pages/tools/time-calculator"));
 const OvertimeCostCalculatorPage = lazy(() => import("@/pages/tools/overtime-cost-calculator"));
 const EmployeeCostCalculatorPage = lazy(() => import("@/pages/tools/employee-cost-calculator"));
@@ -2983,6 +2985,31 @@ function App() {
                     </Suspense>
                   }
                 />
+                {/* Departamento Pessoal — Férias Coletivas */}
+                <Route
+                  path={routes.personnelDepartment.vacationGroups.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentVacationGroupsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.vacationGroups.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentVacationGroupsCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.vacationGroups.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentVacationGroupsDetails />
+                    </Suspense>
+                  }
+                />
                 {/* Departamento Pessoal — Empréstimos */}
                 <Route
                   path={routes.humanResources.loans.root}
@@ -3422,14 +3449,6 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ColorPalettePage />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.tools.calculator.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <CalculatorPage />
                     </Suspense>
                   }
                 />

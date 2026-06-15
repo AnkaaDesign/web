@@ -667,31 +667,6 @@ export function TerminationForm(props: TerminationFormProps) {
                     </FormItem>
                   )}
                 />
-
-                {props.mode === "update" && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name={"paymentDate" as any}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <DateTimeInput
-                              mode="date"
-                              value={field.value}
-                              onChange={(date) => field.onChange(date instanceof Date ? date : null)}
-                              label="Data de Pagamento"
-                              disabled={fieldsDisabled}
-                              placeholder="Selecione a data de pagamento"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormMoneyInput name={"paidAmount" as any} label="Valor Pago" disabled={fieldsDisabled} />
-                  </>
-                )}
               </div>
             </CardContent>
           </Card>

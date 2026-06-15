@@ -73,6 +73,22 @@ export const createPpeDeliveryColumns = (): PpeDeliveryColumn[] => [
     align: "left",
   },
   {
+    key: "user.sector",
+    header: "SETOR",
+    accessor: (delivery: PpeDelivery) => <div className="truncate">{delivery.user?.sector?.name || <span className="text-muted-foreground">-</span>}</div>,
+    sortable: false,
+    className: "w-40",
+    align: "left",
+  },
+  {
+    key: "user.position",
+    header: "CARGO",
+    accessor: (delivery: PpeDelivery) => <div className="truncate">{delivery.user?.position?.name || <span className="text-muted-foreground">-</span>}</div>,
+    sortable: false,
+    className: "w-44",
+    align: "left",
+  },
+  {
     key: "status",
     header: "STATUS",
     accessor: (delivery: PpeDelivery) => {
@@ -157,5 +173,5 @@ export const createPpeDeliveryColumns = (): PpeDeliveryColumn[] => [
 ];
 
 export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["item.uniCode", "item.name", "item.measures", "user.name", "status", "quantity", "createdAt"]);
+  return new Set(["item.uniCode", "item.name", "item.measures", "user.name", "user.sector", "user.position", "status", "quantity", "createdAt"]);
 }

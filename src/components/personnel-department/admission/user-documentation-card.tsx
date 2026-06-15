@@ -32,6 +32,7 @@ import {
   useAdmissionDocumentUploadByUser,
 } from "../../../hooks/personnel-department/use-admissions";
 import { usePrivileges } from "../../../hooks/common/use-privileges";
+import { getFileUrl } from "../../../utils";
 import { getDocumentProgress } from "./utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,7 +40,7 @@ import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileItem } from "@/components/common/file";
+import { FileThumbnail } from "@/components/common/file";
 
 const DOCUMENT_STATUS_BADGE: Record<string, BadgeProps["variant"]> = {
   [ADMISSION_DOCUMENT_STATUS.PENDING]: "pending",
@@ -109,49 +110,43 @@ function DocumentationRow({ userId, document, canEdit }: DocumentationRowProps) 
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      {/* Type + file (click-to-open via FileViewer) */}
+      {/* Type + note. No "Obrigatório" badge: required only means the document
+          is part of the standard checklist — HR can still legitimately waive
+          (Dispensar) it. The status control below is the single source of
+          truth, mirroring the admission Checklist de Documentos. */}
       <div className="min-w-0 flex-1 space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">{typeLabel}</span>
-          {document.required && (
-            <Badge variant="outline" className="text-[10px] uppercase">
-              Obrigatório
-            </Badge>
-          )}
-        </div>
-        {document.file ? (
-          <FileItem file={document.file} viewMode="list" showActions={false} className="max-w-md" />
-        ) : (
-          <p className="text-xs text-muted-foreground">Nenhum arquivo anexado</p>
-        )}
+        <span className="block text-sm font-medium truncate">{typeLabel}</span>
         {document.note && <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">{document.note}</p>}
       </div>
 
-      {/* Status + upload */}
-      <div className="flex flex-wrap items-center gap-3 sm:flex-shrink-0">
-        <Badge variant={DOCUMENT_STATUS_BADGE[document.status] || "secondary"} className="text-xs whitespace-nowrap">
+      {/* Controls — status combobox IS the status (no redundant badge), file
+          thumbnail (click-to-open) + upload, all on a single compact row. */}
+      {canEdit ? (
+        <div className="flex flex-nowrap items-center gap-2 sm:flex-shrink-0">
+          <Combobox
+            value={document.status}
+            onValueChange={handleStatusChange}
+            options={STATUS_OPTIONS}
+            searchable={false}
+            clearable={false}
+            disabled={isBusy}
+            placeholder="Status"
+            triggerClassName="h-8 w-44 text-xs"
+          />
+          {document.file && (
+            <FileThumbnail file={document.file} size="sm" onClick={() => window.open(getFileUrl(document.file!), "_blank", "noopener,noreferrer")} />
+          )}
+          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
+          <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
+            {isBusy ? <IconLoader2 className="h-4 w-4 mr-1 animate-spin" /> : <IconUpload className="h-4 w-4 mr-1" />}
+            {document.fileId ? "Substituir" : "Enviar"}
+          </Button>
+        </div>
+      ) : (
+        <Badge variant={DOCUMENT_STATUS_BADGE[document.status] || "secondary"} className="text-xs whitespace-nowrap sm:flex-shrink-0">
           {ADMISSION_DOCUMENT_STATUS_LABELS[document.status] || document.status}
         </Badge>
-        {canEdit && (
-          <>
-            <Combobox
-              value={document.status}
-              onValueChange={handleStatusChange}
-              options={STATUS_OPTIONS}
-              searchable={false}
-              clearable={false}
-              disabled={isBusy}
-              placeholder="Status"
-              triggerClassName="h-8 w-32 text-xs"
-            />
-            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
-            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
-              {isBusy ? <IconLoader2 className="h-4 w-4 mr-1 animate-spin" /> : <IconUpload className="h-4 w-4 mr-1" />}
-              {document.fileId ? "Substituir" : "Enviar"}
-            </Button>
-          </>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -277,7 +272,10 @@ export function UserDocumentationCard({ userId, className }: UserDocumentationCa
               // expiring copies (e.g. CNH) can be replaced at any time.
               <DocumentationRow key={document.id} userId={userId} document={document} canEdit />
             ))}
-            <AddDocumentRow userId={userId} existingTypes={existingTypes} emptyChecklist={documents.length === 0} />
+            {/* Only the bootstrap upload (cria a admissão no primeiro envio) is
+                kept; once o checklist existe, a linha "Adicionar outro documento"
+                é omitida para manter o card enxuto. */}
+            {documents.length === 0 && <AddDocumentRow userId={userId} existingTypes={existingTypes} emptyChecklist />}
           </>
         )}
       </CardContent>

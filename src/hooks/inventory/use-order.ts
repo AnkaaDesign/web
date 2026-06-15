@@ -14,6 +14,7 @@ import {
   batchDeleteOrders,
   getOrderPaymentSummary,
   getOrderPayables,
+  settlePayrollMonth,
   requestOrderPayment,
   markOrderAwaitingPayment,
   markOrderPaid,
@@ -151,6 +152,15 @@ export const useOrderPayables = (options?: { enabled?: boolean }) =>
     staleTime: 1000 * 60, // 1 minute
     enabled: options?.enabled ?? true,
   });
+
+/** Settle the payroll competence month (folha batch) from Contas a Pagar. */
+export const useSettlePayrollMonth = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ year, month, amount }: { year: number; month: number; amount: number | null }) => settlePayrollMonth(year, month, amount),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: orderKeys.all }),
+  });
+};
 
 // =====================================================
 // Specialized Order Query Hooks

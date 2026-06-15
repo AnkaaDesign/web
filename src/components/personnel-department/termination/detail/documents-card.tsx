@@ -10,8 +10,10 @@ import {
   TERMINATION_DOCUMENT_STATUS,
   TERMINATION_DOCUMENT_TYPE_LABELS,
   TERMINATION_DOCUMENT_STATUS_LABELS,
+  TERMINATION_STATUS,
 } from "../../../../constants";
 import type { Termination, TerminationDocument } from "../../../../types/termination";
+import { TERMINATION_STATUS_CHAIN } from "./status-stepper-card";
 import type { File as AnkaaFile } from "../../../../types";
 import { useTerminationDocumentUpload, useTerminationDocumentUpdate } from "../../../../hooks/personnel-department/use-terminations";
 import { downloadFile, downloadFileInBrowser } from "../../../../api-client";
@@ -45,6 +47,18 @@ export function DocumentsCard({ termination, disabled = false, className }: Docu
   const fileViewerContext = useContext(FileViewerContext);
 
   const documents = termination.documents || [];
+
+  // Documents may only be managed once the process has reached the Documentação
+  // step. Before that, the checklist is read-only (downloads stay available).
+  const currentIndex = TERMINATION_STATUS_CHAIN.indexOf(termination.status);
+  const documentsStepIndex = TERMINATION_STATUS_CHAIN.indexOf(TERMINATION_STATUS.DOCUMENTS);
+  const stepLocked = currentIndex >= 0 && currentIndex < documentsStepIndex;
+  const mutationsDisabled = disabled || stepLocked;
+  const lockedReason = disabled
+    ? "Rescisões concluídas ou canceladas não podem ser alteradas."
+    : stepLocked
+      ? "Os documentos podem ser anexados a partir da etapa de Documentação."
+      : undefined;
 
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
 
@@ -126,6 +140,12 @@ export function DocumentsCard({ termination, disabled = false, className }: Docu
         {/* Hidden file input shared by every row */}
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
 
+        {stepLocked && !disabled && (
+          <p className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            Os documentos só podem ser anexados a partir da etapa de Documentação. Avance o processo até lá para gerenciar os anexos.
+          </p>
+        )}
+
         {documents.length > 0 && (
           <p className="mb-3 text-xs text-muted-foreground">
             O TRCT, a carta de aviso, o termo 484-A e o termo de homologação são gerados automaticamente em PDF ao entrar na etapa de Homologação. Use o botão de
@@ -162,11 +182,11 @@ export function DocumentsCard({ termination, disabled = false, className }: Docu
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild disabled={disabled || isUpdatingThis}>
+                        <DropdownMenuTrigger asChild disabled={mutationsDisabled || isUpdatingThis}>
                           <button
                             type="button"
-                            className={cn("inline-flex items-center gap-1", (disabled || isUpdatingThis) && "cursor-not-allowed opacity-70")}
-                            title={disabled ? "Rescisões concluídas ou canceladas não podem ser alteradas." : "Alterar status do documento"}
+                            className={cn("inline-flex items-center gap-1", (mutationsDisabled || isUpdatingThis) && "cursor-not-allowed opacity-70")}
+                            title={lockedReason ?? "Alterar status do documento"}
                           >
                             <Badge variant={DOCUMENT_STATUS_BADGE_VARIANTS[document.status] || "secondary"} className="text-xs whitespace-nowrap">
                               {TERMINATION_DOCUMENT_STATUS_LABELS[document.status] || document.status}
@@ -174,7 +194,7 @@ export function DocumentsCard({ termination, disabled = false, className }: Docu
                             {isUpdatingThis ? (
                               <IconLoader2 className="h-3 w-3 animate-spin text-muted-foreground" />
                             ) : (
-                              !disabled && <IconChevronDown className="h-3 w-3 text-muted-foreground" />
+                              !mutationsDisabled && <IconChevronDown className="h-3 w-3 text-muted-foreground" />
                             )}
                           </button>
                         </DropdownMenuTrigger>
@@ -221,8 +241,8 @@ export function DocumentsCard({ termination, disabled = false, className }: Docu
                           variant="outline"
                           size="sm"
                           onClick={() => handleUploadClick(document)}
-                          disabled={disabled || upload.isPending}
-                          title={disabled ? "Rescisões concluídas ou canceladas não podem ser alteradas." : document.file ? "Substituir arquivo" : "Anexar arquivo"}
+                          disabled={mutationsDisabled || upload.isPending}
+                          title={lockedReason ?? (document.file ? "Substituir arquivo" : "Anexar arquivo")}
                         >
                           {isUploadingThis ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconUpload className="h-4 w-4 mr-2" />}
                           {document.file ? "Substituir" : "Anexar"}

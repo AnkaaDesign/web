@@ -51,7 +51,7 @@ export function CollaboratorLoansCard({ userId, className }: CollaboratorLoansCa
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: loans = [], isLoading, refetch } = useUserLoans(userId);
 
-  const loanRows = (loans as Discount[]).filter(
+  const loanRows = (Array.isArray(loans) ? (loans as Discount[]) : []).filter(
     (d) => d.discountType === "LOAN" || d.discountType === "ADVANCE",
   );
 

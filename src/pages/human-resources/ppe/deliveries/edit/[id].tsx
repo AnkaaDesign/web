@@ -34,7 +34,7 @@ export const EPIDeliveryEdit = () => {
           sector: true,
         },
       },
-      approvedByUser: true,
+      reviewedByUser: true,
       ppeSchedule: true,
     },
     enabled: !!id,

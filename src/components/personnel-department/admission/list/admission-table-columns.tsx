@@ -37,25 +37,39 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
     align: "left",
   },
 
-  // Setor / Cargo (do colaborador)
+  // Setor (do colaborador)
   {
-    key: "user.sectorPosition",
-    header: "SETOR / CARGO",
+    key: "user.sector",
+    header: "SETOR",
     accessor: (admission: Admission) => {
       const sector = admission.user?.sector?.name;
-      const position = admission.user?.position?.name;
-      if (!sector && !position) return <span className="text-muted-foreground">-</span>;
+      if (!sector) return <span className="text-muted-foreground">-</span>;
       return (
-        <div className="truncate">
-          <p className="text-sm truncate" title={sector ?? undefined}>
-            {sector || <span className="text-muted-foreground">-</span>}
-          </p>
-          {position && <p className="text-xs text-muted-foreground truncate" title={position}>{position}</p>}
-        </div>
+        <p className="text-sm truncate" title={sector}>
+          {sector}
+        </p>
       );
     },
     sortable: false,
-    className: "min-w-[200px]",
+    className: "min-w-[150px]",
+    align: "left",
+  },
+
+  // Cargo (do colaborador)
+  {
+    key: "user.position",
+    header: "CARGO",
+    accessor: (admission: Admission) => {
+      const position = admission.user?.position?.name;
+      if (!position) return <span className="text-muted-foreground">-</span>;
+      return (
+        <p className="text-sm truncate" title={position}>
+          {position}
+        </p>
+      );
+    },
+    sortable: false,
+    className: "min-w-[170px]",
     align: "left",
   },
 
@@ -127,7 +141,7 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
       );
     },
     sortable: false,
-    className: "min-w-[140px]",
+    className: "min-w-[110px]",
     align: "left",
   },
 
@@ -148,7 +162,7 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
       );
     },
     sortable: false,
-    className: "min-w-[120px]",
+    className: "min-w-[100px]",
     align: "left",
   },
 
@@ -162,7 +176,7 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
       </div>
     ),
     sortable: false,
-    className: "min-w-[180px]",
+    className: "min-w-[150px]",
     align: "left",
   },
 
@@ -182,7 +196,8 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
 // Export the default visible columns
 export const DEFAULT_ADMISSION_VISIBLE_COLUMNS = new Set([
   "user.name",
-  "user.sectorPosition",
+  "user.sector",
+  "user.position",
   "user.currentContractType",
   "status",
   "hireDate",

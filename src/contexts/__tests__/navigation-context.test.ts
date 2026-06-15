@@ -255,10 +255,9 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     expect(byId(FINANCIAL, "financeiro")).toBeUndefined();
   });
 
-  it("Ferramentas: spec tools incl. Calculadora and Calendário; no QR Code/Paleta", () => {
+  it("Ferramentas: spec tools incl. Calculadora de Horas and Calendário; no QR Code/Paleta", () => {
     const tools = byId(ACCOUNTING, "ferramentas")!;
     expect((tools.children || []).map((c) => c.title)).toEqual([
-      "Calculadora",
       "Calculadora de Horas",
       "Calendário",
       "Certificado de Resíduos",

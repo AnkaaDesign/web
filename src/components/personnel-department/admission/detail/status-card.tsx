@@ -121,7 +121,12 @@ export function StatusCard({ admission, className }: StatusCardProps) {
                     </div>
                     <span
                       className={cn(
-                        "mt-2 w-full px-1 text-center text-xs leading-tight break-words first:text-left last:text-right",
+                        // Index-based alignment: first label flush-left under the
+                        // first dot, last flush-right under the last, rest centered.
+                        // (first:/last: on the span match its sibling slot — the
+                        // circle/span pair — not the column, so they don't work here.)
+                        "mt-2 w-full px-1 text-xs leading-tight break-words",
+                        index === 0 ? "text-left" : index === STEPPER_STEPS.length - 1 ? "text-right" : "text-center",
                         isCurrent ? "font-semibold text-foreground" : isDone ? "text-foreground" : "text-muted-foreground",
                       )}
                     >

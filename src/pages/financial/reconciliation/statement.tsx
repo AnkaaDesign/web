@@ -12,13 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableSearchInput } from "@/components/ui/table-search-input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import {
   StandardizedTable,
   type StandardizedColumn,
@@ -237,41 +231,31 @@ export const ReconciliationStatementPage = () => {
           );
         },
       },
-      {
-        key: "runningBalance",
-        header: hasBankBalance ? "Saldo" : "Acumulado no mês",
-        width: "160px",
-        align: "right",
-        render: t => {
-          if (t.runningBalance != null) {
-            return (
-              <span
-                className={cn(
-                  "tabular-nums whitespace-nowrap text-sm",
-                  Number(t.runningBalance) < 0 ? "text-red-700" : "text-foreground",
-                )}
-              >
-                {formatCurrency(t.runningBalance)}
-              </span>
-            );
-          }
-          const acc = cumulativeById.get(t.id);
-          if (acc === undefined)
-            return <span className="text-muted-foreground text-xs">—</span>;
-          return (
-            <span
-              className={cn(
-                "tabular-nums whitespace-nowrap text-sm text-muted-foreground",
-                acc < 0 && "text-red-700/80",
-              )}
-              title="Movimentação acumulada no mês (o OFX não informa saldo por lançamento)"
-            >
-              {acc < 0 ? "−" : ""}
-              {formatCurrency(Math.abs(acc))}
-            </span>
-          );
-        },
-      },
+      // "Saldo" only when the bank statement actually carries per-line balances.
+      // The synthetic "Acumulado no mês" running total was noise and is dropped.
+      ...(hasBankBalance
+        ? [
+            {
+              key: "runningBalance",
+              header: "Saldo",
+              width: "160px",
+              align: "right" as const,
+              render: (t: BankTransaction) =>
+                t.runningBalance != null ? (
+                  <span
+                    className={cn(
+                      "tabular-nums whitespace-nowrap text-sm",
+                      Number(t.runningBalance) < 0 ? "text-red-700" : "text-foreground",
+                    )}
+                  >
+                    {formatCurrency(t.runningBalance)}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground text-xs">—</span>
+                ),
+            } as StandardizedColumn<BankTransaction>,
+          ]
+        : []),
       {
         key: "status",
         header: "Conciliação",
@@ -341,22 +325,21 @@ export const ReconciliationStatementPage = () => {
                     placeholder="Buscar por contraparte, descrição ou FITID..."
                   />
                 </div>
-                <Select
+                <Combobox
+                  mode="single"
                   value={effectiveAccountKey || undefined}
-                  onValueChange={setAccountKey}
-                >
-                  <SelectTrigger className="h-10 w-full sm:w-[300px]">
-                    <SelectValue placeholder="Conta bancária" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map(a => (
-                      <SelectItem key={a.key} value={a.key}>
-                        {a.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <MonthNav month={month} onChange={setMonth} />
+                  onValueChange={(v) => {
+                    const key = typeof v === "string" ? v : Array.isArray(v) ? v[0] : undefined;
+                    if (key) setAccountKey(key);
+                  }}
+                  options={accounts.map(a => ({ value: a.key, label: a.label }))}
+                  placeholder="Conta bancária"
+                  searchPlaceholder="Buscar conta..."
+                  clearable={false}
+                  className="w-full sm:w-[300px] flex-shrink-0"
+                  triggerClassName="h-10 w-full"
+                />
+                <MonthNav month={month} onChange={setMonth} className="flex-shrink-0" />
               </div>
 
               <div className="flex-1 min-h-0 overflow-auto">

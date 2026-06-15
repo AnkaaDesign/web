@@ -65,7 +65,7 @@ export function UserBenefitTable({ visibleColumns, className, onTerminate, onDel
       // position.remunerations = salário-base do colaborador, exigido pela
       // regra percentual do Vale Transporte (% do salário) nas colunas
       // "Empresa Paga" / "Colaborador Paga"
-      user: { include: { position: { include: { remunerations: true } } } },
+      user: { include: { position: { include: { remunerations: true } }, sector: true } },
       benefit: true,
     }),
     [],
