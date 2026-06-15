@@ -48,6 +48,7 @@ import { PpeSizesSection } from "@/components/administration/user/form/ppe-sizes
 import { admissionCollaboratorFormSchema } from "../../../../schemas/admission";
 import type { AdmissionCreateFormData, AdmissionCollaboratorFormData } from "../../../../schemas/admission";
 import { CONTRACT_TYPE, CONTRACT_STATUS, EMPLOYEE_TYPE, SECTOR_PRIVILEGES, ADMISSION_DOCUMENT_TYPE, ADMISSION_DOCUMENT_TYPE_LABELS } from "../../../../constants";
+import { ADMISSION_CHECKLIST_DOC_TYPES } from "../utils";
 import { useSector } from "../../../../hooks";
 import { getUsers } from "../../../../api-client";
 import { uploadSingleFile } from "../../../../api-client/file";
@@ -60,15 +61,10 @@ interface AdmissionNewUserFormProps {
   isSubmitting?: boolean;
 }
 
-// Curated document checklist surfaced as upload fields on the form.
-const DOCUMENT_CHECKLIST: ADMISSION_DOCUMENT_TYPE[] = [
-  ADMISSION_DOCUMENT_TYPE.CPF,
-  ADMISSION_DOCUMENT_TYPE.RG,
-  ADMISSION_DOCUMENT_TYPE.CTPS,
-  ADMISSION_DOCUMENT_TYPE.PROOF_OF_RESIDENCE,
-  ADMISSION_DOCUMENT_TYPE.ADMISSION_EXAM,
-  ADMISSION_DOCUMENT_TYPE.PHOTO,
-];
+// Documentos exibidos no cadastro da admissão (mesma fonte que o checklist do
+// detalhe). Obrigatórios: CPF, CTPS e RG OU CNH; os demais são opcionais. Tudo
+// que não está aqui pertence ao colaborador, não à admissão.
+const DOCUMENT_CHECKLIST: ADMISSION_DOCUMENT_TYPE[] = ADMISSION_CHECKLIST_DOC_TYPES;
 
 export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUserFormProps) {
   // Pending document uploads keyed by document type. Files are uploaded to get
@@ -84,9 +80,10 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
       name: "",
       email: null,
       employeeType: EMPLOYEE_TYPE.CLT,
-      // New CLT hires start in experiência: a FIXED_TERM modality + EXPERIENCE status.
-      contractType: CONTRACT_TYPE.FIXED_TERM,
-      contractStatus: CONTRACT_STATUS.EXPERIENCE,
+      // Default: contrato por prazo indeterminado + status efetivado (ACTIVE) —
+      // o status é governado pelo CONTRACT_STATUS e INDETERMINATE pareia com ACTIVE.
+      contractType: CONTRACT_TYPE.INDETERMINATE,
+      contractStatus: CONTRACT_STATUS.ACTIVE,
       phone: null,
       cpf: null as any,
       pis: null,
@@ -190,13 +187,66 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
     };
   }, [debouncedCpf]);
 
-  // Prefill identity (read-only) when an existing person is detected.
+  // Personal fields prefilled from a matched person (and cleared when the match
+  // goes away). Identity fields default to "" (text inputs), the rest to null.
+  const prevMatchedIdRef = useRef<string | null>(null);
+
+  // Prefill ALL editable fields when an existing person is detected, and CLEAR
+  // them when the CPF stops matching (so a different person doesn't keep stale
+  // data). Fields stay EDITABLE — corrections are detected via dirtyFields and
+  // sent back as a `userUpdate` patch. Prefill is non-dirty so untouched values
+  // are NOT re-sent.
   useEffect(() => {
+    const apply = (values: Record<string, unknown>) => {
+      for (const [field, value] of Object.entries(values)) {
+        form.setValue(field as any, value as any, { shouldValidate: false, shouldDirty: false });
+      }
+    };
+
     if (matchedUser) {
-      form.setValue("name", matchedUser.name, { shouldValidate: false });
-      if (matchedUser.email) form.setValue("email", matchedUser.email, { shouldValidate: false });
-      if (matchedUser.phone) form.setValue("phone", matchedUser.phone, { shouldValidate: false });
-      if (matchedUser.pis) form.setValue("pis", matchedUser.pis, { shouldValidate: false });
+      const m = matchedUser as any;
+      // Always set EVERY field (including empty), so switching between two
+      // existing people replaces the previous person's data cleanly.
+      apply({
+        name: m.name ?? "",
+        email: m.email ?? null,
+        phone: m.phone ?? null,
+        pis: m.pis ?? null,
+        birth: m.birth ? new Date(m.birth) : null,
+        address: m.address ?? null,
+        addressNumber: m.addressNumber ?? null,
+        addressComplement: m.addressComplement ?? null,
+        neighborhood: m.neighborhood ?? null,
+        city: m.city ?? null,
+        state: m.state ?? null,
+        zipCode: m.zipCode ?? null,
+        site: m.site ?? null,
+        positionId: m.positionId ?? null,
+        sectorId: m.sectorId ?? null,
+      });
+      prevMatchedIdRef.current = m.id;
+    } else if (prevMatchedIdRef.current) {
+      // The CPF no longer matches a previously-detected person → clear the
+      // prefilled data so the form is blank for a NEW person. (Untouched fresh
+      // input is preserved because this only fires after a real match cleared.)
+      apply({
+        name: "",
+        email: null,
+        phone: null,
+        pis: null,
+        birth: null,
+        address: null,
+        addressNumber: null,
+        addressComplement: null,
+        neighborhood: null,
+        city: null,
+        state: null,
+        zipCode: null,
+        site: null,
+        positionId: null,
+        sectorId: null,
+      });
+      prevMatchedIdRef.current = null;
     }
   }, [matchedUser, form]);
 
@@ -236,10 +286,30 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
         providerCnpj: (providerCnpj as string) ?? null,
       };
 
+      // Recontratação: além de anexar um NOVO vínculo à pessoa existente, envia
+      // as CORREÇÕES de cadastro (campos pessoais que o usuário editou no
+      // formulário) como `userUpdate` — o servidor atualiza a pessoa, sem
+      // duplicá-la. Apenas campos sujos (dirty) são enviados.
+      const PERSONAL_FIELDS = [
+        "name", "email", "phone", "pis", "birth",
+        "address", "addressNumber", "addressComplement", "neighborhood", "city", "state", "zipCode", "site",
+      ] as const;
+      let userUpdate: Record<string, unknown> | undefined;
+      if (matchedUser) {
+        const dirty = form.formState.dirtyFields as Record<string, unknown>;
+        const patch: Record<string, unknown> = {};
+        for (const field of PERSONAL_FIELDS) {
+          if (dirty[field]) patch[field] = (data as any)[field] ?? null;
+        }
+        if (Object.keys(patch).length > 0) userUpdate = patch;
+      }
+
       const payload: AdmissionCreateFormData = matchedUser
         ? ({
-            // Rehire: attach a NEW vínculo to the existing person.
+            // Rehire: attach a NEW vínculo to the existing person (+ optional
+            // personal-data corrections via userUpdate).
             userId: matchedUser.id,
+            ...(userUpdate ? { userUpdate } : {}),
             contract,
             documents: documents.length ? documents : undefined,
             hireDate: admissionDate,
@@ -280,7 +350,7 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormInput<AdmissionCollaboratorFormData> type="cpf" name="cpf" label="CPF" placeholder="Digite o CPF do colaborador" disabled={submitting} required />
-                <FormInput<AdmissionCollaboratorFormData> type="pis" name="pis" label="PIS" disabled={submitting || !!matchedUser} />
+                <FormInput<AdmissionCollaboratorFormData> type="pis" name="pis" label="PIS" disabled={submitting} />
               </div>
 
               {matchedUser && (
@@ -288,7 +358,7 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
                   <div className="flex items-center gap-2 min-w-0">
                     <IconUserCheck className="h-5 w-5 text-primary shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">Pessoa já cadastrada — um novo vínculo será criado para {matchedUser.name}</p>
+                      <p className="text-sm font-medium truncate">Pessoa já cadastrada — {matchedUser.name}. Os dados foram preenchidos; ajuste o que precisar (as alterações atualizam o cadastro) e um novo vínculo será criado.</p>
                       {matchedUserMeta && <p className="text-xs text-muted-foreground truncate">{matchedUserMeta}</p>}
                     </div>
                   </div>
@@ -308,13 +378,13 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <NameInput disabled={submitting || !!matchedUser} />
+                <NameInput disabled={submitting} />
                 <FormInput<AdmissionCollaboratorFormData>
                   name="email"
                   type="email"
                   label="E-mail"
                   placeholder="Digite o e-mail do colaborador"
-                  disabled={submitting || !!matchedUser}
+                  disabled={submitting}
                   required={!form.watch("phone") && !matchedUser}
                 />
               </div>
@@ -325,10 +395,10 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
                   type="phone"
                   label="Telefone"
                   placeholder="Digite o telefone do colaborador"
-                  disabled={submitting || !!matchedUser}
+                  disabled={submitting}
                   required={false}
                 />
-                <BirthDateInput disabled={submitting || !!matchedUser} required={!matchedUser} />
+                <BirthDateInput disabled={submitting} required={!matchedUser} />
                 <PayrollNumberInput disabled={submitting} />
               </div>
             </CardContent>

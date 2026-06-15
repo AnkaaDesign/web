@@ -54,10 +54,10 @@ export const VacationGroupDetailPage = () => {
   const group = response?.data;
 
   if (!id) {
-    return <Navigate to={routes.personnelDepartment.vacationGroups.root} replace />;
+    return <Navigate to={routes.personnelDepartment.vacations.root} replace />;
   }
   if (error) {
-    return <Navigate to={routes.personnelDepartment.vacationGroups.root} replace />;
+    return <Navigate to={routes.personnelDepartment.vacations.root} replace />;
   }
   if (isLoading || !group) {
     return (
@@ -83,7 +83,7 @@ export const VacationGroupDetailPage = () => {
   const handleDelete = async () => {
     try {
       await deleteAsync(id);
-      navigate(routes.personnelDepartment.vacationGroups.root);
+      navigate(routes.personnelDepartment.vacations.root);
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {
         console.error("Error deleting vacation group:", error);
@@ -101,7 +101,7 @@ export const VacationGroupDetailPage = () => {
           breadcrumbs={[
             { label: "Início", href: "/" },
             { label: "Departamento Pessoal" },
-            { label: "Férias Coletivas", href: routes.personnelDepartment.vacationGroups.root },
+            { label: "Férias Coletivas", href: routes.personnelDepartment.vacations.root },
             { label: group.name || "Detalhes" },
           ]}
           headerExtra={

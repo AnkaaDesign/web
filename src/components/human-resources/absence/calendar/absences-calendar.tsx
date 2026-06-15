@@ -53,6 +53,14 @@ const CATEGORY_BAR_CLASSES = {
     "bg-red-700 text-white border border-red-800 font-semibold",
 } as const;
 type BarCategory = keyof typeof CATEGORY_BAR_CLASSES;
+// Per-category bar icon, mirroring the icons used in the summary stat tiles so
+// each cell bar reads with the same glyph as its tile (férias=praia,
+// falta justificada=usuário ausente, falta n.j.=usuário alerta).
+const CATEGORY_BAR_ICONS = {
+  AUSENCIA: IconBeach,
+  FALTA_JUSTIFIED: IconUserOff,
+  FALTA_UNJUSTIFIED: IconUserExclamation,
+} as const;
 const HOLIDAY_BAR_CLASS = "bg-cyan-600 text-white border border-cyan-700";
 // New unified-calendar overlays: afastamentos (Leave), aniversários (User.birth)
 // e eventos da agenda (AgendaEvent). Hues keep distance from the existing four.
@@ -695,10 +703,6 @@ export function AbsencesCalendar() {
           onToggleCommemorative={() => setShowCommemorative((v) => !v)}
         />
 
-        {/* Color legend — labels the category colors used by the bars/dots/tiles.
-            Shown in both month and year views (purely presentational). */}
-        <Legend />
-
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <LoadingSpinner size="lg" />
@@ -761,33 +765,6 @@ export function AbsencesCalendar() {
         />
       </CardContent>
     </Card>
-  );
-}
-
-// ===== LEGEND =========================================================
-// Purely presentational color key shown in both month and year views so the
-// dots/bars/tiles have a labeling. Reuses the canonical category color classes
-// literally so it always matches the rest of the calendar.
-function Legend() {
-  const items: Array<{ label: string; cls: string }> = [
-    { label: "Férias", cls: "bg-purple-600" },
-    { label: "Falta justificada", cls: "bg-amber-600" },
-    { label: "Falta não justificada", cls: "bg-red-700" },
-    { label: "Feriado", cls: "bg-cyan-600" },
-    { label: "Afastamento", cls: "bg-orange-600" },
-    { label: "Aniversário", cls: "bg-pink-600" },
-    { label: "Evento", cls: "bg-indigo-600" },
-    { label: "Comemorativa", cls: "bg-fuchsia-600" },
-  ];
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 py-2 text-xs text-muted-foreground">
-      {items.map((it) => (
-        <span key={it.label} className="inline-flex items-center gap-1.5">
-          <span className={cn("inline-block h-2 w-2 rounded-full", it.cls)} />
-          {it.label}
-        </span>
-      ))}
-    </div>
   );
 }
 
@@ -1137,11 +1114,12 @@ function MonthView({
                       <div
                         key={`h${i}`}
                         className={cn(
-                          "text-[10px] px-1.5 py-0.5 rounded-sm truncate font-medium",
+                          "text-[10px] px-1.5 py-0.5 rounded-sm truncate font-medium flex items-center gap-1",
                           HOLIDAY_BAR_CLASS,
                         )}
                       >
-                        {h.Descricao || h.descricao || "Feriado"}
+                        <IconConfetti className="h-3 w-3 flex-shrink-0" strokeWidth={2.5} />
+                        <span className="truncate">{h.Descricao || h.descricao || "Feriado"}</span>
                       </div>
                     ))}
                     {/* Commemorative dates — fuchsia. Always visible (incl. weekends/holidays). */}
@@ -1193,12 +1171,13 @@ function MonthView({
                         <div
                           key={`l${l.id}`}
                           className={cn(
-                            "text-[10px] px-1.5 py-0.5 rounded-sm truncate font-medium",
+                            "text-[10px] px-1.5 py-0.5 rounded-sm truncate font-medium flex items-center gap-1",
                             LEAVE_BAR_CLASS,
                           )}
                           title={`${l.user?.name ?? "Colaborador"} · ${getLeaveTypeLabel(l)}`}
                         >
-                          {shortName(l.user?.name ?? "Colaborador")} · {getLeaveTypeLabel(l)}
+                          <IconStethoscope className="h-3 w-3 flex-shrink-0" strokeWidth={2.5} />
+                          <span className="truncate">{shortName(l.user?.name ?? "Colaborador")} · {getLeaveTypeLabel(l)}</span>
                         </div>
                       ))}
                     {/* Absence bars use category-level color so they line up
@@ -1248,16 +1227,18 @@ function MonthView({
                             const cls = barCat
                               ? CATEGORY_BAR_CLASSES[barCat]
                               : "bg-muted text-muted-foreground border border-border";
+                            const BarIcon = barCat ? CATEGORY_BAR_ICONS[barCat] : null;
                             return (
                               <div
                                 key={`a${i}`}
                                 className={cn(
-                                  "text-[10px] px-1.5 py-0.5 rounded-sm truncate font-medium",
+                                  "text-[10px] px-1.5 py-0.5 rounded-sm truncate font-medium flex items-center gap-1",
                                   cls,
                                 )}
                                 title={`${a.userName} · ${meta?.label ?? a.JustificativaDescricao}`}
                               >
-                                {shortName(a.userName)} · {meta?.label ?? a.JustificativaDescricao}
+                                {BarIcon && <BarIcon className="h-3 w-3 flex-shrink-0" strokeWidth={2.5} />}
+                                <span className="truncate">{shortName(a.userName)} · {meta?.label ?? a.JustificativaDescricao}</span>
                               </div>
                             );
                           })}
@@ -1787,61 +1768,63 @@ function MiniMonth({
         "group text-left rounded-xl border border-border bg-card overflow-hidden transition-colors hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background",
       )}
     >
-      {/* Header band — neutral bg, no per-month tint. */}
+      {/* Header band — neutral bg, no per-month tint. Month name and the count
+          badges share one row; the badges wrap (right-aligned) only if a busy
+          month can't fit them all, so they never collide with the title. */}
       <div className="px-4 py-2.5 border-b border-border bg-card flex items-center justify-between gap-2">
-        <h3 className="text-base font-bold capitalize text-foreground group-hover:text-primary transition-colors truncate">
+        <h3 className="text-base font-bold capitalize text-foreground group-hover:text-primary transition-colors flex-shrink-0">
           {format(monthDate, "MMMM", { locale: ptBR })}
         </h3>
-        <div className="flex items-center gap-2 text-xs font-semibold tabular-nums">
+        <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs font-semibold tabular-nums">
           {totalEvents === 0 ? (
             <span className="text-muted-foreground/60 text-[11px]">sem registros</span>
           ) : (
             <>
               {vacationDays > 0 && (
                 <span className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-400">
-                  <IconBeach className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <IconBeach className="h-4 w-4" strokeWidth={2.5} />
                   {vacationDays}
                 </span>
               )}
               {justifiedFaltaDays > 0 && (
                 <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                  <IconUserOff className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <IconUserOff className="h-4 w-4" strokeWidth={2.5} />
                   {justifiedFaltaDays}
                 </span>
               )}
               {unjustifiedFaltaDays > 0 && (
                 <span className="inline-flex items-center gap-1 text-red-700 dark:text-red-300">
-                  <IconUserExclamation className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <IconUserExclamation className="h-4 w-4" strokeWidth={2.5} />
                   {unjustifiedFaltaDays}
                 </span>
               )}
               {holidayDays > 0 && (
                 <span className="inline-flex items-center gap-1 text-cyan-600 dark:text-cyan-400">
-                  <IconConfetti className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <IconConfetti className="h-4 w-4" strokeWidth={2.5} />
                   {holidayDays}
                 </span>
               )}
               {leaveDays > 0 && (
                 <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400">
-                  <IconStethoscope className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <IconStethoscope className="h-4 w-4" strokeWidth={2.5} />
                   {leaveDays}
                 </span>
               )}
               {birthdayDays > 0 && (
                 <span className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400">
-                  <IconCake className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <IconCake className="h-4 w-4" strokeWidth={2.5} />
                   {birthdayDays}
                 </span>
               )}
               {eventDays > 0 && (
                 <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
-                  <IconCalendarEvent className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <IconCalendarEvent className="h-4 w-4" strokeWidth={2.5} />
                   {eventDays}
                 </span>
               )}
               {commemorativeDays > 0 && (
                 <span className="inline-flex items-center gap-1 text-fuchsia-600 dark:text-fuchsia-400">
-                  <IconStar className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <IconStar className="h-4 w-4" strokeWidth={2.5} />
                   {commemorativeDays}
                 </span>
               )}
@@ -1917,22 +1900,22 @@ function MiniMonth({
                 isUnjustifiedFalta(a),
             ).length;
 
-            // Compact per-category dots — cells are tiny so we drop one colored
-            // dot per category present that day rather than full icons. Colors
-            // mirror the month-view bars / legend exactly. Absence-style
-            // categories (férias, faltas, afastamento) only count on work days
-            // (no weekends/holidays — same noise rule the month view applies);
-            // holidays, comemorativas, aniversários and eventos always show.
+            // Compact per-category indicators — one small icon per category
+            // present that day, matching the header badge glyphs / month-view
+            // bars exactly. Absence-style categories (férias, faltas,
+            // afastamento) only count on work days (no weekends/holidays — same
+            // noise rule the month view applies); holidays, comemorativas,
+            // aniversários and eventos always show.
             const isWorkDay = !isWeekend && dayHolidays.length === 0;
-            const dots: Array<{ key: string; cls: string }> = [];
-            if (dayHolidays.length > 0) dots.push({ key: "holiday", cls: "bg-cyan-600" });
-            if (dayCommemoratives.length > 0) dots.push({ key: "commem", cls: "bg-fuchsia-600" });
-            if (dayEvents.length > 0) dots.push({ key: "event", cls: "bg-indigo-600" });
-            if (dayBirthdays.length > 0) dots.push({ key: "birthday", cls: "bg-pink-600" });
-            if (isWorkDay && dayLeaves.length > 0) dots.push({ key: "leave", cls: "bg-orange-600" });
-            if (isWorkDay && ausencias > 0) dots.push({ key: "ausencia", cls: "bg-purple-600" });
-            if (isWorkDay && justifiedFaltas > 0) dots.push({ key: "jfalta", cls: "bg-amber-600" });
-            if (isWorkDay && unjustifiedFaltas > 0) dots.push({ key: "ufalta", cls: "bg-red-700" });
+            const indicators: Array<{ key: string; Icon: any; cls: string }> = [];
+            if (dayHolidays.length > 0) indicators.push({ key: "holiday", Icon: IconConfetti, cls: "text-cyan-600 dark:text-cyan-400" });
+            if (dayCommemoratives.length > 0) indicators.push({ key: "commem", Icon: IconStar, cls: "text-fuchsia-600 dark:text-fuchsia-400" });
+            if (dayEvents.length > 0) indicators.push({ key: "event", Icon: IconCalendarEvent, cls: "text-indigo-600 dark:text-indigo-400" });
+            if (dayBirthdays.length > 0) indicators.push({ key: "birthday", Icon: IconCake, cls: "text-pink-600 dark:text-pink-400" });
+            if (isWorkDay && dayLeaves.length > 0) indicators.push({ key: "leave", Icon: IconStethoscope, cls: "text-orange-600 dark:text-orange-400" });
+            if (isWorkDay && ausencias > 0) indicators.push({ key: "ausencia", Icon: IconBeach, cls: "text-purple-600 dark:text-purple-400" });
+            if (isWorkDay && justifiedFaltas > 0) indicators.push({ key: "jfalta", Icon: IconUserOff, cls: "text-amber-600 dark:text-amber-400" });
+            if (isWorkDay && unjustifiedFaltas > 0) indicators.push({ key: "ufalta", Icon: IconUserExclamation, cls: "text-red-700 dark:text-red-300" });
 
             const cellNode = (
               <div
@@ -1946,12 +1929,13 @@ function MiniMonth({
                 )}
               >
                 <span className="leading-none">{format(date, "d")}</span>
-                {dots.length > 0 && (
+                {indicators.length > 0 && (
                   <div className="mt-0.5 flex items-center justify-center gap-[2px] flex-wrap max-w-full px-0.5">
-                    {dots.map((d) => (
-                      <span
-                        key={d.key}
-                        className={cn("inline-block h-1.5 w-1.5 rounded-full flex-shrink-0", d.cls)}
+                    {indicators.map(({ key, Icon, cls }) => (
+                      <Icon
+                        key={key}
+                        className={cn("h-3.5 w-3.5 flex-shrink-0", cls)}
+                        strokeWidth={2.5}
                       />
                     ))}
                   </div>

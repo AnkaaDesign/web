@@ -86,9 +86,6 @@ const ReconciliationFiscalDocumentDetail = lazy(() => import("@/pages/financial/
 const ReconciliationCategoriesList = lazy(() => import("@/pages/financial/reconciliation/categories-list").then((module) => ({ default: module.ReconciliationCategoriesListPage })));
 const ReconciliationRecurringForecast = lazy(() => import("@/pages/financial/reconciliation/recurring-forecast").then((module) => ({ default: module.ReconciliationRecurringForecastPage })));
 const ReconciliationStatement = lazy(() => import("@/pages/financial/reconciliation/statement").then((module) => ({ default: module.ReconciliationStatementPage })));
-const ReconciliationOutflows = lazy(() => import("@/pages/financial/reconciliation/outflows").then((module) => ({ default: module.ReconciliationOutflowsPage })));
-const ReconciliationInflows = lazy(() => import("@/pages/financial/reconciliation/inflows").then((module) => ({ default: module.ReconciliationInflowsPage })));
-const ReconciliationOutflowForecast = lazy(() => import("@/pages/financial/reconciliation/outflow-forecast").then((module) => ({ default: module.ReconciliationOutflowForecastPage })));
 const ReconciliationStatistics = lazy(() => import("@/pages/financial/statistics/reconciliation").then((module) => ({ default: module.ReconciliationStatisticsPage })));
 const AccountsPayableListPage = lazy(() => import("@/pages/financial/accounts-payable/list"));
 const FinancialCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
@@ -128,8 +125,6 @@ const PersonnelDepartmentVacationsList = lazy(() => import("@/pages/personnel-de
 const PersonnelDepartmentVacationsCreate = lazy(() => import("@/pages/personnel-department/vacations/create").then((module) => ({ default: module.VacationCreatePage })));
 const PersonnelDepartmentVacationsDetails = lazy(() => import("@/pages/personnel-department/vacations/details/[id]").then((module) => ({ default: module.VacationDetailPage })));
 const PersonnelDepartmentVacationsEdit = lazy(() => import("@/pages/personnel-department/vacations/edit/[id]").then((module) => ({ default: module.VacationEditPage })));
-const PersonnelDepartmentVacationGroupsList = lazy(() => import("@/pages/personnel-department/vacation-groups/list"));
-const PersonnelDepartmentVacationGroupsCreate = lazy(() => import("@/pages/personnel-department/vacation-groups/create").then((module) => ({ default: module.VacationGroupCreatePage })));
 const PersonnelDepartmentVacationGroupsDetails = lazy(() => import("@/pages/personnel-department/vacation-groups/details/[id]").then((module) => ({ default: module.VacationGroupDetailPage })));
 
 // Occupational Health - Medicina do Trabalho (W3C)
@@ -1494,7 +1489,7 @@ function App() {
                 />
                 <Route
                   path={routes.financial.reconciliation.root}
-                  element={<Navigate to={routes.financial.reconciliation.transactions} replace />}
+                  element={<Navigate to={routes.financial.reconciliation.statement} replace />}
                 />
                 <Route
                   path="/financeiro/conciliacao/extratos"
@@ -1508,34 +1503,25 @@ function App() {
                     </Suspense>
                   }
                 />
+                {/* Saídas/Entradas were merged into the Extrato (type + status
+                    filters live there now). Old links redirect. */}
                 <Route
                   path={routes.financial.reconciliation.outflows}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ReconciliationOutflows />
-                    </Suspense>
-                  }
+                  element={<Navigate to={routes.financial.reconciliation.statement} replace />}
                 />
                 <Route
                   path={routes.financial.reconciliation.inflows}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ReconciliationInflows />
-                    </Suspense>
-                  }
+                  element={<Navigate to={routes.financial.reconciliation.statement} replace />}
                 />
+                {/* Previsão de Saídas was merged into Contas a Pagar. Old links
+                    (current + legacy conciliação path) redirect there. */}
                 <Route
                   path={routes.financial.outflowForecast}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ReconciliationOutflowForecast />
-                    </Suspense>
-                  }
+                  element={<Navigate to={routes.financial.accountsPayable.root} replace />}
                 />
-                {/* Legacy path (Previsão moved out of the conciliação domain). */}
                 <Route
                   path="/financeiro/conciliacao/previsao-de-saidas"
-                  element={<Navigate to={routes.financial.outflowForecast} replace />}
+                  element={<Navigate to={routes.financial.accountsPayable.root} replace />}
                 />
                 <Route
                   path={routes.financial.reconciliation.transactions}
@@ -2985,25 +2971,9 @@ function App() {
                     </Suspense>
                   }
                 />
-                {/* Departamento Pessoal — Férias Coletivas */}
+                {/* Departamento Pessoal — Férias Coletivas (detalhe vive no namespace de Férias) */}
                 <Route
-                  path={routes.personnelDepartment.vacationGroups.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonnelDepartmentVacationGroupsList />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personnelDepartment.vacationGroups.create}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonnelDepartmentVacationGroupsCreate />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personnelDepartment.vacationGroups.details(":id")}
+                  path={routes.personnelDepartment.vacations.collectiveDetails(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PersonnelDepartmentVacationGroupsDetails />

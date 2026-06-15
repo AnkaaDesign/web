@@ -14,7 +14,7 @@ import { useAdmissionDocumentUpdate, useAdmissionDocumentUpload } from "../../..
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { FileThumbnail } from "@/components/common/file";
-import { getDocumentProgress } from "../utils";
+import { getDocumentProgress, getAdmissionChecklistDocuments } from "../utils";
 
 interface DocumentsCardProps {
   admission: Admission;
@@ -23,11 +23,29 @@ interface DocumentsCardProps {
 
 const STATUS_OPTIONS = Object.entries(ADMISSION_DOCUMENT_STATUS_LABELS).map(([value, label]) => ({ value, label }));
 
-// A document is considered signed (in-app, mobile/biometric) when its status is
-// SIGNED or it carries signature evidence (signedAt / signedFile). Applies to any
-// signable doc; in practice the Termo LGPD (LGPD_TERM) is the one signed in-app.
+// Cores do "badge" do status (gatilho do Combobox), no mesmo padrão dos status
+// badge-dropdown da página de detalhe da tarefa (ordem de serviço).
+const getDocStatusTriggerClass = (status: string): string => {
+  switch (status) {
+    case ADMISSION_DOCUMENT_STATUS.RECEIVED:
+      return "bg-green-700 text-white hover:bg-green-800 border-green-800";
+    case ADMISSION_DOCUMENT_STATUS.SIGNED:
+      return "bg-blue-700 text-white hover:bg-blue-800 border-blue-800";
+    case ADMISSION_DOCUMENT_STATUS.WAIVED:
+      return "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600";
+    case ADMISSION_DOCUMENT_STATUS.PENDING:
+    default:
+      return "bg-amber-600 text-white hover:bg-amber-700 border-amber-700";
+  }
+};
+
+// The signature-evidence banner is shown ONLY when the document carries REAL
+// in-app signature data (signedAt / signedFile) — e.g. the Termo LGPD signed via
+// the mobile/biometric flow. Manually picking the "Assinado" status from the
+// dropdown does NOT carry evidence and must not render the banner (the status
+// badge alone already reflects it), otherwise the row breaks visually.
 function isDocumentSigned(document: AdmissionDocument): boolean {
-  return document.status === ADMISSION_DOCUMENT_STATUS.SIGNED || !!document.signedAt || !!document.signedFileId;
+  return !!document.signedAt || !!document.signedFileId;
 }
 
 interface DocumentRowProps {
@@ -77,11 +95,11 @@ function DocumentRow({ admissionId, document }: DocumentRowProps) {
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-lg bg-muted/50 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
       {/* Type + file */}
       <div className="min-w-0 flex-1 space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">{typeLabel}</span>
+          <span className="text-sm font-medium text-muted-foreground truncate">{typeLabel}</span>
         </div>
         {document.note && <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">{document.note}</p>}
 
@@ -127,7 +145,7 @@ function DocumentRow({ admissionId, document }: DocumentRowProps) {
           clearable={false}
           disabled={isBusy}
           placeholder="Status"
-          triggerClassName="h-8 w-44 text-xs"
+          triggerClassName={cn("h-8 w-40 text-xs font-medium", getDocStatusTriggerClass(document.status))}
         />
 
         {/* File preview (when an arquivo is anexado) — clica para abrir. */}
@@ -151,8 +169,12 @@ function DocumentRow({ admissionId, document }: DocumentRowProps) {
 }
 
 export function DocumentsCard({ admission, className }: DocumentsCardProps) {
-  const documents = admission.documents || [];
-  const { done, total } = getDocumentProgress(documents);
+  // Only the admission checklist types are shown (CPF, RG, CNH, CTPS, comprovante,
+  // certidão, foto). Legacy/unrelated docs (LGPD, contrato, vale-transporte,
+  // reservista, título de eleitor, PIS, ASO…) are hidden — they belong to the
+  // collaborator, not the admission.
+  const documents = getAdmissionChecklistDocuments(admission.documents);
+  const { done, total } = getDocumentProgress(admission.documents);
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
@@ -173,7 +195,7 @@ export function DocumentsCard({ admission, className }: DocumentsCardProps) {
         {documents.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">Nenhum documento no checklist desta admissão.</div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {documents.map((document) => (
               <DocumentRow key={document.id} admissionId={admission.id} document={document} />
             ))}

@@ -6,6 +6,7 @@ import { TERMINATION_STATUS } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { Textarea } from "@/components/ui/textarea";
 import { TerminationTable } from "./termination-table";
 import { IconFilter } from "@tabler/icons-react";
 import { TerminationFilters } from "./termination-filters";
@@ -33,6 +34,12 @@ interface TerminationListProps {
 
 const DEFAULT_PAGE_SIZE = 40;
 
+// Não-finais: por padrão a lista mostra apenas rescisões em andamento
+// (Concluída/Cancelada ficam ocultas até serem filtradas explicitamente).
+const ACTIVE_TERMINATION_STATUSES: string[] = Object.values(TERMINATION_STATUS).filter(
+  (status) => status !== TERMINATION_STATUS.COMPLETED && status !== TERMINATION_STATUS.CANCELLED,
+);
+
 export function TerminationList({ className }: TerminationListProps) {
   const { deleteAsync, deleteMutation } = useTerminationMutations();
   const advance = useTerminationAdvance();
@@ -40,6 +47,7 @@ export function TerminationList({ className }: TerminationListProps) {
 
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [cancelDialog, setCancelDialog] = useState<Termination | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [deleteDialog, setDeleteDialog] = useState<Termination | null>(null);
 
   // Custom deserializer for termination filters
@@ -106,12 +114,18 @@ export function TerminationList({ className }: TerminationListProps) {
   // Get all available columns for column visibility manager
   const allColumns = useMemo(() => createTerminationColumns(), []);
 
+  // True when the user picked a status filter explicitly (else default to active-only).
+  const hasExplicitStatusFilter = Array.isArray(filters.statuses) && filters.statuses.length > 0;
+
   // Query filters to pass to the paginated table
   const queryFilters = useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
+    const hasStatuses = Array.isArray((filterWithoutOrderBy as any).statuses) && (filterWithoutOrderBy as any).statuses.length > 0;
 
     return {
       ...filterWithoutOrderBy,
+      // Default: hide Concluída/Cancelada until explicitly filtered.
+      ...(hasStatuses ? {} : { statuses: ACTIVE_TERMINATION_STATUSES }),
       limit: DEFAULT_PAGE_SIZE,
     } as Partial<TerminationGetManyFormData>;
   }, [baseQueryFilters]);
@@ -146,8 +160,22 @@ export function TerminationList({ className }: TerminationListProps) {
       searchingFor: searchingFor || undefined,
     };
 
-    return extractActiveFilters(filtersWithSearch, onRemoveFilter);
-  }, [filters, searchingFor, onRemoveFilter]);
+    const extracted = extractActiveFilters(filtersWithSearch, onRemoveFilter);
+    // Default active-only filter (no explicit status): show it with an escape
+    // hatch to reveal Concluída/Cancelada too.
+    if (!hasExplicitStatusFilter) {
+      return [
+        {
+          key: "status-default",
+          label: "Exibindo",
+          value: "Em andamento",
+          onRemove: () => handleFilterChange({ ...filters, statuses: Object.values(TERMINATION_STATUS) }),
+        },
+        ...extracted,
+      ];
+    }
+    return extracted;
+  }, [filters, searchingFor, onRemoveFilter, hasExplicitStatusFilter, handleFilterChange]);
 
   // Count active filters for the button
   const activeFilterCount = useMemo(() => {
@@ -161,10 +189,13 @@ export function TerminationList({ className }: TerminationListProps) {
 
   const confirmCancel = async () => {
     if (!cancelDialog) return;
+    const reason = cancelReason.trim();
+    if (!reason) return;
 
     try {
-      await advance.mutateAsync({ id: cancelDialog.id, data: { status: TERMINATION_STATUS.CANCELLED } });
+      await advance.mutateAsync({ id: cancelDialog.id, data: { status: TERMINATION_STATUS.CANCELLED, reason } });
       setCancelDialog(null);
+      setCancelReason("");
     } catch (error) {
       // Error is handled by the API client with detailed message
       if (process.env.NODE_ENV !== "production") {
@@ -231,18 +262,30 @@ export function TerminationList({ className }: TerminationListProps) {
       <TerminationFilters open={showFilterModal} onOpenChange={setShowFilterModal} filters={filters} onFilterChange={handleFilterChange} />
 
       {/* Cancel Confirmation Dialog */}
-      <AlertDialog open={!!cancelDialog} onOpenChange={(open) => !open && setCancelDialog(null)}>
+      <AlertDialog
+        open={!!cancelDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCancelDialog(null);
+            setCancelReason("");
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancelar rescisão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja cancelar a rescisão{cancelDialog?.user?.name ? ` de "${cancelDialog.user.name}"` : ""}? O processo será encerrado e não poderá mais ser
-              avançado.
+              A rescisão{cancelDialog?.user?.name ? ` de "${cancelDialog.user.name}"` : ""} será marcada como cancelada na etapa atual e não poderá mais ser avançada. Informe o
+              motivo de não ter sido concluída.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <Textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Motivo do cancelamento (obrigatório)" rows={4} autoFocus />
+            {cancelReason.trim().length === 0 && <p className="text-xs text-muted-foreground">O motivo é obrigatório para cancelar.</p>}
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmCancel} disabled={advance.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={confirmCancel} disabled={advance.isPending || cancelReason.trim().length === 0} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Cancelar rescisão
             </AlertDialogAction>
           </AlertDialogFooter>

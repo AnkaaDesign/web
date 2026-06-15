@@ -13,11 +13,14 @@ import {
   IconUsers,
   IconGift,
   IconArrowRight,
+  IconTrendingDown,
 } from "@tabler/icons-react";
 
 import type { PayableRow, PayableState } from "../../../types";
 import { routes, SECTOR_PRIVILEGES, ORDER_PAYMENT_STATUS, AIRBRUSHING_PAYMENT_STATUS, PAYMENT_METHOD, PAYMENT_METHOD_LABELS } from "../../../constants";
 import { useOrderPayables, useOrderMutations, useSettlePayrollMonth, useTriggerOrderSchedule } from "../../../hooks";
+import { useOutflowForecast } from "@/hooks/financial/use-reconciliation";
+import { monthKey } from "@/components/financial/reconciliation/month-nav";
 import { useAirbrushingMutations } from "../../../hooks/production/use-airbrushing";
 import { usePrivileges } from "../../../hooks/common/use-privileges";
 import { formatCurrency, formatDate } from "../../../utils";
@@ -265,6 +268,25 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   const allRows = useMemo(() => response?.data?.rows ?? [], [response?.data?.rows]);
   const summary = response?.data?.summary;
 
+  // --- Forecast strip (absorbed from the former "Previsão de Saídas") --------
+  // Read-only composition of the current competence month's projected outflows:
+  // pedidos + impostos + folha + folha programada + recorrentes. Complements the
+  // status buckets below (which stay the clickable table filters).
+  const currentMonthKey = useMemo(() => monthKey(new Date()), []);
+  const { data: forecast, isLoading: forecastLoading } = useOutflowForecast(currentMonthKey);
+  // Compact forecast breakdown for the "Previsão do mês" line (read-only).
+  const forecastTotal = forecast ? formatCurrency(forecast.total) : null;
+  const forecastParts = useMemo(
+    () => [
+      { key: "pedidos", label: "Pedidos", value: forecast?.pedidos ? formatCurrency(forecast.pedidos.totalOpen) : null },
+      { key: "impostos", label: "Impostos", value: forecast?.impostos ? formatCurrency(forecast.impostos.invoicedServices?.totalEstimated ?? 0) : null },
+      { key: "folha", label: "Folha", value: forecast?.folha ? (forecast.folha.available ? formatCurrency(forecast.folha.total) : "—") : null },
+      { key: "folha-prog", label: "Folha prog.", value: forecast?.folhaProgramada ? formatCurrency(forecast.folhaProgramada.total) : null },
+      { key: "recorrentes", label: "Recorrentes", value: forecast?.recorrentes ? formatCurrency(forecast.recorrentes.totalForecast) : null },
+    ],
+    [forecast],
+  );
+
   // Card value/count come from the server summary, regrouped into buckets so the
   // cards always show absolute totals regardless of the active filter.
   const bucketSummary = (key: PayableBucketKey) => {
@@ -316,12 +338,6 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     });
     return rows;
   }, [filteredRows]);
-
-  // "Em aberto" total excludes paid-this-month and forecast rows.
-  const grandTotal = useMemo(
-    () => filteredRows.filter((row) => row.paymentState !== "PAID" && row.paymentState !== "EXPECTED").reduce((sum, row) => sum + row.amount, 0),
-    [filteredRows],
-  );
 
   const handleRowClick = (row: PayableRow) => {
     if (row.source === "ORDER") {
@@ -383,7 +399,19 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       key: "description",
       header: "Descrição",
       className: "min-w-[16rem]",
-      render: (row) => <TruncatedTextWithTooltip text={row.description || "-"} className={cn("text-sm", row.paymentState === "EXPECTED" && "italic text-muted-foreground")} />,
+      render: (row) => {
+        const isForecast = row.paymentState === "EXPECTED" || row.isEstimate;
+        return (
+          <div className="flex items-center gap-2 min-w-0">
+            <TruncatedTextWithTooltip text={row.description || "-"} className={cn("text-sm", isForecast && "italic text-muted-foreground")} />
+            {isForecast && (
+              <Badge variant="secondary" size="sm" className="flex-shrink-0 text-[10px]">
+                Estimado
+              </Badge>
+            )}
+          </div>
+        );
+      },
     },
     { key: "type", header: "Tipo", width: 176, render: (row) => <PayableTypeBadge row={row} /> },
     { key: "payee", header: "Tomador", className: "min-w-[12rem]", render: (row) => <TruncatedTextWithTooltip text={row.payeeName || "-"} className="text-sm font-medium" /> },
@@ -412,8 +440,24 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // --- Render ---------------------------------------------------------------
   return (
     <div className={cn("flex flex-col gap-4 h-full min-h-0", className)}>
+      {/* Forecast breakdown — read-only, compact (the cards below are the
+          clickable filters). Total + the slices that build it. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground flex-shrink-0">
+        <span className="inline-flex items-center gap-1.5">
+          <IconTrendingDown className="h-4 w-4 text-red-600" />
+          Previsão do mês:{" "}
+          <span className="font-semibold text-foreground tabular-nums">{forecastLoading ? "…" : forecastTotal ?? "—"}</span>
+        </span>
+        {forecastParts.map((p) => (
+          <span key={p.key} className="tabular-nums">
+            {p.label}{" "}
+            <span className="font-medium text-foreground">{forecastLoading ? "…" : p.value ?? "—"}</span>
+          </span>
+        ))}
+      </div>
+
       {/* Summary cards double as filter buckets — click to show only that status. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 flex-shrink-0">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 flex-shrink-0">
         {BUCKET_ORDER.map((key) => {
           const meta = PAYABLE_BUCKETS[key];
           const b = bucketSummary(key);
@@ -442,10 +486,6 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
               placeholder="Buscar por fornecedor, pintor ou descrição..."
               isPending={searchText !== debouncedSearch}
             />
-            <div className="text-sm text-muted-foreground whitespace-nowrap sm:text-right">
-              {filteredRows.length} {filteredRows.length === 1 ? "conta" : "contas"} •{" "}
-              <span className="font-semibold text-foreground tabular-nums">{formatCurrency(grandTotal)}</span> em aberto
-            </div>
           </div>
 
           {canManagePayments && (

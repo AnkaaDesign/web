@@ -24,6 +24,9 @@ import {
   TERMINATION_ITEM_TYPE_LABELS,
   TERMINATION_DOCUMENT_TYPE_LABELS,
   TERMINATION_DOCUMENT_STATUS_LABELS,
+  ADMISSION_STATUS_LABELS,
+  ADMISSION_DOCUMENT_TYPE_LABELS,
+  ADMISSION_DOCUMENT_STATUS_LABELS,
 } from '@constants';
 import { formatDateTime, formatDate } from "./date";
 import { formatCurrency } from "./number";
@@ -992,6 +995,19 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     // Nested relationship fields
     "user.name": "Nome do Colaborador",
   },
+  [CHANGE_LOG_ENTITY_TYPE.ADMISSION]: {
+    userId: "Colaborador",
+    status: "Status",
+    statusOrder: "Ordem do Status",
+    hireDate: "Data de Admissão",
+    admissionDate: "Data de Admissão",
+    notes: "Observações",
+    cancelledFromStatus: "Cancelada na Etapa",
+    cancellationReason: "Motivo do Cancelamento",
+    documents: "Documentos",
+    // Nested relationship fields
+    "user.name": "Nome do Colaborador",
+  },
   // Add more entity-specific mappings as needed
 };
 
@@ -1003,6 +1019,14 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
  */
 export function getFieldLabel(field: string | null, entityType: CHANGE_LOG_ENTITY_TYPE): string {
   if (!field) return "";
+
+  // Admission documents are logged per-type as `document_<TYPE>` (e.g.
+  // `document_VOTER_ID`). Render a readable "Documento: <label>" label.
+  if (entityType === CHANGE_LOG_ENTITY_TYPE.ADMISSION && field.startsWith("document_")) {
+    const docType = field.slice("document_".length);
+    const label = ADMISSION_DOCUMENT_TYPE_LABELS[docType as keyof typeof ADMISSION_DOCUMENT_TYPE_LABELS];
+    return label ? `Documento: ${label}` : `Documento: ${docType}`;
+  }
 
   // Try entity-specific fields first, then common fields
   const entityFields = entitySpecificFields[entityType] || {};
@@ -1383,8 +1407,25 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   }
 
   // Handle termination fields
+  if (entityType === CHANGE_LOG_ENTITY_TYPE.ADMISSION) {
+    if ((field === "status" || field === "status_transition" || field === "cancelledFromStatus") && typeof value === "string") {
+      return ADMISSION_STATUS_LABELS[value as keyof typeof ADMISSION_STATUS_LABELS] || value;
+    }
+    // Documentos do checklist: `document_<TYPE>` carrega { status, note, required }
+    // (ou { status, fileId }). Renderiza algo legível em vez do JSON cru.
+    if (field && field.startsWith("document_") && value && typeof value === "object" && !Array.isArray(value)) {
+      const doc = value as { status?: string; note?: string | null; required?: boolean };
+      const statusLabel = doc.status ? ADMISSION_DOCUMENT_STATUS_LABELS[doc.status as keyof typeof ADMISSION_DOCUMENT_STATUS_LABELS] || doc.status : "—";
+      const parts = [statusLabel];
+      if (doc.required) parts.push("obrigatório");
+      let out = parts.join(" · ");
+      if (doc.note) out += ` (${doc.note})`;
+      return out;
+    }
+  }
+
   if (entityType === CHANGE_LOG_ENTITY_TYPE.TERMINATION) {
-    if ((field === "status" || field === "status_transition") && typeof value === "string") {
+    if ((field === "status" || field === "status_transition" || field === "cancelledFromStatus") && typeof value === "string") {
       return TERMINATION_STATUS_LABELS[value as keyof typeof TERMINATION_STATUS_LABELS] || value;
     }
     if (field === "type" && typeof value === "string") {

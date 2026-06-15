@@ -721,6 +721,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                       installmentPaymentMethod={installment.paymentMethod}
                                       receiptFiles={installment.receiptFiles}
                                       observations={installment.observations}
+                                      canManage={!disabled}
                                     />
                                   </div>
                                 </div>
@@ -747,7 +748,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                     <NfsePdfButtons elotechNfseId={activeNfse.elotechNfseId} />
                                   )}
                                   {/* Cancel for authorized; reemit for error/pending */}
-                                  <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                                  <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} canManage={!disabled} />
                                 </div>
                               </div>
                               {activeNfse.elotechNfseId && (
@@ -762,7 +763,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                           {!activeNfse && canceledNfses.length === 0 && (
                             <div className="rounded-md border border-border/50 px-3 py-2 flex items-center justify-between">
                               <span className="text-xs text-muted-foreground">Nao emitida</span>
-                              <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                              <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} canManage={!disabled} />
                             </div>
                           )}
                           {/* Canceled NFS-e entries — with reemit button on the last one */}
@@ -782,7 +783,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                   )}
                                   {/* Reemit button — only on last cancelled when no active NFSe */}
                                   {!activeNfse && idx === canceledNfses.length - 1 && (
-                                    <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                                    <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} canManage={!disabled} />
                                   )}
                                 </div>
                               </div>

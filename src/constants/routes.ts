@@ -611,12 +611,10 @@ export const routes = {
       create: "/departamento-pessoal/ferias/cadastrar",
       details: (id: string) => `/departamento-pessoal/ferias/detalhes/${id}`,
       edit: (id: string) => `/departamento-pessoal/ferias/editar/${id}`,
+      // Férias coletivas: período coletivo expandido em férias individuais.
+      // Mora dentro do mesmo namespace de Férias (sem página/menu separados).
+      collectiveDetails: (id: string) => `/departamento-pessoal/ferias/coletiva/detalhes/${id}`,
       root: "/departamento-pessoal/ferias",
-    },
-    vacationGroups: {
-      create: "/departamento-pessoal/ferias-coletivas/cadastrar",
-      details: (id: string) => `/departamento-pessoal/ferias-coletivas/detalhes/${id}`,
-      root: "/departamento-pessoal/ferias-coletivas",
     },
     salaryAdjustments: {
       details: (id: string) => `/departamento-pessoal/reajustes/detalhes/${id}`,

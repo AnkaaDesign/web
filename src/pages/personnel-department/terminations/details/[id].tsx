@@ -16,6 +16,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +50,7 @@ export const TerminationDetailPage = () => {
   const [showAdvanceDialog, setShowAdvanceDialog] = useState(false);
   const [showRegressDialog, setShowRegressDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { deleteAsync, deleteMutation } = useTerminationMutations();
@@ -129,9 +131,12 @@ export const TerminationDetailPage = () => {
   };
 
   const handleCancelTermination = async () => {
+    const reason = cancelReason.trim();
+    if (!reason) return;
     try {
-      await advance.mutateAsync({ id, data: { status: TERMINATION_STATUS.CANCELLED } });
+      await advance.mutateAsync({ id, data: { status: TERMINATION_STATUS.CANCELLED, reason } });
       setShowCancelDialog(false);
+      setCancelReason("");
     } catch (error) {
       // Error is handled by the API client with detailed message
       if (process.env.NODE_ENV !== "production") {
@@ -178,13 +183,7 @@ export const TerminationDetailPage = () => {
                   },
                 ]
               : []),
-            {
-              key: "edit",
-              label: "Editar",
-              icon: IconEdit,
-              onClick: () => navigate(routes.personnelDepartment.terminations.edit(id)),
-              disabled: isFinal,
-            },
+            // Ordem desejada no header: Voltar etapa · Avançar · Editar · Cancelar.
             ...(!isFinal
               ? [
                   {
@@ -193,14 +192,28 @@ export const TerminationDetailPage = () => {
                     icon: IconPlayerTrackNext,
                     onClick: () => setShowAdvanceDialog(true),
                     variant: "default" as const,
+                    group: "primary" as const,
                     disabled: !!advanceDisabledReason || advance.isPending,
                   },
+                ]
+              : []),
+            {
+              key: "edit",
+              label: "Editar",
+              icon: IconEdit,
+              onClick: () => navigate(routes.personnelDepartment.terminations.edit(id)),
+              group: "primary" as const,
+              disabled: isFinal,
+            },
+            ...(!isFinal
+              ? [
                   {
                     key: "cancel",
                     label: "Cancelar",
                     icon: IconBan,
                     onClick: () => setShowCancelDialog(true),
                     variant: "destructive" as const,
+                    group: "danger" as const,
                   },
                 ]
               : []),
@@ -211,6 +224,7 @@ export const TerminationDetailPage = () => {
                     label: "Excluir",
                     icon: IconTrash,
                     onClick: () => setShowDeleteDialog(true),
+                    group: "danger" as const,
                     disabled: deleteMutation.isPending,
                   },
                 ]
@@ -305,18 +319,32 @@ export const TerminationDetailPage = () => {
         </AlertDialog>
 
         {/* Cancel Confirmation Dialog */}
-        <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialog
+          open={showCancelDialog}
+          onOpenChange={(open) => {
+            setShowCancelDialog(open);
+            if (!open) setCancelReason("");
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Cancelar rescisão</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja cancelar a rescisão{termination.user?.name ? ` de "${termination.user.name}"` : ""}? O processo será encerrado e não poderá mais ser
-                avançado.
+                A rescisão{termination.user?.name ? ` de "${termination.user.name}"` : ""} será marcada como cancelada na etapa atual ({TERMINATION_STATUS_LABELS[termination.status]}) e
+                não poderá mais ser avançada. Informe o motivo de não ter sido concluída.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            <div className="space-y-1.5">
+              <Textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Motivo do cancelamento (obrigatório)" rows={4} autoFocus />
+              {cancelReason.trim().length === 0 && <p className="text-xs text-muted-foreground">O motivo é obrigatório para cancelar.</p>}
+            </div>
             <AlertDialogFooter>
               <AlertDialogCancel>Voltar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleCancelTermination} disabled={advance.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <AlertDialogAction
+                onClick={handleCancelTermination}
+                disabled={advance.isPending || cancelReason.trim().length === 0}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
                 Cancelar rescisão
               </AlertDialogAction>
             </AlertDialogFooter>

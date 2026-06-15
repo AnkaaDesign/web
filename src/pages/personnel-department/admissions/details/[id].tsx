@@ -1,18 +1,17 @@
 import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
-import { IconEdit, IconTrash, IconRefresh, IconBan, IconPlayerTrackNext, IconFileText } from "@tabler/icons-react";
+import { IconEdit, IconTrash, IconBan, IconPlayerTrackNext, IconPlayerTrackPrev } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, ADMISSION_STATUS, ADMISSION_STATUS_LABELS } from "../../../../constants";
 import { useAdmission, useAdmissionMutations, useAdmissionAdvance } from "@/hooks/personnel-department/use-admissions";
 import { useAuth } from "@/hooks/common/use-auth";
-import { getPositionMonthlySalary } from "@/utils/overtime-cost";
-import { generateEmploymentContractPDF } from "@/utils/employment-contract-pdf-generator";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
-import { StatusCard, DocumentsCard, UserCard, AdmissionDetailSkeleton } from "@/components/personnel-department/admission/detail";
-import { isAdmissionFinal, hasBlockingRequiredDocs, getNextAdmissionStatus } from "@/components/personnel-department/admission/utils";
+import { Textarea } from "@/components/ui/textarea";
+import { StatusCard, ExamCard, DocumentsCard, UserCard, AdmissionDetailSkeleton } from "@/components/personnel-department/admission/detail";
+import { isAdmissionFinal, hasBlockingRequiredDocs, getNextAdmissionStatus, getPreviousAdmissionStatus } from "@/components/personnel-department/admission/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +31,9 @@ export const AdmissionDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
+  const [previousDialogOpen, setPreviousDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const { user } = useAuth();
@@ -42,8 +43,6 @@ export const AdmissionDetailPage = () => {
     data: response,
     isLoading,
     error,
-    refetch,
-    isRefetching,
   } = useAdmission(id || "", {
     include: {
       user: {
@@ -92,7 +91,14 @@ export const AdmissionDetailPage = () => {
   const isFinal = isAdmissionFinal(admission.status);
   const blockedByDocs = hasBlockingRequiredDocs(admission);
   const nextStatus = getNextAdmissionStatus(admission.status);
+  const previousStatus = getPreviousAdmissionStatus(admission.status);
   const title = admission.user?.name ? `Admissão — ${admission.user.name}` : "Admissão";
+
+  // Layout adaptativo: Colaborador é SEMPRE o primeiro (coluna esquerda). Ao lado
+  // dele (coluna direita) fica o cartão da etapa atual — Exame Admissional na
+  // etapa de exame, senão o Checklist de Documentos. O outro cartão fica
+  // empilhado abaixo do Colaborador. Ambos permanecem visíveis (1/2 cada).
+  const inExamStep = admission.status === ADMISSION_STATUS.MEDICAL_EXAM;
 
   const handleAdvance = async () => {
     try {
@@ -106,9 +112,23 @@ export const AdmissionDetailPage = () => {
     setAdvanceDialogOpen(false);
   };
 
-  const handleCancel = async () => {
+  const handlePrevious = async () => {
+    if (!previousStatus) return;
     try {
-      await advanceMutation.mutateAsync({ id, data: { status: ADMISSION_STATUS.CANCELLED } });
+      await advanceMutation.mutateAsync({ id, data: { status: previousStatus } });
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error reverting admission step:", error);
+      }
+    }
+    setPreviousDialogOpen(false);
+  };
+
+  const handleCancel = async () => {
+    const reason = cancelReason.trim();
+    if (!reason) return;
+    try {
+      await advanceMutation.mutateAsync({ id, data: { status: ADMISSION_STATUS.CANCELLED, reason } });
     } catch (error) {
       // Error is handled by the API client with detailed message
       if (process.env.NODE_ENV !== "production") {
@@ -116,6 +136,7 @@ export const AdmissionDetailPage = () => {
       }
     }
     setCancelDialogOpen(false);
+    setCancelReason("");
   };
 
   const handleDelete = async () => {
@@ -131,38 +152,26 @@ export const AdmissionDetailPage = () => {
     setDeleteDialogOpen(false);
   };
 
-  const handleGenerateContract = () => {
-    const u = admission.user;
-    const contract = u?.currentContract;
-    generateEmploymentContractPDF({
-      employeeName: u?.name ?? "Colaborador",
-      cpf: u?.cpf ?? null,
-      position: u?.position?.name ?? null,
-      sector: u?.sector?.name ?? null,
-      monthlySalary: getPositionMonthlySalary(u?.position),
-      admissionDate: admission.hireDate ?? contract?.admissionDate ?? null,
-      employeeType: u?.currentEmployeeType ?? contract?.employeeType ?? null,
-      contractType: u?.currentContractType ?? contract?.contractType ?? null,
-      contractStatus: u?.currentContractStatus ?? contract?.status ?? null,
-      exp1StartAt: contract?.exp1StartAt ?? null,
-      exp1EndAt: contract?.exp1EndAt ?? null,
-      exp2StartAt: contract?.exp2StartAt ?? null,
-      exp2EndAt: contract?.exp2EndAt ?? null,
-      providerName: contract?.providerName ?? null,
-      providerCnpj: contract?.providerCnpj ?? null,
-    });
-  };
-
   const actions = [
-    {
-      key: "refresh",
-      label: "Atualizar",
-      icon: IconRefresh,
-      onClick: () => refetch(),
-      loading: isRefetching,
-    },
-    // Advance — hidden when final; disabled (with explanation in the status card)
-    // while required documents are still pending (mirrors the server guard).
+    // Voltar etapa — retrocede um passo no fluxo; oculto na primeira etapa/final.
+    ...(!isFinal && previousStatus
+      ? [
+          {
+            key: "previous",
+            label: "Voltar etapa",
+            icon: IconPlayerTrackPrev,
+            onClick: () => setPreviousDialogOpen(true),
+            variant: "outline" as const,
+            disabled: advanceMutation.isPending,
+          },
+        ]
+      : []),
+    // Avançar — oculto quando final; desabilitado (com explicação no card de
+    // status) enquanto houver documentos obrigatórios pendentes (espelha o guard
+    // do servidor).
+    // Ordem desejada no header: Voltar etapa · Avançar · Editar · Cancelar.
+    // O PageHeader renderiza secondary (Voltar/outline) e depois [primary, danger];
+    // por isso Avançar+Editar usam group "primary" e Cancelar/Excluir, "danger".
     ...(!isFinal
       ? [
           {
@@ -171,21 +180,17 @@ export const AdmissionDetailPage = () => {
             icon: IconPlayerTrackNext,
             onClick: () => setAdvanceDialogOpen(true),
             variant: "default" as const,
+            group: "primary" as const,
             disabled: blockedByDocs || advanceMutation.isPending,
           },
         ]
       : []),
     {
-      key: "employment-contract",
-      label: "Gerar Contrato de Trabalho",
-      icon: IconFileText,
-      onClick: handleGenerateContract,
-    },
-    {
       key: "edit",
       label: "Editar",
       icon: IconEdit,
       onClick: () => navigate(routes.personnelDepartment.admissions.edit(id)),
+      group: "primary" as const,
     },
     ...(!isFinal
       ? [
@@ -195,6 +200,7 @@ export const AdmissionDetailPage = () => {
             icon: IconBan,
             onClick: () => setCancelDialogOpen(true),
             variant: "destructive" as const,
+            group: "danger" as const,
             disabled: advanceMutation.isPending,
           },
         ]
@@ -206,6 +212,7 @@ export const AdmissionDetailPage = () => {
             label: "Excluir",
             icon: IconTrash,
             onClick: () => setDeleteDialogOpen(true),
+            group: "danger" as const,
             disabled: deleteMutation.isPending,
           },
         ]
@@ -233,20 +240,25 @@ export const AdmissionDetailPage = () => {
             {/* Status stepper */}
             <StatusCard admission={admission} />
 
-            {/* Colaborador (resumo) e Documentação lado a lado — cada um ocupa
-                metade da largura em telas grandes; empilham no mobile. */}
+            {/* Linha 1: Colaborador (sempre primeiro) ao lado do cartão da etapa
+                atual (Exame na etapa de exame, senão Checklist) — mesma altura. */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
               <UserCard admission={admission} className="h-full" />
-              <DocumentsCard admission={admission} className="h-full" />
+              {inExamStep ? <ExamCard admission={admission} className="h-full" /> : <DocumentsCard admission={admission} className="h-full" />}
             </div>
 
-            {/* Changelog — always the last section on the page. */}
-            <ChangelogHistory
-              entityType={CHANGE_LOG_ENTITY_TYPE.ADMISSION}
-              entityId={id}
-              entityName={title}
-              entityCreatedAt={admission.createdAt}
-            />
+            {/* Linha 2: o outro cartão ao lado do Histórico de Alterações, para
+                aproveitar o espaço (ex.: Checklist ao lado do Changelog). */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+              {inExamStep ? <DocumentsCard admission={admission} /> : <ExamCard admission={admission} />}
+              <ChangelogHistory
+                entityType={CHANGE_LOG_ENTITY_TYPE.ADMISSION}
+                entityId={id}
+                entityName={title}
+                entityCreatedAt={admission.createdAt}
+                maxHeight="640px"
+              />
+            </div>
           </div>
         </div>
 
@@ -271,19 +283,60 @@ export const AdmissionDetailPage = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Cancel Confirmation Dialog */}
-        <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        {/* Previous step Confirmation Dialog */}
+        <AlertDialog open={previousDialogOpen} onOpenChange={setPreviousDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Cancelar admissão</AlertDialogTitle>
+              <AlertDialogTitle>Voltar etapa</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja cancelar a admissão{admission.user?.name ? ` de "${admission.user.name}"` : ""}? O processo será marcado como cancelado e não
-                poderá mais ser avançado.
+                Retroceder esta admissão para a etapa anterior?
+                {previousStatus ? (
+                  <span className="block mt-2 font-medium text-foreground">Etapa anterior: {ADMISSION_STATUS_LABELS[previousStatus]}</span>
+                ) : null}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Voltar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleCancel} disabled={advanceMutation.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <AlertDialogAction onClick={handlePrevious} disabled={advanceMutation.isPending}>
+                Voltar etapa
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Cancel Confirmation Dialog */}
+        <AlertDialog
+          open={cancelDialogOpen}
+          onOpenChange={(open) => {
+            setCancelDialogOpen(open);
+            if (!open) setCancelReason("");
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancelar admissão</AlertDialogTitle>
+              <AlertDialogDescription>
+                A admissão{admission.user?.name ? ` de "${admission.user.name}"` : ""} será marcada como cancelada na etapa atual ({ADMISSION_STATUS_LABELS[admission.status]}) e
+                não poderá mais ser avançada. Informe o motivo de não ter sido concluída.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-1.5">
+              <Textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Motivo do cancelamento (obrigatório)"
+                rows={4}
+                autoFocus
+              />
+              {cancelReason.trim().length === 0 && <p className="text-xs text-muted-foreground">O motivo é obrigatório para cancelar.</p>}
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Voltar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleCancel}
+                disabled={advanceMutation.isPending || cancelReason.trim().length === 0}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
                 Cancelar admissão
               </AlertDialogAction>
             </AlertDialogFooter>

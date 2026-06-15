@@ -8,6 +8,7 @@ import { formatDate } from "../../../../utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { Textarea } from "@/components/ui/textarea";
 import { AdmissionTable } from "./admission-table";
 import { IconFilter } from "@tabler/icons-react";
 import { AdmissionFilters } from "./admission-filters";
@@ -34,6 +35,10 @@ interface AdmissionListProps {
 
 const DEFAULT_PAGE_SIZE = 40;
 
+// Não-finais: o que está "em andamento". Por padrão a lista mostra apenas estes
+// (Concluída/Cancelada ficam ocultas até o usuário filtrá-las explicitamente).
+const ACTIVE_ADMISSION_STATUSES: string[] = [ADMISSION_STATUS.DOCS_PENDING, ADMISSION_STATUS.MEDICAL_EXAM, ADMISSION_STATUS.CONTRACT, ADMISSION_STATUS.REGISTRATION];
+
 export function AdmissionList({ className }: AdmissionListProps) {
   const { deleteAsync, deleteMutation } = useAdmissionMutations();
   const advanceMutation = useAdmissionAdvance();
@@ -42,6 +47,7 @@ export function AdmissionList({ className }: AdmissionListProps) {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<Admission | null>(null);
   const [cancelDialog, setCancelDialog] = useState<Admission | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
 
   // Custom deserializer for admission filters
   const deserializeFilters = useCallback((params: URLSearchParams): Partial<AdmissionGetManyFormData> => {
@@ -114,12 +120,19 @@ export function AdmissionList({ className }: AdmissionListProps) {
     { enabled: selectedUserIds.length > 0 },
   );
 
+  // True when the user picked a status filter explicitly (otherwise we default
+  // to active-only). Kept off the URL so the filter UI stays clean.
+  const hasExplicitStatusFilter = Array.isArray(filters.statuses) && filters.statuses.length > 0;
+
   // Query filters to pass to the paginated table
   const queryFilters = useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
+    const hasStatuses = Array.isArray((filterWithoutOrderBy as any).statuses) && (filterWithoutOrderBy as any).statuses.length > 0;
 
     return {
       ...filterWithoutOrderBy,
+      // Default: hide Concluída/Cancelada until explicitly filtered.
+      ...(hasStatuses ? {} : { statuses: ACTIVE_ADMISSION_STATUSES }),
       limit: DEFAULT_PAGE_SIZE,
     } as Partial<AdmissionGetManyFormData>;
   }, [baseQueryFilters]);
@@ -136,6 +149,17 @@ export function AdmissionList({ className }: AdmissionListProps) {
   // Extract active filters for display
   const activeFilters = useMemo(() => {
     const indicators: Array<{ key: string; label: string; value: string; onRemove: () => void }> = [];
+
+    // Default active-only filter (no explicit status chosen): make it visible and
+    // give an escape hatch to reveal Concluída/Cancelada too.
+    if (!hasExplicitStatusFilter) {
+      indicators.push({
+        key: "status-default",
+        label: "Exibindo",
+        value: "Em andamento",
+        onRemove: () => handleFilterChange({ ...filters, statuses: Object.values(ADMISSION_STATUS) }),
+      });
+    }
 
     if (searchingFor) {
       indicators.push({
@@ -182,7 +206,7 @@ export function AdmissionList({ className }: AdmissionListProps) {
     }
 
     return indicators;
-  }, [filters, searchingFor, filterUsersData?.data, handleFilterChange, setSearch]);
+  }, [filters, searchingFor, filterUsersData?.data, handleFilterChange, setSearch, hasExplicitStatusFilter]);
 
   // Count active filters for the button
   const activeFilterCount = useMemo(() => {
@@ -210,10 +234,13 @@ export function AdmissionList({ className }: AdmissionListProps) {
 
   const confirmCancel = async () => {
     if (!cancelDialog) return;
+    const reason = cancelReason.trim();
+    if (!reason) return;
 
     try {
-      await advanceMutation.mutateAsync({ id: cancelDialog.id, data: { status: ADMISSION_STATUS.CANCELLED } });
+      await advanceMutation.mutateAsync({ id: cancelDialog.id, data: { status: ADMISSION_STATUS.CANCELLED, reason } });
       setCancelDialog(null);
+      setCancelReason("");
     } catch (error) {
       // Error is handled by the API client with detailed message
       if (process.env.NODE_ENV !== "production") {
@@ -266,18 +293,34 @@ export function AdmissionList({ className }: AdmissionListProps) {
       <AdmissionFilters open={showFilterModal} onOpenChange={setShowFilterModal} filters={filters} onFilterChange={handleFilterChange} />
 
       {/* Cancel Confirmation Dialog */}
-      <AlertDialog open={!!cancelDialog} onOpenChange={(open) => !open && setCancelDialog(null)}>
+      <AlertDialog
+        open={!!cancelDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCancelDialog(null);
+            setCancelReason("");
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancelar admissão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja cancelar a admissão{cancelDialog?.user?.name ? ` de "${cancelDialog.user.name}"` : ""}? O processo será marcado como cancelado e não
-              poderá mais ser avançado.
+              A admissão{cancelDialog?.user?.name ? ` de "${cancelDialog.user.name}"` : ""} será marcada como cancelada na etapa atual e não poderá mais ser avançada. Informe
+              o motivo de não ter sido concluída.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <Textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Motivo do cancelamento (obrigatório)" rows={4} autoFocus />
+            {cancelReason.trim().length === 0 && <p className="text-xs text-muted-foreground">O motivo é obrigatório para cancelar.</p>}
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmCancel} disabled={advanceMutation.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={confirmCancel}
+              disabled={advanceMutation.isPending || cancelReason.trim().length === 0}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Cancelar admissão
             </AlertDialogAction>
           </AlertDialogFooter>

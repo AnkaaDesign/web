@@ -681,7 +681,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Faturamento",
         icon: "fileInvoice",
         path: "/financeiro/faturamento",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
         children: [
           { id: "faturamento-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/faturamento/detalhes/:id", isDynamic: true },
         ],
@@ -709,34 +709,19 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "conciliacao-bancaria",
         title: "Conciliação Bancária",
         icon: "arrowsExchange2",
-        path: "/financeiro/conciliacao/transacoes",
+        path: "/financeiro/conciliacao/extrato",
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
         children: [
-          // Spec-ordered children (Área Andressa §4): Extrato → Saídas → Previsão de
-          // Saídas → Entradas. `order` keeps them ahead of the
-          // alphabetical FINANCIAL/ADMIN-only utilities below.
+          // Extrato is the single Conciliação Bancária view — it absorbed the
+          // former Saídas/Entradas pages (now CREDIT/DEBIT + status filters on
+          // the Extrato itself). `order` keeps it ahead of the alphabetical
+          // FINANCIAL/ADMIN-only utilities below.
           {
             id: "conciliacao-extrato",
             title: "Extrato",
             icon: "fileSpreadsheet",
             path: "/financeiro/conciliacao/extrato",
             order: 1,
-            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
-          },
-          {
-            id: "conciliacao-saidas",
-            title: "Saídas",
-            icon: "movement",
-            path: "/financeiro/conciliacao/saidas",
-            order: 2,
-            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
-          },
-          {
-            id: "conciliacao-entradas",
-            title: "Entradas",
-            icon: "arrowsExchange",
-            path: "/financeiro/conciliacao/entradas",
-            order: 3,
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
           },
           {
@@ -777,15 +762,8 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       {
-        // Top-level (outside the Conciliação Bancária domain) — a forward forecast
-        // that spans pedidos + impostos + folha, not a reconciliation sub-page.
-        id: "previsao-de-saidas",
-        title: "Previsão de Saídas",
-        icon: "calendarDollar",
-        path: "/financeiro/previsao-de-saidas",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
-      },
-      {
+        // Single payables hub — absorbed the former "Previsão de Saídas"
+        // (its forecast KPI strip + estimate styling live here now).
         id: "contas-a-pagar",
         title: "Contas a Pagar",
         icon: "receipt",
@@ -1993,17 +1971,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "dp-ferias-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/ferias/cadastrar" },
           { id: "dp-ferias-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/ferias/detalhes/:id", isDynamic: true },
           { id: "dp-ferias-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/ferias/editar/:id", isDynamic: true },
-        ],
-      },
-      {
-        id: "dp-ferias-coletivas",
-        title: "Férias Coletivas",
-        icon: "vacation",
-        path: "/departamento-pessoal/ferias-coletivas",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-        children: [
-          { id: "dp-ferias-coletivas-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/ferias-coletivas/cadastrar" },
-          { id: "dp-ferias-coletivas-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/ferias-coletivas/detalhes/:id", isDynamic: true },
+          { id: "dp-ferias-coletiva-detalhes", title: "Férias Coletivas", icon: "eye", path: "/departamento-pessoal/ferias/coletiva/detalhes/:id", isDynamic: true },
         ],
       },
       // NOTE (spec alignment 2026-06-11): "Feriados" and "Calendário" are NOT DP items.

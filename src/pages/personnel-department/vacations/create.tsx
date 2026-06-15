@@ -50,9 +50,9 @@ export const VacationCreatePage = () => {
       setIsSubmitting(true);
       const result = await createGroupAsync(data);
       if (result.data?.id) {
-        navigate(routes.personnelDepartment.vacationGroups.details(result.data.id));
+        navigate(routes.personnelDepartment.vacations.collectiveDetails(result.data.id));
       } else {
-        navigate(routes.personnelDepartment.vacationGroups.root);
+        navigate(routes.personnelDepartment.vacations.root);
       }
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {

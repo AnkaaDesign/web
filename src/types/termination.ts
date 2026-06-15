@@ -47,6 +47,9 @@ export interface Termination extends BaseEntity {
   accruedVacationPeriods: number;
   reason: string | null;
   justCauseArticle: string | null;
+  /** Quando cancelada: a etapa em que o processo estava + o porquê não foi concluída. */
+  cancelledFromStatus: TERMINATION_STATUS | null;
+  cancellationReason: string | null;
   initiatedById: string | null;
 
   // Relations (optional, populated based on query)

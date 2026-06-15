@@ -13,7 +13,7 @@ import {
   createDescriptionSchema,
 } from "./common";
 import { ADMISSION_STATUS, ADMISSION_DOCUMENT_TYPE, ADMISSION_DOCUMENT_STATUS, CONTRACT_TYPE, EMPLOYEE_TYPE } from "../constants";
-import { userCreateSchema } from "./user";
+import { userCreateSchema, userUpdateSchema } from "./user";
 
 // =====================
 // Generic relation include (Prisma passthrough)
@@ -239,6 +239,9 @@ export const admissionCreateSchema = z
     // anexa um NOVO vínculo à pessoa existente em vez de duplicá-la.
     userId: z.string().uuid({ message: "Colaborador inválido" }).optional(),
     user: userCreateSchema.optional(),
+    // Pessoa EXISTENTE: correções de dados pessoais (apenas campos alterados). O
+    // servidor atualiza o colaborador antes de criar o novo vínculo + admissão.
+    userUpdate: userUpdateSchema.optional(),
     // Vínculo da admissão. Opcional; o serviço aplica defaults (CLT / experiência).
     contract: admissionContractSchema.optional(),
     // Documentos enviados inline (além do endpoint POST /admissions/:id/documents).

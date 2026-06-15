@@ -100,7 +100,7 @@ export function VacationGroupList({ className }: VacationGroupListProps) {
                   <TableRow
                     key={group.id}
                     className={cn("cursor-pointer transition-colors", index % 2 === 1 && "bg-muted/10", "hover:bg-muted/20")}
-                    onClick={() => navigate(routes.personnelDepartment.vacationGroups.details(group.id))}
+                    onClick={() => navigate(routes.personnelDepartment.vacations.collectiveDetails(group.id))}
                   >
                     {columns.map((column) => (
                       <TableCell

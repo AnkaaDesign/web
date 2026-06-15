@@ -69,6 +69,10 @@ interface BoletoActionsProps {
   receiptFiles?: Installment['receiptFiles'];
   /** Free-text observations on the installment */
   observations?: string | null;
+  /** When false, all mutating actions (generate/regenerate/cancel/change due
+   *  date/mark paid/manage receipts) are hidden, leaving only read-only
+   *  view/download/copy — for read-only viewers (e.g. ACCOUNTING). Default true. */
+  canManage?: boolean;
 }
 
 function getDefaultRegenerateDate(dueDate?: string | Date | null, bankSlipDueDate?: string | Date | null): Date {
@@ -96,6 +100,7 @@ export function BoletoActions({
   installmentPaymentMethod: _installmentPaymentMethod,
   receiptFiles,
   observations: observationsProp,
+  canManage = true,
 }: BoletoActionsProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDueDateDialog, setShowDueDateDialog] = useState(false);
@@ -379,20 +384,22 @@ export function BoletoActions({
   const receiptCount = receiptFiles?.length ?? 0;
   const hasReceipts = receiptCount > 0;
 
-  const canGenerate = !bankSlip && !isPaid && installmentStatus !== 'CANCELLED';
-  const canRegenerate = bankSlip && ['ERROR', 'REJECTED', 'CANCELLED'].includes(bankSlip.status);
-  const canCancel = bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
+  // Mutating actions are gated by `canManage`; read-only ones (view/download
+  // PDF, copy digitable line) stay available to read-only viewers.
+  const canGenerate = canManage && !bankSlip && !isPaid && installmentStatus !== 'CANCELLED';
+  const canRegenerate = canManage && bankSlip && ['ERROR', 'REJECTED', 'CANCELLED'].includes(bankSlip.status);
+  const canCancel = canManage && bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canDownloadPdf = bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canCopyDigitableLine =
     !!bankSlip?.digitableLine && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
-  const canChangeDueDate = bankSlip && (bankSlip.status === 'OVERDUE' || bankSlip.status === 'ACTIVE');
+  const canChangeDueDate = canManage && bankSlip && (bankSlip.status === 'OVERDUE' || bankSlip.status === 'ACTIVE');
   // Allow mark-as-paid whenever the installment itself is unpaid (PENDING, ACTIVE, or OVERDUE).
   // PENDING is included for the generateBankSlip=false flow where no bank slip is created (PIX/transfer).
   const canMarkPaid =
-    installmentStatus === 'ACTIVE' || installmentStatus === 'OVERDUE' || installmentStatus === 'PENDING';
+    canManage && (installmentStatus === 'ACTIVE' || installmentStatus === 'OVERDUE' || installmentStatus === 'PENDING');
 
   // Receipt management: any paid installment can open the manage-receipts dialog.
-  const canManageReceipts = isPaid;
+  const canManageReceipts = canManage && isPaid;
   // Sicredi removes the PDF after payment; only show boleto PDF if we have a locally stored copy
   // and the user hasn't already attached their own receipts.
   const showBoletoPdfForPaid = isPaidByBankSlip && !hasReceipts && !!bankSlip?.pdfFileId;

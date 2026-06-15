@@ -721,27 +721,28 @@ export const BillingDetailPage = () => {
       disabled: isSaving,
     });
   }
-  if (canEdit) {
-    if (currentStep < totalSteps) {
-      actions.push({
-        key: "next",
-        label: "Próximo",
-        icon: IconArrowRight,
-        onClick: nextStep,
-        variant: "default" as const,
-        disabled: isSaving,
-      });
-    } else {
-      actions.push({
-        key: "save",
-        label: "Salvar",
-        icon: isSaving ? IconLoader2 : IconCheck,
-        onClick: handleSave,
-        variant: "default" as const,
-        disabled: isSaving,
-        loading: isSaving,
-      });
-    }
+  // Step navigation is available to everyone (read-only viewers included) — only
+  // "Salvar" is gated by canEdit. Read-only users skip the edit validation so
+  // they can page through freely.
+  if (currentStep < totalSteps) {
+    actions.push({
+      key: "next",
+      label: "Próximo",
+      icon: IconArrowRight,
+      onClick: canEdit ? nextStep : () => setCurrentStep((prev) => Math.min(prev + 1, totalSteps)),
+      variant: "default" as const,
+      disabled: isSaving,
+    });
+  } else if (canEdit) {
+    actions.push({
+      key: "save",
+      label: "Salvar",
+      icon: isSaving ? IconLoader2 : IconCheck,
+      onClick: handleSave,
+      variant: "default" as const,
+      disabled: isSaving,
+      loading: isSaving,
+    });
   }
 
   // Step detection: 1=Tarefa, 2=Proposta (COMMERCIAL/ADMIN only), then Serviços, Cliente(s), Resumo
@@ -759,6 +760,10 @@ export const BillingDetailPage = () => {
         SECTOR_PRIVILEGES.FINANCIAL,
         SECTOR_PRIVILEGES.ADMIN,
         SECTOR_PRIVILEGES.COMMERCIAL,
+        // ACCOUNTING gets read-only access: canEditQuote/canUpdateQuoteStatus
+        // both exclude it, so every step input is disabled and the Save action
+        // is hidden (canEdit === false).
+        SECTOR_PRIVILEGES.ACCOUNTING,
       ]}
     >
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">

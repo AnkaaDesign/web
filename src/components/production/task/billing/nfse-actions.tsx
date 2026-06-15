@@ -30,9 +30,12 @@ const CANCEL_REASONS = [
 interface NfseActionsProps {
   invoiceId: string;
   nfseDocuments: NfseDocument[] | null | undefined;
+  /** When false, all mutating actions (emit/cancel) are hidden — read-only
+   *  viewers (e.g. ACCOUNTING on Faturamento). Defaults to true. */
+  canManage?: boolean;
 }
 
-export function NfseActions({ invoiceId, nfseDocuments }: NfseActionsProps) {
+export function NfseActions({ invoiceId, nfseDocuments, canManage = true }: NfseActionsProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelReasonCode, setCancelReasonCode] = useState('1');
@@ -82,7 +85,7 @@ export function NfseActions({ invoiceId, nfseDocuments }: NfseActionsProps) {
     );
   };
 
-  if (!canEmit && !canCancel) return null;
+  if (!canManage || (!canEmit && !canCancel)) return null;
 
   return (
     <>
