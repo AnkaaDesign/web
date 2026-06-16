@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { IconClock } from "@tabler/icons-react";
 import { DashboardCardList, DashboardPagination } from "./dashboard-card-list";
 import { useMySecullumCalculations } from "../../hooks/integrations/use-secullum";
+import { renderHourValue } from "../integrations/secullum/cell-renderers";
 
 function getWeekRange() {
   const now = new Date();
@@ -27,6 +28,8 @@ interface ParsedEntry {
   entrada2: string;
   saida2: string;
   normais: string;
+  faltas: string;
+  atraso: string;
 }
 
 function parseSecullumResponse(data: any): ParsedEntry[] {
@@ -45,20 +48,47 @@ function parseSecullumResponse(data: any): ParsedEntry[] {
     return [];
   }
 
-  const columnMap = new Map<string, number>();
+  // Secullum's /Calculos column names vary in case and exact spelling
+  // (e.g. "Atras." vs "Atrasos"), and the canonical label sometimes lives in
+  // NomeExibicao rather than Nome — mirror the bonus/payroll integration
+  // services and match case-insensitively against both, with synonyms.
+  const columnIndex = new Map<string, number>();
   Colunas.forEach((col: any, index: number) => {
-    if (col?.Nome) {
-      columnMap.set(col.Nome, index);
+    for (const key of [col?.Nome, col?.NomeExibicao]) {
+      if (key) {
+        const norm = String(key).toLowerCase().trim();
+        if (!columnIndex.has(norm)) columnIndex.set(norm, index);
+      }
     }
   });
+  const colIdx = (candidates: string[], fallback: number): number => {
+    for (const c of candidates) {
+      const idx = columnIndex.get(c);
+      if (idx != null) return idx;
+    }
+    return fallback;
+  };
+
+  const idxData = colIdx(["data"], 0);
+  const idxEntrada1 = colIdx(["entrada 1", "entrada1"], 1);
+  const idxSaida1 = colIdx(["saída 1", "saida 1", "saída1", "saida1"], 2);
+  const idxEntrada2 = colIdx(["entrada 2", "entrada2"], 3);
+  const idxSaida2 = colIdx(["saída 2", "saida 2", "saída2", "saida2"], 4);
+  const idxNormais = colIdx(["normais"], 7);
+  const idxFaltas = colIdx(["faltas", "ausências", "ausencias"], -1);
+  const idxAtraso = colIdx(["atras.", "atrasos", "atraso", "atras"], -1);
+
+  const at = (row: any[], idx: number): string => (idx >= 0 ? row[idx] || "" : "");
 
   return Linhas.map((row: any[]) => ({
-    date: row[columnMap.get("Data") ?? 0] || "",
-    entrada1: row[columnMap.get("Entrada 1") ?? 1] || "",
-    saida1: row[columnMap.get("Saída 1") ?? 2] || "",
-    entrada2: row[columnMap.get("Entrada 2") ?? 3] || "",
-    saida2: row[columnMap.get("Saída 2") ?? 4] || "",
-    normais: row[columnMap.get("Normais") ?? 7] || "",
+    date: at(row, idxData),
+    entrada1: at(row, idxEntrada1),
+    saida1: at(row, idxSaida1),
+    entrada2: at(row, idxEntrada2),
+    saida2: at(row, idxSaida2),
+    normais: at(row, idxNormais),
+    faltas: at(row, idxFaltas),
+    atraso: at(row, idxAtraso),
   }));
 }
 
@@ -136,27 +166,31 @@ export function TimeEntriesCard({ embedded }: TimeEntriesCardProps = {}) {
       }
     >
       {/* Table header */}
-      <div className="sticky top-0 z-10 grid grid-cols-[auto_1fr_1fr_1fr_1fr_auto] gap-x-2 px-4 py-2 bg-secondary border-b border-border text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        <span className="w-20">Data</span>
+      <div className="sticky top-0 z-10 grid grid-cols-[auto_1fr_1fr_1fr_1fr_auto_auto_auto] gap-x-2 px-4 py-2 bg-secondary border-b border-border text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="w-16">Data</span>
         <span className="text-center">Entrada 1</span>
         <span className="text-center">Saída 1</span>
         <span className="text-center">Entrada 2</span>
         <span className="text-center">Saída 2</span>
-        <span className="w-14 text-right">Normais</span>
+        <span className="w-12 text-right">Normais</span>
+        <span className="w-12 text-right">Faltas</span>
+        <span className="w-12 text-right">Atraso</span>
       </div>
       {entries.map((entry, index) => (
         <div
           key={index}
-          className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_auto] gap-x-2 items-center px-4 py-2 border-b border-border last:border-b-0"
+          className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_auto_auto_auto] gap-x-2 items-center px-4 py-2 border-b border-border last:border-b-0"
         >
-          <span className="text-xs font-medium text-foreground w-20">
+          <span className="text-xs font-medium text-foreground w-16">
             {entry.date || `Dia ${index + 1}`}
           </span>
           <span className="text-xs text-muted-foreground text-center">{entry.entrada1 || "—"}</span>
           <span className="text-xs text-muted-foreground text-center">{entry.saida1 || "—"}</span>
           <span className="text-xs text-muted-foreground text-center">{entry.entrada2 || "—"}</span>
           <span className="text-xs text-muted-foreground text-center">{entry.saida2 || "—"}</span>
-          <span className="text-xs text-muted-foreground w-14 text-right">{entry.normais || "—"}</span>
+          <span className="text-xs text-muted-foreground w-12 text-right">{entry.normais || "—"}</span>
+          <span className="w-12 text-right">{renderHourValue(entry.faltas, "bad")}</span>
+          <span className="w-12 text-right">{renderHourValue(entry.atraso, "bad")}</span>
         </div>
       ))}
     </DashboardCardList>

@@ -7,7 +7,6 @@ import { IconFilter } from "@tabler/icons-react";
 import type { MessageGetManyFormData } from "@/schemas/message";
 import { getUsers } from "@/api-client/user";
 import { getSectors } from "@/api-client/sector";
-import { CONTRACT_STATUS } from "@/constants";
 
 const STATUS_OPTIONS = [
   { value: "draft", label: "Rascunho" },
@@ -44,8 +43,8 @@ export function MessageFilters({
         orderBy: { name: "asc" },
         page,
         take: 50,
-        // Active users only — filtered by current vínculo status.
-        statuses: [CONTRACT_STATUS.ACTIVE],
+        // Employed users only (not terminated) — includes experience/notice/on-leave.
+        isActive: true,
       };
       if (search && search.trim()) {
         params.searchingFor = search.trim();

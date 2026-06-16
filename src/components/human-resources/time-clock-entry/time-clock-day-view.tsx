@@ -61,6 +61,7 @@ const DAY_VIEW_DEFAULT_COLUMNS = new Set([
   "saida2",
   "normais",
   "faltas",
+  "atras",
   "ex50",
   "ex100",
   "dsr",

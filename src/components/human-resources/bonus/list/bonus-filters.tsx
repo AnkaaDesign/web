@@ -5,6 +5,7 @@ import { IconFilter, IconBuilding, IconBriefcase, IconUserCheck } from "@tabler/
 import type { UserGetManyFormData } from "../../../../schemas";
 import { useUsers, useSectors, usePositions } from "../../../../hooks";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { EMPLOYEE_TYPE } from "../../../../constants";
 
 // Extended filters with UI-only fields for bonus
 interface BonusFiltersData extends Partial<UserGetManyFormData> {
@@ -31,7 +32,8 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
     orderBy: { name: "asc" },
     include: { position: true, sector: true },
     where: {
-      isActive: true, // Only active users for bonus
+      isActive: true, // Only active users for bonus (not terminated)
+      currentEmployeeType: EMPLOYEE_TYPE.CLT, // Bonus is folha-only → CLT (exclude terceirizado/PJ/autônomo)
       payrollNumber: { not: null }, // Only users with payroll numbers
       secullumEmployeeId: { not: null } // Only users registered in Secullum
     },

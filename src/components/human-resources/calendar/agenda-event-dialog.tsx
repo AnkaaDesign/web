@@ -14,7 +14,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { IconCalendarEvent } from "@tabler/icons-react";
 import { z } from "zod";
 
-import { CONTRACT_STATUS, NOTIFICATION_CHANNEL, NOTIFICATION_CHANNEL_LABELS } from "../../../constants";
+import { NOTIFICATION_CHANNEL, NOTIFICATION_CHANNEL_LABELS } from "../../../constants";
 import type { AgendaEvent } from "../../../types";
 import { useAgendaEventMutations, useSectors, useUsers } from "../../../hooks";
 
@@ -71,7 +71,7 @@ export function AgendaEventDialog({ open, onOpenChange, editing, defaultDate }: 
 
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" }, take: 100 } as any);
   const { data: usersData } = useUsers({
-    statuses: [CONTRACT_STATUS.ACTIVE],
+    isActive: true,
     orderBy: { name: "asc" },
     limit: 100,
   } as any);

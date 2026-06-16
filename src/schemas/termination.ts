@@ -368,6 +368,8 @@ export const terminationAdvanceSchema = z.object({
       errorMap: () => ({ message: "status inválido" }),
     })
     .optional(),
+  // Justificativa obrigatória ao cancelar (por que a rescisão não foi concluída).
+  reason: createDescriptionSchema(0, 2000).nullable().optional(),
 });
 
 export const terminationDocumentUploadSchema = z.object({

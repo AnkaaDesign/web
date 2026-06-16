@@ -11,7 +11,6 @@ import {
 } from "@tabler/icons-react";
 
 import { useSector, useUsers } from "../../../hooks";
-import { CONTRACT_STATUS } from "../../../constants";
 import type { Sector, User } from "../../../types";
 
 import { Combobox } from "@/components/ui/combobox";
@@ -70,7 +69,7 @@ export function SectorAssessmentConfigCard({
   // backend Zod schema also caps `take` at 100.
   const usersQ = useUsers({
     sectorIds: [sectorId],
-    statuses: [CONTRACT_STATUS.ACTIVE],
+    isActive: true,
     orderBy: { name: "asc" },
     take: 100,
   } as any);

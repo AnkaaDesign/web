@@ -177,6 +177,9 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
     setDeleteTarget(null);
   };
 
+  // Só exibe a seção quando há dependentes — oculta enquanto carrega e quando vazia.
+  if (isLoading || dependents.length === 0) return null;
+
   return (
     <Card className={cn("flex flex-col", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">

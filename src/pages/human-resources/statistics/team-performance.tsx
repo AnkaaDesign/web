@@ -549,8 +549,10 @@ function TeamDrillDownModal({
     const where: Record<string, any> = {};
 
     if (mode === 'headcount') {
-      // Active right now = currently-active status (not dismissed).
-      where.currentContractStatus = CONTRACT_STATUS.ACTIVE;
+      // Active right now = employed (not terminated). Matches the summary card's
+      // totalActive = effected + inExperiencePeriod (EXPERIENCE/NOTICE/ON_LEAVE
+      // all count as active); only TERMINATED is excluded.
+      where.currentContractStatus = { not: CONTRACT_STATUS.TERMINATED };
     } else if (mode === 'newHires') {
       // Mirror the backend's joinDate() = effectedAt ?? createdAt
       // (hr-statistics.service.ts). Without the fallback the modal counts

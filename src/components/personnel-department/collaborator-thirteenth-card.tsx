@@ -66,6 +66,9 @@ export function CollaboratorThirteenthCard({ userId, className }: CollaboratorTh
 
   const records = (data?.data ?? []) as Thirteenth[];
 
+  // Só exibe a seção quando há registros de 13º — oculta enquanto carrega e quando vazia.
+  if (isLoading || records.length === 0) return null;
+
   return (
     <Card className={className}>
       <CardHeader className="pb-4">

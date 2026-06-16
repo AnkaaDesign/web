@@ -402,7 +402,7 @@ export const useUserLoans = (userId: string | undefined, options?: { enabled?: b
     queryKey: [...payrollKeys.all, "user-loans", userId],
     queryFn: () =>
       discountService
-        .getMany({ where: { userId: userId!, isPersistent: true }, orderBy: { createdAt: "desc" } })
+        .getMany({ where: { userId: userId!, isPersistent: true, payrollId: null }, orderBy: { createdAt: "desc" } })
         // Resilient to the GET response shape (network vs cache path can differ):
         // accept either the array directly or `{ data: [...] }` (see useLoanMasters).
         .then((response) => {

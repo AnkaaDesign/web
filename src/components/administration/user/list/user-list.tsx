@@ -283,8 +283,8 @@ export function UserList({ className, teamScope }: UserListProps) {
 
   // Visible columns state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
-    "user-list-visible-columns-v2", // v2: "status" column renamed to "contractKind"
-    new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "contractKind"])
+    "user-list-visible-columns-v2", // v2: "status" column renamed to "currentContractType"
+    new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "currentContractType"])
   );
 
   // Get all available columns for column visibility manager

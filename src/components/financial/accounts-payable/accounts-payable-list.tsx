@@ -364,7 +364,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     }
   };
 
-  const settleAirbrushing = (id: string, paymentStatus: string) => updateAirbrushingAsync({ id, data: { paymentStatus } }).then(() => refetch());
+  const settleAirbrushing = (id: string, paymentStatus: AIRBRUSHING_PAYMENT_STATUS) => updateAirbrushingAsync({ id, data: { paymentStatus } }).then(() => refetch());
 
   const parseCompetence = (c?: string | null): { year: number; month: number } | null => {
     const m = /^(\d{4})-(\d{2})$/.exec(c ?? "");

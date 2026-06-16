@@ -11,7 +11,6 @@ import {
   SECULLUM_JUSTIFICATIVAS,
   getJustificativaCategory,
   getJustificativaMeta,
-  CONTRACT_STATUS,
   TONE_CLASSES,
 } from "@/constants";
 import { useSecullumAbsenceDays, useUsers } from "@/hooks";
@@ -378,7 +377,7 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
     useSecullumAbsenceDays(fetchParams);
 
   const { data: usersData } = useUsers({
-    statuses: [CONTRACT_STATUS.ACTIVE],
+    isActive: true,
     where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,

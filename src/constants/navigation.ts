@@ -768,7 +768,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Contas a Pagar",
         icon: "receipt",
         path: "/financeiro/contas-a-pagar",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
+        // ACCOUNTING-only: new accounting-sector payables hub (did not exist in the
+        // baseline menu). ADMIN/FINANCIAL keep their original Financeiro menu unchanged.
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
       },
     ],
   },
@@ -1765,7 +1767,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         icon: "briefcase",
         path: "/recursos-humanos/cargos",
         children: [
-          { id: "cargos-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/cargos/cadastrar", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "cargos-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/cargos/cadastrar", requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN] },
           { id: "cargos-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/cargos/detalhes/:id", isDynamic: true },
           { id: "cargos-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/cargos/editar/:id", isDynamic: true },
         ],
@@ -1918,7 +1920,10 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Departamento Pessoal",
     icon: "team",
     path: "/administracao/colaboradores",
-    requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+    // ACCOUNTING-only: this is a new accounting-sector section. HR/ADMIN keep their
+    // original "Recursos Humanos" menu and must NOT see this duplicate. (Page-level
+    // route privileges remain open to HR/ADMIN — only the menu entry is accounting-only.)
+    requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
     children: [
       {
         id: "dp-colaboradores",
@@ -2122,7 +2127,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Medicina do Trabalho",
     icon: "safety",
     path: "/recursos-humanos/epi/entregas",
-    requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+    // ACCOUNTING-only: new accounting-sector section. HR/ADMIN keep their original
+    // "Recursos Humanos" menu and must NOT see this. (Route privileges unchanged.)
+    requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
     children: [
       {
         id: "mt-epi-entregas",
@@ -2274,6 +2281,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Custo de Funcionário",
         icon: "calendarDollar",
         path: "/ferramentas/custo-de-funcionario",
+        // Accounting-sector tool. Gate explicitly so it does NOT inherit the broad
+        // Ferramentas audience (WAREHOUSE/HR/ADMIN/EXTERNAL).
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
       },
       {
         // Gateless = inherits the section audience (WAREHOUSE/HR/ADMIN/EXTERNAL/ACCOUNTING),

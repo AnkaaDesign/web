@@ -11,6 +11,7 @@ import {
   IconUserCheck,
   IconUserOff,
   IconLink,
+  IconActivity,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,8 @@ import { Combobox } from "@/components/ui/combobox";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { usePrivileges } from "@/hooks/common/use-privileges";
+import { DiagnosticoCard } from "@/components/integrations/secullum/diagnostics/diagnostico-card";
 import { routes, SECTOR_PRIVILEGES } from "@/constants";
 
 import {
@@ -62,6 +65,8 @@ export default function SecullumMappingPage() {
     icon: "users",
   });
 
+  const { isAdmin } = usePrivileges();
+
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
@@ -86,6 +91,11 @@ export default function SecullumMappingPage() {
             <TabsTrigger value="funcionarios" className="gap-2">
               <IconUsers className="h-4 w-4" /> Funcionários ↔ Usuários
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="diagnostico" className="gap-2">
+                <IconActivity className="h-4 w-4" /> Diagnóstico
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent
@@ -106,6 +116,14 @@ export default function SecullumMappingPage() {
           >
             <FuncionariosCard />
           </TabsContent>
+          {isAdmin && (
+            <TabsContent
+              value="diagnostico"
+              className="flex-1 min-h-0 overflow-y-auto pb-6 mt-0"
+            >
+              <DiagnosticoCard />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </PrivilegeRoute>
@@ -655,7 +673,6 @@ type UserRow = {
   name: string;
   payrollNumber?: number | null;
   secullumEmployeeId?: number | null;
-  contractKind?: string | null;
   sector?: { id: string; name: string } | null;
 };
 

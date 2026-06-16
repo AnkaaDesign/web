@@ -116,6 +116,8 @@ export function VacationForm(props: VacationFormProps) {
       page,
       take: 50,
       orderBy: { name: "asc" },
+      // Vacations can only be created for employed (non-terminated) collaborators.
+      where: { isActive: true },
       include: { position: true, sector: true, currentContract: true },
     };
     if (search && search.trim()) {

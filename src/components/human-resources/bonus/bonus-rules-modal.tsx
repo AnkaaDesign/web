@@ -69,7 +69,9 @@ function Section({
   );
 }
 
-function TierTable({ rows }: { rows: [string, string, boolean][] }) {
+// Assiduidade cell: "Mantém" keeps the full extra (green); anything else is a
+// graded loss (red) — "Perde o dia" (−1%), "−50%" or "−100%".
+function TierTable({ rows }: { rows: [string, string, string][] }) {
   return (
     <div className="rounded-md border border-border overflow-hidden text-xs mt-1">
       <div className="grid grid-cols-3 bg-muted/60 font-medium text-foreground">
@@ -77,15 +79,15 @@ function TierTable({ rows }: { rows: [string, string, boolean][] }) {
         <div className="px-3 py-1.5 border-r border-border">Desconto do Bônus</div>
         <div className="px-3 py-1.5">Assiduidade</div>
       </div>
-      {rows.map(([hours, discount, keepsAssiduidade], i) => (
+      {rows.map(([hours, discount, assiduidade], i) => (
         <div
           key={i}
           className="grid grid-cols-3 border-t border-border odd:bg-muted/10 even:bg-muted/25"
         >
           <div className="px-3 py-1.5 border-r border-border">{hours}</div>
           <div className={cn("px-3 py-1.5 border-r border-border font-semibold", discount === "0%" ? "text-emerald-600" : "text-destructive")}>{discount}</div>
-          <div className={cn("px-3 py-1.5 font-semibold", keepsAssiduidade ? "text-emerald-600" : "text-destructive")}>
-            {keepsAssiduidade ? "Mantém" : "Perde"}
+          <div className={cn("px-3 py-1.5 font-semibold", assiduidade === "Mantém" ? "text-emerald-600" : "text-destructive")}>
+            {assiduidade}
           </div>
         </div>
       ))}
@@ -125,10 +127,7 @@ export function BonusRulesModal({ open, onClose, highlightReference }: BonusRule
               highlighted={highlighted === "assiduidade"}
             >
               <p>
-                A cada dia útil do período com o <strong className="text-foreground">ponto eletrônico completo</strong> (4 batidas: entrada, saída almoço, retorno almoço, saída), o colaborador acumula <strong className="text-foreground">+1% de bônus</strong>.
-              </p>
-              <p>
-                Qualquer falta ou atestado acima de 02:00h <strong className="text-destructive">zera todo o bônus de assiduidade</strong>.
+                A assiduidade é <strong className="text-foreground">somada (+1% por dia útil)</strong> sempre que o colaborador <strong className="text-foreground">não solicita nenhuma correção</strong>, <strong className="text-foreground">não deixa de registrar nenhuma batida</strong> e <strong className="text-foreground">não tem atrasos</strong> — ou seja, o dia tem o <strong className="text-foreground">ponto eletrônico completo</strong> (4 batidas: entrada, saída almoço, retorno almoço, saída).
               </p>
             </Section>
           </div>
@@ -146,14 +145,11 @@ export function BonusRulesModal({ open, onClose, highlightReference }: BonusRule
               icon={IconBan}
               title="Tarefas Suspensas"
               badge="Excluído do cálculo"
-              badgeClassName="bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400"
+              badgeClassName="bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400"
               highlighted={highlighted === "suspensas"}
             >
               <p>
                 Quando uma tarefa é marcada com <strong className="text-foreground">bonificação suspensa</strong>, ela é <strong className="text-destructive">removida do cálculo do bônus</strong>.
-              </p>
-              <p>
-                Tarefas suspensas <strong className="text-foreground">não contam</strong> na média ponderada por colaborador e portanto não geram bônus para nenhum dos elegíveis. O valor que seria recebido por aquela tarefa aparece como <strong className="text-foreground">desconto "Tarefas Suspensas"</strong> no bônus.
               </p>
               <p className="text-xs italic">
                 Tarefas com <strong className="text-foreground">bonificação integral</strong> contam como 1.0 e <strong className="text-foreground">bonificação parcial</strong> conta como 0.5 na ponderação. <strong className="text-foreground">Sem bonificação</strong> e <strong className="text-foreground">suspensa</strong> contam como 0.
@@ -170,10 +166,11 @@ export function BonusRulesModal({ open, onClose, highlightReference }: BonusRule
               <p>Ausências e atrasos não justificados.</p>
               <TierTable
                 rows={[
-                  ["Nenhuma", "0%", true],
-                  ["até 02:00h", "-25%", false],
-                  ["02:00h – 08:00h", "-50%", false],
-                  ["Maior 08:00h", "-100%", false],
+                  ["Nenhuma", "0%", "Mantém"],
+                  ["até 02:00h", "0%", "Perde o dia"],
+                  ["02:00h – 04:00h", "-25%", "-50%"],
+                  ["04:00h – 08:00h", "-50%", "-100%"],
+                  ["Maior 08:00h", "-100%", "-100%"],
                 ]}
               />
             </Section>
@@ -186,15 +183,15 @@ export function BonusRulesModal({ open, onClose, highlightReference }: BonusRule
               highlighted={highlighted === "atestado"}
             >
               <p>
-                Afastamentos por atestado médico. Atestados curtos (até 02:00h) não geram nenhuma penalidade.
+                Afastamentos por atestado médico. Atestados curtos (até 02:00h) não geram nenhuma penalidade — mantêm o bônus e a assiduidade.
               </p>
               <TierTable
                 rows={[
-                  ["até 02:00h", "0%", true],
-                  ["02:00h – 08:00h", "0%", false],
-                  ["08:00h – 16:00h", "-25%", false],
-                  ["16:00h – 25:00h", "-50%", false],
-                  ["Maior 25:00h", "-100%", false],
+                  ["até 02:00h", "0%", "Mantém"],
+                  ["02:00h – 04:00h", "0%", "Perde o dia"],
+                  ["04:00h – 08:00h", "-25%", "-50%"],
+                  ["08:00h – 25:00h", "-50%", "-100%"],
+                  ["Maior 25:00h", "-100%", "-100%"],
                 ]}
               />
               <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 px-3 py-2 text-emerald-700 dark:text-emerald-400 text-xs mt-1">

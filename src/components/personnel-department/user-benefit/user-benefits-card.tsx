@@ -90,6 +90,9 @@ export function UserBenefitsCard({ userId, className }: UserBenefitsCardProps) {
 
   const enrollmentsListUrl = `${routes.personnelDepartment.benefits.enrollments.root}?users=${userId}`;
 
+  // Só exibe a seção quando há benefícios ativos — oculta enquanto carrega e quando vazia.
+  if (isLoading || rows.length === 0) return null;
+
   return (
     <Card className={cn("shadow-sm border border-border", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">

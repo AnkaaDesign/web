@@ -55,6 +55,9 @@ export function CollaboratorLoansCard({ userId, className }: CollaboratorLoansCa
     (d) => d.discountType === "LOAN" || d.discountType === "ADVANCE",
   );
 
+  // Só exibe a seção quando há empréstimos/adiantamentos — oculta enquanto carrega e quando vazia.
+  if (isLoading || loanRows.length === 0) return null;
+
   return (
     <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">

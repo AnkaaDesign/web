@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { getUsers, getUserById } from "../../../../api-client";
-import { CONTRACT_STATUS, EMPLOYEE_TYPE, CONTRACT_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
+import { EMPLOYEE_TYPE, CONTRACT_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useUserMutations } from "../../../../hooks";
 import type { User } from "../../../../types";
 
@@ -72,7 +72,6 @@ export function AdminUserSelector<_T extends FieldValues = FieldValues>({
     try {
       const queryParams: any = {
         where: { isActive: true },
-        statuses: [CONTRACT_STATUS.ACTIVE],
         orderBy: { name: "asc" },
         page: page,
         take: 50,

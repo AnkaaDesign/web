@@ -12,7 +12,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useSectors, useCustomers, useUsers } from "../../../../hooks";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { TASK_STATUS, TASK_STATUS_LABELS, CONTRACT_STATUS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { IconChevronDown, IconChevronRight, IconFilter, IconX } from "@tabler/icons-react";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
@@ -45,7 +45,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
   const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" }, include: { logo: true } });
   const { data: usersData } = useUsers({
     orderBy: { name: "asc" },
-    statuses: [CONTRACT_STATUS.ACTIVE],
+    isActive: true,
   });
 
   const sectors = sectorsData?.data || [];

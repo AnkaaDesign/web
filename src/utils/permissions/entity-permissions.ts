@@ -499,25 +499,24 @@ export function canBatchOperateMaintenance(user: PermissionUser | null): boolean
 
 /**
  * Can user edit external operations?
- * WAREHOUSE manages external operations; FINANCIAL handles billing (matches API)
+ * ADMIN only — the API restricts every external-operation write endpoint
+ * (POST/PUT/PATCH/DELETE + billing) to @Roles(ADMIN). Offering this to
+ * WAREHOUSE/FINANCIAL would surface buttons the server rejects.
  */
 export function canEditExternalOperations(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.WAREHOUSE,
-    SECTOR_PRIVILEGES.FINANCIAL,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
 
 /**
  * Can user delete external operations?
- * WAREHOUSE and ADMIN only (FINANCIAL has no delete on the API)
+ * ADMIN only (matches API @Roles(ADMIN) on DELETE / DELETE batch).
  */
 export function canDeleteExternalOperations(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.WAREHOUSE,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }

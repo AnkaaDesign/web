@@ -6,7 +6,7 @@ import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, Ic
 import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useSuppliers, useCanViewPrices, useNextOrderNumber } from "../../../../hooks";
-import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, SECTOR_PRIVILEGES, CONTRACT_STATUS } from "../../../../constants";
+import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, SECTOR_PRIVILEGES } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
@@ -1234,7 +1234,6 @@ export const OrderCreateForm = () => {
                                   const { getUsers } = await import("../../../../api-client");
                                   const response = await getUsers({
                                     where: { isActive: true },
-                                    statuses: [CONTRACT_STATUS.ACTIVE],
                                     orderBy: { name: "asc" },
                                     page,
                                     take: 50,

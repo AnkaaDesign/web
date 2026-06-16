@@ -310,6 +310,8 @@ export const admissionAdvanceSchema = z.object({
       errorMap: () => ({ message: "status inválido" }),
     })
     .optional(),
+  // Justificativa obrigatória ao cancelar (por que a admissão não foi concluída).
+  reason: createDescriptionSchema(0, 2000).nullable().optional(),
 });
 
 export const admissionDocumentUploadSchema = z.object({
