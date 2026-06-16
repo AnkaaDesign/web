@@ -39,7 +39,7 @@ export interface User extends BaseEntity {
   pis: string | null;
   cpf: string | null;
   verified: boolean;
-  birth: Date; // Date of birth
+  birth: Date | null; // Date of birth
   performanceLevel: number;
   sectorId: string | null;
   address: string | null;
@@ -56,7 +56,7 @@ export interface User extends BaseEntity {
   requirePasswordChange?: boolean;
   lastLoginAt?: Date | null;
   sessionToken: string | null;
-  secullumId: string | null;
+  secullumEmployeeId: number | null;
   payrollNumber: number | null;
 
   // Payroll-related fields (available when fetched directly)

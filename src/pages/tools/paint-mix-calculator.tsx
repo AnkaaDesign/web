@@ -108,18 +108,14 @@ const DEFAULT_VALUES: MixFormValues = {
 
 /**
  * Latest unit price for an item (price for ONE inventory unit/package). Tries
- * the virtual `item.price` (computed current unit price), then `monetaryValues[0].value`,
- * then `prices[0].value`. Never falls back to `totalPrice` — that's the whole
- * inventory value (qty × unit price), not a per-unit price.
+ * the virtual `item.price` (computed current unit price), then `prices[0].value`.
+ * Never falls back to `totalPrice` — that's the whole inventory value
+ * (qty × unit price), not a per-unit price.
  */
 const getItemUnitPrice = (item: Item | null): number | null => {
   if (!item) return null;
   if (typeof item.price === "number" && Number.isFinite(item.price)) {
     return item.price;
-  }
-  const fromMonetary = item.monetaryValues?.[0]?.value;
-  if (typeof fromMonetary === "number" && Number.isFinite(fromMonetary)) {
-    return fromMonetary;
   }
   const fromPrices = item.prices?.[0]?.value;
   if (typeof fromPrices === "number" && Number.isFinite(fromPrices)) {

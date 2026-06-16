@@ -36,7 +36,7 @@ import {
   useSectors
 } from "../../../hooks";
 import { formatCurrency } from "../../../utils";
-import { routes } from "../../../constants";
+import { routes, EMPLOYEE_TYPE } from "../../../constants";
 import type { Payroll } from "../../../types";
 import type { PayrollGetManyParams } from "../../../types";
 import { toNumber } from "../../../types/common";
@@ -162,6 +162,7 @@ export function PayrollList({ className }: PayrollListProps) {
     // Default filters: only active users with payroll numbers
     const userConditions: any = {
       isActive: true, // Only active users
+      currentEmployeeType: EMPLOYEE_TYPE.CLT, // Folha is CLT-only — exclude terceirizado/PJ/autônomo/estagiário
       payrollNumber: { not: null } // Only users with payroll numbers
     };
 

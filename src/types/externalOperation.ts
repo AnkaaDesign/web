@@ -26,6 +26,8 @@ export interface ExternalOperation extends BaseEntity {
   type: EXTERNAL_OPERATION_TYPE;
   status: EXTERNAL_OPERATION_STATUS;
   statusOrder: number;
+  invoiceIds?: string[];
+  receiptIds?: string[];
   notes: string | null;
   totalPrice?: number;
 
@@ -39,7 +41,6 @@ export interface ExternalOperation extends BaseEntity {
 
   // Relations (optional, populated based on query)
   items?: ExternalOperationItem[];
-  budgets?: File[];
   invoices?: File[];
   invoiceReimbursements?: File[];
   receipts?: File[];
@@ -78,11 +79,6 @@ export interface ExternalOperationItem extends BaseEntity {
 // =====================
 
 export interface ExternalOperationIncludes {
-  budgets?:
-    | boolean
-    | {
-        include?: FileIncludes;
-      };
   invoices?:
     | boolean
     | {

@@ -47,15 +47,10 @@ export function PositionExport({ className, filters, currentPositions = [], tota
           page,
           limit: 100,
           include: {
-            // Fetch monetary values for accurate current remuneration
-            monetaryValues: {
-              orderBy: { createdAt: "desc" },
-              take: 5,
-            },
-            // Also fetch deprecated remunerations for backwards compatibility
+            // Fetch remunerations (MonetaryValue records) for accurate current remuneration
             remunerations: {
               orderBy: { createdAt: "desc" },
-              take: 1,
+              take: 5,
             },
             _count: {
               select: {

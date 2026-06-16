@@ -49,13 +49,12 @@ import { useNavigate } from "react-router-dom";
 import { routes } from "@/constants";
 import { exportDossiePdf } from "@/utils/dossie-pdf-generator";
 
-const STATUSES_REQUIRING_COMPLETE_DATA = ["COMMERCIAL_APPROVED", "BILLING_APPROVED"];
+const STATUSES_REQUIRING_COMPLETE_DATA = ["BILLING_APPROVED"];
 
 // Canonical label map for every quote status (used for the trigger-render fallback).
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "Pendente",
   BUDGET_APPROVED: "Orçamento Aprovado",
-  COMMERCIAL_APPROVED: "Aprovado pelo Comercial",
   BILLING_APPROVED: "Faturamento Aprovado",
   UPCOMING: "A Vencer",
   DUE: "Vencido",
@@ -67,7 +66,7 @@ const STATUS_LABELS: Record<string, string> = {
 const REVERT_OPTION_VALUE = "__REVERT_BILLING__";
 
 // Statuses meaning billing has already been approved (invoice/NF/boleto exist or are generating).
-// Pre-billing (e.g. COMMERCIAL_APPROVED) → the forward action is to APPROVE faturamento, which
+// Pre-billing (e.g. BUDGET_APPROVED) → the forward action is to APPROVE faturamento, which
 // generates the documents. Post-billing → the only manual actions are revert or mark-as-settled.
 const POST_BILLING_STATUSES = ["BILLING_APPROVED", "UPCOMING", "DUE", "PARTIAL", "SETTLED"];
 
@@ -86,7 +85,6 @@ const getStatusTriggerClass = (status: string) => {
   const map: Record<string, string> = {
     PENDING: "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600",
     BUDGET_APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
-    COMMERCIAL_APPROVED: "bg-blue-700 text-white hover:bg-blue-800 border-blue-800",
     BILLING_APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
     UPCOMING: "bg-amber-600 text-white hover:bg-amber-700 border-amber-700",
     DUE: "bg-red-600 text-white hover:bg-red-700 border-red-700",
@@ -370,7 +368,6 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                     // (e.g. SETTLED -> PARTIAL, BUDGET_APPROVED -> PENDING handled above already).
                     const isBackward =
                       (currentStatus === "BUDGET_APPROVED" && v === "PENDING") ||
-                      (currentStatus === "COMMERCIAL_APPROVED" && v === "BUDGET_APPROVED") ||
                       (currentStatus === "SETTLED" && v === "PARTIAL");
                     if (isBackward) {
                       setPendingConfirmStatus(v);
@@ -392,7 +389,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                   }
 
                   // Candidate statuses for this step, in display order:
-                  //  - Pre-billing (e.g. COMMERCIAL_APPROVED): the forward action is to APPROVE
+                  //  - Pre-billing (e.g. BUDGET_APPROVED): the forward action is to APPROVE
                   //    faturamento (BILLING_APPROVED — generates the invoice/NF/boleto) or settle
                   //    directly. The automatic due-states are not shown yet (no invoice exists).
                   //  - Post-billing (UPCOMING/DUE/PARTIAL/…): show the due-states for context
@@ -1046,7 +1043,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             <AlertDialogTitle>Reverter aprovação de faturamento?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta ação irá baixar os boletos ativos no Sicredi, cancelar as NFS-e autorizadas, remover as
-              faturas e parcelas, e reverter o orçamento para <strong>Aprovado pelo Comercial</strong>.
+              faturas e parcelas, e reverter o orçamento para <strong>Aprovado</strong>.
               O orçamento poderá ser editado e aprovado novamente.
             </AlertDialogDescription>
           </AlertDialogHeader>

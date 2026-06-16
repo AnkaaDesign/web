@@ -1,7 +1,7 @@
 // Overtime Cost Calculator — pure math utilities.
 //
 // Brazilian payroll math (CLT Art. 64 + CCT metalúrgicos):
-//   - `position.remunerations[current].value` (or `monetaryValues[current]`) is
+//   - `position.remunerations[current].value` is
 //     the MONTHLY salary (e.g. R$ 2.850,26 for "Pleno I").
 //   - Monthly divisor = workdayDecimal × 30 (includes paid weekly rest day).
 //   - Hourly rate = monthlySalary / monthlyDivisor.
@@ -20,29 +20,21 @@ import {
  * Resolve the effective MONTHLY salary (R$/mês) for a position.
  *
  * Priority:
- *   1. `monetaryValues` array, pick `current === true`.
- *   2. Fallback to first `monetaryValues` entry if none flagged current.
- *   3. Legacy `remunerations` array, current entry; otherwise first.
- *   4. Otherwise null.
+ *   1. `remunerations` array, pick `current === true`.
+ *   2. Fallback to first `remunerations` entry if none flagged current.
+ *   3. Otherwise null.
  */
 export function getPositionMonthlySalary(
   position: Position | null | undefined,
 ): number | null {
   if (!position) return null;
 
-  const monetary = (position.monetaryValues ?? []) as MonetaryValue[];
+  const monetary = (position.remunerations ?? []) as MonetaryValue[];
   if (monetary.length > 0) {
     const current = monetary.find((m) => m.current);
     if (current && typeof current.value === "number") return current.value;
     const first = monetary[0];
     if (first && typeof first.value === "number") return first.value;
-  }
-
-  const legacy = position.remunerations ?? [];
-  if (legacy.length > 0) {
-    const current = legacy.find((m) => (m as { current?: boolean }).current);
-    if (current && typeof current.value === "number") return current.value;
-    if (typeof legacy[0].value === "number") return legacy[0].value;
   }
 
   return null;

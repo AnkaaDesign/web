@@ -45,6 +45,7 @@ import type {
 import type { Payroll } from "../../../types";
 import { toNumber } from "../../../types/common";
 import { UserSelector } from "@/components/ui/user-selector";
+import { EMPLOYEE_TYPE } from "../../../constants";
 
 interface PayrollFormProps {
   initialData?: Payroll;
@@ -97,8 +98,7 @@ export function PayrollForm({
 
 
   // Get base remuneration from user's position
-  // Note: PositionRemuneration is deprecated, using monetaryValues instead
-  const baseRemunerationFromPosition = selectedUser?.position?.monetaryValues?.find(
+  const baseRemunerationFromPosition = selectedUser?.position?.remunerations?.find(
     (mv) => mv.current
   )?.value || selectedUser?.position?.remunerations?.[0]?.value || 0;
 
@@ -188,6 +188,7 @@ export function PayrollForm({
                             }}
                             placeholder="Selecione um funcionário"
                             disabled={isEditing} // Don't allow changing user in edit mode
+                            additionalWhere={{ currentEmployeeType: EMPLOYEE_TYPE.CLT }} // Folha is CLT-only
                           />
                         </FormControl>
                         <FormMessage />

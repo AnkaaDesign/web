@@ -24,6 +24,19 @@ export const dependentIncludeSchema = z
         }),
       ])
       .optional(),
+    healthPlanBenefit: z
+      .union([
+        z.boolean(),
+        z.object({
+          include: z
+            .object({
+              benefit: z.boolean().optional(),
+              user: z.boolean().optional(),
+            })
+            .optional(),
+        }),
+      ])
+      .optional(),
   })
   .partial();
 

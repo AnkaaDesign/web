@@ -118,7 +118,6 @@ function EmployeeCostCalculatorContent() {
         include: {
           position: {
             include: {
-              monetaryValues: true,
               remunerations: true,
             },
           },

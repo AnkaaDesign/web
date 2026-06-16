@@ -46,7 +46,7 @@ interface ContextMenuState {
 }
 
 // The API returns MonetaryValue records (value/current/createdAt) under the
-// `monetaryValues` relation (and legacy `remunerations`) on Position.
+// `remunerations` relation on Position.
 interface RemunerationRecord {
   id: string;
   value: number;
@@ -55,7 +55,7 @@ interface RemunerationRecord {
 }
 
 const getRemunerationHistory = (position: Position): RemunerationRecord[] => {
-  const records = (position.monetaryValues ?? position.remunerations ?? []) as unknown as RemunerationRecord[];
+  const records = (position.remunerations ?? []) as unknown as RemunerationRecord[];
   return [...records].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 };
 
@@ -119,15 +119,10 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       include: {
-        // Fetch monetary values (new approach)
-        monetaryValues: {
-          orderBy: { createdAt: "desc" as const },
-          take: 5,
-        },
-        // Also fetch deprecated remunerations for backwards compatibility
+        // Fetch remunerations (MonetaryValue records) for history
         remunerations: {
           orderBy: { createdAt: "desc" as const },
-          take: 1,
+          take: 5,
         },
         _count: {
           select: { users: true },
@@ -356,7 +351,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
         className: "min-w-[150px]",
         align: "left" as const,
         accessor: (position: Position) => {
-          // Use the virtual remuneration field (populated by backend from monetaryValues or remunerations)
+          // Use the virtual remuneration field (populated by backend from remunerations)
           // This ensures we always get the correct current remuneration value
           const remuneration = position.remuneration ?? 0;
           return remuneration > 0 ? (

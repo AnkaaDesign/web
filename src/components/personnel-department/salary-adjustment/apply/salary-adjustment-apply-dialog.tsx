@@ -247,7 +247,7 @@ export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjust
 
   const getCurrentSalary = (positionId: string): number => {
     const position = positionCache[positionId];
-    return position?.remuneration ?? position?.monetaryValues?.[0]?.value ?? 0;
+    return position?.remuneration ?? position?.remunerations?.[0]?.value ?? 0;
   };
 
   // Live before/after preview per selected position (percentage mode)

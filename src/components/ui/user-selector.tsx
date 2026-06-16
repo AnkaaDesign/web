@@ -11,6 +11,12 @@ interface UserSelectorProps {
   showEmail?: boolean;
   loading?: boolean;
   initialUser?: { id: string; name: string; email?: string };
+  /**
+   * Extra `where` conditions merged into the user query (e.g. restrict to CLT
+   * for payroll/bonus). Omit to keep the default "any active account" behaviour
+   * used by stock/message selectors.
+   */
+  additionalWhere?: Record<string, unknown>;
 }
 
 /**
@@ -35,7 +41,10 @@ export function UserSelector({
   showEmail = false,
   loading = false,
   initialUser,
+  additionalWhere,
 }: UserSelectorProps) {
+  // Stable key fragment so different filters (e.g. CLT-only) cache separately.
+  const whereKey = useMemo(() => (additionalWhere ? JSON.stringify(additionalWhere) : ""), [additionalWhere]);
   // Memoize initial options
   const initialOptions = useMemo<ComboboxOption[]>(() => {
     if (!initialUser) return [];
@@ -55,6 +64,7 @@ export function UserSelector({
         skip: (page - 1) * pageSize,
         where: {
           isActive: true,
+          ...additionalWhere,
           ...(searchTerm ? {
             OR: [
               { name: { contains: searchTerm, mode: "insensitive" } },
@@ -93,12 +103,12 @@ export function UserSelector({
         hasMore: false,
       };
     }
-  }, [showEmail]);
+  }, [showEmail, additionalWhere]);
 
   return (
     <Combobox
       async
-      queryKey={["users", "selector", showEmail ? "with-email" : "name-only"]}
+      queryKey={["users", "selector", showEmail ? "with-email" : "name-only", whereKey]}
       queryFn={queryUsers}
       initialOptions={initialOptions}
       minSearchLength={0}

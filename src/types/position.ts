@@ -40,8 +40,7 @@ export interface Position extends BaseEntity {
 
   // Relations (optional, populated based on query)
   users?: User[];
-  monetaryValues?: MonetaryValue[];
-  remunerations?: PositionRemuneration[]; // DEPRECATED: use monetaryValues
+  remunerations?: MonetaryValue[];
 
   // Virtual field (computed from latest/current monetary value)
   remuneration?: number;
@@ -49,8 +48,7 @@ export interface Position extends BaseEntity {
   // Count fields (when included)
   _count?: {
     users?: number;
-    monetaryValues?: number;
-    remunerations?: number; // DEPRECATED
+    remunerations?: number;
   };
 }
 
@@ -78,15 +76,10 @@ export interface PositionIncludes {
     | {
         include?: UserIncludes;
       };
-  monetaryValues?:
+  remunerations?:
     | boolean
     | {
         include?: MonetaryValueIncludes;
-      };
-  remunerations?:  // DEPRECATED: use monetaryValues
-    | boolean
-    | {
-        include?: PositionRemunerationIncludes;
       };
 }
 

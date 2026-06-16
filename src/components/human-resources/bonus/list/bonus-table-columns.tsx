@@ -259,18 +259,21 @@ export const createBonusColumns = (): BonusColumn[] => [
     className: "w-40",
     align: "right",
   },
-  // Calculation Period (start - end dates)
+  // Calculation Period — derived from year/month (no stored period column).
   {
     key: "calculationPeriod",
     header: "PERÍODO DE CÁLCULO",
     accessor: (bonus: BonusTableRow) => {
-      if (!bonus.calculationPeriodStart || !bonus.calculationPeriodEnd) {
+      if (!bonus.year || !bonus.month) {
         return <div className="text-sm">-</div>;
       }
 
+      const periodStart = new Date(bonus.year, bonus.month - 1, 1);
+      const periodEnd = new Date(bonus.year, bonus.month, 0);
+
       return (
         <div className="text-sm">
-          {formatDate(bonus.calculationPeriodStart)} - {formatDate(bonus.calculationPeriodEnd)}
+          {formatDate(periodStart)} - {formatDate(periodEnd)}
         </div>
       );
     },

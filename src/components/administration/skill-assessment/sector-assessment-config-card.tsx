@@ -120,7 +120,7 @@ export function SectorAssessmentConfigCard({
         .map(u => ({
           value: u.id,
           label: u.name,
-          description: u.secullumId ? undefined : "Sem vínculo Secullum",
+          description: u.secullumEmployeeId ? undefined : "Sem vínculo Secullum",
         })),
     [sectorUsers, effectiveAppraiserId],
   );

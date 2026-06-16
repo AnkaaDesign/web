@@ -1280,7 +1280,7 @@ export const userUpdateSchema = z
 
     // Payroll info
     payrollNumber: z.number().int().positive("Número da folha deve ser positivo").nullable().optional(),
-    secullumId: z.string().nullable().optional(),
+    secullumEmployeeId: z.number().int().nullable().optional(),
 
     verificationCode: z.string().nullable().optional(),
     verificationExpiresAt: z.date().nullable().optional(),

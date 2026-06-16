@@ -37,7 +37,6 @@ export const ExternalOperationEditPage = () => {
           },
         },
       },
-      budgets: true,
       receipts: true,
       invoices: true,
       customer: true,

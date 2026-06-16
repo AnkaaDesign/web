@@ -200,14 +200,18 @@ export function groupUsersByStatus(users: User[]): Record<string, User[]> {
 
   users.forEach((user) => {
     // Terminated users group under the TERMINATED status bucket regardless of
-    // modality; everyone else groups by their current contract modality.
-    const key =
-      user.currentContractStatus === CONTRACT_STATUS.TERMINATED
-        ? CONTRACT_STATUS.TERMINATED
-        : user.currentContractType;
-    if (key && groups[key]) {
-      groups[key].push(user);
+    // modality. Active CLT bonds group by contract modality. Off-payroll
+    // categories (terceirizado/PJ/estagiário/autônomo) carry no modality, so
+    // they group under their EMPLOYEE_TYPE instead of being silently dropped.
+    let key: string | null;
+    if (user.currentContractStatus === CONTRACT_STATUS.TERMINATED) {
+      key = CONTRACT_STATUS.TERMINATED;
+    } else {
+      key = user.currentContractType ?? user.currentEmployeeType ?? null;
     }
+    if (!key) return;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(user);
   });
 
   return groups;
@@ -612,7 +616,9 @@ export function getDaysSinceExperienceStart(user: User): number | null {
     return null;
   }
 
-  const inPhase2 = !!contract?.exp2StartAt;
+  // Phase 2 only once we've actually reached its start date (exp2StartAt may be
+  // pre-filled at creation while the employee is still in phase 1).
+  const inPhase2 = !!contract?.exp2StartAt && now.getTime() >= new Date(contract.exp2StartAt).getTime();
 
   if (!inPhase2 && contract?.exp1StartAt) {
     const startDate = new Date(contract.exp1StartAt);
@@ -623,32 +629,32 @@ export function getDaysSinceExperienceStart(user: User): number | null {
 
   if (inPhase2) {
     let exp1Duration = 30; // Default to 30 days if we can't calculate
-    let exp2Start: Date | null = null;
+    let phase2Start: Date | null = null;
 
     // Calculate exp1 duration if we have the dates
     if (contract?.exp1StartAt && contract?.exp1EndAt) {
       const exp1StartDate = new Date(contract.exp1StartAt);
       const exp1EndDate = new Date(contract.exp1EndAt);
       exp1Duration = Math.floor((exp1EndDate.getTime() - exp1StartDate.getTime()) / (1000 * 60 * 60 * 24));
-      exp2Start = exp1EndDate;
+      phase2Start = exp1EndDate;
     } else if (contract?.exp1StartAt && contract?.exp2StartAt) {
       // If exp1EndAt not available, use exp2StartAt
       const exp1StartDate = new Date(contract.exp1StartAt);
       const exp2StartDate = new Date(contract.exp2StartAt);
       exp1Duration = Math.floor((exp2StartDate.getTime() - exp1StartDate.getTime()) / (1000 * 60 * 60 * 24));
-      exp2Start = exp2StartDate;
+      phase2Start = exp2StartDate;
     } else if (contract?.exp2StartAt) {
       // Only exp2StartAt available, use it with default exp1 duration
-      exp2Start = new Date(contract.exp2StartAt);
+      phase2Start = new Date(contract.exp2StartAt);
     } else if (contract?.exp1EndAt) {
       // Only exp1EndAt available, use it with default exp1 duration
-      exp2Start = new Date(contract.exp1EndAt);
+      phase2Start = new Date(contract.exp1EndAt);
     }
 
     // Calculate days into exp2
     let daysIntoExp2 = 0;
-    if (exp2Start) {
-      const diffTime = now.getTime() - exp2Start.getTime();
+    if (phase2Start) {
+      const diffTime = now.getTime() - phase2Start.getTime();
       daysIntoExp2 = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       daysIntoExp2 = daysIntoExp2 >= 0 ? daysIntoExp2 : 0;
     }
@@ -677,7 +683,22 @@ export function getUserStatusBadgeText(user: User): string {
   if (user.currentContractStatus === CONTRACT_STATUS.TERMINATED) {
     baseLabel = "Demitido";
   } else if (user.currentContractStatus === CONTRACT_STATUS.EXPERIENCE) {
-    baseLabel = user.currentContract?.exp2StartAt ? "Experiencia 2" : "Experiencia 1";
+    // Phase 2 only once its start date has actually arrived; exp2StartAt may be
+    // pre-filled at creation while the employee is still in phase 1.
+    const exp2StartAt = user.currentContract?.exp2StartAt;
+    const inPhase2 = !!exp2StartAt && new Date().getTime() >= new Date(exp2StartAt).getTime();
+    baseLabel = inPhase2 ? "Experiencia 2" : "Experiencia 1";
+  } else if (user.currentEmployeeType && user.currentEmployeeType !== EMPLOYEE_TYPE.CLT) {
+    // Off-payroll categories (terceirizado/PJ/estagiário/autônomo) carry no
+    // CONTRACT_TYPE modality, so label by worker category instead of falling
+    // through to the "—" placeholder.
+    const employeeTypeLabels: Record<string, string> = {
+      [EMPLOYEE_TYPE.INTERN]: "Estagiário",
+      [EMPLOYEE_TYPE.TERCEIRIZADO]: "Terceirizado",
+      [EMPLOYEE_TYPE.PJ]: "PJ",
+      [EMPLOYEE_TYPE.AUTONOMOUS]: "Autônomo",
+    };
+    baseLabel = employeeTypeLabels[user.currentEmployeeType] || user.currentEmployeeType;
   } else {
     baseLabel = typeLabels[user.currentContractType ?? ""] || user.currentContractType || "—";
   }

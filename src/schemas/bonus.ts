@@ -31,7 +31,7 @@ export const bonusIncludeSchema = z
             .object({
               customer: z.boolean().optional(),
               sector: z.boolean().optional(),
-              services: z.boolean().optional(),
+              serviceOrders: z.boolean().optional(),
               bonifications: z.boolean().optional(),
             })
             .optional(),
@@ -175,46 +175,7 @@ export const bonusWhereSchema: z.ZodType<any> = z.lazy(() =>
           }),
         ])
         .optional(),
-      ponderedTaskCount: z
-        .union([
-          z.number(),
-          z.object({
-            equals: z.number().optional(),
-            not: z.number().optional(),
-            lt: z.number().optional(),
-            lte: z.number().optional(),
-            gt: z.number().optional(),
-            gte: z.number().optional(),
-          }),
-        ])
-        .optional(),
-      averageTasksPerUser: z
-        .union([
-          z.number(),
-          z.object({
-            equals: z.number().optional(),
-            not: z.number().optional(),
-            lt: z.number().optional(),
-            lte: z.number().optional(),
-            gt: z.number().optional(),
-            gte: z.number().optional(),
-          }),
-        ])
-        .optional(),
-      calculationPeriodStart: nullableDate.optional(),
-      calculationPeriodEnd: nullableDate.optional(),
-      status: z
-        .union([
-          z.enum(Object.values(BONUS_STATUS) as [string, ...string[]]),
-          z.object({
-            equals: z.enum(Object.values(BONUS_STATUS) as [string, ...string[]]).optional(),
-            not: z.enum(Object.values(BONUS_STATUS) as [string, ...string[]]).optional(),
-            in: z.array(z.enum(Object.values(BONUS_STATUS) as [string, ...string[]])).optional(),
-            notIn: z.array(z.enum(Object.values(BONUS_STATUS) as [string, ...string[]])).optional(),
-          }),
-        ])
-        .optional(),
-      statusOrder: z
+      averageTaskPerUser: z
         .union([
           z.number(),
           z.object({
@@ -284,12 +245,7 @@ export const bonusOrderBySchema = z.union([
       userId: orderByDirectionSchema.optional(),
       performanceLevel: orderByDirectionSchema.optional(),
       baseBonus: orderByDirectionSchema.optional(),
-      ponderedTaskCount: orderByDirectionSchema.optional(),
-      averageTasksPerUser: orderByDirectionSchema.optional(),
-      calculationPeriodStart: orderByDirectionSchema.optional(),
-      calculationPeriodEnd: orderByDirectionSchema.optional(),
-      status: orderByDirectionSchema.optional(),
-      statusOrder: orderByDirectionSchema.optional(),
+      averageTaskPerUser: orderByDirectionSchema.optional(),
       createdAt: orderByDirectionSchema.optional(),
       updatedAt: orderByDirectionSchema.optional(),
 
@@ -315,12 +271,7 @@ export const bonusOrderBySchema = z.union([
         userId: orderByDirectionSchema.optional(),
         performanceLevel: orderByDirectionSchema.optional(),
         baseBonus: orderByDirectionSchema.optional(),
-        ponderedTaskCount: orderByDirectionSchema.optional(),
-        averageTasksPerUser: orderByDirectionSchema.optional(),
-        calculationPeriodStart: orderByDirectionSchema.optional(),
-        calculationPeriodEnd: orderByDirectionSchema.optional(),
-        status: orderByDirectionSchema.optional(),
-        statusOrder: orderByDirectionSchema.optional(),
+        averageTaskPerUser: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
 
@@ -606,10 +557,6 @@ export const mapToBonusFormData = createMapToFormDataHelper<Bonus, BonusUpdateFo
   year: bonus.year,
   month: bonus.month,
   performanceLevel: bonus.performanceLevel,
-  ponderedTaskCount: bonus.ponderedTaskCount ? (typeof bonus.ponderedTaskCount === 'number' ? bonus.ponderedTaskCount : bonus.ponderedTaskCount.toNumber()) : 0,
-  averageTasksPerUser: bonus.averageTasksPerUser ? (typeof bonus.averageTasksPerUser === 'number' ? bonus.averageTasksPerUser : bonus.averageTasksPerUser.toNumber()) : 0,
-  calculationPeriodStart: bonus.calculationPeriodStart,
-  calculationPeriodEnd: bonus.calculationPeriodEnd,
 }));
 
 // =====================

@@ -27,7 +27,12 @@ export type PayrollDiscountType =
   | 'LOAN'
   | 'ADVANCE'
   | 'AUTHORIZED_DISCOUNT'
-  | 'CUSTOM';
+  | 'CUSTOM'
+  // Proventos (earnings)
+  | 'FAMILY_ALLOWANCE'
+  | 'INSALUBRIDADE'
+  | 'PERICULOSIDADE'
+  | 'HABITUAL_GRATIFICATION';
 
 export interface Discount extends BaseEntity {
   percentage: DecimalValue | number | null;

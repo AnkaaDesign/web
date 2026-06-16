@@ -48,8 +48,8 @@ export function SalaryAdjustmentModal({ open, onOpenChange, selectedPositions, o
   }, [open, form]);
 
   const getCurrentSalary = (position: Position): number => {
-    // Virtual remuneration field from backend, or fallback to latest monetaryValues
-    return position.remuneration ?? position.monetaryValues?.[0]?.value ?? 0;
+    // Virtual remuneration field from backend, or fallback to latest remuneration
+    return position.remuneration ?? position.remunerations?.[0]?.value ?? 0;
   };
 
   const getPreviewSalaries = () => {

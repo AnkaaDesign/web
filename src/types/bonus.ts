@@ -29,14 +29,10 @@ export interface Bonus extends BaseEntity {
   // here but the database has no such field. Use derived state from
   // payrollId presence (saved/draft) instead.
 
-  // Calculation period
-  calculationPeriodStart?: Date | null;
-  calculationPeriodEnd?: Date | null;
-
-  // @deprecated Aliases retained for `mapToBonusFormData` in schemas/bonus.ts
-  // (owned by another agent). Prefer canonical names: weightedTasks, averageTaskPerUser.
-  ponderedTaskCount?: DecimalValue | number;
-  averageTasksPerUser?: DecimalValue | number;
+  // Note: There is no stored calculation period. The period is derived from
+  // year/month. The canonical task metrics are weightedTasks and
+  // averageTaskPerUser (above) — there are no ponderedTaskCount /
+  // averageTasksPerUser columns on the Bonus model.
 
   // Relations (optional, populated based on query)
   user?: User;

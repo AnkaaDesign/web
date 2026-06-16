@@ -46,23 +46,11 @@ export const positionIncludeSchema = z
         }),
       ])
       .optional(),
-    monetaryValues: z
+    remunerations: z
       .union([
         z.boolean(),
         z.object({
           include: monetaryValueIncludeSchema.optional(),
-        }),
-      ])
-      .optional(),
-    remunerations: z  // DEPRECATED: use monetaryValues
-      .union([
-        z.boolean(),
-        z.object({
-          include: z
-            .object({
-              position: z.boolean().optional(),
-            })
-            .optional(),
         }),
       ])
       .optional(),

@@ -10,6 +10,7 @@ import { formatCurrency } from "../../../../utils";
 import { bonusCreateSchema, bonusUpdateSchema } from "../../../../schemas";
 import type { BonusCreateFormData, BonusUpdateFormData } from "../../../../schemas";
 import type { Bonus, User } from "../../../../types";
+import { EMPLOYEE_TYPE } from "../../../../constants";
 import { IconDeviceFloppy, IconX, IconCurrencyDollar } from "@tabler/icons-react";
 
 interface BonusFormProps {
@@ -31,6 +32,10 @@ export function BonusForm({
 }: BonusFormProps) {
   const isEdit = !!bonus;
   const schema = isEdit ? bonusUpdateSchema : bonusCreateSchema;
+
+  // Bonus is folha-only: never offer terceirizado/PJ/autônomo/estagiário, even
+  // if the caller passes an unfiltered list.
+  const cltUsers = users.filter((user) => user.currentEmployeeType === EMPLOYEE_TYPE.CLT);
 
   const form = useForm<BonusCreateFormData | BonusUpdateFormData>({
     resolver: zodResolver(schema),
@@ -190,7 +195,7 @@ export function BonusForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {users.map((user) => (
+                        {cltUsers.map((user) => (
                           <SelectItem key={user.id} value={user.id}>
                             {user.name} - {user.email}
                           </SelectItem>

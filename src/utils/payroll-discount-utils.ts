@@ -4,7 +4,7 @@ export interface DiscountTypeInfo {
   label: string;
   icon: string;
   color: string;
-  category: 'tax' | 'absence' | 'benefit' | 'legal' | 'loan' | 'custom';
+  category: 'tax' | 'absence' | 'benefit' | 'legal' | 'loan' | 'custom' | 'earning';
 }
 
 export const DISCOUNT_TYPE_INFO: Record<PayrollDiscountType, DiscountTypeInfo> = {
@@ -121,6 +121,31 @@ export const DISCOUNT_TYPE_INFO: Record<PayrollDiscountType, DiscountTypeInfo> =
     icon: '📝',
     color: 'gray',
     category: 'custom',
+  },
+  // Proventos (earnings)
+  FAMILY_ALLOWANCE: {
+    label: 'Salário-Família',
+    icon: '👨‍👩‍👧',
+    color: 'green',
+    category: 'earning',
+  },
+  INSALUBRIDADE: {
+    label: 'Adicional de Insalubridade',
+    icon: '⚗️',
+    color: 'green',
+    category: 'earning',
+  },
+  PERICULOSIDADE: {
+    label: 'Adicional de Periculosidade',
+    icon: '⚠️',
+    color: 'green',
+    category: 'earning',
+  },
+  HABITUAL_GRATIFICATION: {
+    label: 'Gratificação Habitual',
+    icon: '🎁',
+    color: 'green',
+    category: 'earning',
   },
 };
 

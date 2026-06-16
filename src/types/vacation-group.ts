@@ -50,7 +50,7 @@ export interface VacationGroupMember {
   sectorName: string | null;
   positionId: string | null;
   positionName: string | null;
-  secullumEmployeeId: string | null;
+  secullumEmployeeId: number | null;
   eligible: boolean;
   reason?: string;
   alreadyExpanded: boolean;

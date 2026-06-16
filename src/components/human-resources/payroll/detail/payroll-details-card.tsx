@@ -9,7 +9,7 @@ import {
   IconCalculator,
   IconChartLine
 } from "@tabler/icons-react";
-import { CONTRACT_STATUS } from "../../../../constants";
+import { CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../../constants";
 
 interface PayrollDetailsCardProps {
   users: PayrollUserRow[];
@@ -45,13 +45,16 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
       const remuneration = user.position?.remuneration || 0;
       totalRemuneration += remuneration;
 
-      // Eligible for bonus = the canonical four predicates (must match the API
-      // live calc): confirmed bond (status ACTIVE) + bonifiable + performanceLevel > 0
-      // + registered in Secullum. The vínculo redesign moved "efetivado" from the
+      // Eligible for bonus = the canonical predicates (must match the API live
+      // calc): CLT category + confirmed bond (status ACTIVE) + bonifiable +
+      // performanceLevel > 0 + registered in Secullum. Bonus is folha-only, so a
+      // terceirizado/PJ bond (even if ACTIVE) is never eligible. The vínculo
+      // redesign moved "efetivado" from the
       // CONTRACT_TYPE modality onto the orthogonal CONTRACT_STATUS lifecycle, so a
       // confirmed bond is now status === ACTIVE (replaces the old EFFECTED type).
       const u = user as typeof user & { performanceLevel?: number | null; secullumEmployeeId?: number | null };
       const isEligible =
+        u.currentEmployeeType === EMPLOYEE_TYPE.CLT &&
         u.currentContractStatus === CONTRACT_STATUS.ACTIVE &&
         u.position?.bonifiable === true &&
         (u.performanceLevel ?? 0) > 0 &&

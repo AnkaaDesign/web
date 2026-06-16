@@ -78,13 +78,25 @@ export interface BankSlip {
 
 export interface NfseDocument {
   id: string;
-  invoiceId: string;
+  // invoiceId is nullable: a note survives as task history even if its invoice is removed.
+  invoiceId: string | null;
+  // Durable link to the task so the full NFS-e history is always visible on the quote page.
+  taskId: string | null;
   elotechNfseId: number | null;
   nfseNumber: number | null;
   status: NFSE_STATUS;
   errorMessage: string | null;
   errorCount?: number;
   retryAfter?: Date | null;
+  // Cancellation request lifecycle (Elotech "solicitação de cancelamento").
+  cancelRequestId?: number | null;
+  cancelRequestStatus?: string | null;
+  cancelReason?: string | null;
+  cancelReasonCode?: number | null;
+  cancelRejectionMessage?: string | null;
+  cancelSubstituteNfseNumber?: number | null;
+  cancelRequestedAt?: Date | null;
+  cancelResolvedAt?: Date | null;
 }
 
 export interface ElotechNfseListItem {

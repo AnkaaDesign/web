@@ -15,10 +15,10 @@ import type { NOTIFICATION_TYPE, NOTIFICATION_CHANNEL, NOTIFICATION_IMPORTANCE, 
  * automatically at send time.
  */
 export interface NotificationTemplateConfig {
-  inApp?: { title?: string; body?: string };
-  push?: { title?: string; body?: string };
-  email?: { subject?: string; body?: string };
-  whatsapp?: { body?: string };
+  inApp?: { title: string; body: string };
+  email?: { subject: string; body: string; html?: string };
+  push?: { title: string; body: string };
+  whatsapp?: { body: string };
 }
 
 // =====================

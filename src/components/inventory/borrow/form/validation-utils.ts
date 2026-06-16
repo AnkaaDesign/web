@@ -1,5 +1,5 @@
 import type { Item, User, Borrow } from "../../../../types";
-import { BORROW_STATUS, SECTOR_PRIVILEGES, CONTRACT_STATUS } from "../../../../constants";
+import { BORROW_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { hasPrivilege } from "../../../../utils";
 
 /**
@@ -50,9 +50,11 @@ export function checkUserBorrowPermission(user: User | null): ValidationError | 
     };
   }
 
-  // Check if user is active (current vínculo in ACTIVE status — replaces the old
-  // EFFECTED modality check)
-  if (user.currentContractStatus !== CONTRACT_STATUS.ACTIVE) {
+  // Borrowing eligibility follows the ACCOUNT flag, not the vínculo lifecycle:
+  // a worker in experiência/afastamento — or a dismissed CLT who continues as a
+  // terceirizado (current vínculo ACTIVE, but the account is what matters) —
+  // must still be able to take items. Only a disabled account is blocked.
+  if (!user.isActive) {
     return {
       field: "user",
       message: "Usuário inativo não pode fazer empréstimos",

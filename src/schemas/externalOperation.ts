@@ -108,15 +108,6 @@ export const externalOperationIncludeSchema = z
         }),
       ])
       .optional(),
-    budgets: z
-      .union([
-        z.boolean(),
-        z.object({
-          include: z.object({}).passthrough().optional(),
-          orderBy: z.object({}).passthrough().optional(),
-        }),
-      ])
-      .optional(),
     items: z
       .union([
         z.boolean(),
@@ -703,7 +694,6 @@ export const externalOperationItemIncludeSchema = z
             .object({
               invoices: z.boolean().optional(),
               receipts: z.boolean().optional(),
-              budgets: z.boolean().optional(),
               items: z.boolean().optional(),
             })
             .optional(),

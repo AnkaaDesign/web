@@ -4,6 +4,7 @@
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
 import type { DEPENDENT_RELATIONSHIP, ORDER_BY_DIRECTION } from "../constants";
 import type { User, UserIncludes } from "./user";
+import type { UserBenefit, UserBenefitIncludes } from "./benefit";
 
 // =====================
 // Main Entity Interface
@@ -27,6 +28,7 @@ export interface Dependent extends BaseEntity {
 
   // Relations (optional, populated based on query)
   user?: User;
+  healthPlanBenefit?: UserBenefit;
 }
 
 // =====================
@@ -38,6 +40,11 @@ export interface DependentIncludes {
     | boolean
     | {
         include?: UserIncludes;
+      };
+  healthPlanBenefit?:
+    | boolean
+    | {
+        include?: UserBenefitIncludes;
       };
 }
 

@@ -244,11 +244,11 @@ function parseSecullumCalculations(payload: any): { rows: CalculationDayRow[]; t
 }
 
 async function fetchHorarioForUser(user: User | null | undefined): Promise<HorarioInfo | null> {
-  if (!user?.secullumId) return null;
+  if (!user?.secullumEmployeeId) return null;
   try {
     const empResp = await secullumService.getEmployees();
     const empList: any[] = (empResp?.data as any)?.data ?? [];
-    const employee = empList.find((e: any) => String(e?.Id) === String(user.secullumId));
+    const employee = empList.find((e: any) => String(e?.Id) === String(user.secullumEmployeeId));
     const horarioId = employee?.HorarioId;
     if (!horarioId) return null;
     const horarioResp = await secullumService.getHorarioById(horarioId);

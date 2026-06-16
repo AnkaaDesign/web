@@ -217,6 +217,80 @@ const VALID_ROUTES = [
 
   // Profile route
   routes.profile,
+
+  // Financial - Reconciliation (Conciliação Bancária) routes
+  routes.financial.reconciliation.root,
+  routes.financial.reconciliation.statement,
+  routes.financial.reconciliation.transactions,
+  routes.financial.reconciliation.transactionDetail(":id"),
+  routes.financial.reconciliation.fiscalDocuments,
+  routes.financial.reconciliation.fiscalDocumentDetail(":id"),
+  routes.financial.reconciliation.categories,
+  routes.financial.reconciliation.recurring,
+  routes.financial.reconciliation.outflows,
+  routes.financial.reconciliation.inflows,
+
+  // Financial - Outflow forecast (Previsão de Saídas)
+  routes.financial.outflowForecast,
+
+  // Financial - Accounts Payable (Contas a Pagar) route
+  routes.financial.accountsPayable.root,
+
+  // Human Resources - Payroll (Folha de Pagamento) routes
+  routes.humanResources.payroll.root,
+  routes.humanResources.payroll.create,
+  routes.humanResources.payroll.detail(":id"),
+  routes.humanResources.payroll.edit(":id"),
+
+  // Human Resources - Loans (Empréstimos) route
+  routes.humanResources.loans.root,
+
+  // Personnel Department (Departamento Pessoal) routes
+  routes.personnelDepartment.root,
+  routes.personnelDepartment.admissions.root,
+  routes.personnelDepartment.admissions.create,
+  routes.personnelDepartment.admissions.details(":id"),
+  routes.personnelDepartment.admissions.edit(":id"),
+  routes.personnelDepartment.terminations.root,
+  routes.personnelDepartment.terminations.create,
+  routes.personnelDepartment.terminations.details(":id"),
+  routes.personnelDepartment.terminations.edit(":id"),
+  routes.personnelDepartment.vacations.root,
+  routes.personnelDepartment.vacations.create,
+  routes.personnelDepartment.vacations.details(":id"),
+  routes.personnelDepartment.vacations.edit(":id"),
+  routes.personnelDepartment.vacations.collectiveDetails(":id"),
+  routes.personnelDepartment.salaryAdjustments.root,
+  routes.personnelDepartment.salaryAdjustments.details(":id"),
+  routes.personnelDepartment.promotions.root,
+  routes.personnelDepartment.benefits.root,
+  routes.personnelDepartment.benefits.create,
+  routes.personnelDepartment.benefits.details(":id"),
+  routes.personnelDepartment.benefits.edit(":id"),
+  routes.personnelDepartment.benefits.enrollments.root,
+  routes.personnelDepartment.benefits.enrollments.create,
+  routes.personnelDepartment.benefits.enrollments.details(":id"),
+  routes.personnelDepartment.benefits.enrollments.edit(":id"),
+
+  // Occupational Health (Medicina do Trabalho) routes
+  routes.occupationalHealth.root,
+  routes.occupationalHealth.medicalExams.root,
+  routes.occupationalHealth.medicalExams.create,
+  routes.occupationalHealth.medicalExams.details(":id"),
+  routes.occupationalHealth.medicalExams.edit(":id"),
+  routes.occupationalHealth.periodicExams.root,
+  routes.occupationalHealth.leaves.root,
+  routes.occupationalHealth.leaves.create,
+  routes.occupationalHealth.leaves.details(":id"),
+  routes.occupationalHealth.leaves.edit(":id"),
+  routes.occupationalHealth.workAccidents.root,
+  routes.occupationalHealth.workAccidents.create,
+  routes.occupationalHealth.workAccidents.details(":id"),
+  routes.occupationalHealth.workAccidents.edit(":id"),
+
+  // Tools (Ferramentas) - Employee Cost & Post-its routes
+  routes.tools.employeeCost.root,
+  routes.tools.postIts.root,
 ];
 
 /**
