@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/utils/number";
 
 export interface AnalysisData {
   label: string;
@@ -105,11 +106,11 @@ export function AnalysisCard({ title, type, data, icon: Icon, className }: Analy
                       : type === "COMPLEXITY"
                         ? `${totalValue} fórmulas`
                         : type === "REVENUE"
-                          ? data.reduce((sum, item) => {
+                          ? formatCurrency(data.reduce((sum, item) => {
                               const match = item.info?.match(/R\$\s?([\d.,]+)/);
                               const value = match ? parseFloat(match[1].replace(/\./g, '').replace(',', '.')) : 0;
                               return sum + value;
-                            }, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                            }, 0))
                           : `${totalValue} itens`}
               </span>
             </div>

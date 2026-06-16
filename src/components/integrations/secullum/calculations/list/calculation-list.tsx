@@ -160,7 +160,7 @@ export function CalculationList({ className, mode = 'hr', teamScope = false, onE
     "calculation-list-visible-columns",
     new Set([
       "date", "entrada1", "saida1", "entrada2", "saida2",
-      "normais", "faltas", "ex50", "ex100", "dsr", "ajuste"
+      "normais", "atras", "faltas", "ajuste", "ex50", "ex100", "dsr",
     ])
   );
 

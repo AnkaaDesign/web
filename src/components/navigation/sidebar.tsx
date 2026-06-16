@@ -13,6 +13,7 @@ import { fixNavigationPath } from "@/utils/route-validation";
 import { useAuth } from "@/contexts/auth-context";
 import { IconLogout, IconUser, IconSettings, IconChevronRight, IconExternalLink } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { PricingToggle } from "@/components/ui/pricing-toggle";
 import { NotificationCenter } from "@/components/notification-center";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
@@ -286,6 +287,7 @@ export const Sidebar = memo(() => {
   // State management
   const [expandedMenus, setExpandedMenus] = useState<{ [key: string]: boolean }>({});
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showAvatarTooltip, setShowAvatarTooltip] = useState(false);
   const [navigatingItemId, setNavigatingItemId] = useState<string | null>(null);
   const [showFavorites, setShowFavorites] = useState(() => {
     const stored = localStorage.getItem("ankaa-sidebar-show-favorites");
@@ -857,7 +859,11 @@ export const Sidebar = memo(() => {
     <>
       <aside className={cn("flex flex-col bg-card border-r border-border transition-all duration-300 relative", isOpen ? "w-72" : "w-16")}>
         {/* Header Section - User Profile & Theme Toggle */}
-        <div className={cn("border-b relative h-16 flex items-center", isDark ? "border-neutral-800" : "border-neutral-200")}>
+        <div className={cn(
+          "border-b relative",
+          isDark ? "border-neutral-800" : "border-neutral-200",
+          isOpen ? "h-16 flex items-center" : "flex flex-col items-center",
+        )}>
           {isOpen ? (
             /* Expanded State - User Card and Theme Toggle */
             <>
@@ -881,19 +887,56 @@ export const Sidebar = memo(() => {
               <div className="flex-shrink-0 flex items-center gap-1 px-2">
                 <NotificationCenter />
                 <ThemeToggle />
+                <PricingToggle />
               </div>
             </>
           ) : (
-            /* Minimized State - User Icon Only */
-            <div className="w-full flex items-center justify-center">
+            /* Minimized State - Avatar + Buttons */
+            <div className="w-full flex flex-col items-center gap-1 py-2">
+              {/* Avatar with hover info popup */}
               <div
-                className={cn(
-                  "w-8 h-8 bg-primary rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 relative",
-                  showUserMenu && "scale-110 shadow-sm",
-                )}
-                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="relative"
+                onMouseEnter={() => setShowAvatarTooltip(true)}
+                onMouseLeave={() => setShowAvatarTooltip(false)}
               >
-                <span className="text-white font-bold text-lg">{user?.name?.charAt(0)?.toUpperCase() || "U"}</span>
+                <div
+                  className={cn(
+                    "w-8 h-8 bg-primary rounded-full flex items-center justify-center cursor-pointer transition-all duration-200",
+                    showUserMenu && "scale-110 shadow-sm",
+                  )}
+                  onClick={() => {
+                    setShowAvatarTooltip(false);
+                    setShowUserMenu(!showUserMenu);
+                  }}
+                >
+                  <span className="text-white font-bold text-lg">{user?.name?.charAt(0)?.toUpperCase() || "U"}</span>
+                </div>
+
+                {/* Hover info popup */}
+                {showAvatarTooltip && !showUserMenu && (
+                  <div
+                    className={cn(
+                      "absolute left-full top-0 ml-3 z-50 bg-card border border-border rounded-lg shadow-md p-3 min-w-[200px] animate-in fade-in-0 slide-in-from-left-1",
+                      isDark ? "border-neutral-700" : "border-neutral-200",
+                    )}
+                  >
+                    <div className={cn("font-semibold text-sm truncate", isDark ? "text-neutral-100" : "text-neutral-900")}>
+                      {user?.name || "Usuário"}
+                    </div>
+                    <div className={cn("text-xs mt-0.5 truncate", isDark ? "text-neutral-400" : "text-neutral-500")}>
+                      {user?.email && user?.phone
+                        ? user.email
+                        : user?.email || (user?.phone && maskPhone(user?.phone))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons in collapsed mode */}
+              <div className="flex flex-col items-center gap-0.5">
+                <NotificationCenter />
+                <ThemeToggle />
+                <PricingToggle />
               </div>
             </div>
           )}

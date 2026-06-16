@@ -1,5 +1,6 @@
 import { FormInput } from "@/components/ui/form-input";
 import { useFormContext } from "react-hook-form";
+import { formatCurrency } from "@/utils/number";
 
 interface PriceInputProps {
   name?: string;
@@ -32,8 +33,8 @@ export function PriceInput({
     if (description) return description;
 
     const parts = [];
-    if (min !== undefined) parts.push(`Mínimo: ${min.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`);
-    if (max !== undefined) parts.push(`Máximo: ${max.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`);
+    if (min !== undefined) parts.push(`Mínimo: ${formatCurrency(min)}`);
+    if (max !== undefined) parts.push(`Máximo: ${formatCurrency(max)}`);
 
     return parts.length > 0 ? parts.join(" • ") : undefined;
   };

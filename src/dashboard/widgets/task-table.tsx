@@ -119,6 +119,7 @@ import {
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
 import { getFileThumbnailUrl } from "../../utils/file";
+import { formatCurrency as _formatCurrency } from "@/utils/number";
 
 import { WidgetCard } from "../components/widget-card";
 import { ColumnPicker } from "../components/column-picker";
@@ -171,7 +172,7 @@ function formatDateTimeShort(d: Date | string | null | undefined): string {
 }
 function formatCurrency(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
+  return _formatCurrency(n);
 }
 function startOfDay(d = new Date()): Date {
   const x = new Date(d);

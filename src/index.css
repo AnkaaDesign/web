@@ -752,3 +752,30 @@ input[type="time"]::-moz-calendar-picker-indicator {
 [data-sonner-toaster][data-x-position="right"] {
   right: 8px !important;
 }
+
+/* Pricing visibility — blur chart/stat areas when prices are hidden */
+.prices-hidden .recharts-surface,
+.prices-hidden .recharts-wrapper,
+.prices-hidden [data-price-chart] {
+  filter: blur(6px);
+  transition: filter 0.2s ease;
+  pointer-events: none;
+  user-select: none;
+}
+
+.recharts-surface,
+.recharts-wrapper {
+  transition: filter 0.2s ease;
+}
+
+/* Price value element masking */
+.price-value {
+  transition: filter 0.15s ease;
+  display: inline;
+}
+
+.prices-hidden .price-value {
+  filter: blur(5px);
+  user-select: none;
+  pointer-events: none;
+}

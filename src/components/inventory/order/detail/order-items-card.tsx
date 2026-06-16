@@ -23,7 +23,7 @@ import { buildOrderCode } from "@/utils/order-code";
 import { OrderPdfExportButton } from "../common/order-pdf-export-button";
 import type { Order, OrderItem } from "../../../../types";
 import { ORDER_STATUS, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, MEASURE_TYPE } from "../../../../constants";
-import { useOrderItemBatchMutations, useOrderItemSpecializedBatchMutations, useCanViewPrices } from "../../../../hooks";
+import { useOrderItemBatchMutations, useOrderItemSpecializedBatchMutations, useCanViewPrices, usePrivileges } from "../../../../hooks";
 import { toast } from "@/components/ui/sonner";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { StockStatusIndicator } from "../../item/list/stock-status-indicator";
@@ -47,6 +47,7 @@ interface SelectedItems {
 
 export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCardProps) {
   const canViewPrices = useCanViewPrices();
+  const { isWarehouse } = usePrivileges();
   const { batchUpdate } = useOrderItemBatchMutations({
     onBatchUpdateSuccess: () => {
       toast.success("Quantidades recebidas atualizadas com sucesso!");
@@ -73,6 +74,8 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
 
   // Check if order allows inline editing
   const canEditItems = [ORDER_STATUS.CREATED, ORDER_STATUS.PARTIALLY_FULFILLED, ORDER_STATUS.FULFILLED, ORDER_STATUS.PARTIALLY_RECEIVED].includes(order.status);
+  // WAREHOUSE can mark items as fulfilled but cannot mark them as received (close the order).
+  const canReceiveItems = canEditItems && !isWarehouse;
 
   // Check if there are unsaved changes
   const hasChanges = useMemo(() => {
@@ -417,10 +420,12 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                     <IconShoppingCart className="mr-2 h-4 w-4" />
                     Marcar como Feito ({selectedCount})
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleBatchMarkReceived} disabled={isSaving}>
-                    <IconTruck className="mr-2 h-4 w-4" />
-                    Marcar como Recebido ({selectedCount})
-                  </Button>
+                  {canReceiveItems && (
+                    <Button variant="outline" size="sm" onClick={handleBatchMarkReceived} disabled={isSaving}>
+                      <IconTruck className="mr-2 h-4 w-4" />
+                      Marcar como Recebido ({selectedCount})
+                    </Button>
+                  )}
                 </>
               )}
               {hasChanges && (

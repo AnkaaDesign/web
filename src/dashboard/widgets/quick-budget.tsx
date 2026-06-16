@@ -22,6 +22,7 @@
 // not exposed inline (file uploads, multi-customer billing, payment terms).
 
 import { useMemo, useState } from "react";
+import { formatCurrency } from "@/utils/number";
 import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
@@ -415,10 +416,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
           <div className="flex items-center justify-between text-xs pt-1 border-t border-border">
             <span className="text-muted-foreground">Total</span>
             <span className="font-semibold tabular-nums">
-              {new Intl.NumberFormat("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-              }).format(subtotal)}
+              {formatCurrency(subtotal)}
             </span>
           </div>
         </Section>

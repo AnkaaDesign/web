@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
+import { formatCurrency } from "@/utils/number";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { useDebounce } from "@/hooks/common/use-debounce";
 import { extractActiveFilters } from "./filter-utils";
@@ -764,7 +765,7 @@ export const ExternalOperationItemSelector = ({
                         <TableCell className="w-24 p-0 !border-r-0">
                           <div className="px-4 py-1">
                             <span className="font-medium tabular-nums">
-                              {item.prices?.[0]?.value ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(item.prices[0].value) : "-"}
+                              {item.prices?.[0]?.value ? formatCurrency(item.prices[0].value) : "-"}
                             </span>
                           </div>
                         </TableCell>
@@ -799,7 +800,7 @@ export const ExternalOperationItemSelector = ({
                                 }}
                                 className="w-full h-8 text-sm"
                                 placeholder={
-                                  item.prices?.[0]?.value ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(item.prices[0].value) : "R$ 0,00"
+                                  item.prices?.[0]?.value ? formatCurrency(item.prices[0].value) : "R$ 0,00"
                                 }
                               />
                             ) : (

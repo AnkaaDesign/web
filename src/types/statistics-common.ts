@@ -1,4 +1,6 @@
 // Shared types for all statistics pages
+import { formatCurrency, formatCurrencyCompact } from "@/utils/number";
+export { formatCurrency, formatCurrencyCompact };
 
 export type StatisticsChartType = 'bar' | 'line' | 'line-smooth' | 'area' | 'area-smooth' | 'pie' | 'bar-stacked' | 'line-stacked';
 
@@ -110,13 +112,6 @@ export const FUNNEL_STAGE_COLORS = [
   '#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#84cc16', '#eab308', '#f97316', '#ef4444',
 ];
 
-// Format currency helper
-export const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
-};
 
 // Format percentage
 export const formatPercentage = (value: number, decimals = 1) => {

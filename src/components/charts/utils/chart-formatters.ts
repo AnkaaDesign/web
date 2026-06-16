@@ -5,6 +5,7 @@
 
 import { format, parseISO, formatDistance } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getPricingVisible } from "@/utils/pricing-visibility";
 
 /**
  * Format currency values
@@ -14,6 +15,7 @@ export function formatCurrency(value: number, options?: {
   maximumFractionDigits?: number;
   compact?: boolean;
 }): string {
+  if (!getPricingVisible()) return "R$ ••••••";
   const {
     minimumFractionDigits = 2,
     maximumFractionDigits = 2,
@@ -36,6 +38,7 @@ export function formatCurrency(value: number, options?: {
  * Format compact currency (e.g., 1.5K, 2.3M)
  */
 export function formatCompactCurrency(value: number): string {
+  if (!getPricingVisible()) return "R$ ••••";
   const absValue = Math.abs(value);
   const sign = value < 0 ? '-' : '';
 

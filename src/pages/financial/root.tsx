@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
+import { formatCurrency as _formatCurrency } from "@/utils/number";
 import {
   SECTOR_PRIVILEGES,
   routes,
@@ -48,12 +49,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 
 const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+  return _formatCurrency(value, "pt-BR", "BRL", 0);
 };
 
 const formatPercent = (value: number) => {

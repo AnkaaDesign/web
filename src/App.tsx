@@ -4,6 +4,7 @@ import { routes } from "./constants";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthProvider } from "@/contexts/auth-context";
 import { SidebarProvider } from "@/contexts/sidebar-context";
+import { PricingProvider } from "@/contexts/pricing-context";
 import { FavoritesProvider } from "@/contexts/favorites-context";
 import { FileViewerProvider } from "@/components/common/file/file-viewer";
 import { MessageModalProvider } from "@/components/common/message-modal";
@@ -560,6 +561,7 @@ function App() {
               element={
                 <AuthProvider>
                   <SidebarProvider>
+                    <PricingProvider>
                     <SocketNotificationsListener />
                     <SocketReconnectHandler />
                     <AppVersionChecker />
@@ -3495,6 +3497,7 @@ function App() {
                         </MessageModalProvider>
                       </FileViewerProvider>
                     </FavoritesProvider>
+                    </PricingProvider>
                   </SidebarProvider>
                 </AuthProvider>
               }

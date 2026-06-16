@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { FormField, FormItem, FormControl } from "@/components/ui/form";
+import { formatCurrency as _formatCurrency } from "@/utils/number";
 
 interface PriceCellProps {
   control: any;
@@ -19,12 +20,7 @@ export function PriceCell({ control, index }: PriceCellProps) {
 
   const formatCurrency = (value: number) => {
     if (isNaN(value)) return "";
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
+    return _formatCurrency(value);
   };
 
   const parseCurrency = (value: string) => {

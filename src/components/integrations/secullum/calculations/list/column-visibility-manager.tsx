@@ -20,11 +20,12 @@ export function getDefaultVisibleColumns(): Set<string> {
     "entrada2",
     "saida2",
     "normais",
+    "atras",
     "faltas",
+    "ajuste",
     "ex50",
     "ex100",
     "dsr",
-    "ajuste",
   ]);
 }
 

@@ -14,6 +14,7 @@
 // uses. Combobox is used for all filter dropdowns (per user preference).
 
 import { useMemo, useState } from "react";
+import { formatCurrency as _formatCurrency } from "@/utils/number";
 import { WidgetTabsBar } from "../components/config-kit";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
@@ -90,7 +91,7 @@ function formatNumber(n: number | null | undefined): string {
 }
 function formatCurrency(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
+  return _formatCurrency(n);
 }
 function formatDate(d: Date | string | null | undefined): string {
   if (!d) return "—";

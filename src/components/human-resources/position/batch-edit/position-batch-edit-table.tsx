@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatCurrency } from "@/utils/number";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -358,7 +359,7 @@ export function PositionBatchEditTable({ positions, onCancel: _onCancel, onSubmi
             <span className="font-medium">{item.name}</span>
             {item.remuneration && (
               <span className="text-muted-foreground">
-                - R$ {item.remuneration.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                - {formatCurrency(item.remuneration)}
               </span>
             )}
           </div>

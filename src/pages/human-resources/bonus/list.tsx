@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { formatCurrency as _formatCurrency } from "@/utils/number";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -201,12 +202,10 @@ interface BonusRow {
   oderId?: string;
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(value);
-}
+const formatCurrency = (n: number | null | undefined): string => {
+  if (n == null) return "—";
+  return _formatCurrency(n);
+};
 
 // BonusTableComponent - Simple table for displaying bonus data
 interface BonusTableComponentProps {

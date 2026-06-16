@@ -27,6 +27,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { formatCurrency as _formatCurrency } from "@/utils/number";
 import { z } from "zod";
 import { WidgetTabsBar } from "../components/config-kit";
 import { useNavigate } from "react-router-dom";
@@ -339,10 +340,7 @@ function formatOrderNumber(n: number | null): string {
 
 function formatCurrency(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(n);
+  return _formatCurrency(n);
 }
 
 function formatDate(d: Date | string | null | undefined): string {

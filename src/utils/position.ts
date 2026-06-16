@@ -1,6 +1,7 @@
 // packages/utils/src/position.ts
 
 import type { Position } from "../types";
+import { formatCurrency, formatCurrencyCompact } from "./number";
 
 // =====================
 // Display Formatters
@@ -21,19 +22,11 @@ export const formatPositionFullDisplay = (position: Position): string => {
 };
 
 export const formatRemuneration = (value: number): string => {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
+  return formatCurrency(value);
 };
 
 export const formatRemunerationCompact = (value: number): string => {
-  if (value >= 1000000) {
-    return `R$ ${(value / 1000000).toFixed(1)}M`;
-  } else if (value >= 1000) {
-    return `R$ ${(value / 1000).toFixed(1)}K`;
-  }
-  return formatRemuneration(value);
+  return formatCurrencyCompact(value);
 };
 
 // =====================

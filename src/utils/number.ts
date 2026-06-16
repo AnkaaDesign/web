@@ -1,5 +1,7 @@
 // packages/utils/src/number.ts
 
+import { getPricingVisible } from "./pricing-visibility";
+
 // =====================
 // Currency Formatting
 // =====================
@@ -12,6 +14,7 @@ export const formatCurrency = (
   // supplier quotes per-cento/dúzia and resolve to 3 decimal places per unit).
   fractionDigits?: number,
 ): string => {
+  if (!getPricingVisible()) return "R$ ••••••";
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
@@ -23,6 +26,7 @@ export const formatCurrency = (
 };
 
 export const formatCurrencyCompact = (value: number, locale: string = "pt-BR"): string => {
+  if (!getPricingVisible()) return "R$ ••••••";
   if (value >= 1000000000) {
     return `R$ ${(value / 1000000000).toFixed(1)}B`;
   } else if (value >= 1000000) {
@@ -34,6 +38,7 @@ export const formatCurrencyCompact = (value: number, locale: string = "pt-BR"): 
 };
 
 export const formatCurrencyWithoutSymbol = (value: number, locale: string = "pt-BR"): string => {
+  if (!getPricingVisible()) return "••••••";
   return new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

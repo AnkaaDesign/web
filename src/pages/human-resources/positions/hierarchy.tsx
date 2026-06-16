@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatCurrency as _formatCurrency } from "@/utils/number";
 import { useNavigate } from "react-router-dom";
 import { IconBriefcase, IconGripVertical, IconCheck, IconX } from "@tabler/icons-react";
 import { toast } from "@/components/ui/sonner";
@@ -50,10 +51,7 @@ function SortableRow({ position, index }: SortableRowProps) {
 
   const formatCurrency = (value: number | null) => {
     if (value === null) return "N/A";
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
+    return _formatCurrency(value);
   };
 
   return (
