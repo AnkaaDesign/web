@@ -149,19 +149,19 @@ function buildTemplatesPayload(templates: ConfigurationFormData["templates"]): N
   const inAppTitle = templates.inApp.title.trim();
   const inAppBody = templates.inApp.body.trim();
   if (inAppTitle || inAppBody) {
-    payload.inApp = { ...(inAppTitle && { title: inAppTitle }), ...(inAppBody && { body: inAppBody }) };
+    payload.inApp = { title: inAppTitle, body: inAppBody };
   }
 
   const pushTitle = templates.push.title.trim();
   const pushBody = templates.push.body.trim();
   if (pushTitle || pushBody) {
-    payload.push = { ...(pushTitle && { title: pushTitle }), ...(pushBody && { body: pushBody }) };
+    payload.push = { title: pushTitle, body: pushBody };
   }
 
   const emailSubject = templates.email.subject.trim();
   const emailBody = templates.email.body.trim();
   if (emailSubject || emailBody) {
-    payload.email = { ...(emailSubject && { subject: emailSubject }), ...(emailBody && { body: emailBody }) };
+    payload.email = { subject: emailSubject, body: emailBody };
   }
 
   const whatsappBody = templates.whatsapp.body.trim();

@@ -452,7 +452,7 @@ export const StatisticsRadarChart = forwardRef<
         const name: string = params?.name ?? params?.value;
         if (!name) return;
         const idx = indicators.findIndex(i => i.name === name);
-        onIndicatorClick(name, idx);
+        onIndicatorClick(name, idx, 'label');
       },
     };
   }, [onIndicatorClick, indicators]);

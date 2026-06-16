@@ -62,7 +62,7 @@ export function PayrollCalculation({
         include: { position: true, sector: true }
       },
       bonus: true,
-      discounts: { orderBy: { calculationOrder: "asc" } },
+      discounts: { orderBy: { discountType: "asc" } },
     }
   });
 

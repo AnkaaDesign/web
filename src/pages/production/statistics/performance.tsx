@@ -813,7 +813,6 @@ const TaskPerformancePage = () => {
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
   const summary = data?.data?.summary;
-  const params = data?.data?.params;
 
   // Period filter / year aggregation. For year mode we sum totalCount and
   // totalContribution across months and recompute avgPerformance from those

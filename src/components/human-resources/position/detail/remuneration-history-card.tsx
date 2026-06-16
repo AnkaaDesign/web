@@ -1,6 +1,6 @@
 import { IconHistory, IconCurrencyReal, IconTrendingUp, IconTrendingDown, IconMinus } from "@tabler/icons-react";
 
-import type { Position, PositionRemuneration } from "../../../../types";
+import type { MonetaryValue, Position } from "../../../../types";
 import { formatCurrency, formatDateTime } from "../../../../utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +35,7 @@ export function RemunerationHistoryCard({ position, className }: RemunerationHis
 
   const sortedRemunerations = [...position.remunerations].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const getChangeInfo = (current: PositionRemuneration, previous?: PositionRemuneration) => {
+  const getChangeInfo = (current: MonetaryValue, previous?: MonetaryValue) => {
     if (!previous) return null;
 
     const difference = current.value - previous.value;

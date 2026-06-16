@@ -19,11 +19,12 @@ const statusVariantMap: Record<string, string> = {
   ERROR: 'red',
 };
 
-// Labels for the cancellation-lifecycle statuses not present in NFSE_STATUS_LABELS.
+// Badge-specific short copy that intentionally differs from NFSE_STATUS_LABELS
+// (e.g. "Emitida" instead of "Autorizada", "Aguardando Fiscal" for an in-flight
+// cancellation). Statuses without an override fall back to NFSE_STATUS_LABELS.
 const EXTRA_STATUS_LABELS: Record<string, string> = {
   AUTHORIZED: 'Emitida',
   CANCEL_REQUESTED: 'Aguardando Fiscal',
-  CANCEL_REJECTED: 'Cancelamento Rejeitado',
 };
 
 export function NfseStatusBadge({ status, className, size = 'default' }: NfseStatusBadgeProps) {

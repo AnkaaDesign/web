@@ -110,11 +110,6 @@ export function HoleriteBreakdownCard({ calculation }: HoleriteBreakdownCardProp
     additionalEarnings?.hazardPay,
     "30% do salário-base",
   );
-  pushEarning(
-    "Gratificação Habitual",
-    additionalEarnings?.habitualGratification,
-    "integra base INSS/IRRF/FGTS",
-  );
   pushEarning("Outros Proventos", otherEarnings);
 
   // ===== Build desconto (deduction) groups, skipping zeros =====

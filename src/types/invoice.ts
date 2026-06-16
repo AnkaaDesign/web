@@ -2,7 +2,7 @@ export type INVOICE_STATUS = 'DRAFT' | 'ACTIVE' | 'PARTIALLY_PAID' | 'PAID' | 'C
 export type INSTALLMENT_STATUS = 'PENDING' | 'PROCESSING' | 'PAID' | 'OVERDUE' | 'CANCELLED';
 export type BANK_SLIP_STATUS = 'CREATING' | 'REGISTERING' | 'ACTIVE' | 'OVERDUE' | 'PAID' | 'CANCELLED' | 'REJECTED' | 'ERROR';
 export type BANK_SLIP_TYPE = 'NORMAL' | 'HIBRIDO';
-export type NFSE_STATUS = 'PENDING' | 'PROCESSING' | 'AUTHORIZED' | 'CANCELLED' | 'ERROR';
+export type NFSE_STATUS = 'PENDING' | 'PROCESSING' | 'AUTHORIZED' | 'CANCEL_REQUESTED' | 'CANCEL_REJECTED' | 'CANCELLED' | 'ERROR';
 
 // Full NFS-e cancellation lifecycle status (mirrors backend NfseStatus enum).
 // AUTHORIZED → CANCEL_REQUESTED (aguardando fiscal) → CANCEL_REJECTED | CANCELLED.

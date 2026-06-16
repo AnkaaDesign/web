@@ -616,6 +616,12 @@ export const routes = {
       collectiveDetails: (id: string) => `/departamento-pessoal/ferias/coletiva/detalhes/${id}`,
       root: "/departamento-pessoal/ferias",
     },
+    thirteenth: {
+      create: "/departamento-pessoal/decimo-terceiro/cadastrar",
+      details: (id: string) => `/departamento-pessoal/decimo-terceiro/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/decimo-terceiro/editar/${id}`,
+      root: "/departamento-pessoal/decimo-terceiro",
+    },
     salaryAdjustments: {
       details: (id: string) => `/departamento-pessoal/reajustes/detalhes/${id}`,
       root: "/departamento-pessoal/reajustes",

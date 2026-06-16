@@ -42,7 +42,7 @@ interface UseStatisticsPagePersistenceOptions<T extends Record<string, unknown>>
   debounceMs?: number;
 }
 
-interface UseStatisticsPagePersistenceReturn<T extends Record<string, unknown>> {
+interface UseStatisticsPagePersistenceReturn {
   /** True until the last-seen config has been fetched and applied (or determined absent/invalid). */
   isRestoring: boolean;
   /** Named presets saved for this page. */
@@ -80,7 +80,7 @@ export function useStatisticsPagePersistence<T extends Record<string, unknown>>(
   current,
   apply,
   debounceMs = AUTO_SAVE_DEBOUNCE_MS,
-}: UseStatisticsPagePersistenceOptions<T>): UseStatisticsPagePersistenceReturn<T> {
+}: UseStatisticsPagePersistenceOptions<T>): UseStatisticsPagePersistenceReturn {
   const queryClient = useQueryClient();
   const [isRestored, setIsRestored] = useState(false);
 

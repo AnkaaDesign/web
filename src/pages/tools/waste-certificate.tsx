@@ -360,7 +360,7 @@ export function WasteCertificateToolPage() {
                 onSort={toggleSort}
                 getSortDirection={getSortDirection}
                 getSortOrder={getSortOrder}
-                sortConfigs={sortConfigs}
+                sortConfigs={sortConfigs.map((config) => ({ field: config.column, direction: config.direction }))}
                 currentPage={page}
                 totalPages={totalPages}
                 pageSize={pageSize}

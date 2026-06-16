@@ -127,6 +127,10 @@ const PersonnelDepartmentVacationsCreate = lazy(() => import("@/pages/personnel-
 const PersonnelDepartmentVacationsDetails = lazy(() => import("@/pages/personnel-department/vacations/details/[id]").then((module) => ({ default: module.VacationDetailPage })));
 const PersonnelDepartmentVacationsEdit = lazy(() => import("@/pages/personnel-department/vacations/edit/[id]").then((module) => ({ default: module.VacationEditPage })));
 const PersonnelDepartmentVacationGroupsDetails = lazy(() => import("@/pages/personnel-department/vacation-groups/details/[id]").then((module) => ({ default: module.VacationGroupDetailPage })));
+const PersonnelDepartmentThirteenthList = lazy(() => import("@/pages/personnel-department/thirteenth/list"));
+const PersonnelDepartmentThirteenthCreate = lazy(() => import("@/pages/personnel-department/thirteenth/create").then((module) => ({ default: module.ThirteenthCreatePage })));
+const PersonnelDepartmentThirteenthDetails = lazy(() => import("@/pages/personnel-department/thirteenth/details/[id]").then((module) => ({ default: module.ThirteenthDetailPage })));
+const PersonnelDepartmentThirteenthEdit = lazy(() => import("@/pages/personnel-department/thirteenth/edit/[id]").then((module) => ({ default: module.ThirteenthEditPage })));
 
 // Occupational Health - Medicina do Trabalho (W3C)
 const OccupationalHealthMedicalExamsList = lazy(() => import("@/pages/occupational-health/medical-exams/list").then((module) => ({ default: module.MedicalExamListPage })));
@@ -2979,6 +2983,39 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PersonnelDepartmentVacationGroupsDetails />
+                    </Suspense>
+                  }
+                />
+                {/* Departamento Pessoal — 13º Salário */}
+                <Route
+                  path={routes.personnelDepartment.thirteenth.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentThirteenthList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.thirteenth.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentThirteenthCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.thirteenth.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentThirteenthDetails />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personnelDepartment.thirteenth.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentThirteenthEdit />
                     </Suspense>
                   }
                 />

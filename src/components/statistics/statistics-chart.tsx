@@ -992,8 +992,8 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
 
     const simpleTooltip = {
       ...tooltipBase,
-      trigger: (tooltipTrigger === 'item' ? 'item' : 'axis') as const,
-      axisPointer: { type: (tooltipTrigger === 'item' ? 'none' : (baseChartType.startsWith('bar') ? 'shadow' : 'line')) as const },
+      trigger: tooltipTrigger === 'item' ? ('item' as const) : ('axis' as const),
+      axisPointer: { type: tooltipTrigger === 'item' ? ('none' as const) : (baseChartType.startsWith('bar') ? ('shadow' as const) : ('line' as const)) },
       formatter: (params: any) => {
         const list = Array.isArray(params) ? params : params ? [params] : [];
         if (list.length === 0) return '';

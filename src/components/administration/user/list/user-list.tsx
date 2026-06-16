@@ -340,10 +340,15 @@ export function UserList({ className, teamScope }: UserListProps) {
       delete result.ledSectorId;
     }
 
+    // The API only accepts `contractKinds` (mapped to currentContractType
+    // server-side); `contractTypes` is silently stripped. Always emit the
+    // server-recognized param and drop the UI-only alias.
+    delete (result as any).contractTypes;
+
     // Apply contract type / status filter logic
     if (hasExplicitContractTypeFilter) {
       // User has explicitly selected contract types - use only those
-      result.contractTypes = [...filterWithoutOrderBy.contractTypes!];
+      result.contractKinds = [...filterWithoutOrderBy.contractTypes!];
     } else if (hasDismissedAtFilter) {
       // Filtering by dismissal date without an explicit contract type filter:
       // restrict to dismissed vínculos via the status cache.

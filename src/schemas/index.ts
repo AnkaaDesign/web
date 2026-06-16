@@ -98,7 +98,7 @@ export * from "./payroll";
 // Discount exports (to avoid naming conflicts with payroll and bonusDiscount)
 export {
   discountIncludeSchema,
-  calculationOrderBySchema as discountOrderBySchema,
+  discountOrderBySchema,
   discountWhereSchema,
   discountGetManySchema,
   discountGetByIdSchema,

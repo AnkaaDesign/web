@@ -1979,6 +1979,18 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "dp-ferias-coletiva-detalhes", title: "Férias Coletivas", icon: "eye", path: "/departamento-pessoal/ferias/coletiva/detalhes/:id", isDynamic: true },
         ],
       },
+      {
+        id: "dp-decimo-terceiro",
+        title: "13º Salário",
+        icon: "coins",
+        path: "/departamento-pessoal/decimo-terceiro",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          { id: "dp-decimo-terceiro-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/decimo-terceiro/cadastrar" },
+          { id: "dp-decimo-terceiro-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/decimo-terceiro/detalhes/:id", isDynamic: true },
+          { id: "dp-decimo-terceiro-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/decimo-terceiro/editar/:id", isDynamic: true },
+        ],
+      },
       // NOTE (spec alignment 2026-06-11): "Feriados" and "Calendário" are NOT DP items.
       // Calendário moved under Ferramentas for ACCOUNTING (HR/ADMIN keep the
       // Recursos Humanos placement); Feriados stays HR/ADMIN-only in Recursos Humanos.

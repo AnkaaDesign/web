@@ -58,6 +58,7 @@ import { getAccountingTypeLabel } from "@/components/financial/reconciliation/ma
 import {
   SECTOR_PRIVILEGES,
   routes,
+  ACCOUNTING_TYPE,
   ACCOUNTING_TYPE_LABELS,
 } from "@/constants";
 import type {
@@ -526,7 +527,7 @@ function CategoryEditorDialog({
   const [isRecurring, setIsRecurring] = useState(false);
   const [color, setColor] = useState("");
   // Accounting type (chart-of-accounts cost group). Empty string = unset.
-  const [accountingType, setAccountingType] = useState("");
+  const [accountingType, setAccountingType] = useState<ACCOUNTING_TYPE | "">("");
   const colorInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -537,7 +538,7 @@ function CategoryEditorDialog({
       setIsRecurring(category.isRecurring);
       setColor(category.color ?? "");
       setAccountingType(
-        (category as { accountingType?: string | null }).accountingType ?? "",
+        ((category as { accountingType?: string | null }).accountingType as ACCOUNTING_TYPE | null) ?? "",
       );
     } else {
       setName("");
@@ -607,7 +608,7 @@ function CategoryEditorDialog({
             <Combobox
               value={accountingType || undefined}
               onValueChange={v =>
-                setAccountingType(typeof v === "string" ? v : "")
+                setAccountingType(typeof v === "string" ? (v as ACCOUNTING_TYPE) : "")
               }
               options={ACCOUNTING_TYPE_OPTIONS}
               placeholder="Selecione o grupo contábil..."

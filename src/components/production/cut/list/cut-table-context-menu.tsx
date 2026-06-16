@@ -27,9 +27,9 @@ export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTable
   const isMultiSelection = items.length > 1;
 
   // Permission checks aligned to the API roles (cut.controller.ts)
-  const canRequestNewCut = canRequestCut(currentUser); // POST /cuts: DESIGNER, ADMIN
-  const canChangeStatus = canManageCutStatus(currentUser); // PUT /cuts/:id: DESIGNER, PLOTTING, ADMIN
-  const canDelete = canDeleteCuts(currentUser); // DELETE /cuts/:id: DESIGNER, ADMIN
+  const canRequestNewCut = canRequestCut(currentUser ?? null); // POST /cuts: DESIGNER, ADMIN
+  const canChangeStatus = canManageCutStatus(currentUser ?? null); // PUT /cuts/:id: DESIGNER, PLOTTING, ADMIN
+  const canDelete = canDeleteCuts(currentUser ?? null); // DELETE /cuts/:id: DESIGNER, ADMIN
 
   // Status checks
   const hasPendingCuts = items.some((c) => c.status === CUT_STATUS.PENDING);

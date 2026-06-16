@@ -120,10 +120,10 @@ export function CategorySelector({ disabled, required, onCategoryChange, initial
       });
 
       if (result.success && result.data) {
-        const newId = result.data.id;
-        form.setValue("categoryId", newId as any, { shouldDirty: true, shouldValidate: true });
-        onCategoryChange?.(newId);
-        return newId;
+        const created = result.data;
+        form.setValue("categoryId", created.id as any, { shouldDirty: true, shouldValidate: true });
+        onCategoryChange?.(created.id);
+        return { value: created.id, label: created.name };
       }
       return undefined;
     } catch (error) {

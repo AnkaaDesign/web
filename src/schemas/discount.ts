@@ -120,19 +120,18 @@ export const discountWhereSchema: z.ZodType<any> = z.lazy(() =>
           }),
         ])
         .optional(),
-      calculationOrder: z
+      discountType: z
         .union([
-          z.number(),
+          z.string(),
           z.object({
-            equals: z.number().optional(),
-            not: z.number().optional(),
-            lt: z.number().optional(),
-            lte: z.number().optional(),
-            gt: z.number().optional(),
-            gte: z.number().optional(),
+            equals: z.string().optional(),
+            in: z.array(z.string()).optional(),
+            notIn: z.array(z.string()).optional(),
           }),
         ])
         .optional(),
+      isPersistent: z.boolean().optional(),
+      isActive: z.boolean().optional(),
       createdAt: nullableDate.optional(),
       updatedAt: nullableDate.optional(),
 
@@ -163,7 +162,7 @@ export const discountWhereSchema: z.ZodType<any> = z.lazy(() =>
 // Order By Schema for Sorting
 // =====================
 
-export const calculationOrderBySchema = z.union([
+export const discountOrderBySchema = z.union([
   // Single field ordering
   z
     .object({
@@ -172,7 +171,7 @@ export const calculationOrderBySchema = z.union([
       percentage: orderByDirectionSchema.optional(),
       value: orderByDirectionSchema.optional(),
       reference: orderByDirectionSchema.optional(),
-      calculationOrder: orderByDirectionSchema.optional(),
+      discountType: orderByDirectionSchema.optional(),
       createdAt: orderByDirectionSchema.optional(),
       updatedAt: orderByDirectionSchema.optional(),
 
@@ -199,7 +198,7 @@ export const calculationOrderBySchema = z.union([
         percentage: orderByDirectionSchema.optional(),
         value: orderByDirectionSchema.optional(),
         reference: orderByDirectionSchema.optional(),
-        calculationOrder: orderByDirectionSchema.optional(),
+        discountType: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
 
@@ -325,6 +324,36 @@ export const discountUpdateSchema = z
   );
 
 // =====================
+// Employee-anchored MASTER loan (registered once, applied to future folhas)
+// =====================
+// Mirrors the API loanMasterCreateSchema (POST /discount/loan). Creates a master
+// persistent PayrollDiscount (payrollId=null) auto-applied to every future folha.
+
+export const loanMasterCreateSchema = z.object({
+  userId: z.string().uuid("Colaborador inválido"),
+  value: z
+    .number()
+    .positive("O valor da parcela deve ser maior que zero")
+    .transform((val) => Math.round(val * 100) / 100),
+  totalInstallments: z
+    .number()
+    .int("O total de parcelas deve ser um número inteiro")
+    .min(1, "O total de parcelas deve ser pelo menos 1")
+    .max(120, "O total de parcelas deve ser no máximo 120"),
+  startCompetence: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Competência inválida (formato esperado: YYYY-MM)"),
+  discountType: z.enum(["LOAN", "ADVANCE"]).default("LOAN"),
+  // Modalidade: COMPANY = empréstimo/adiantamento da própria empresa; PAYROLL_CONSIGNED = consignado (banco).
+  loanKind: z.enum(["COMPANY", "PAYROLL_CONSIGNED"]).default("COMPANY"),
+  // Banco/credor — usado quando loanKind = PAYROLL_CONSIGNED.
+  lenderName: z.string().max(200, "Nome do credor muito longo").optional(),
+  description: z.string().max(200, "Descrição muito longa").optional(),
+});
+
+export type LoanMasterCreateFormData = z.infer<typeof loanMasterCreateSchema>;
+
+// =====================
 // Batch Operations
 // =====================
 
@@ -363,7 +392,7 @@ export const discountGetManySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(10),
   include: discountIncludeSchema.optional(),
   where: discountWhereSchema.optional(),
-  orderBy: calculationOrderBySchema.optional().default({ calculationOrder: "asc", createdAt: "desc" }),
+  orderBy: discountOrderBySchema.optional().default([{ discountType: "asc" }, { createdAt: "desc" }]),
   searchingFor: z.string().optional(),
 
   // Specific discount filters
@@ -376,7 +405,7 @@ export const discountGetByIdSchema = z.object({
 
 export const discountQuerySchema = z.object({
   where: discountWhereSchema.optional(),
-  orderBy: calculationOrderBySchema.optional(),
+  orderBy: discountOrderBySchema.optional(),
   skip: z.coerce.number().int().min(0).optional(),
   take: z.coerce.number().int().min(1).max(100).optional(),
   page: z.coerce.number().int().min(1).optional(),
@@ -428,7 +457,7 @@ export type DiscountBatchCreateFormData = z.infer<typeof discountBatchCreateSche
 export type DiscountBatchUpdateFormData = z.infer<typeof discountBatchUpdateSchema>;
 export type DiscountBatchDeleteFormData = z.infer<typeof discountBatchDeleteSchema>;
 export type DiscountInclude = z.infer<typeof discountIncludeSchema>;
-export type DiscountOrderBy = z.infer<typeof calculationOrderBySchema>;
+export type DiscountOrderBy = z.infer<typeof discountOrderBySchema>;
 export type DiscountWhere = z.infer<typeof discountWhereSchema>;
 
 // =====================

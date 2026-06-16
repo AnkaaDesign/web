@@ -29,6 +29,7 @@ import type { File, FileIncludes } from "./file";
 
 export interface Termination extends BaseEntity {
   userId: string;
+  contractId: string | null;
   type: TERMINATION_TYPE;
   status: TERMINATION_STATUS;
   statusOrder: number;

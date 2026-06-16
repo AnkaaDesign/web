@@ -1752,7 +1752,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
   }, [openModalWithContext, filters.skillIds, filters.topicIds, overview]);
 
   const handlePieClick = useCallback(
-    (_dataIndex: number, name: string) => openScoreBand(SCORE_LEVEL_LABELS.indexOf(name)),
+    (_dataIndex: number, name: string) => openScoreBand((SCORE_LEVEL_LABELS as readonly string[]).indexOf(name)),
     [openScoreBand],
   );
 
@@ -1791,7 +1791,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
     // Distribution: clicking a single colored band ("Atende: 4") opens the
     // scores list filtered to exactly that 0–5 score for the clicked skill/topic.
     if (yAxisMode === 'distribution') {
-      const level = SCORE_LEVEL_LABELS.indexOf(seriesName);
+      const level = (SCORE_LEVEL_LABELS as readonly string[]).indexOf(seriesName);
       openModalWithContext(level >= 0 ? { primary, score: level } : { primary });
       return;
     }
@@ -1833,7 +1833,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
     if (!overview) return;
     // Distribution radar: the spokes are the 6 score levels → drill the band.
     if (yAxisMode === 'distribution') {
-      openScoreBand(SCORE_LEVEL_LABELS.indexOf(name));
+      openScoreBand((SCORE_LEVEL_LABELS as readonly string[]).indexOf(name));
       return;
     }
     if (xAxisMode === 'skill') {

@@ -167,8 +167,9 @@ export function convertToApiFilters(urlFilters: UserFilters): Partial<UserGetMan
   // Text search
   if (urlFilters.searchingFor) apiFilters.searchingFor = urlFilters.searchingFor;
 
-  // Contract type filter
-  if (urlFilters.contractTypes && urlFilters.contractTypes.length > 0) apiFilters.contractTypes = urlFilters.contractTypes;
+  // Contract type filter — the API only accepts `contractKinds`
+  // (mapped to currentContractType server-side); `contractTypes` is stripped.
+  if (urlFilters.contractTypes && urlFilters.contractTypes.length > 0) apiFilters.contractKinds = urlFilters.contractTypes;
 
   // Entity filters
   if (urlFilters.positionId && urlFilters.positionId.length > 0) apiFilters.positionId = urlFilters.positionId;
@@ -209,8 +210,10 @@ export function convertFromApiFilters(apiFilters: Partial<UserGetManyFormData>):
   // Text search
   if (apiFilters.searchingFor) urlFilters.searchingFor = apiFilters.searchingFor;
 
-  // Contract type filter
-  if (apiFilters.contractTypes) urlFilters.contractTypes = apiFilters.contractTypes;
+  // Contract type filter — accept either the canonical `contractKinds` (sent to
+  // the API) or the legacy `contractTypes` alias.
+  const apiContractTypes = apiFilters.contractKinds ?? apiFilters.contractTypes;
+  if (apiContractTypes) urlFilters.contractTypes = apiContractTypes;
 
   // Entity filters
   if (apiFilters.positionId) urlFilters.positionId = apiFilters.positionId;

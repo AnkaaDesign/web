@@ -24,7 +24,7 @@ interface ScheduledNextOrder {
   quantity: number;
   scheduleName?: string | null;
   scheduleId?: string;
-  nextRun?: string | null;
+  nextRun?: string | Date | null;
 }
 
 interface CalculationBreakdownCardProps {

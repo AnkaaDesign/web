@@ -68,6 +68,8 @@ const NFSE_STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Pendente' },
   { value: 'PROCESSING', label: 'Processando' },
   { value: 'AUTHORIZED', label: 'Autorizada' },
+  { value: 'CANCEL_REQUESTED', label: 'Cancelamento Solicitado' },
+  { value: 'CANCEL_REJECTED', label: 'Cancelamento Rejeitado' },
   { value: 'CANCELLED', label: 'Cancelada' },
   { value: 'ERROR', label: 'Erro' },
 ];
@@ -89,6 +91,8 @@ const STATUS_COLORS: Record<string, string> = {
   AUTHORIZED: '#10b981',
   PENDING: '#94a3b8',
   PROCESSING: '#3b82f6',
+  CANCEL_REQUESTED: '#f59e0b',
+  CANCEL_REJECTED: '#f97316',
   CANCELLED: '#6b7280',
   ERROR: '#ef4444',
 };

@@ -39,6 +39,7 @@ export const admissionIncludeSchema = z
     contract: relationIncludeSchema.optional(),
     createdBy: relationIncludeSchema.optional(),
     documents: relationIncludeSchema.optional(),
+    admissionExam: relationIncludeSchema.optional(),
   })
   .partial();
 

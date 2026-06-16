@@ -157,9 +157,10 @@ export function PpeSizesList({ className }: PpeSizesListProps) {
       isActive: true,
     };
 
-    // Convert contract kind array to API format
+    // Convert contract kind array to API format. The API only accepts
+    // `contractKinds` (mapped to currentContractType server-side).
     if (result.contractKind && Array.isArray(result.contractKind) && result.contractKind.length > 0) {
-      result.contractTypes = [...result.contractKind];
+      result.contractKinds = [...result.contractKind];
       delete result.contractKind;
     }
 

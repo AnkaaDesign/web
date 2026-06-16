@@ -50,7 +50,6 @@ type LinkedTransaction = NonNullable<
 >;
 import {
   docTypeLabel,
-  docTypeVariant,
 } from "@/components/financial/reconciliation/fiscal-doc-badge";
 import { getConfidenceBadgeVariant } from "@/components/financial/reconciliation/match-status-badge";
 import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";

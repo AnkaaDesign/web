@@ -591,7 +591,9 @@ const FaltasStatisticsPage = () => {
 
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const chartHandleRef = useRef<StatisticsChartHandle>(null);
-  const [chartType, setChartType] = useState<HrChartType>('line');
+  // This page only offers line/bar/area (see CHART_TYPE_OPTIONS); keep the
+  // state in sync with the persisted PageConfig union.
+  const [chartType, setChartType] = useState<PageConfig['chartType']>('line');
   const [trendLine, setTrendLine] = useState<TrendLineType | null>(null);
   const [yAxisMode, setYAxisMode] = useState<AbsenteeismYMode>('rate');
   const [drillDown, setDrillDown] = useState<AbsenteeismDrillMode | null>(null);
@@ -939,7 +941,7 @@ const FaltasStatisticsPage = () => {
                     <DropdownMenuContent align="end" className="w-60">
                       <DropdownMenuLabel>Tipo de gráfico</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuRadioGroup value={chartType} onValueChange={v => setChartType(v as HrChartType)}>
+                      <DropdownMenuRadioGroup value={chartType} onValueChange={v => setChartType(v as PageConfig['chartType'])}>
                         {CHART_TYPE_OPTIONS.map(c => {
                           const Icon = c.icon;
                           return (

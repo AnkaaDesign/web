@@ -214,7 +214,7 @@ export function PayrollList({ className }: PayrollListProps) {
         },
         bonus: true,
         discounts: {
-          orderBy: { calculationOrder: "asc" }
+          orderBy: { discountType: "asc" }
         },
       },
     };

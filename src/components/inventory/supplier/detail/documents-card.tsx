@@ -15,7 +15,6 @@ interface DocumentsCardProps {
 }
 
 export function DocumentsCard({
-  supplier,
   className,
   contracts = [],
   certificates = [],

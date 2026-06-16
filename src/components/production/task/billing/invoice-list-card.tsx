@@ -303,7 +303,12 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
                           <div className="px-4 py-2.5">
                             {(() => {
                               const nfseDocuments = invoice.nfseDocuments ?? [];
-                              const activeNfse = nfseDocuments.find((d) => d.status === 'AUTHORIZED') ?? nfseDocuments[nfseDocuments.length - 1] ?? null;
+                              // A note stays "live" at the prefeitura while authorized or while a
+                              // cancellation is in flight / was rejected (CANCEL_REQUESTED/CANCEL_REJECTED).
+                              const activeNfse =
+                                nfseDocuments.find((d) => d.status === 'AUTHORIZED' || d.status === 'CANCEL_REQUESTED' || d.status === 'CANCEL_REJECTED') ??
+                                nfseDocuments[nfseDocuments.length - 1] ??
+                                null;
                               return (
                                 <div>
                                   <div className="flex items-center justify-between">

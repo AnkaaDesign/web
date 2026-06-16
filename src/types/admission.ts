@@ -21,6 +21,7 @@ import type { MedicalExam } from "./medical-exam";
 
 export interface Admission extends BaseEntity {
   userId: string;
+  contractId: string | null;
   status: ADMISSION_STATUS;
   statusOrder: number;
   hireDate: Date | null;

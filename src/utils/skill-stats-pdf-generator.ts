@@ -43,6 +43,8 @@ const COMPARE_LABELS: Record<SkillStatsCompareMode, string> = {
   user: 'Colaborador',
   skill: 'Competência',
   position: 'Cargo',
+  topic: 'Tópico',
+  campaign: 'Campanha',
 };
 
 const fmt = (n: number | null | undefined, decimals = 2) =>

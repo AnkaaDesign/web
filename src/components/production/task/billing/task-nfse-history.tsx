@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,14 +28,23 @@ function isActiveNote(nfse: TaskNfseHistoryItem): boolean {
  */
 export function TaskNfseHistoryCard({ taskId }: TaskNfseHistoryProps) {
   const navigate = useNavigate();
-  const { data: response, isLoading } = useTaskNfseHistory(taskId);
   const [cancelTarget, setCancelTarget] = useState<TaskNfseHistoryItem | null>(null);
+  // Poll while any note has a cancellation awaiting fiscal — the prefeitura
+  // resolves CANCEL_REQUESTED → CANCELLED/CANCEL_REJECTED asynchronously.
+  const [pollInterval, setPollInterval] = useState<number | false>(false);
+  const { data: response, isLoading } = useTaskNfseHistory(taskId, { refetchInterval: pollInterval });
 
   const history: TaskNfseHistory | undefined = response?.data;
   // Latest first (highest NF number on top; not-yet-emitted notes last).
   const nfses: TaskNfseHistoryItem[] = [...(history?.nfses ?? [])].sort(
     (a, b) => (b.nfseNumber ?? -1) - (a.nfseNumber ?? -1),
   );
+
+  // Keep polling alive only while a cancellation is in flight; stop once it resolves.
+  const hasPendingCancellation = nfses.some((nfse) => nfse.status === "CANCEL_REQUESTED");
+  useEffect(() => {
+    setPollInterval(hasPendingCancellation ? 15000 : false);
+  }, [hasPendingCancellation]);
 
   // Hide the card entirely when there is nothing to show (keeps the review page clean).
   if (!isLoading && nfses.length === 0) return null;
