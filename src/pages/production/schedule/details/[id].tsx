@@ -2317,7 +2317,6 @@ export const TaskDetailsPage = () => {
                             const statusLabels: Record<TASK_QUOTE_STATUS, string> = {
                               PENDING: 'Pendente',
                               BUDGET_APPROVED: 'Orçamento Aprovado',
-                              COMMERCIAL_APPROVED: 'Aprovado pelo Comercial',
                               BILLING_APPROVED: 'Faturamento Aprovado',
                               UPCOMING: 'A Vencer',
                               DUE: 'Vencido',
@@ -2329,9 +2328,10 @@ export const TaskDetailsPage = () => {
                             // BUDGET_APPROVED); further status changes happen in the
                             // financial pages. We ALWAYS include the current status so
                             // the Combobox can render its label — otherwise a
-                            // COMMERCIAL_APPROVED+ quote shows the "Selecione uma opção"
-                            // placeholder. The current status is shown selected+disabled;
-                            // the transitions helper still gates the rest by role.
+                            // BILLING_APPROVED+ quote shows the "Selecione uma opção"
+                            // placeholder. The current status is shown
+                            // selected+disabled; the transitions helper still gates
+                            // the rest by role.
                             const allStatuses: TASK_QUOTE_STATUS[] = Array.from(
                               new Set<TASK_QUOTE_STATUS>([
                                 'PENDING',
@@ -2360,8 +2360,6 @@ export const TaskDetailsPage = () => {
                                 case 'PENDING':
                                   return "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600";
                                 case 'BUDGET_APPROVED':
-                                  return "bg-green-700 text-white hover:bg-green-800 border-green-800";
-                                case 'COMMERCIAL_APPROVED':
                                   return "bg-blue-700 text-white hover:bg-blue-800 border-blue-800";
                                 case 'BILLING_APPROVED':
                                   return "bg-green-700 text-white hover:bg-green-800 border-green-800";

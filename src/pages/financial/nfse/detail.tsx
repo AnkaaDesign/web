@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from "@/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InlinePdfViewer } from "@/components/common/file/inline-pdf-viewer";
+import { NfseCancellationCard } from "@/components/financial/nfse/nfse-cancellation-card";
 import {
   IconRefresh,
   IconDownload,
@@ -118,10 +119,12 @@ export function NfseDetailPage() {
   const formImposto = detail.formImposto || {};
   const formTotal = detail.formTotal || {};
 
-  // Derive status from local NfseDocument status
+  // Derive status from local NfseDocument status (full cancellation lifecycle)
   const localStatus = detail.localStatus;
   const isCancelada = localStatus === "CANCELLED";
-  const isEmitida = localStatus === "AUTHORIZED" || !isCancelada;
+  const isCancelRejected = localStatus === "CANCEL_REJECTED";
+  const isCancelRequested = localStatus === "CANCEL_REQUESTED";
+  const isEmitida = !isCancelada && !isCancelRejected && !isCancelRequested;
 
   const documentNumber = formDados.numeroNfse || elotechNfseId;
 
@@ -218,6 +221,10 @@ export function NfseDetailPage() {
                       <span className="text-sm font-semibold text-foreground">
                         {isCancelada ? (
                           <Badge variant="cancelled">Cancelada</Badge>
+                        ) : isCancelRejected ? (
+                          <Badge variant="destructive">Cancelamento Rejeitado</Badge>
+                        ) : isCancelRequested ? (
+                          <Badge variant="amber">Aguardando Fiscal</Badge>
                         ) : isEmitida ? (
                           <Badge variant="green">Emitida</Badge>
                         ) : (
@@ -456,6 +463,13 @@ export function NfseDetailPage() {
                 </Card>
               )}
             </div>
+
+            {/* Cancelamento — async cancellation lifecycle at the prefeitura */}
+            <NfseCancellationCard
+              elotechNfseId={elotechNfseId}
+              invoiceId={detail.invoiceId}
+              nfseDocumentId={detail.nfseDocumentId}
+            />
 
             {/* PDF Viewer */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

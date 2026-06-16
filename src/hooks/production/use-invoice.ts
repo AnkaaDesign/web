@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoiceService } from '@/api-client/invoice';
+import { nfseService } from '@/api-client/nfse';
 import { taskQuoteKeys } from '@/hooks/production/use-task-quote';
 import { dashboardQueryKeys } from '@/hooks/common/use-dashboard';
 import { taskKeys } from '@/hooks';
@@ -12,6 +13,7 @@ export const invoiceKeys = {
   detail: (id: string) => [...invoiceKeys.details(), id] as const,
   byTask: (taskId: string) => [...invoiceKeys.all, 'byTask', taskId] as const,
   byCustomer: (customerId: string) => [...invoiceKeys.all, 'byCustomer', customerId] as const,
+  nfseHistory: (taskId: string) => [...invoiceKeys.all, 'nfseHistory', taskId] as const,
 };
 
 /**
@@ -57,6 +59,17 @@ export function useInvoicesByCustomer(customerId: string) {
     queryKey: invoiceKeys.byCustomer(customerId),
     queryFn: () => invoiceService.getByCustomerId(customerId),
     enabled: !!customerId,
+  });
+}
+
+// Get full NFS-e history for a task (cancelled/rejected/orphan notes included).
+// Supports polling while a cancellation request is awaiting fiscal.
+export function useTaskNfseHistory(taskId: string, options?: { refetchInterval?: number | false }) {
+  return useQuery({
+    queryKey: invoiceKeys.nfseHistory(taskId),
+    queryFn: () => invoiceService.taskNfseHistory(taskId),
+    enabled: !!taskId,
+    refetchInterval: options?.refetchInterval,
   });
 }
 
@@ -125,15 +138,37 @@ export function useEmitNfse() {
   });
 }
 
-// Cancel NFS-e
+// Cancel NFS-e — registers an async cancellation request at the prefeitura.
+// `substituteNfseNumber` is forwarded through (required when reasonCode=4 / Duplicidade).
+// Returns the CancelNfseResult so callers can surface result.message and the pending/rejected flags.
 export function useCancelNfse() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ invoiceId, nfseDocumentId, data }: { invoiceId: string; nfseDocumentId: string; data: any }) =>
-      invoiceService.cancelNfse(invoiceId, { ...data, nfseDocumentId }),
+      invoiceService
+        .cancelNfse(invoiceId, { ...data, nfseDocumentId })
+        .then((r) => r.data),
     onSuccess: () => {
       invalidateAllBillingCaches(queryClient);
+      // Refresh NFS-e list/detail/cancellation views as well
+      queryClient.invalidateQueries({ queryKey: ['nfse'] });
+    },
+  });
+}
+
+// Cancel NFS-e by its local document id — works for ANY note (incl. invoice-less orphans).
+// Uses the document-scoped endpoint PUT /nfse/document/:id/cancel. Returns the CancelNfseResult.
+export function useCancelNfseByDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ nfseDocumentId, data }: { nfseDocumentId: string; data: any }) =>
+      nfseService.cancelByDocument(nfseDocumentId, data).then((r) => r.data),
+    onSuccess: () => {
+      invalidateAllBillingCaches(queryClient);
+      // Refresh NFS-e list/detail/cancellation/history views as well
+      queryClient.invalidateQueries({ queryKey: ['nfse'] });
     },
   });
 }

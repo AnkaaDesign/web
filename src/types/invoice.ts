@@ -4,6 +4,17 @@ export type BANK_SLIP_STATUS = 'CREATING' | 'REGISTERING' | 'ACTIVE' | 'OVERDUE'
 export type BANK_SLIP_TYPE = 'NORMAL' | 'HIBRIDO';
 export type NFSE_STATUS = 'PENDING' | 'PROCESSING' | 'AUTHORIZED' | 'CANCELLED' | 'ERROR';
 
+// Full NFS-e cancellation lifecycle status (mirrors backend NfseStatus enum).
+// AUTHORIZED → CANCEL_REQUESTED (aguardando fiscal) → CANCEL_REJECTED | CANCELLED.
+export type NfseStatus =
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'AUTHORIZED'
+  | 'CANCEL_REQUESTED'
+  | 'CANCEL_REJECTED'
+  | 'CANCELLED'
+  | 'ERROR';
+
 export interface Invoice {
   id: string;
   customerConfigId: string | null;
@@ -98,7 +109,81 @@ export interface ElotechNfseListItem {
   taskSerialNumber?: string | null;
   customerName?: string | null;
   nfseDocumentId?: string | null;
-  localStatus?: string | null;
+  localStatus?: NfseStatus | string | null;
   idMotivoSituacao?: number;
   descricaoMotivoSituacao?: string;
+  // Local cancellation lifecycle — surfaced when Elotech still shows the note active
+  cancelRequestStatus?: 'AGUARDANDO_FISCAL' | 'AUTORIZADO' | 'REJEITADO' | string | null;
+  cancelRejectionMessage?: string | null;
+  cancelSubstituteNfseNumber?: number | null;
+}
+
+// Response of PUT /invoices/:invoiceId/nfse/cancel
+export interface CancelNfseResult {
+  message: string;
+  cancelled: boolean;
+  pending: boolean;
+  rejected: boolean;
+  status: NfseStatus;
+  elotechNfseId: number;
+  requestStatus: 'AGUARDANDO_FISCAL' | 'AUTORIZADO' | 'REJEITADO' | null;
+  rejectionMessage: string | null;
+}
+
+// Single entry in the cancellation-request timeline (GET /nfse/:id/cancellation)
+export interface NfseCancellationHistorico {
+  data: string | null;
+  status: string | null;
+  descricaoStatus: string | null;
+  motivo: string | null;
+}
+
+// Response of GET /nfse/:elotechNfseId/cancellation
+export interface NfseCancellationStatus {
+  elotechNfseId: number;
+  nfseNumber: number | null;
+  notaSituacao: string;
+  cancelada: boolean;
+  request: {
+    id: number | null;
+    ultimoStatus: string | null;
+    motivo: string | null;
+    data: string | null;
+    codigoMotivoSituacao: number | null;
+    historicos: NfseCancellationHistorico[];
+  } | null;
+  nfseDocumentId: string | null;
+}
+
+// Single note in the task NFS-e history (GET /invoices/task/:taskId/nfse-history)
+export interface TaskNfseHistoryItem {
+  id: string;
+  invoiceId: string | null;
+  elotechNfseId: number | null;
+  nfseNumber: number | null;
+  status: NfseStatus;
+  errorMessage: string | null;
+  cancelRequestStatus: string | null;
+  cancelReason: string | null;
+  cancelReasonCode: number | null;
+  cancelRejectionMessage: string | null;
+  cancelSubstituteNfseNumber: number | null;
+  cancelRequestedAt: string | null;
+  cancelResolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isOrphan: boolean;
+  // Enriched from Elotech (the live fiscal record at the prefeitura)
+  dataEmissao: string | null;
+  valorDoc: number | null;
+  valorISS: number | null;
+  tomadorRazaoNome: string | null;
+  cancelada: boolean;
+}
+
+// Response of GET /invoices/task/:taskId/nfse-history
+export interface TaskNfseHistory {
+  taskId: string;
+  total: number;
+  nfses: TaskNfseHistoryItem[];
 }

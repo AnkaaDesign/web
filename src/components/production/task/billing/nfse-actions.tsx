@@ -39,8 +39,12 @@ export function NfseActions({ invoiceId, nfseDocuments, canManage = true }: Nfse
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelReasonCode, setCancelReasonCode] = useState('1');
+  const [cancelSubstituteNumber, setCancelSubstituteNumber] = useState('');
   const emitNfse = useEmitNfse();
   const cancelNfse = useCancelNfse();
+
+  // Substitute NF number is required by the prefeitura for Duplicidade (code 4)
+  const substituteRequired = cancelReasonCode === '4';
 
   // Find the latest authorized NFSe (for cancel action)
   const authorizedNfse = nfseDocuments?.find((d) => d.status === 'AUTHORIZED') ?? null;
@@ -68,18 +72,37 @@ export function NfseActions({ invoiceId, nfseDocuments, canManage = true }: Nfse
       toast.error('Motivo do cancelamento é obrigatório e deve ter no mínimo 15 caracteres.');
       return;
     }
+    if (substituteRequired && !cancelSubstituteNumber.trim()) {
+      toast.error('Informe o número da nota fiscal substituta para cancelamento por duplicidade.');
+      return;
+    }
     if (!authorizedNfse) return;
     cancelNfse.mutate(
       {
         invoiceId,
         nfseDocumentId: authorizedNfse.id,
-        data: { reason: cancelReason, reasonCode: Number(cancelReasonCode) },
+        data: {
+          reason: cancelReason,
+          reasonCode: Number(cancelReasonCode),
+          substituteNfseNumber: cancelSubstituteNumber.trim()
+            ? Number(cancelSubstituteNumber)
+            : undefined,
+        },
       },
       {
-        onSuccess: () => {
+        // The backend message states the outcome (pending/rejected/cancelled).
+        onSuccess: (result: any) => {
+          if (result?.message) {
+            if (result.rejected) {
+              toast.error(result.message);
+            } else {
+              toast.success(result.message);
+            }
+          }
           setShowCancelDialog(false);
           setCancelReason('');
           setCancelReasonCode('1');
+          setCancelSubstituteNumber('');
         },
       }
     );
@@ -147,6 +170,26 @@ export function NfseActions({ invoiceId, nfseDocuments, canManage = true }: Nfse
                 onChange={(value) => setCancelReason(String(value ?? ''))}
                 placeholder="Descreva o motivo do cancelamento..."
               />
+            </div>
+            <div>
+              <label
+                className={`text-sm font-medium mb-1.5 block ${substituteRequired ? 'text-destructive' : ''}`}
+              >
+                Nota fiscal substituta (Nº)
+                {substituteRequired && <span className="text-destructive"> *</span>}
+              </label>
+              <Input
+                type="number"
+                value={cancelSubstituteNumber}
+                onChange={(value) => setCancelSubstituteNumber(String(value ?? ''))}
+                placeholder="Número da NFS-e que substitui esta nota"
+                className={substituteRequired ? 'border-destructive focus-visible:ring-destructive' : ''}
+              />
+              {substituteRequired && (
+                <p className="text-xs text-destructive mt-1">
+                  Obrigatório para cancelamento por duplicidade.
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>

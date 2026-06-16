@@ -340,7 +340,7 @@ export const BillingDetailPage = () => {
   const firstCustomerStepIdx = servicesStepIdx + 1;
 
   const STATUSES_REQUIRING_COMPLETE_DATA = [
-    "COMMERCIAL_APPROVED",
+    "BUDGET_APPROVED",
     "BILLING_APPROVED",
   ];
 

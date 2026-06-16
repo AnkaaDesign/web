@@ -93,10 +93,31 @@ const defaultFilters: NfseFilters = {
 // ── Badge ──────────────────────────────────────────────────
 
 function NfseSituacaoBadge({ item }: { item: ElotechNfseListItem }) {
+  // Cancellation at the prefeitura is asynchronous: while Elotech still shows the
+  // note active, the local lifecycle reflects what's pending/rejected.
+  // Priority: cancelada > rejeitado > aguardando fiscal > emitida.
   if (item.cancelada) {
     return (
       <Badge variant="cancelled" className="font-medium whitespace-nowrap">
         Cancelada
+      </Badge>
+    );
+  }
+  if (item.cancelRequestStatus === "REJEITADO" || item.localStatus === "CANCEL_REJECTED") {
+    return (
+      <Badge
+        variant="destructive"
+        className="font-medium whitespace-nowrap"
+        title={item.cancelRejectionMessage || undefined}
+      >
+        Cancelamento Rejeitado
+      </Badge>
+    );
+  }
+  if (item.localStatus === "CANCEL_REQUESTED" || item.cancelRequestStatus === "AGUARDANDO_FISCAL") {
+    return (
+      <Badge variant="amber" className="font-medium whitespace-nowrap">
+        Aguardando Fiscal
       </Badge>
     );
   }
@@ -360,6 +381,7 @@ export function NfseListPage() {
   const [cancelTarget, setCancelTarget] = useState<ElotechNfseListItem | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelReasonCode, setCancelReasonCode] = useState("1");
+  const [cancelSubstituteNumber, setCancelSubstituteNumber] = useState("");
   const cancelNfse = useCancelNfse();
 
   // Close context menu on outside click
@@ -469,9 +491,13 @@ export function NfseListPage() {
       setCancelTarget(contextMenu.item);
       setCancelReason("");
       setCancelReasonCode("1");
+      setCancelSubstituteNumber("");
       setContextMenu(null);
     }
   }, [contextMenu]);
+
+  // Substitute NF number is required by the prefeitura when the reason is Duplicidade (code 4)
+  const substituteRequired = cancelReasonCode === "4";
 
   // Submit cancel
   const handleConfirmCancel = useCallback(() => {
@@ -479,6 +505,12 @@ export function NfseListPage() {
     if (!cancelReason.trim() || cancelReason.trim().length < 15) {
       toast.error(
         "Motivo do cancelamento é obrigatório e deve ter no mínimo 15 caracteres.",
+      );
+      return;
+    }
+    if (cancelReasonCode === "4" && !cancelSubstituteNumber.trim()) {
+      toast.error(
+        "Informe o número da nota fiscal substituta para cancelamento por duplicidade.",
       );
       return;
     }
@@ -491,20 +523,33 @@ export function NfseListPage() {
         data: {
           reason: cancelReason,
           reasonCode: Number(cancelReasonCode),
+          substituteNfseNumber: cancelSubstituteNumber.trim()
+            ? Number(cancelSubstituteNumber)
+            : undefined,
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (result) => {
+          // The backend message already states pending/rejected/cancelled appropriately.
+          if (result?.message) {
+            if (result.rejected) {
+              toast.error(result.message);
+            } else {
+              toast.success(result.message);
+            }
+          }
           setCancelTarget(null);
           setCancelReason("");
           setCancelReasonCode("1");
+          setCancelSubstituteNumber("");
           refetch();
         },
       },
     );
-  }, [cancelTarget, cancelReason, cancelReasonCode, cancelNfse, refetch]);
+  }, [cancelTarget, cancelReason, cancelReasonCode, cancelSubstituteNumber, cancelNfse, refetch]);
 
-  // Can cancel: not already cancelled, has invoiceId and nfseDocumentId
+  // Can cancel/re-request: emitida (still active at Elotech — includes rejected requests),
+  // not yet cancelled, and linked to a local invoice + NFS-e document.
   const canCancelItem = (item: ElotechNfseListItem) =>
     item.emitida && !item.cancelada && !!item.invoiceId && !!item.nfseDocumentId;
 
@@ -626,7 +671,10 @@ export function NfseListPage() {
                 className="text-destructive"
               >
                 <IconBan className="mr-2 h-4 w-4" />
-                Cancelar NFS-e
+                {contextMenu.item.cancelRequestStatus === "REJEITADO" ||
+                contextMenu.item.localStatus === "CANCEL_REJECTED"
+                  ? "Corrigir e reenviar cancelamento"
+                  : "Cancelar NFS-e"}
               </DropdownMenuItem>
             </>
           )}
@@ -675,6 +723,42 @@ export function NfseListPage() {
                 placeholder="Descreva o motivo do cancelamento..."
               />
             </div>
+            <div>
+              <label
+                className={`text-sm font-medium mb-1.5 block ${
+                  substituteRequired ? "text-destructive" : ""
+                }`}
+              >
+                Nota fiscal substituta (Nº)
+                {substituteRequired && <span className="text-destructive"> *</span>}
+              </label>
+              <Input
+                type="number"
+                value={cancelSubstituteNumber}
+                onChange={(value) => setCancelSubstituteNumber(String(value ?? ""))}
+                placeholder="Número da NFS-e que substitui esta nota"
+                className={substituteRequired ? "border-destructive focus-visible:ring-destructive" : ""}
+              />
+              {substituteRequired && (
+                <p className="text-xs text-destructive mt-1">
+                  Obrigatório para cancelamento por duplicidade.
+                </p>
+              )}
+            </div>
+            {/* If this note's previous cancellation request was rejected, surface the reason so
+                the user can correct and resubmit. */}
+            {(cancelTarget?.cancelRequestStatus === "REJEITADO" ||
+              cancelTarget?.localStatus === "CANCEL_REJECTED") &&
+              cancelTarget?.cancelRejectionMessage && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
+                  <p className="text-xs font-medium text-destructive">
+                    Solicitação anterior rejeitada
+                  </p>
+                  <p className="text-xs text-destructive/90 mt-0.5">
+                    {cancelTarget.cancelRejectionMessage}
+                  </p>
+                </div>
+              )}
           </div>
           <DialogFooter>
             <Button

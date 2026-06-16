@@ -173,7 +173,7 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
 };
 
 // Quote statuses that may have installments worth tracking. We exclude
-// PENDING/BUDGET_APPROVED/COMMERCIAL_APPROVED because those quotes haven't
+// PENDING/BUDGET_APPROVED because those quotes haven't
 // been turned into bills yet.
 const RELEVANT_QUOTE_STATUSES = [
   TASK_QUOTE_STATUS.BILLING_APPROVED,

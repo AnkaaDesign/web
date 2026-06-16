@@ -7,6 +7,7 @@ export const nfseKeys = {
   list: (filters: any) => ['nfse', 'list', filters] as const,
   detail: (id: number) => ['nfse', 'detail', id] as const,
   pdf: (id: number) => ['nfse', 'pdf', id] as const,
+  cancellation: (id: number) => ['nfse', 'cancellation', id] as const,
 };
 
 export function useNfseList(filters: {
@@ -28,6 +29,17 @@ export function useNfseDetail(elotechNfseId: number) {
   return useQuery({
     queryKey: nfseKeys.detail(elotechNfseId),
     queryFn: () => nfseService.detail(elotechNfseId),
+    enabled: !!elotechNfseId,
+  });
+}
+
+/**
+ * Fetches the current cancellation-request status + timeline for an NFS-e.
+ */
+export function useNfseCancellation(elotechNfseId: number) {
+  return useQuery({
+    queryKey: nfseKeys.cancellation(elotechNfseId),
+    queryFn: () => nfseService.getCancellationStatus(elotechNfseId),
     enabled: !!elotechNfseId,
   });
 }

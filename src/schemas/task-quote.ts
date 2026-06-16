@@ -27,7 +27,6 @@ const preprocessMoney = (val: unknown): number | null | undefined => {
 export const taskQuoteStatusSchema = z.enum([
   'PENDING',
   'BUDGET_APPROVED',
-  'COMMERCIAL_APPROVED',
   'BILLING_APPROVED',
   'UPCOMING',
   'DUE',

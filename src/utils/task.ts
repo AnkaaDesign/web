@@ -411,7 +411,6 @@ export function getQuoteStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     PENDING: 'Pendente',
     BUDGET_APPROVED: 'Orçamento Aprovado',
-    COMMERCIAL_APPROVED: 'Aprovado pelo Comercial',
     BILLING_APPROVED: 'Faturamento Aprovado',
     UPCOMING: 'A Vencer',
     DUE: 'Vencido',

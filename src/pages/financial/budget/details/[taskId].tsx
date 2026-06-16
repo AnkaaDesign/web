@@ -824,7 +824,7 @@ export const FinancialBudgetDetailPage = () => {
         //
         // The dropdown gates options by the FORM status, so the user can advance
         // several steps in one session (PENDING → BUDGET_APPROVED →
-        // COMMERCIAL_APPROVED). The server only accepts single legal hops, so we
+        // BILLING_APPROVED). The server only accepts single legal hops, so we
         // replay the whole path hop-by-hop — each validated by the backend.
         const targetStatus = data.status as TASK_QUOTE_STATUS | undefined;
         if (targetStatus && targetStatus !== existingQuote.status) {

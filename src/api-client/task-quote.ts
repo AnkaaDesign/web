@@ -25,16 +25,13 @@ export const taskQuoteService = {
   updateStatus: (id: string, status: string, reason?: string) =>
     apiClient.put(`/task-quotes/${id}/status`, { status, reason }),
 
-  // Budget Approve (customer approved the budget: PENDING → BUDGET_APPROVED)
+  // Budget Approve (commercial approves the budget: PENDING → BUDGET_APPROVED)
   approve: (id: string) => apiClient.put(`/task-quotes/${id}/budget-approve`),
 
   // Budget Approve (alias)
   budgetApprove: (id: string) => apiClient.put(`/task-quotes/${id}/budget-approve`),
 
-  // Commercial approve (BUDGET_APPROVED → COMMERCIAL_APPROVED)
-  commercialApprove: (id: string) => apiClient.put(`/task-quotes/${id}/commercial-approve`),
-
-  // Revert billing approval back to COMMERCIAL_APPROVED (requires all bank slips + NFS-e cancelled)
+  // Revert billing approval back to BUDGET_APPROVED (requires all bank slips + NFS-e cancelled)
   revertBilling: (id: string) => apiClient.put(`/task-quotes/${id}/revert-billing`),
 
   // Reject (sends back to PENDING with a reason)

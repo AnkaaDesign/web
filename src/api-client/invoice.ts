@@ -33,6 +33,10 @@ export const invoiceService = {
   getByCustomerId: (customerId: string) =>
     apiClient.get(`/invoices/customer/${customerId}`),
 
+  // Get full NFS-e history for a task (includes cancelled/rejected/orphan notes)
+  taskNfseHistory: (taskId: string) =>
+    apiClient.get(`/invoices/task/${taskId}/nfse-history`),
+
   // Cancel invoice
   cancel: (id: string, data?: any) =>
     apiClient.put(`/invoices/${id}/cancel`, data),

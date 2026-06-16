@@ -20,10 +20,6 @@ export function QuoteStatusBadge({ status, className, size = 'default', paidCoun
     },
     BUDGET_APPROVED: {
       label: 'Orçamento Aprovado',
-      variant: 'approved',
-    },
-    COMMERCIAL_APPROVED: {
-      label: 'Aprovado pelo Comercial',
       variant: 'processing',
     },
     BILLING_APPROVED: {
@@ -48,7 +44,7 @@ export function QuoteStatusBadge({ status, className, size = 'default', paidCoun
     },
   };
 
-  // Normalize casing so an unexpectedly-cased value (e.g. "commercial_approved"
+  // Normalize casing so an unexpectedly-cased value (e.g. "budget_approved"
   // from a legacy payload) still resolves to a label instead of leaking raw.
   const normalized = (typeof status === 'string' ? status.toUpperCase() : status) as TASK_QUOTE_STATUS;
   const { label, variant } = config[normalized] || { label: 'Desconhecido', variant: 'secondary' };

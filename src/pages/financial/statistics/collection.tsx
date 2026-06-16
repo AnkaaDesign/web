@@ -123,7 +123,6 @@ const INVOICE_STATUS_OPTIONS = [
 const QUOTE_STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Pendente' },
   { value: 'BUDGET_APPROVED', label: 'Orçamento Aprovado' },
-  { value: 'COMMERCIAL_APPROVED', label: 'Aprovado pelo Comercial' },
   { value: 'BILLING_APPROVED', label: 'Faturamento Aprovado' },
   { value: 'UPCOMING', label: 'A Vencer' },
   { value: 'DUE', label: 'Vencido' },

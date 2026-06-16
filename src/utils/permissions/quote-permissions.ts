@@ -47,7 +47,7 @@ export function canUpdateQuoteStatus(userRole: string): boolean {
  * Valid status transitions for task quote.
  *
  * Typical flow:
- *   PENDING -> BUDGET_APPROVED -> COMMERCIAL_APPROVED -> BILLING_APPROVED -> UPCOMING -> PARTIAL -> SETTLED
+ *   PENDING -> BUDGET_APPROVED -> BILLING_APPROVED -> UPCOMING -> PARTIAL -> SETTLED
  *
  * DUE status represents overdue installments:
  *   UPCOMING -> DUE (when installments become overdue)
@@ -64,11 +64,10 @@ export function canUpdateQuoteStatus(userRole: string): boolean {
  */
 const VALID_TRANSITIONS: Record<TASK_QUOTE_STATUS, TASK_QUOTE_STATUS[]> = {
   PENDING: ['BUDGET_APPROVED'],
-  BUDGET_APPROVED: ['COMMERCIAL_APPROVED', 'PENDING'],
-  // SETTLED from COMMERCIAL_APPROVED covers "direct" quotes (orçamento direto)
+  // SETTLED from BUDGET_APPROVED covers "direct" quotes (orçamento direto)
   // paid upfront with no billing/installment phase. The server's settleManually
   // handles this safely (no installments/boletos exist yet to clean up).
-  COMMERCIAL_APPROVED: ['BILLING_APPROVED', 'BUDGET_APPROVED', 'PENDING', 'SETTLED'],
+  BUDGET_APPROVED: ['BILLING_APPROVED', 'PENDING', 'SETTLED'],
   // SETTLED from BILLING_APPROVED covers prepayment (customer pays before
   // installments are tracked) and recovery from quotes stuck at BILLING_APPROVED
   // when the auto-transition to UPCOMING failed. The server's settleManually
@@ -93,14 +92,10 @@ export function getAvailableQuoteStatusTransitions(
 ): TASK_QUOTE_STATUS[] {
   const transitions = VALID_TRANSITIONS[currentStatus] || [];
 
-  // COMMERCIAL cannot set BILLING_APPROVED
+  // COMMERCIAL can approve the budget (BUDGET_APPROVED) but cannot approve
+  // billing (BILLING_APPROVED) — that belongs to ADMIN/FINANCIAL.
   if (userRole === SECTOR_PRIVILEGES.COMMERCIAL) {
     return transitions.filter((s) => s !== 'BILLING_APPROVED');
-  }
-
-  // FINANCIAL cannot set COMMERCIAL_APPROVED (that step belongs to the commercial sector)
-  if (userRole === SECTOR_PRIVILEGES.FINANCIAL) {
-    return transitions.filter((s) => s !== 'COMMERCIAL_APPROVED');
   }
 
   return transitions;
@@ -113,7 +108,7 @@ export function getAvailableQuoteStatusTransitions(
  *
  * The status dropdowns gate their options by the *form* status, so within one
  * editing session a user can advance several steps (e.g. PENDING →
- * BUDGET_APPROVED → COMMERCIAL_APPROVED). The server only accepts single legal
+ * BUDGET_APPROVED → BILLING_APPROVED). The server only accepts single legal
  * hops, so the save must replay the path hop-by-hop. BFS yields the shortest
  * legal path through VALID_TRANSITIONS.
  */

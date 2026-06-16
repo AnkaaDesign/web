@@ -513,6 +513,20 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     observation: "observation",
   }), []);
 
+  // Recursively extract the first human-readable validation message from a
+  // (possibly deeply nested, e.g. serviceOrders[2].status) react-hook-form error tree.
+  const getFirstErrorMessage = useCallback((errors: any): string | undefined => {
+    if (!errors || typeof errors !== "object") return undefined;
+    if (typeof errors.message === "string" && errors.message.trim() !== "") {
+      return errors.message;
+    }
+    for (const value of Object.values(errors)) {
+      const message = getFirstErrorMessage(value);
+      if (message) return message;
+    }
+    return undefined;
+  }, []);
+
   // Find the accordion section that contains the first validation error
   const openSectionWithError = useCallback((errors: Record<string, any>) => {
     const errorKeys = Object.keys(errors);
@@ -2602,7 +2616,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           return handleSubmitChanges(undefined, (errors) => {
             console.log('[TaskEditForm] Validation errors:', errors);
             openSectionWithError(errors);
-            toast.error("Existem erros no formulário. Verifique os campos destacados.");
+            const firstMessage = getFirstErrorMessage(errors);
+            toast.error(
+              firstMessage
+                ? `Verifique os campos destacados: ${firstMessage}`
+                : "Existem erros no formulário. Verifique os campos destacados."
+            );
           })(e);
         }}
       >

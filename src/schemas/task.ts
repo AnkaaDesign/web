@@ -1066,18 +1066,11 @@ const taskObservationCreateSchema = z.object({
 const taskServiceOrderCreateSchema = z.object({
   id: z.string().uuid().optional(), // For existing service orders
   status: z
-    .enum([
-      SERVICE_ORDER_STATUS.PENDING,
-      SERVICE_ORDER_STATUS.IN_PROGRESS,
-      SERVICE_ORDER_STATUS.COMPLETED,
-      SERVICE_ORDER_STATUS.CANCELLED,
-      SERVICE_ORDER_STATUS.WAITING_APPROVE,
-      SERVICE_ORDER_STATUS.WAITING_ARTWORK,
-    ] as [string, ...string[]], {
+    .enum(Object.values(SERVICE_ORDER_STATUS) as [string, ...string[]], {
       errorMap: () => ({ message: "Selecione um status válido" }),
     })
     .default(SERVICE_ORDER_STATUS.PENDING),
-  statusOrder: z.number().int().min(1).max(5).default(1).optional(),
+  statusOrder: z.number().int().min(1).max(6).default(1).optional(),
   description: z.string({
     required_error: "Selecione um serviço",
     invalid_type_error: "Selecione um serviço",
