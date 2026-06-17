@@ -70,9 +70,9 @@ export function PpeSizesSection({ disabled }: PpeSizesSectionProps) {
         </CardTitle>
         <CardDescription>Tamanhos dos equipamentos de proteção individual do colaborador</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Row 1: Shirts and Pants */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <CardContent>
+        {/* All 8 EPI sizes flow in one uniform grid (no orphaned single-item rows). */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
           <FormCombobox
             name="ppeSize.shirts"
             label="Camisa"
@@ -93,10 +93,6 @@ export function PpeSizesSection({ disabled }: PpeSizesSectionProps) {
             emptyText="Nenhum tamanho disponível"
             required={false}
           />
-        </div>
-
-        {/* Row 2: Shorts and Boots */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormCombobox
             name="ppeSize.shorts"
             label="Bermuda"
@@ -117,10 +113,6 @@ export function PpeSizesSection({ disabled }: PpeSizesSectionProps) {
             emptyText="Nenhum tamanho disponível"
             required={false}
           />
-        </div>
-
-        {/* Row 3: Rain Boots */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormCombobox
             name="ppeSize.rainBoots"
             label="Galocha"
@@ -131,10 +123,6 @@ export function PpeSizesSection({ disabled }: PpeSizesSectionProps) {
             emptyText="Nenhum tamanho disponível"
             required={false}
           />
-        </div>
-
-        {/* Row 4: Sleeves and Mask */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormCombobox
             name="ppeSize.sleeves"
             label="Manguito"
@@ -146,26 +134,22 @@ export function PpeSizesSection({ disabled }: PpeSizesSectionProps) {
             required={false}
           />
           <FormCombobox
-            name="ppeSize.mask"
-            label="Máscara"
-            icon={<IconShirt className="h-4 w-4 text-muted-foreground" />}
-            options={maskSizeOptions}
-            disabled={disabled}
-            placeholder="Selecione o tamanho da máscara"
-            emptyText="Nenhum tamanho disponível"
-            required={false}
-          />
-        </div>
-
-        {/* Row 5: Gloves */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormCombobox
             name="ppeSize.gloves"
             label="Luvas"
             icon={<IconShirt className="h-4 w-4 text-muted-foreground" />}
             options={glovesSizeOptions}
             disabled={disabled}
             placeholder="Selecione o tamanho das luvas"
+            emptyText="Nenhum tamanho disponível"
+            required={false}
+          />
+          <FormCombobox
+            name="ppeSize.mask"
+            label="Máscara"
+            icon={<IconShirt className="h-4 w-4 text-muted-foreground" />}
+            options={maskSizeOptions}
+            disabled={disabled}
+            placeholder="Selecione o tamanho da máscara"
             emptyText="Nenhum tamanho disponível"
             required={false}
           />

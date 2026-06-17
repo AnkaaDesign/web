@@ -3,7 +3,7 @@ import { useOrder, useOrderMutations, useCanViewPrices } from "../../../../hooks
 import { routes, ORDER_STATUS, ORDER_PAYMENT_STATUS, CHANGE_LOG_ENTITY_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
 import { hasAnyPrivilege } from "@/utils/user";
 import { Button } from "@/components/ui/button";
-import { IconAlertTriangle, IconShoppingCart, IconTrash, IconRefresh, IconEdit, IconLoader2, IconCheck, IconCashBanknote } from "@tabler/icons-react";
+import { IconAlertTriangle, IconShoppingCart, IconTrash, IconRefresh, IconEdit, IconLoader2, IconCheck, IconCircleCheck, IconHourglass } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import type { PageAction } from "@/components/ui/page-header";
 import { OrderInfoCard, OrderItemsCard, OrderDocumentsCard } from "@/components/inventory/order/detail";
@@ -31,15 +31,15 @@ const OrderDetailsPage = () => {
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-  const [showRequestPaymentDialog, setShowRequestPaymentDialog] = useState(false);
+  const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
   const { user } = useAuth();
   const canViewPrices = useCanViewPrices();
   const canManageWarehouse = canEditOrders(user);
-  const { deleteMutation, updateAsync, requestPaymentAsync } = useOrderMutations();
+  const { deleteMutation, updateAsync, markPaidAsync, markAwaitingPaymentAsync } = useOrderMutations();
 
-  // Request-payment is gated to the same privileges the API endpoint allows
+  // Payment management is gated to the same privileges the API endpoint allows
   // (WAREHOUSE / FINANCIAL / ACCOUNTING / ADMIN).
-  const canRequestPayment = hasAnyPrivilege(user as any, [
+  const canManagePayments = hasAnyPrivilege(user as any, [
     SECTOR_PRIVILEGES.WAREHOUSE,
     SECTOR_PRIVILEGES.FINANCIAL,
     SECTOR_PRIVILEGES.ACCOUNTING,
@@ -166,14 +166,25 @@ const OrderDetailsPage = () => {
     }
   };
 
-  const handleRequestPayment = async () => {
+  const handleMarkPaid = async () => {
     try {
-      await requestPaymentAsync(order.id);
-      setShowRequestPaymentDialog(false);
+      await markPaidAsync(order.id);
+      setShowMarkPaidDialog(false);
       refetch();
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {
-        console.error("Error requesting payment:", error);
+        console.error("Error marking order paid:", error);
+      }
+    }
+  };
+
+  const handleMarkAwaitingPayment = async () => {
+    try {
+      await markAwaitingPaymentAsync(order.id);
+      refetch();
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error reverting payment:", error);
       }
     }
   };
@@ -267,14 +278,21 @@ const OrderDetailsPage = () => {
     });
   }
 
-  // Show "Solicitar Pagamento" when the order's payment was not yet requested
-  // (finance pipeline trigger; the rest of the pipeline stays in finance hands).
-  if (canRequestPayment && order.paymentStatus === ORDER_PAYMENT_STATUS.NOT_REQUESTED) {
+  // Show "Marcar como Pago" while the order is still awaiting payment
+  // (any non-PAID state); once PAID, offer "Desfazer pagamento" to revert.
+  if (canManagePayments && order.paymentStatus !== ORDER_PAYMENT_STATUS.PAID) {
     orderActions.push({
-      key: "request-payment",
-      label: "Solicitar Pagamento",
-      icon: IconCashBanknote,
-      onClick: () => setShowRequestPaymentDialog(true),
+      key: "mark-paid",
+      label: "Marcar como Pago",
+      icon: IconCircleCheck,
+      onClick: () => setShowMarkPaidDialog(true),
+    });
+  } else if (canManagePayments && order.paymentStatus === ORDER_PAYMENT_STATUS.PAID) {
+    orderActions.push({
+      key: "mark-awaiting-payment",
+      label: "Desfazer pagamento",
+      icon: IconHourglass,
+      onClick: () => handleMarkAwaitingPayment(),
     });
   }
 
@@ -411,13 +429,13 @@ const OrderDetailsPage = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Request Payment Confirmation Dialog */}
-        <AlertDialog open={showRequestPaymentDialog} onOpenChange={setShowRequestPaymentDialog}>
+        {/* Mark Paid Confirmation Dialog */}
+        <AlertDialog open={showMarkPaidDialog} onOpenChange={setShowMarkPaidDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Solicitar Pagamento</AlertDialogTitle>
+              <AlertDialogTitle>Marcar como Pago</AlertDialogTitle>
               <AlertDialogDescription>
-                Deseja solicitar o pagamento deste pedido? O pedido passará para a etapa de solicitação no pipeline de Contas a Pagar.
+                Deseja marcar este pedido como pago? O pedido será registrado como liquidado em Contas a Pagar.
                 <br />
                 <br />
                 <strong>Fornecedor:</strong> {order.supplier?.fantasyName || "Não especificado"}
@@ -431,9 +449,9 @@ const OrderDetailsPage = () => {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleRequestPayment}>
-                <IconCashBanknote className="mr-2 h-4 w-4" />
-                Solicitar Pagamento
+              <AlertDialogAction onClick={handleMarkPaid}>
+                <IconCircleCheck className="mr-2 h-4 w-4" />
+                Marcar como Pago
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

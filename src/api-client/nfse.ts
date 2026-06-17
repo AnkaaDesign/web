@@ -15,6 +15,12 @@ export const nfseService = {
   detail: (elotechNfseId: number) =>
     apiClient.get(`/nfse/${elotechNfseId}`),
 
+  // Predicted next NFS-e number (last authorized + 1) — sequential per prestador.
+  nextNumber: () =>
+    apiClient.get<{ lastNumber: number | null; nextNumber: number | null }>(
+      '/nfse/next-number',
+    ),
+
   getPdf: (elotechNfseId: number) =>
     apiClient.get(`/nfse/${elotechNfseId}/pdf`, { responseType: 'blob' }),
 

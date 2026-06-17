@@ -94,11 +94,11 @@ export function UserForm(props: UserFormProps) {
     // Current vínculo (EmploymentContract). The collaborator-create flow nests
     // these into `contract` on submit; the flat date fields below drive the
     // shared StatusDatesSection + admission date.
-    // New CLT hires start in experiência: a FIXED_TERM modality in EXPERIENCE
-    // status (efetivação later converts it to INDETERMINATE + ACTIVE).
+    // New CLT hires start in experiência: an EXPERIENCE_PERIOD_1 modality with
+    // ACTIVE status (efetivação later converts the modality to INDETERMINATE).
     employeeType: EMPLOYEE_TYPE.CLT as any,
-    contractType: CONTRACT_TYPE.FIXED_TERM as any,
-    contractStatus: CONTRACT_STATUS.EXPERIENCE as any,
+    contractType: CONTRACT_TYPE.EXPERIENCE_PERIOD_1 as any,
+    contractStatus: CONTRACT_STATUS.ACTIVE as any,
     unionMember: false,
     unionAuthorizationDate: null,
     dependentsCount: 0,
@@ -256,8 +256,8 @@ export function UserForm(props: UserFormProps) {
       contract: {
         employeeType: employeeType ?? EMPLOYEE_TYPE.CLT,
         // Off-folha categories (TERCEIRIZADO/PJ/AUTÔNOMO) carry no legal modality.
-        contractType: isOffPayroll ? null : (contractType ?? CONTRACT_TYPE.FIXED_TERM),
-        contractStatus: contractStatus ?? CONTRACT_STATUS.EXPERIENCE,
+        contractType: isOffPayroll ? null : (contractType ?? CONTRACT_TYPE.EXPERIENCE_PERIOD_1),
+        contractStatus: contractStatus ?? CONTRACT_STATUS.ACTIVE,
         admissionDate,
         positionId: data.positionId ?? null,
         sectorId: data.sectorId ?? null,
@@ -422,16 +422,6 @@ export function UserForm(props: UserFormProps) {
                 <FormCityInput<UserCreateFormData | UserUpdateFormData> name="city" disabled={isSubmitting} required={false} />
                 <FormStateSelector<UserCreateFormData | UserUpdateFormData> name="state" disabled={isSubmitting} />
               </div>
-              <div className="grid grid-cols-1 gap-6">
-                <FormInput<UserCreateFormData | UserUpdateFormData>
-                  name="site"
-                  type="text"
-                  label="Site / Link"
-                  placeholder="https://"
-                  disabled={isSubmitting}
-                  required={false}
-                />
-              </div>
             </CardContent>
           </Card>
 
@@ -545,19 +535,21 @@ export function UserForm(props: UserFormProps) {
               />
 
               {unionMember && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name={"unionAuthorizationDate" as any}
-                    render={({ field }) => (
-                      <DateTimeInput
-                        field={{ onChange: field.onChange, onBlur: field.onBlur, value: (field.value as Date | null) ?? null, name: field.name }}
-                        label="Data de Autorização Sindical"
-                        disabled={isSubmitting}
-                        mode="date"
-                      />
-                    )}
-                  />
+                <div className="ml-3 border-l-2 border-primary/30 pl-4 pt-1">
+                  <div className="max-w-xs">
+                    <FormField
+                      control={form.control}
+                      name={"unionAuthorizationDate" as any}
+                      render={({ field }) => (
+                        <DateTimeInput
+                          field={{ onChange: field.onChange, onBlur: field.onBlur, value: (field.value as Date | null) ?? null, name: field.name }}
+                          label="Data de Autorização Sindical"
+                          disabled={isSubmitting}
+                          mode="date"
+                        />
+                      )}
+                    />
+                  </div>
                 </div>
               )}
 

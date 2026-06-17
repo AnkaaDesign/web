@@ -20,7 +20,6 @@ const relationIncludeSchema = z.union([
 
 export const vacationGroupIncludeSchema = z
   .object({
-    periods: relationIncludeSchema.optional(),
     vacations: relationIncludeSchema.optional(),
   })
   .partial();
@@ -170,21 +169,16 @@ export const vacationGroupQuerySchema = z.object({
 });
 
 // =====================
-// Period child schema (fracionamento)
-// =====================
-
-const vacationGroupPeriodInputSchema = z.object({
-  startDate: z.coerce.date({ invalid_type_error: "data de início inválida" }),
-  days: z.coerce
-    .number({ invalid_type_error: "dias inválidos" })
-    .int({ message: "Dias deve ser inteiro" })
-    .min(1, { message: "O período deve ter ao menos 1 dia" })
-    .max(30, { message: "Um período não pode exceder 30 dias" }),
-});
-
-// =====================
 // CRUD schemas
 // =====================
+// Template is a single gozo window (startDate + days), bulk-applied to each
+// eligible collaborator on expand.
+
+const groupDaysSchema = z.coerce
+  .number({ invalid_type_error: "dias inválidos" })
+  .int({ message: "Dias deve ser inteiro" })
+  .min(1, { message: "O gozo deve ter ao menos 1 dia" })
+  .max(30, { message: "O gozo não pode exceder 30 dias" });
 
 export const vacationGroupCreateSchema = z
   .object({
@@ -195,7 +189,8 @@ export const vacationGroupCreateSchema = z
     sectorIds: z.array(z.string().uuid({ message: "Setor inválido" })).optional(),
     positionIds: z.array(z.string().uuid({ message: "Cargo inválido" })).optional(),
     notes: z.string().max(2000).nullable().optional(),
-    periods: z.array(vacationGroupPeriodInputSchema).min(1, { message: "Defina ao menos um período" }).max(3),
+    startDate: z.coerce.date({ required_error: "Data de início é obrigatória", invalid_type_error: "data de início inválida" }),
+    days: groupDaysSchema,
   })
   .refine((data) => data.type !== VACATION_GROUP_TYPE.SECTOR || (Array.isArray(data.sectorIds) && data.sectorIds.length > 0), {
     message: "Selecione ao menos um setor",
@@ -211,7 +206,8 @@ export const vacationGroupUpdateSchema = z.object({
   sectorIds: z.array(z.string().uuid()).optional(),
   positionIds: z.array(z.string().uuid()).optional(),
   notes: z.string().max(2000).nullable().optional(),
-  periods: z.array(vacationGroupPeriodInputSchema).min(1).max(3).optional(),
+  startDate: z.coerce.date({ invalid_type_error: "data de início inválida" }).optional(),
+  days: groupDaysSchema.optional(),
 });
 
 // =====================
@@ -231,5 +227,4 @@ export type VacationGroupQueryFormData = z.infer<typeof vacationGroupQuerySchema
 export type VacationGroupCreateFormData = z.infer<typeof vacationGroupCreateSchema>;
 export type VacationGroupUpdateFormData = z.infer<typeof vacationGroupUpdateSchema>;
 export type VacationGroupAdvanceFormData = z.infer<typeof vacationGroupAdvanceSchema>;
-export type VacationGroupPeriodInput = z.infer<typeof vacationGroupPeriodInputSchema>;
 export type VacationGroupInclude = z.infer<typeof vacationGroupIncludeSchema>;

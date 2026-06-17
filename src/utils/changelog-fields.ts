@@ -1426,11 +1426,21 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     typeof value === "string"
   ) {
     const contractKindLabels: Record<string, string> = {
+      // Current modalities / statuses.
       EXPERIENCE_PERIOD_1: "Experiência - 1º Período",
       EXPERIENCE_PERIOD_2: "Experiência - 2º Período",
-      EFFECTED: "Efetivado",
+      INDETERMINATE: "Prazo indeterminado",
+      FIXED_TERM: "Prazo determinado",
+      TEMPORARY: "Temporário",
       APPRENTICE: "Aprendiz",
       INTERMITTENT: "Intermitente",
+      ACTIVE: "Ativo",
+      TERMINATED: "Desligado",
+      // Historical values kept for old changelog rows.
+      EXPERIENCE: "Em experiência",
+      NOTICE_PERIOD: "Aviso prévio",
+      ON_LEAVE: "Afastado",
+      EFFECTED: "Efetivado",
       DISMISSED: "Demitido",
     };
     return contractKindLabels[value] || value;

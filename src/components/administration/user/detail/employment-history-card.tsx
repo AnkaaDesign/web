@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,24 +9,33 @@ import { cn } from "@/lib/utils";
 import { formatDate, formatRelativeTime } from "../../../../utils";
 import { CONTRACT_TYPE_LABELS, CONTRACT_STATUS, CONTRACT_STATUS_LABELS, EMPLOYEE_TYPE_LABELS, STABILITY_TYPE_LABELS } from "../../../../constants";
 import { useEmploymentContracts } from "../../../../hooks/personnel-department/use-employment-contracts";
-import type { EmploymentContract } from "../../../../types/employment-contract";
+import type { EmploymentContract, ContractPhaseHistory } from "../../../../types/employment-contract";
 
 interface EmploymentHistoryCardProps {
   userId: string;
   className?: string;
   maxHeight?: string;
+  /**
+   * Reports how many vínculos were loaded so the parent can decide whether to
+   * render this card at all (it must never show an empty "Nenhum registro"
+   * placeholder). `null` while loading, then the contract count.
+   */
+  onCount?: (count: number | null) => void;
 }
 
 const NO_DATE = "Sem data";
 
 /**
  * "Histórico de Vínculos" — lists every EmploymentContract (vínculo) the person
- * has had. Mirrors the visual language of ChangelogHistory / RelatedActivitiesCard:
- * a scrollable, date-grouped timeline where each vínculo is a nested card with an
- * icon node on the left rail. The current vínculo (isCurrent) is highlighted green,
- * terminated ones red.
+ * has had. It is a visual sibling of RelatedActivitiesCard ("Histórico de
+ * Atividades") and ChangelogHistory ("Histórico de Alterações"): same card
+ * chrome, same centered date-chip separator, the same `w-12 h-12` timeline node
+ * + `absolute left-6 top-12 ... w-0.5 bg-border` rail, the same
+ * `bg-card-nested rounded-xl p-4 border border-border` entry card with a
+ * right-aligned relative timestamp in its header. The phase sub-timeline reuses
+ * the same rail idiom at a smaller scale so it reads as a nested mini-rail.
  */
-export function EmploymentHistoryCard({ userId, className, maxHeight = "500px" }: EmploymentHistoryCardProps) {
+export function EmploymentHistoryCard({ userId, className, maxHeight = "500px", onCount }: EmploymentHistoryCardProps) {
   const {
     data: response,
     isLoading,
@@ -36,12 +45,21 @@ export function EmploymentHistoryCard({ userId, className, maxHeight = "500px" }
       userIds: [userId],
       orderBy: { sequence: "desc" },
       limit: 100,
-      include: { position: true, sector: true },
+      include: {
+        position: true,
+        sector: true,
+        phaseHistory: { orderBy: { startDate: "asc" } },
+      },
     } as any,
     { enabled: !!userId },
   );
 
   const contracts: EmploymentContract[] = response?.data || [];
+
+  // Surface the record count to the parent (used to hide this card when empty).
+  useEffect(() => {
+    onCount?.(isLoading ? null : contracts.length);
+  }, [isLoading, contracts.length, onCount]);
 
   // Group by admission date (newest first), matching the changelog/activity layout.
   const grouped = useMemo(() => {
@@ -63,17 +81,14 @@ export function EmploymentHistoryCard({ userId, className, maxHeight = "500px" }
   }, [contracts]);
 
   return (
-    <Card
-      className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)}
-      style={maxHeight ? { maxHeight, height: maxHeight } : undefined}
-    >
+    <Card className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)} style={maxHeight ? { maxHeight, height: maxHeight } : undefined}>
       <CardHeader className="pb-4 flex-shrink-0">
         <CardTitle className="flex items-center gap-2">
           <IconBriefcase className="h-5 w-5 text-muted-foreground" />
           Histórico de Vínculos
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0 flex-1 flex flex-col min-h-0 overflow-hidden">
+      <CardContent className="pt-0 flex-grow flex flex-col min-h-0 overflow-hidden">
         {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 2 }).map((_, i) => (
@@ -88,14 +103,14 @@ export function EmploymentHistoryCard({ userId, className, maxHeight = "500px" }
         ) : contracts.length === 0 ? (
           <div className="text-sm text-muted-foreground py-8 text-center">Nenhum vínculo registrado.</div>
         ) : (
-          <ScrollArea className="pr-4 h-full">
+          <ScrollArea className="pr-4 flex-grow">
             <div className="space-y-6">
               {grouped.map(([date, group], groupIndex) => {
                 const isLastGroup = groupIndex === grouped.length - 1;
 
                 return (
                   <div key={date} className="relative">
-                    {/* Date header */}
+                    {/* Date Header — identical centered chip separator as the reference cards */}
                     <div className="pb-1 mb-4 rounded-md">
                       <div className="flex justify-center items-center gap-4">
                         <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
@@ -107,48 +122,49 @@ export function EmploymentHistoryCard({ userId, className, maxHeight = "500px" }
                       </div>
                     </div>
 
+                    {/* Entries for this date */}
                     <div className="space-y-3 relative">
+                      {/* Timeline rail */}
                       {!isLastGroup && <div className="absolute left-6 top-12 bottom-0 w-0.5 bg-border" />}
 
                       {group.map((contract, index) => {
-                        const isExperience = contract.status === CONTRACT_STATUS.EXPERIENCE;
                         const isTerminated = contract.status === CONTRACT_STATUS.TERMINATED;
-                        const isOnLeave = contract.status === CONTRACT_STATUS.ON_LEAVE;
-                        const isNoticePeriod = contract.status === CONTRACT_STATUS.NOTICE_PERIOD;
                         const admission = contract.admissionDate ?? contract.exp1StartAt ?? null;
-                        const experiencePhase = isExperience
-                          ? contract.experiencePhase ?? (contract.exp2StartAt ? 2 : 1)
-                          : null;
-                        const hasStability =
-                          !!contract.stabilityType && (!!contract.stabilityStart || !!contract.stabilityEnd);
+                        const hasStability = !!contract.stabilityType && (!!contract.stabilityStart || !!contract.stabilityEnd);
                         const isLastItem = isLastGroup && index === group.length - 1;
+
+                        // Phase history: every MODALITY this vínculo held over time,
+                        // ordered by startDate. endDate === null ⇒ current/open phase.
+                        const phases: ContractPhaseHistory[] = [...(contract.phaseHistory ?? [])].sort(
+                          (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
+                        );
 
                         return (
                           <div key={contract.id} className="relative">
+                            {/* Timeline rail connector */}
                             {!isLastItem && <div className="absolute left-6 top-12 bottom-0 w-0.5 bg-border" />}
 
-                            <div className="flex items-start gap-4">
-                              {/* Icon node on the timeline rail */}
+                            <div className="flex items-start gap-4 group">
+                              {/* Timeline dot and icon — bare icon in the w-12 h-12 node, exactly like the reference cards */}
                               <div className="relative z-10 flex items-center justify-center w-12 h-12">
-                                <div
+                                <IconBriefcase
                                   className={cn(
-                                    "flex items-center justify-center w-10 h-10 rounded-full border",
+                                    "h-5 w-5 transition-transform group-hover:scale-110",
                                     contract.isCurrent
-                                      ? "bg-green-100 dark:bg-green-900/30 border-green-700/40 text-green-700 dark:text-green-400"
+                                      ? "text-green-600 dark:text-green-400"
                                       : isTerminated
-                                        ? "bg-red-100 dark:bg-red-900/30 border-red-700/40 text-red-700 dark:text-red-400"
-                                        : "bg-muted border-border text-muted-foreground",
+                                        ? "text-red-600 dark:text-red-400"
+                                        : "text-muted-foreground",
                                   )}
-                                >
-                                  <IconBriefcase className="h-5 w-5" />
-                                </div>
+                                />
                               </div>
 
                               {/* Vínculo card */}
                               <div className="flex-1 bg-card-nested rounded-xl p-4 border border-border">
-                                <div className="flex items-center justify-between gap-2 mb-2">
+                                {/* Header — badges on the left, relative timestamp right-aligned (matches references) */}
+                                <div className="flex items-center justify-between gap-2 mb-3">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-sm font-medium">Vínculo #{contract.sequence}</span>
+                                    <span className="text-sm font-semibold">Vínculo #{contract.sequence}</span>
                                     {contract.contractType && (
                                       <Badge variant={getBadgeVariantFromStatus(contract.contractType, "USER")} className="text-xs whitespace-nowrap">
                                         {CONTRACT_TYPE_LABELS[contract.contractType] || contract.contractType}
@@ -156,7 +172,6 @@ export function EmploymentHistoryCard({ userId, className, maxHeight = "500px" }
                                     )}
                                     <Badge variant={getBadgeVariantFromStatus(contract.status, "CONTRACT_STATUS")} className="text-xs whitespace-nowrap">
                                       {CONTRACT_STATUS_LABELS[contract.status] || contract.status}
-                                      {experiencePhase ? ` ${experiencePhase}` : ""}
                                     </Badge>
                                     {contract.isCurrent && (
                                       <Badge variant="active" className="text-xs whitespace-nowrap">
@@ -164,9 +179,7 @@ export function EmploymentHistoryCard({ userId, className, maxHeight = "500px" }
                                       </Badge>
                                     )}
                                   </div>
-                                  {admission && (
-                                    <div className="text-sm text-muted-foreground whitespace-nowrap">{formatRelativeTime(admission)}</div>
-                                  )}
+                                  {admission && <div className="text-sm text-muted-foreground whitespace-nowrap">{formatRelativeTime(admission)}</div>}
                                 </div>
 
                                 <div className="text-xs text-muted-foreground">
@@ -178,8 +191,6 @@ export function EmploymentHistoryCard({ userId, className, maxHeight = "500px" }
                                 <div className="text-xs text-muted-foreground mt-1">
                                   Admissão: {admission ? formatDate(admission) : "-"}
                                   {contract.effectedAt ? ` · Efetivado: ${formatDate(contract.effectedAt)}` : ""}
-                                  {isNoticePeriod ? " · Em aviso prévio" : ""}
-                                  {isOnLeave ? " · Afastado" : ""}
                                   {isTerminated ? ` · Desligamento: ${contract.terminationDate ? formatDate(contract.terminationDate) : "-"}` : ""}
                                 </div>
 
@@ -189,6 +200,44 @@ export function EmploymentHistoryCard({ userId, className, maxHeight = "500px" }
                                     {contract.stabilityStart || contract.stabilityEnd
                                       ? ` (${contract.stabilityStart ? formatDate(contract.stabilityStart) : "?"} – ${contract.stabilityEnd ? formatDate(contract.stabilityEnd) : "?"})`
                                       : ""}
+                                  </div>
+                                )}
+
+                                {phases.length > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-border">
+                                    <div className="text-xs font-medium text-muted-foreground mb-2">Fases da modalidade</div>
+                                    {/* Nested mini-rail — same rail idiom as the parent timeline, scaled down to read as a subtle sub-timeline */}
+                                    <div className="relative space-y-2">
+                                      {phases.map((phase, phaseIndex) => {
+                                        const isOpen = phase.endDate === null || phase.endDate === undefined;
+                                        const isLastPhase = phaseIndex === phases.length - 1;
+                                        return (
+                                          <div key={phase.id} className="relative flex items-start gap-2.5">
+                                            {/* Mini rail connector */}
+                                            {!isLastPhase && <div className="absolute left-[3px] top-3.5 bottom-0 w-px bg-border" />}
+                                            <div
+                                              className={cn(
+                                                "relative z-10 mt-1 h-1.5 w-1.5 rounded-full flex-shrink-0",
+                                                isOpen ? "bg-green-600 dark:bg-green-400" : "bg-muted-foreground/50",
+                                              )}
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-xs font-medium">{CONTRACT_TYPE_LABELS[phase.contractType] || phase.contractType}</span>
+                                                {isOpen && (
+                                                  <Badge variant="active" className="text-[10px] px-1.5 py-0 leading-4 whitespace-nowrap">
+                                                    Atual
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                              <div className="text-xs text-muted-foreground">
+                                                {formatDate(phase.startDate)} – {isOpen ? "atual" : formatDate(phase.endDate)}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
                                 )}
                               </div>

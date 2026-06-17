@@ -17,12 +17,6 @@ import type { User } from "./user";
 // Entities
 // =====================
 
-export interface VacationPeriod extends BaseEntity {
-  vacationId: string;
-  startDate: Date;
-  days: number;
-}
-
 export interface Vacation extends BaseEntity {
   userId: string;
   contractId: string | null;
@@ -33,6 +27,10 @@ export interface Vacation extends BaseEntity {
   concessiveEnd: Date | null;
   unjustifiedAbsencesInPeriod: number;
   entitledDays: number;
+  /** Gozo start of THIS taking (null while not scheduled). */
+  startDate: Date | string | null;
+  /** Gozo days of THIS taking. */
+  days: number;
   status: VACATION_STATUS;
   statusOrder: number;
   abonoPecuniarioDays: number;
@@ -49,7 +47,32 @@ export interface Vacation extends BaseEntity {
 
   // Relations
   user?: User;
-  periods?: VacationPeriod[];
+}
+
+// =====================
+// Period balance (remaining-days history) — GET /vacations/period-balance
+// =====================
+
+export interface VacationPeriodBalanceTaking {
+  id: string;
+  startDate: Date | string | null;
+  days: number;
+  status: VACATION_STATUS;
+}
+
+export interface VacationPeriodBalanceData {
+  entitledDays: number;
+  abonoDays: number;
+  gozoEntitled: number;
+  scheduledDays: number;
+  remainingDays: number;
+  takings: VacationPeriodBalanceTaking[];
+}
+
+export interface VacationPeriodBalanceResponse {
+  success: boolean;
+  message: string;
+  data: VacationPeriodBalanceData;
 }
 
 // =====================

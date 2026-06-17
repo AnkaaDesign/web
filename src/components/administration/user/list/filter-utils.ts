@@ -1,6 +1,6 @@
 import type { UserGetManyFormData } from "../../../../schemas";
 import { formatDate, formatCurrency } from "../../../../utils";
-import { CONTRACT_TYPE, CONTRACT_TYPE_LABELS } from "../../../../constants";
+import { CONTRACT_TYPE, CONTRACT_TYPE_LABELS, CONTRACT_STATUS, CONTRACT_STATUS_LABELS, EMPLOYEE_TYPE, EMPLOYEE_TYPE_LABELS } from "../../../../constants";
 
 export interface FilterIndicator {
   key: string;
@@ -58,6 +58,47 @@ export function extractActiveFilters(
       value: contractTypeLabel,
       iconType: "user",
       onRemove: () => onRemoveFilter("contractTypes"),
+    });
+  }
+
+  // Exibir tri-state (only show a badge when explicitly Ativos/Demitidos; Todos = omitted)
+  if (typeof filters.isActive === "boolean") {
+    activeFilters.push({
+      key: "isActive",
+      label: "Exibir",
+      value: filters.isActive ? "Ativos" : "Desligados",
+      iconType: "eye",
+      onRemove: () => onRemoveFilter("isActive"),
+    });
+  }
+
+  // Situação filters (current vínculo lifecycle status)
+  if (filters.contractStatuses && Array.isArray(filters.contractStatuses) && filters.contractStatuses.length > 0) {
+    filters.contractStatuses.forEach((status: string) => {
+      const statusLabel = CONTRACT_STATUS_LABELS[status as CONTRACT_STATUS] || status;
+      activeFilters.push({
+        key: `contractStatuses-${status}`,
+        label: "Situação",
+        value: statusLabel,
+        iconType: "activity",
+        itemId: status,
+        onRemove: () => onRemoveFilter("contractStatuses", status),
+      });
+    });
+  }
+
+  // Categoria filters (worker category)
+  if (filters.employeeTypes && Array.isArray(filters.employeeTypes) && filters.employeeTypes.length > 0) {
+    filters.employeeTypes.forEach((employeeType: string) => {
+      const employeeTypeLabel = EMPLOYEE_TYPE_LABELS[employeeType as EMPLOYEE_TYPE] || employeeType;
+      activeFilters.push({
+        key: `employeeTypes-${employeeType}`,
+        label: "Categoria",
+        value: employeeTypeLabel,
+        iconType: "id",
+        itemId: employeeType,
+        onRemove: () => onRemoveFilter("employeeTypes", employeeType),
+      });
     });
   }
 
@@ -374,6 +415,33 @@ export function createFilterRemover(currentFilters: Partial<UserGetManyFormData>
         } else {
           // Remove all contract types
           delete newFilters.contractTypes;
+        }
+        break;
+      case "isActive":
+        delete newFilters.isActive;
+        break;
+      case "contractStatuses":
+        if (itemId && Array.isArray(newFilters.contractStatuses)) {
+          const filtered = newFilters.contractStatuses.filter((status) => status !== itemId);
+          if (filtered.length > 0) {
+            newFilters.contractStatuses = filtered;
+          } else {
+            delete newFilters.contractStatuses;
+          }
+        } else {
+          delete newFilters.contractStatuses;
+        }
+        break;
+      case "employeeTypes":
+        if (itemId && Array.isArray(newFilters.employeeTypes)) {
+          const filtered = newFilters.employeeTypes.filter((employeeType) => employeeType !== itemId);
+          if (filtered.length > 0) {
+            newFilters.employeeTypes = filtered;
+          } else {
+            delete newFilters.employeeTypes;
+          }
+        } else {
+          delete newFilters.employeeTypes;
         }
         break;
       case "positionId":

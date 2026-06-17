@@ -3,9 +3,9 @@ import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { getPositions, getSectors } from "../../../../api-client";
-import { CONTRACT_TYPE_LABELS } from "../../../../constants";
+import { CONTRACT_TYPE_LABELS, CONTRACT_STATUS_LABELS, EMPLOYEE_TYPE_LABELS } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
-import { IconFilter, IconUser, IconBriefcase, IconBuilding, IconCalendar } from "@tabler/icons-react";
+import { IconFilter, IconUser, IconBriefcase, IconBuilding, IconCalendar, IconEye, IconActivity, IconId } from "@tabler/icons-react";
 import type { UserGetManyFormData } from "../../../../schemas";
 
 interface UserFiltersProps {
@@ -32,8 +32,13 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
 
   // Get current values for multi-select components
   const selectedContractTypes = localFilters.contractTypes || [];
+  const selectedContractStatuses = localFilters.contractStatuses || [];
+  const selectedEmployeeTypes = localFilters.employeeTypes || [];
   const selectedPositions = localFilters.positionId || [];
   const selectedSectors = localFilters.sectorId || [];
+
+  // "Exibir" tri-state derived from isActive: true → Ativos, false → Demitidos, undefined → Todos.
+  const exibirValue = localFilters.isActive === true ? "active" : localFilters.isActive === false ? "dismissed" : "all";
 
   const handleApplyFilters = () => {
     // Apply all filters at once using the external callback
@@ -50,6 +55,24 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
 
   const handleContractTypeChange = (contractTypes: string[]) => {
     setLocalFilters({ ...localFilters, contractTypes: contractTypes.length > 0 ? (contractTypes as any) : undefined });
+  };
+
+  const handleContractStatusChange = (contractStatuses: string[]) => {
+    setLocalFilters({ ...localFilters, contractStatuses: contractStatuses.length > 0 ? (contractStatuses as any) : undefined });
+  };
+
+  const handleEmployeeTypeChange = (employeeTypes: string[]) => {
+    setLocalFilters({ ...localFilters, employeeTypes: employeeTypes.length > 0 ? (employeeTypes as any) : undefined });
+  };
+
+  const handleExibirChange = (value: string) => {
+    // active → isActive:true; dismissed → isActive:false; all → omit isActive.
+    if (value === "active") setLocalFilters({ ...localFilters, isActive: true });
+    else if (value === "dismissed") setLocalFilters({ ...localFilters, isActive: false });
+    else {
+      const { isActive: _removed, ...rest } = localFilters;
+      setLocalFilters(rest);
+    }
   };
 
   // Dismissal/admission date ranges now live on the related current EmploymentContract.
@@ -106,6 +129,22 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
     value,
     label,
   }));
+
+  const contractStatusOptions = Object.entries(CONTRACT_STATUS_LABELS).map(([value, label]) => ({
+    value,
+    label,
+  }));
+
+  const employeeTypeOptions = Object.entries(EMPLOYEE_TYPE_LABELS).map(([value, label]) => ({
+    value,
+    label,
+  }));
+
+  const exibirOptions = [
+    { value: "active", label: "Ativos" },
+    { value: "dismissed", label: "Desligados" },
+    { value: "all", label: "Todos" },
+  ];
 
   // Async query function for positions
   const queryPositions = useCallback(async (searchTerm: string, page = 1) => {
@@ -210,8 +249,43 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
     >
             <div>
               <Label className="flex items-center gap-2 mb-2">
+                <IconEye className="h-4 w-4" />
+                Exibir
+              </Label>
+              <Combobox
+                mode="single"
+                options={exibirOptions}
+                value={exibirValue}
+                onValueChange={(value) => handleExibirChange(typeof value === "string" ? value : "all")}
+                placeholder="Selecione quais colaboradores exibir"
+                searchable={false}
+                clearable={false}
+              />
+            </div>
+
+            <div>
+              <Label className="flex items-center gap-2 mb-2">
+                <IconActivity className="h-4 w-4" />
+                Situação
+              </Label>
+              <Combobox
+                mode="multiple"
+                options={contractStatusOptions}
+                value={selectedContractStatuses}
+                onValueChange={(value) => {
+                  const arr = Array.isArray(value) ? value : (value ? [value] : []);
+                  handleContractStatusChange(arr);
+                }}
+                placeholder="Selecione as situações"
+                searchable={true}
+                minSearchLength={0}
+              />
+            </div>
+
+            <div>
+              <Label className="flex items-center gap-2 mb-2">
                 <IconUser className="h-4 w-4" />
-                Tipo de Contrato
+                Modalidade
               </Label>
               <Combobox
                 mode="multiple"
@@ -221,7 +295,26 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                   const arr = Array.isArray(value) ? value : (value ? [value] : []);
                   handleContractTypeChange(arr);
                 }}
-                placeholder="Selecione os tipos de contrato"
+                placeholder="Selecione as modalidades de contrato"
+                searchable={true}
+                minSearchLength={0}
+              />
+            </div>
+
+            <div>
+              <Label className="flex items-center gap-2 mb-2">
+                <IconId className="h-4 w-4" />
+                Categoria
+              </Label>
+              <Combobox
+                mode="multiple"
+                options={employeeTypeOptions}
+                value={selectedEmployeeTypes}
+                onValueChange={(value) => {
+                  const arr = Array.isArray(value) ? value : (value ? [value] : []);
+                  handleEmployeeTypeChange(arr);
+                }}
+                placeholder="Selecione as categorias"
                 searchable={true}
                 minSearchLength={0}
               />

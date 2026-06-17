@@ -154,26 +154,21 @@ export class OrderService {
   // Order Payment Operations (contas a pagar)
   // =====================
 
-  /** NOT_REQUESTED → REQUESTED (sets paymentRequestedAt). */
-  async requestPayment(id: string, query?: OrderQueryFormData): Promise<OrderUpdateResponse> {
-    const response = await apiClient.put<OrderUpdateResponse>(`${this.basePath}/${id}/request-payment`, undefined, { params: query });
-    return response.data;
-  }
-
-  /** NOT_REQUESTED/REQUESTED → AWAITING_PAYMENT. */
+  /** Revert/undo payment back to AWAITING_PAYMENT. */
   async markAwaitingPayment(id: string, query?: OrderQueryFormData): Promise<OrderUpdateResponse> {
     const response = await apiClient.put<OrderUpdateResponse>(`${this.basePath}/${id}/mark-awaiting-payment`, undefined, { params: query });
     return response.data;
   }
 
-  /** Any non-PAID → PAID (sets paidAt). */
+  /** Any non-PAID → PAID (sets paidAt + paidById). */
   async markPaid(id: string, query?: OrderQueryFormData): Promise<OrderUpdateResponse> {
     const response = await apiClient.put<OrderUpdateResponse>(`${this.basePath}/${id}/mark-paid`, undefined, { params: query });
     return response.data;
   }
 
-  async batchRequestPayment(data: OrderBatchPaymentFormData, query?: OrderQueryFormData): Promise<OrderBatchUpdateResponse<OrderUpdateFormData>> {
-    const response = await apiClient.put<OrderBatchUpdateResponse<OrderUpdateFormData>>(`${this.basePath}/batch/request-payment`, data, { params: query });
+  /** Settle one boleto parcela. */
+  async markInstallmentPaid(installmentId: string, query?: OrderQueryFormData): Promise<OrderUpdateResponse> {
+    const response = await apiClient.put<OrderUpdateResponse>(`${this.basePath}/installments/${installmentId}/mark-paid`, undefined, { params: query });
     return response.data;
   }
 
@@ -376,10 +371,9 @@ export const batchDeleteOrders = (data: OrderBatchDeleteFormData) => orderServic
 export const getOrderPaymentSummary = () => orderService.getPaymentSummary();
 export const getOrderPayables = () => orderService.getPayables();
 export const settlePayrollMonth = (year: number, month: number, amount: number | null) => orderService.settlePayrollMonth(year, month, amount);
-export const requestOrderPayment = (id: string, query?: OrderQueryFormData) => orderService.requestPayment(id, query);
 export const markOrderAwaitingPayment = (id: string, query?: OrderQueryFormData) => orderService.markAwaitingPayment(id, query);
 export const markOrderPaid = (id: string, query?: OrderQueryFormData) => orderService.markPaid(id, query);
-export const batchRequestOrderPayment = (data: OrderBatchPaymentFormData, query?: OrderQueryFormData) => orderService.batchRequestPayment(data, query);
+export const markOrderInstallmentPaid = (installmentId: string, query?: OrderQueryFormData) => orderService.markInstallmentPaid(installmentId, query);
 export const batchMarkOrdersAwaitingPayment = (data: OrderBatchPaymentFormData, query?: OrderQueryFormData) => orderService.batchMarkAwaitingPayment(data, query);
 export const batchMarkOrdersPaid = (data: OrderBatchPaymentFormData, query?: OrderQueryFormData) => orderService.batchMarkPaid(data, query);
 

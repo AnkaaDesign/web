@@ -326,6 +326,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     paymentMethod: order.paymentMethod || null,
     paymentPix: order.paymentPix || null,
     paymentDueDays: order.paymentDueDays || null,
+    installmentCount: order.installmentCount || 1,
     paymentResponsibleId: order.paymentResponsibleId || undefined,
   };
 
@@ -598,6 +599,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   const watchedPaymentMethod = form.watch("paymentMethod");
   const watchedPaymentPix = form.watch("paymentPix");
   const watchedPaymentDueDays = form.watch("paymentDueDays");
+  const watchedInstallmentCount = form.watch("installmentCount");
   const watchedPaymentResponsibleId = form.watch("paymentResponsibleId");
 
   // Detect if form has actual changes from original order.
@@ -613,6 +615,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     const paymentMethodChanged = (watchedPaymentMethod || null) !== (order.paymentMethod || null);
     const paymentPixChanged = (watchedPaymentPix || null) !== (order.paymentPix || null);
     const paymentDueDaysChanged = (watchedPaymentDueDays || null) !== (order.paymentDueDays || null);
+    const installmentCountChanged = (watchedInstallmentCount || 1) !== (order.installmentCount || 1);
     const paymentResponsibleChanged = (watchedPaymentResponsibleId || null) !== (order.paymentResponsibleId || null);
 
     // Inventory item set
@@ -655,9 +658,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     return (
       descriptionChanged || supplierChanged || forecastChanged || notesChanged || freightChanged || discountChanged ||
       inventoryItemsChanged || inventoryDetailsChanged || tempCountChanged || tempContentChanged ||
-      hasFileChanges || paymentMethodChanged || paymentPixChanged || paymentDueDaysChanged || paymentResponsibleChanged
+      hasFileChanges || paymentMethodChanged || paymentPixChanged || paymentDueDaysChanged || installmentCountChanged || paymentResponsibleChanged
     );
-  }, [description, supplierId, forecast, localNotes, watchedFreight, watchedDiscount, selectedItems, quantities, prices, icmses, ipis, temporaryItems, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedPaymentResponsibleId]);
+  }, [description, supplierId, forecast, localNotes, watchedFreight, watchedDiscount, selectedItems, quantities, prices, icmses, ipis, temporaryItems, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedInstallmentCount, watchedPaymentResponsibleId]);
 
   // Stage validation
   const validateCurrentStep = useCallback((): boolean => {
@@ -753,6 +756,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const currentPaymentMethod = form.getValues("paymentMethod");
       const currentPaymentPix = form.getValues("paymentPix");
       const currentPaymentDueDays = form.getValues("paymentDueDays");
+      const currentInstallmentCount = form.getValues("installmentCount");
       const currentPaymentResponsibleId = form.getValues("paymentResponsibleId");
       const currentFreight = Number(form.getValues("freight")) || 0;
       const currentDiscount = Number(form.getValues("discount")) || 0;
@@ -768,6 +772,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         paymentMethod: currentPaymentMethod || undefined,
         paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
         paymentDueDays: currentPaymentMethod === "BANK_SLIP" ? currentPaymentDueDays || undefined : undefined,
+        installmentCount: currentPaymentMethod === "BANK_SLIP" ? currentInstallmentCount || 1 : 1,
         paymentResponsibleId: currentPaymentResponsibleId || null,
       };
 
@@ -1380,6 +1385,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   }
                                   if (stringValue !== "BANK_SLIP") {
                                     form.setValue("paymentDueDays", null, { shouldDirty: true });
+                                    form.setValue("installmentCount", 1, { shouldDirty: true });
                                   }
                                 }}
                                 options={[
@@ -1441,6 +1447,30 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   ]}
                                   placeholder="Selecione o prazo"
                                   emptyText="Nenhum prazo"
+                                  className="h-8 w-full"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Parcelas (boleto 2x/3x). Changing this regenerates the
+                              installment schedule on save, unless a parcela is already paid. */}
+                          {form.watch("paymentMethod") === "BANK_SLIP" && (
+                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
+                              <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Parcelas</span>
+                              <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
+                                <Combobox
+                                  value={(form.watch("installmentCount") || 1).toString()}
+                                  onValueChange={(value) => {
+                                    const stringValue = Array.isArray(value) ? value[0] : value;
+                                    form.setValue("installmentCount", stringValue ? parseInt(stringValue) : 1, { shouldDirty: true });
+                                  }}
+                                  options={Array.from({ length: 12 }, (_, i) => ({
+                                    value: (i + 1).toString(),
+                                    label: i === 0 ? "À vista (1x)" : `${i + 1}x`,
+                                  }))}
+                                  placeholder="Selecione as parcelas"
+                                  emptyText="—"
                                   className="h-8 w-full"
                                 />
                               </div>

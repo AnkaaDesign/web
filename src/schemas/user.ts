@@ -671,11 +671,12 @@ const userFilters = {
   payrollNumber: z.coerce.number().int().optional(),
   sectorIds: z.array(z.string()).optional(),
   positionIds: z.array(z.string()).optional(),
-  // Current-vínculo caches. `contractTypes`/`statuses`/`employeeTypes` map to
+  // Current-vínculo caches. `contractTypes`/`contractStatuses`/`employeeTypes` map to
   // currentContractType/currentContractStatus/currentEmployeeType. `contractKinds`
-  // is kept as a back-compat alias for `contractTypes`.
+  // is a back-compat alias for `contractTypes`; `statuses` for `contractStatuses`.
   contractTypes: z.array(z.nativeEnum(CONTRACT_TYPE)).optional(),
   contractKinds: z.array(z.nativeEnum(CONTRACT_TYPE)).optional(),
+  contractStatuses: z.array(z.nativeEnum(CONTRACT_STATUS)).optional(),
   statuses: z.array(z.nativeEnum(CONTRACT_STATUS)).optional(),
   employeeTypes: z.array(z.nativeEnum(EMPLOYEE_TYPE)).optional(),
   isActive: z.boolean().optional(),
@@ -685,7 +686,6 @@ const userFilters = {
   hasPpeSize: z.boolean().optional(),
   hasActivities: z.boolean().optional(),
   hasTasks: z.boolean().optional(),
-  showDismissed: z.boolean().optional(),
   performanceLevelRange: z
     .object({
       min: z.number().optional(),
@@ -773,11 +773,14 @@ const userTransform = (data: any) => {
   delete data.contractTypes;
   delete data.contractKinds;
 
-  // Handle statuses filter — current vínculo status (ACTIVE/DISMISSED).
-  if (data.statuses && Array.isArray(data.statuses) && data.statuses.length > 0) {
-    andConditions.push({ currentContractStatus: { in: data.statuses } });
-    delete data.statuses;
+  // Handle contractStatuses filter — current vínculo lifecycle status.
+  // `statuses` kept as a back-compat alias.
+  const contractStatusFilter = data.contractStatuses ?? data.statuses;
+  if (contractStatusFilter && Array.isArray(contractStatusFilter) && contractStatusFilter.length > 0) {
+    andConditions.push({ currentContractStatus: { in: contractStatusFilter } });
   }
+  delete data.contractStatuses;
+  delete data.statuses;
 
   // Handle employeeTypes filter — worker category (CLT/Estágio/...).
   if (data.employeeTypes && Array.isArray(data.employeeTypes) && data.employeeTypes.length > 0) {
@@ -785,13 +788,11 @@ const userTransform = (data: any) => {
     delete data.employeeTypes;
   }
 
-  // Handle isActive filter — driven by the current vínculo's status cache.
+  // Handle isActive filter — driven by the null-safe User.isActive column.
+  // Dismissed (isActive:false) = all contracts terminated OR no contract, so
+  // zero-contract users are reachable (unlike currentContractStatus { not }).
   if (typeof data.isActive === "boolean") {
-    andConditions.push({
-      currentContractStatus: data.isActive
-        ? { not: CONTRACT_STATUS.TERMINATED } // Active = current vínculo not terminated
-        : CONTRACT_STATUS.TERMINATED, // Inactive = current vínculo terminated
-    });
+    andConditions.push({ isActive: data.isActive });
     delete data.isActive;
   }
 
@@ -982,8 +983,8 @@ const notificationPreferenceCreateNestedSchema = z.object({
 });
 
 // First employment contract (vínculo) created together with the collaborator.
-// When omitted, the service defaults employeeType=CLT, contractType=FIXED_TERM,
-// status=EXPERIENCE (experiência is the situação, not a modalidade) and uses the
+// When omitted, the service defaults employeeType=CLT, contractType=EXPERIENCE_PERIOD_1
+// (experiência reads from the modality), status=ACTIVE and uses the
 // user's admissionDate (positionId/sectorId mirror the user).
 export const userContractCreateNestedSchema = z.object({
   employeeType: z
@@ -1020,7 +1021,7 @@ export const userCreateSchema = z
     name: createNameSchema(2, 200, "Nome"),
     avatarId: z.string().uuid("ID de avatar inválido").nullable().optional(),
     // First vínculo (EmploymentContract) created with the collaborator. Optional;
-    // the service defaults employeeType=CLT, contractType=FIXED_TERM, status=EXPERIENCE.
+    // the service defaults employeeType=CLT, contractType=EXPERIENCE_PERIOD_1, status=ACTIVE.
     contract: userContractCreateNestedSchema.optional(),
     // FLAT helper fields for the create FORMS (user-form + admission collaborator
     // form). They are mapped into the nested `contract` on submit; the service
@@ -1261,8 +1262,6 @@ export const userUpdateSchema = z
     exp1EndAt: nullableDate.optional(),
     exp2StartAt: nullableDate.optional(),
     exp2EndAt: nullableDate.optional(),
-    // Fase de experiência (1|2) do vínculo atual. NULL = derivar das datas.
-    experiencePhase: z.number().int().min(1).max(2).nullable().optional(),
     // Art. 481 CLT — cláusula assecuratória do direito recíproco de rescisão.
     hasArt481Clause: z.boolean().optional(),
     // Overrides per-vínculo da insalubridade/periculosidade do cargo (NULL = herda).
@@ -1426,14 +1425,30 @@ export type UserWhere = z.infer<typeof userWhereSchema>;
 
 /**
  * Contract-MODALITY transition rules WITHIN a single vínculo (EmploymentContract).
- * With the Part-A taxonomy, the lifecycle is driven by CONTRACT_STATUS
- * (EXPERIENCE → ACTIVE → … → TERMINATED), NOT by the modality. The modality is
- * largely stable; the one canonical change is efetivação (CLT art. 451), which
- * converts FIXED_TERM → INDETERMINATE while the status flips EXPERIENCE → ACTIVE.
- * Administrative modality corrections among CLT modalities are allowed; the real
- * gating is the status machine. Mirrors api/src/schemas/user.ts.
+ * With the binary CONTRACT_STATUS taxonomy (ACTIVE | TERMINATED), experiência is a
+ * modality (EXPERIENCE_PERIOD_1/_2) rather than a status. The canonical lifecycle is
+ * EXPERIENCE_PERIOD_1 → EXPERIENCE_PERIOD_2 → efetivação (→ INDETERMINATE, CLT art. 451),
+ * with the status staying ACTIVE throughout. Administrative corrections among CLT
+ * modalities are allowed. Mirrors api/src/schemas/user.ts.
  */
 export const CONTRACT_TYPE_TRANSITIONS: Record<CONTRACT_TYPE, CONTRACT_TYPE[]> = {
+  // Experiência fase 1 → fase 2, or directly efetivada/corrected.
+  [CONTRACT_TYPE.EXPERIENCE_PERIOD_1]: [
+    CONTRACT_TYPE.EXPERIENCE_PERIOD_2,
+    CONTRACT_TYPE.INDETERMINATE,
+    CONTRACT_TYPE.FIXED_TERM,
+    CONTRACT_TYPE.INTERMITTENT,
+    CONTRACT_TYPE.APPRENTICE,
+    CONTRACT_TYPE.TEMPORARY,
+  ],
+  // Experiência fase 2 → efetivada or corrected (no going back to fase 1).
+  [CONTRACT_TYPE.EXPERIENCE_PERIOD_2]: [
+    CONTRACT_TYPE.INDETERMINATE,
+    CONTRACT_TYPE.FIXED_TERM,
+    CONTRACT_TYPE.INTERMITTENT,
+    CONTRACT_TYPE.APPRENTICE,
+    CONTRACT_TYPE.TEMPORARY,
+  ],
   // INDETERMINATE (efetivo) is terminal as a modality.
   [CONTRACT_TYPE.INDETERMINATE]: [],
   // The other CLT modalities can be efetivadas (→ INDETERMINATE) or corrected
@@ -1471,6 +1486,8 @@ export function isValidStatusTransition(currentType: CONTRACT_TYPE | string, new
  */
 export function getStatusTransitionError(currentType: CONTRACT_TYPE | string, newType: CONTRACT_TYPE | string): string {
   const typeLabels: Record<string, string> = {
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_1]: "Experiência 1",
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_2]: "Experiência 2",
     [CONTRACT_TYPE.INDETERMINATE]: "Prazo indeterminado (efetivo)",
     [CONTRACT_TYPE.FIXED_TERM]: "Prazo determinado",
     [CONTRACT_TYPE.INTERMITTENT]: "Intermitente",

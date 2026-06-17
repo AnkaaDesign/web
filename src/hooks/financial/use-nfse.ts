@@ -8,7 +8,26 @@ export const nfseKeys = {
   detail: (id: number) => ['nfse', 'detail', id] as const,
   pdf: (id: number) => ['nfse', 'pdf', id] as const,
   cancellation: (id: number) => ['nfse', 'cancellation', id] as const,
+  nextNumber: ['nfse', 'next-number'] as const,
 };
+
+/**
+ * Predicted next NFS-e number (last authorized + 1). Used by the billing
+ * approval preview to show the número that will be assigned on emission and
+ * woven into the boleto's seuNumero. `enabled` lets callers fetch only when
+ * the preview is visible.
+ */
+export function useNextNfseNumber(enabled = true) {
+  return useQuery({
+    queryKey: nfseKeys.nextNumber,
+    queryFn: async () => {
+      const res = await nfseService.nextNumber();
+      return res.data as { lastNumber: number | null; nextNumber: number | null };
+    },
+    enabled,
+    staleTime: 60 * 1000,
+  });
+}
 
 export function useNfseList(filters: {
   dataEmissaoInicial?: string;

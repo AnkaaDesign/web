@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconPlus } from "@tabler/icons-react";
+import { IconPlus, IconSparkles } from "@tabler/icons-react";
 import { UserList } from "@/components/administration/user/list/user-list";
+import { ThirteenthGenerateDialog } from "@/components/personnel-department/thirteenth/list/thirteenth-generate-dialog";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { FAVORITE_PAGES, routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { useAuth } from "@/contexts/auth-context";
@@ -10,7 +12,15 @@ import { useNavigate } from "react-router-dom";
 const CollaboratorListPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  const privileges = user?.sector?.privileges;
+  const isAdmin = privileges === SECTOR_PRIVILEGES.ADMIN;
+  // 13º bulk generation lives here (no dedicated 13º page anymore).
+  const canGenerateThirteenth =
+    privileges === SECTOR_PRIVILEGES.ADMIN ||
+    privileges === SECTOR_PRIVILEGES.HUMAN_RESOURCES ||
+    privileges === SECTOR_PRIVILEGES.ACCOUNTING;
+
+  const [generateOpen, setGenerateOpen] = useState(false);
 
   // Context-aware trail: this page is shared across sections — accounting users see
   // "Departamento Pessoal", "Administração" only when reached from that section.
@@ -20,20 +30,33 @@ const CollaboratorListPage = () => {
     { label: "Colaboradores" },
   ]);
 
-  const actions = isAdmin
-    ? [
-        {
-          key: "create",
-          label: "Novo Colaborador",
-          icon: IconPlus,
-          onClick: () => navigate(routes.administration.collaborators.create),
-          variant: "default" as const,
-        },
-      ]
-    : [];
+  const actions = [
+    ...(canGenerateThirteenth
+      ? [
+          {
+            key: "generate-thirteenth",
+            label: "Gerar 13º do ano",
+            icon: IconSparkles,
+            onClick: () => setGenerateOpen(true),
+            variant: "outline" as const,
+          },
+        ]
+      : []),
+    ...(isAdmin
+      ? [
+          {
+            key: "create",
+            label: "Novo Colaborador",
+            icon: IconPlus,
+            onClick: () => navigate(routes.administration.collaborators.create),
+            variant: "default" as const,
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.ACCOUNTING]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"
@@ -47,6 +70,7 @@ const CollaboratorListPage = () => {
           <UserList className="h-full" />
         </div>
       </div>
+      <ThirteenthGenerateDialog open={generateOpen} onOpenChange={setGenerateOpen} />
     </PrivilegeRoute>
   );
 };

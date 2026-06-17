@@ -80,9 +80,9 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
       name: "",
       email: null,
       employeeType: EMPLOYEE_TYPE.CLT,
-      // Default: contrato por prazo indeterminado + status efetivado (ACTIVE) —
-      // o status é governado pelo CONTRACT_STATUS e INDETERMINATE pareia com ACTIVE.
-      contractType: CONTRACT_TYPE.INDETERMINATE,
+      // Default: novo colaborador inicia em experiência (EXPERIENCE_PERIOD_1) com
+      // status ACTIVE — a efetivação posterior converte a modalidade em INDETERMINATE.
+      contractType: CONTRACT_TYPE.EXPERIENCE_PERIOD_1,
       contractStatus: CONTRACT_STATUS.ACTIVE,
       phone: null,
       cpf: null as any,
@@ -277,7 +277,7 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
 
       const contract = {
         employeeType: et ?? EMPLOYEE_TYPE.CLT,
-        contractType: et && et !== EMPLOYEE_TYPE.CLT ? null : ((ct as CONTRACT_TYPE) ?? CONTRACT_TYPE.FIXED_TERM),
+        contractType: et && et !== EMPLOYEE_TYPE.CLT ? null : ((ct as CONTRACT_TYPE) ?? CONTRACT_TYPE.EXPERIENCE_PERIOD_1),
         admissionDate,
         positionId: (userData.positionId as string) ?? null,
         sectorId: (userData.sectorId as string) ?? null,
@@ -470,46 +470,49 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
               <CardDescription>Categoria, tipo de contrato e data de admissão</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <EmployeeTypeSelector disabled={submitting} required />
-                {isClt && <ContractTypeSelector disabled={submitting} required />}
-              </div>
-
-              {isProvider && <ProviderFields disabled={submitting} namePath="providerName" cnpjPath="providerCnpj" />}
-
-              {/* Datas (admissão / experiência) */}
               {isClt ? (
-                <StatusDatesSection disabled={submitting} />
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <EmployeeTypeSelector disabled={submitting} required />
+                    <ContractTypeSelector disabled={submitting} required />
+                  </div>
+                  <StatusDatesSection disabled={submitting} />
+                </>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name={"exp1StartAt" as any}
-                    render={({ field }) => (
-                      <DateTimeInput
-                        field={{
-                          onChange: (d: any) => {
-                            const date = d instanceof Date ? d : null;
-                            field.onChange(date);
-                            form.setValue("admissionDate" as any, date, { shouldValidate: true, shouldDirty: true });
-                          },
-                          onBlur: field.onBlur,
-                          value: (field.value as Date | null) ?? null,
-                          name: field.name,
-                        }}
-                        label={
-                          <span className="flex items-center gap-1.5">
-                            Data de Admissão
-                            <span className="text-destructive ml-0.5">*</span>
-                          </span>
-                        }
-                        disabled={submitting}
-                        mode="date"
-                        required
-                      />
-                    )}
-                  />
-                </div>
+                <>
+                  {/* Off-payroll: Categoria + Data de Admissão lado a lado. */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <EmployeeTypeSelector disabled={submitting} required />
+                    <FormField
+                      control={form.control}
+                      name={"exp1StartAt" as any}
+                      render={({ field }) => (
+                        <DateTimeInput
+                          field={{
+                            onChange: (d: any) => {
+                              const date = d instanceof Date ? d : null;
+                              field.onChange(date);
+                              form.setValue("admissionDate" as any, date, { shouldValidate: true, shouldDirty: true });
+                            },
+                            onBlur: field.onBlur,
+                            value: (field.value as Date | null) ?? null,
+                            name: field.name,
+                          }}
+                          label={
+                            <span className="flex items-center gap-1.5">
+                              Data de Admissão
+                              <span className="text-destructive ml-0.5">*</span>
+                            </span>
+                          }
+                          disabled={submitting}
+                          mode="date"
+                          required
+                        />
+                      )}
+                    />
+                  </div>
+                  {isProvider && <ProviderFields disabled={submitting} namePath="providerName" cnpjPath="providerCnpj" />}
+                </>
               )}
             </CardContent>
           </Card>

@@ -9,9 +9,7 @@ import { useAuth } from "../../../../hooks/common/use-auth";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +23,7 @@ import {
 import {
   VacationStatusStepperCard,
   VacationSummaryCard,
-  VacationPeriodsCard,
+  VacationBalanceCard,
   VacationReciboCard,
   VacationDetailSkeleton,
   getNextVacationStatus,
@@ -56,7 +54,6 @@ export const VacationDetailPage = () => {
   } = useVacation(id || "", {
     include: {
       user: { include: { position: true, sector: true } },
-      periods: { orderBy: { startDate: "asc" } },
     },
     enabled: !!id,
   });
@@ -116,23 +113,10 @@ export const VacationDetailPage = () => {
     setShowDeleteDialog(false);
   };
 
-  const advanceButton = (
-    <Button variant="default" size="default" onClick={() => setShowAdvanceDialog(true)} disabled={!!advanceDisabledReason || advance.isPending}>
-      <IconPlayerTrackNext className="h-4 w-4 mr-2" />
-      Avançar
-    </Button>
-  );
-
-  const headerExtra = advanceDisabledReason ? (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span tabIndex={0}>{advanceButton}</span>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs">{advanceDisabledReason}</TooltipContent>
-    </Tooltip>
-  ) : (
-    advanceButton
-  );
+  // "Avançar" is a PageHeader action (NOT a standalone button) so it renders at
+  // the same size as Editar/Excluir — matches Admissão/Rescisão. The disabled
+  // reason is folded into the label (no tooltip on header actions).
+  const advanceLabel = nextIsPaid && !vacation.paymentDate ? "Avançar (informe o pagamento)" : "Avançar";
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
@@ -146,20 +130,34 @@ export const VacationDetailPage = () => {
             { label: "Férias", href: routes.personnelDepartment.vacations.root },
             { label: vacation.user?.name || "Detalhes" },
           ]}
-          headerExtra={headerExtra}
           actions={[
             {
               key: "refresh",
               label: "Atualizar",
               icon: IconRefresh,
               onClick: () => refetch(),
+              variant: "outline" as const,
               loading: isRefetching,
             },
+            ...(!isFinal && nextStatus
+              ? [
+                  {
+                    key: "advance",
+                    label: advanceLabel,
+                    icon: IconPlayerTrackNext,
+                    onClick: () => setShowAdvanceDialog(true),
+                    variant: "default" as const,
+                    group: "primary" as const,
+                    disabled: !!advanceDisabledReason || advance.isPending,
+                  },
+                ]
+              : []),
             {
               key: "edit",
               label: "Editar",
               icon: IconEdit,
               onClick: () => navigate(routes.personnelDepartment.vacations.edit(id)),
+              group: "primary" as const,
               disabled: isFinal,
             },
             ...(isAdmin
@@ -169,6 +167,7 @@ export const VacationDetailPage = () => {
                     label: "Excluir",
                     icon: IconTrash,
                     onClick: () => setShowDeleteDialog(true),
+                    group: "danger" as const,
                     disabled: deleteMutation.isPending,
                   },
                 ]
@@ -197,20 +196,21 @@ export const VacationDetailPage = () => {
 
             <VacationStatusStepperCard vacation={vacation} />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-              <VacationSummaryCard vacation={vacation} />
+            {/* Resumo (left) stretches to match the right column = Saldo + Recibo. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+              <VacationSummaryCard vacation={vacation} className="h-full" />
               <div className="space-y-4">
-                <VacationPeriodsCard vacation={vacation} disabled={isFinal} />
-                <ChangelogHistory
-                  entityType={CHANGE_LOG_ENTITY_TYPE.VACATION}
-                  entityId={id}
-                  entityName={vacation.user?.name}
-                  entityCreatedAt={vacation.createdAt}
-                />
+                <VacationBalanceCard vacation={vacation} />
+                <VacationReciboCard vacation={vacation} />
               </div>
             </div>
 
-            <VacationReciboCard vacation={vacation} />
+            <ChangelogHistory
+              entityType={CHANGE_LOG_ENTITY_TYPE.VACATION}
+              entityId={id}
+              entityName={vacation.user?.name}
+              entityCreatedAt={vacation.createdAt}
+            />
           </div>
         </div>
 

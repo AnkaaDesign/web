@@ -2,7 +2,8 @@ import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/compo
 import { toast } from "@/components/ui/sonner";
 import { userService } from "../../../../api-client";
 import { formatCPF, formatBrazilianPhone, formatDate, formatDateTime } from "../../../../utils";
-import { getUserStatusBadgeText } from "../../../../utils/user";
+import { getCollaboratorStatus } from "../../../../utils/user";
+import { CONTRACT_TYPE_LABELS } from "../../../../constants";
 import type { User } from "../../../../types";
 import type { UserGetManyFormData } from "../../../../schemas";
 
@@ -28,7 +29,8 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
   { id: "tasksCount", label: "Tarefas", getValue: (user: User) => user._count?.createdTasks?.toString() || "0" },
   { id: "birth", label: "Data de Nascimento", getValue: (user: User) => (user.birth ? formatDate(new Date(user.birth)) : "") },
   { id: "dismissedAt", label: "Data de Demissão", getValue: (user: User) => (user.currentContract?.terminationDate ? formatDate(new Date(user.currentContract.terminationDate)) : "") },
-  { id: "currentContractType", label: "Tipo de Contrato", getValue: (user: User) => getUserStatusBadgeText(user) },
+  { id: "currentContractStatus", label: "Situação", getValue: (user: User) => getCollaboratorStatus(user).label },
+  { id: "currentContractType", label: "Modalidade", getValue: (user: User) => (user.currentContractType ? CONTRACT_TYPE_LABELS[user.currentContractType] : "") },
   { id: "performanceLevel", label: "Nível de Performance", getValue: (user: User) => user.performanceLevel?.toString() || "0" },
   { id: "verified", label: "Verificado", getValue: (user: User) => (user.verified ? "Sim" : "Não") },
   { id: "lastLoginAt", label: "Último Login", getValue: (user: User) => (user.lastLoginAt ? formatDateTime(new Date(user.lastLoginAt)) : "") },
@@ -54,7 +56,7 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
 ];
 
 // Default visible columns if none specified - matches table default
-const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "currentContractType"]);
+const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "currentContractStatus"]);
 
 export function UserExport({ className, filters, currentUsers = [], totalRecords = 0, visibleColumns, selectedUsers }: UserExportProps) {
   const fetchAllUsers = async (): Promise<User[]> => {
@@ -347,6 +349,7 @@ export function UserExport({ className, filters, currentUsers = [], totalRecords
                 case "dismissedAt":
                   width = "100px";
                   break;
+                case "currentContractStatus":
                 case "currentContractType":
                   width = "150px";
                   break;

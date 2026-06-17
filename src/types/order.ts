@@ -1,7 +1,7 @@
 // packages/interfaces/src/order.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
-import type { ORDER_STATUS, ORDER_PAYMENT_STATUS, PAYMENT_METHOD, SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, ORDER_TRIGGER_TYPE, ORDER_BY_DIRECTION, RESCHEDULE_REASON } from '@constants';
+import type { ORDER_STATUS, ORDER_PAYMENT_STATUS, ORDER_INSTALLMENT_STATUS, PAYMENT_METHOD, SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, ORDER_TRIGGER_TYPE, ORDER_BY_DIRECTION, RESCHEDULE_REASON } from '@constants';
 import type { Supplier, SupplierIncludes, SupplierOrderBy } from "./supplier";
 import type { Item, ItemIncludes, ItemOrderBy, ItemWhere } from "./item";
 import type { File, FileIncludes } from "./file";
@@ -131,6 +131,8 @@ export interface Order extends BaseEntity {
   paymentStatusOrder: number; // 1=NotRequested, 2=Requested, 3=AwaitingPayment, 4=Paid
   paymentRequestedAt: Date | null;
   paidAt: Date | null;
+  paidById: string | null;
+  installmentCount: number;
   budgetIds?: string[];
   invoiceIds?: string[];
   receiptIds?: string[];
@@ -152,6 +154,8 @@ export interface Order extends BaseEntity {
   // Relations (optional, populated based on query)
   paymentResponsible?: User;
   paymentAssignedBy?: User;
+  paidBy?: User;
+  installments?: OrderInstallment[];
   budgets?: File[];
   invoices?: File[];
   receipts?: File[];
@@ -168,6 +172,24 @@ export interface Order extends BaseEntity {
     items?: number;
     activities?: number;
   };
+}
+
+// Payment installment (boleto 2x/3x). Single-payment PIX/cartão orders carry none.
+export interface OrderInstallment {
+  id: string;
+  orderId: string;
+  number: number;
+  dueDate: Date | null;
+  amount: number;
+  paidAmount: number;
+  status: ORDER_INSTALLMENT_STATUS;
+  paidAt: Date | null;
+  paidById: string | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  order?: Order;
+  paidBy?: User;
 }
 
 // =====================
@@ -443,9 +465,9 @@ export interface OrderPaymentSummaryBucket {
 }
 
 export interface OrderPaymentSummaryData {
-  NOT_REQUESTED: OrderPaymentSummaryBucket;
-  REQUESTED: OrderPaymentSummaryBucket;
   AWAITING_PAYMENT: OrderPaymentSummaryBucket;
+  PARTIALLY_PAID: OrderPaymentSummaryBucket;
+  /** PAID universe is unbounded, so it is windowed to the last 90 days. */
   PAID_LAST_90_DAYS: OrderPaymentSummaryBucket;
 }
 
@@ -472,7 +494,7 @@ export type PayableSettleVia =
   | "RECONCILIATION"
   | "NONE";
 
-export type PayableState = "NOT_REQUESTED" | "REQUESTED" | "AWAITING_PAYMENT" | "PARTIALLY_PAID" | "EXPECTED" | "PAID";
+export type PayableState = "AWAITING_PAYMENT" | "PARTIALLY_PAID" | "EXPECTED" | "PAID";
 
 /** One normalized payable row: an open order, an airbrushing painter payment, or a scheduled/expected outflow. */
 export interface PayableRow {
@@ -492,6 +514,8 @@ export interface PayableRow {
   paidAt?: string | null;
   /** Convenience link back to the originating task (airbrushing rows). */
   taskId?: string | null;
+  /** Installment id when the row represents a single boleto parcela. */
+  installmentId?: string | null;
   /** How to settle this row (drives the Contas a Pagar action menu). */
   settleVia?: PayableSettleVia;
   /** Estimated value (taxes / recurrents / schedules) — informational. */
@@ -505,8 +529,6 @@ export interface PayableRow {
 }
 
 export interface PayablesSummary {
-  NOT_REQUESTED: OrderPaymentSummaryBucket;
-  REQUESTED: OrderPaymentSummaryBucket;
   AWAITING_PAYMENT: OrderPaymentSummaryBucket;
   PARTIALLY_PAID: OrderPaymentSummaryBucket;
   EXPECTED: OrderPaymentSummaryBucket;

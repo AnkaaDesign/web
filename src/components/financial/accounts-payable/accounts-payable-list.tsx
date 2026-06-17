@@ -5,7 +5,6 @@ import {
   IconRepeat,
   IconSpray,
   IconCash,
-  IconClockDollar,
   IconProgressCheck,
   IconCoins,
   IconPackage,
@@ -34,12 +33,9 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparato
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { FinancialKpiCard } from "../common/financial-kpi-card";
 
-// --- Per-row payment-state badge. NOT_REQUESTED/REQUESTED collapse to a single
-// "Em Aberto" reading — the request sub-step is no longer surfaced as its own
-// status. EXPECTED (previstos/recorrentes) is a forecast, not a real debt yet. --
+// --- Per-row payment-state badge. EXPECTED (previstos/recorrentes) is a forecast,
+// not a real debt yet. ---------------------------------------------------------
 const PAYABLE_STATE_LABELS: Record<PayableState, string> = {
-  NOT_REQUESTED: "Em Aberto",
-  REQUESTED: "Em Aberto",
   AWAITING_PAYMENT: "Aguardando Pagamento",
   PARTIALLY_PAID: "Parcialmente Pago",
   EXPECTED: "Previsto/Recorrente",
@@ -47,37 +43,30 @@ const PAYABLE_STATE_LABELS: Record<PayableState, string> = {
 };
 
 const PAYABLE_STATE_BADGE: Record<PayableState, BadgeProps["variant"]> = {
-  NOT_REQUESTED: "secondary", // gray — open, awaiting action
-  REQUESTED: "secondary",
-  AWAITING_PAYMENT: "pending", // amber — queued by finance
+  AWAITING_PAYMENT: "pending", // amber — open obligation awaiting payment
   PARTIALLY_PAID: "orange",
   EXPECTED: "outline", // muted — forecast/recurrent, not a real debt yet
   PAID: "completed", // green
 };
 
-// --- Summary cards double as clickable filter buckets (Conciliação pattern).
-// Each bucket maps to one or more underlying payment states; "Em Aberto" merges
-// NOT_REQUESTED + REQUESTED. ---------------------------------------------------
-type PayableBucketKey = "OPEN" | "AWAITING" | "PARTIAL" | "EXPECTED" | "PAID";
+// --- Summary cards double as clickable filter buckets (Conciliação pattern). ----
+type PayableBucketKey = "AWAITING" | "PARTIAL" | "EXPECTED" | "PAID";
 
 const PAYABLE_BUCKETS: Record<
   PayableBucketKey,
   { label: string; Icon: React.ComponentType<{ className?: string }>; tone: string; states: PayableState[] }
 > = {
-  OPEN: { label: "Em Aberto", Icon: IconClockDollar, tone: "text-amber-600 bg-amber-500/10", states: ["NOT_REQUESTED", "REQUESTED"] },
-  AWAITING: { label: "Aguardando Pagamento", Icon: IconProgressCheck, tone: "text-blue-600 bg-blue-500/10", states: ["AWAITING_PAYMENT"] },
+  AWAITING: { label: "Aguardando Pagamento", Icon: IconProgressCheck, tone: "text-amber-600 bg-amber-500/10", states: ["AWAITING_PAYMENT"] },
   PARTIAL: { label: "Parcialmente Pago", Icon: IconCoins, tone: "text-orange-600 bg-orange-500/10", states: ["PARTIALLY_PAID"] },
   EXPECTED: { label: "Previsto/Recorrente", Icon: IconRepeat, tone: "text-neutral-500 bg-neutral-500/10", states: ["EXPECTED"] },
   PAID: { label: "Pago no mês", Icon: IconCash, tone: "text-emerald-600 bg-emerald-500/10", states: ["PAID"] },
 };
 
-const BUCKET_ORDER: PayableBucketKey[] = ["OPEN", "AWAITING", "PARTIAL", "EXPECTED", "PAID"];
+const BUCKET_ORDER: PayableBucketKey[] = ["AWAITING", "PARTIAL", "EXPECTED", "PAID"];
 // Default view: every open/forecast obligation; paid-this-month is opt-in (click the card).
-const DEFAULT_BUCKETS: PayableBucketKey[] = ["OPEN", "AWAITING", "PARTIAL", "EXPECTED"];
+const DEFAULT_BUCKETS: PayableBucketKey[] = ["AWAITING", "PARTIAL", "EXPECTED"];
 
 const STATE_TO_BUCKET: Record<PayableState, PayableBucketKey> = {
-  NOT_REQUESTED: "OPEN",
-  REQUESTED: "OPEN",
   AWAITING_PAYMENT: "AWAITING",
   PARTIALLY_PAID: "PARTIAL",
   EXPECTED: "EXPECTED",
@@ -305,7 +294,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // Payment mutations. Order transitions auto-invalidate the payables query
   // (keyed under orderKeys.all); airbrushing settles via its own update, so we
   // refetch the list manually afterward.
-  const { markAwaitingPaymentAsync, markPaidAsync } = useOrderMutations();
+  const { markAwaitingPaymentAsync, markPaidAsync, markInstallmentPaidAsync } = useOrderMutations();
   const { updateAsync: updateAirbrushingAsync } = useAirbrushingMutations();
   const settlePayrollMonth = useSettlePayrollMonth();
   const triggerSchedule = useTriggerOrderSchedule();
@@ -520,25 +509,33 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
               <DropdownMenuSeparator />
 
               {ctxRow.paymentState === "PAID" && (
-                <DropdownMenuItem disabled>
-                  <IconCash className="mr-2 h-4 w-4" />
-                  Pago{ctxRow.paidAt ? ` em ${formatDate(new Date(ctxRow.paidAt))}` : ""}
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem disabled>
+                    <IconCash className="mr-2 h-4 w-4" />
+                    Pago{ctxRow.paidAt ? ` em ${formatDate(new Date(ctxRow.paidAt))}` : ""}
+                  </DropdownMenuItem>
+                  {ctxRow.source === "ORDER" && !ctxRow.installmentId && (
+                    <DropdownMenuItem onClick={() => runAction(() => markAwaitingPaymentAsync(ctxRow.id))}>
+                      <IconProgressCheck className="mr-2 h-4 w-4" />
+                      Desfazer pagamento
+                    </DropdownMenuItem>
+                  )}
+                </>
               )}
 
               {ctxRow.source === "ORDER" && ctxRow.paymentState !== "PAID" && (
-                <>
-                  {ctxRow.paymentState !== ORDER_PAYMENT_STATUS.AWAITING_PAYMENT && (
-                    <DropdownMenuItem onClick={() => runAction(() => markAwaitingPaymentAsync(ctxRow.id))}>
-                      <IconProgressCheck className="mr-2 h-4 w-4" />
-                      Marcar como aguardando pagamento
-                    </DropdownMenuItem>
-                  )}
+                ctxRow.installmentId ? (
+                  // Boleto parcela — settle this single installment (or reconcile, below).
+                  <DropdownMenuItem onClick={() => runAction(() => markInstallmentPaidAsync(ctxRow.installmentId!))}>
+                    <IconCash className="mr-2 h-4 w-4" />
+                    Marcar parcela como paga
+                  </DropdownMenuItem>
+                ) : (
                   <DropdownMenuItem onClick={() => runAction(() => markPaidAsync(ctxRow.id))}>
                     <IconCash className="mr-2 h-4 w-4" />
                     Marcar como pago
                   </DropdownMenuItem>
-                </>
+                )
               )}
 
               {ctxRow.source === "AIRBRUSHING" && ctxRow.paymentState !== "PAID" && (

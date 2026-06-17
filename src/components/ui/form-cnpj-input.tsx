@@ -9,6 +9,8 @@ interface FormCNPJInputProps<T extends Record<string, any>> {
   placeholder?: string;
   disabled?: boolean;
   required?: boolean;
+  /** Called with the cleaned 14-digit CNPJ once a complete value is entered (for autocomplete lookups). */
+  onComplete?: (cnpj: string) => void;
 }
 
 export function FormCNPJInput<T extends Record<string, any>>({
@@ -17,6 +19,7 @@ export function FormCNPJInput<T extends Record<string, any>>({
   placeholder = "00.000.000/0000-00",
   disabled = false,
   required = false,
+  onComplete,
 }: FormCNPJInputProps<T>) {
   const form = useFormContext<T>();
 
@@ -38,6 +41,10 @@ export function FormCNPJInput<T extends Record<string, any>>({
               onChange={(value) => {
                 field.onChange(value as any);
                 form.setValue(name, value as any, { shouldDirty: true, shouldValidate: true });
+                if (onComplete) {
+                  const digits = String(value ?? "").replace(/\D/g, "");
+                  if (digits.length === 14) onComplete(digits);
+                }
               }}
               onBlur={field.onBlur}
               placeholder={placeholder}

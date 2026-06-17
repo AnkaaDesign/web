@@ -14,7 +14,7 @@ import type { Borrow, BorrowIncludes } from "./borrow";
 import type { ChangeLog, ChangeLogIncludes } from "./changelog";
 import type { Bonus, BonusIncludes } from "./bonus";
 import type { File } from "./file";
-import type { EmploymentContract } from "./employment-contract";
+import type { EmploymentContract, ContractPhaseHistory } from "./employment-contract";
 import type { Admission } from "./admission";
 
 // =====================
@@ -71,6 +71,8 @@ export interface User extends BaseEntity {
   // (isCurrent=true); `contracts` is the full history; `admissions` the onboardings.
   currentContract?: EmploymentContract;
   contracts?: EmploymentContract[];
+  /** Audit trail of every contract MODALITY this user's vínculos held over time. */
+  contractPhaseHistory?: ContractPhaseHistory[];
   admissions?: Admission[];
   ppeSize?: PpeSize;
   preference?: Preferences;
@@ -119,6 +121,7 @@ export interface UserIncludes {
   avatar?: boolean;
   currentContract?: boolean | { include?: any; select?: any };
   contracts?: boolean | { include?: any; where?: any; orderBy?: any };
+  contractPhaseHistory?: boolean | { include?: any; where?: any; orderBy?: any };
   admissions?: boolean | { include?: any; where?: any; orderBy?: any };
   ppeSize?:
     | boolean

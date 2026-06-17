@@ -562,9 +562,8 @@ export interface ReconciliationSuggestion extends BankTransaction {
 
 // GET /outflow-forecast — composite "Previsão de Saídas" (spec §4.3).
 export type OrderPaymentStatusKey =
-  | "NOT_REQUESTED"
-  | "REQUESTED"
   | "AWAITING_PAYMENT"
+  | "PARTIALLY_PAID"
   | "PAID";
 
 export interface OutflowForecastOrderRow {
@@ -603,7 +602,7 @@ export interface OutflowForecast {
   pedidos: {
     totalOpen: number;
     byStatus: Record<
-      "NOT_REQUESTED" | "REQUESTED" | "AWAITING_PAYMENT",
+      "AWAITING_PAYMENT" | "PARTIALLY_PAID",
       { count: number; total: number }
     >;
     orders: OutflowForecastOrderRow[];

@@ -28,6 +28,64 @@ export const BRAND_COLORS = {
 } as const;
 
 /**
+ * NFS-e issuer data — Prefeitura de Ibiporã / Elotech OXY (the real DANFS-e the
+ * integration emits). These values are transcribed verbatim from an authorized
+ * NFS-e PDF so the pre-emission preview matches the document the prefeitura
+ * actually produces. The `numeroNfse`, código de verificação, chave de acesso
+ * and final ISS values only exist AFTER emission — the preview shows those as
+ * "a ser atribuído".
+ *
+ * Used by:
+ * - NFS-e preview (src/components/financial/billing/preview/nfse-preview.tsx)
+ */
+export const NFSE_ISSUER = {
+  municipio: "PREFEITURA DO MUNICÍPIO DE IBIPORÃ",
+  secretaria: "SECRETARIA MUNICIPAL DE FAZENDA",
+  municipioEndereco: "PADRE VITORIANO VALENTE, 540 - 86200000 - CENTRO - IBIPORA - PR",
+  prestador: {
+    inscricaoMunicipal: "53459",
+    cnpj: "13.636.938/0001-44",
+    razaoSocial: "S. RODRIGUES & G. RODRIGUES LTDA",
+    fantasia: "Ankaa Design",
+    regimeFiscal: "LUCRO PRESUMIDO",
+    endereco: "RUA LUIZ CARLOS ZANI, 2493 - JARDIM SANTA PAULA",
+    municipioUf: "IBIPORA-PR",
+    cep: "86.200-000",
+    telefone: "(43) 98428-3228",
+    email: "ankaadesign@outlook.com",
+  },
+  /** Item da Lista de Serviços da LC nº 116/03 (ELOTECH_OXY_SERVICO_LC_ID + descrição). */
+  itemListaServico: "141201 Funilaria e lanternagem.",
+  cnae: "4520002",
+  localPrestacao: "IBIPORA-PR",
+  naturezaOperacao: "Tributado no Município",
+  /** Alíquota do ISSQN em % (ELOTECH_OXY_SERVICO_LC_ALIQUOTA). */
+  issAliquota: 2,
+  siteAutenticidade: "https://ibipora.oxy.elotech.com.br/iss/autenticar-documento-fiscal",
+} as const;
+
+/**
+ * Sicredi beneficiário / cobrança data — the fixed issuer side of the boleto
+ * (the pagador/valores/vencimento come from the invoice). `nossoNumero`,
+ * `linhaDigitavel` and `codigoBarras` only exist AFTER Sicredi registers the
+ * boleto, so the preview renders those as placeholders.
+ *
+ * Banco Cooperativo Sicredi = 748. Used by:
+ * - Boleto preview (src/components/financial/billing/preview/boleto-preview.tsx)
+ */
+export const SICREDI_BENEFICIARIO = {
+  nome: "S RODRIGUES E G RODRIGUES LTDA",
+  cnpj: "13.636.938/0001-44",
+  agenciaCodigo: "0718.58.18078",
+  bancoCodigo: "748-X",
+  bancoNome: "BANCO COOPERATIVO SICREDI S.A.",
+  /** Espécie do documento — DUPLICATA_MERCANTIL_INDICACAO → "DMI" na ficha. */
+  especieDoc: "DMI",
+  especieMoeda: "REAL",
+  localPagamento: "Preferencialmente em canais eletrônicos da sua instituição financeira.",
+} as const;
+
+/**
  * Company fiscal setup — the actual tax/payroll parameters for Ankaa Design.
  *
  * Used to pre-fill the "Custo de Funcionário" simulator so the owner doesn't

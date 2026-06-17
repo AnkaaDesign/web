@@ -14,22 +14,29 @@ import { UserPositionHistoryCard } from "@/components/personnel-department/user-
 import { UserBenefitsCard } from "@/components/personnel-department/user-benefit/user-benefits-card";
 import { DependentsCard } from "@/components/human-resources/dependent/dependents-card";
 import { CollaboratorLoansCard } from "@/components/personnel-department/collaborator-loans-card";
-import { CollaboratorThirteenthCard } from "@/components/personnel-department/collaborator-thirteenth-card";
 import { UserDetailSkeleton } from "@/components/administration/user/detail/user-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useNavBreadcrumbs } from "@/contexts/navigation-context";
+import { canEditUsers, canDeleteUsers } from "@/utils/permissions/entity-permissions";
 
 const CollaboratorDetailsPage = () => {
   usePageTracker({ title: "Detalhes do Colaborador" });
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
-  const isAdmin = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  const canEdit = canEditUsers(currentUser);
+  const canDelete = canDeleteUsers(currentUser);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Históricos (Vínculos / Cargos) render only when they have records. Each card
+  // reports its row count via onCount; we keep a paired row clean when one or
+  // both are empty (no orphan "Nenhum registro" placeholder cards).
+  const [employmentCount, setEmploymentCount] = useState<number | null>(null);
+  const [positionCount, setPositionCount] = useState<number | null>(null);
 
   const {
     data: response,
@@ -57,9 +64,9 @@ const CollaboratorDetailsPage = () => {
   const user = response?.data;
   const mutations = useUserMutations();
 
-  // 13º salário and payroll-loans only apply to CLT vínculos; off-payroll
+  // Payroll loans / advances only apply to CLT vínculos; off-payroll
   // categories (terceirizado/PJ/autônomo/estagiário) don't accrue them, so we
-  // hide those cards to keep the page focused.
+  // hide that card to keep the page focused.
   const isCltCollaborator =
     (user?.currentContract?.employeeType ?? (user as unknown as { currentEmployeeType?: EMPLOYEE_TYPE })?.currentEmployeeType) ===
     EMPLOYEE_TYPE.CLT;
@@ -91,7 +98,7 @@ const CollaboratorDetailsPage = () => {
 
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.ACCOUNTING]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}>
         <UserDetailSkeleton />
       </PrivilegeRoute>
     );
@@ -117,7 +124,7 @@ const CollaboratorDetailsPage = () => {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.ACCOUNTING]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
@@ -130,13 +137,15 @@ const CollaboratorDetailsPage = () => {
               icon: IconRefresh,
               onClick: () => refetch(),
             },
-            ...(isAdmin ? [
+            ...(canEdit ? [
               {
                 key: "edit",
                 label: "Editar",
                 icon: IconEdit,
                 onClick: () => navigate(routes.administration.collaborators.edit(id)),
               },
+            ] : []),
+            ...(canDelete ? [
               {
                 key: "delete",
                 label: "Excluir",
@@ -171,10 +180,20 @@ const CollaboratorDetailsPage = () => {
               <PpeSizesCard user={user} />
             </div>
 
-            {/* Registros / históricos lado a lado: Vínculos + Cargos */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <EmploymentHistoryCard userId={id} maxHeight="500px" className="h-[500px]" />
-              <UserPositionHistoryCard userId={id} maxHeight="500px" className="h-[500px]" />
+            {/* Registros / históricos lado a lado: Vínculos + Cargos.
+                O grid permanece SEMPRE em 2 colunas: Vínculos ocupa a coluna 1
+                (meia largura) e nunca se expande para a página inteira. Cargos
+                renderiza na coluna 2 apenas quando tem registros — quando vazia,
+                a coluna 2 fica simplesmente em branco (sem card-fantasma de
+                "Nenhum registro"). Ambos ficam montados (zero altura quando
+                vazios) para que os onCount disparem. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+              <div className={(employmentCount ?? 0) > 0 ? undefined : "hidden"}>
+                <EmploymentHistoryCard userId={id} maxHeight="500px" className="h-[500px]" onCount={setEmploymentCount} />
+              </div>
+              <div className={(positionCount ?? 0) > 0 ? undefined : "hidden"}>
+                <UserPositionHistoryCard userId={id} maxHeight="500px" className="h-[500px]" onCount={setPositionCount} />
+              </div>
             </div>
 
             {/* Benefícios ativos (Empresa × Colaborador) — tabela larga */}
@@ -183,13 +202,8 @@ const CollaboratorDetailsPage = () => {
             {/* Dependentes (IRRF / Salário-Família) — tabela larga */}
             <DependentsCard userId={id} />
 
-            {/* Folha: Empréstimos / Adiantamentos + 13º Salário — somente CLT */}
-            {isCltCollaborator && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <CollaboratorLoansCard userId={id} />
-                <CollaboratorThirteenthCard userId={id} />
-              </div>
-            )}
+            {/* Folha: Empréstimos / Adiantamentos — somente CLT */}
+            {isCltCollaborator && <CollaboratorLoansCard userId={id} />}
 
             {/* Auditoria: Atividades + Histórico de Alterações (changelog) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

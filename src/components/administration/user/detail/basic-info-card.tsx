@@ -1,10 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { IconUser, IconMail, IconPhone, IconBrandWhatsapp, IconId, IconShieldCheck, IconCake } from "@tabler/icons-react";
 import type { User } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { formatBrazilianPhone, getUserStatusBadgeText, formatDate } from "../../../../utils";
-import { CONTRACT_STATUS_LABELS } from "../../../../constants";
+import { formatBrazilianPhone, getCollaboratorStatus, formatDate } from "../../../../utils";
+import { CONTRACT_TYPE_LABELS } from "../../../../constants";
 import { UserAvatarDisplay } from "@/components/ui/avatar-display";
 
 interface BasicInfoCardProps {
@@ -13,8 +13,7 @@ interface BasicInfoCardProps {
 }
 
 export function BasicInfoCard({ user, className }: BasicInfoCardProps) {
-  const statusVariant = getBadgeVariantFromStatus(user.currentContractType ?? "", "USER");
-  const contractStatusVariant = getBadgeVariantFromStatus(user.currentContractStatus ?? "", "CONTRACT_STATUS");
+  const collaboratorStatus = getCollaboratorStatus(user);
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
@@ -99,12 +98,12 @@ export function BasicInfoCard({ user, className }: BasicInfoCardProps) {
               <div className="grid grid-cols-[auto_1fr] gap-4 items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2 whitespace-nowrap">
                   <IconShieldCheck className="h-4 w-4" />
-                  Tipo de Contrato
+                  Situação
                 </span>
                 <div className="flex justify-end gap-2">
-                  <Badge variant={statusVariant}>{getUserStatusBadgeText(user)}</Badge>
-                  {user.currentContractStatus && (
-                    <Badge variant={contractStatusVariant}>{CONTRACT_STATUS_LABELS[user.currentContractStatus]}</Badge>
+                  <Badge variant={collaboratorStatus.variant}>{collaboratorStatus.label}</Badge>
+                  {user.currentContractType && (
+                    <Badge variant="outline">{CONTRACT_TYPE_LABELS[user.currentContractType]}</Badge>
                   )}
                 </div>
               </div>

@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { IconGift, IconUser, IconCalendar, IconNotes, IconProgress } from "@tabler/icons-react";
+import { IconUser, IconCalendar, IconNotes, IconProgress } from "@tabler/icons-react";
 
 import {
   thirteenthCreateSchema,
@@ -14,7 +14,6 @@ import type { User } from "../../../../types";
 import { THIRTEENTH_STATUS, THIRTEENTH_STATUS_LABELS } from "../../../../constants";
 import { getUsers } from "../../../../api-client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
@@ -24,6 +23,8 @@ import { FormMoneyInput } from "@/components/ui/form-money-input";
 
 interface CreateModeProps {
   mode: "create";
+  /** When provided, the colaborador is fixed (per-collaborator context) and the picker is hidden. */
+  fixedUser?: { id: string; name: string };
   onSubmit: (data: ThirteenthCreateFormData) => Promise<void>;
 }
 
@@ -34,19 +35,28 @@ interface UpdateModeProps {
 }
 
 type ThirteenthFormProps = (CreateModeProps | UpdateModeProps) & {
+  /** Stable id so a Dialog footer button can submit the right form. */
+  formId?: string;
   isSubmitting?: boolean;
   disabled?: boolean;
 };
 
+/**
+ * 13º Salário form — rendered inside a Dialog/Drawer from the colaborador
+ * detail page. It no longer has dedicated pages, so it renders only the fields
+ * (the dialog provides the title/footer chrome).
+ */
 export function ThirteenthForm(props: ThirteenthFormProps) {
   const thirteenth = props.mode === "update" ? props.thirteenth : undefined;
+  const fixedUser = props.mode === "create" ? props.fixedUser : undefined;
+  const formId = props.formId ?? "thirteenth-form";
 
   const form = useForm<ThirteenthCreateFormData | ThirteenthUpdateFormData>({
     resolver: zodResolver(props.mode === "create" ? thirteenthCreateSchema : thirteenthUpdateSchema),
     defaultValues:
       props.mode === "create"
         ? {
-            userId: "",
+            userId: fixedUser?.id ?? "",
             year: new Date().getFullYear(),
             avos: undefined,
             baseRemuneration: null,
@@ -88,220 +98,204 @@ export function ThirteenthForm(props: ThirteenthFormProps) {
 
   return (
     <FormProvider {...form}>
-      <form id="thirteenth-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-3xl">
-        <button id="thirteenth-form-submit" type="submit" className="hidden" disabled={fieldsDisabled} />
+      <form id={formId} onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <button id={`${formId}-submit`} type="submit" className="hidden" disabled={fieldsDisabled} />
 
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconGift className="h-5 w-5 text-muted-foreground" />
-                {props.mode === "create" ? "Novo 13º Salário" : "Editar 13º Salário"}
-              </CardTitle>
-              <CardDescription>
-                {props.mode === "create"
-                  ? "Lançamento manual de 13º. Deixe os avos e a base em branco para que o sistema calcule automaticamente a partir da admissão do vínculo."
-                  : "Ajuste manual de avos, base de cálculo e status. As parcelas são recalculadas pelo servidor."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Colaborador */}
-                {props.mode === "create" ? (
-                  <FormField
-                    control={form.control}
-                    name={"userId" as any}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          <div className="flex items-center gap-2">
-                            <IconUser className="h-4 w-4" />
-                            Colaborador <span className="text-destructive">*</span>
-                          </div>
-                        </FormLabel>
-                        <FormControl>
-                          <Combobox<User>
-                            value={field.value}
-                            onValueChange={field.onChange}
-                            disabled={fieldsDisabled}
-                            placeholder="Selecione o colaborador"
-                            emptyText="Nenhum colaborador encontrado"
-                            searchPlaceholder="Buscar colaborador..."
-                            async={true}
-                            queryKey={["users", "thirteenth-collaborator"]}
-                            queryFn={queryUsers}
-                            initialOptions={[]}
-                            getOptionLabel={(u) => u.name}
-                            getOptionValue={(u) => u.id}
-                            renderOption={(u) => (
-                              <div>
-                                <p className="font-medium">{u.name}</p>
-                                {u.position && <p className="text-xs text-muted-foreground">{u.position.name}</p>}
-                              </div>
-                            )}
-                            minSearchLength={0}
-                            pageSize={50}
-                            debounceMs={300}
-                            searchable={true}
-                            clearable={true}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ) : (
-                  <FormItem>
-                    <FormLabel>
-                      <div className="flex items-center gap-2">
-                        <IconUser className="h-4 w-4" />
-                        Colaborador
-                      </div>
-                    </FormLabel>
-                    <Input value={thirteenth?.user?.name || "-"} disabled readOnly />
-                  </FormItem>
-                )}
-
-                {/* Ano */}
-                {props.mode === "create" ? (
-                  <FormField
-                    control={form.control}
-                    name={"year" as any}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          <div className="flex items-center gap-2">
-                            <IconCalendar className="h-4 w-4" />
-                            Ano <span className="text-destructive">*</span>
-                          </div>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={2000}
-                            max={2100}
-                            value={field.value ?? ""}
-                            disabled={fieldsDisabled}
-                            onChange={(value) => {
-                              const num = value === null || value === "" ? undefined : Number(value);
-                              field.onChange(Number.isFinite(num) ? num : undefined);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ) : (
-                  <FormItem>
-                    <FormLabel>
-                      <div className="flex items-center gap-2">
-                        <IconCalendar className="h-4 w-4" />
-                        Ano
-                      </div>
-                    </FormLabel>
-                    <Input value={String(thirteenth?.year ?? "-")} disabled readOnly />
-                  </FormItem>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Avos */}
-                <FormField
-                  control={form.control}
-                  name={"avos" as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Avos (0–12)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={12}
-                          placeholder={props.mode === "create" ? "Automático" : ""}
-                          value={field.value ?? ""}
-                          disabled={fieldsDisabled}
-                          onChange={(value) => {
-                            field.onChange(value === null || value === "" ? undefined : Number(value));
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Base de cálculo */}
-                <FormMoneyInput<ThirteenthCreateFormData | ThirteenthUpdateFormData>
-                  name={"baseRemuneration" as any}
-                  label="Base de Cálculo (média de variáveis)"
-                  placeholder="Automático"
-                  disabled={fieldsDisabled}
-                />
-              </div>
-
-              {/* Status — update only */}
-              {props.mode === "update" && (
-                <FormField
-                  control={form.control}
-                  name={"status" as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        <div className="flex items-center gap-2">
-                          <IconProgress className="h-4 w-4" />
-                          Status
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Colaborador */}
+          {props.mode === "create" && !fixedUser ? (
+            <FormField
+              control={form.control}
+              name={"userId" as any}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    <div className="flex items-center gap-2">
+                      <IconUser className="h-4 w-4" />
+                      Colaborador <span className="text-destructive">*</span>
+                    </div>
+                  </FormLabel>
+                  <FormControl>
+                    <Combobox<User>
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={fieldsDisabled}
+                      placeholder="Selecione o colaborador"
+                      emptyText="Nenhum colaborador encontrado"
+                      searchPlaceholder="Buscar colaborador..."
+                      async={true}
+                      queryKey={["users", "thirteenth-collaborator"]}
+                      queryFn={queryUsers}
+                      initialOptions={[]}
+                      getOptionLabel={(u) => u.name}
+                      getOptionValue={(u) => u.id}
+                      renderOption={(u) => (
+                        <div>
+                          <p className="font-medium">{u.name}</p>
+                          {u.position && <p className="text-xs text-muted-foreground">{u.position.name}</p>}
                         </div>
-                      </FormLabel>
-                      <FormControl>
-                        <Combobox
-                          options={statusOptions}
-                          value={field.value ?? ""}
-                          onValueChange={(value) => field.onChange(Array.isArray(value) ? value[0] : value)}
-                          disabled={fieldsDisabled}
-                          placeholder="Selecione o status"
-                          searchable={false}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                      {field.value === THIRTEENTH_STATUS.CANCELLED && (
-                        <p className="text-xs text-muted-foreground">Cancelar interrompe o pagamento das parcelas.</p>
                       )}
-                    </FormItem>
-                  )}
-                />
+                      minSearchLength={0}
+                      pageSize={50}
+                      debounceMs={300}
+                      searchable={true}
+                      clearable={true}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
+            />
+          ) : (
+            <FormItem>
+              <FormLabel>
+                <div className="flex items-center gap-2">
+                  <IconUser className="h-4 w-4" />
+                  Colaborador
+                </div>
+              </FormLabel>
+              <Input value={fixedUser?.name ?? thirteenth?.user?.name ?? "-"} disabled readOnly />
+            </FormItem>
+          )}
 
-              {/* Observações */}
-              <FormField
-                control={form.control}
-                name={"notes" as any}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      <div className="flex items-center gap-2">
-                        <IconNotes className="h-4 w-4" />
-                        Observações
-                      </div>
-                    </FormLabel>
-                    <FormControl>
-                      <Textarea {...field} value={field.value ?? ""} disabled={fieldsDisabled} rows={3} placeholder="Notas internas sobre este 13º (opcional)" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {props.mode === "create" && (
-                <Alert>
-                  <AlertDescription>
-                    Para gerar o 13º de todos os colaboradores CLT ativos de uma vez, use a ação "Gerar 13º do ano" na listagem.
-                  </AlertDescription>
-                </Alert>
+          {/* Ano */}
+          {props.mode === "create" ? (
+            <FormField
+              control={form.control}
+              name={"year" as any}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    <div className="flex items-center gap-2">
+                      <IconCalendar className="h-4 w-4" />
+                      Ano <span className="text-destructive">*</span>
+                    </div>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={2000}
+                      max={2100}
+                      value={field.value ?? ""}
+                      disabled={fieldsDisabled}
+                      onChange={(value) => {
+                        const num = value === null || value === "" ? undefined : Number(value);
+                        field.onChange(Number.isFinite(num) ? num : undefined);
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
-            </CardContent>
-          </Card>
+            />
+          ) : (
+            <FormItem>
+              <FormLabel>
+                <div className="flex items-center gap-2">
+                  <IconCalendar className="h-4 w-4" />
+                  Ano
+                </div>
+              </FormLabel>
+              <Input value={String(thirteenth?.year ?? "-")} disabled readOnly />
+            </FormItem>
+          )}
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Avos */}
+          <FormField
+            control={form.control}
+            name={"avos" as any}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Avos (0–12)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={12}
+                    placeholder={props.mode === "create" ? "Automático" : ""}
+                    value={field.value ?? ""}
+                    disabled={fieldsDisabled}
+                    onChange={(value) => {
+                      field.onChange(value === null || value === "" ? undefined : Number(value));
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Base de cálculo */}
+          <FormMoneyInput<ThirteenthCreateFormData | ThirteenthUpdateFormData>
+            name={"baseRemuneration" as any}
+            label="Base de Cálculo (média de variáveis)"
+            placeholder="Automático"
+            disabled={fieldsDisabled}
+          />
+        </div>
+
+        {/* Status — update only */}
+        {props.mode === "update" && (
+          <FormField
+            control={form.control}
+            name={"status" as any}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  <div className="flex items-center gap-2">
+                    <IconProgress className="h-4 w-4" />
+                    Status
+                  </div>
+                </FormLabel>
+                <FormControl>
+                  <Combobox
+                    options={statusOptions}
+                    value={field.value ?? ""}
+                    onValueChange={(value) => field.onChange(Array.isArray(value) ? value[0] : value)}
+                    disabled={fieldsDisabled}
+                    placeholder="Selecione o status"
+                    searchable={false}
+                  />
+                </FormControl>
+                <FormMessage />
+                {field.value === THIRTEENTH_STATUS.CANCELLED && (
+                  <p className="text-xs text-muted-foreground">Cancelar interrompe o pagamento das parcelas.</p>
+                )}
+              </FormItem>
+            )}
+          />
+        )}
+
+        {/* Observações */}
+        <FormField
+          control={form.control}
+          name={"notes" as any}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>
+                <div className="flex items-center gap-2">
+                  <IconNotes className="h-4 w-4" />
+                  Observações
+                </div>
+              </FormLabel>
+              <FormControl>
+                <Textarea {...field} value={field.value ?? ""} disabled={fieldsDisabled} rows={3} placeholder="Notas internas sobre este 13º (opcional)" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {props.mode === "create" && (
+          <Alert>
+            <AlertDescription>
+              Deixe avos e base em branco para o sistema calcular automaticamente a partir da admissão do vínculo. Para gerar o 13º de todos os colaboradores CLT de uma vez,
+              use a ação "Gerar 13º do ano" na listagem de colaboradores.
+            </AlertDescription>
+          </Alert>
+        )}
       </form>
     </FormProvider>
   );

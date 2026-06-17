@@ -47,7 +47,7 @@ export const VacationGroupDetailPage = () => {
     refetch,
     isRefetching,
   } = useVacationGroup(id || "", {
-    include: { periods: { orderBy: { startDate: "asc" } }, vacations: { include: { user: true } } },
+    include: { vacations: { include: { user: true } } },
     enabled: !!id,
   });
 
@@ -168,22 +168,18 @@ export const VacationGroupDetailPage = () => {
               </CardContent>
             </Card>
 
-            {group.periods && group.periods.length > 0 && (
+            {group.startDate && group.days > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <IconCalendar className="h-5 w-5 text-muted-foreground" />
-                    Períodos de Gozo
+                    Período de Gozo
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {group.periods.map((p) => (
-                      <Badge key={p.id} variant="secondary" className="text-xs">
-                        {formatDate(new Date(p.startDate))} · {p.days} dia{p.days > 1 ? "s" : ""}
-                      </Badge>
-                    ))}
-                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {formatDate(new Date(group.startDate))} · {group.days} dia{group.days > 1 ? "s" : ""}
+                  </Badge>
                 </CardContent>
               </Card>
             )}

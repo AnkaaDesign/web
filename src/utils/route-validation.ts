@@ -339,9 +339,12 @@ export const ROUTE_FIXES: Record<string, string> = {
 
   // Human Resources route mappings
   "/recursos-humanos/cargos/listar": "/recursos-humanos/cargos",
-  "/recursos-humanos/ausencias/listar": "/recursos-humanos/ferias",
-  "/recursos-humanos/ausencias": "/recursos-humanos/ferias",
-  "/recursos-humanos/ausencias/cadastrar": "/recursos-humanos/ferias/cadastrar",
+  "/recursos-humanos/ausencias/listar": "/departamento-pessoal/ferias",
+  "/recursos-humanos/ausencias": "/departamento-pessoal/ferias",
+  "/recursos-humanos/ausencias/cadastrar": "/departamento-pessoal/ferias/cadastrar",
+  // Férias migrated to Departamento Pessoal — fix RH-namespace links.
+  "/recursos-humanos/ferias": "/departamento-pessoal/ferias",
+  "/recursos-humanos/ferias/cadastrar": "/departamento-pessoal/ferias/cadastrar",
   "/recursos-humanos/faltas/listar": "/recursos-humanos",
   "/recursos-humanos/faltas": "/recursos-humanos",
   "/recursos-humanos/faltas/cadastrar": "/recursos-humanos",
@@ -417,8 +420,8 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/human-resources/employees/list": "/administracao/colaboradores",
   "/human-resources/employees/details": "/administracao/colaboradores",
   "/human-resources/employees/edit": "/administracao/colaboradores",
-  "/human-resources/absences": "/recursos-humanos/ferias",
-  "/human-resources/vacations": "/recursos-humanos/ferias",
+  "/human-resources/absences": "/departamento-pessoal/ferias",
+  "/human-resources/vacations": "/departamento-pessoal/ferias",
   "/producao/cronograma/aguardando": "/producao/agenda",
   "/producao/em-espera": "/producao/agenda",
   "/pintura/formulas/cadastrar": "/pintura/catalogo/cadastrar",

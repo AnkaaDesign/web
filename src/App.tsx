@@ -80,6 +80,7 @@ const FinancialCustomersDetails = lazy(() => import("@/pages/financial/customers
 const FinancialCustomersEdit = lazy(() => import("@/pages/financial/customers/edit/[id]").then((module) => ({ default: module.FinancialCustomersEditPage })));
 const FinancialBilling = lazy(() => import("@/pages/financial/billing/list").then((module) => ({ default: module.BillingPage })));
 const FinancialBillingDetail = lazy(() => import("@/pages/financial/billing/details/[id]").then((module) => ({ default: module.BillingDetailPage })));
+const FinancialBillingDocumentPreview = lazy(() => import("@/pages/financial/billing/document-preview").then((module) => ({ default: module.BillingDocumentPreviewPage })));
 const FinancialBudgetList = lazy(() => import("@/pages/financial/budget/list").then((module) => ({ default: module.BudgetListPage })));
 const FinancialBudgetCreate = lazy(() => import("@/pages/financial/budget/create").then((module) => ({ default: module.FinancialBudgetCreatePage })));
 const FinancialBudgetDetail = lazy(() => import("@/pages/financial/budget/details/[taskId]").then((module) => ({ default: module.FinancialBudgetDetailPage })));
@@ -132,10 +133,6 @@ const PersonnelDepartmentVacationsCreate = lazy(() => import("@/pages/personnel-
 const PersonnelDepartmentVacationsDetails = lazy(() => import("@/pages/personnel-department/vacations/details/[id]").then((module) => ({ default: module.VacationDetailPage })));
 const PersonnelDepartmentVacationsEdit = lazy(() => import("@/pages/personnel-department/vacations/edit/[id]").then((module) => ({ default: module.VacationEditPage })));
 const PersonnelDepartmentVacationGroupsDetails = lazy(() => import("@/pages/personnel-department/vacation-groups/details/[id]").then((module) => ({ default: module.VacationGroupDetailPage })));
-const PersonnelDepartmentThirteenthList = lazy(() => import("@/pages/personnel-department/thirteenth/list"));
-const PersonnelDepartmentThirteenthCreate = lazy(() => import("@/pages/personnel-department/thirteenth/create").then((module) => ({ default: module.ThirteenthCreatePage })));
-const PersonnelDepartmentThirteenthDetails = lazy(() => import("@/pages/personnel-department/thirteenth/details/[id]").then((module) => ({ default: module.ThirteenthDetailPage })));
-const PersonnelDepartmentThirteenthEdit = lazy(() => import("@/pages/personnel-department/thirteenth/edit/[id]").then((module) => ({ default: module.ThirteenthEditPage })));
 
 // Occupational Health - Medicina do Trabalho (W3C)
 const OccupationalHealthMedicalExamsList = lazy(() => import("@/pages/occupational-health/medical-exams/list").then((module) => ({ default: module.MedicalExamListPage })));
@@ -1480,6 +1477,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <FinancialBillingDetail />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.billing.documentPreview}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialBillingDocumentPreview />
                     </Suspense>
                   }
                 />
@@ -2992,39 +2997,19 @@ function App() {
                     </Suspense>
                   }
                 />
-                {/* Departamento Pessoal — 13º Salário */}
-                <Route
-                  path={routes.personnelDepartment.thirteenth.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonnelDepartmentThirteenthList />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personnelDepartment.thirteenth.create}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonnelDepartmentThirteenthCreate />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personnelDepartment.thirteenth.details(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonnelDepartmentThirteenthDetails />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personnelDepartment.thirteenth.edit(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonnelDepartmentThirteenthEdit />
-                    </Suspense>
-                  }
-                />
+                {/* Férias migrou para Departamento Pessoal. Links/bookmarks
+                    antigos do namespace de RH redirecionam para as páginas de DP. */}
+                <Route path="/recursos-humanos/ferias" element={<Navigate to={routes.personnelDepartment.vacations.root} replace />} />
+                <Route path="/recursos-humanos/ferias/cadastrar" element={<Navigate to={routes.personnelDepartment.vacations.create} replace />} />
+                <Route path="/recursos-humanos/ferias/editar/:id" element={<Navigate to={routes.personnelDepartment.vacations.root} replace />} />
+                <Route path="/recursos-humanos/ferias/detalhes/:id" element={<Navigate to={routes.personnelDepartment.vacations.root} replace />} />
+                {/* 13º Salário não tem mais páginas dedicadas — passou a ser
+                    gerido por colaborador (na tela de detalhe do colaborador).
+                    Links/bookmarks antigos redirecionam para a lista de colaboradores. */}
+                <Route path={routes.personnelDepartment.thirteenth.root} element={<Navigate to={routes.administration.collaborators.root} replace />} />
+                <Route path={routes.personnelDepartment.thirteenth.create} element={<Navigate to={routes.administration.collaborators.root} replace />} />
+                <Route path={routes.personnelDepartment.thirteenth.details(":id")} element={<Navigate to={routes.administration.collaborators.root} replace />} />
+                <Route path={routes.personnelDepartment.thirteenth.edit(":id")} element={<Navigate to={routes.administration.collaborators.root} replace />} />
                 {/* Departamento Pessoal — Empréstimos */}
                 <Route
                   path={routes.humanResources.loans.root}

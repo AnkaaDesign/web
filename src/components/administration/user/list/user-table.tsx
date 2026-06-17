@@ -595,16 +595,20 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             <>
               <DropdownMenuSeparator />
 
-              {/* Show efetivar option if any user is currently in experiência */}
-              {contextMenu?.users.some((user) => user.currentContractStatus === CONTRACT_STATUS.EXPERIENCE) && (
+              {/* Show efetivar option if any user is currently in experiência (modality) */}
+              {contextMenu?.users.some(
+                (user) =>
+                  user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_1 ||
+                  user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_2,
+              ) && (
                 <DropdownMenuItem onClick={handleMarkAsContracted}>
                   <IconUserCheck className="mr-2 h-4 w-4" />
                   {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Efetivar selecionados" : "Efetivar"}
                 </DropdownMenuItem>
               )}
 
-              {/* Show dismiss option if any user is not yet terminated */}
-              {contextMenu?.users.some((user) => user.currentContractStatus !== CONTRACT_STATUS.TERMINATED) && (
+              {/* Show dismiss option if any user is still connected (active bond) */}
+              {contextMenu?.users.some((user) => user.isActive) && (
                 <DropdownMenuItem onClick={handleMarkAsDismissed}>
                   <IconUserX className="mr-2 h-4 w-4" />
                   {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Demitir selecionados" : "Demitir"}

@@ -182,24 +182,32 @@ function AddDocumentRow({ userId, existingTypes, emptyChecklist }: { userId: str
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-md border border-dashed border-border px-4 py-3">
-      <IconPlus className="h-4 w-4 text-muted-foreground" />
-      <span className="text-sm text-muted-foreground">{emptyChecklist ? "Enviar documento" : "Adicionar outro documento"}</span>
-      <Combobox
-        value={type ?? undefined}
-        onValueChange={(value) => setType(typeof value === "string" ? value : null)}
-        options={options}
-        searchable
-        clearable={false}
-        disabled={isBusy}
-        placeholder="Tipo de documento"
-        triggerClassName="h-8 w-56 text-xs"
-      />
-      <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
-      <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isBusy || !type}>
-        {isBusy ? <IconLoader2 className="h-4 w-4 mr-1 animate-spin" /> : <IconUpload className="h-4 w-4 mr-1" />}
-        Enviar
-      </Button>
+    <div className="rounded-md border border-border bg-muted/30 px-4 py-3">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          <IconPlus className="h-4 w-4" />
+        </div>
+        <span className="text-sm font-medium">{emptyChecklist ? "Enviar documento" : "Adicionar outro documento"}</span>
+      </div>
+      {/* Tipo de documento + Enviar on a SINGLE row, vertically aligned.
+          The combobox grows (flex-1) and the button sits beside it. */}
+      <div className="flex items-center gap-2">
+        <Combobox
+          value={type ?? undefined}
+          onValueChange={(value) => setType(typeof value === "string" ? value : null)}
+          options={options}
+          searchable
+          clearable={false}
+          disabled={isBusy}
+          placeholder="Tipo de documento"
+          triggerClassName="h-9 flex-1 text-xs"
+        />
+        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
+        <Button type="button" variant="outline" size="sm" className="h-9 flex-shrink-0" onClick={() => fileInputRef.current?.click()} disabled={isBusy || !type}>
+          {isBusy ? <IconLoader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <IconUpload className="h-4 w-4 mr-1.5" />}
+          Enviar
+        </Button>
+      </div>
     </div>
   );
 }
@@ -262,10 +270,15 @@ export function UserDocumentationCard({ userId, className }: UserDocumentationCa
         ) : (
           <>
             {!admission && (
-              <p className="text-sm text-muted-foreground">
-                Este colaborador ainda não possui processo de admissão. Ao enviar o primeiro documento, o processo será criado automaticamente com o
-                checklist padrão.
-              </p>
+              <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-muted/30 px-6 py-8 text-center">
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <IconFileText className="h-6 w-6" />
+                </div>
+                <p className="text-sm font-medium">Nenhum documento enviado</p>
+                <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                  Ao enviar o primeiro documento, o processo de admissão é criado automaticamente com o checklist padrão.
+                </p>
+              </div>
             )}
             {documents.map((document) => (
               // Documents stay editable even after the admission completes —

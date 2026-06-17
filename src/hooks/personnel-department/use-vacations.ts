@@ -1,16 +1,18 @@
 // hooks/personnel-department/use-vacations.ts
 // Férias (Departamento Pessoal) — Part C
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getVacations,
   getVacationById,
   createVacation,
   updateVacation,
   deleteVacation,
-  setVacationPeriods,
+  getVacationPeriodBalance,
   calculateVacation,
   advanceVacation,
+  getVacationSecullumStatus,
+  syncVacationSecullum,
   batchCreateVacations,
   batchUpdateVacations,
   batchDeleteVacations,
@@ -23,7 +25,6 @@ import type {
   VacationBatchUpdateFormData,
   VacationBatchDeleteFormData,
   VacationAdvanceFormData,
-  VacationSetPeriodsFormData,
 } from "../../schemas/vacation";
 import type {
   VacationGetManyResponse,
@@ -86,7 +87,7 @@ export const useVacationMutations = baseHooks.useMutations;
 export const useVacationBatchMutations = baseHooks.useBatchMutations;
 
 // =====================================================
-// Specialized Mutations (periods, calculate, status machine)
+// Specialized Hooks (period balance, calculate, status machine)
 // =====================================================
 
 function useInvalidateVacations() {
@@ -98,12 +99,13 @@ function useInvalidateVacations() {
   };
 }
 
-/** PUT /vacations/:id/periods — set fracionamento periods (≤3, one ≥14 dias). */
-export function useVacationSetPeriods() {
-  const invalidate = useInvalidateVacations();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: VacationSetPeriodsFormData }) => setVacationPeriods(id, data),
-    onSuccess: invalidate,
+/** GET /vacations/:id/period-balance — remaining gozo days + sibling takings for the acquisitive period. */
+export function useVacationPeriodBalance(vacationId: string | null | undefined, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...vacationKeys.all, "period-balance", vacationId],
+    queryFn: () => getVacationPeriodBalance(vacationId as string),
+    enabled: (options?.enabled ?? true) && !!vacationId,
+    staleTime: 1000 * 30,
   });
 }
 
@@ -122,5 +124,26 @@ export function useVacationAdvance() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data?: VacationAdvanceFormData }) => advanceVacation(id, data ?? {}),
     onSuccess: invalidate,
+  });
+}
+
+/** GET /vacations/:id/secullum-status — read-derived ponto sync status. */
+export function useVacationSecullumStatus(id: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...vacationKeys.detail(id), "secullum-status"],
+    queryFn: () => getVacationSecullumStatus(id),
+    enabled: (options?.enabled ?? true) && !!id,
+    staleTime: 1000 * 30,
+  });
+}
+
+/** POST /vacations/:id/sync — manually (re)push gozo períodos to the ponto. */
+export function useVacationSyncSecullum() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => syncVacationSecullum(id),
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: [...vacationKeys.detail(id), "secullum-status"] });
+    },
   });
 }

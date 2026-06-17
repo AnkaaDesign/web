@@ -1,7 +1,7 @@
 import { formatCPF, formatBrazilianPhone, formatDate, formatDateTime } from "../../../../utils";
-import { SHIRT_SIZE_LABELS, PANTS_SIZE_LABELS, BOOT_SIZE_LABELS, SLEEVES_SIZE_LABELS, MASK_SIZE_LABELS, GLOVES_SIZE_LABELS, RAIN_BOOTS_SIZE_LABELS } from "../../../../constants";
-import { getUserStatusBadgeText } from "../../../../utils/user";
-import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
+import { SHIRT_SIZE_LABELS, PANTS_SIZE_LABELS, BOOT_SIZE_LABELS, SLEEVES_SIZE_LABELS, MASK_SIZE_LABELS, GLOVES_SIZE_LABELS, RAIN_BOOTS_SIZE_LABELS, CONTRACT_TYPE_LABELS } from "../../../../constants";
+import { getCollaboratorStatus } from "../../../../utils/user";
+import { Badge } from "@/components/ui/badge";
 import type { User } from "../../../../types";
 import type { UserColumn } from "./types";
 
@@ -140,21 +140,40 @@ export const createUserColumns = (): UserColumn[] => [
     align: "left",
   },
 
-  // Contract type
+  // Situação (collaborator status — color + label derived from cache fields)
   {
-    key: "currentContractType",
-    header: "TIPO DE CONTRATO",
+    key: "currentContractStatus",
+    header: "SITUAÇÃO",
     accessor: (user: User) => {
-      const variant = getBadgeVariantFromStatus(user.currentContractType ?? "", "USER");
+      const { label, variant } = getCollaboratorStatus(user);
 
       return (
         <Badge variant={variant} className="text-xs whitespace-nowrap">
-          {getUserStatusBadgeText(user)}
+          {label}
         </Badge>
       );
     },
     sortable: true,
     className: "min-w-[250px]",
+    align: "left",
+  },
+
+  // Modalidade (legal contract type — neutral, non-default column)
+  {
+    key: "currentContractType",
+    header: "MODALIDADE",
+    accessor: (user: User) => {
+      const type = user.currentContractType;
+      return type ? (
+        <Badge variant="outline" className="text-xs whitespace-nowrap">
+          {CONTRACT_TYPE_LABELS[type]}
+        </Badge>
+      ) : (
+        <span className="text-muted-foreground">-</span>
+      );
+    },
+    sortable: true,
+    className: "min-w-[200px]",
     align: "left",
   },
 

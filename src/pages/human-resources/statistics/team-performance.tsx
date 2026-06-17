@@ -550,8 +550,8 @@ function TeamDrillDownModal({
 
     if (mode === 'headcount') {
       // Active right now = employed (not terminated). Matches the summary card's
-      // totalActive = effected + inExperiencePeriod (EXPERIENCE/NOTICE/ON_LEAVE
-      // all count as active); only TERMINATED is excluded.
+      // totalActive = effected + inExperiencePeriod (all ACTIVE bonds, including
+      // the EXPERIENCE_PERIOD_* modalities, count as active); only TERMINATED is excluded.
       where.currentContractStatus = { not: CONTRACT_STATUS.TERMINATED };
     } else if (mode === 'newHires') {
       // Mirror the backend's joinDate() = effectedAt ?? createdAt
@@ -853,21 +853,15 @@ function TeamPeriodModal({
   }, [rawUsers, search, multiSector]);
 
   const statusLabel = (u: any): { label: string; tone: string } => {
-    // Lifecycle status (situação) is orthogonal to the contract modality. Show
-    // the situação first — it is what HR cares about — and only fall back to the
-    // legal modality when the bond is in a regular ACTIVE state.
-    switch (u.currentContractStatus) {
-      case CONTRACT_STATUS.TERMINATED:
-        return { label: 'Desligado', tone: 'text-red-700 dark:text-red-400' };
-      case CONTRACT_STATUS.EXPERIENCE:
-        return { label: 'Em experiência', tone: 'text-blue-700 dark:text-blue-400' };
-      case CONTRACT_STATUS.NOTICE_PERIOD:
-        return { label: 'Aviso prévio', tone: 'text-amber-700 dark:text-amber-400' };
-      case CONTRACT_STATUS.ON_LEAVE:
-        return { label: 'Afastado', tone: 'text-amber-700 dark:text-amber-400' };
+    // Binary status: only TERMINATED is special. Experiência is now a modality
+    // (EXPERIENCE_PERIOD_1/_2), so everything else is labelled by contract type.
+    if (u.currentContractStatus === CONTRACT_STATUS.TERMINATED) {
+      return { label: 'Desligado', tone: 'text-red-700 dark:text-red-400' };
     }
-    // ACTIVE (or unknown status): label by legal modality.
+    // ACTIVE: label by legal modality.
     switch (u.currentContractType) {
+      case CONTRACT_TYPE.EXPERIENCE_PERIOD_1: return { label: 'Em experiência 1', tone: 'text-amber-700 dark:text-amber-400' };
+      case CONTRACT_TYPE.EXPERIENCE_PERIOD_2: return { label: 'Em experiência 2', tone: 'text-amber-700 dark:text-amber-400' };
       case CONTRACT_TYPE.INDETERMINATE: return { label: 'Efetivado', tone: 'text-emerald-700 dark:text-emerald-400' };
       case CONTRACT_TYPE.APPRENTICE: return { label: 'Aprendiz', tone: 'text-blue-700 dark:text-blue-400' };
       case CONTRACT_TYPE.FIXED_TERM: return { label: 'Prazo Determinado', tone: 'text-blue-700 dark:text-blue-400' };

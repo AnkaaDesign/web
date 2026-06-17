@@ -62,6 +62,7 @@ import {
   MEDICAL_EXAM_RESULT,
   LEAVE_STATUS,
   ORDER_PAYMENT_STATUS,
+  ORDER_INSTALLMENT_STATUS,
 } from "./enums";
 
 /**
@@ -406,6 +407,8 @@ export const ENTITY_BADGE_CONFIG = {
 
   // User Contract Type (the legal MODALITY of the current vínculo)
   USER: {
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_1]: "blue" as BadgeVariant,    // Blue - experiência 1
+    [CONTRACT_TYPE.EXPERIENCE_PERIOD_2]: "orange" as BadgeVariant,  // Orange - experiência 2
     [CONTRACT_TYPE.INDETERMINATE]: "green" as BadgeVariant,          // Entity-specific: use green (efetivo)
     [CONTRACT_TYPE.FIXED_TERM]: "created" as BadgeVariant,           // Blue - fixed term
     [CONTRACT_TYPE.INTERMITTENT]: "purple" as BadgeVariant,          // Purple - intermittent contract
@@ -415,10 +418,7 @@ export const ENTITY_BADGE_CONFIG = {
 
   // Employment contract lifecycle status
   CONTRACT_STATUS: {
-    [CONTRACT_STATUS.EXPERIENCE]: "pending" as BadgeVariant,         // Amber - em experiência
     [CONTRACT_STATUS.ACTIVE]: "green" as BadgeVariant,
-    [CONTRACT_STATUS.NOTICE_PERIOD]: "orange" as BadgeVariant,       // Aviso prévio
-    [CONTRACT_STATUS.ON_LEAVE]: "purple" as BadgeVariant,            // Afastado
     [CONTRACT_STATUS.TERMINATED]: "red" as BadgeVariant,
   },
 
@@ -769,10 +769,18 @@ export const ENTITY_BADGE_CONFIG = {
 
   // Order Payment Status (Contas a Pagar)
   ORDER_PAYMENT: {
-    [ORDER_PAYMENT_STATUS.NOT_REQUESTED]: "gray" as BadgeVariant,      // Gray - not requested yet
-    [ORDER_PAYMENT_STATUS.REQUESTED]: "pending" as BadgeVariant,       // Amber - payment requested
-    [ORDER_PAYMENT_STATUS.AWAITING_PAYMENT]: "orange" as BadgeVariant, // Orange - awaiting payment
-    [ORDER_PAYMENT_STATUS.PAID]: "green" as BadgeVariant,              // Green - paid
+    [ORDER_PAYMENT_STATUS.AWAITING_PAYMENT]: "pending" as BadgeVariant, // Amber - awaiting payment
+    [ORDER_PAYMENT_STATUS.PARTIALLY_PAID]: "orange" as BadgeVariant,    // Orange - partially paid
+    [ORDER_PAYMENT_STATUS.PAID]: "green" as BadgeVariant,               // Green - paid
+  },
+
+  // Order Installment Status (Parcelas)
+  ORDER_INSTALLMENT: {
+    [ORDER_INSTALLMENT_STATUS.PENDING]: "gray" as BadgeVariant,           // Gray - pending
+    [ORDER_INSTALLMENT_STATUS.PARTIALLY_PAID]: "orange" as BadgeVariant,  // Orange - partially paid
+    [ORDER_INSTALLMENT_STATUS.PAID]: "green" as BadgeVariant,             // Green - paid
+    [ORDER_INSTALLMENT_STATUS.OVERDUE]: "red" as BadgeVariant,            // Red - overdue
+    [ORDER_INSTALLMENT_STATUS.CANCELLED]: "gray" as BadgeVariant,         // Gray - cancelled (muted)
   },
 };
 
@@ -812,10 +820,10 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
   CHARGED: "blue",
   RATE_LIMITED: "pending",
   BOUNCED: "bounced",
-  // Contract statuses (EmploymentContract redesign — replaced DISMISSED/EFFECTED)
-  EXPERIENCE: "pending",
-  NOTICE_PERIOD: "orange",
-  ON_LEAVE: "purple",
+  // Contract types (EmploymentContract redesign — experiência reads from contractType)
+  EXPERIENCE_PERIOD_1: "blue",
+  EXPERIENCE_PERIOD_2: "orange",
+  NOTICE_PERIOD: "orange", // Termination status (aviso prévio) / overlay
   TERMINATED: "red",
   REPROVED: "rejected",
 

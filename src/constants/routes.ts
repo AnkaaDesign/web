@@ -176,6 +176,9 @@ export const routes = {
     billing: {
       root: "/financeiro/faturamento",
       details: (id: string) => `/financeiro/faturamento/detalhes/${id}`,
+      // Full-page preview of a single NFS-e/boleto, opened in a new tab from the
+      // billing-approval modal. Data is handed off via localStorage (key in `?k=`).
+      documentPreview: "/financeiro/faturamento/previa-documento",
     },
     budget: {
       root: "/financeiro/orcamento",
@@ -296,10 +299,12 @@ export const routes = {
       },
     },
     vacations: {
-      root: "/recursos-humanos/ferias",
-      create: "/recursos-humanos/ferias/cadastrar",
-      edit: (id: string) => `/recursos-humanos/ferias/editar/${id}`,
-      details: (id: string) => `/recursos-humanos/ferias/detalhes/${id}`,
+      // Férias migrated to Departamento Pessoal. RH still surfaces it in its
+      // menu (child of both), but the canonical pages/routes live under DP.
+      root: "/departamento-pessoal/ferias",
+      create: "/departamento-pessoal/ferias/cadastrar",
+      edit: (id: string) => `/departamento-pessoal/ferias/editar/${id}`,
+      details: (id: string) => `/departamento-pessoal/ferias/detalhes/${id}`,
     },
     calendar: {
       root: "/recursos-humanos/calendario",
@@ -616,6 +621,9 @@ export const routes = {
       collectiveDetails: (id: string) => `/departamento-pessoal/ferias/coletiva/detalhes/${id}`,
       root: "/departamento-pessoal/ferias",
     },
+    // LEGACY: 13º Salário no longer has standalone pages — it is managed
+    // per-collaborator from the colaborador detail page. These paths are kept
+    // only so App.tsx can redirect old links/bookmarks to the colaborador list.
     thirteenth: {
       create: "/departamento-pessoal/decimo-terceiro/cadastrar",
       details: (id: string) => `/departamento-pessoal/decimo-terceiro/detalhes/${id}`,

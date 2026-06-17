@@ -3,6 +3,8 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { IconBriefcase, IconUsers, IconCircleCheck } from "@tabler/icons-react";
 import { FormCombobox } from "@/components/ui/form-combobox";
 import { FormInput } from "@/components/ui/form-input";
+import { FormCNPJInput } from "@/components/ui/form-cnpj-input";
+import { useCnpjLookup } from "@/hooks/common/use-cnpj-lookup";
 import {
   CONTRACT_TYPE,
   CONTRACT_TYPE_LABELS,
@@ -84,10 +86,19 @@ export function ProviderFields({
   namePath?: string;
   cnpjPath?: string;
 }) {
+  const form = useFormContext();
+  // Autocomplete: a complete CNPJ looks up the company and fills the Razão Social
+  // (same Brasil API lookup the supplier/customer forms use).
+  const { lookupCnpj } = useCnpjLookup({
+    onSuccess: (data) => {
+      form.setValue(namePath as any, data.corporateName, { shouldDirty: true, shouldValidate: true });
+    },
+  });
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <FormInput name={namePath as any} label="Empresa / Prestador" placeholder="Nome da empresa prestadora" disabled={disabled} />
-      <FormInput name={cnpjPath as any} label="CNPJ do Prestador" placeholder="CNPJ" disabled={disabled} />
+      <FormCNPJInput name={cnpjPath as any} label="CNPJ" onComplete={lookupCnpj} disabled={disabled} />
+      <FormInput name={namePath as any} label="Razão Social" placeholder="Razão social da empresa" disabled={disabled} />
     </div>
   );
 }

@@ -135,6 +135,28 @@ export const createVacationColumns = (): VacationColumn[] => [
     align: "left",
   },
 
+  // Gozo (start + days of THIS taking)
+  {
+    key: "gozo",
+    header: "GOZO",
+    accessor: (vacation: Vacation) => (
+      <div className="text-sm truncate">
+        {vacation.startDate ? (
+          <span>
+            {formatDate(new Date(vacation.startDate))} · <span className="font-medium tabular-nums">{vacation.days} dia{vacation.days > 1 ? "s" : ""}</span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">
+            Não agendado{vacation.days > 0 ? ` · ${vacation.days} dia${vacation.days > 1 ? "s" : ""}` : ""}
+          </span>
+        )}
+      </div>
+    ),
+    sortable: false,
+    className: "min-w-[170px]",
+    align: "left",
+  },
+
   // Dias de Direito
   {
     key: "entitledDays",
@@ -238,4 +260,4 @@ export const createVacationColumns = (): VacationColumn[] => [
   },
 ];
 
-export const DEFAULT_VACATION_VISIBLE_COLUMNS = new Set(["user.name", "acquisitiveStart", "concessiveEnd", "entitledDays", "abonoPecuniarioDays", "isDouble", "statusOrder"]);
+export const DEFAULT_VACATION_VISIBLE_COLUMNS = new Set(["user.name", "acquisitiveStart", "gozo", "concessiveEnd", "entitledDays", "abonoPecuniarioDays", "isDouble", "statusOrder"]);

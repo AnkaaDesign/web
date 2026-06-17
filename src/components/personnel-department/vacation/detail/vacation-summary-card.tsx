@@ -19,6 +19,10 @@ export function VacationSummaryCard({ vacation, className }: VacationSummaryCard
   const expiring = isConcessiveExpiringSoon(vacation);
   const remaining = getConcessiveDaysRemaining(vacation);
 
+  // A Vacation is now a single gozo "taking" (startDate + days). The full
+  // remaining-days picture across sibling takings lives in the balance card.
+  const gozoEntitled = Math.max(0, vacation.entitledDays - vacation.abonoPecuniarioDays);
+
   return (
     <Card className={cn("shadow-sm border border-border", className)}>
       <CardHeader className="pb-4">
@@ -82,11 +86,21 @@ export function VacationSummaryCard({ vacation, className }: VacationSummaryCard
             }
           />
 
+          <DetailRow
+            label="Início do Gozo"
+            value={vacation.startDate ? formatDate(new Date(vacation.startDate)) : "Não agendado"}
+          />
+          <DetailRow label="Dias de Gozo (este período)" value={`${vacation.days} dia(s)`} />
+
           <DetailRow label="Faltas Injustificadas" value={vacation.unjustifiedAbsencesInPeriod} />
-          <DetailRow label="Dias de Direito (art. 130)" value={vacation.entitledDays} />
+          <DetailRow label="Dias de Direito (art. 130)" value={`${vacation.entitledDays} dias`} />
           <DetailRow label="Abono Pecuniário" value={vacation.abonoPecuniarioDays > 0 ? `${vacation.abonoPecuniarioDays} dia(s)` : "-"} />
+          <DetailRow label="Gozo de Direito (direito − abono)" value={`${gozoEntitled} dias`} />
           <DetailRow label="Vendeu 1/3" value={vacation.soldThird ? "Sim" : "Não"} />
-          <DetailRow label="Em Dobro (art. 137)" value={vacation.isDouble ? "Sim" : "Não"} />
+          <DetailRow
+            label="Em Dobro (art. 137)"
+            value={vacation.isDouble ? <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Em dobro</Badge> : "Não"}
+          />
 
           <DetailRow label="Prazo de Pagamento" value={vacation.paymentDueDate ? formatDate(new Date(vacation.paymentDueDate)) : "-"} />
           <DetailRow label="Data de Pagamento" value={vacation.paymentDate ? formatDate(new Date(vacation.paymentDate)) : "-"} />

@@ -16,12 +16,6 @@ import type { Vacation } from "./vacation";
 // Entities
 // =====================
 
-export interface VacationGroupPeriod extends BaseEntity {
-  groupId: string;
-  startDate: Date;
-  days: number;
-}
-
 export interface VacationGroup extends BaseEntity {
   name: string;
   type: VACATION_GROUP_TYPE;
@@ -33,9 +27,11 @@ export interface VacationGroup extends BaseEntity {
   sectorIds: string[];
   positionIds: string[];
   notes: string | null;
+  /** Gozo template (single window) bulk-applied to each member on expand. */
+  startDate: Date | string | null;
+  days: number;
 
   // Relations
-  periods?: VacationGroupPeriod[];
   vacations?: Vacation[];
 }
 

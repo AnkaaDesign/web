@@ -42,8 +42,6 @@ export interface EmploymentContract extends BaseEntity {
   exp2StartAt: Date | null;
   exp2EndAt: Date | null;
   effectedAt: Date | null;
-  /** Fase de experiência (1 ou 2). Normalmente DERIVADA das datas de experiência. NULL = derivar. */
-  experiencePhase: number | null;
   /** Art. 481 CLT — cláusula assecuratória do direito recíproco de rescisão. */
   hasArt481Clause: boolean;
   terminationDate: Date | null;
@@ -64,6 +62,27 @@ export interface EmploymentContract extends BaseEntity {
   admission?: Admission;
   terminations?: Termination[];
   payrolls?: any[];
+  /** Audit trail of each MODALITY (contractType) this vínculo held over time. */
+  phaseHistory?: ContractPhaseHistory[];
+}
+
+// =====================
+// Contract Phase History
+// =====================
+
+/**
+ * Audit record of a single MODALITY (contractType) a continuous vínculo held over
+ * time. The single contract advances EXPERIENCE_PERIOD_1 → EXPERIENCE_PERIOD_2 →
+ * INDETERMINATE; each phase is one row. `endDate === null` ⇒ current/open phase.
+ */
+export interface ContractPhaseHistory extends BaseEntity {
+  contractId: string;
+  userId: string;
+  contractType: CONTRACT_TYPE;
+  startDate: Date | string;
+  endDate: Date | string | null;
+  triggeredBy?: string | null;
+  reason?: string | null;
 }
 
 // =====================
@@ -77,6 +96,7 @@ export interface EmploymentContractIncludes {
   admission?: boolean | { include?: any };
   terminations?: boolean | { include?: any };
   payrolls?: boolean | { include?: any };
+  phaseHistory?: boolean | { include?: any; where?: any; orderBy?: any };
 }
 
 // =====================

@@ -132,6 +132,7 @@ export const OrderCreateForm = () => {
       paymentMethod: null,
       paymentPix: null,
       paymentDueDays: null,
+      installmentCount: 1,
     },
     mode: "onTouched", // Only validate after user touches a field
     reValidateMode: "onChange", // Re-validate on change after initial validation
@@ -535,6 +536,7 @@ export const OrderCreateForm = () => {
       const currentPaymentMethod = form.getValues("paymentMethod");
       const currentPaymentPix = form.getValues("paymentPix");
       const currentPaymentDueDays = form.getValues("paymentDueDays");
+      const currentInstallmentCount = form.getValues("installmentCount");
       const currentPaymentResponsibleId = form.getValues("paymentResponsibleId");
 
       // Prepare the complete form data
@@ -550,6 +552,7 @@ export const OrderCreateForm = () => {
         paymentMethod: currentPaymentMethod || undefined,
         paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
         paymentDueDays: currentPaymentMethod === "BANK_SLIP" ? currentPaymentDueDays || undefined : undefined,
+        installmentCount: currentPaymentMethod === "BANK_SLIP" ? currentInstallmentCount || 1 : 1,
         paymentResponsibleId: currentPaymentResponsibleId || undefined,
       };
 
@@ -1277,6 +1280,7 @@ export const OrderCreateForm = () => {
                                   }
                                   if (stringValue !== "BANK_SLIP") {
                                     form.setValue("paymentDueDays", null);
+                                    form.setValue("installmentCount", 1);
                                   }
                                 }}
                                 options={[
@@ -1342,6 +1346,30 @@ export const OrderCreateForm = () => {
                                   ]}
                                   placeholder="Selecione o prazo"
                                   emptyText="Nenhum prazo"
+                                  className="h-8 w-full"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Parcelas (boleto 2x/3x) — generates one installment per parcela,
+                              each spaced by the "Prazo de Vencimento" above. */}
+                          {form.watch("paymentMethod") === "BANK_SLIP" && (
+                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
+                              <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Parcelas</span>
+                              <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
+                                <Combobox
+                                  value={(form.watch("installmentCount") || 1).toString()}
+                                  onValueChange={(value) => {
+                                    const stringValue = Array.isArray(value) ? value[0] : value;
+                                    form.setValue("installmentCount", stringValue ? parseInt(stringValue) : 1);
+                                  }}
+                                  options={Array.from({ length: 12 }, (_, i) => ({
+                                    value: (i + 1).toString(),
+                                    label: i === 0 ? "À vista (1x)" : `${i + 1}x`,
+                                  }))}
+                                  placeholder="Selecione as parcelas"
+                                  emptyText="—"
                                   className="h-8 w-full"
                                 />
                               </div>

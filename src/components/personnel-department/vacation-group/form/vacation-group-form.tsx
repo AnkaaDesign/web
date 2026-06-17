@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconBeach, IconCalendar, IconFileDescription, IconUsersGroup } from "@tabler/icons-react";
@@ -15,9 +15,6 @@ import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-
-import { FracionamentoEditor } from "@/components/personnel-department/vacation/form";
-import type { FracionamentoPeriod } from "@/components/personnel-department/vacation/form";
 
 interface VacationGroupFormProps {
   mode: "create";
@@ -37,7 +34,8 @@ export function VacationGroupForm({ onSubmit, isSubmitting: isSubmittingProp, di
       sectorIds: [],
       positionIds: [],
       notes: null,
-      periods: [],
+      startDate: undefined,
+      days: 30,
     } as any,
   });
 
@@ -45,10 +43,6 @@ export function VacationGroupForm({ onSubmit, isSubmitting: isSubmittingProp, di
   const fieldsDisabled = disabled || isSubmitting;
 
   const watchedType = useWatch({ control: form.control, name: "type" });
-
-  // Fracionamento — guideline of 30 dias de gozo (template is a guideline).
-  const [periods, setPeriods] = useState<FracionamentoPeriod[]>([]);
-  const vacationDaysToSplit = 30;
 
   // Reset the irrelevant target list when type changes.
   useEffect(() => {
@@ -73,14 +67,10 @@ export function VacationGroupForm({ onSubmit, isSubmitting: isSubmittingProp, di
 
   const handleSubmit = async (data: VacationGroupCreateFormData) => {
     try {
-      const filledPeriods = periods
-        .filter((p) => p.startDate && p.days)
-        .map((p) => ({ startDate: p.startDate as Date, days: Number(p.days) }));
       await onSubmit({
         ...data,
         sectorIds: data.type === VACATION_GROUP_TYPE.SECTOR ? data.sectorIds : undefined,
         positionIds: data.type === VACATION_GROUP_TYPE.POSITION ? data.positionIds : undefined,
-        periods: filledPeriods,
       } as VacationGroupCreateFormData);
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {
@@ -279,13 +269,53 @@ export function VacationGroupForm({ onSubmit, isSubmitting: isSubmittingProp, di
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconCalendar className="h-5 w-5 text-muted-foreground" />
-                Períodos de Gozo
+                Período de Gozo
               </CardTitle>
-              <CardDescription>Divida o gozo em até 3 períodos. Ao menos um período é obrigatório.</CardDescription>
+              <CardDescription>Defina o início e a quantidade de dias do gozo coletivo. Será aplicado a cada colaborador elegível.</CardDescription>
             </CardHeader>
             <CardContent>
-              <FracionamentoEditor periods={periods} onChange={setPeriods} vacationDaysToSplit={vacationDaysToSplit} disabled={fieldsDisabled} />
-              {form.formState.errors.periods && <p className="mt-2 text-sm text-destructive">{form.formState.errors.periods.message as string}</p>}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name={"startDate" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <DateTimeInput
+                          mode="date"
+                          value={field.value as Date | undefined}
+                          onChange={(date) => field.onChange(date instanceof Date ? date : undefined)}
+                          label="Início do gozo *"
+                          disabled={fieldsDisabled}
+                          placeholder="Selecione a data"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={"days" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dias de gozo *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={field.value ?? ""}
+                          onChange={(value) => field.onChange(value === "" || value === null ? undefined : Number(value))}
+                          disabled={fieldsDisabled}
+                          placeholder="30"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </CardContent>
           </Card>
 

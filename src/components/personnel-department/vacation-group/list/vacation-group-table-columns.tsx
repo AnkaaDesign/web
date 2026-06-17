@@ -31,14 +31,11 @@ export function getVacationGroupStatusVariant(status: VACATION_STATUS): "seconda
 }
 
 function periodRange(group: VacationGroup): string {
-  const periods = group.periods || [];
-  if (periods.length === 0) return "-";
-  const sorted = [...periods].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-  const first = sorted[0];
-  const last = sorted[sorted.length - 1];
-  const lastEnd = new Date(last.startDate);
-  lastEnd.setDate(lastEnd.getDate() + (Number(last.days) || 0));
-  return `${formatDate(new Date(first.startDate))} — ${formatDate(lastEnd)}`;
+  if (!group.startDate || !group.days) return "-";
+  const start = new Date(group.startDate);
+  const end = new Date(start);
+  end.setDate(end.getDate() + (Number(group.days) || 0) - 1);
+  return `${formatDate(start)} — ${formatDate(end)}`;
 }
 
 export const createVacationGroupColumns = (): VacationGroupColumn[] => [

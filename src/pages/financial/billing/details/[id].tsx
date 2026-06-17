@@ -44,6 +44,8 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
+import { BillingDocumentPreviews } from "@/components/financial/billing/preview/billing-document-previews";
+import { useNextNfseNumber } from "@/hooks/financial/use-nfse";
 
 export const BillingDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -69,6 +71,8 @@ export const BillingDetailPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [layoutFiles, setLayoutFiles] = useState<FileWithPreview[]>([]);
   const [billingApprovalDialogOpen, setBillingApprovalDialogOpen] = useState(false);
+  // Predicted NFS-e número (last emitted + 1) — fetched only while the approval modal is open.
+  const { data: nextNfse } = useNextNfseNumber(billingApprovalDialogOpen);
   const [isGenerating, setIsGenerating] = useState(false);
   const [dossieCustomerId, setDossieCustomerId] = useState<string>("all");
 
@@ -886,7 +890,7 @@ export const BillingDetailPage = () => {
 
       {/* Billing Approval Confirmation Dialog */}
       <AlertDialog open={billingApprovalDialogOpen} onOpenChange={setBillingApprovalDialogOpen}>
-        <AlertDialogContent className="max-w-lg border-red-500 border-2">
+        <AlertDialogContent className="max-w-3xl w-[95vw] border-red-500 border-2 max-h-[92vh] overflow-y-auto">
           <AlertDialogHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
@@ -897,6 +901,25 @@ export const BillingDetailPage = () => {
               </AlertDialogTitle>
             </div>
           </AlertDialogHeader>
+
+          {/* Faithful previews of the NFS-e + boletos that will be generated */}
+          <div className="my-2">
+            <p className="mb-2 text-sm font-medium text-foreground">
+              Confira os documentos que serão gerados automaticamente:
+            </p>
+            <BillingDocumentPreviews
+              customerConfigs={form.watch("customerConfigs")}
+              services={form.watch("services")}
+              nextNfseNumber={nextNfse?.nextNumber ?? null}
+              task={{
+                plate: form.watch("plate"),
+                serialNumber: form.watch("serialNumber"),
+                chassisNumber: form.watch("chassisNumber"),
+                category: form.watch("category"),
+                implementType: form.watch("implementType"),
+              }}
+            />
+          </div>
 
           <div className="rounded-lg border-2 border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-4 my-2 space-y-3">
             <p className="text-sm font-semibold text-red-800 dark:text-red-300">

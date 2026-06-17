@@ -16,6 +16,7 @@ import { recentMessagesWidget } from "./recent-messages";
 import { timeEntriesWidget } from "./time-entries";
 import { dailyPontoWidget } from "./daily-ponto";
 import { quickNoteWidget } from "./quick-note";
+import { postitBoardWidget } from "./postit-board";
 // import { quickBudgetWidget } from "./quick-budget"; // Hidden from gallery — pending redesign
 import { hrCalendarWidget } from "./hr-calendar";
 import { productionCalendarWidget } from "./production-calendar";
@@ -34,6 +35,7 @@ const allWidgets: any[] = [
   // Quick-action / form widgets
   // quickBudgetWidget, // Hidden from gallery — pending redesign
   quickNoteWidget,
+  postitBoardWidget,
   // Navigation
   favoritesWidget,
   // Single-purpose data widgets

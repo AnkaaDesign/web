@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,6 +17,12 @@ interface UserPositionHistoryCardProps {
   className?: string;
   /** Maximum height of the scrollable timeline area. */
   maxHeight?: string;
+  /**
+   * Reports how many cargo records were loaded so the parent can hide this card
+   * entirely when there are none (promotion history is frequently empty — it
+   * must never surface a "Nenhum registro" placeholder). `null` while loading.
+   */
+  onCount?: (count: number | null) => void;
 }
 
 const NO_DATE = "Sem data";
@@ -47,7 +53,7 @@ function reasonIconNode(reason: string) {
  * timeline where each promotion/adjustment is a nested card with a reason-coloured
  * icon node on the left rail. The open row (endedAt = null) is the current cargo.
  */
-export function UserPositionHistoryCard({ userId, className, maxHeight = "500px" }: UserPositionHistoryCardProps) {
+export function UserPositionHistoryCard({ userId, className, maxHeight = "500px", onCount }: UserPositionHistoryCardProps) {
   const {
     data: response,
     isLoading,
@@ -67,6 +73,11 @@ export function UserPositionHistoryCard({ userId, className, maxHeight = "500px"
   );
 
   const records: UserPositionHistory[] = response?.data || [];
+
+  // Surface the record count to the parent (used to hide this card when empty).
+  useEffect(() => {
+    onCount?.(isLoading ? null : records.length);
+  }, [isLoading, records.length, onCount]);
 
   // Group by start date (newest first), matching the changelog/activity layout.
   const grouped = useMemo(() => {

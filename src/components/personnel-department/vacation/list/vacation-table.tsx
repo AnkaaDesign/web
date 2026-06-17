@@ -48,7 +48,6 @@ export function VacationTable({ visibleColumns, className, onDelete, filters = {
           sector: true,
         },
       },
-      periods: true,
     }),
     [],
   );

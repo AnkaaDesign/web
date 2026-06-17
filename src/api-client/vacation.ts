@@ -10,7 +10,6 @@ import type {
   VacationBatchUpdateFormData,
   VacationBatchDeleteFormData,
   VacationAdvanceFormData,
-  VacationSetPeriodsFormData,
 } from "../schemas/vacation";
 import type {
   Vacation,
@@ -23,7 +22,43 @@ import type {
   VacationBatchUpdateResponse,
   VacationBatchDeleteResponse,
   VacationCalculateResponse,
+  VacationPeriodBalanceResponse,
 } from "../types/vacation";
+
+// =====================
+// Secullum (ponto) sync visibility
+// =====================
+
+export interface VacationDateRange {
+  inicio: string; // YYYY-MM-DD
+  fim: string; // YYYY-MM-DD (inclusive)
+}
+
+export type VacationSecullumState = "NOT_LINKED" | "NOT_PUSHED" | "SYNCED" | "OUT_OF_SYNC" | "UNKNOWN";
+
+export interface VacationSecullumStatusData {
+  linked: boolean;
+  secullumEmployeeId: number | null;
+  expectedPeriods: VacationDateRange[];
+  pushedAbsences: (VacationDateRange & { id: number })[];
+  missing: VacationDateRange[];
+  extra: (VacationDateRange & { id: number })[];
+  inSync: boolean;
+  state: VacationSecullumState;
+  message: string;
+}
+
+export interface VacationSecullumStatusResponse {
+  success: boolean;
+  message: string;
+  data: VacationSecullumStatusData;
+}
+
+export interface VacationSecullumSyncResponse {
+  success: boolean;
+  message: string;
+  data: { success: boolean; message: string; created?: number; removed?: number; skipped?: boolean };
+}
 
 // =====================
 // Vacation Service Class
@@ -59,12 +94,15 @@ export class VacationService {
     return response.data;
   }
 
-  // Periods / Status Machine / Calculation
-  async setVacationPeriods(id: string, data: VacationSetPeriodsFormData): Promise<VacationUpdateResponse> {
-    const response = await apiClient.put<VacationUpdateResponse>(`${this.basePath}/${id}/periods`, data);
+  // Period balance (remaining-days history across siblings). Keyed by vacation
+  // id — the server reads the acquisitive dates from the row, so there's no
+  // client date-serialization drift in the grouping.
+  async getVacationPeriodBalance(vacationId: string): Promise<VacationPeriodBalanceResponse> {
+    const response = await apiClient.get<VacationPeriodBalanceResponse>(`${this.basePath}/${vacationId}/period-balance`);
     return response.data;
   }
 
+  // Status Machine / Calculation
   async calculateVacation(id: string): Promise<VacationCalculateResponse> {
     const response = await apiClient.post<VacationCalculateResponse>(`${this.basePath}/${id}/calculate`);
     return response.data;
@@ -72,6 +110,17 @@ export class VacationService {
 
   async advanceVacation(id: string, data: VacationAdvanceFormData = {}, query?: any): Promise<VacationUpdateResponse> {
     const response = await apiClient.put<VacationUpdateResponse>(`${this.basePath}/${id}/advance`, data, { params: query });
+    return response.data;
+  }
+
+  // Secullum (ponto) — read-derived status + manual (re)sync
+  async getSecullumStatus(id: string): Promise<VacationSecullumStatusResponse> {
+    const response = await apiClient.get<VacationSecullumStatusResponse>(`${this.basePath}/${id}/secullum-status`);
+    return response.data;
+  }
+
+  async syncSecullum(id: string): Promise<VacationSecullumSyncResponse> {
+    const response = await apiClient.post<VacationSecullumSyncResponse>(`${this.basePath}/${id}/sync`);
     return response.data;
   }
 
@@ -103,10 +152,14 @@ export const createVacation = (data: VacationCreateFormData, query?: any) => vac
 export const updateVacation = (id: string, data: VacationUpdateFormData, query?: any) => vacationService.updateVacation(id, data, query);
 export const deleteVacation = (id: string) => vacationService.deleteVacation(id);
 
-// Periods / Status Machine / Calculation
-export const setVacationPeriods = (id: string, data: VacationSetPeriodsFormData) => vacationService.setVacationPeriods(id, data);
+// Period balance / Status Machine / Calculation
+export const getVacationPeriodBalance = (vacationId: string) => vacationService.getVacationPeriodBalance(vacationId);
 export const calculateVacation = (id: string) => vacationService.calculateVacation(id);
 export const advanceVacation = (id: string, data?: VacationAdvanceFormData, query?: any) => vacationService.advanceVacation(id, data, query);
+
+// Secullum (ponto) sync visibility
+export const getVacationSecullumStatus = (id: string) => vacationService.getSecullumStatus(id);
+export const syncVacationSecullum = (id: string) => vacationService.syncSecullum(id);
 
 // Batch Operations
 export const batchCreateVacations = (data: VacationBatchCreateFormData, query?: any) => vacationService.batchCreateVacations(data, query);

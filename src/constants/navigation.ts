@@ -1877,12 +1877,14 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "ferias",
         title: "Férias",
         icon: "vacation",
-        path: "/recursos-humanos/ferias",
+        // Férias lives under Departamento Pessoal; RH surfaces it too (child of
+        // both menus) by pointing at the canonical DP pages.
+        path: "/departamento-pessoal/ferias",
         requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
         children: [
-          { id: "ferias-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/ferias/cadastrar" },
-          { id: "ferias-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/ferias/editar/:id", isDynamic: true },
-          { id: "ferias-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/ferias/detalhes/:id", isDynamic: true },
+          { id: "ferias-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/ferias/cadastrar" },
+          { id: "ferias-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/ferias/editar/:id", isDynamic: true },
+          { id: "ferias-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/ferias/detalhes/:id", isDynamic: true },
         ],
       },
       {
@@ -1979,18 +1981,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "dp-ferias-coletiva-detalhes", title: "Férias Coletivas", icon: "eye", path: "/departamento-pessoal/ferias/coletiva/detalhes/:id", isDynamic: true },
         ],
       },
-      {
-        id: "dp-decimo-terceiro",
-        title: "13º Salário",
-        icon: "coins",
-        path: "/departamento-pessoal/decimo-terceiro",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-        children: [
-          { id: "dp-decimo-terceiro-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/decimo-terceiro/cadastrar" },
-          { id: "dp-decimo-terceiro-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/decimo-terceiro/detalhes/:id", isDynamic: true },
-          { id: "dp-decimo-terceiro-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/decimo-terceiro/editar/:id", isDynamic: true },
-        ],
-      },
+      // 13º Salário no longer has a dedicated DP menu/page. It is handled
+      // per-collaborator (generate/edit/pay) from the colaborador detail page.
+      // The Thirteenth model, engine, and Contas a Pagar forecast are untouched.
       // NOTE (spec alignment 2026-06-11): "Feriados" and "Calendário" are NOT DP items.
       // Calendário moved under Ferramentas for ACCOUNTING (HR/ADMIN keep the
       // Recursos Humanos placement); Feriados stays HR/ADMIN-only in Recursos Humanos.

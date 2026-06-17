@@ -13,11 +13,13 @@ import { createVacationGroupColumns } from "./vacation-group-table-columns";
 
 interface VacationGroupListProps {
   className?: string;
+  /** Fires after navigating to a group's detail (e.g. to close a containing drawer). */
+  onRowClick?: () => void;
 }
 
 const DEFAULT_PAGE_SIZE = 40;
 
-export function VacationGroupList({ className }: VacationGroupListProps) {
+export function VacationGroupList({ className, onRowClick }: VacationGroupListProps) {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
 
@@ -32,7 +34,7 @@ export function VacationGroupList({ className }: VacationGroupListProps) {
     () => ({
       page: page + 1,
       limit: pageSize,
-      include: { periods: true, vacations: true },
+      include: { vacations: true },
       orderBy: { createdAt: "desc" as const },
       ...(search.trim() ? { searchingFor: search.trim() } : {}),
     }),
@@ -91,7 +93,7 @@ export function VacationGroupList({ className }: VacationGroupListProps) {
                     <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
                       <IconBeach className="h-12 w-12 text-muted-foreground/50 mb-4" />
                       <div className="text-lg font-medium mb-2">Nenhuma férias coletiva encontrada</div>
-                      <div className="text-sm">Use a ação "Novas Férias Coletivas" para começar.</div>
+                      <div className="text-sm">Em "Novas Férias", escolha o modo "Coletiva" para criar um período por setor, cargo ou toda a empresa.</div>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -100,7 +102,10 @@ export function VacationGroupList({ className }: VacationGroupListProps) {
                   <TableRow
                     key={group.id}
                     className={cn("cursor-pointer transition-colors", index % 2 === 1 && "bg-muted/10", "hover:bg-muted/20")}
-                    onClick={() => navigate(routes.personnelDepartment.vacations.collectiveDetails(group.id))}
+                    onClick={() => {
+                      navigate(routes.personnelDepartment.vacations.collectiveDetails(group.id));
+                      onRowClick?.();
+                    }}
                   >
                     {columns.map((column) => (
                       <TableCell

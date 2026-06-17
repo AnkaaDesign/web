@@ -1,15 +1,34 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { IconBeach, IconUser, IconCalendar, IconFileDescription, IconCash, IconCalendarStats } from "@tabler/icons-react";
 
-import {
-  vacationCreateSchema,
-  vacationUpdateSchema,
-  type VacationCreateFormData,
-  type VacationUpdateFormData,
-} from "../../../../schemas/vacation";
+import { vacationUpdateSchema, type VacationUpdateFormData } from "../../../../schemas/vacation";
 import type { Vacation } from "../../../../types/vacation";
+
+// Create form schema — multi-select colaboradores. The page bulk-creates one
+// (single-period) vacation per selected user; the server derives each one's
+// acquisitive period from the colaborador's admission.
+const vacationCreateFormSchema = z.object({
+  userIds: z.array(z.string().uuid()).min(1, { message: "Selecione ao menos um colaborador" }),
+  startDate: z.coerce.date().nullish(),
+  days: z.coerce.number().int().min(1).max(30),
+  unjustifiedAbsencesInPeriod: z.coerce.number().int().min(0).optional(),
+  abonoPecuniarioDays: z.coerce.number().int().min(0).max(10).optional(),
+  soldThird: z.boolean().optional(),
+  notes: z.string().nullish(),
+});
+
+export interface VacationCreateSubmit {
+  userIds: string[];
+  startDate?: Date | null;
+  days: number;
+  unjustifiedAbsencesInPeriod?: number;
+  abonoPecuniarioDays?: number;
+  soldThird?: boolean;
+  notes?: string | null;
+}
 import type { User } from "../../../../types";
 import { getUsers } from "../../../../api-client";
 import { useUser } from "../../../../hooks/human-resources/use-user";
@@ -24,12 +43,11 @@ import { Switch } from "@/components/ui/switch";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { formatDate } from "../../../../utils";
 
-import { entitledDaysFromAbsences, deriveVacationPeriods, type FracionamentoPeriod } from "./vacation-art130";
-import { FracionamentoEditor } from "./fracionamento-editor";
+import { entitledDaysFromAbsences, deriveVacationPeriods } from "./vacation-art130";
 
 interface CreateModeProps {
   mode: "create";
-  onSubmit: (data: VacationCreateFormData) => Promise<void>;
+  onSubmit: (data: VacationCreateSubmit) => Promise<void>;
 }
 
 interface UpdateModeProps {
@@ -46,22 +64,22 @@ type VacationFormProps = (CreateModeProps | UpdateModeProps) & {
 export function VacationForm(props: VacationFormProps) {
   const vacation = props.mode === "update" ? props.vacation : undefined;
 
-  const form = useForm<VacationCreateFormData | VacationUpdateFormData>({
-    resolver: zodResolver(props.mode === "create" ? vacationCreateSchema : vacationUpdateSchema),
+  const form = useForm<any>({
+    resolver: zodResolver(props.mode === "create" ? vacationCreateFormSchema : vacationUpdateSchema),
     defaultValues:
       props.mode === "create"
         ? {
-            userId: "",
-            contractId: null,
-            acquisitiveStart: undefined,
-            acquisitiveEnd: undefined,
+            userIds: [],
+            startDate: null,
+            days: 30,
             unjustifiedAbsencesInPeriod: 0,
             abonoPecuniarioDays: 0,
             soldThird: false,
             notes: null,
-            periods: [],
           }
         : {
+            startDate: vacation?.startDate ? new Date(vacation.startDate) : null,
+            days: vacation?.days ?? undefined,
             unjustifiedAbsencesInPeriod: vacation?.unjustifiedAbsencesInPeriod ?? 0,
             abonoPecuniarioDays: vacation?.abonoPecuniarioDays ?? 0,
             soldThird: vacation?.soldThird ?? false,
@@ -75,11 +93,13 @@ export function VacationForm(props: VacationFormProps) {
   const isSubmitting = props.isSubmitting || form.formState.isSubmitting;
   const fieldsDisabled = props.disabled || isSubmitting;
 
-  // Selected collaborator (create) → derives the contract & período aquisitivo.
-  const watchedUserId = useWatch({ control: form.control, name: "userId" as any });
-  const { data: selectedUserResponse } = useUser(props.mode === "create" ? (watchedUserId as string) || "" : "", {
+  // Selected collaborators (create, multi-select). The período aquisitivo preview
+  // only makes sense for a single selection; with many, each is derived server-side.
+  const watchedUserIds = (useWatch({ control: form.control, name: "userIds" as any }) as string[] | undefined) ?? [];
+  const singleUserId = props.mode === "create" && watchedUserIds.length === 1 ? watchedUserIds[0] : "";
+  const { data: selectedUserResponse } = useUser(singleUserId, {
     include: { position: true, sector: true, currentContract: true },
-    enabled: props.mode === "create" && !!watchedUserId,
+    enabled: props.mode === "create" && !!singleUserId,
   });
   const selectedUser: User | null = (selectedUserResponse?.data as User | undefined) ?? null;
 
@@ -99,10 +119,8 @@ export function VacationForm(props: VacationFormProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedAbsences]);
 
-  // Fracionamento periods (create only; edit uses the dedicated /periods endpoint on the detail page).
-  const [periods, setPeriods] = useState<FracionamentoPeriod[]>([]);
-
-  const vacationDaysToSplit = Math.max(0, entitledDays - (Number(watchedAbono) || 0));
+  // Gozo de direito available for this period (entitled − abono).
+  const gozoEntitled = Math.max(0, entitledDays - (Number(watchedAbono) || 0));
 
   // Derived período aquisitivo/concessivo for display (create).
   const derived = useMemo(() => {
@@ -130,28 +148,17 @@ export function VacationForm(props: VacationFormProps) {
     };
   }, []);
 
-  // Keep contractId synced with the resolved current contract of the selected user.
-  useEffect(() => {
-    if (props.mode !== "create") return;
-    form.setValue("contractId" as any, selectedUser?.currentContract?.id ?? null, { shouldDirty: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedUser?.currentContract?.id]);
-
-  const handleUserChange = (value: string | string[] | null | undefined, fieldOnChange: (value: any) => void) => {
-    const userId = Array.isArray(value) ? value[0] : value;
-    fieldOnChange(userId ?? "");
-  };
-
-  const handleSubmit = async (data: VacationCreateFormData | VacationUpdateFormData) => {
+  const handleSubmit = async (data: any) => {
     try {
       if (props.mode === "create") {
-        const createData = data as VacationCreateFormData;
-        const filledPeriods = periods.filter((p) => p.startDate && p.days).map((p) => ({ startDate: p.startDate as Date, days: Number(p.days) }));
         await props.onSubmit({
-          ...createData,
-          // entitledDays is derived/overridden client-side; the service also stores it.
-          ...(derived ? { acquisitiveStart: derived.acquisitiveStart, acquisitiveEnd: derived.acquisitiveEnd } : {}),
-          periods: filledPeriods.length > 0 ? filledPeriods : undefined,
+          userIds: data.userIds,
+          startDate: data.startDate ?? null,
+          days: Number(data.days),
+          unjustifiedAbsencesInPeriod: Number(data.unjustifiedAbsencesInPeriod) || 0,
+          abonoPecuniarioDays: Number(data.abonoPecuniarioDays) || 0,
+          soldThird: !!data.soldThird,
+          notes: data.notes ?? null,
         });
       } else {
         await props.onSubmit(data as VacationUpdateFormData);
@@ -177,7 +184,7 @@ export function VacationForm(props: VacationFormProps) {
               </CardTitle>
               <CardDescription>
                 {props.mode === "create"
-                  ? "Selecione o colaborador — o período aquisitivo é derivado da admissão do vínculo atual"
+                  ? "Selecione um ou mais colaboradores — uma férias é criada para cada um, com o período aquisitivo derivado da sua admissão"
                   : "O colaborador e o vínculo não podem ser alterados"}
               </CardDescription>
             </CardHeader>
@@ -186,21 +193,22 @@ export function VacationForm(props: VacationFormProps) {
               {props.mode === "create" ? (
                 <FormField
                   control={form.control}
-                  name={"userId" as any}
+                  name={"userIds" as any}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
                         <div className="flex items-center gap-2">
                           <IconUser className="h-4 w-4" />
-                          Colaborador <span className="text-destructive">*</span>
+                          Colaboradores <span className="text-destructive">*</span>
                         </div>
                       </FormLabel>
                       <FormControl>
                         <Combobox<User>
-                          value={field.value}
-                          onValueChange={(value) => handleUserChange(value, field.onChange)}
+                          mode="multiple"
+                          value={(field.value as string[]) ?? []}
+                          onValueChange={field.onChange}
                           disabled={fieldsDisabled}
-                          placeholder="Selecione o colaborador"
+                          placeholder="Selecione um ou mais colaboradores"
                           emptyText="Nenhum colaborador encontrado"
                           searchPlaceholder="Buscar colaborador..."
                           async={true}
@@ -284,6 +292,16 @@ export function VacationForm(props: VacationFormProps) {
                     </AlertDescription>
                   </Alert>
                 )
+              )}
+
+              {/* Multi-selection: período aquisitivo é individual por colaborador */}
+              {props.mode === "create" && watchedUserIds.length > 1 && (
+                <Alert>
+                  <AlertDescription>
+                    {watchedUserIds.length} colaboradores selecionados — uma férias será criada para cada um, com o período aquisitivo e o limite concessivo derivados
+                    individualmente da admissão de cada colaborador.
+                  </AlertDescription>
+                </Alert>
               )}
 
               {props.mode === "update" && vacation && (
@@ -400,35 +418,78 @@ export function VacationForm(props: VacationFormProps) {
                 )}
               />
 
-              {/* Prominent dias de gozo summary */}
+              {/* Prominent dias de gozo de direito summary */}
               <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium">Dias de gozo</p>
+                  <p className="text-sm font-medium">Gozo de direito</p>
                   <p className="text-xs text-muted-foreground">Direito ({entitledDays}) − abono ({Number(watchedAbono) || 0})</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-bold tabular-nums text-primary">{vacationDaysToSplit}</span>
+                  <span className="text-2xl font-bold tabular-nums text-primary">{gozoEntitled}</span>
                   <span className="ml-1 text-sm text-muted-foreground">dias</span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Fracionamento (create only) */}
-          {props.mode === "create" && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconCalendar className="h-5 w-5 text-muted-foreground" />
-                  Fracionamento (opcional)
-                </CardTitle>
-                <CardDescription>Divida o gozo em até 3 períodos. Deixe vazio para um único período.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FracionamentoEditor periods={periods} onChange={setPeriods} vacationDaysToSplit={vacationDaysToSplit} disabled={fieldsDisabled} />
-              </CardContent>
-            </Card>
-          )}
+          {/* Período de gozo desta tomada (create + update) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconCalendar className="h-5 w-5 text-muted-foreground" />
+                Período de Gozo
+              </CardTitle>
+              <CardDescription>
+                Informe o início e a quantidade de dias deste gozo. Para fracionar, cadastre outra tomada no mesmo período aquisitivo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name={"startDate" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <DateTimeInput
+                          mode="date"
+                          value={field.value as Date | null | undefined}
+                          onChange={(date) => field.onChange(date instanceof Date ? date : null)}
+                          label="Início do gozo"
+                          disabled={fieldsDisabled}
+                          placeholder="Selecione a data (opcional)"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={"days" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Dias de gozo <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={field.value ?? ""}
+                          onChange={(value) => field.onChange(value === "" || value === null ? undefined : Number(value))}
+                          disabled={fieldsDisabled}
+                          placeholder="30"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Pagamento (update) */}
           {props.mode === "update" && (

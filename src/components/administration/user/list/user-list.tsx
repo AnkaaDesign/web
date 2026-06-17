@@ -93,6 +93,24 @@ export function UserList({ className, teamScope }: UserListProps) {
       filters.where = { ...filters.where, currentContractType: contractType } as any;
     }
 
+    // Situação (current vínculo lifecycle status) — multi-select.
+    const contractStatuses = params.get("contractStatuses");
+    if (contractStatuses) {
+      filters.contractStatuses = contractStatuses.split(",") as any;
+    }
+
+    // Categoria (worker category) — multi-select.
+    const employeeTypes = params.get("employeeTypes");
+    if (employeeTypes) {
+      filters.employeeTypes = employeeTypes.split(",") as any;
+    }
+
+    // Exibir (tri-state): isActive=true → Ativos, false → Demitidos, omit → Todos.
+    const isActive = params.get("isActive");
+    if (isActive !== null) {
+      filters.isActive = isActive === "true";
+    }
+
     // Parse entity filters (support both single and multiple selections)
     const position = params.get("position");
     const positions = params.get("positions");
@@ -133,11 +151,6 @@ export function UserList({ className, teamScope }: UserListProps) {
     const requirePasswordChange = params.get("requirePasswordChange");
     if (requirePasswordChange !== null) {
       filters.requirePasswordChange = requirePasswordChange === "true";
-    }
-
-    const showDismissed = params.get("showDismissed");
-    if (showDismissed !== null) {
-      filters.showDismissed = showDismissed === "true";
     }
 
     // Parse date range filters
@@ -213,6 +226,13 @@ export function UserList({ className, teamScope }: UserListProps) {
     if (filters.contractTypes?.length) params.contractTypes = filters.contractTypes.join(",");
     else if ((filters.where as any)?.currentContractType) params.contractType = (filters.where as any).currentContractType as string;
 
+    // Situação / Categoria multi-selects
+    if (filters.contractStatuses?.length) params.contractStatuses = filters.contractStatuses.join(",");
+    if (filters.employeeTypes?.length) params.employeeTypes = filters.employeeTypes.join(",");
+
+    // Exibir tri-state (only serialize when explicitly Ativos/Demitidos; Todos omits).
+    if (typeof filters.isActive === "boolean") params.isActive = String(filters.isActive);
+
     // Entity filters
     if (filters.positionId?.length) params.positions = filters.positionId.join(",");
     else if (filters.where?.positionId) params.position = filters.where.positionId as string;
@@ -232,9 +252,6 @@ export function UserList({ className, teamScope }: UserListProps) {
     }
     if (typeof filters.requirePasswordChange === "boolean") {
       params.requirePasswordChange = String(filters.requirePasswordChange);
-    }
-    if (typeof filters.showDismissed === "boolean") {
-      params.showDismissed = String(filters.showDismissed);
     }
 
     // Date filters
@@ -273,6 +290,9 @@ export function UserList({ className, teamScope }: UserListProps) {
   } = useTableFilters<UserGetManyFormData>({
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
+      // Exibir defaults to "Ativos" so the landing list shows active collaborators;
+      // the user can switch to Demitidos (isActive:false) or Todos (omit) in the filter sheet.
+      isActive: true,
     },
     searchDebounceMs: 500,
     searchParamName: "search", // Use "search" for URL compatibility
@@ -283,8 +303,8 @@ export function UserList({ className, teamScope }: UserListProps) {
 
   // Visible columns state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
-    "user-list-visible-columns-v2", // v2: "status" column renamed to "currentContractType"
-    new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "currentContractType"])
+    "user-list-visible-columns-v3", // v3: status column key renamed to "currentContractStatus" (SITUAÇÃO)
+    new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "currentContractStatus"])
   );
 
   // Get all available columns for column visibility manager
@@ -340,22 +360,17 @@ export function UserList({ className, teamScope }: UserListProps) {
       delete result.ledSectorId;
     }
 
-    // The API only accepts `contractKinds` (mapped to currentContractType
-    // server-side); `contractTypes` is silently stripped. Always emit the
-    // server-recognized param and drop the UI-only alias.
+    // The API accepts `contractKinds` (mapped to currentContractType server-side);
+    // emit the server-recognized param for the modalidade filter and drop the alias.
     delete (result as any).contractTypes;
-
-    // Apply contract type / status filter logic
     if (hasExplicitContractTypeFilter) {
-      // User has explicitly selected contract types - use only those
       result.contractKinds = [...filterWithoutOrderBy.contractTypes!];
-    } else if (hasDismissedAtFilter) {
-      // Filtering by dismissal date without an explicit contract type filter:
-      // restrict to dismissed vínculos via the status cache.
-      result.statuses = [CONTRACT_STATUS.TERMINATED];
-    } else if (result.isActive === undefined && result.statuses === undefined) {
-      // No explicit filter - default to active users only
-      result.isActive = true;
+    }
+
+    // Filtering by dismissal date implies dismissed vínculos: force Exibir to
+    // Demitidos (isActive:false) so the active default does not hide the matches.
+    if (hasDismissedAtFilter) {
+      result.isActive = false;
     }
 
     if (teamScope) {
