@@ -1,5 +1,6 @@
 import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
+import { isChunkLoadError, reloadForStaleChunk } from "@/lib/chunk-reload";
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
@@ -31,6 +32,13 @@ export class ErrorBoundary extends Component<Props, State> {
       }
     } catch (e) {
       // Ignore logging errors
+    }
+
+    // A failed dynamic import after a deploy (stale chunk) renders blank under
+    // Suspense — reload once (guarded) to fetch the fresh build.
+    if (isChunkLoadError(error)) {
+      reloadForStaleChunk("error-boundary");
+      return;
     }
 
     // Check if it's a hook call error

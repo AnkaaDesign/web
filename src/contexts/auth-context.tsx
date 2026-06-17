@@ -101,9 +101,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (token) {
           setAuthToken(token);
 
-          // Load cached user data first for immediate display
+          // Load cached user data first for immediate display. Guard the shape
+          // so a stale/old-deploy blob can't crash the first paint (privilege
+          // checks read user.sector). getUserData() already drops version-stale
+          // blobs; this is belt-and-suspenders.
           const cachedUser = getUserData();
-          if (cachedUser) {
+          if (cachedUser && (cachedUser as any).id && (cachedUser as any).sector !== undefined) {
             setUser(cachedUser as AuthUser);
             // Don't set isLoading to false yet if we're going to fetch fresh data
           }
@@ -414,9 +417,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     resendCode,
   };
 
-  // Don't render children until auth is initialized to prevent hook call errors
-  // Also wait if we're loading and haven't determined auth state yet
-  if (!isInitialized || (isLoading && user === null)) {
+  // Block the app only when we genuinely have nothing to show yet (not
+  // initialized AND no cached user). A returning user with a cached profile
+  // renders immediately while /auth/me refreshes in the background — this stops
+  // the full-screen spinner from flashing for the whole /me round-trip on every
+  // reload/deploy.
+  if (!isInitialized && user === null) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>

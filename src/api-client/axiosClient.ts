@@ -813,57 +813,37 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       // Process and handle the error
       const errorInfo = handleApiError(error);
 
-      // Handle 401 errors - try to refresh token first
-      if (errorInfo._statusCode === 401 && !config.url?.includes("/auth/refresh") && !config.url?.includes("/auth/login")) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.log("[API CLIENT DEBUG] Got 401, attempting to refresh token");
-        }
-
-        // Check if we're already refreshing to avoid infinite loops
+      // Handle 401: re-validate the session ONCE (serialized) before any logout.
+      // The previous code called /auth/refresh, but that endpoint requires a
+      // valid access token (no separate refresh token is sent), so it could
+      // never recover an expired session and a single transient 401 logged the
+      // user out. Instead we confirm with /auth/me:
+      //  - still valid  -> retry the original request, no logout
+      //  - genuine 401  -> fall through to the logout handler below
+      //  - network/5xx  -> keep the session, surface the original error for retry
+      // /auth/me is excluded so its own 401 doesn't recurse here.
+      if (
+        errorInfo._statusCode === 401 &&
+        !config.url?.includes("/auth/refresh") &&
+        !config.url?.includes("/auth/login") &&
+        !config.url?.includes("/auth/me")
+      ) {
         if (!(config as any).__isRetryRequest) {
-          try {
-            // Import authService dynamically to avoid circular dependency
-            const { authService } = await import("./auth");
+          const sessionState = await revalidateSession();
 
-            // Try to refresh the token
-            const refreshResponse = await authService.refreshToken();
-
-            if (refreshResponse?.success && refreshResponse?.data?.token) {
-              if (process.env.NODE_ENV !== 'production') {
-                console.log("[API CLIENT DEBUG] Token refreshed successfully");
-              }
-
-              // Update the stored token
-              const newToken = refreshResponse.data.token;
-
-              // Update token in storage with proper key prefix
-              safeLocalStorage.setItem("ankaa_token", newToken);
-              // Also update global token (only in web environment)
-              if (typeof (globalThis as any).window !== "undefined") {
-                (globalThis as any).window.__ANKAA_AUTH_TOKEN__ = newToken;
-              }
-
-              // Retry the original request with new token
-              config.headers.Authorization = `Bearer ${newToken}`;
-              (config as any).__isRetryRequest = true;
-
-              return client.request(config);
-            }
-          } catch (refreshError: any) {
-            if (process.env.NODE_ENV !== 'production') {
-              console.error("[API CLIENT DEBUG] Token refresh failed:", refreshError);
-            }
-
-            // If refresh returns 401, it means the refresh token is also invalid
-            // Don't try to refresh again, just proceed to logout
-            const refreshStatus = refreshError?.originalError?.response?.status || refreshError?._statusCode;
-            if (refreshStatus === 401) {
-              if (process.env.NODE_ENV !== 'production') {
-                console.log("[API CLIENT DEBUG] Refresh token is also invalid, proceeding to logout");
-              }
-            }
-            // Continue to logout flow below
+          if (sessionState === true) {
+            // Token still works — the 401 was transient (e.g. API restart). Retry once.
+            (config as any).__isRetryRequest = true;
+            return client.request(config);
           }
+
+          if (sessionState === null) {
+            // Re-validation failed for a non-auth reason (offline / 5xx during a
+            // restart). Do NOT log out; surface the original error so React Query
+            // can retry it.
+            return Promise.reject(error);
+          }
+          // sessionState === false -> session genuinely invalid -> fall through to logout.
         }
       }
 
@@ -1316,6 +1296,38 @@ let globalTokenProvider: (() => string | null | Promise<string | null>) | undefi
 
 // Global authentication error handler
 let globalAuthErrorHandler: ((error: { statusCode: number; message: string; category: ErrorCategory }) => void) | undefined;
+
+// Shared, serialized session re-validation used by the 401 interceptor.
+//
+// A single transient 401 — e.g. a request that lands while the API is being
+// restarted during a deploy — must NOT log a valid user out. On a 401 we
+// re-check the session ONCE via /auth/me. Because many queries can 401 at the
+// same moment (e.g. a burst of refetches on reconnect), all concurrent callers
+// share ONE in-flight check instead of each firing its own — which previously
+// caused a logout storm (the old un-serialized /auth/refresh path).
+//
+// Returns:
+//   true  -> token still valid; the original 401 was transient -> retry it
+//   false -> /auth/me itself returned 401; session is genuinely invalid -> logout
+//   null  -> re-validation failed for a NON-auth reason (network/5xx) -> keep session
+let sessionRevalidationPromise: Promise<boolean | null> | null = null;
+async function revalidateSession(): Promise<boolean | null> {
+  if (!sessionRevalidationPromise) {
+    sessionRevalidationPromise = (async (): Promise<boolean | null> => {
+      try {
+        const { authService } = await import("./auth");
+        await authService.me();
+        return true; // token works -> the 401 was transient
+      } catch (e: any) {
+        const code = e?._statusCode ?? e?.originalError?.response?.status ?? e?.statusCode;
+        return code === 401 ? false : null; // 401 -> genuine; otherwise transient
+      }
+    })().finally(() => {
+      sessionRevalidationPromise = null;
+    });
+  }
+  return sessionRevalidationPromise;
+}
 
 export const setAuthToken = (token: string | null): void => {
   // Get the singleton instance (lazy initialization)

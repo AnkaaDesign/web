@@ -3,6 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { z } from "zod";
 import "./index.css";
 
+// Auto-recover from stale-chunk failures after a deploy (blank page on first
+// navigation). Installed before anything renders so the listeners are armed for
+// the very first lazy route import.
+import { installChunkReloadHandlers } from "./lib/chunk-reload";
+installChunkReloadHandlers();
+
 // Configure Zod error messages in Portuguese
 z.setErrorMap((issue, ctx) => {
   if (issue.code === z.ZodIssueCode.invalid_type) {

@@ -1,4 +1,9 @@
-import { lazy, Suspense, useEffect } from "react";
+import { Suspense, useEffect } from "react";
+// Use the retry-wrapped lazy so a stale-chunk import after a deploy reloads to
+// the fresh build instead of blanking the page. All `lazy(() => import(...))`
+// call sites below are unchanged.
+import { lazyWithRetry as lazy } from "@/lib/lazy-with-retry";
+import { ErrorBoundary } from "@/components/navigation/error-boundary";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { routes } from "./constants";
 import { ThemeProvider } from "@/contexts/theme-context";
@@ -514,6 +519,7 @@ function App() {
     <Router>
       <ThemeProvider defaultTheme="light" storageKey="ankaa-ui-theme">
         <TooltipProvider skipDelayDuration={0}>
+          <ErrorBoundary>
           <Routes>
             {/* Customer routes (no authentication, no notifications) - MUST be first */}
             <Route
@@ -3540,6 +3546,7 @@ function App() {
               }
             />
           </Routes>
+          </ErrorBoundary>
         </TooltipProvider>
       </ThemeProvider>
     </Router>
