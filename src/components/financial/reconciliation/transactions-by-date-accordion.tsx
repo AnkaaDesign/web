@@ -7,7 +7,6 @@ import {
   IconCategory,
   IconChevronRight,
 } from "@tabler/icons-react";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -42,10 +41,6 @@ interface Props {
   autoExpand?: boolean;
   /** Whether to show the bank account column (only on global view). */
   showAccountColumn?: boolean;
-  /** User-controlled column visibility (column key set). When provided, a
-   *  column is rendered only if it's both structurally enabled (`show`) and
-   *  present in this set. The DATA column is always kept (see RECONCILIATION_LOCKED_COLUMNS). */
-  visibleColumns?: Set<string>;
   onIgnore?: (tx: BankTransaction) => void;
   onViewDetails?: (tx: BankTransaction) => void;
   onChangeCategory?: (tx: BankTransaction) => void;
@@ -117,46 +112,12 @@ interface ColumnSpec {
   show: boolean;
 }
 
-/** Column keys that can never be hidden (anchor the day banner + indent). */
-export const RECONCILIATION_LOCKED_COLUMNS = new Set<string>(["postedAt"]);
-
-/** {key, header} list for the column-visibility manager. `account` is only
- *  offered when the global account column is in play. */
-export function getReconciliationColumnsMeta(
-  showAccountColumn?: boolean,
-): { key: string; header: string }[] {
-  return [
-    { key: "postedAt", header: "Data" },
-    ...(showAccountColumn ? [{ key: "account", header: "Conta" }] : []),
-    { key: "type", header: "Tipo" },
-    { key: "subtype", header: "Forma" },
-    { key: "amount", header: "Valor" },
-    { key: "counterparty", header: "Contraparte / Descrição" },
-    { key: "linkedNf", header: "NF vinculada" },
-    { key: "category", header: "Categoria" },
-    { key: "reconciliationStatus", header: "Status" },
-  ];
-}
-
-/** Columns visible by default. TIPO and FORMA are intentionally hidden — they
- *  add little signal day-to-day, so users opt back in via the manager. */
-export function getDefaultVisibleReconciliationColumns(
-  showAccountColumn?: boolean,
-): Set<string> {
-  return new Set(
-    getReconciliationColumnsMeta(showAccountColumn)
-      .map(c => c.key)
-      .filter(key => key !== "type" && key !== "subtype"),
-  );
-}
-
 export function TransactionsByDateAccordion({
   data,
   dates,
   isLoading,
   autoExpand,
   showAccountColumn,
-  visibleColumns: visibleColumnKeys,
   onIgnore,
   onViewDetails,
   onChangeCategory,
@@ -285,32 +246,27 @@ export function TransactionsByDateAccordion({
     return out;
   }, [txByDate]);
 
-  const columns = useMemo<ColumnSpec[]>(() => {
-    // A column shows when it's structurally enabled AND (no visibility set is
-    // supplied OR the user kept it visible). Locked columns (DATA) ignore the
-    // user's set so the day banner + indent never lose their anchor.
-    const isVisible = (key: string, structural: boolean) => {
-      if (!structural) return false;
-      if (RECONCILIATION_LOCKED_COLUMNS.has(key)) return true;
-      return visibleColumnKeys ? visibleColumnKeys.has(key) : true;
-    };
-    return [
+  const columns = useMemo<ColumnSpec[]>(
+    () => [
       // Date column is wide enough to host the group header's chevron + date
       // (e.g. "26/04/26 Dom.") so the date label stays inside the DATA column
       // space — keeping CONTA cleanly separated from the date visually.
-      { key: "postedAt", header: "Data", width: `${DATE_COLUMN_WIDTH}px`, show: isVisible("postedAt", true) },
-      { key: "account", header: "Conta", width: "240px", show: isVisible("account", !!showAccountColumn) },
-      { key: "type", header: "Tipo", width: "110px", align: "center", show: isVisible("type", true) },
-      { key: "subtype", header: "Forma", width: "120px", align: "center", show: isVisible("subtype", true) },
-      { key: "amount", header: "Valor", width: "140px", align: "right", show: isVisible("amount", true) },
-      { key: "counterparty", header: "Contraparte / Descrição", show: isVisible("counterparty", true) },
+      { key: "postedAt", header: "Data", width: `${DATE_COLUMN_WIDTH}px`, show: true },
+      { key: "account", header: "Conta", width: "240px", show: !!showAccountColumn },
+      // No "Tipo" column — the green Entrada / red Saída values already encode
+      // credit vs. debit.
+      { key: "subtype", header: "Forma", width: "120px", align: "center", show: true },
+      { key: "credit", header: "Entrada", width: "140px", align: "right", show: true },
+      { key: "debit", header: "Saída", width: "140px", align: "right", show: true },
+      { key: "counterparty", header: "Contraparte / Descrição", show: true },
       // Wider so longer emitter names ("FARBEN S/A INDUSTRIA QUIMICA") fit
       // without truncation. The freed space comes from Contraparte (flex).
-      { key: "linkedNf", header: "NF vinculada", width: "220px", show: isVisible("linkedNf", true) },
-      { key: "category", header: "Categoria", width: "240px", show: isVisible("category", true) },
-      { key: "reconciliationStatus", header: "Status", width: "180px", show: isVisible("reconciliationStatus", true) },
-    ];
-  }, [showAccountColumn, visibleColumnKeys]);
+      { key: "linkedNf", header: "NF vinculada", width: "220px", show: true },
+      { key: "category", header: "Categoria", width: "240px", show: true },
+      { key: "reconciliationStatus", header: "Status", width: "180px", show: true },
+    ],
+    [showAccountColumn],
+  );
   const visibleColumns = useMemo(() => columns.filter(c => c.show), [columns]);
   const colSpan = visibleColumns.length;
 
@@ -589,30 +545,27 @@ function DayGroup({
               </TableCell>
             );
           }
-          if (c.key === "amount") {
+          if (c.key === "credit") {
             return (
               <TableCell key={c.key} className="p-0 !border-r-0 text-right">
-                {!isEmpty && (summary.credits > 0 || summary.debits > 0) ? (
-                  <div className="flex flex-col items-end gap-0.5 px-4 py-2.5 leading-tight">
-                    {summary.credits > 0 && (
-                      <span className="text-xs font-semibold tabular-nums text-emerald-700 whitespace-nowrap">
-                        +{formatCurrency(summary.credits)}
-                      </span>
-                    )}
-                    {summary.debits > 0 && (
-                      <span
-                        className={cn(
-                          "tabular-nums whitespace-nowrap font-semibold",
-                          // The debit total is the headline number on the day
-                          // banner — saídas drive reconciliation, so render it
-                          // a notch larger than credits when both are present.
-                          summary.credits > 0 ? "text-xs" : "text-sm",
-                          "text-red-700",
-                        )}
-                      >
-                        −{formatCurrency(summary.debits)}
-                      </span>
-                    )}
+                {!isEmpty && summary.credits > 0 ? (
+                  <div className="px-4 py-2.5 text-right leading-tight">
+                    <span className="text-sm font-semibold tabular-nums text-emerald-700 whitespace-nowrap">
+                      {formatCurrency(summary.credits)}
+                    </span>
+                  </div>
+                ) : null}
+              </TableCell>
+            );
+          }
+          if (c.key === "debit") {
+            return (
+              <TableCell key={c.key} className="p-0 !border-r-0 text-right">
+                {!isEmpty && summary.debits > 0 ? (
+                  <div className="px-4 py-2.5 text-right leading-tight">
+                    <span className="text-sm font-semibold tabular-nums text-red-700 whitespace-nowrap">
+                      {formatCurrency(summary.debits)}
+                    </span>
                   </div>
                 ) : null}
               </TableCell>
@@ -629,7 +582,7 @@ function DayGroup({
               </TableCell>
             );
           }
-          // Account / type / subtype / counterparty / linkedNf / category —
+          // Account / subtype / counterparty / linkedNf / category —
           // intentionally blank so the banner reads as a sub-header, not data.
           return <TableCell key={c.key} className="p-0 !border-r-0" />;
         })}
@@ -683,23 +636,21 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
           {t.accountNumber ? ` / ${formatAccountNumber(t.accountNumber)}` : ""}
         </span>
       );
-    case "type":
-      return (
-        <Badge variant={t.type === "CREDIT" ? "completed" : "cancelled"} size="sm">
-          {t.type === "CREDIT" ? "Crédito" : "Débito"}
-        </Badge>
-      );
     case "subtype":
       return <span className="text-xs text-muted-foreground">{t.subtype}</span>;
-    case "amount":
-      return (
-        <span
-          className={cn(
-            "font-semibold tabular-nums whitespace-nowrap text-sm",
-            t.type === "CREDIT" ? "text-emerald-700" : "text-red-700",
-          )}
-        >
-          {formatCurrency(t.amount)}
+    case "credit":
+      // Entrada column — only CREDIT rows carry a value here (the column
+      // header conveys direction, so no +/− sign is needed).
+      return t.type === "CREDIT" ? (
+        <span className="font-semibold tabular-nums whitespace-nowrap text-sm text-emerald-700">
+          {formatCurrency(Math.abs(Number(t.amount) || 0))}
+        </span>
+      ) : null;
+    case "debit":
+      // Saída column — only DEBIT rows carry a value here.
+      return t.type === "CREDIT" ? null : (
+        <span className="font-semibold tabular-nums whitespace-nowrap text-sm text-red-700">
+          {formatCurrency(Math.abs(Number(t.amount) || 0))}
         </span>
       );
     case "counterparty":

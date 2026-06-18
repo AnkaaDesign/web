@@ -73,7 +73,7 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
 
   // Administration - List Pages
   "/financeiro/clientes": FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR,
-  "/administracao/colaboradores": FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_LISTAR,
+  "/departamento-pessoal/colaboradores": FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_LISTAR,
   "/administracao/orcamentos": FAVORITE_PAGES.ADMINISTRACAO_ORCAMENTOS_LISTAR,
   "/administracao/registros-de-alteracoes": FAVORITE_PAGES.ADMINISTRACAO_REGISTROS_ALTERACOES_LISTAR,
   "/administracao/arquivos": FAVORITE_PAGES.ADMINISTRACAO_ARQUIVOS_LISTAR,
@@ -83,7 +83,7 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
 
   // Administration - Create Pages
   "/financeiro/clientes/cadastrar": FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_CADASTRAR,
-  "/administracao/colaboradores/cadastrar": FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_CADASTRAR,
+  "/departamento-pessoal/colaboradores/cadastrar": FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_CADASTRAR,
   "/administracao/orcamentos/cadastrar": FAVORITE_PAGES.ADMINISTRACAO_ORCAMENTOS_CADASTRAR,
   "/administracao/arquivos/upload": FAVORITE_PAGES.ADMINISTRACAO_ARQUIVOS_CADASTRAR,
   "/administracao/setores/cadastrar": FAVORITE_PAGES.ADMINISTRACAO_SETORES_CADASTRAR,
@@ -91,25 +91,25 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/administracao/mensagens/criar": FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_CRIAR,
 
   // Human Resources - List Pages
-  "/recursos-humanos/cargos": FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR,
-  "/recursos-humanos/ferias": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_LISTAR,
-  "/recursos-humanos/calendario": FAVORITE_PAGES.RECURSOS_HUMANOS_CALENDARIO,
-  "/recursos-humanos/feriados": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_LISTAR,
-  "/recursos-humanos/avisos": FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_LISTAR,
-  "/recursos-humanos/epi": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_LISTAR,
-  "/recursos-humanos/epi/entregas": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR,
-  "/recursos-humanos/epi/agendamentos": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR,
-  "/recursos-humanos/setores": FAVORITE_PAGES.RECURSOS_HUMANOS_SETORES_LISTAR,
+  "/departamento-pessoal/cargos": FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR,
+  "/departamento-pessoal/ferias": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_LISTAR,
+  "/departamento-pessoal/calendario": FAVORITE_PAGES.RECURSOS_HUMANOS_CALENDARIO,
+  "/departamento-pessoal/feriados": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_LISTAR,
+  "/departamento-pessoal/avisos": FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_LISTAR,
+  "/departamento-pessoal/epi": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_LISTAR,
+  "/departamento-pessoal/epi/entregas": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR,
+  "/departamento-pessoal/epi/agendamentos": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR,
+  "/departamento-pessoal/setores": FAVORITE_PAGES.RECURSOS_HUMANOS_SETORES_LISTAR,
 
   // Human Resources - Create Pages
-  "/recursos-humanos/cargos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_CADASTRAR,
-  "/recursos-humanos/ferias/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_CADASTRAR,
-  "/recursos-humanos/feriados/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_CADASTRAR,
-  "/recursos-humanos/avisos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_CADASTRAR,
-  "/recursos-humanos/epi/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_CADASTRAR,
-  "/recursos-humanos/epi/entregas/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR,
-  "/recursos-humanos/epi/agendamentos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR,
-  "/recursos-humanos/setores/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_SETORES_CADASTRAR,
+  "/departamento-pessoal/cargos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_CADASTRAR,
+  "/departamento-pessoal/ferias/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_CADASTRAR,
+  "/departamento-pessoal/feriados/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_CADASTRAR,
+  "/departamento-pessoal/avisos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_CADASTRAR,
+  "/departamento-pessoal/epi/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_CADASTRAR,
+  "/departamento-pessoal/epi/entregas/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR,
+  "/departamento-pessoal/epi/agendamentos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR,
+  "/departamento-pessoal/setores/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_SETORES_CADASTRAR,
 
   // Personal - List Pages
   "/pessoal/feriados": FAVORITE_PAGES.PESSOAL_FERIADOS_LISTAR,

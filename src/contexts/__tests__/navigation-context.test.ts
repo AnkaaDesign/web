@@ -22,8 +22,8 @@ function expandedTopLevel(menu: MenuItem[], expanded: { [k: string]: boolean }):
 
 describe("winner resolution with recorded nav context", () => {
   it("ACCOUNTING: DP > Colaboradores click (and reload with persisted context)", () => {
-    const recorded = { id: "dp-colaboradores", path: "/administracao/colaboradores" };
-    const active = resolveActiveNav(ACCOUNTING, "/administracao/colaboradores", recorded);
+    const recorded = { id: "dp-colaboradores", path: "/departamento-pessoal/colaboradores" };
+    const active = resolveActiveNav(ACCOUNTING, "/departamento-pessoal/colaboradores", recorded);
     expect(active.id).toBe("dp-colaboradores");
     expect(active.trail.map((t) => t.id)).toEqual(["departamento-pessoal"]);
 
@@ -32,8 +32,8 @@ describe("winner resolution with recorded nav context", () => {
   });
 
   it("ADMIN: DP > Colaboradores click does NOT open Administração", () => {
-    const recorded = { id: "dp-colaboradores", path: "/administracao/colaboradores" };
-    const active = resolveActiveNav(ADMIN, "/administracao/colaboradores", recorded);
+    const recorded = { id: "dp-colaboradores", path: "/departamento-pessoal/colaboradores" };
+    const active = resolveActiveNav(ADMIN, "/departamento-pessoal/colaboradores", recorded);
     expect(active.id).toBe("dp-colaboradores");
 
     const expanded = computeExpandedFromActive(ADMIN, active);
@@ -41,28 +41,30 @@ describe("winner resolution with recorded nav context", () => {
     expect(expanded["administracao"]).toBe(false);
   });
 
-  it("ADMIN: Administração > Colaboradores click does NOT open Departamento Pessoal", () => {
-    const recorded = { id: "colaboradores", path: "/administracao/colaboradores" };
-    const active = resolveActiveNav(ADMIN, "/administracao/colaboradores", recorded);
-    expect(active.id).toBe("colaboradores");
+  it("ADMIN: Colaboradores lives only under Departamento Pessoal (removed from Administração)", () => {
+    // The duplicate "Colaboradores" entry under Administração was removed; the
+    // employee directory now lives solely under Departamento Pessoal.
+    const recorded = { id: "dp-colaboradores", path: "/departamento-pessoal/colaboradores" };
+    const active = resolveActiveNav(ADMIN, "/departamento-pessoal/colaboradores", recorded);
+    expect(active.id).toBe("dp-colaboradores");
 
     const expanded = computeExpandedFromActive(ADMIN, active);
-    expect(expandedTopLevel(ADMIN, expanded)).toEqual(["administracao"]);
-    expect(expanded["departamento-pessoal"]).toBe(false);
+    expect(expandedTopLevel(ADMIN, expanded)).toEqual(["departamento-pessoal"]);
+    expect(expanded["administracao"]).toBe(false);
   });
 
   it("context survives into child routes (/detalhes/:id) of the recorded entry", () => {
-    const recorded = { id: "dp-colaboradores", path: "/administracao/colaboradores" };
-    const active = resolveActiveNav(ADMIN, "/administracao/colaboradores/detalhes/abc-123", recorded);
+    const recorded = { id: "dp-colaboradores", path: "/departamento-pessoal/colaboradores" };
+    const active = resolveActiveNav(ADMIN, "/departamento-pessoal/colaboradores/detalhes/abc-123", recorded);
     expect(active.id).toBe("dp-colaboradores-detalhes");
     expect(active.trail.map((t) => t.id)).toEqual(["departamento-pessoal", "dp-colaboradores"]);
     expect(computeExpandedFromActive(ADMIN, active)["administracao"]).toBe(false);
   });
 
-  it("Gratificações click (cross-section path /recursos-humanos/bonus) stays in DP", () => {
-    const recorded = { id: "dp-gratificacoes", path: "/recursos-humanos/bonus" };
+  it("Gratificações click (cross-section path /departamento-pessoal/bonus) stays in DP", () => {
+    const recorded = { id: "dp-gratificacoes", path: "/departamento-pessoal/bonus" };
     for (const menu of [ACCOUNTING, ADMIN]) {
-      const active = resolveActiveNav(menu, "/recursos-humanos/bonus", recorded);
+      const active = resolveActiveNav(menu, "/departamento-pessoal/bonus", recorded);
       expect(active.id).toBe("dp-gratificacoes");
       const expanded = computeExpandedFromActive(menu, active);
       expect(expandedTopLevel(menu, expanded)).toEqual(["departamento-pessoal"]);
@@ -85,12 +87,11 @@ describe("winner resolution with recorded nav context", () => {
   });
 
   it("favorites jump / no recorded context falls back to longest match (one winner)", () => {
-    // ACCOUNTING: only the DP entry exists for this path
-    const acc = resolveActiveNav(ACCOUNTING, "/administracao/colaboradores", null);
+    // Colaboradores now has a single placement (Departamento Pessoal) for every sector.
+    const acc = resolveActiveNav(ACCOUNTING, "/departamento-pessoal/colaboradores", null);
     expect(acc.id).toBe("dp-colaboradores");
-    // ADMIN: tie between Administração and DP resolves by displayed tree order (Administração first)
-    const adm = resolveActiveNav(ADMIN, "/administracao/colaboradores", null);
-    expect(adm.id).toBe("colaboradores");
+    const adm = resolveActiveNav(ADMIN, "/departamento-pessoal/colaboradores", null);
+    expect(adm.id).toBe("dp-colaboradores");
     expect(expandedTopLevel(ADMIN, computeExpandedFromActive(ADMIN, adm)).length).toBe(1);
   });
 
@@ -101,7 +102,7 @@ describe("winner resolution with recorded nav context", () => {
   });
 
   it("stale recorded context that no longer matches the URL falls back", () => {
-    const recorded = { id: "dp-colaboradores", path: "/administracao/colaboradores" };
+    const recorded = { id: "dp-colaboradores", path: "/departamento-pessoal/colaboradores" };
     const active = resolveActiveNav(ACCOUNTING, "/financeiro/contas-a-pagar", recorded);
     expect(active.id).toBe("contas-a-pagar");
     expect(active.trail.map((t) => t.id)).toEqual(["financeiro"]);
@@ -118,34 +119,34 @@ describe("breadcrumbs derived from nav context", () => {
   it("ACCOUNTING never sees Administração on shared pages", () => {
     const crumbs = buildNavBreadcrumbs(
       ACCOUNTING,
-      "/administracao/colaboradores",
-      { id: "dp-colaboradores", path: "/administracao/colaboradores" },
+      "/departamento-pessoal/colaboradores",
+      { id: "dp-colaboradores", path: "/departamento-pessoal/colaboradores" },
       fallback,
     );
     expect(crumbs.map((c) => c.label)).toEqual(["Início", "Departamento Pessoal", "Colaboradores"]);
   });
 
   it("ACCOUNTING without recorded context still derives DP trail", () => {
-    const crumbs = buildNavBreadcrumbs(ACCOUNTING, "/administracao/colaboradores", null, fallback);
+    const crumbs = buildNavBreadcrumbs(ACCOUNTING, "/departamento-pessoal/colaboradores", null, fallback);
     expect(crumbs.some((c) => c.label === "Administração")).toBe(false);
     expect(crumbs[crumbs.length - 1].label).toBe("Colaboradores");
   });
 
-  it("ADMIN coming from Administração keeps the Administração trail", () => {
+  it("ADMIN Colaboradores resolves to the Departamento Pessoal trail (Administração entry removed)", () => {
     const crumbs = buildNavBreadcrumbs(
       ADMIN,
-      "/administracao/colaboradores",
-      { id: "colaboradores", path: "/administracao/colaboradores" },
+      "/departamento-pessoal/colaboradores",
+      { id: "dp-colaboradores", path: "/departamento-pessoal/colaboradores" },
       fallback,
     );
-    expect(crumbs.map((c) => c.label)).toEqual(["Início", "Administração", "Colaboradores"]);
+    expect(crumbs.map((c) => c.label)).toEqual(["Início", "Departamento Pessoal", "Colaboradores"]);
   });
 
   it("leaf crumbs replace the winner crumb (entity names)", () => {
     const crumbs = buildNavBreadcrumbs(
       ACCOUNTING,
-      "/administracao/colaboradores/detalhes/abc-123",
-      { id: "dp-colaboradores", path: "/administracao/colaboradores" },
+      "/departamento-pessoal/colaboradores/detalhes/abc-123",
+      { id: "dp-colaboradores", path: "/departamento-pessoal/colaboradores" },
       fallback,
       [{ label: "Fulano da Silva" }],
     );
@@ -178,25 +179,26 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     ]);
   });
 
-  it("Departamento Pessoal: no Calendário, no Feriados", () => {
+  it("Departamento Pessoal (ACCOUNTING): no Calendário/Feriados/EPI, and Secullum is ADMIN-only", () => {
     const dp = byId(ACCOUNTING, "departamento-pessoal")!;
     const titles = (dp.children || []).map((c) => c.title);
+    // "Integração Secullum" is now ADMIN-only and no longer surfaces for ACCOUNTING.
+    // "EPI" and "Feriados" are HR/ADMIN-only DP items (ACCOUNTING uses Medicina do
+    // Trabalho for PPE), so they don't appear here either.
     expect(titles).toEqual([
       "Admissões",
       "Advertências",
       "Benefícios",
       "Colaboradores",
       "Controle de Ponto",
+      "Empréstimos",
       "Férias",
-      "Integração Secullum",
-      "Requisições",
       "Rescisões",
       "Salários e Cargos",
     ]);
     const salarios = (dp.children || []).find((c) => c.id === "dp-salarios-e-cargos")!;
     expect(salarios.children!.map((c) => c.title)).toEqual([
       "Cargos",
-      "Faixas Salariais",
       "Folha de Pagamento",
       "Gratificações",
       "Horários",
@@ -265,19 +267,39 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
       "Custo de Horas Extras",
       "Post-its",
     ]);
-    const calendario = (tools.children || []).find((c) => c.id === "ferramentas-calendario-accounting")!;
-    expect(calendario.path).toBe("/recursos-humanos/calendario");
+    const calendario = (tools.children || []).find((c) => c.id === "ferramentas-calendario")!;
+    expect(calendario.path).toBe("/departamento-pessoal/calendario");
   });
 
-  it("HR/ADMIN keep Calendário/Feriados in Recursos Humanos (not under Ferramentas)", () => {
+  it("HR/ADMIN: legacy Recursos Humanos section is gone; Calendário lives under Ferramentas; Feriados/EPI under Departamento Pessoal", () => {
     for (const privilege of [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]) {
       const menu = menuFor(privilege);
-      const rh = byId(menu, "recursos-humanos")!;
-      const titles = (rh.children || []).map((c) => c.title);
-      expect(titles).toContain("Calendário");
-      expect(titles).toContain("Feriados");
+      // The duplicate "Recursos Humanos" section was retired entirely.
+      expect(byId(menu, "recursos-humanos")).toBeUndefined();
+      // Calendário now lives under Ferramentas for HR/ADMIN (same as ACCOUNTING).
       const tools = byId(menu, "ferramentas")!;
-      expect((tools.children || []).some((c) => c.id === "ferramentas-calendario-accounting")).toBe(false);
+      expect((tools.children || []).some((c) => c.id === "ferramentas-calendario")).toBe(true);
+      // Feriados and EPI fold into the consolidated Departamento Pessoal area.
+      const dp = byId(menu, "departamento-pessoal")!;
+      const dpTitles = (dp.children || []).map((c) => c.title);
+      expect(dpTitles).toContain("Feriados");
+      expect(dpTitles).toContain("EPI");
+      // Integração Secullum is ADMIN-only: present for ADMIN, absent for HR.
+      const hasSecullum = (dp.children || []).some((c) => c.id === "dp-integracao-secullum");
+      expect(hasSecullum).toBe(privilege === SECTOR_PRIVILEGES.ADMIN);
     }
+  });
+
+  it("PRODUCTION_MANAGER: gains Admissões/Rescisões/Férias and a Ferramentas Calendário", () => {
+    const PM = menuFor(SECTOR_PRIVILEGES.PRODUCTION_MANAGER);
+    const colaboradores = byId(PM, "colaboradores-group-production-manager")!;
+    const colabTitles = (colaboradores.children || []).map((c) => c.title);
+    expect(colabTitles).toContain("Admissões");
+    expect(colabTitles).toContain("Rescisões");
+    expect(colabTitles).toContain("Férias");
+    const tools = byId(PM, "ferramentas-production-manager")!;
+    expect((tools.children || []).some((c) => c.id === "ferramentas-calendario-pm")).toBe(true);
+    // Secullum is ADMIN-only — PM must not see it anywhere.
+    expect(JSON.stringify(PM).includes("dp-integracao-secullum")).toBe(false);
   });
 });

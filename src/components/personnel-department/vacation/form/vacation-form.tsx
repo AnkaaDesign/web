@@ -1,18 +1,19 @@
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { IconBeach, IconUser, IconCalendar, IconFileDescription, IconCash, IconCalendarStats } from "@tabler/icons-react";
+import { IconBeach, IconUser, IconCalendar, IconFileDescription, IconCash, IconCalendarStats, IconUsersGroup, IconChevronDown, IconAdjustments } from "@tabler/icons-react";
 
 import { vacationUpdateSchema, type VacationUpdateFormData } from "../../../../schemas/vacation";
 import type { Vacation } from "../../../../types/vacation";
 
 // Create form schema — multi-select colaboradores. The page bulk-creates one
-// (single-period) vacation per selected user; the server derives each one's
-// acquisitive period from the colaborador's admission.
+// (single-period) vacation per selected user via POST /vacations/batch; the
+// server derives each one's acquisitive period from the colaborador's admission
+// and auto-calculates the recibo. startDate is required (create-and-schedule).
 const vacationCreateFormSchema = z.object({
   userIds: z.array(z.string().uuid()).min(1, { message: "Selecione ao menos um colaborador" }),
-  startDate: z.coerce.date().nullish(),
+  startDate: z.coerce.date({ required_error: "A data de início é obrigatória", invalid_type_error: "data de início inválida" }),
   days: z.coerce.number().int().min(1).max(30),
   unjustifiedAbsencesInPeriod: z.coerce.number().int().min(0).optional(),
   abonoPecuniarioDays: z.coerce.number().int().min(0).max(10).optional(),
@@ -22,13 +23,14 @@ const vacationCreateFormSchema = z.object({
 
 export interface VacationCreateSubmit {
   userIds: string[];
-  startDate?: Date | null;
+  startDate: Date;
   days: number;
   unjustifiedAbsencesInPeriod?: number;
   abonoPecuniarioDays?: number;
   soldThird?: boolean;
   notes?: string | null;
 }
+import { EMPLOYEE_TYPE } from "../../../../constants";
 import type { User } from "../../../../types";
 import { getUsers } from "../../../../api-client";
 import { useUser } from "../../../../hooks/human-resources/use-user";
@@ -40,7 +42,10 @@ import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import { cn } from "@/lib/utils";
 import { formatDate } from "../../../../utils";
 
 import { entitledDaysFromAbsences, deriveVacationPeriods } from "./vacation-art130";
@@ -60,6 +65,10 @@ type VacationFormProps = (CreateModeProps | UpdateModeProps) & {
   isSubmitting?: boolean;
   disabled?: boolean;
 };
+
+// Eligibility query: active (não-desligado) colaboradores CLT (folha de
+// pagamento) — espelha o gate CLT do servidor (isPayrollEmployeeType).
+const ELIGIBLE_VACATION_WHERE = { isActive: true, where: { currentEmployeeType: EMPLOYEE_TYPE.CLT } } as const;
 
 export function VacationForm(props: VacationFormProps) {
   const vacation = props.mode === "update" ? props.vacation : undefined;
@@ -92,6 +101,8 @@ export function VacationForm(props: VacationFormProps) {
 
   const isSubmitting = props.isSubmitting || form.formState.isSubmitting;
   const fieldsDisabled = props.disabled || isSubmitting;
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
 
   // Selected collaborators (create, multi-select). The período aquisitivo preview
   // only makes sense for a single selection; with many, each is derived server-side.
@@ -106,18 +117,10 @@ export function VacationForm(props: VacationFormProps) {
   const watchedAbsences = useWatch({ control: form.control, name: "unjustifiedAbsencesInPeriod" as any });
   const watchedAbono = useWatch({ control: form.control, name: "abonoPecuniarioDays" as any });
 
-  // Entitled days are editable but seeded from art. 130 scale by absences.
-  const [entitledDays, setEntitledDays] = useState<number>(props.mode === "update" ? vacation?.entitledDays ?? 30 : 30);
-  const [entitledManuallySet, setEntitledManuallySet] = useState(false);
-
-  // When absences change and the user hasn't manually overridden entitledDays,
-  // recompute from the art. 130 scale.
-  useEffect(() => {
-    if (!entitledManuallySet) {
-      setEntitledDays(entitledDaysFromAbsences(Number(watchedAbsences) || 0));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedAbsences]);
+  // Entitled days are derived (read-only) from the art. 130 scale by absences.
+  // On update, the persisted entitled days are shown.
+  const entitledDays =
+    props.mode === "update" ? vacation?.entitledDays ?? 30 : entitledDaysFromAbsences(Number(watchedAbsences) || 0);
 
   // Gozo de direito available for this period (entitled − abono).
   const gozoEntitled = Math.max(0, entitledDays - (Number(watchedAbono) || 0));
@@ -134,8 +137,7 @@ export function VacationForm(props: VacationFormProps) {
       page,
       take: 50,
       orderBy: { name: "asc" },
-      // Vacations can only be created for employed (non-terminated) collaborators.
-      where: { isActive: true },
+      ...ELIGIBLE_VACATION_WHERE,
       include: { position: true, sector: true, currentContract: true },
     };
     if (search && search.trim()) {
@@ -148,12 +150,32 @@ export function VacationForm(props: VacationFormProps) {
     };
   }, []);
 
+  // "Coletiva / Todos" — fetch every eligible active CLT colaborador (paginated)
+  // and select them all at once.
+  const handleSelectAll = useCallback(async () => {
+    setSelectingAll(true);
+    try {
+      const ids: string[] = [];
+      let page = 1;
+      // Cap pages defensively so a runaway dataset can't loop forever.
+      for (let i = 0; i < 50; i++) {
+        const response = await getUsers({ page, take: 100, orderBy: { name: "asc" }, ...ELIGIBLE_VACATION_WHERE } as any);
+        for (const u of response.data || []) ids.push(u.id);
+        if (!response.meta?.hasNextPage) break;
+        page += 1;
+      }
+      form.setValue("userIds", Array.from(new Set(ids)), { shouldValidate: true, shouldDirty: true });
+    } finally {
+      setSelectingAll(false);
+    }
+  }, [form]);
+
   const handleSubmit = async (data: any) => {
     try {
       if (props.mode === "create") {
         await props.onSubmit({
           userIds: data.userIds,
-          startDate: data.startDate ?? null,
+          startDate: data.startDate,
           days: Number(data.days),
           unjustifiedAbsencesInPeriod: Number(data.unjustifiedAbsencesInPeriod) || 0,
           abonoPecuniarioDays: Number(data.abonoPecuniarioDays) || 0,
@@ -184,7 +206,7 @@ export function VacationForm(props: VacationFormProps) {
               </CardTitle>
               <CardDescription>
                 {props.mode === "create"
-                  ? "Selecione um ou mais colaboradores — uma férias é criada para cada um, com o período aquisitivo derivado da sua admissão"
+                  ? "Selecione um ou mais colaboradores (ou Coletiva / Todos) — uma férias é criada para cada um, com o período aquisitivo derivado da sua admissão e o recibo calculado automaticamente"
                   : "O colaborador e o vínculo não podem ser alterados"}
               </CardDescription>
             </CardHeader>
@@ -209,7 +231,7 @@ export function VacationForm(props: VacationFormProps) {
                           onValueChange={field.onChange}
                           disabled={fieldsDisabled}
                           placeholder="Selecione um ou mais colaboradores"
-                          emptyText="Nenhum colaborador encontrado"
+                          emptyText="Nenhum colaborador CLT ativo encontrado"
                           searchPlaceholder="Buscar colaborador..."
                           async={true}
                           queryKey={["users", "vacation-collaborator"]}
@@ -228,6 +250,23 @@ export function VacationForm(props: VacationFormProps) {
                           debounceMs={300}
                           searchable={true}
                           clearable={true}
+                          fixedTopContent={
+                            <button
+                              type="button"
+                              onClick={handleSelectAll}
+                              disabled={selectingAll || fieldsDisabled}
+                              className={cn(
+                                "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium",
+                                "hover:bg-accent focus:bg-accent focus:outline-none disabled:opacity-50",
+                              )}
+                            >
+                              <IconUsersGroup className="h-4 w-4 text-primary" />
+                              <span>Coletiva / Todos</span>
+                              <span className="ml-auto text-xs text-muted-foreground">
+                                {selectingAll ? "Selecionando..." : "Selecionar todos os CLT ativos"}
+                              </span>
+                            </button>
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -321,118 +360,7 @@ export function VacationForm(props: VacationFormProps) {
             </CardContent>
           </Card>
 
-          {/* Dias e abono */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconCalendarStats className="h-5 w-5 text-muted-foreground" />
-                Dias de Direito e Abono
-              </CardTitle>
-              <CardDescription>
-                Os dias de direito seguem a escala do art. 130 conforme as faltas injustificadas no período (editável).
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name={"unjustifiedAbsencesInPeriod" as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Faltas Injustificadas</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          value={field.value ?? 0}
-                          onChange={(value) => field.onChange(value === "" || value === null ? 0 : Number(value))}
-                          disabled={fieldsDisabled}
-                          placeholder="0"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormItem>
-                  <FormLabel>Dias de Direito (art. 130)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={30}
-                      value={entitledDays}
-                      onChange={(value) => {
-                        setEntitledManuallySet(true);
-                        setEntitledDays(value === "" || value === null ? 0 : Number(value));
-                      }}
-                      disabled={fieldsDisabled}
-                    />
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Sugerido pela escala: {entitledDaysFromAbsences(Number(watchedAbsences) || 0)} dias
-                  </p>
-                </FormItem>
-
-                <FormField
-                  control={form.control}
-                  name={"abonoPecuniarioDays" as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Abono Pecuniário (0–10)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={10}
-                          value={field.value ?? 0}
-                          onChange={(value) => field.onChange(value === "" || value === null ? 0 : Number(value))}
-                          disabled={fieldsDisabled}
-                          placeholder="0"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                Escala do art. 130: até 5 faltas → 30 dias · 6–14 → 24 · 15–23 → 18 · 24–32 → 12 · acima de 32 → 0.
-              </p>
-
-              <FormField
-                control={form.control}
-                name={"soldThird" as any}
-                render={({ field }) => (
-                  <FormItem className="flex items-center justify-between rounded-md border border-border p-3">
-                    <div>
-                      <FormLabel className="cursor-pointer">Vender 1/3 das férias (abono)</FormLabel>
-                      <p className="text-xs text-muted-foreground">Converte parte das férias em abono pecuniário (art. 143 CLT).</p>
-                    </div>
-                    <FormControl>
-                      <Switch checked={!!field.value} onCheckedChange={field.onChange} disabled={fieldsDisabled} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              {/* Prominent dias de gozo de direito summary */}
-              <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium">Gozo de direito</p>
-                  <p className="text-xs text-muted-foreground">Direito ({entitledDays}) − abono ({Number(watchedAbono) || 0})</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xl font-bold tabular-nums text-primary">{gozoEntitled}</span>
-                  <span className="ml-1 text-sm text-muted-foreground">dias</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Período de gozo desta tomada (create + update) */}
+          {/* Período de gozo desta tomada (create + update) — startDate first-class */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -440,7 +368,7 @@ export function VacationForm(props: VacationFormProps) {
                 Período de Gozo
               </CardTitle>
               <CardDescription>
-                Informe o início e a quantidade de dias deste gozo. Para fracionar, cadastre outra tomada no mesmo período aquisitivo.
+                Informe o início (obrigatório) e a quantidade de dias deste gozo. Para fracionar, cadastre outra tomada no mesmo período aquisitivo.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -455,9 +383,9 @@ export function VacationForm(props: VacationFormProps) {
                           mode="date"
                           value={field.value as Date | null | undefined}
                           onChange={(date) => field.onChange(date instanceof Date ? date : null)}
-                          label="Início do gozo"
+                          label="Início do gozo *"
                           disabled={fieldsDisabled}
-                          placeholder="Selecione a data (opcional)"
+                          placeholder="Selecione a data de início"
                         />
                       </FormControl>
                       <FormMessage />
@@ -488,6 +416,121 @@ export function VacationForm(props: VacationFormProps) {
                   )}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Dias de direito (read-only) + abono */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconCalendarStats className="h-5 w-5 text-muted-foreground" />
+                Dias de Direito e Abono
+              </CardTitle>
+              <CardDescription>
+                Os dias de direito seguem a escala do art. 130 conforme as faltas injustificadas no período (somente leitura).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Dias de Direito — read-only (derivado da escala art. 130) */}
+                <FormItem>
+                  <FormLabel>Dias de Direito (art. 130)</FormLabel>
+                  <FormControl>
+                    <Input type="number" value={entitledDays} disabled readOnly />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Derivado das faltas injustificadas em "Ajustes avançados".
+                  </p>
+                </FormItem>
+
+                <FormField
+                  control={form.control}
+                  name={"abonoPecuniarioDays" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Abono Pecuniário (0–10)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={field.value ?? 0}
+                          onChange={(value) => field.onChange(value === "" || value === null ? 0 : Number(value))}
+                          disabled={fieldsDisabled}
+                          placeholder="0"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name={"soldThird" as any}
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-md border border-border p-3">
+                    <div>
+                      <FormLabel className="cursor-pointer">Vender 1/3 das férias (abono)</FormLabel>
+                      <p className="text-xs text-muted-foreground">Converte parte das férias em abono pecuniário (art. 143 CLT).</p>
+                    </div>
+                    <FormControl>
+                      <Switch checked={!!field.value} onCheckedChange={field.onChange} disabled={fieldsDisabled} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {/* Prominent dias de gozo de direito summary */}
+              <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">Gozo de direito</p>
+                  <p className="text-xs text-muted-foreground">Direito ({entitledDays}) − abono ({Number(watchedAbono) || 0})</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-2xl font-bold tabular-nums text-primary">{gozoEntitled}</span>
+                  <span className="ml-1 text-sm text-muted-foreground">dias</span>
+                </div>
+              </div>
+
+              {/* Ajustes avançados — faltas injustificadas (afeta a escala art. 130) */}
+              <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button type="button" variant="ghost" className="w-full justify-between px-2">
+                    <span className="flex items-center gap-2 text-sm font-medium">
+                      <IconAdjustments className="h-4 w-4" />
+                      Ajustes avançados
+                    </span>
+                    <IconChevronDown className={cn("h-4 w-4 transition-transform", advancedOpen && "rotate-180")} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3 pt-3">
+                  <FormField
+                    control={form.control}
+                    name={"unjustifiedAbsencesInPeriod" as any}
+                    render={({ field }) => (
+                      <FormItem className="max-w-xs">
+                        <FormLabel>Faltas Injustificadas</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={field.value ?? 0}
+                            onChange={(value) => field.onChange(value === "" || value === null ? 0 : Number(value))}
+                            disabled={fieldsDisabled}
+                            placeholder="0"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Escala do art. 130: até 5 faltas → 30 dias · 6–14 → 24 · 15–23 → 18 · 24–32 → 12 · acima de 32 → 0.
+                  </p>
+                </CollapsibleContent>
+              </Collapsible>
             </CardContent>
           </Card>
 
@@ -557,7 +600,7 @@ export function VacationForm(props: VacationFormProps) {
               {props.mode === "create" && (
                 <Alert>
                   <AlertDescription>
-                    A base de cálculo (remuneração + média de variáveis), 1/3 constitucional, INSS e IRRF são calculados no recibo de férias, disponível nos detalhes após o cadastro.
+                    A base de cálculo (remuneração + média de variáveis), 1/3 constitucional, INSS e IRRF são calculados automaticamente no recibo de férias ao cadastrar, disponível nos detalhes.
                   </AlertDescription>
                 </Alert>
               )}

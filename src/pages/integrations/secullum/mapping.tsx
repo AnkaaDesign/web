@@ -68,14 +68,14 @@ export default function SecullumMappingPage() {
   const { isAdmin } = usePrivileges();
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Integração Secullum"
           icon={IconUsers}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
+            { label: "Departamento Pessoal", href: routes.administration.collaborators.root },
             { label: "Integração Secullum" },
           ]}
           className="flex-shrink-0"

@@ -12,14 +12,12 @@ import {
   IconUsers,
   IconGift,
   IconArrowRight,
-  IconTrendingDown,
 } from "@tabler/icons-react";
 
 import type { PayableRow, PayableState } from "../../../types";
-import { routes, SECTOR_PRIVILEGES, ORDER_PAYMENT_STATUS, AIRBRUSHING_PAYMENT_STATUS, PAYMENT_METHOD, PAYMENT_METHOD_LABELS } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, AIRBRUSHING_PAYMENT_STATUS, PAYMENT_METHOD, PAYMENT_METHOD_LABELS } from "../../../constants";
 import { useOrderPayables, useOrderMutations, useSettlePayrollMonth, useTriggerOrderSchedule } from "../../../hooks";
-import { useOutflowForecast } from "@/hooks/financial/use-reconciliation";
-import { monthKey } from "@/components/financial/reconciliation/month-nav";
+import { MonthNav, monthKey, parseMonthKey } from "@/components/financial/reconciliation/month-nav";
 import { useAirbrushingMutations } from "../../../hooks/production/use-airbrushing";
 import { usePrivileges } from "../../../hooks/common/use-privileges";
 import { formatCurrency, formatDate } from "../../../utils";
@@ -94,8 +92,8 @@ const PRODUCTION_VIEW_PRIVILEGES: SECTOR_PRIVILEGES[] = [
   SECTOR_PRIVILEGES.ADMIN,
 ];
 
+// Financial-only: WAREHOUSE manages orders but never settles their payment side.
 const PAYMENT_MANAGER_PRIVILEGES: SECTOR_PRIVILEGES[] = [
-  SECTOR_PRIVILEGES.WAREHOUSE,
   SECTOR_PRIVILEGES.FINANCIAL,
   SECTOR_PRIVILEGES.ACCOUNTING,
   SECTOR_PRIVILEGES.ADMIN,
@@ -103,6 +101,7 @@ const PAYMENT_MANAGER_PRIVILEGES: SECTOR_PRIVILEGES[] = [
 
 const SEARCH_PARAM = "search";
 const STATUS_PARAM = "status";
+const MONTH_PARAM = "mes";
 
 function parseBuckets(raw: string | null): PayableBucketKey[] {
   if (raw === null) return DEFAULT_BUCKETS;
@@ -200,6 +199,9 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   const [searchText, setSearchText] = useState(urlSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(urlSearch);
   const [buckets, setBuckets] = useState<PayableBucketKey[]>(() => parseBuckets(searchParams.get(STATUS_PARAM)));
+  // Competence month — same period switcher as the Extrato. Scopes the list (and
+  // the summary cards) to obligations of the selected month.
+  const [month, setMonth] = useState<Date>(() => parseMonthKey(searchParams.get(MONTH_PARAM)) ?? new Date());
 
   // Right-click payment menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: PayableRow } | null>(null);
@@ -231,6 +233,19 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     return () => document.removeEventListener("click", close);
   }, []);
 
+  // Keep the selected month shareable in the URL.
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (params.get(MONTH_PARAM) === monthKey(month)) return prev;
+        params.set(MONTH_PARAM, monthKey(month));
+        return params;
+      },
+      { replace: true },
+    );
+  }, [month, setSearchParams]);
+
   // Toggle a summary card on/off and mirror the selection into the URL.
   const toggleBucket = (key: PayableBucketKey) => {
     setBuckets((prev) => {
@@ -255,41 +270,37 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // --- Unified payables endpoint (orders + airbrushing + scheduled) ---------
   const { data: response, isLoading, error, refetch } = useOrderPayables();
   const allRows = useMemo(() => response?.data?.rows ?? [], [response?.data?.rows]);
-  const summary = response?.data?.summary;
 
-  // --- Forecast strip (absorbed from the former "Previsão de Saídas") --------
-  // Read-only composition of the current competence month's projected outflows:
-  // pedidos + impostos + folha + folha programada + recorrentes. Complements the
-  // status buckets below (which stay the clickable table filters).
-  const currentMonthKey = useMemo(() => monthKey(new Date()), []);
-  const { data: forecast, isLoading: forecastLoading } = useOutflowForecast(currentMonthKey);
-  // Compact forecast breakdown for the "Previsão do mês" line (read-only).
-  const forecastTotal = forecast ? formatCurrency(forecast.total) : null;
-  const forecastParts = useMemo(
-    () => [
-      { key: "pedidos", label: "Pedidos", value: forecast?.pedidos ? formatCurrency(forecast.pedidos.totalOpen) : null },
-      { key: "impostos", label: "Impostos", value: forecast?.impostos ? formatCurrency(forecast.impostos.invoicedServices?.totalEstimated ?? 0) : null },
-      { key: "folha", label: "Folha", value: forecast?.folha ? (forecast.folha.available ? formatCurrency(forecast.folha.total) : "—") : null },
-      { key: "folha-prog", label: "Folha prog.", value: forecast?.folhaProgramada ? formatCurrency(forecast.folhaProgramada.total) : null },
-      { key: "recorrentes", label: "Recorrentes", value: forecast?.recorrentes ? formatCurrency(forecast.recorrentes.totalForecast) : null },
-    ],
-    [forecast],
-  );
+  // --- Period scope: keep only the rows that belong to the selected month ----
+  // A row's month is its competence (payroll/tax/recurring), else its paidAt for
+  // already-settled rows, else its due date. Undated, non-competence rows have no
+  // natural month, so they stay visible across every period.
+  const monthRows = useMemo(() => {
+    const key = monthKey(month);
+    return allRows.filter((row) => {
+      if (row.competence) return row.competence === key;
+      if (row.paymentState === "PAID") return row.paidAt ? monthKey(new Date(row.paidAt)) === key : false;
+      if (row.dueDate) return monthKey(new Date(row.dueDate)) === key;
+      return true;
+    });
+  }, [allRows, month]);
 
-  // Card value/count come from the server summary, regrouped into buckets so the
-  // cards always show absolute totals regardless of the active filter.
-  const bucketSummary = (key: PayableBucketKey) => {
-    let count = 0;
-    let total = 0;
-    for (const state of PAYABLE_BUCKETS[key].states) {
-      const b = summary?.[state];
-      if (b) {
-        count += b.count;
-        total += b.total;
-      }
+  // Card value/count are computed over the month's rows (independent of the
+  // active bucket/search filter) so the cards always show the month's totals.
+  const monthBucketSummary = useMemo(() => {
+    const out: Record<PayableBucketKey, { count: number; total: number }> = {
+      AWAITING: { count: 0, total: 0 },
+      PARTIAL: { count: 0, total: 0 },
+      EXPECTED: { count: 0, total: 0 },
+      PAID: { count: 0, total: 0 },
+    };
+    for (const row of monthRows) {
+      const bucket = STATE_TO_BUCKET[row.paymentState];
+      out[bucket].count += 1;
+      out[bucket].total += row.amount;
     }
-    return { count, total };
-  };
+    return out;
+  }, [monthRows]);
 
   // Payment mutations. Order transitions auto-invalidate the payables query
   // (keyed under orderKeys.all); airbrushing settles via its own update, so we
@@ -303,10 +314,10 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   const filteredRows = useMemo(() => {
     const active = new Set(buckets);
     const term = debouncedSearch.trim().toLowerCase();
-    let base = allRows.filter((row) => active.has(STATE_TO_BUCKET[row.paymentState]));
+    let base = monthRows.filter((row) => active.has(STATE_TO_BUCKET[row.paymentState]));
     if (term) base = base.filter((row) => row.payeeName.toLowerCase().includes(term) || row.description.toLowerCase().includes(term));
     return base;
-  }, [allRows, buckets, debouncedSearch]);
+  }, [monthRows, buckets, debouncedSearch]);
 
   // --- Flat ordering: real obligations first, overdue first, then due, then payee.
   const sortedRows = useMemo(() => {
@@ -373,7 +384,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
         break;
       case "RECONCILIATION":
         setContextMenu(null);
-        navigate(row.source === "RECURRING" && row.payeeId ? `${routes.financial.reconciliation.transactions}?categoryIds=${row.payeeId}` : routes.financial.reconciliation.transactions);
+        navigate(routes.financial.reconciliation.statement);
         break;
       default:
         setContextMenu(null);
@@ -390,19 +401,22 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       className: "min-w-[16rem]",
       render: (row) => {
         const isForecast = row.paymentState === "EXPECTED" || row.isEstimate;
-        return (
-          <div className="flex items-center gap-2 min-w-0">
-            <TruncatedTextWithTooltip text={row.description || "-"} className={cn("text-sm", isForecast && "italic text-muted-foreground")} />
-            {isForecast && (
-              <Badge variant="secondary" size="sm" className="flex-shrink-0 text-[10px]">
-                Estimado
-              </Badge>
-            )}
-          </div>
-        );
+        return <TruncatedTextWithTooltip text={row.description || "-"} className={cn("text-sm", isForecast && "italic text-muted-foreground")} />;
       },
     },
     { key: "type", header: "Tipo", width: 176, render: (row) => <PayableTypeBadge row={row} /> },
+    {
+      key: "installment",
+      header: "Parcela",
+      width: 140,
+      // Boleto parcela label e.g. "1ª parcela de 3"; "-" for single-payment rows.
+      render: (row) =>
+        row.source === "ORDER" && row.installmentId && row.subtype ? (
+          <span className="text-sm whitespace-nowrap tabular-nums">{row.subtype}</span>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
+        ),
+    },
     { key: "payee", header: "Tomador", className: "min-w-[12rem]", render: (row) => <TruncatedTextWithTooltip text={row.payeeName || "-"} className="text-sm font-medium" /> },
     { key: "amount", header: "Valor", width: 128, align: "right", render: (row) => <span className="text-sm font-medium tabular-nums">{formatCurrency(row.amount)}</span> },
     { key: "payment", header: "Pagamento", width: 192, render: (row) => <PayableStateBadge state={row.paymentState} /> },
@@ -429,32 +443,16 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // --- Render ---------------------------------------------------------------
   return (
     <div className={cn("flex flex-col gap-4 h-full min-h-0", className)}>
-      {/* Forecast breakdown — read-only, compact (the cards below are the
-          clickable filters). Total + the slices that build it. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground flex-shrink-0">
-        <span className="inline-flex items-center gap-1.5">
-          <IconTrendingDown className="h-4 w-4 text-red-600" />
-          Previsão do mês:{" "}
-          <span className="font-semibold text-foreground tabular-nums">{forecastLoading ? "…" : forecastTotal ?? "—"}</span>
-        </span>
-        {forecastParts.map((p) => (
-          <span key={p.key} className="tabular-nums">
-            {p.label}{" "}
-            <span className="font-medium text-foreground">{forecastLoading ? "…" : p.value ?? "—"}</span>
-          </span>
-        ))}
-      </div>
-
       {/* Summary cards double as filter buckets — click to show only that status. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 flex-shrink-0">
         {BUCKET_ORDER.map((key) => {
           const meta = PAYABLE_BUCKETS[key];
-          const b = bucketSummary(key);
+          const b = monthBucketSummary[key];
           return (
             <FinancialKpiCard
               key={key}
               label={meta.label}
-              value={isLoading || !summary ? null : formatCurrency(b.total)}
+              value={isLoading ? null : formatCurrency(b.total)}
               count={b.count}
               Icon={meta.Icon}
               tone={meta.tone}
@@ -465,24 +463,20 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
         })}
       </div>
 
-      {/* Search + flat list */}
+      {/* Search + period switcher + flat list */}
       <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
         <CardContent className="flex-1 min-h-0 flex flex-col p-4 space-y-4 overflow-hidden">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <TableSearchInput
-              value={searchText}
-              onChange={(value) => setSearchText(value)}
-              placeholder="Buscar por fornecedor, pintor ou descrição..."
-              isPending={searchText !== debouncedSearch}
-            />
+            <div className="flex flex-1 min-w-0">
+              <TableSearchInput
+                value={searchText}
+                onChange={(value) => setSearchText(value)}
+                placeholder="Buscar por fornecedor, pintor ou descrição..."
+                isPending={searchText !== debouncedSearch}
+              />
+            </div>
+            <MonthNav month={month} onChange={setMonth} className="flex-shrink-0" />
           </div>
-
-          {canManagePayments && (
-            <p className="text-xs text-muted-foreground">
-              Clique nos cartões acima para filtrar por situação. Clique com o botão direito em uma conta para registrar o pagamento. Pedidos: Em Aberto → (Aguardando) →
-              Pago; aerografia e folha são pagas direto; impostos e recorrentes são quitados pela conciliação bancária.
-            </p>
-          )}
 
           <div className="flex-1 min-h-0 overflow-auto">
             <StandardizedTable<PayableRow>

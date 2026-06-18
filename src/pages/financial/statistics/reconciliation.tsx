@@ -185,7 +185,7 @@ export const ReconciliationStatisticsPage = () => {
                   data={data?.topUnmatchedByCounterparty ?? []}
                   onBarClick={counterparty =>
                     navigate(
-                      `${routes.financial.reconciliation.transactions}?reconciliationStatus=PENDING&counterparty=${encodeURIComponent(counterparty)}`,
+                      `${routes.financial.reconciliation.statement}?status=PENDING&search=${encodeURIComponent(counterparty)}`,
                     )
                   }
                 />
@@ -214,9 +214,11 @@ export const ReconciliationStatisticsPage = () => {
                       BANK_SLIP_BRIDGE: 0,
                     }
                   }
-                  onSliceClick={matchType =>
+                  onSliceClick={() =>
+                    // Extrato has no match-type filter; the closest native view
+                    // is the reconciled (Conciliadas) bucket.
                     navigate(
-                      `${routes.financial.reconciliation.transactions}?matchType=${matchType}`,
+                      `${routes.financial.reconciliation.statement}?status=RECONCILED`,
                     )
                   }
                 />
@@ -239,10 +241,10 @@ export const ReconciliationStatisticsPage = () => {
             ) : (
               <CategoryDistributionList
                 data={data?.categoryDistribution ?? []}
-                onRowClick={categoryId =>
-                  navigate(
-                    `${routes.financial.reconciliation.transactions}?categoryIds=${categoryId}`,
-                  )
+                onRowClick={() =>
+                  // Extrato filters by conta/mês/tipo/status (not category), so
+                  // the row just opens the Extrato.
+                  navigate(routes.financial.reconciliation.statement)
                 }
               />
             )}
@@ -315,14 +317,14 @@ function SummaryGrid({
         value={isLoading ? null : formatCurrency(stats?.totalConciliadoMes ?? 0)}
         Icon={IconCheck}
         tone="emerald"
-        href={`${routes.financial.reconciliation.transactions}?reconciliationStatus=RECONCILED&reconciliationSource=AUTO`}
+        href={`${routes.financial.reconciliation.statement}?status=RECONCILED`}
       />
       <KpiCard
         label="Pendente de conciliação"
         value={isLoading ? null : formatCurrency(stats?.pendenteConciliacao ?? 0)}
         Icon={IconClockHour4}
         tone="amber"
-        href={`${routes.financial.reconciliation.transactions}?reconciliationStatus=PENDING`}
+        href={`${routes.financial.reconciliation.statement}?status=PENDING`}
       />
       <KpiCard
         label="Notas recebidas"
@@ -342,7 +344,7 @@ function SummaryGrid({
         }
         Icon={IconUpload}
         tone="sky"
-        href={routes.financial.reconciliation.transactions}
+        href={routes.financial.reconciliation.statement}
       />
     </div>
   );

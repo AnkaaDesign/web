@@ -1,19 +1,15 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { OrderStatusBadge } from "../common/order-status-badge";
-import { OrderPaymentStatusBadge } from "../common/order-payment-status-badge";
 import { OrderTotalBadge } from "../common/order-total-calculator";
-import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFileText, IconId, IconCreditCard, IconCopy, IconQrcode, IconUser } from "@tabler/icons-react";
+import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFileText, IconId } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { formatDate, formatDateTime, formatCNPJ, formatPixKey } from "../../../../utils";
+import { formatDate, formatDateTime, formatCNPJ } from "../../../../utils";
 import { formatOrderNumber } from "@/utils/order-code";
 import { useCanViewPrices } from "../../../../hooks";
 import type { Order } from "../../../../types";
-import { PAYMENT_METHOD_LABELS } from "../../../../constants";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
-import { toast } from "@/components/ui/sonner";
 
 interface OrderInfoCardProps {
   order: Order;
@@ -169,96 +165,8 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
           </div>
         </div>
 
-        {/* Payment Information — paymentStatus always exists (contas a pagar
-            workflow), so the section is always rendered. */}
-        <Separator className="bg-border" />
-        <div className="space-y-4">
-          <h3 className="text-base font-semibold mb-4 text-foreground">Pagamento</h3>
-          <div className="space-y-4">
-                {order.paymentStatus && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconCreditCard className="h-4 w-4" />
-                      Status de Pagamento
-                    </span>
-                    <OrderPaymentStatusBadge status={order.paymentStatus} />
-                  </div>
-                )}
-
-                {order.paymentRequestedAt && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconCalendar className="h-4 w-4" />
-                      Pagamento Solicitado em
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">{formatDateTime(order.paymentRequestedAt)}</span>
-                  </div>
-                )}
-
-                {order.paidAt && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconCalendar className="h-4 w-4" />
-                      Pago em
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">{formatDateTime(order.paidAt)}</span>
-                  </div>
-                )}
-
-                {order.paymentResponsible && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconUser className="h-4 w-4" />
-                      Responsável pelo Pagamento
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">{order.paymentResponsible.name}</span>
-                  </div>
-                )}
-
-                {order.paymentMethod && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconCreditCard className="h-4 w-4" />
-                      Método de Pagamento
-                    </span>
-                    <Badge variant="outline">{PAYMENT_METHOD_LABELS[order.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS]}</Badge>
-                  </div>
-                )}
-
-                {order.paymentMethod === "PIX" && order.paymentPix && (
-                  <div className="bg-muted/50 rounded-lg px-4 py-3 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <IconQrcode className="h-4 w-4" />
-                        Chave Pix
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-muted-foreground hover:text-foreground"
-                        onClick={() => {
-                          navigator.clipboard.writeText(order.paymentPix!);
-                          toast.success("Chave Pix copiada!");
-                        }}
-                      >
-                        <IconCopy className="h-4 w-4 mr-1" />
-                        Copiar
-                      </Button>
-                    </div>
-                    <p className="text-sm font-semibold text-foreground font-mono break-all">{formatPixKey(order.paymentPix!)}</p>
-                  </div>
-                )}
-
-                {order.paymentMethod === "BANK_SLIP" && order.paymentDueDays && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground">Prazo de Vencimento</span>
-                    <span className="text-sm font-semibold text-foreground">{order.paymentDueDays} dias</span>
-                  </div>
-                )}
-
-          </div>
-        </div>
-
+        {/* Payment details now live in a dedicated OrderPaymentCard rendered beside this
+            card on the detail page (financial-only, hidden from WAREHOUSE). */}
       </CardContent>
     </Card>
   );

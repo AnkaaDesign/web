@@ -86,7 +86,6 @@ const FinancialBudgetCreate = lazy(() => import("@/pages/financial/budget/create
 const FinancialBudgetDetail = lazy(() => import("@/pages/financial/budget/details/[taskId]").then((module) => ({ default: module.FinancialBudgetDetailPage })));
 const FinancialNfseList = lazy(() => import("@/pages/financial/nfse/list").then((module) => ({ default: module.NfseListPage })));
 const FinancialNfseDetail = lazy(() => import("@/pages/financial/nfse/detail").then((module) => ({ default: module.NfseDetailPage })));
-const ReconciliationTransactionsList = lazy(() => import("@/pages/financial/reconciliation/transactions-list").then((module) => ({ default: module.ReconciliationTransactionsListPage })));
 const ReconciliationTransactionDetail = lazy(() => import("@/pages/financial/reconciliation/transaction-detail").then((module) => ({ default: module.ReconciliationTransactionDetailPage })));
 const ReconciliationFiscalDocumentsList = lazy(() => import("@/pages/financial/reconciliation/fiscal-documents-list").then((module) => ({ default: module.ReconciliationFiscalDocumentsListPage })));
 const ReconciliationFiscalDocumentDetail = lazy(() => import("@/pages/financial/reconciliation/fiscal-document-detail").then((module) => ({ default: module.ReconciliationFiscalDocumentDetailPage })));
@@ -132,7 +131,6 @@ const PersonnelDepartmentVacationsList = lazy(() => import("@/pages/personnel-de
 const PersonnelDepartmentVacationsCreate = lazy(() => import("@/pages/personnel-department/vacations/create").then((module) => ({ default: module.VacationCreatePage })));
 const PersonnelDepartmentVacationsDetails = lazy(() => import("@/pages/personnel-department/vacations/details/[id]").then((module) => ({ default: module.VacationDetailPage })));
 const PersonnelDepartmentVacationsEdit = lazy(() => import("@/pages/personnel-department/vacations/edit/[id]").then((module) => ({ default: module.VacationEditPage })));
-const PersonnelDepartmentVacationGroupsDetails = lazy(() => import("@/pages/personnel-department/vacation-groups/details/[id]").then((module) => ({ default: module.VacationGroupDetailPage })));
 
 // Occupational Health - Medicina do Trabalho (W3C)
 const OccupationalHealthMedicalExamsList = lazy(() => import("@/pages/occupational-health/medical-exams/list").then((module) => ({ default: module.MedicalExamListPage })));
@@ -1205,7 +1203,7 @@ function App() {
                 />
                 {/* Payroll detail route by ID */}
                 <Route
-                  path="/recursos-humanos/folha-de-pagamento/detalhe/:payrollId"
+                  path="/departamento-pessoal/folha-de-pagamento/detalhe/:payrollId"
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPayrollDetail />
@@ -1240,7 +1238,7 @@ function App() {
                 />
                 {/* Legacy redirect for old simulation URL */}
                 <Route
-                  path="/recursos-humanos/simulacao-bonus"
+                  path="/departamento-pessoal/simulacao-bonus"
                   element={<Navigate to={routes.humanResources.bonus.simulation} replace />}
                 />
                 <Route
@@ -1540,13 +1538,11 @@ function App() {
                   path="/financeiro/conciliacao/previsao-de-saidas"
                   element={<Navigate to={routes.financial.accountsPayable.root} replace />}
                 />
+                {/* Transações was merged into the Extrato (day-grouped accordion
+                    + type/status filters live there now). Old links redirect. */}
                 <Route
                   path={routes.financial.reconciliation.transactions}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ReconciliationTransactionsList />
-                    </Suspense>
-                  }
+                  element={<Navigate to={routes.financial.reconciliation.statement} replace />}
                 />
                 <Route
                   path="/financeiro/conciliacao/transacoes/:id"
@@ -2768,7 +2764,7 @@ function App() {
                   }
                 />
                 {/* Legacy URL — the unified Controle de Ponto page lives at
-                    /recursos-humanos/controle-ponto with `?view=` query
+                    /departamento-pessoal/controle-ponto with `?view=` query
                     param selecting the mode (colaborador-unico is default). */}
                 <Route
                   path={routes.humanResources.calculations.root}
@@ -2801,7 +2797,7 @@ function App() {
                   }
                 />
                 <Route
-                  path="/recursos-humanos/feriados/cadastrar"
+                  path={routes.humanResources.holidays.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesHolidaysCreate />
@@ -2988,21 +2984,12 @@ function App() {
                     </Suspense>
                   }
                 />
-                {/* Departamento Pessoal — Férias Coletivas (detalhe vive no namespace de Férias) */}
+                {/* Férias Coletivas foram aposentadas — coletiva agora é só um
+                    multiselect no cadastro de Férias. Redireciona links antigos. */}
                 <Route
-                  path={routes.personnelDepartment.vacations.collectiveDetails(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonnelDepartmentVacationGroupsDetails />
-                    </Suspense>
-                  }
+                  path="/departamento-pessoal/ferias/coletiva/detalhes/:id"
+                  element={<Navigate to={routes.personnelDepartment.vacations.root} replace />}
                 />
-                {/* Férias migrou para Departamento Pessoal. Links/bookmarks
-                    antigos do namespace de RH redirecionam para as páginas de DP. */}
-                <Route path="/recursos-humanos/ferias" element={<Navigate to={routes.personnelDepartment.vacations.root} replace />} />
-                <Route path="/recursos-humanos/ferias/cadastrar" element={<Navigate to={routes.personnelDepartment.vacations.create} replace />} />
-                <Route path="/recursos-humanos/ferias/editar/:id" element={<Navigate to={routes.personnelDepartment.vacations.root} replace />} />
-                <Route path="/recursos-humanos/ferias/detalhes/:id" element={<Navigate to={routes.personnelDepartment.vacations.root} replace />} />
                 {/* 13º Salário não tem mais páginas dedicadas — passou a ser
                     gerido por colaborador (na tela de detalhe do colaborador).
                     Links/bookmarks antigos redirecionam para a lista de colaboradores. */}

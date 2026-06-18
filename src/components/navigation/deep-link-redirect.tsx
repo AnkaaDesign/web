@@ -48,8 +48,9 @@ const DEEP_LINK_ROUTES: Record<string, (id: string) => string> = {
   bankslip: (id) => routes.financial.billing.details(id),
   // Payroll (HR payroll root, id ignored)
   payroll: () => routes.humanResources.payroll.root,
-  // Secullum solicitation (HR integration root, id ignored)
-  secullumsolicitacao: () => routes.humanResources.integrations.secullum.root,
+  // Secullum solicitation — HR time-adjustment requests review page (id ignored).
+  // (The admin-only integration-mapping page is not used as a deep-link target.)
+  secullumsolicitacao: () => routes.humanResources.requisicoes.root,
 };
 
 /**

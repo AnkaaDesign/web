@@ -66,6 +66,7 @@ export const leaveWhereSchema: z.ZodSchema = z.lazy(() =>
       status: createStringWhereSchema().optional(),
       cid: z.union([createStringWhereSchema(), z.null()]).optional(),
       inssBenefitNumber: z.union([createStringWhereSchema(), z.null()]).optional(),
+      inssBenefitSpecies: z.union([createStringWhereSchema(), z.null()]).optional(),
       notes: z.union([createStringWhereSchema(), z.null()]).optional(),
 
       returnExamRequired: createBooleanWhereSchema().optional(),

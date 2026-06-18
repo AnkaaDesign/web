@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,15 +27,54 @@ function Line({ label, amount, negative }: { label: string; amount: number; nega
   );
 }
 
+/**
+ * Build a display recibo from the persisted vacation fields so the card
+ * hydrates on load (the recibo is auto-calculated at create time). A fresh
+ * recalculation via the action replaces this with the server response.
+ */
+function reciboFromEntity(vacation: Vacation): VacationRecibo | null {
+  if (vacation.baseRemuneration == null) return null;
+  const baseRemuneration = vacation.baseRemuneration ?? 0;
+  const oneThird = vacation.oneThird ?? 0;
+  const abonoAmount = vacation.abonoAmount ?? 0;
+  const inss = vacation.inss ?? 0;
+  const irrf = vacation.irrf ?? 0;
+  const abonoOneThird = 0; // not persisted separately on the entity
+  const earnings = baseRemuneration + oneThird + abonoAmount + abonoOneThird;
+  const discounts = inss + irrf;
+  return {
+    vacationId: vacation.id,
+    userId: vacation.userId,
+    vacationDays: Math.max(0, vacation.entitledDays - vacation.abonoPecuniarioDays),
+    abonoPecuniarioDays: vacation.abonoPecuniarioDays,
+    baseRemuneration,
+    oneThird,
+    abonoAmount,
+    abonoOneThird,
+    isDouble: vacation.isDouble,
+    taxableBase: baseRemuneration + oneThird,
+    inss,
+    irrf,
+    earnings,
+    discounts,
+    net: earnings - discounts,
+    lines: [],
+  };
+}
+
 export function VacationReciboCard({ vacation, className }: VacationReciboCardProps) {
   const calculate = useVacationCalculate();
-  const [recibo, setRecibo] = useState<VacationRecibo | null>(null);
+  const [recalculated, setRecalculated] = useState<VacationRecibo | null>(null);
+
+  // Hydrate from the persisted entity; a manual recalc overrides it.
+  const persisted = useMemo(() => reciboFromEntity(vacation), [vacation]);
+  const recibo = recalculated ?? persisted;
 
   const handleCalculate = async () => {
     try {
       const result = await calculate.mutateAsync(vacation.id);
       if (result.data?.recibo) {
-        setRecibo(result.data.recibo);
+        setRecalculated(result.data.recibo);
       }
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {

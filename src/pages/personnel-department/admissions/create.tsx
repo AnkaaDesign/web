@@ -57,7 +57,7 @@ export const AdmissionCreatePage = () => {
   ];
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col bg-background px-4 pt-4">
         {/* Header + form share ONE scroll container and ONE max-w-4xl column, so their
             widths match exactly. The header is `sticky top-0` so it stays pinned while the

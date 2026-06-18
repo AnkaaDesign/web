@@ -70,7 +70,7 @@ export function ReconciliationTransactionDetailPage() {
   // Salvar button and running "Alocado / Faltam" summary live in the header.
   const [matchState, setMatchState] = useState<MatchSaveState | null>(null);
 
-  if (!id) return <Navigate to={routes.financial.reconciliation.transactions} replace />;
+  if (!id) return <Navigate to={routes.financial.reconciliation.statement} replace />;
 
   if (isLoading) {
     return (
@@ -91,7 +91,7 @@ export function ReconciliationTransactionDetailPage() {
             <span>Não foi possível carregar a transação.</span>
             <button
               className="text-sm underline hover:text-foreground"
-              onClick={() => navigate(routes.financial.reconciliation.transactions)}
+              onClick={() => navigate(routes.financial.reconciliation.statement)}
             >
               Voltar para a lista
             </button>
@@ -125,7 +125,7 @@ export function ReconciliationTransactionDetailPage() {
           { label: "Início", href: routes.home },
           { label: "Financeiro", href: routes.financial.root },
           { label: "Conciliação Bancária", href: routes.financial.reconciliation.root },
-          { label: "Transações", href: routes.financial.reconciliation.transactions },
+          { label: "Extrato", href: routes.financial.reconciliation.statement },
           { label: title },
         ]}
         headerExtra={

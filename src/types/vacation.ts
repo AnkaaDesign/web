@@ -32,7 +32,6 @@ export interface Vacation extends BaseEntity {
   /** Gozo days of THIS taking. */
   days: number;
   status: VACATION_STATUS;
-  statusOrder: number;
   abonoPecuniarioDays: number;
   soldThird: boolean;
   baseRemuneration: number | null;

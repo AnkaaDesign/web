@@ -36,6 +36,17 @@ export const userIncludeSchema = z
         }),
       ])
       .optional(),
+    contractPhaseHistory: z
+      .union([
+        z.boolean(),
+        z.object({
+          include: z.any().optional(),
+          select: z.any().optional(),
+          where: z.any().optional(),
+          orderBy: z.any().optional(),
+        }),
+      ])
+      .optional(),
     admissions: z
       .union([
         z.boolean(),

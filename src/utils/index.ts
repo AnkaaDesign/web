@@ -52,6 +52,7 @@ export * from "./task-measures";
 export * from "./measure";
 export * from "./maskings";
 export * from "./validators";
+export * from "./vacation-status";
 export * from "./notification";
 export * from "./navigation";
 export * from "./number";

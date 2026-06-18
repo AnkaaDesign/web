@@ -35,7 +35,6 @@ const vacationGroupOrderByFields = z.object({
   name: orderByDirection.optional(),
   type: orderByDirection.optional(),
   status: orderByDirection.optional(),
-  statusOrder: orderByDirection.optional(),
   acquisitiveStart: orderByDirection.optional(),
   acquisitiveEnd: orderByDirection.optional(),
   concessiveEnd: orderByDirection.optional(),
@@ -61,30 +60,8 @@ const stringWhere = z.union([
   }),
 ]);
 
-const numberWhere = z.union([
-  z.number(),
-  z.object({
-    equals: z.number().optional(),
-    in: z.array(z.number()).optional(),
-    lt: z.number().optional(),
-    lte: z.number().optional(),
-    gt: z.number().optional(),
-    gte: z.number().optional(),
-    not: z.number().optional(),
-  }),
-]);
-
-const dateWhere = z.union([
-  z.coerce.date(),
-  z.object({
-    equals: z.coerce.date().optional(),
-    lt: z.coerce.date().optional(),
-    lte: z.coerce.date().optional(),
-    gt: z.coerce.date().optional(),
-    gte: z.coerce.date().optional(),
-  }),
-]);
-
+// Tightened to match the api where (id/name/type/status only) — extra keys
+// 400 server-side.
 export const vacationGroupWhereSchema: z.ZodSchema = z.lazy(() =>
   z
     .object({
@@ -96,13 +73,6 @@ export const vacationGroupWhereSchema: z.ZodSchema = z.lazy(() =>
       name: stringWhere.optional(),
       type: stringWhere.optional(),
       status: stringWhere.optional(),
-      statusOrder: numberWhere.optional(),
-
-      acquisitiveStart: dateWhere.optional(),
-      acquisitiveEnd: dateWhere.optional(),
-      concessiveEnd: z.union([dateWhere, z.null()]).optional(),
-      createdAt: dateWhere.optional(),
-      updatedAt: dateWhere.optional(),
     })
     .partial(),
 );

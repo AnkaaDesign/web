@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
-import { IconEdit, IconTrash, IconRefresh, IconPlayerTrackNext } from "@tabler/icons-react";
+import { IconEdit, IconTrash, IconRefresh, IconCash, IconCheck, IconLoader2 } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, VACATION_STATUS, VACATION_STATUS_LABELS } from "../../../../constants";
+import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, VACATION_STATUS } from "../../../../constants";
 import { useVacation, useVacationMutations, useVacationAdvance } from "../../../../hooks/personnel-department/use-vacations";
 import { useAuth } from "../../../../hooks/common/use-auth";
 
@@ -10,6 +10,9 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DateTimeInput } from "@/components/ui/date-time-input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,10 +42,11 @@ export const VacationDetailPage = () => {
   const { user } = useAuth();
   const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
 
-  const [showAdvanceDialog, setShowAdvanceDialog] = useState(false);
+  const [payPopoverOpen, setPayPopoverOpen] = useState(false);
+  const [paymentDate, setPaymentDate] = useState<Date | null>(new Date());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const { deleteAsync, deleteMutation } = useVacationMutations();
+  const { deleteAsync, deleteMutation, updateAsync, updateMutation } = useVacationMutations();
   const advance = useVacationAdvance();
 
   const {
@@ -70,33 +74,34 @@ export const VacationDetailPage = () => {
 
   if (isLoading || !vacation) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
         <VacationDetailSkeleton />
       </PrivilegeRoute>
     );
   }
 
-  const isFinal = vacation.status === VACATION_STATUS.PAID || vacation.status === VACATION_STATUS.EXPIRED;
+  const isPaid = vacation.status === VACATION_STATUS.PAID;
   const nextStatus = getNextVacationStatus(vacation);
-  const nextIsPaid = nextStatus === VACATION_STATUS.PAID;
+  const canMarkPaid = nextStatus === VACATION_STATUS.PAID;
+  // Recibo must exist (auto-calculated at create — keep the guard honest) before
+  // the vacation can be marked as paid.
+  const reciboReady = vacation.baseRemuneration != null;
   const expired = isConcessiveExpired(vacation);
   const expiring = isConcessiveExpiringSoon(vacation);
   const remaining = getConcessiveDaysRemaining(vacation);
 
-  let advanceDisabledReason: string | null = null;
-  if (isFinal || !nextStatus) {
-    advanceDisabledReason = `Não é possível alterar o status de umas férias ${VACATION_STATUS_LABELS[vacation.status].toLowerCase()}.`;
-  } else if (nextIsPaid && !vacation.paymentDate) {
-    advanceDisabledReason = "Não é possível concluir como Pago: a data de pagamento não foi informada (edite as férias).";
-  }
+  const isMarkingPaid = updateMutation.isPending || advance.isPending;
 
-  const handleAdvance = async () => {
+  // "Marcar como pago": stamp the chosen payment date, then transition to PAID.
+  const handleMarkPaid = async () => {
+    if (!paymentDate || !reciboReady) return;
     try {
+      await updateAsync({ id, data: { paymentDate } });
       await advance.mutateAsync({ id });
-      setShowAdvanceDialog(false);
+      setPayPopoverOpen(false);
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {
-        console.error("Error advancing vacation:", error);
+        console.error("Error marking vacation as paid:", error);
       }
     }
   };
@@ -113,13 +118,8 @@ export const VacationDetailPage = () => {
     setShowDeleteDialog(false);
   };
 
-  // "Avançar" is a PageHeader action (NOT a standalone button) so it renders at
-  // the same size as Editar/Excluir — matches Admissão/Rescisão. The disabled
-  // reason is folded into the label (no tooltip on header actions).
-  const advanceLabel = nextIsPaid && !vacation.paymentDate ? "Avançar (informe o pagamento)" : "Avançar";
-
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
@@ -139,26 +139,13 @@ export const VacationDetailPage = () => {
               variant: "outline" as const,
               loading: isRefetching,
             },
-            ...(!isFinal && nextStatus
-              ? [
-                  {
-                    key: "advance",
-                    label: advanceLabel,
-                    icon: IconPlayerTrackNext,
-                    onClick: () => setShowAdvanceDialog(true),
-                    variant: "default" as const,
-                    group: "primary" as const,
-                    disabled: !!advanceDisabledReason || advance.isPending,
-                  },
-                ]
-              : []),
             {
               key: "edit",
               label: "Editar",
               icon: IconEdit,
               onClick: () => navigate(routes.personnelDepartment.vacations.edit(id)),
               group: "primary" as const,
-              disabled: isFinal,
+              disabled: isPaid,
             },
             ...(isAdmin
               ? [
@@ -194,6 +181,45 @@ export const VacationDetailPage = () => {
               </Alert>
             )}
 
+            {/* Action bar — self-documenting "Marcar como pago" with an inline
+                payment-date popover (no separate edit round-trip). */}
+            {canMarkPaid && (
+              <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Pagamento das férias</p>
+                  <p className="text-xs text-muted-foreground">
+                    {reciboReady
+                      ? "Informe a data de pagamento e conclua como Paga."
+                      : "O recibo ainda não foi calculado — não é possível concluir o pagamento."}
+                  </p>
+                </div>
+                <Popover open={payPopoverOpen} onOpenChange={setPayPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="default" disabled={!reciboReady || isMarkingPaid}>
+                      {isMarkingPaid ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCash className="h-4 w-4 mr-2" />}
+                      Marcar como pago
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-72 space-y-3">
+                    <div>
+                      <p className="text-sm font-medium">Data de pagamento</p>
+                      <p className="text-xs text-muted-foreground">Será registrada no recibo de férias.</p>
+                    </div>
+                    <DateTimeInput
+                      mode="date"
+                      value={paymentDate}
+                      onChange={(date) => setPaymentDate(date instanceof Date ? date : null)}
+                      placeholder="Selecione a data de pagamento"
+                    />
+                    <Button className="w-full" onClick={handleMarkPaid} disabled={!paymentDate || isMarkingPaid}>
+                      {isMarkingPaid ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCheck className="h-4 w-4 mr-2" />}
+                      Confirmar pagamento
+                    </Button>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
             <VacationStatusStepperCard vacation={vacation} />
 
             {/* Resumo (left) stretches to match the right column = Saldo + Recibo. */}
@@ -213,24 +239,6 @@ export const VacationDetailPage = () => {
             />
           </div>
         </div>
-
-        {/* Advance Confirmation Dialog */}
-        <AlertDialog open={showAdvanceDialog} onOpenChange={setShowAdvanceDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Avançar status das férias</AlertDialogTitle>
-              <AlertDialogDescription>
-                Avançar de {VACATION_STATUS_LABELS[vacation.status]} para <span className="font-medium">{nextStatus ? VACATION_STATUS_LABELS[nextStatus] : "-"}</span>?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Voltar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleAdvance} disabled={advance.isPending}>
-                Avançar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

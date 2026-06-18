@@ -259,7 +259,6 @@ const VALID_ROUTES = [
   routes.personnelDepartment.vacations.create,
   routes.personnelDepartment.vacations.details(":id"),
   routes.personnelDepartment.vacations.edit(":id"),
-  routes.personnelDepartment.vacations.collectiveDetails(":id"),
   routes.personnelDepartment.salaryAdjustments.root,
   routes.personnelDepartment.salaryAdjustments.details(":id"),
   routes.personnelDepartment.promotions.root,
@@ -330,7 +329,7 @@ export const ROUTE_FIXES: Record<string, string> = {
 
   // Administration route mappings
   "/administracao/clientes/listar": "/financeiro/clientes",
-  "/administracao/colaboradores/listar": "/administracao/colaboradores",
+  "/departamento-pessoal/colaboradores/listar": "/departamento-pessoal/colaboradores",
   "/administracao/registros-de-alteracoes/listar": "/servidor/registros-de-alteracoes",
   "/administracao/registros-de-alteracoes": "/servidor/registros-de-alteracoes",
   "/administracao/arquivos/listar": "/administracao/arquivos",
@@ -338,24 +337,24 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/administracao/notificacoes/listar": "/administracao/notificacoes",
 
   // Human Resources route mappings
-  "/recursos-humanos/cargos/listar": "/recursos-humanos/cargos",
-  "/recursos-humanos/ausencias/listar": "/departamento-pessoal/ferias",
-  "/recursos-humanos/ausencias": "/departamento-pessoal/ferias",
-  "/recursos-humanos/ausencias/cadastrar": "/departamento-pessoal/ferias/cadastrar",
+  "/departamento-pessoal/cargos/listar": "/departamento-pessoal/cargos",
+  "/departamento-pessoal/ausencias/listar": "/departamento-pessoal/ferias",
+  "/departamento-pessoal/ausencias": "/departamento-pessoal/ferias",
+  "/departamento-pessoal/ausencias/cadastrar": "/departamento-pessoal/ferias/cadastrar",
   // Férias migrated to Departamento Pessoal — fix RH-namespace links.
-  "/recursos-humanos/ferias": "/departamento-pessoal/ferias",
-  "/recursos-humanos/ferias/cadastrar": "/departamento-pessoal/ferias/cadastrar",
-  "/recursos-humanos/faltas/listar": "/recursos-humanos",
-  "/recursos-humanos/faltas": "/recursos-humanos",
-  "/recursos-humanos/faltas/cadastrar": "/recursos-humanos",
-  "/recursos-humanos/feriados/listar": "/recursos-humanos/feriados",
-  "/recursos-humanos/feriados/detalhes/:id": "/recursos-humanos/feriados/:id",
-  "/recursos-humanos/avisos/listar": "/recursos-humanos/avisos",
-  "/recursos-humanos/epi/listar": "/recursos-humanos/epi",
-  "/recursos-humanos/epi/entregas/listar": "/recursos-humanos/epi/entregas",
-  "/recursos-humanos/epi/tamanhos/listar": "/recursos-humanos/epi/tamanhos",
-  "/recursos-humanos/epi/tamanhos/detalhes/:id": "/recursos-humanos/epi/tamanhos/:id",
-  "/recursos-humanos/epi/agendamentos/listar": "/recursos-humanos/epi/agendamentos",
+  "/departamento-pessoal/ferias": "/departamento-pessoal/ferias",
+  "/departamento-pessoal/ferias/cadastrar": "/departamento-pessoal/ferias/cadastrar",
+  "/departamento-pessoal/faltas/listar": "/departamento-pessoal",
+  "/departamento-pessoal/faltas": "/departamento-pessoal",
+  "/departamento-pessoal/faltas/cadastrar": "/departamento-pessoal",
+  "/departamento-pessoal/feriados/listar": "/departamento-pessoal/feriados",
+  "/departamento-pessoal/feriados/detalhes/:id": "/departamento-pessoal/feriados/:id",
+  "/departamento-pessoal/avisos/listar": "/departamento-pessoal/avisos",
+  "/departamento-pessoal/epi/listar": "/departamento-pessoal/epi",
+  "/departamento-pessoal/epi/entregas/listar": "/departamento-pessoal/epi/entregas",
+  "/departamento-pessoal/epi/tamanhos/listar": "/departamento-pessoal/epi/tamanhos",
+  "/departamento-pessoal/epi/tamanhos/detalhes/:id": "/departamento-pessoal/epi/tamanhos/:id",
+  "/departamento-pessoal/epi/agendamentos/listar": "/departamento-pessoal/epi/agendamentos",
 
   // Personal (Pessoal) route mappings
   "/pessoal/meus-feriados": "/pessoal/feriados",
@@ -370,7 +369,7 @@ export const ROUTE_FIXES: Record<string, string> = {
 
   // Statistics route mappings
   "/estatisticas/producao/listar": "/estatisticas/producao",
-  "/estatisticas/recursos-humanos/listar": "/estatisticas/recursos-humanos",
+  "/estatisticas/departamento-pessoal/listar": "/estatisticas/departamento-pessoal",
   "/estatisticas/estoque/listar": "/estatisticas/estoque",
 
   // Maintenance route mappings
@@ -379,17 +378,14 @@ export const ROUTE_FIXES: Record<string, string> = {
   // Missing route mappings - these paths exist in navigation but need to be added to routes
   "/estoque/ppe/configuracoes": "/estoque/epi",
   "/estoque/ppe/configuracoes/cadastrar": "/estoque/epi/cadastrar",
-  "/recursos-humanos/colaboradores": "/administracao/colaboradores",
-  "/recursos-humanos/colaboradores/cadastrar": "/administracao/colaboradores/cadastrar",
-  "/recursos-humanos/colaboradores/listar": "/administracao/colaboradores",
-  "/recursos-humanos/colaboradores/detalhes": "/administracao/colaboradores",
-  "/recursos-humanos/colaboradores/editar": "/administracao/colaboradores",
-  "/recursos-humanos/setores": "/administracao/setores",
-  "/recursos-humanos/setores/cadastrar": "/administracao/setores/cadastrar",
-  "/recursos-humanos/vagas": "/recursos-humanos/vagas",
-  "/recursos-humanos/vagas/cadastrar": "/recursos-humanos/vagas/cadastrar",
-  "/recursos-humanos/ppe/configuracoes": "/recursos-humanos/epi",
-  "/recursos-humanos/ppe/configuracoes/cadastrar": "/recursos-humanos/epi/cadastrar",
+  "/departamento-pessoal/colaboradores/detalhes": "/departamento-pessoal/colaboradores",
+  "/departamento-pessoal/colaboradores/editar": "/departamento-pessoal/colaboradores",
+  "/departamento-pessoal/setores": "/administracao/setores",
+  "/departamento-pessoal/setores/cadastrar": "/administracao/setores/cadastrar",
+  "/departamento-pessoal/vagas": "/departamento-pessoal/vagas",
+  "/departamento-pessoal/vagas/cadastrar": "/departamento-pessoal/vagas/cadastrar",
+  "/departamento-pessoal/ppe/configuracoes": "/departamento-pessoal/epi",
+  "/departamento-pessoal/ppe/configuracoes/cadastrar": "/departamento-pessoal/epi/cadastrar",
 
   // Financial sector route mappings - redirect to main production routes
   "/financeiro/producao": "/producao",
@@ -414,12 +410,12 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/personal/time-tracking": "/pessoal",
   "/personal/time-tracking/details/:id": "/pessoal",
   "/registro-de-ponto": "/pessoal",
-  "/human-resources": "/recursos-humanos",
-  "/human-resources/employees": "/administracao/colaboradores",
-  "/human-resources/employees/create": "/administracao/colaboradores/cadastrar",
-  "/human-resources/employees/list": "/administracao/colaboradores",
-  "/human-resources/employees/details": "/administracao/colaboradores",
-  "/human-resources/employees/edit": "/administracao/colaboradores",
+  "/human-resources": "/departamento-pessoal",
+  "/human-resources/employees": "/departamento-pessoal/colaboradores",
+  "/human-resources/employees/create": "/departamento-pessoal/colaboradores/cadastrar",
+  "/human-resources/employees/list": "/departamento-pessoal/colaboradores",
+  "/human-resources/employees/details": "/departamento-pessoal/colaboradores",
+  "/human-resources/employees/edit": "/departamento-pessoal/colaboradores",
   "/human-resources/absences": "/departamento-pessoal/ferias",
   "/human-resources/vacations": "/departamento-pessoal/ferias",
   "/producao/cronograma/aguardando": "/producao/agenda",
@@ -430,19 +426,19 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/pintura/tintas/cadastrar": "/pintura/tipos-de-tinta/cadastrar",
   "/pintura/tintas/tipos-de-tinta": "/pintura/tipos-de-tinta",
   "/pintura/tintas/tipos-de-tinta/cadastrar": "/pintura/tipos-de-tinta/cadastrar",
-  "/recursos-humanos/advertencias": "/recursos-humanos/avisos",
-  "/recursos-humanos/advertencias/cadastrar": "/recursos-humanos/avisos/cadastrar",
-  "/recursos-humanos/ppe": "/recursos-humanos/epi",
-  "/recursos-humanos/ppe/cadastrar": "/recursos-humanos/epi/cadastrar",
-  "/recursos-humanos/ppe/agendamentos": "/recursos-humanos/epi/agendamentos",
-  "/recursos-humanos/ppe/agendamentos/cadastrar": "/recursos-humanos/epi/agendamentos/cadastrar",
-  "/recursos-humanos/ppe/entregas": "/recursos-humanos/epi/entregas",
-  "/recursos-humanos/ppe/entregas/cadastrar": "/recursos-humanos/epi/entregas/cadastrar",
-  "/recursos-humanos/ppe/tamanhos": "/recursos-humanos/epi/tamanhos",
-  "/recursos-humanos/ppe/tamanhos/cadastrar": "/recursos-humanos/epi/tamanhos/cadastrar",
+  "/departamento-pessoal/advertencias": "/departamento-pessoal/avisos",
+  "/departamento-pessoal/advertencias/cadastrar": "/departamento-pessoal/avisos/cadastrar",
+  "/departamento-pessoal/ppe": "/departamento-pessoal/epi",
+  "/departamento-pessoal/ppe/cadastrar": "/departamento-pessoal/epi/cadastrar",
+  "/departamento-pessoal/ppe/agendamentos": "/departamento-pessoal/epi/agendamentos",
+  "/departamento-pessoal/ppe/agendamentos/cadastrar": "/departamento-pessoal/epi/agendamentos/cadastrar",
+  "/departamento-pessoal/ppe/entregas": "/departamento-pessoal/epi/entregas",
+  "/departamento-pessoal/ppe/entregas/cadastrar": "/departamento-pessoal/epi/entregas/cadastrar",
+  "/departamento-pessoal/ppe/tamanhos": "/departamento-pessoal/epi/tamanhos",
+  "/departamento-pessoal/ppe/tamanhos/cadastrar": "/departamento-pessoal/epi/tamanhos/cadastrar",
   "/statistics": "/estatisticas",
   "/statistics/production": "/estatisticas/producao",
-  "/statistics/human-resources": "/estatisticas/recursos-humanos",
+  "/statistics/human-resources": "/estatisticas/departamento-pessoal",
   "/statistics/inventory": "/estatisticas/estoque",
 };
 
@@ -532,7 +528,7 @@ export function fixNavigationPath(path: string): string {
   }
 
   if (path.startsWith("/human-resources")) {
-    const portuguesePath = path.replace("/human-resources", "/recursos-humanos");
+    const portuguesePath = path.replace("/human-resources", "/departamento-pessoal");
     if (isValidRoute(portuguesePath)) {
       return portuguesePath;
     }

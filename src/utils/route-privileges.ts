@@ -15,12 +15,8 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/administracao/mensagens": ["ADMIN", "PRODUCTION_MANAGER", "ACCOUNTING"],
   "/administracao/mensagens/criar": ["ADMIN", "PRODUCTION_MANAGER", "ACCOUNTING"],
   "/administracao/mensagens/*": ["ADMIN", "PRODUCTION_MANAGER", "ACCOUNTING"],
-  "/administracao/colaboradores": ["ADMIN", "PRODUCTION_MANAGER", "ACCOUNTING"],
-  "/administracao/colaboradores/detalhes/:id": ["ADMIN", "PRODUCTION_MANAGER", "ACCOUNTING"],
-  // Edit reachable from the Departamento Pessoal section (ACCOUNTING/HR) and the
-  // Administração section (HR/ADMIN) — without this entry it fell through to the
-  // "/administracao/*" ADMIN-only wildcard.
-  "/administracao/colaboradores/editar/:id": ["ADMIN", "HUMAN_RESOURCES", "ACCOUNTING"],
+  // Colaboradores (employee directory) lives at /departamento-pessoal/colaboradores
+  // (see the Departamento Pessoal section below).
   "/administracao/avaliacao-competencias": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
   "/administracao/avaliacao-competencias/*": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
   "/administracao/competencias": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
@@ -87,9 +83,9 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/estatisticas": "ADMIN",
   "/estatisticas/*": "ADMIN",
   // PRODUCTION_MANAGER stat pages — explicit allowlist (otherwise falls back to ADMIN default)
-  "/estatisticas/recursos-humanos": ["ADMIN", "PRODUCTION_MANAGER"],
-  "/estatisticas/recursos-humanos/equipe": ["ADMIN", "PRODUCTION_MANAGER"],
-  "/estatisticas/recursos-humanos/competencias": ["ADMIN", "PRODUCTION_MANAGER"],
+  "/estatisticas/departamento-pessoal": ["ADMIN", "PRODUCTION_MANAGER"],
+  "/estatisticas/departamento-pessoal/equipe": ["ADMIN", "PRODUCTION_MANAGER"],
+  "/estatisticas/departamento-pessoal/competencias": ["ADMIN", "PRODUCTION_MANAGER"],
   "/estatisticas/producao/desempenho": ["ADMIN", "PRODUCTION_MANAGER"],
 
   // Estoque - Warehouse operations with full access
@@ -221,33 +217,59 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
 
   // Recursos Humanos - HR with admin requirements for sensitive operations
   // ACCOUNTING (Departamento Pessoal) shares the HR routes granted by the accounting-area contract.
-  "/recursos-humanos": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/recursos-humanos/colaboradores": "HUMAN_RESOURCES",
-  "/recursos-humanos/colaboradores/cadastrar": "ADMIN", // Employee creation requires admin
-  "/recursos-humanos/setores": "HUMAN_RESOURCES",
-  "/recursos-humanos/setores/cadastrar": "ADMIN", // Department creation requires admin
-  "/recursos-humanos/cargos": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/recursos-humanos/cargos/cadastrar": "ADMIN", // Position creation requires admin
+  "/departamento-pessoal": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
+  // Colaboradores (employee directory) — canonical home under Departamento Pessoal.
+  // List/detail open to the DP audience + Production Manager; edit excludes PM;
+  // create is ADMIN-only (matches the page-level guards).
+  "/departamento-pessoal/colaboradores": ["ADMIN", "HUMAN_RESOURCES", "ACCOUNTING", "PRODUCTION_MANAGER"],
+  "/departamento-pessoal/colaboradores/detalhes/:id": ["ADMIN", "HUMAN_RESOURCES", "ACCOUNTING", "PRODUCTION_MANAGER"],
+  "/departamento-pessoal/colaboradores/editar/:id": ["ADMIN", "HUMAN_RESOURCES", "ACCOUNTING"],
+  "/departamento-pessoal/colaboradores/editar-em-lote": ["ADMIN", "HUMAN_RESOURCES", "ACCOUNTING"],
+  "/departamento-pessoal/colaboradores/cadastrar": "ADMIN", // Employee creation requires admin
+  "/departamento-pessoal/setores": "HUMAN_RESOURCES",
+  "/departamento-pessoal/setores/cadastrar": "ADMIN", // Department creation requires admin
+  "/departamento-pessoal/cargos": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
+  "/departamento-pessoal/cargos/cadastrar": "ADMIN", // Position creation requires admin
+  // Integração Secullum — ADMIN only (edits the live integration mapping + diagnostics).
+  // Explicit exact entry so it wins over the "/departamento-pessoal/*" HR/ACCOUNTING/ADMIN wildcard.
+  "/departamento-pessoal/integracoes/secullum": "ADMIN",
+  "/departamento-pessoal/integracoes/secullum/*": "ADMIN",
   // Unified Controle de Ponto. View tabs (colaborador, dia, ausências) are open to
   // this audience; the edit tabs (edição, fechamento) are gated client-side to HR + ADMIN
   // via PrivilegeRoute on each page + the hrOnly tab filter.
-  "/recursos-humanos/controle-ponto": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "ACCOUNTING"],
-  // View tabs are explicitly listed so they win over the "/recursos-humanos/*" HR-only
+  "/departamento-pessoal/controle-ponto": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "ACCOUNTING"],
+  // View tabs are explicitly listed so they win over the "/departamento-pessoal/*" HR-only
   // wildcard below. Edição and Fechamento intentionally have NO entry here — they fall
   // through to the wildcard (HR/ACCOUNTING/ADMIN) and are further guarded per-page via PrivilegeRoute.
   // COMMERCIAL excluded — the Secullum API endpoints reject it.
-  "/recursos-humanos/controle-ponto/colaborador": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "ACCOUNTING"],
-  "/recursos-humanos/controle-ponto/dia": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "ACCOUNTING"],
-  "/recursos-humanos/controle-ponto/ausencias": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "ACCOUNTING"],
-  "/recursos-humanos/ferias": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/recursos-humanos/calendario": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/recursos-humanos/feriados": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/recursos-humanos/avisos": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/recursos-humanos/ppe": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/recursos-humanos/ppe/entregas": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/recursos-humanos/ppe/entregas/cadastrar": ["HUMAN_RESOURCES", "WAREHOUSE", "ACCOUNTING", "ADMIN"], // HR, Warehouse, Accounting, and Admin can create (matches API)
+  "/departamento-pessoal/controle-ponto/colaborador": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "ACCOUNTING"],
+  "/departamento-pessoal/controle-ponto/dia": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "ACCOUNTING"],
+  "/departamento-pessoal/controle-ponto/ausencias": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "ACCOUNTING"],
+  // Calendário now surfaced under Ferramentas for HR/ACCOUNTING/ADMIN + PRODUCTION_MANAGER.
+  "/departamento-pessoal/calendario": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN", "PRODUCTION_MANAGER"],
+  // Feriados moved to Departamento Pessoal — HR/ADMIN only (ACCOUNTING intentionally
+  // excluded, matching the menu). Old /departamento-pessoal/feriados URL is handled by a
+  // legacy redirect route and still matches the "/departamento-pessoal/*" HR/ACC/ADMIN wildcard.
+  "/departamento-pessoal/feriados": ["HUMAN_RESOURCES", "ADMIN"],
+  "/departamento-pessoal/feriados/*": ["HUMAN_RESOURCES", "ADMIN"],
+  // Requisições now lives under Controle de Ponto. Explicit entry (wins over the
+  // "/departamento-pessoal/*" wildcard) so its audience is documented.
+  "/departamento-pessoal/controle-ponto/requisicoes": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
+  "/departamento-pessoal/avisos": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
+  "/departamento-pessoal/ppe": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
+  "/departamento-pessoal/ppe/entregas": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
+  "/departamento-pessoal/ppe/entregas/cadastrar": ["HUMAN_RESOURCES", "WAREHOUSE", "ACCOUNTING", "ADMIN"], // HR, Warehouse, Accounting, and Admin can create (matches API)
 
-  // Departamento Pessoal - Personnel Department (ACCOUNTING area)
+  // Departamento Pessoal - Personnel Department (HR / ACCOUNTING / ADMIN)
+  // Production Manager additionally manages its team's admissions, terminations and
+  // vacations — explicit entries (longer wildcards win) add PRODUCTION_MANAGER to just
+  // those three areas; the rest of /departamento-pessoal stays HR/ACCOUNTING/ADMIN.
+  "/departamento-pessoal/admissoes": ["ACCOUNTING", "HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER"],
+  "/departamento-pessoal/admissoes/*": ["ACCOUNTING", "HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER"],
+  "/departamento-pessoal/rescisoes": ["ACCOUNTING", "HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER"],
+  "/departamento-pessoal/rescisoes/*": ["ACCOUNTING", "HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER"],
+  "/departamento-pessoal/ferias": ["ACCOUNTING", "HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER"],
+  "/departamento-pessoal/ferias/*": ["ACCOUNTING", "HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER"],
   "/departamento-pessoal/*": ["ACCOUNTING", "HUMAN_RESOURCES", "ADMIN"],
 
   // Medicina do Trabalho - Occupational Health (ACCOUNTING area)
@@ -284,17 +306,18 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/ferramentas/custo-de-funcionario": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING"],
   // Post-its notes board — broad availability (matches the other broad tools above)
   "/ferramentas/post-its": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING", "TEAM_LEADER"],
-  // QR generator and color palette — ACCOUNTING intentionally excluded (its nav hides
-  // them too); everyone else keeps the access they had via the "/ferramentas/*" wildcard.
-  "/ferramentas/qr-code": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
-  "/ferramentas/paleta": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  // QR generator, color palette and waste certificate — ACCOUNTING and
+  // PRODUCTION_MANAGER intentionally excluded (their navs hide these); everyone else
+  // keeps the access they had via the "/ferramentas/*" wildcard.
+  "/ferramentas/qr-code": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  "/ferramentas/paleta": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  "/ferramentas/certificado-residuos": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING"],
 
   // Fallback patterns (for broader route matching)
   "/administracao/*": "ADMIN",
   [`${routes.inventory.root}/*`]: "WAREHOUSE",
   "/pintura/*": ["WAREHOUSE", "DESIGNER", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "TEAM_LEADER", "ADMIN"], // PRODUCTION excluded from paint routes
   [`${routes.production.root}/*`]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL"], // DESIGNER, FINANCIAL, LOGISTIC, PRODUCTION_MANAGER, PLOTTING have read access to production routes
-  "/recursos-humanos/*": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
   "/human-resources/*": "HUMAN_RESOURCES",
   "/meu-pessoal/*": "TEAM_LEADER", // Team leader routes - uses virtual privilege
   "/manutencao/*": ["MAINTENANCE", "WAREHOUSE", "ADMIN"],

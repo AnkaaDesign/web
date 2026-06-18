@@ -1,4 +1,4 @@
-// INFO drill-down content for the /estatisticas/recursos-humanos/competencias
+// INFO drill-down content for the /estatisticas/departamento-pessoal/competencias
 // page. Explains WHAT a skill / topic is: the skill description, and for each
 // topic its description and contrary behaviour ("comportamentos contrários").
 //

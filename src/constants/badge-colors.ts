@@ -63,6 +63,7 @@ import {
   LEAVE_STATUS,
   ORDER_PAYMENT_STATUS,
   ORDER_INSTALLMENT_STATUS,
+  VACATION_STATUS,
 } from "./enums";
 
 /**
@@ -729,6 +730,7 @@ export const ENTITY_BADGE_CONFIG = {
     [TERMINATION_STATUS.INITIATED]: "gray" as BadgeVariant,        // Gray - just initiated
     [TERMINATION_STATUS.NOTICE_PERIOD]: "pending" as BadgeVariant, // Amber - notice period running
     [TERMINATION_STATUS.DOCUMENTS]: "blue" as BadgeVariant,        // Blue - documents phase
+    [TERMINATION_STATUS.HOMOLOGATION]: "blue" as BadgeVariant,     // Blue - homologation phase
     [TERMINATION_STATUS.MEDICAL_EXAM]: "purple" as BadgeVariant,   // Purple - dismissal exam phase
     [TERMINATION_STATUS.CALCULATION]: "cyan" as BadgeVariant,      // Cyan - calculation phase
     [TERMINATION_STATUS.PAYMENT]: "orange" as BadgeVariant,        // Orange - awaiting payment
@@ -749,6 +751,15 @@ export const ENTITY_BADGE_CONFIG = {
     [MEDICAL_EXAM_RESULT.PENDING]: "pending" as BadgeVariant,      // Amber - awaiting result
     [MEDICAL_EXAM_RESULT.FIT]: "green" as BadgeVariant,            // Green - fit (apto)
     [MEDICAL_EXAM_RESULT.UNFIT]: "red" as BadgeVariant,            // Red - unfit (inapto)
+  },
+
+  // Vacation Status (Departamento Pessoal). "Em gozo" is computed from dates
+  // (see isVacationInProgress) and rendered with the "active"/blue chip ad-hoc;
+  // only the persisted statuses live here.
+  VACATION: {
+    [VACATION_STATUS.SCHEDULED]: "warning" as BadgeVariant,        // Amber - agendada
+    [VACATION_STATUS.PAID]: "success" as BadgeVariant,             // Green - paga
+    [VACATION_STATUS.EXPIRED]: "destructive" as BadgeVariant,      // Red - vencida (em dobro)
   },
 
   // Leave Status (Medicina do Trabalho)

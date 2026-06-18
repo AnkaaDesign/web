@@ -78,7 +78,7 @@ function RequisicosList() {
           title="Ajustes de Ponto"
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
+            { label: "Departamento Pessoal", href: routes.administration.collaborators.root },
             { label: "Controle de Ponto", href: routes.humanResources.timeClock.root },
             { label: "Requisições" },
           ]}

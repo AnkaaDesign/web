@@ -7,17 +7,17 @@ import { AbsencesCalendar } from "@/components/human-resources/absence";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const HRCalendarPage = () => {
-  usePageTracker({ title: "Calendário RH", icon: "calendarStats" });
+  usePageTracker({ title: "Calendário", icon: "calendarStats" });
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Calendário"
           icon={IconCalendarStats}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
+            { label: "Ferramentas", href: routes.tools.root },
             { label: "Calendário" },
           ]}
           className="flex-shrink-0"

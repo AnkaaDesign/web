@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
-const REQUIRED_PRIVILEGES = [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN];
+const REQUIRED_PRIVILEGES = [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER];
 
 export const AdmissionDetailPage = () => {
   usePageTracker({ title: "Detalhes da Admissão" });

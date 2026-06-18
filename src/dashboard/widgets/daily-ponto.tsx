@@ -905,7 +905,7 @@ function DailyPontoRender({
       }
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       viewAllHref={
-        display.showViewAllLink ? `/recursos-humanos/controle-ponto?date=${dateStr}` : undefined
+        display.showViewAllLink ? `/departamento-pessoal/controle-ponto?date=${dateStr}` : undefined
       }
       accentColor={config.accent?.color as WidgetAccentColor}
       accentShade={config.accent?.shade as WidgetAccentShade | undefined}

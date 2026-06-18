@@ -1,4 +1,4 @@
-// Unified drill-down modal for the /estatisticas/recursos-humanos/competencias
+// Unified drill-down modal for the /estatisticas/departamento-pessoal/competencias
 // page. Just 2 levels: the SKILL DETAIL (description + per-topic distribution,
 // responses, average AND each topic's description/contrary behaviour) and the
 // TOPIC DETAIL (the evaluations behind a topic). The page owns the stack; this

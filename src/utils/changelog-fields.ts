@@ -30,7 +30,7 @@ import {
 } from '@constants';
 import { formatDateTime, formatDate } from "./date";
 import { formatCurrency } from "./number";
-import { formatBrazilianPhone, formatCPF, formatCNPJ, formatChassis } from "./formatters";
+import { formatBrazilianPhone, formatCPF, formatCNPJ, formatChassis, formatPixKey } from "./formatters";
 
 // Common field name mapping for all entities
 const commonFields: Record<string, string> = {
@@ -188,13 +188,18 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "receipt.filename": "Nome do Recibo",
     paymentMethod: "Método de Pagamento",
     paymentPix: "Chave Pix",
-    paymentDueDays: "Prazo de Vencimento",
+    paymentDueDays: "Intervalo entre Parcelas",
+    paymentFirstDueDate: "Primeiro Vencimento",
     paymentResponsibleId: "Responsável pelo Pagamento",
     paymentAssignedById: "Atribuído por",
     paymentStatus: "Status de Pagamento",
     paymentStatusOrder: "Ordem do Status de Pagamento",
     paymentRequestedAt: "Pagamento Solicitado em",
     paidAt: "Pago em",
+    paidById: "Pago por",
+    installmentCount: "Parcelas",
+    freight: "Frete",
+    discount: "Desconto",
     items: "Itens do Pedido",
   },
   [CHANGE_LOG_ENTITY_TYPE.ORDER_ITEM]: {
@@ -1363,9 +1368,29 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return paymentMethodLabels[value] || value;
   }
 
-  // Handle order payment due days
+  // Handle order payment due days (interval between parcelas)
   if (field === "paymentDueDays" && entityType === CHANGE_LOG_ENTITY_TYPE.ORDER && typeof value === "number") {
     return `${value} ${value === 1 ? "dia" : "dias"}`;
+  }
+
+  // Order: installment count → "À vista (1x)" / "Nx"
+  if (field === "installmentCount" && entityType === CHANGE_LOG_ENTITY_TYPE.ORDER && typeof value === "number") {
+    return value <= 1 ? "À vista (1x)" : `${value}x`;
+  }
+
+  // Order: freight is a currency amount
+  if (field === "freight" && entityType === CHANGE_LOG_ENTITY_TYPE.ORDER && typeof value === "number") {
+    return formatCurrency(value);
+  }
+
+  // Order: discount is a percentage of the goods subtotal
+  if (field === "discount" && entityType === CHANGE_LOG_ENTITY_TYPE.ORDER && typeof value === "number") {
+    return `${value.toLocaleString("pt-BR")}%`;
+  }
+
+  // Order: format the Pix key for readability
+  if (field === "paymentPix" && entityType === CHANGE_LOG_ENTITY_TYPE.ORDER && typeof value === "string" && value) {
+    return formatPixKey(value);
   }
 
   // Handle external withdrawal status
@@ -2363,6 +2388,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     field === "term" ||
     field === "scheduledFor" ||
     field === "forecast" ||
+    field === "paymentFirstDueDate" ||
     field === "scheduledDate" ||
     field === "actualDeliveryDate" ||
     field === "nextRun" ||

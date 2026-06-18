@@ -44,12 +44,12 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   SERVICEORDER: "/producao/cronograma/detalhes",
 
   // User routes
-  USER: "/administracao/colaboradores/detalhes",
-  User: "/administracao/colaboradores/detalhes",
+  USER: "/departamento-pessoal/colaboradores/detalhes",
+  User: "/departamento-pessoal/colaboradores/detalhes",
 
   // Employee routes
-  EMPLOYEE: "/administracao/colaboradores/detalhes",
-  Employee: "/administracao/colaboradores/detalhes",
+  EMPLOYEE: "/departamento-pessoal/colaboradores/detalhes",
+  Employee: "/departamento-pessoal/colaboradores/detalhes",
 
   // Customer routes
   CUSTOMER: "/financeiro/clientes/detalhes",
@@ -59,13 +59,13 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   SUPPLIER: "/estoque/fornecedores/detalhes",
   Supplier: "/estoque/fornecedores/detalhes",
 
-  // Warning routes (mounted at /recursos-humanos/avisos in App.tsx)
-  WARNING: "/recursos-humanos/avisos/detalhes",
-  Warning: "/recursos-humanos/avisos/detalhes",
+  // Warning routes (mounted at /departamento-pessoal/avisos in App.tsx)
+  WARNING: "/departamento-pessoal/avisos/detalhes",
+  Warning: "/departamento-pessoal/avisos/detalhes",
 
-  // Bonus routes (registered route is /recursos-humanos/bonus/:id)
-  BONUS: "/recursos-humanos/bonus",
-  Bonus: "/recursos-humanos/bonus",
+  // Bonus routes (registered route is /departamento-pessoal/bonus/:id)
+  BONUS: "/departamento-pessoal/bonus",
+  Bonus: "/departamento-pessoal/bonus",
 
   // Financial routes (/financeiro/transacoes does not exist; billing details does)
   FINANCIAL: "/financeiro/faturamento/detalhes",
@@ -118,17 +118,20 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   TASK_QUOTE: "/financeiro/orcamento/detalhes",
   TaskQuote: "/financeiro/orcamento/detalhes",
 
-  // Secullum solicitation routes (HR integration)
-  SECULLUM_SOLICITACAO: "/recursos-humanos/integracoes/secullum",
-  SecullumSolicitacao: "/recursos-humanos/integracoes/secullum",
+  // Secullum solicitation routes — HR review page (time-adjustment requests).
+  // The admin-only integration-mapping page is NOT used here; per-notification
+  // metadata.webUrl (set by the API) takes priority and points each notification
+  // at its correct audience-accessible page.
+  SECULLUM_SOLICITACAO: "/departamento-pessoal/controle-ponto/requisicoes",
+  SecullumSolicitacao: "/departamento-pessoal/controle-ponto/requisicoes",
 
   // Bank slip / billing routes (entityId is the taskId)
   BANK_SLIP: "/financeiro/faturamento/detalhes",
   BankSlip: "/financeiro/faturamento/detalhes",
 
   // Payroll routes (list/root page)
-  PAYROLL: "/recursos-humanos/folha-de-pagamento",
-  Payroll: "/recursos-humanos/folha-de-pagamento",
+  PAYROLL: "/departamento-pessoal/folha-de-pagamento",
+  Payroll: "/departamento-pessoal/folha-de-pagamento",
 };
 
 /**

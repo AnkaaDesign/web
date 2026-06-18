@@ -3,11 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconArrowDownLeft,
   IconArrowUpRight,
-  IconBan,
   IconBuildingBank,
-  IconCash,
-  IconCategory,
-  IconListDetails,
+  IconHelpCircle,
   IconRefresh,
   IconUpload,
 } from "@tabler/icons-react";
@@ -16,24 +13,20 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Combobox } from "@/components/ui/combobox";
-import {
-  StandardizedTable,
-  type StandardizedColumn,
-} from "@/components/ui/standardized-table";
-import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { FinancialKpiCard } from "@/components/financial/common/financial-kpi-card";
-import {
-  CategoryChips,
-  MatchStatusBadge,
-} from "@/components/financial/reconciliation/match-status-badge";
 import {
   MonthNav,
   monthBounds,
   monthKey,
   parseMonthKey,
 } from "@/components/financial/reconciliation/month-nav";
+import { TransactionsByDateAccordion } from "@/components/financial/reconciliation/transactions-by-date-accordion";
+import {
+  buildDatesForPeriod,
+  effectivePeriodDates,
+} from "@/components/financial/reconciliation/date-utils";
 import { OfxImportDialog } from "@/components/financial/reconciliation/ofx-import-dialog";
+import { ScoringWorkflowDialog } from "@/components/financial/reconciliation/scoring-workflow-dialog";
 import { IgnoreTransactionDialog } from "@/components/financial/reconciliation/ignore-transaction-dialog";
 import { CategoryPickerDialog } from "@/components/financial/reconciliation/category-picker-dialog";
 import {
@@ -41,7 +34,6 @@ import {
   BUCKET_META,
   BUCKET_STATUSES,
   bucketOf,
-  LinkedDocCell,
   parseBuckets,
   type BucketKey,
 } from "@/components/financial/reconciliation/transaction-buckets";
@@ -57,13 +49,7 @@ import { useDebouncedValue } from "@/hooks/common/use-debounced-value";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useToast } from "@/hooks/common/use-toast";
 import { SECTOR_PRIVILEGES, routes } from "@/constants";
-import { cn } from "@/lib/utils";
-import {
-  formatAccountNumber,
-  formatCnpjCpf,
-  formatCurrency,
-  formatDate,
-} from "@/utils";
+import { formatAccountNumber, formatCurrency } from "@/utils";
 import type { BankTransaction, TransactionType } from "@/types/reconciliation";
 
 // Mirrors the API DTO cap; a busy month fits in one fetch.
@@ -98,12 +84,12 @@ function accountLabelOf(t: BankTransaction): string {
 
 /**
  * Extrato — the single Conciliação Bancária view. It shows one account's
- * transactions in statement order (oldest first) with the running balance and
- * credit/debit coloring, and absorbs what used to be the Saídas/Entradas pages:
- * the Entradas/Saídas summary cards toggle a CREDIT/DEBIT type filter, the
- * status buckets (Pendentes/Parciais/Conciliadas/Ignoradas) filter by
- * conciliation status, and each row funnels into the matching flow, category
- * assignment or ignore — plus the "Verificar" auto-match pass.
+ * transactions for the selected month, grouped into expandable/collapsible day
+ * rows, and absorbs what used to be the Saídas/Entradas/Transações pages: the
+ * Entradas/Saídas summary cards toggle a CREDIT/DEBIT type filter, the status
+ * buckets (Pendentes/Parciais/Conciliadas/Ignoradas) filter by conciliação
+ * status, and each row funnels into the matching flow, category assignment or
+ * ignore — plus the "Verificar" auto-match pass and the "Como funciona" modal.
  */
 export const ReconciliationStatementPage = () => {
   usePageTracker({ title: "Extrato - Conciliação", icon: "building-bank" });
@@ -128,6 +114,7 @@ export const ReconciliationStatementPage = () => {
   );
   const debouncedSearch = useDebouncedValue(searchText.trim(), 300);
   const [importOpen, setImportOpen] = useState(false);
+  const [scoringHelpOpen, setScoringHelpOpen] = useState(false);
 
   // Keep month/account/search/type/status shareable in the URL.
   useEffect(() => {
@@ -137,7 +124,8 @@ export const ReconciliationStatementPage = () => {
     else params.delete("conta");
     if (searchText) params.set("search", searchText);
     else params.delete("search");
-    if (types.length !== ALL_TYPES.length) params.set("tipo", [...types].sort().join(","));
+    if (types.length !== ALL_TYPES.length)
+      params.set("tipo", [...types].sort().join(","));
     else params.delete("tipo");
     const bucketCsv = [...buckets].sort().join(",");
     if (buckets.length !== ALL_BUCKETS.length) params.set("status", bucketCsv);
@@ -150,10 +138,9 @@ export const ReconciliationStatementPage = () => {
 
   const { from, to } = useMemo(() => monthBounds(month), [month]);
 
-  // Newest first (most recent lançamentos on top). `search` (memo/FITID) +
-  // `counterparty` (name/CNPJ) OR together server-side. No `type` filter
-  // server-side — the same payload feeds both type cards and the table, so
-  // toggling a filter never refetches.
+  // Newest first. `search` (memo/FITID) + `counterparty` (name/CNPJ) OR together
+  // server-side. No type/status filter server-side — the same payload feeds the
+  // cards and the table, so toggling a card never refetches.
   const { data, isLoading, refetch } = useBankTransactions({
     page: 1,
     pageSize: PERIOD_PAGE_SIZE,
@@ -167,8 +154,8 @@ export const ReconciliationStatementPage = () => {
 
   const rows = useMemo(() => data?.data ?? [], [data]);
 
-  // Accounts present in the month — drives the selector. The statement (running
-  // balance) only makes sense per account, so we always narrow to one.
+  // Accounts present in the month — drives the selector. The statement only
+  // makes sense per account, so we always narrow to one.
   const accounts = useMemo(() => {
     const map = new Map<string, string>();
     for (const t of rows) {
@@ -185,8 +172,8 @@ export const ReconciliationStatementPage = () => {
     return accounts[0]?.key ?? "";
   }, [accountKey, accounts]);
 
-  // The full account set — drives the running balance and the absolute month
-  // totals (credits/debits/net), independent of the active type/status filter.
+  // The full account set — drives the month totals (credits/debits),
+  // independent of the active type/status filter.
   const statementRows = useMemo(
     () => rows.filter(t => accountKeyOf(t) === effectiveAccountKey),
     [rows, effectiveAccountKey],
@@ -205,18 +192,6 @@ export const ReconciliationStatementPage = () => {
     return typedRows.filter(t => allowed.has(t.reconciliationStatus));
   }, [typedRows, buckets]);
 
-  // The OFX import doesn't carry a per-row bank balance (runningBalance is
-  // null across the dataset), so the "Saldo" column only appears when the bank
-  // supplies it. A running balance is meaningless on a filtered subset, so the
-  // column also hides whenever a type/status filter is active.
-  const hasBankBalance = useMemo(
-    () => statementRows.some(t => t.runningBalance != null),
-    [statementRows],
-  );
-  const filterActive =
-    types.length !== ALL_TYPES.length || buckets.length !== ALL_BUCKETS.length;
-  const showBalance = hasBankBalance && !filterActive;
-
   const totals = useMemo(() => {
     let credits = 0;
     let debits = 0;
@@ -225,13 +200,7 @@ export const ReconciliationStatementPage = () => {
       if (t.type === "CREDIT") credits += amt;
       else debits += amt;
     }
-    const last = statementRows[statementRows.length - 1];
-    return {
-      credits,
-      debits,
-      net: credits - debits,
-      closingBalance: last?.runningBalance ?? null,
-    };
+    return { credits, debits };
   }, [statementRows]);
 
   // Status buckets summarized over the current type selection, so the counts
@@ -253,7 +222,9 @@ export const ReconciliationStatementPage = () => {
 
   const toggleType = useCallback(
     (t: TransactionType) =>
-      setTypes(prev => (prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])),
+      setTypes(prev =>
+        prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t],
+      ),
     [],
   );
   const toggleBucket = useCallback((key: BucketKey) => {
@@ -262,7 +233,32 @@ export const ReconciliationStatementPage = () => {
     );
   }, []);
 
-  // ----- row quick actions (URL-driven dialogs, same keys as transações) ----
+  // Collapse the calendar to only the days that contain a matching transaction
+  // (and auto-expand them) whenever a search/filter narrows the result set; the
+  // default browse view keeps the full month calendar (empty days collapsed).
+  const narrowing =
+    debouncedSearch.length > 0 ||
+    types.length !== ALL_TYPES.length ||
+    buckets.length !== ALL_BUCKETS.length;
+
+  const periodDates = useMemo(
+    () =>
+      buildDatesForPeriod(month.getFullYear(), [
+        String(month.getMonth() + 1).padStart(2, "0"),
+      ]),
+    [month],
+  );
+  const dates = useMemo(
+    () =>
+      effectivePeriodDates(
+        periodDates,
+        visibleRows.map(t => t.postedAt),
+        narrowing,
+      ),
+    [periodDates, visibleRows, narrowing],
+  );
+
+  // ----- row quick actions (URL-driven dialogs) ----------------------------
   const ignoreDialog = useUrlDialog("ignore");
   const categoryDialog = useUrlDialog("editCategory");
   const ignoreMut = useIgnoreTransaction();
@@ -289,119 +285,6 @@ export const ReconciliationStatementPage = () => {
     categoryDialogId && !categoryTxFromList ? categoryDialogId : undefined,
   );
   const categoryTx = categoryTxFromList ?? fetchedCategoryTx ?? null;
-
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    tx: BankTransaction;
-  } | null>(null);
-
-  const columns: StandardizedColumn<BankTransaction>[] = useMemo(
-    () => [
-      {
-        key: "postedAt",
-        header: "Data",
-        width: "110px",
-        render: t => (
-          <span className="tabular-nums text-sm whitespace-nowrap">
-            {formatDate(t.postedAt)}
-          </span>
-        ),
-      },
-      {
-        key: "description",
-        header: "Histórico / Contraparte",
-        render: t => (
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">
-              {t.counterpartyName ||
-                (t.counterpartyCnpjCpf
-                  ? formatCnpjCpf(t.counterpartyCnpjCpf)
-                  : t.memo || "—")}
-            </p>
-            {t.counterpartyName && t.memo && (
-              <p className="truncate text-xs text-muted-foreground">{t.memo}</p>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "amount",
-        header: "Valor",
-        width: "150px",
-        align: "right",
-        render: t => {
-          const isCredit = t.type === "CREDIT";
-          const amount = Math.abs(Number(t.amount) || 0);
-          return (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 font-semibold tabular-nums whitespace-nowrap text-sm",
-                isCredit ? "text-emerald-700" : "text-red-700",
-              )}
-            >
-              {isCredit ? (
-                <IconArrowDownLeft className="h-3.5 w-3.5" />
-              ) : (
-                <IconArrowUpRight className="h-3.5 w-3.5" />
-              )}
-              {isCredit ? "+" : "−"}
-              {formatCurrency(amount)}
-            </span>
-          );
-        },
-      },
-      // "Saldo" only when the bank statement carries per-line balances AND no
-      // filter is active (a running total over a filtered subset is noise).
-      ...(showBalance
-        ? [
-            {
-              key: "runningBalance",
-              header: "Saldo",
-              width: "160px",
-              align: "right" as const,
-              render: (t: BankTransaction) =>
-                t.runningBalance != null ? (
-                  <span
-                    className={cn(
-                      "tabular-nums whitespace-nowrap text-sm",
-                      Number(t.runningBalance) < 0 ? "text-red-700" : "text-foreground",
-                    )}
-                  >
-                    {formatCurrency(t.runningBalance)}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground text-xs">—</span>
-                ),
-            } as StandardizedColumn<BankTransaction>,
-          ]
-        : []),
-      {
-        key: "category",
-        header: "Categoria",
-        width: "200px",
-        render: t => <CategoryChips categories={t.categories} maxVisible={2} />,
-      },
-      {
-        key: "linked",
-        header: "NF / Boleto",
-        width: "200px",
-        render: t => <LinkedDocCell tx={t} />,
-      },
-      {
-        key: "status",
-        header: "Conciliação",
-        width: "170px",
-        render: t => (
-          <MatchStatusBadge
-            status={t.reconciliationStatus}
-            topMatchScore={t.topMatchScore}
-          />
-        ),
-      },
-    ],
-    [showBalance],
-  );
 
   return (
     <PrivilegeRoute
@@ -459,40 +342,16 @@ export const ReconciliationStatementPage = () => {
               onClick: () => setImportOpen(true),
               variant: "outline" as const,
             },
+            {
+              key: "scoring-help",
+              label: "Como funciona",
+              icon: IconHelpCircle,
+              onClick: () => setScoringHelpOpen(true),
+              variant: "outline" as const,
+            },
           ]}
           className="flex-shrink-0"
         />
-
-        {/* Compact month totals — informational (the cards below are filters). */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground flex-shrink-0">
-          <span>
-            Resultado do mês:{" "}
-            <span
-              className={cn(
-                "font-semibold tabular-nums",
-                totals.net < 0 ? "text-red-600" : "text-emerald-600",
-              )}
-            >
-              {totals.net < 0 ? "−" : "+"}
-              {formatCurrency(Math.abs(totals.net))}
-            </span>
-          </span>
-          {totals.closingBalance != null ? (
-            <span>
-              Saldo final:{" "}
-              <span className="font-semibold text-foreground tabular-nums">
-                {formatCurrency(totals.closingBalance)}
-              </span>
-            </span>
-          ) : (
-            <span>
-              Lançamentos:{" "}
-              <span className="font-semibold text-foreground tabular-nums">
-                {statementRows.length}
-              </span>
-            </span>
-          )}
-        </div>
 
         {/* Filters in one row — Entradas/Saídas (CREDIT/DEBIT type) + the 4
             status buckets. Every card is a toggle; click again to clear. */}
@@ -545,8 +404,13 @@ export const ReconciliationStatementPage = () => {
                 <Combobox
                   mode="single"
                   value={effectiveAccountKey || undefined}
-                  onValueChange={(v) => {
-                    const key = typeof v === "string" ? v : Array.isArray(v) ? v[0] : undefined;
+                  onValueChange={v => {
+                    const key =
+                      typeof v === "string"
+                        ? v
+                        : Array.isArray(v)
+                          ? v[0]
+                          : undefined;
                     if (key) setAccountKey(key);
                   }}
                   options={accounts.map(a => ({ value: a.key, label: a.label }))}
@@ -556,77 +420,33 @@ export const ReconciliationStatementPage = () => {
                   className="w-full sm:w-[300px] flex-shrink-0"
                   triggerClassName="h-10 w-full"
                 />
-                <MonthNav month={month} onChange={setMonth} className="flex-shrink-0" />
+                <MonthNav
+                  month={month}
+                  onChange={setMonth}
+                  className="flex-shrink-0"
+                />
               </div>
 
               <div className="flex-1 min-h-0 overflow-auto">
-                <StandardizedTable<BankTransaction>
-                  columns={columns}
+                <TransactionsByDateAccordion
                   data={visibleRows}
-                  getItemKey={t => t.id}
+                  dates={dates}
                   isLoading={isLoading}
-                  emptyMessage="Nenhuma transação no período/filtros selecionados — importe um OFX ou ajuste o mês"
-                  emptyIcon={IconCash}
-                  onRowClick={t =>
+                  autoExpand={narrowing}
+                  persistKey="reconciliation-statement"
+                  onIgnore={tx => ignoreDialog.set(tx.id)}
+                  onChangeCategory={tx => categoryDialog.set(tx.id)}
+                  onViewDetails={tx =>
                     navigate(
-                      routes.financial.reconciliation.transactionDetail(t.id),
+                      routes.financial.reconciliation.transactionDetail(tx.id),
                     )
                   }
-                  onContextMenu={(e, t) => {
-                    e.preventDefault();
-                    setContextMenu({ x: e.clientX, y: e.clientY, tx: t });
-                  }}
                 />
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
-
-      {contextMenu && (
-        <DropdownMenu open onOpenChange={open => !open && setContextMenu(null)}>
-          <PositionedDropdownMenuContent
-            position={contextMenu}
-            isOpen
-            className="w-60"
-            onCloseAutoFocus={e => e.preventDefault()}
-          >
-            <DropdownMenuItem
-              onClick={() => {
-                navigate(
-                  routes.financial.reconciliation.transactionDetail(
-                    contextMenu.tx.id,
-                  ),
-                );
-                setContextMenu(null);
-              }}
-            >
-              <IconListDetails className="h-4 w-4 mr-2" />
-              Conciliar / ver detalhes
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                categoryDialog.set(contextMenu.tx.id);
-                setContextMenu(null);
-              }}
-            >
-              <IconCategory className="h-4 w-4 mr-2" />
-              Alterar categoria
-            </DropdownMenuItem>
-            {contextMenu.tx.reconciliationStatus !== "IGNORED" && (
-              <DropdownMenuItem
-                onClick={() => {
-                  ignoreDialog.set(contextMenu.tx.id);
-                  setContextMenu(null);
-                }}
-              >
-                <IconBan className="h-4 w-4 mr-2" />
-                Ignorar
-              </DropdownMenuItem>
-            )}
-          </PositionedDropdownMenuContent>
-        </DropdownMenu>
-      )}
 
       <IgnoreTransactionDialog
         open={ignoreDialog.open}
@@ -661,6 +481,11 @@ export const ReconciliationStatementPage = () => {
         open={importOpen}
         onOpenChange={setImportOpen}
         onImported={() => refetch()}
+      />
+
+      <ScoringWorkflowDialog
+        open={scoringHelpOpen}
+        onOpenChange={setScoringHelpOpen}
       />
     </PrivilegeRoute>
   );

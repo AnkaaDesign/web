@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import { BoletoPaymentFields } from "./boleto-payment-fields";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
@@ -132,6 +133,7 @@ export const OrderCreateForm = () => {
       paymentMethod: null,
       paymentPix: null,
       paymentDueDays: null,
+      paymentFirstDueDate: null,
       installmentCount: 1,
     },
     mode: "onTouched", // Only validate after user touches a field
@@ -536,6 +538,7 @@ export const OrderCreateForm = () => {
       const currentPaymentMethod = form.getValues("paymentMethod");
       const currentPaymentPix = form.getValues("paymentPix");
       const currentPaymentDueDays = form.getValues("paymentDueDays");
+      const currentPaymentFirstDueDate = form.getValues("paymentFirstDueDate");
       const currentInstallmentCount = form.getValues("installmentCount");
       const currentPaymentResponsibleId = form.getValues("paymentResponsibleId");
 
@@ -552,6 +555,7 @@ export const OrderCreateForm = () => {
         paymentMethod: currentPaymentMethod || undefined,
         paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
         paymentDueDays: currentPaymentMethod === "BANK_SLIP" ? currentPaymentDueDays || undefined : undefined,
+        paymentFirstDueDate: currentPaymentMethod === "BANK_SLIP" ? currentPaymentFirstDueDate || undefined : undefined,
         installmentCount: currentPaymentMethod === "BANK_SLIP" ? currentInstallmentCount || 1 : 1,
         paymentResponsibleId: currentPaymentResponsibleId || undefined,
       };
@@ -1217,7 +1221,8 @@ export const OrderCreateForm = () => {
                         </CardContent>
                       </Card>
 
-                      {/* Payment Method Card */}
+                      {/* Payment Method Card — hidden from WAREHOUSE (financial-only). */}
+                      {canViewPrices && (
                       <Card className="h-full">
                         <CardHeader className="pb-4">
                           <CardTitle className="flex items-center gap-2">
@@ -1280,6 +1285,7 @@ export const OrderCreateForm = () => {
                                   }
                                   if (stringValue !== "BANK_SLIP") {
                                     form.setValue("paymentDueDays", null);
+                                    form.setValue("paymentFirstDueDate", null);
                                     form.setValue("installmentCount", 1);
                                   }
                                 }}
@@ -1327,53 +1333,10 @@ export const OrderCreateForm = () => {
                             </div>
                           )}
 
-                          {/* Due Days - Show only when BANK_SLIP is selected */}
+                          {/* Boleto scheduling — parcelas, primeiro vencimento (presets ou data),
+                              and the interval between parcelas. */}
                           {form.watch("paymentMethod") === "BANK_SLIP" && (
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
-                              <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Prazo de Vencimento</span>
-                              <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
-                                <Combobox
-                                  value={form.watch("paymentDueDays")?.toString() || ""}
-                                  onValueChange={(value) => {
-                                    const stringValue = Array.isArray(value) ? value[0] : value;
-                                    form.setValue("paymentDueDays", stringValue ? parseInt(stringValue) : null);
-                                  }}
-                                  options={[
-                                    { value: "30", label: "30 dias" },
-                                    { value: "60", label: "60 dias" },
-                                    { value: "90", label: "90 dias" },
-                                    { value: "120", label: "120 dias" },
-                                  ]}
-                                  placeholder="Selecione o prazo"
-                                  emptyText="Nenhum prazo"
-                                  className="h-8 w-full"
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Parcelas (boleto 2x/3x) — generates one installment per parcela,
-                              each spaced by the "Prazo de Vencimento" above. */}
-                          {form.watch("paymentMethod") === "BANK_SLIP" && (
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
-                              <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Parcelas</span>
-                              <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
-                                <Combobox
-                                  value={(form.watch("installmentCount") || 1).toString()}
-                                  onValueChange={(value) => {
-                                    const stringValue = Array.isArray(value) ? value[0] : value;
-                                    form.setValue("installmentCount", stringValue ? parseInt(stringValue) : 1);
-                                  }}
-                                  options={Array.from({ length: 12 }, (_, i) => ({
-                                    value: (i + 1).toString(),
-                                    label: i === 0 ? "À vista (1x)" : `${i + 1}x`,
-                                  }))}
-                                  placeholder="Selecione as parcelas"
-                                  emptyText="—"
-                                  className="h-8 w-full"
-                                />
-                              </div>
-                            </div>
+                            <BoletoPaymentFields form={form} />
                           )}
 
                           {/* Freight (frete) — supplier shipping cost added to the order total. */}
@@ -1425,6 +1388,7 @@ export const OrderCreateForm = () => {
                           )}
                         </CardContent>
                       </Card>
+                      )}
                     </div>
 
                     {/* Items Table */}

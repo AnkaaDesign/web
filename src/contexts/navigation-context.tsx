@@ -8,9 +8,9 @@ import { useAuth } from "@/contexts/auth-context";
 /**
  * Navigation context — remembers WHICH menu entry the user clicked.
  *
- * Several pages live under more than one menu section (e.g. /administracao/colaboradores
+ * Several pages live under more than one menu section (e.g. /departamento-pessoal/colaboradores
  * exists under "Administração" for ADMIN and under "Departamento Pessoal" for the same
- * ADMIN; /recursos-humanos/bonus is both RH > Bônus and DP > Salários e Cargos >
+ * ADMIN; /departamento-pessoal/bonus is both RH > Bônus and DP > Salários e Cargos >
  * Gratificações). Pure URL matching therefore cannot tell which section should be
  * highlighted/expanded — it used to pick a section the user never clicked, "opening
  * different menus when clicking into other pages".

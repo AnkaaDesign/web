@@ -1,4 +1,4 @@
-// /estatisticas/recursos-humanos/competencias
+// /estatisticas/departamento-pessoal/competencias
 //
 // Cross-campaign Skill-Assessment statistics. Mirrors the structural pattern
 // of /estatisticas/producao/produtividade (the productivity page) — the user

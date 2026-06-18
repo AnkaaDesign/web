@@ -496,17 +496,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
     path: "/administracao",
     requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
     children: [
-      {
-        id: "colaboradores",
-        title: "Colaboradores",
-        icon: "user",
-        path: "/administracao/colaboradores",
-        children: [
-          { id: "colaboradores-cadastrar", title: "Cadastrar", icon: "plus", path: "/administracao/colaboradores/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
-          { id: "colaboradores-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/colaboradores/detalhes/:id", isDynamic: true },
-          { id: "colaboradores-editar", title: "Editar", icon: "edit", path: "/administracao/colaboradores/editar/:id", isDynamic: true },
-        ],
-      },
+      // Colaboradores (employee directory) lives under the Departamento Pessoal
+      // section now (dp-colaboradores) — removed from Administração to avoid the
+      // duplicate entry. ADMIN/HR still reach it via Departamento Pessoal.
       {
         id: "mensagens-admin",
         title: "Mensagens",
@@ -725,14 +717,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
           },
           {
-            // FINANCIAL/ADMIN-only: ACCOUNTING uses the spec's four pages above.
-            id: "conciliacao-transacoes",
-            title: "Transações",
-            icon: "list",
-            path: "/financeiro/conciliacao/transacoes",
-            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL],
-          },
-          {
             // Reconciliation fiscal-documents list. Now the single home for
             // "Notas Fiscais" (the top-level ACCOUNTING duplicate was removed), so
             // ACCOUNTING is included here alongside ADMIN/FINANCIAL.
@@ -819,12 +803,12 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "stats-recursos-humanos",
         title: "Recursos Humanos",
         icon: "users",
-        path: "/estatisticas/recursos-humanos",
+        path: "/estatisticas/departamento-pessoal",
         children: [
-          { id: "stats-rh-folha", title: "Folha de Pagamento", icon: "chartBar", path: "/estatisticas/recursos-humanos/folha" },
-          { id: "stats-rh-equipe", title: "Equipe", icon: "users", path: "/estatisticas/recursos-humanos/equipe" },
-          { id: "stats-rh-faltas", title: "Faltas", icon: "calendarOff", path: "/estatisticas/recursos-humanos/faltas" },
-          { id: "stats-rh-competencias", title: "Competências", icon: "clipboardList", path: "/estatisticas/recursos-humanos/competencias" },
+          { id: "stats-rh-folha", title: "Folha de Pagamento", icon: "chartBar", path: "/estatisticas/departamento-pessoal/folha" },
+          { id: "stats-rh-equipe", title: "Equipe", icon: "users", path: "/estatisticas/departamento-pessoal/equipe" },
+          { id: "stats-rh-faltas", title: "Faltas", icon: "calendarOff", path: "/estatisticas/departamento-pessoal/faltas" },
+          { id: "stats-rh-competencias", title: "Competências", icon: "clipboardList", path: "/estatisticas/departamento-pessoal/competencias" },
         ],
       },
     ],
@@ -1219,9 +1203,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
   },
   {
     id: "colaboradores-group-production-manager",
-    title: "Colaboradores",
+    title: "Departamento Pessoal",
     icon: "users",
-    path: "/administracao/colaboradores",
+    path: "/departamento-pessoal/colaboradores",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
     children: [
       {
@@ -1254,7 +1238,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "colaboradores-production-manager",
         title: "Colaboradores",
         icon: "user",
-        path: "/administracao/colaboradores",
+        path: "/departamento-pessoal/colaboradores",
       },
       {
         // Production manager gets the view-only tabs (Colaborador, Dia, Ausências).
@@ -1262,30 +1246,69 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "controle-de-ponto-production-manager",
         title: "Controle de Ponto",
         icon: "fingerprint",
-        path: "/recursos-humanos/controle-ponto",
+        path: "/departamento-pessoal/controle-ponto",
         requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
         children: [
           {
             id: "controle-ponto-colaborador-production-manager",
             title: "Visualização Colaborador",
             icon: "user",
-            path: "/recursos-humanos/controle-ponto/colaborador",
+            path: "/departamento-pessoal/controle-ponto/colaborador",
             requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
           },
           {
             id: "controle-ponto-dia-production-manager",
             title: "Visualização Dia",
             icon: "calendar",
-            path: "/recursos-humanos/controle-ponto/dia",
+            path: "/departamento-pessoal/controle-ponto/dia",
             requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
           },
           {
             id: "controle-ponto-ausencias-production-manager",
             title: "Ausências",
             icon: "list",
-            path: "/recursos-humanos/controle-ponto/ausencias",
+            path: "/departamento-pessoal/controle-ponto/ausencias",
             requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
           },
+        ],
+      },
+      {
+        // Production Manager also manages the lifecycle of its team: admissions,
+        // terminations and vacations. These reuse the Departamento Pessoal pages
+        // (route + page guards grant PRODUCTION_MANAGER access). Delete stays ADMIN-only.
+        id: "dp-admissoes-production-manager",
+        title: "Admissões",
+        icon: "userCheck",
+        path: "/departamento-pessoal/admissoes",
+        requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+        children: [
+          { id: "dp-admissoes-cadastrar-pm", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/admissoes/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
+          { id: "dp-admissoes-detalhes-pm", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/admissoes/detalhes/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
+          { id: "dp-admissoes-editar-pm", title: "Editar", icon: "edit", path: "/departamento-pessoal/admissoes/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
+        ],
+      },
+      {
+        id: "dp-rescisoes-production-manager",
+        title: "Rescisões",
+        icon: "logOut",
+        path: "/departamento-pessoal/rescisoes",
+        requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+        children: [
+          { id: "dp-rescisoes-cadastrar-pm", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/rescisoes/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
+          { id: "dp-rescisoes-detalhes-pm", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/rescisoes/detalhes/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
+          { id: "dp-rescisoes-editar-pm", title: "Editar", icon: "edit", path: "/departamento-pessoal/rescisoes/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
+        ],
+      },
+      {
+        id: "dp-ferias-production-manager",
+        title: "Férias",
+        icon: "vacation",
+        path: "/departamento-pessoal/ferias",
+        requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+        children: [
+          { id: "dp-ferias-cadastrar-pm", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/ferias/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
+          { id: "dp-ferias-detalhes-pm", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/ferias/detalhes/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
+          { id: "dp-ferias-editar-pm", title: "Editar", icon: "edit", path: "/departamento-pessoal/ferias/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
         ],
       },
     ],
@@ -1294,14 +1317,14 @@ export const NAVIGATION_MENU: MenuItem[] = [
     id: "estatisticas-production-manager",
     title: "Estatísticas",
     icon: "barChart",
-    path: "/estatisticas/recursos-humanos/equipe",
+    path: "/estatisticas/departamento-pessoal/equipe",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
     children: [
       {
         id: "stats-equipe-production-manager",
         title: "Equipe",
         icon: "users",
-        path: "/estatisticas/recursos-humanos/equipe",
+        path: "/estatisticas/departamento-pessoal/equipe",
       },
       {
         id: "stats-performance-production-manager",
@@ -1313,7 +1336,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "stats-competencias-production-manager",
         title: "Competências",
         icon: "clipboardList",
-        path: "/estatisticas/recursos-humanos/competencias",
+        path: "/estatisticas/departamento-pessoal/competencias",
       },
     ],
   },
@@ -1339,12 +1362,12 @@ export const NAVIGATION_MENU: MenuItem[] = [
     path: "/ferramentas",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
     children: [
-      { id: "ferramentas-qr-code-pm", title: "Gerador de QR Code", icon: "qrcode", path: "/ferramentas/qr-code" },
-      { id: "ferramentas-paleta-pm", title: "Paleta de Cores", icon: "palette", path: "/ferramentas/paleta" },
+      // QR Code, Paleta de Cores and Certificado de Resíduos are intentionally
+      // omitted for PRODUCTION_MANAGER (not part of its toolset).
       { id: "ferramentas-calculadora-de-horas-pm", title: "Calculadora de Horas", icon: "clock", path: "/ferramentas/calculadora-de-horas" },
       { id: "ferramentas-custo-horas-extras-pm", title: "Custo de Horas Extras", icon: "calendarDollar", path: "/ferramentas/custo-horas-extras" },
       { id: "ferramentas-calculadora-de-mistura-pm", title: "Calculadora de Mistura", icon: "flask", path: "/ferramentas/calculadora-de-mistura" },
-      { id: "ferramentas-certificado-residuos-pm", title: "Certificado de Resíduos", icon: "recycle", path: "/ferramentas/certificado-residuos" },
+      { id: "ferramentas-calendario-pm", title: "Calendário", icon: "calendarStats", path: "/departamento-pessoal/calendario" },
       { id: "ferramentas-post-its-pm", title: "Post-its", icon: "note", path: "/ferramentas/post-its" },
     ],
   },
@@ -1593,6 +1616,10 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [{ id: "minhas-advertencias-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/minhas-advertencias/detalhes/:id", isDynamic: true }],
       },
       { id: "minhas-mensagens", title: "Minhas Mensagens", icon: "message", path: "/pessoal/mensagens" },
+      // Post-its for PRODUCTION lives here inside "Pessoal" (not floating at the root via
+      // post-its-flat). WAREHOUSE already gets Post-its through the Ferramentas section, so
+      // gate this to PRODUCTION only to avoid a duplicate entry for warehouse users.
+      { id: "meus-post-its", title: "Post-its", icon: "note", path: "/ferramentas/post-its", requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION },
       {
         id: "minhas-movimentacoes",
         title: "Minhas Movimentações",
@@ -1730,190 +1757,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     ],
   },
 
-  // RECURSOS HUMANOS
-  // NOTE: ACCOUNTING must NOT see this section — everything accounting needs lives in
-  // the Departamento Pessoal / Medicina do Trabalho sections below.
-  {
-    id: "recursos-humanos",
-    title: "Recursos Humanos",
-    icon: "users",
-    path: "/recursos-humanos",
-    requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES],
-    children: [
-      {
-        id: "warnings",
-        title: "Advertências",
-        icon: "alertTriangle",
-        path: "/recursos-humanos/avisos",
-        children: [
-          { id: "warnings-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/avisos/cadastrar" },
-          { id: "warnings-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/avisos/detalhes/:id", isDynamic: true },
-          { id: "warnings-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/avisos/editar/:id", isDynamic: true },
-        ],
-      },
-      {
-        id: "bonus",
-        title: "Bônus",
-        icon: "coins",
-        path: "/recursos-humanos/bonus",
-        children: [
-          { id: "simulacao-bonus", title: "Simulação de Bônus", icon: "calculator", path: "/recursos-humanos/bonus/simulacao-de-bonus" },
-          { id: "nivel-de-performance", title: "Nível de Performance", icon: "trendingUp", path: "/recursos-humanos/bonus/nivel-de-performance" },
-        ],
-      },
-      {
-        id: "cargos",
-        title: "Cargos",
-        icon: "briefcase",
-        path: "/recursos-humanos/cargos",
-        children: [
-          { id: "cargos-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/cargos/cadastrar", requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN] },
-          { id: "cargos-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/cargos/detalhes/:id", isDynamic: true },
-          { id: "cargos-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/cargos/editar/:id", isDynamic: true },
-        ],
-      },
-      {
-        id: "controle-ponto",
-        title: "Controle de Ponto",
-        icon: "fingerprint",
-        path: "/recursos-humanos/controle-ponto",
-        children: [
-          {
-            id: "controle-ponto-colaborador",
-            title: "Visualização Colaborador",
-            icon: "user",
-            path: "/recursos-humanos/controle-ponto/colaborador",
-          },
-          {
-            id: "controle-ponto-dia",
-            title: "Visualização Dia",
-            icon: "calendar",
-            path: "/recursos-humanos/controle-ponto/dia",
-          },
-          {
-            id: "controle-ponto-edicao",
-            title: "Edição",
-            icon: "edit",
-            path: "/recursos-humanos/controle-ponto/edicao",
-            requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-          },
-          {
-            id: "controle-ponto-ausencias",
-            title: "Ausências",
-            icon: "list",
-            path: "/recursos-humanos/controle-ponto/ausencias",
-            requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING],
-          },
-          {
-            id: "controle-ponto-fechamento",
-            title: "Fechamento",
-            icon: "signature",
-            path: "/recursos-humanos/controle-ponto/fechamento",
-            requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-          },
-          {
-            id: "controle-ponto-requisicoes",
-            title: "Requisições",
-            icon: "clipboardList",
-            path: "/recursos-humanos/requisicoes",
-            requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING],
-          },
-        ],
-      },
-      {
-        // Secullum integration — admin tool for mapping sectors↔departamentos
-        // and positions↔funções, plus an overview of active/dismissed funcionários.
-        id: "integracoes-secullum",
-        title: "Integração Secullum",
-        icon: "users",
-        path: "/recursos-humanos/integracoes/secullum",
-        requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-      },
-      {
-        id: "epi-rh",
-        title: "EPI",
-        icon: "helmet",
-        path: "/recursos-humanos/epi",
-        children: [
-          {
-            id: "epi-rh-agendamentos",
-            title: "Agendamentos",
-            icon: "schedule",
-            path: "/recursos-humanos/epi/agendamentos",
-            children: [
-              { id: "epi-rh-agendamentos-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/epi/agendamentos/cadastrar" },
-              { id: "epi-rh-agendamentos-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/epi/agendamentos/detalhes/:id", isDynamic: true },
-              { id: "epi-rh-agendamentos-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/epi/agendamentos/editar/:id", isDynamic: true },
-            ],
-          },
-          { id: "epi-rh-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/epi/cadastrar" },
-          { id: "epi-rh-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/epi/detalhes/:id", isDynamic: true },
-          { id: "epi-rh-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/epi/editar/:id", isDynamic: true },
-          { id: "epi-rh-tamanhos", title: "Tamanhos", icon: "sizes", path: "/recursos-humanos/epi/tamanhos" },
-          {
-            id: "epi-rh-entregas",
-            title: "Entregas",
-            icon: "truck",
-            path: "/recursos-humanos/epi/entregas",
-            children: [
-              { id: "epi-rh-entregas-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/epi/entregas/cadastrar" },
-              { id: "epi-rh-entregas-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/epi/entregas/detalhes/:id", isDynamic: true },
-              { id: "epi-rh-entregas-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/epi/entregas/editar/:id", isDynamic: true },
-            ],
-          },
-        ],
-      },
-      {
-        id: "feriados",
-        title: "Feriados",
-        icon: "holiday",
-        path: "/recursos-humanos/feriados",
-        children: [
-          { id: "feriados-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/feriados/cadastrar" },
-          // No "Editar" entry: /recursos-humanos/feriados/editar/:id has no route/page (holidays are Secullum-synced; edit page was removed).
-        ],
-      },
-      {
-        id: "ferias",
-        title: "Férias",
-        icon: "vacation",
-        // Férias lives under Departamento Pessoal; RH surfaces it too (child of
-        // both menus) by pointing at the canonical DP pages.
-        path: "/departamento-pessoal/ferias",
-        requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-        children: [
-          { id: "ferias-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/ferias/cadastrar" },
-          { id: "ferias-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/ferias/editar/:id", isDynamic: true },
-          { id: "ferias-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/ferias/detalhes/:id", isDynamic: true },
-        ],
-      },
-      {
-        id: "rh-calendario",
-        title: "Calendário",
-        icon: "calendarStats",
-        path: "/recursos-humanos/calendario",
-        requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-      },
-      {
-        id: "horarios",
-        title: "Horários",
-        icon: "clock",
-        path: "/recursos-humanos/horarios",
-        children: [
-          { id: "horarios-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/horarios/detalhes/:id", isDynamic: true },
-        ],
-      },
-      {
-        id: "folha-de-pagamento",
-        title: "Folha de Pagamento",
-        icon: "payroll",
-        path: "/recursos-humanos/folha-de-pagamento",
-        requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-      },
-      { id: "minhas-mensagens-rh", title: "Minhas Mensagens", icon: "message", path: "/pessoal/mensagens", requiredPrivilege: SECTOR_PRIVILEGES.HUMAN_RESOURCES },
-    ],
-  },
-
   // DEPARTAMENTO PESSOAL (Contabilidade / RH / Admin)
   // Section path points to the first real page (no /departamento-pessoal root page exists),
   // same precedent as the PRODUCTION_MANAGER grouped sections.
@@ -1921,33 +1764,34 @@ export const NAVIGATION_MENU: MenuItem[] = [
     id: "departamento-pessoal",
     title: "Departamento Pessoal",
     icon: "team",
-    path: "/administracao/colaboradores",
-    // ACCOUNTING-only: this is a new accounting-sector section. HR/ADMIN keep their
-    // original "Recursos Humanos" menu and must NOT see this duplicate. (Page-level
-    // route privileges remain open to HR/ADMIN — only the menu entry is accounting-only.)
-    requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
+    path: "/departamento-pessoal/colaboradores",
+    // Single consolidated personnel area. The legacy "Recursos Humanos" section was
+    // retired and merged here, so this is now the one home shared by HR, ACCOUNTING
+    // and ADMIN. (Production Manager reaches a curated subset via its own grouped menu.)
+    requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN],
     children: [
       {
         id: "dp-colaboradores",
         title: "Colaboradores",
         icon: "user",
-        path: "/administracao/colaboradores",
+        path: "/departamento-pessoal/colaboradores",
         requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
         children: [
-          { id: "dp-colaboradores-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/colaboradores/detalhes/:id", isDynamic: true },
-          { id: "dp-colaboradores-editar", title: "Editar", icon: "edit", path: "/administracao/colaboradores/editar/:id", isDynamic: true },
+          { id: "dp-colaboradores-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/colaboradores/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+          { id: "dp-colaboradores-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/colaboradores/detalhes/:id", isDynamic: true },
+          { id: "dp-colaboradores-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/colaboradores/editar/:id", isDynamic: true },
         ],
       },
       {
         id: "dp-advertencias",
         title: "Advertências",
         icon: "alertTriangle",
-        path: "/recursos-humanos/avisos",
+        path: "/departamento-pessoal/avisos",
         requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
         children: [
-          { id: "dp-advertencias-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/avisos/cadastrar" },
-          { id: "dp-advertencias-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/avisos/detalhes/:id", isDynamic: true },
-          { id: "dp-advertencias-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/avisos/editar/:id", isDynamic: true },
+          { id: "dp-advertencias-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/avisos/cadastrar" },
+          { id: "dp-advertencias-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/avisos/detalhes/:id", isDynamic: true },
+          { id: "dp-advertencias-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/avisos/editar/:id", isDynamic: true },
         ],
       },
       {
@@ -1957,15 +1801,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "dp-controle-ponto",
         title: "Controle de Ponto",
         icon: "fingerprint",
-        path: "/recursos-humanos/controle-ponto",
+        path: "/departamento-pessoal/controle-ponto",
         requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
         children: [
-          { id: "dp-controle-ponto-colaborador", title: "Visualização Colaborador", icon: "user", path: "/recursos-humanos/controle-ponto/colaborador" },
-          { id: "dp-controle-ponto-dia", title: "Visualização Dia", icon: "calendar", path: "/recursos-humanos/controle-ponto/dia" },
-          { id: "dp-controle-ponto-edicao", title: "Edição", icon: "edit", path: "/recursos-humanos/controle-ponto/edicao", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
-          { id: "dp-controle-ponto-ausencias", title: "Ausências", icon: "list", path: "/recursos-humanos/controle-ponto/ausencias", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
-          { id: "dp-controle-ponto-fechamento", title: "Fechamento", icon: "signature", path: "/recursos-humanos/controle-ponto/fechamento", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
-          { id: "dp-controle-ponto-requisicoes", title: "Requisições", icon: "clipboardList", path: "/recursos-humanos/requisicoes", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "dp-controle-ponto-colaborador", title: "Visualização Colaborador", icon: "user", path: "/departamento-pessoal/controle-ponto/colaborador" },
+          { id: "dp-controle-ponto-dia", title: "Visualização Dia", icon: "calendar", path: "/departamento-pessoal/controle-ponto/dia" },
+          { id: "dp-controle-ponto-edicao", title: "Edição", icon: "edit", path: "/departamento-pessoal/controle-ponto/edicao", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "dp-controle-ponto-ausencias", title: "Ausências", icon: "list", path: "/departamento-pessoal/controle-ponto/ausencias", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "dp-controle-ponto-fechamento", title: "Fechamento", icon: "signature", path: "/departamento-pessoal/controle-ponto/fechamento", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "dp-controle-ponto-requisicoes", title: "Requisições", icon: "clipboardList", path: "/departamento-pessoal/controle-ponto/requisicoes", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
         ],
       },
       {
@@ -1978,21 +1822,22 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "dp-ferias-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/ferias/cadastrar" },
           { id: "dp-ferias-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/ferias/detalhes/:id", isDynamic: true },
           { id: "dp-ferias-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/ferias/editar/:id", isDynamic: true },
-          { id: "dp-ferias-coletiva-detalhes", title: "Férias Coletivas", icon: "eye", path: "/departamento-pessoal/ferias/coletiva/detalhes/:id", isDynamic: true },
         ],
       },
       // 13º Salário no longer has a dedicated DP menu/page. It is handled
       // per-collaborator (generate/edit/pay) from the colaborador detail page.
       // The Thirteenth model, engine, and Contas a Pagar forecast are untouched.
-      // NOTE (spec alignment 2026-06-11): "Feriados" and "Calendário" are NOT DP items.
-      // Calendário moved under Ferramentas for ACCOUNTING (HR/ADMIN keep the
-      // Recursos Humanos placement); Feriados stays HR/ADMIN-only in Recursos Humanos.
+      // NOTE: "Calendário" lives under Ferramentas (shared by HR/ACCOUNTING/ADMIN/PM);
+      // "Feriados" and "EPI" are DP items below, scoped to HR/ADMIN (ACCOUNTING gets
+      // EPI via the Medicina do Trabalho section instead).
       {
+        // Secullum mapping/diagnostics — ADMIN-only (it edits the live integration
+        // mapping and exposes the smoke-test diagnostics grid).
         id: "dp-integracao-secullum",
         title: "Integração Secullum",
         icon: "users",
-        path: "/recursos-humanos/integracoes/secullum",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+        path: "/departamento-pessoal/integracoes/secullum",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
       },
       {
         id: "dp-admissoes",
@@ -2022,14 +1867,63 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "dp-emprestimos",
         title: "Empréstimos",
         icon: "payroll",
-        path: "/recursos-humanos/emprestimos",
+        path: "/departamento-pessoal/emprestimos",
         requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+      },
+      {
+        // EPI catalog — HR/ADMIN only here. ACCOUNTING manages PPE delivery through the
+        // Medicina do Trabalho section ("Entrega de EPIs"), so it is not duplicated here.
+        id: "dp-epi",
+        title: "EPI",
+        icon: "helmet",
+        path: "/departamento-pessoal/epi",
+        requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          {
+            id: "dp-epi-agendamentos",
+            title: "Agendamentos",
+            icon: "schedule",
+            path: "/departamento-pessoal/epi/agendamentos",
+            children: [
+              { id: "dp-epi-agendamentos-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/epi/agendamentos/cadastrar" },
+              { id: "dp-epi-agendamentos-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/epi/agendamentos/detalhes/:id", isDynamic: true },
+              { id: "dp-epi-agendamentos-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/epi/agendamentos/editar/:id", isDynamic: true },
+            ],
+          },
+          { id: "dp-epi-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/epi/cadastrar" },
+          { id: "dp-epi-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/epi/detalhes/:id", isDynamic: true },
+          { id: "dp-epi-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/epi/editar/:id", isDynamic: true },
+          { id: "dp-epi-tamanhos", title: "Tamanhos", icon: "sizes", path: "/departamento-pessoal/epi/tamanhos" },
+          {
+            id: "dp-epi-entregas",
+            title: "Entregas",
+            icon: "truck",
+            path: "/departamento-pessoal/epi/entregas",
+            children: [
+              { id: "dp-epi-entregas-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/epi/entregas/cadastrar" },
+              { id: "dp-epi-entregas-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/epi/entregas/detalhes/:id", isDynamic: true },
+              { id: "dp-epi-entregas-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/epi/entregas/editar/:id", isDynamic: true },
+            ],
+          },
+        ],
+      },
+      {
+        // Feriados — Secullum-synced holiday list. HR/ADMIN only (matches the prior
+        // Recursos Humanos placement; ACCOUNTING was intentionally excluded).
+        id: "dp-feriados",
+        title: "Feriados",
+        icon: "holiday",
+        path: "/departamento-pessoal/feriados",
+        requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          { id: "dp-feriados-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/feriados/cadastrar" },
+        ],
       },
       {
         id: "dp-salarios-e-cargos",
         title: "Salários e Cargos",
         icon: "salary",
-        path: "/recursos-humanos/cargos",
+        path: "/departamento-pessoal/cargos",
         requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
         children: [
           {
@@ -2053,36 +1947,36 @@ export const NAVIGATION_MENU: MenuItem[] = [
             id: "dp-cargos",
             title: "Cargos",
             icon: "briefcase",
-            path: "/recursos-humanos/cargos",
+            path: "/departamento-pessoal/cargos",
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
             children: [
-              { id: "dp-cargos-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/cargos/detalhes/:id", isDynamic: true },
-              { id: "dp-cargos-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/cargos/editar/:id", isDynamic: true },
+              { id: "dp-cargos-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/cargos/detalhes/:id", isDynamic: true },
+              { id: "dp-cargos-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/cargos/editar/:id", isDynamic: true },
             ],
           },
           {
             id: "dp-horarios",
             title: "Horários",
             icon: "clock",
-            path: "/recursos-humanos/horarios",
+            path: "/departamento-pessoal/horarios",
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
           },
           {
             id: "dp-gratificacoes",
             title: "Gratificações",
             icon: "coins",
-            path: "/recursos-humanos/bonus",
+            path: "/departamento-pessoal/bonus",
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
             children: [
-              { id: "dp-gratificacoes-simulacao", title: "Simulação de Bônus", icon: "calculator", path: "/recursos-humanos/bonus/simulacao-de-bonus" },
-              { id: "dp-gratificacoes-nivel-performance", title: "Nível de Performance", icon: "trendingUp", path: "/recursos-humanos/bonus/nivel-de-performance" },
+              { id: "dp-gratificacoes-simulacao", title: "Simulação de Bônus", icon: "calculator", path: "/departamento-pessoal/bonus/simulacao-de-bonus" },
+              { id: "dp-gratificacoes-nivel-performance", title: "Nível de Performance", icon: "trendingUp", path: "/departamento-pessoal/bonus/nivel-de-performance" },
             ],
           },
           {
             id: "dp-folha-de-pagamento",
             title: "Folha de Pagamento",
             icon: "payroll",
-            path: "/recursos-humanos/folha-de-pagamento",
+            path: "/departamento-pessoal/folha-de-pagamento",
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
           },
         ],
@@ -2131,7 +2025,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
     id: "medicina-do-trabalho",
     title: "Medicina do Trabalho",
     icon: "safety",
-    path: "/recursos-humanos/epi/entregas",
+    path: "/departamento-pessoal/epi/entregas",
     // ACCOUNTING-only: new accounting-sector section. HR/ADMIN keep their original
     // "Recursos Humanos" menu and must NOT see this. (Route privileges unchanged.)
     requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
@@ -2140,7 +2034,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "mt-epi-entregas",
         title: "Entrega de EPIs",
         icon: "truck",
-        path: "/recursos-humanos/epi/entregas",
+        path: "/departamento-pessoal/epi/entregas",
         requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
         children: [
           // Spec (Área Andressa §3): Agendamentos and Tamanhos are CHILDREN of
@@ -2149,24 +2043,24 @@ export const NAVIGATION_MENU: MenuItem[] = [
             id: "mt-epi-agendamentos",
             title: "Agendamentos",
             icon: "schedule",
-            path: "/recursos-humanos/epi/agendamentos",
+            path: "/departamento-pessoal/epi/agendamentos",
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
             children: [
-              { id: "mt-epi-agendamentos-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/epi/agendamentos/cadastrar" },
-              { id: "mt-epi-agendamentos-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/epi/agendamentos/detalhes/:id", isDynamic: true },
-              { id: "mt-epi-agendamentos-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/epi/agendamentos/editar/:id", isDynamic: true },
+              { id: "mt-epi-agendamentos-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/epi/agendamentos/cadastrar" },
+              { id: "mt-epi-agendamentos-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/epi/agendamentos/detalhes/:id", isDynamic: true },
+              { id: "mt-epi-agendamentos-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/epi/agendamentos/editar/:id", isDynamic: true },
             ],
           },
           {
             id: "mt-epi-tamanhos",
             title: "Tamanhos",
             icon: "sizes",
-            path: "/recursos-humanos/epi/tamanhos",
+            path: "/departamento-pessoal/epi/tamanhos",
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
           },
-          { id: "mt-epi-entregas-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/epi/entregas/cadastrar" },
-          { id: "mt-epi-entregas-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/epi/entregas/detalhes/:id", isDynamic: true },
-          { id: "mt-epi-entregas-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/epi/entregas/editar/:id", isDynamic: true },
+          { id: "mt-epi-entregas-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/epi/entregas/cadastrar" },
+          { id: "mt-epi-entregas-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/epi/entregas/detalhes/:id", isDynamic: true },
+          { id: "mt-epi-entregas-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/epi/entregas/editar/:id", isDynamic: true },
         ],
       },
       {
@@ -2248,13 +2142,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
         requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.EXTERNAL],
       },
       {
-        // ACCOUNTING-only placement (Área Andressa §5 puts Calendário under
-        // Ferramentas). HR/ADMIN keep the same page under Recursos Humanos.
-        id: "ferramentas-calendario-accounting",
+        // Calendário now lives under Ferramentas for the whole personnel audience
+        // (the old Recursos Humanos placement was retired). PRODUCTION_MANAGER gets
+        // it via its own Ferramentas group below. Explicit gate so the other
+        // Ferramentas-section roles (WAREHOUSE/EXTERNAL) do NOT see it.
+        id: "ferramentas-calendario",
         title: "Calendário",
         icon: "calendarStats",
-        path: "/recursos-humanos/calendario",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
+        path: "/departamento-pessoal/calendario",
+        requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN],
       },
       {
         id: "ferramentas-calculadora-de-horas",
@@ -2304,12 +2200,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
 
   // POST-ITS - root-level entry for flat-navigation roles that don't see the
   // hierarchical "Ferramentas" section (their navs are flat per-role item lists).
+  // PRODUCTION/TEAM_LEADER are intentionally NOT here: PRODUCTION (and production team
+  // leaders, who are PRODUCTION-sector users) reach Post-its through the "Pessoal" group
+  // (see "meus-post-its" above), so they don't get a floating root-level entry.
   {
     id: "post-its-flat",
     title: "Post-its",
     icon: "note",
     path: "/ferramentas/post-its",
-    requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.PRODUCTION, TEAM_LEADER],
+    requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL],
   },
 
   // SERVIDOR

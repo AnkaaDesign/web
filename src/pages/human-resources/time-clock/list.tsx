@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { hasAnyPrivilege } from "@/utils/user";
 import { SECTOR_PRIVILEGES } from "../../../constants";
 
-// /recursos-humanos/controle-ponto is just an entry point — the views are real
+// /departamento-pessoal/controle-ponto is just an entry point — the views are real
 // subpages, each with its own sidebar submenu. Redirect to the last subpage the
 // user visited (falls back to Colaborador, which is open to everyone).
 export default function TimeClockListPage() {

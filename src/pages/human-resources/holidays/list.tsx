@@ -19,7 +19,7 @@ export const HolidayListPage = () => {
           title="Feriados"
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
+            { label: "Departamento Pessoal", href: routes.administration.collaborators.root },
             { label: "Feriados" },
           ]}
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_LISTAR}
@@ -28,7 +28,7 @@ export const HolidayListPage = () => {
               key: "create",
               label: "Cadastrar",
               icon: IconPlus,
-              onClick: () => navigate("/recursos-humanos/feriados/cadastrar"),
+              onClick: () => navigate("/departamento-pessoal/feriados/cadastrar"),
               variant: "default",
             },
           ]}

@@ -4,11 +4,11 @@ export const routes = {
   // Administration - Administração - Administration
   administration: {
     collaborators: {
-      batchEdit: "/administracao/colaboradores/editar-em-lote",
-      create: "/administracao/colaboradores/cadastrar",
-      details: (id: string) => `/administracao/colaboradores/detalhes/${id}`,
-      edit: (id: string) => `/administracao/colaboradores/editar/${id}`,
-      root: "/administracao/colaboradores",
+      batchEdit: "/departamento-pessoal/colaboradores/editar-em-lote",
+      create: "/departamento-pessoal/colaboradores/cadastrar",
+      details: (id: string) => `/departamento-pessoal/colaboradores/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/colaboradores/editar/${id}`,
+      root: "/departamento-pessoal/colaboradores",
     },
     notifications: {
       create: "/administracao/notificacoes/cadastrar/enviar",
@@ -41,11 +41,11 @@ export const routes = {
       root: "/administracao/metas",
     },
     users: {
-      batchEdit: "/administracao/colaboradores/editar-em-lote",
-      create: "/administracao/colaboradores/cadastrar",
-      details: (id: string) => `/administracao/colaboradores/detalhes/${id}`,
-      edit: (id: string) => `/administracao/colaboradores/editar/${id}`,
-      root: "/administracao/colaboradores",
+      batchEdit: "/departamento-pessoal/colaboradores/editar-em-lote",
+      create: "/departamento-pessoal/colaboradores/cadastrar",
+      details: (id: string) => `/departamento-pessoal/colaboradores/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/colaboradores/editar/${id}`,
+      root: "/departamento-pessoal/colaboradores",
     },
     monitoring: {
       dashboard: "/administracao/monitoramento/dashboard",
@@ -217,85 +217,87 @@ export const routes = {
   // Human Resources - Recursos Humanos - Human Resources
   humanResources: {
     calculations: {
-      list: "/recursos-humanos/calculos",
-      root: "/recursos-humanos/calculos",
+      list: "/departamento-pessoal/calculos",
+      root: "/departamento-pessoal/calculos",
     },
     holidays: {
-      calendar: "/recursos-humanos/feriados/calendario",
-      create: "/recursos-humanos/feriados/cadastrar",
-      details: (id: string) => `/recursos-humanos/feriados/detalhes/${id}`,
-      edit: (id: string) => `/recursos-humanos/feriados/editar/${id}`,
-      list: "/recursos-humanos/feriados",
-      root: "/recursos-humanos/feriados",
+      // URL moved: Feriados relocated from /departamento-pessoal/feriados* to /departamento-pessoal/feriados*
+      calendar: "/departamento-pessoal/feriados/calendario",
+      create: "/departamento-pessoal/feriados/cadastrar",
+      details: (id: string) => `/departamento-pessoal/feriados/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/feriados/editar/${id}`,
+      list: "/departamento-pessoal/feriados",
+      root: "/departamento-pessoal/feriados",
     },
     horarios: {
-      root: "/recursos-humanos/horarios",
-      list: "/recursos-humanos/horarios",
-      details: (id: string) => `/recursos-humanos/horarios/detalhes/${id}`,
+      root: "/departamento-pessoal/horarios",
+      list: "/departamento-pessoal/horarios",
+      details: (id: string) => `/departamento-pessoal/horarios/detalhes/${id}`,
     },
     integrations: {
       // Secullum Ponto Web integration. Drives the user-form
       // "Criar / sincronizar no Secullum" toggle and the bridge
       // service in apps/api/src/modules/integrations/secullum.
       secullum: {
-        root: "/recursos-humanos/integracoes/secullum",
+        root: "/departamento-pessoal/integracoes/secullum",
       },
     },
     positions: {
-      batchEdit: "/recursos-humanos/cargos/editar-em-lote",
-      create: "/recursos-humanos/cargos/cadastrar",
-      details: (id: string) => `/recursos-humanos/cargos/detalhes/${id}`,
-      edit: (id: string) => `/recursos-humanos/cargos/editar/${id}`,
-      hierarchy: "/recursos-humanos/cargos/hierarquia",
-      remunerations: (positionId: string) => `/recursos-humanos/cargos/${positionId}/remuneracoes`,
-      root: "/recursos-humanos/cargos",
+      batchEdit: "/departamento-pessoal/cargos/editar-em-lote",
+      create: "/departamento-pessoal/cargos/cadastrar",
+      details: (id: string) => `/departamento-pessoal/cargos/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/cargos/editar/${id}`,
+      hierarchy: "/departamento-pessoal/cargos/hierarquia",
+      remunerations: (positionId: string) => `/departamento-pessoal/cargos/${positionId}/remuneracoes`,
+      root: "/departamento-pessoal/cargos",
     },
     ppe: {
-      create: "/recursos-humanos/epi/cadastrar",
+      create: "/departamento-pessoal/epi/cadastrar",
       deliveries: {
-        create: "/recursos-humanos/epi/entregas/cadastrar",
-        details: (id: string) => `/recursos-humanos/epi/entregas/detalhes/${id}`,
-        edit: (id: string) => `/recursos-humanos/epi/entregas/editar/${id}`,
-        root: "/recursos-humanos/epi/entregas",
+        create: "/departamento-pessoal/epi/entregas/cadastrar",
+        details: (id: string) => `/departamento-pessoal/epi/entregas/detalhes/${id}`,
+        edit: (id: string) => `/departamento-pessoal/epi/entregas/editar/${id}`,
+        root: "/departamento-pessoal/epi/entregas",
       },
-      details: (id: string) => `/recursos-humanos/epi/detalhes/${id}`,
-      edit: (id: string) => `/recursos-humanos/epi/editar/${id}`,
+      details: (id: string) => `/departamento-pessoal/epi/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/epi/editar/${id}`,
       reports: {
-        masks: "/recursos-humanos/epi/relatorios/mascaras",
-        root: "/recursos-humanos/epi/relatorios",
-        stock: "/recursos-humanos/epi/relatorios/estoque",
-        usage: "/recursos-humanos/epi/relatorios/uso",
+        masks: "/departamento-pessoal/epi/relatorios/mascaras",
+        root: "/departamento-pessoal/epi/relatorios",
+        stock: "/departamento-pessoal/epi/relatorios/estoque",
+        usage: "/departamento-pessoal/epi/relatorios/uso",
       },
-      root: "/recursos-humanos/epi",
+      root: "/departamento-pessoal/epi",
       sizes: {
-        root: "/recursos-humanos/epi/tamanhos",
+        root: "/departamento-pessoal/epi/tamanhos",
       },
       schedules: {
-        create: "/recursos-humanos/epi/agendamentos/cadastrar",
-        details: (id: string) => `/recursos-humanos/epi/agendamentos/detalhes/${id}`,
-        edit: (id: string) => `/recursos-humanos/epi/agendamentos/editar/${id}`,
-        root: "/recursos-humanos/epi/agendamentos",
+        create: "/departamento-pessoal/epi/agendamentos/cadastrar",
+        details: (id: string) => `/departamento-pessoal/epi/agendamentos/detalhes/${id}`,
+        edit: (id: string) => `/departamento-pessoal/epi/agendamentos/editar/${id}`,
+        root: "/departamento-pessoal/epi/agendamentos",
       },
     },
     requisicoes: {
-      list: "/recursos-humanos/requisicoes",
-      root: "/recursos-humanos/requisicoes",
+      // URL moved: Requisições relocated from /departamento-pessoal/requisicoes to /departamento-pessoal/controle-ponto/requisicoes
+      list: "/departamento-pessoal/controle-ponto/requisicoes",
+      root: "/departamento-pessoal/controle-ponto/requisicoes",
     },
-    root: "/recursos-humanos",
+    root: "/departamento-pessoal",
     timeClock: {
-      list: "/recursos-humanos/controle-ponto",
-      root: "/recursos-humanos/controle-ponto",
+      list: "/departamento-pessoal/controle-ponto",
+      root: "/departamento-pessoal/controle-ponto",
       // Each view is its own subpage (with a sidebar submenu).
-      colaborador: "/recursos-humanos/controle-ponto/colaborador",
-      dia: "/recursos-humanos/controle-ponto/dia",
-      edicao: "/recursos-humanos/controle-ponto/edicao",
-      ausencias: "/recursos-humanos/controle-ponto/ausencias",
+      colaborador: "/departamento-pessoal/controle-ponto/colaborador",
+      dia: "/departamento-pessoal/controle-ponto/dia",
+      edicao: "/departamento-pessoal/controle-ponto/edicao",
+      ausencias: "/departamento-pessoal/controle-ponto/ausencias",
       // Fechamento (formerly "Assinatura Digital").
       fechamento: {
-        root: "/recursos-humanos/controle-ponto/fechamento",
-        list: "/recursos-humanos/controle-ponto/fechamento",
+        root: "/departamento-pessoal/controle-ponto/fechamento",
+        list: "/departamento-pessoal/controle-ponto/fechamento",
         details: (id: string | number) =>
-          `/recursos-humanos/controle-ponto/fechamento/${id}`,
+          `/departamento-pessoal/controle-ponto/fechamento/${id}`,
       },
     },
     vacations: {
@@ -307,34 +309,34 @@ export const routes = {
       details: (id: string) => `/departamento-pessoal/ferias/detalhes/${id}`,
     },
     calendar: {
-      root: "/recursos-humanos/calendario",
+      root: "/departamento-pessoal/calendario",
     },
     warnings: {
-      batchEdit: "/recursos-humanos/avisos/editar-em-lote",
-      create: "/recursos-humanos/avisos/cadastrar",
-      details: (id: string) => `/recursos-humanos/avisos/detalhes/${id}`,
-      edit: (id: string) => `/recursos-humanos/avisos/editar/${id}`,
-      root: "/recursos-humanos/avisos",
+      batchEdit: "/departamento-pessoal/avisos/editar-em-lote",
+      create: "/departamento-pessoal/avisos/cadastrar",
+      details: (id: string) => `/departamento-pessoal/avisos/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/avisos/editar/${id}`,
+      root: "/departamento-pessoal/avisos",
     },
     payroll: {
-      root: "/recursos-humanos/folha-de-pagamento",
-      list: "/recursos-humanos/folha-de-pagamento",
-      detail: (payrollId: string) => `/recursos-humanos/folha-de-pagamento/detalhe/${payrollId}`,
-      create: "/recursos-humanos/folha-de-pagamento/criar",
-      edit: (payrollId: string) => `/recursos-humanos/folha-de-pagamento/editar/${payrollId}`,
+      root: "/departamento-pessoal/folha-de-pagamento",
+      list: "/departamento-pessoal/folha-de-pagamento",
+      detail: (payrollId: string) => `/departamento-pessoal/folha-de-pagamento/detalhe/${payrollId}`,
+      create: "/departamento-pessoal/folha-de-pagamento/criar",
+      edit: (payrollId: string) => `/departamento-pessoal/folha-de-pagamento/editar/${payrollId}`,
     },
     loans: {
-      root: "/recursos-humanos/emprestimos",
-      list: "/recursos-humanos/emprestimos",
+      root: "/departamento-pessoal/emprestimos",
+      list: "/departamento-pessoal/emprestimos",
     },
     bonus: {
-      root: "/recursos-humanos/bonus",
-      list: "/recursos-humanos/bonus",
-      details: (id: string) => `/recursos-humanos/bonus/${id}`,
-      simulation: "/recursos-humanos/bonus/simulacao-de-bonus",
+      root: "/departamento-pessoal/bonus",
+      list: "/departamento-pessoal/bonus",
+      details: (id: string) => `/departamento-pessoal/bonus/${id}`,
+      simulation: "/departamento-pessoal/bonus/simulacao-de-bonus",
       performanceLevels: {
-        list: "/recursos-humanos/bonus/nivel-de-performance",
-        root: "/recursos-humanos/bonus/nivel-de-performance",
+        list: "/departamento-pessoal/bonus/nivel-de-performance",
+        root: "/departamento-pessoal/bonus/nivel-de-performance",
       },
     },
   },
@@ -616,9 +618,6 @@ export const routes = {
       create: "/departamento-pessoal/ferias/cadastrar",
       details: (id: string) => `/departamento-pessoal/ferias/detalhes/${id}`,
       edit: (id: string) => `/departamento-pessoal/ferias/editar/${id}`,
-      // Férias coletivas: período coletivo expandido em férias individuais.
-      // Mora dentro do mesmo namespace de Férias (sem página/menu separados).
-      collectiveDetails: (id: string) => `/departamento-pessoal/ferias/coletiva/detalhes/${id}`,
       root: "/departamento-pessoal/ferias",
     },
     // LEGACY: 13º Salário no longer has standalone pages — it is managed
@@ -767,12 +766,12 @@ export const routes = {
       reconciliation: "/estatisticas/financeiro/conciliacao",
     },
     humanResources: {
-      root: "/estatisticas/recursos-humanos",
-      payroll: "/estatisticas/recursos-humanos/folha",
-      salaryCost: "/estatisticas/recursos-humanos/custo-folha",
-      teamPerformance: "/estatisticas/recursos-humanos/equipe",
-      absenteeism: "/estatisticas/recursos-humanos/faltas",
-      skillAssessment: "/estatisticas/recursos-humanos/competencias",
+      root: "/estatisticas/departamento-pessoal",
+      payroll: "/estatisticas/departamento-pessoal/folha",
+      salaryCost: "/estatisticas/departamento-pessoal/custo-folha",
+      teamPerformance: "/estatisticas/departamento-pessoal/equipe",
+      absenteeism: "/estatisticas/departamento-pessoal/faltas",
+      skillAssessment: "/estatisticas/departamento-pessoal/competencias",
     },
     // Advanced Analytics
     analytics: {
@@ -826,11 +825,11 @@ export const routes = {
 
   // Users - Alias for administration users (collaborators) for backward compatibility
   users: {
-    batchEdit: "/administracao/colaboradores/editar-em-lote",
-    create: "/administracao/colaboradores/cadastrar",
-    details: (id: string) => `/administracao/colaboradores/detalhes/${id}`,
-    edit: (id: string) => `/administracao/colaboradores/editar/${id}`,
-    root: "/administracao/colaboradores",
+    batchEdit: "/departamento-pessoal/colaboradores/editar-em-lote",
+    create: "/departamento-pessoal/colaboradores/cadastrar",
+    details: (id: string) => `/departamento-pessoal/colaboradores/detalhes/${id}`,
+    edit: (id: string) => `/departamento-pessoal/colaboradores/editar/${id}`,
+    root: "/departamento-pessoal/colaboradores",
   },
 
   // Profile - User profile page

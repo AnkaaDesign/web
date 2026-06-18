@@ -928,11 +928,43 @@ const ChangelogTimelineItem = ({
                       </span>
                     </div>
                   )}
+                  {entityDetails.forecast && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Previsão de Entrega: </span>
+                      <span className="text-foreground font-medium">
+                        {formatFieldValue(entityDetails.forecast, "forecast", CHANGE_LOG_ENTITY_TYPE.ORDER)}
+                      </span>
+                    </div>
+                  )}
+                  {entityDetails.paymentStatus && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Status de Pagamento: </span>
+                      <span className="text-foreground font-medium">
+                        {formatFieldValue(entityDetails.paymentStatus, "paymentStatus", CHANGE_LOG_ENTITY_TYPE.ORDER)}
+                      </span>
+                    </div>
+                  )}
                   {entityDetails.paymentMethod && (
                     <div className="text-sm">
                       <span className="text-muted-foreground">Pagamento: </span>
                       <span className="text-foreground font-medium">
                         {({ PIX: "Pix", BANK_SLIP: "Boleto", CREDIT_CARD: "Cartão de Crédito" } as Record<string, string>)[entityDetails.paymentMethod] || entityDetails.paymentMethod}
+                      </span>
+                    </div>
+                  )}
+                  {entityDetails.paymentMethod === "BANK_SLIP" && (entityDetails.installmentCount || 1) > 1 && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Parcelas: </span>
+                      <span className="text-foreground font-medium">{entityDetails.installmentCount}x</span>
+                    </div>
+                  )}
+                  {entityDetails.paymentMethod === "BANK_SLIP" && entityDetails.paymentFirstDueDate && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">
+                        {(entityDetails.installmentCount || 1) > 1 ? "1º Vencimento: " : "Vencimento: "}
+                      </span>
+                      <span className="text-foreground font-medium">
+                        {formatFieldValue(entityDetails.paymentFirstDueDate, "paymentFirstDueDate", CHANGE_LOG_ENTITY_TYPE.ORDER)}
                       </span>
                     </div>
                   )}

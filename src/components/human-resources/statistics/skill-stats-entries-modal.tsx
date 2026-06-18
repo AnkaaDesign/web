@@ -1,4 +1,4 @@
-// Details modal for the /estatisticas/recursos-humanos/competencias page.
+// Details modal for the /estatisticas/departamento-pessoal/competencias page.
 //
 // Mirrors the productivity page's ProductionPeriodTasksModal pattern: list of
 // raw rows behind whatever aggregate the user clicked on. For skill-assessment,

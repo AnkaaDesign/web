@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { IconAlertTriangle, IconShoppingCart, IconTrash, IconRefresh, IconEdit, IconLoader2, IconCheck, IconCircleCheck, IconHourglass } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import type { PageAction } from "@/components/ui/page-header";
-import { OrderInfoCard, OrderItemsCard, OrderDocumentsCard } from "@/components/inventory/order/detail";
+import { OrderInfoCard, OrderPaymentCard, OrderItemsCard, OrderDocumentsCard } from "@/components/inventory/order/detail";
+import { cn } from "@/lib/utils";
 import { OrderDetailSkeleton } from "@/components/inventory/order/detail/order-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { useState } from "react";
@@ -37,10 +38,9 @@ const OrderDetailsPage = () => {
   const canManageWarehouse = canEditOrders(user);
   const { deleteMutation, updateAsync, markPaidAsync, markAwaitingPaymentAsync } = useOrderMutations();
 
-  // Payment management is gated to the same privileges the API endpoint allows
-  // (WAREHOUSE / FINANCIAL / ACCOUNTING / ADMIN).
+  // Payment management is financial-only (FINANCIAL / ACCOUNTING / ADMIN), matching
+  // the API. WAREHOUSE may view the order (page route below) but never its payment side.
   const canManagePayments = hasAnyPrivilege(user as any, [
-    SECTOR_PRIVILEGES.WAREHOUSE,
     SECTOR_PRIVILEGES.FINANCIAL,
     SECTOR_PRIVILEGES.ACCOUNTING,
     SECTOR_PRIVILEGES.ADMIN,
@@ -82,6 +82,7 @@ const OrderDetailsPage = () => {
       invoiceReimbursements: true,
       paymentResponsible: true,
       paymentAssignedBy: true,
+      installments: true,
     },
     enabled: !!id,
   });
@@ -332,23 +333,26 @@ const OrderDetailsPage = () => {
         />
         <div className="flex-1 overflow-y-auto pb-6">
           <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Core Information Grid */}
+            {/* Top: order info + payment side by side (payment financial-only) */}
+            <div className={cn("grid grid-cols-1 gap-4", canViewPrices && "lg:grid-cols-2")}>
               <OrderInfoCard order={order} className="h-full" />
-              <ChangelogHistory
-                entityType={CHANGE_LOG_ENTITY_TYPE.ORDER}
-                entityId={order.id}
-                entityName={order.description}
-                entityCreatedAt={order.createdAt}
-                className="h-full"
-              />
+              {canViewPrices && <OrderPaymentCard order={order} className="h-full" />}
             </div>
 
-            {/* Bottom Section: Items and Documents */}
+            {/* Items */}
             <OrderItemsCard order={order} className="w-full" onOrderUpdate={handleOrderUpdate} />
 
-            {/* Documents Section */}
+            {/* Documents */}
             <OrderDocumentsCard order={order} className="w-full" />
+
+            {/* Change history — full width, after the items table. */}
+            <ChangelogHistory
+              entityType={CHANGE_LOG_ENTITY_TYPE.ORDER}
+              entityId={order.id}
+              entityName={order.description}
+              entityCreatedAt={order.createdAt}
+              className="w-full"
+            />
           </div>
         </div>
 

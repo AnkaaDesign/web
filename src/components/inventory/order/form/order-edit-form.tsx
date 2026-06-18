@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import { BoletoPaymentFields } from "./boleto-payment-fields";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
@@ -326,6 +327,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     paymentMethod: order.paymentMethod || null,
     paymentPix: order.paymentPix || null,
     paymentDueDays: order.paymentDueDays || null,
+    paymentFirstDueDate: order.paymentFirstDueDate || null,
     installmentCount: order.installmentCount || 1,
     paymentResponsibleId: order.paymentResponsibleId || undefined,
   };
@@ -599,6 +601,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   const watchedPaymentMethod = form.watch("paymentMethod");
   const watchedPaymentPix = form.watch("paymentPix");
   const watchedPaymentDueDays = form.watch("paymentDueDays");
+  const watchedPaymentFirstDueDate = form.watch("paymentFirstDueDate");
   const watchedInstallmentCount = form.watch("installmentCount");
   const watchedPaymentResponsibleId = form.watch("paymentResponsibleId");
 
@@ -615,6 +618,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     const paymentMethodChanged = (watchedPaymentMethod || null) !== (order.paymentMethod || null);
     const paymentPixChanged = (watchedPaymentPix || null) !== (order.paymentPix || null);
     const paymentDueDaysChanged = (watchedPaymentDueDays || null) !== (order.paymentDueDays || null);
+    const paymentFirstDueDateChanged =
+      (watchedPaymentFirstDueDate ? new Date(watchedPaymentFirstDueDate).getTime() : null) !==
+      (order.paymentFirstDueDate ? new Date(order.paymentFirstDueDate).getTime() : null);
     const installmentCountChanged = (watchedInstallmentCount || 1) !== (order.installmentCount || 1);
     const paymentResponsibleChanged = (watchedPaymentResponsibleId || null) !== (order.paymentResponsibleId || null);
 
@@ -658,9 +664,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     return (
       descriptionChanged || supplierChanged || forecastChanged || notesChanged || freightChanged || discountChanged ||
       inventoryItemsChanged || inventoryDetailsChanged || tempCountChanged || tempContentChanged ||
-      hasFileChanges || paymentMethodChanged || paymentPixChanged || paymentDueDaysChanged || installmentCountChanged || paymentResponsibleChanged
+      hasFileChanges || paymentMethodChanged || paymentPixChanged || paymentDueDaysChanged || paymentFirstDueDateChanged || installmentCountChanged || paymentResponsibleChanged
     );
-  }, [description, supplierId, forecast, localNotes, watchedFreight, watchedDiscount, selectedItems, quantities, prices, icmses, ipis, temporaryItems, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedInstallmentCount, watchedPaymentResponsibleId]);
+  }, [description, supplierId, forecast, localNotes, watchedFreight, watchedDiscount, selectedItems, quantities, prices, icmses, ipis, temporaryItems, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedPaymentFirstDueDate, watchedInstallmentCount, watchedPaymentResponsibleId]);
 
   // Stage validation
   const validateCurrentStep = useCallback((): boolean => {
@@ -756,6 +762,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const currentPaymentMethod = form.getValues("paymentMethod");
       const currentPaymentPix = form.getValues("paymentPix");
       const currentPaymentDueDays = form.getValues("paymentDueDays");
+      const currentPaymentFirstDueDate = form.getValues("paymentFirstDueDate");
       const currentInstallmentCount = form.getValues("installmentCount");
       const currentPaymentResponsibleId = form.getValues("paymentResponsibleId");
       const currentFreight = Number(form.getValues("freight")) || 0;
@@ -772,6 +779,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         paymentMethod: currentPaymentMethod || undefined,
         paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
         paymentDueDays: currentPaymentMethod === "BANK_SLIP" ? currentPaymentDueDays || undefined : undefined,
+        paymentFirstDueDate: currentPaymentMethod === "BANK_SLIP" ? currentPaymentFirstDueDate || null : null,
         installmentCount: currentPaymentMethod === "BANK_SLIP" ? currentInstallmentCount || 1 : 1,
         paymentResponsibleId: currentPaymentResponsibleId || null,
       };
@@ -1321,7 +1329,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                         </CardContent>
                       </Card>
 
-                      {/* Payment Method Card */}
+                      {/* Payment Method Card — hidden from WAREHOUSE (financial-only). */}
+                      {canViewPrices && (
                       <Card className="h-full">
                         <CardHeader className="pb-4">
                           <CardTitle className="flex items-center gap-2">
@@ -1385,6 +1394,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   }
                                   if (stringValue !== "BANK_SLIP") {
                                     form.setValue("paymentDueDays", null, { shouldDirty: true });
+                                    form.setValue("paymentFirstDueDate", null, { shouldDirty: true });
                                     form.setValue("installmentCount", 1, { shouldDirty: true });
                                   }
                                 }}
@@ -1428,53 +1438,11 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                             </div>
                           )}
 
-                          {/* Due Days - Show only when BANK_SLIP is selected */}
-                          {form.watch("paymentMethod") === "BANK_SLIP" && (
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
-                              <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Prazo de Vencimento</span>
-                              <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
-                                <Combobox
-                                  value={form.watch("paymentDueDays")?.toString() || ""}
-                                  onValueChange={(value) => {
-                                    const stringValue = Array.isArray(value) ? value[0] : value;
-                                    form.setValue("paymentDueDays", stringValue ? parseInt(stringValue) : null, { shouldDirty: true });
-                                  }}
-                                  options={[
-                                    { value: "30", label: "30 dias" },
-                                    { value: "60", label: "60 dias" },
-                                    { value: "90", label: "90 dias" },
-                                    { value: "120", label: "120 dias" },
-                                  ]}
-                                  placeholder="Selecione o prazo"
-                                  emptyText="Nenhum prazo"
-                                  className="h-8 w-full"
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Parcelas (boleto 2x/3x). Changing this regenerates the
+                          {/* Boleto scheduling — parcelas, primeiro vencimento (presets ou data),
+                              and the interval between parcelas. Changing these regenerates the
                               installment schedule on save, unless a parcela is already paid. */}
                           {form.watch("paymentMethod") === "BANK_SLIP" && (
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
-                              <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Parcelas</span>
-                              <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
-                                <Combobox
-                                  value={(form.watch("installmentCount") || 1).toString()}
-                                  onValueChange={(value) => {
-                                    const stringValue = Array.isArray(value) ? value[0] : value;
-                                    form.setValue("installmentCount", stringValue ? parseInt(stringValue) : 1, { shouldDirty: true });
-                                  }}
-                                  options={Array.from({ length: 12 }, (_, i) => ({
-                                    value: (i + 1).toString(),
-                                    label: i === 0 ? "À vista (1x)" : `${i + 1}x`,
-                                  }))}
-                                  placeholder="Selecione as parcelas"
-                                  emptyText="—"
-                                  className="h-8 w-full"
-                                />
-                              </div>
-                            </div>
+                            <BoletoPaymentFields form={form} markDirty />
                           )}
 
                           {/* Freight (frete) — supplier shipping cost added to the order total. */}
@@ -1526,6 +1494,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                           )}
                         </CardContent>
                       </Card>
+                      )}
                     </div>
 
                     {/* Items Table */}

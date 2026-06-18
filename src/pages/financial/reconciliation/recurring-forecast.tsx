@@ -261,10 +261,10 @@ export const ReconciliationRecurringForecastPage = () => {
                   isLoading={isLoading}
                   emptyMessage="Nenhuma categoria recorrente paga no período"
                   emptyIcon={IconCalendarRepeat}
-                  onRowClick={item =>
-                    navigate(
-                      `${routes.financial.reconciliation.transactions}?categoryIds=${item.category.id}`,
-                    )
+                  onRowClick={() =>
+                    // Extrato filters by conta/mês/tipo/status (not category), so
+                    // the row just opens the Extrato.
+                    navigate(routes.financial.reconciliation.statement)
                   }
                 />
               </div>
@@ -298,7 +298,7 @@ function SummaryGrid({
         value={isLoading ? null : formatCurrency(totalPaid)}
         Icon={IconCash}
         tone="emerald"
-        href={`${routes.financial.reconciliation.transactions}?dateFrom=${dateFrom}`}
+        href={`${routes.financial.reconciliation.statement}?mes=${dateFrom.slice(0, 7)}`}
       />
       <KpiCard
         label="Previsão total (3 meses)"

@@ -662,7 +662,7 @@ export const Sidebar = memo(() => {
   // Auto-expand menus based on the SINGLE active winner: exactly the winner's ancestor
   // chain is expanded and every unrelated section (at every level) is collapsed. This
   // replaces the old per-item path matching, which expanded EVERY section containing a
-  // matching path (e.g. navigating to /administracao/colaboradores yanked open both
+  // matching path (e.g. navigating to /departamento-pessoal/colaboradores yanked open both
   // "Administração" and "Departamento Pessoal" for ADMIN).
   const lastExpandKeyRef = useRef<string | null>(null);
   useEffect(() => {

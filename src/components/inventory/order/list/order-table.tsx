@@ -56,9 +56,9 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
   const canEdit = user ? canEditOrders(user) : false;
   const canDelete = user ? canDeleteOrders(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'order') : false;
-  // Payment workflow (contas a pagar) — warehouse requests, financial/accounting settle
+  // Payment workflow (contas a pagar) — financial-only; WAREHOUSE never settles payments.
   const canManagePayments = user
-    ? hasAnyPrivilege(user, [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN])
+    ? hasAnyPrivilege(user, [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN])
     : false;
 
   // Context menu state

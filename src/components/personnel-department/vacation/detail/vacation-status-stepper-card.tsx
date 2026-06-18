@@ -4,29 +4,30 @@ import { Badge } from "@/components/ui/badge";
 import { IconProgress, IconAlertTriangle } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { VACATION_STATUS, VACATION_STATUS_LABELS } from "../../../../constants";
+import { isVacationInProgress } from "../../../../utils";
 import type { Vacation } from "../../../../types/vacation";
 import { getVacationStatusVariant } from "../list/vacation-table-columns";
 import { WorkflowStepper, type WorkflowStep } from "@/components/personnel-department/shared/workflow-stepper";
 
-/** Forward chain of the vacation status machine (EXPIRED handled separately). */
-export const VACATION_STATUS_CHAIN: VACATION_STATUS[] = [
-  VACATION_STATUS.OPEN,
-  VACATION_STATUS.SCHEDULED,
-  VACATION_STATUS.IN_PROGRESS,
-  VACATION_STATUS.PAID,
-];
-
+/**
+ * The vacation lifecycle is now SCHEDULED → PAID (+ EXPIRED system-set). The
+ * only action is "Marcar como pago" — there is no chained advance. "Em gozo" is
+ * a computed middle step (never persisted) shown when the gozo window is active.
+ */
 export function getNextVacationStatus(vacation: Pick<Vacation, "status">): VACATION_STATUS | null {
-  const currentIndex = VACATION_STATUS_CHAIN.indexOf(vacation.status);
-  if (currentIndex === -1) return null; // EXPIRED
-  return VACATION_STATUS_CHAIN[currentIndex + 1] ?? null;
+  // From SCHEDULED or EXPIRED the only forward transition is PAID.
+  if (vacation.status === VACATION_STATUS.SCHEDULED || vacation.status === VACATION_STATUS.EXPIRED) {
+    return VACATION_STATUS.PAID;
+  }
+  return null; // PAID is final.
 }
 
-// Shared full-width stepper steps (same component used by Admissão/Rescisão).
-const STEPPER_STEPS: WorkflowStep[] = VACATION_STATUS_CHAIN.map((status) => ({
-  key: status,
-  label: VACATION_STATUS_LABELS[status],
-}));
+// Display stepper: Agendada → Em gozo (computed) → Paga.
+const STEPPER_STEPS: WorkflowStep[] = [
+  { key: VACATION_STATUS.SCHEDULED, label: VACATION_STATUS_LABELS[VACATION_STATUS.SCHEDULED] },
+  { key: "IN_PROGRESS", label: "Em gozo" },
+  { key: VACATION_STATUS.PAID, label: VACATION_STATUS_LABELS[VACATION_STATUS.PAID] },
+];
 
 interface VacationStatusStepperCardProps {
   vacation: Vacation;
@@ -35,11 +36,16 @@ interface VacationStatusStepperCardProps {
 
 export function VacationStatusStepperCard({ vacation, className }: VacationStatusStepperCardProps) {
   const isExpired = vacation.status === VACATION_STATUS.EXPIRED;
-  const isCompleted = vacation.status === VACATION_STATUS.PAID;
-  const chainIndex = VACATION_STATUS_CHAIN.indexOf(vacation.status);
-  // EXPIRED isn't in the forward chain; show it dimmed at the scheduling step
-  // with the art.137 alert below (it is still payable, in dobro).
-  const currentIndex = chainIndex >= 0 ? chainIndex : 1;
+  const isPaid = vacation.status === VACATION_STATUS.PAID;
+  const inProgress = isVacationInProgress(vacation);
+
+  // Map the entity to a step index on the Agendada → Em gozo → Paga rail.
+  // PAID lands on the last step (completed). Em gozo (computed) lands on the
+  // middle step. SCHEDULED (not yet em gozo) and EXPIRED sit on the first step.
+  let currentIndex: number;
+  if (isPaid) currentIndex = 2;
+  else if (inProgress) currentIndex = 1;
+  else currentIndex = 0;
 
   return (
     <Card className={cn("shadow-sm border border-border", className)}>
@@ -49,16 +55,22 @@ export function VacationStatusStepperCard({ vacation, className }: VacationStatu
             <IconProgress className="h-5 w-5 text-muted-foreground" />
             Andamento das Férias
           </div>
-          <Badge variant={getVacationStatusVariant(vacation.status)} className="text-xs whitespace-nowrap">
-            {VACATION_STATUS_LABELS[vacation.status] || vacation.status}
-          </Badge>
+          {inProgress ? (
+            <Badge variant="active" className="text-xs whitespace-nowrap">
+              Em gozo
+            </Badge>
+          ) : (
+            <Badge variant={getVacationStatusVariant(vacation.status)} className="text-xs whitespace-nowrap">
+              {VACATION_STATUS_LABELS[vacation.status] || vacation.status}
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <WorkflowStepper
           steps={STEPPER_STEPS}
           currentIndex={currentIndex}
-          isCompleted={isCompleted}
+          isCompleted={isPaid}
           className={cn(isExpired && "opacity-50")}
         />
 
@@ -68,7 +80,7 @@ export function VacationStatusStepperCard({ vacation, className }: VacationStatu
               <IconAlertTriangle className="h-4 w-4" />
               Período concessivo vencido (art. 137)
             </AlertTitle>
-            <AlertDescription>O período concessivo expirou sem concessão das férias. As férias são devidas em dobro.</AlertDescription>
+            <AlertDescription>O período concessivo expirou sem concessão das férias. As férias são devidas em dobro — ainda podem ser marcadas como pagas.</AlertDescription>
           </Alert>
         )}
       </CardContent>

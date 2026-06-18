@@ -1,7 +1,7 @@
 // HR Calendar widget — monthly view of the Brazilian payroll period (26 → 25)
 // rendering vacations / faltas (justified + unjustified) / holidays for the
 // selected user (or all collaborators) and sector. Built as the dashboard-
-// embeddable counterpart to /recursos-humanos/calendario, sharing the same
+// embeddable counterpart to /departamento-pessoal/calendario, sharing the same
 // data hooks and category color system.
 //
 // Data sources (all dedupe across widget instances via react-query):

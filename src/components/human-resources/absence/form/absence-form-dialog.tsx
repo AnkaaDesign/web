@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { IconAlertTriangle, IconCalendar } from "@tabler/icons-react";
 import { z } from "zod";
 
-import { VACATION_JUSTIFICATIVA_ID, getJustificativaLabel } from "../../../../constants";
+import { getJustificativaLabel } from "../../../../constants";
 import type { SecullumAggregatedAbsence } from "../../../../types";
-import { useSecullumCreateAbsenceForUsers, useSecullumUpdateAbsence } from "../../../../hooks";
+import { useSecullumUpdateAbsence } from "../../../../hooks";
 import { stripGroupPrefix } from "../../../../types";
 
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
@@ -16,15 +16,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { toast } from "@/components/ui/sonner";
 
-import { COLLECTIVE_USER_ID, EmployeeSelect } from "./employee-select";
+import { EmployeeSelect } from "./employee-select";
 
-// Vacations-only form. Create flow hardcodes JustificativaId=2 (Férias);
-// edits preserve whatever JustificativaId the record was created with so
-// non-Férias records edited from the time-clock overview keep their type.
-// The collective vacation mode is selected by picking the special
-// COLLECTIVE_USER_ID entry from the employee combobox.
+// EDIT-ONLY dialog over Secullum afastamentos (DELETE + POST, no PUT endpoint).
+// The legacy Secullum-direct "Adicionar Férias" create path was retired — the
+// DB-backed Férias module (Departamento Pessoal) is the only way to create
+// vacations (it auto-mirrors to Secullum). Edits preserve whatever
+// JustificativaId the record was created with, so non-Férias records edited
+// from the time-clock overview keep their type.
 const absenceFormSchema = z
   .object({
     userId: z.string().min(1, { message: "Selecione um colaborador" }),
@@ -42,16 +42,13 @@ type AbsenceFormInput = z.input<typeof absenceFormSchema>;
 interface AbsenceFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  // When provided, the dialog operates in edit mode.
+  // The dialog only operates in edit mode over an existing Secullum record.
   // Edit performs DELETE + POST against Secullum since there's no PUT endpoint.
-  editing?: SecullumAggregatedAbsence | null;
+  editing: SecullumAggregatedAbsence | null;
 }
 
 export function AbsenceFormDialog({ open, onOpenChange, editing }: AbsenceFormDialogProps) {
-  const isEdit = !!editing;
-  const createForUsersMut = useSecullumCreateAbsenceForUsers();
   const updateMut = useSecullumUpdateAbsence();
-  const [resultSummary, setResultSummary] = useState<string | null>(null);
 
   const form = useForm<AbsenceFormInput>({
     resolver: zodResolver(absenceFormSchema),
@@ -63,101 +60,52 @@ export function AbsenceFormDialog({ open, onOpenChange, editing }: AbsenceFormDi
     },
   });
 
-  const selectedUserId = form.watch("userId");
-  const isCollective = selectedUserId === COLLECTIVE_USER_ID;
-
   useEffect(() => {
-    if (!open) return;
-    setResultSummary(null);
-    if (isEdit && editing) {
-      form.reset({
-        userId: editing.userId,
-        startDate: new Date(editing.Inicio),
-        endDate: new Date(editing.Fim),
-        motivo: stripGroupPrefix(editing.Motivo),
-      });
-    } else {
-      form.reset({
-        userId: "",
-        startDate: new Date(),
-        endDate: new Date(),
-        motivo: "",
-      });
-    }
-  }, [open, isEdit, editing?.Id]);
+    if (!open || !editing) return;
+    form.reset({
+      userId: editing.userId,
+      startDate: new Date(editing.Inicio),
+      endDate: new Date(editing.Fim),
+      motivo: stripGroupPrefix(editing.Motivo),
+    });
+  }, [open, editing?.Id]);
 
   const onSubmit = async (data: AbsenceFormInput) => {
+    if (!editing) return;
     const startDate = data.startDate instanceof Date ? data.startDate : new Date(data.startDate);
     const endDate = data.endDate instanceof Date ? data.endDate : new Date(data.endDate);
 
-    if (isEdit && editing) {
-      try {
-        await updateMut.mutateAsync({
-          absenceId: editing.Id,
-          original: {
-            Id: editing.Id,
-            Inicio: editing.Inicio,
-            Fim: editing.Fim,
-            JustificativaId: editing.JustificativaId,
-            Motivo: editing.Motivo,
-            FuncionarioId: editing.FuncionarioId,
-          },
-          next: {
-            Inicio: format(startDate, "yyyy-MM-dd"),
-            Fim: format(endDate, "yyyy-MM-dd"),
-            JustificativaId: editing.JustificativaId,
-            Motivo: data.motivo ?? "",
-            FuncionarioId: editing.FuncionarioId,
-          },
-        });
-        onOpenChange(false);
-      } catch {
-        // Error toast is emitted by the axios error interceptor.
-      }
-      return;
-    }
-
-    // Create flow — always Férias (JustificativaId=2). Server resolves userId → secullumEmployeeId,
-    // or fans out to every active user with secullumEmployeeId when applyToAll=true.
-    const useCollective = data.userId === COLLECTIVE_USER_ID;
     try {
-      const response = await createForUsersMut.mutateAsync({
-        ...(useCollective
-          ? { applyToAll: true }
-          : { userIds: [data.userId] }),
-        Inicio: format(startDate, "yyyy-MM-dd"),
-        Fim: format(endDate, "yyyy-MM-dd"),
-        JustificativaId: VACATION_JUSTIFICATIVA_ID,
-        Motivo: data.motivo ?? "",
+      await updateMut.mutateAsync({
+        absenceId: editing.Id,
+        original: {
+          Id: editing.Id,
+          Inicio: editing.Inicio,
+          Fim: editing.Fim,
+          JustificativaId: editing.JustificativaId,
+          Motivo: editing.Motivo,
+          FuncionarioId: editing.FuncionarioId,
+        },
+        next: {
+          Inicio: format(startDate, "yyyy-MM-dd"),
+          Fim: format(endDate, "yyyy-MM-dd"),
+          JustificativaId: editing.JustificativaId,
+          Motivo: data.motivo ?? "",
+          FuncionarioId: editing.FuncionarioId,
+        },
       });
-      const result = response?.data?.data ?? (response?.data as any)?.data ?? response?.data;
-      const created: number = result?.created ?? 0;
-      const failed: number = result?.failed ?? 0;
-      if (created > 0 && failed === 0) {
-        onOpenChange(false);
-      } else if (created > 0 && failed > 0) {
-        const failedNames = (result?.results ?? [])
-          .filter((r: any) => !r.ok)
-          .map((r: any) => r.userName)
-          .slice(0, 5)
-          .join(", ");
-        toast.warning(`${created} criadas, ${failed} falharam: ${failedNames}${failed > 5 ? "..." : ""}`);
-        setResultSummary(`${created} criadas, ${failed} falharam.`);
-      } else {
-        const firstError = (result?.results ?? []).find((r: any) => !r.ok)?.error;
-        toast.error(firstError || "Nenhuma férias registrada.");
-      }
+      onOpenChange(false);
     } catch {
       // Error toast is emitted by the axios error interceptor.
     }
   };
 
-  const isSubmitting = createForUsersMut.isPending || updateMut.isPending;
-  // For edits, mirror the record's actual justificativa (e.g. editing an
-  // "Atestado Médico" via the time-clock overview shows that label).
-  const editingLabel = isEdit && editing
+  const isSubmitting = updateMut.isPending;
+  // Mirror the record's actual justificativa (e.g. editing an "Atestado Médico"
+  // via the time-clock overview shows that label).
+  const editingLabel = editing
     ? getJustificativaLabel(editing.JustificativaId, editing.JustificativaDescricao)
-    : "Férias";
+    : "Afastamento";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -165,19 +113,17 @@ export function AbsenceFormDialog({ open, onOpenChange, editing }: AbsenceFormDi
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <IconCalendar className="h-5 w-5" />
-            {isEdit ? `Editar ${editingLabel}` : "Adicionar Férias"}
+            {`Editar ${editingLabel}`}
           </DialogTitle>
-          {isEdit && (
-            <DialogDescription>
-              <Alert className="mt-2 border-amber-500/40">
-                <IconAlertTriangle className="h-4 w-4 text-amber-500" />
-                <AlertDescription>
-                  O Secullum não permite edição direta de afastamentos. Ao salvar, o registro original
-                  será excluído e um novo será criado em seu lugar.
-                </AlertDescription>
-              </Alert>
-            </DialogDescription>
-          )}
+          <DialogDescription>
+            <Alert className="mt-2 border-amber-500/40">
+              <IconAlertTriangle className="h-4 w-4 text-amber-500" />
+              <AlertDescription>
+                O Secullum não permite edição direta de afastamentos. Ao salvar, o registro original
+                será excluído e um novo será criado em seu lugar.
+              </AlertDescription>
+            </Alert>
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -185,8 +131,7 @@ export function AbsenceFormDialog({ open, onOpenChange, editing }: AbsenceFormDi
             <EmployeeSelect
               control={form.control}
               required
-              disabled={isEdit}
-              allowCollective={!isEdit}
+              disabled
             />
 
             <div className="grid grid-cols-2 gap-3">
@@ -239,18 +184,12 @@ export function AbsenceFormDialog({ open, onOpenChange, editing }: AbsenceFormDi
                 </FormItem>
               )}
             />
-            {resultSummary && (
-              <Alert className="border-amber-500/40">
-                <IconAlertTriangle className="h-4 w-4 text-amber-500" />
-                <AlertDescription>{resultSummary}</AlertDescription>
-              </Alert>
-            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Salvando..." : isEdit ? "Atualizar" : isCollective ? "Criar para todos" : "Adicionar"}
+                {isSubmitting ? "Salvando..." : "Atualizar"}
               </Button>
             </DialogFooter>
           </form>

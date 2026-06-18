@@ -1,7 +1,7 @@
 // commemorative-dates.ts
 // ===========================================================================
 // FONTE ÚNICA das DATAS COMEMORATIVAS pt-BR do calendário unificado de RH.
-// (O calendário em /recursos-humanos/calendario lê este arquivo via
+// (O calendário em /departamento-pessoal/calendario lê este arquivo via
 //  getCommemorativesForDay(); não há cadastro no servidor — quem quiser
 //  adicionar/remover uma data comemorativa edita as tabelas abaixo.)
 //

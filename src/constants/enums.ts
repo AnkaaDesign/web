@@ -531,10 +531,10 @@ export enum INSS_BENEFIT_SPECIES {
 }
 
 // Status de um período de férias.
+// "Em gozo" não é mais um status persistido — é derivado das datas
+// (ver isVacationInProgress).
 export enum VACATION_STATUS {
-  OPEN = "OPEN",
   SCHEDULED = "SCHEDULED",
-  IN_PROGRESS = "IN_PROGRESS",
   PAID = "PAID",
   EXPIRED = "EXPIRED",
 }
@@ -2362,7 +2362,7 @@ export enum FAVORITE_PAGES {
   STATISTICS_CONSUMPTION = "/estatisticas/estoque/consumo",
   ESTATISTICAS_PRODUCAO = "/estatisticas/producao",
   ESTATISTICAS_PEDIDOS = "/estatisticas/pedidos",
-  ESTATISTICAS_RECURSOS_HUMANOS = "/estatisticas/recursos-humanos",
+  ESTATISTICAS_RECURSOS_HUMANOS = "/estatisticas/departamento-pessoal",
   ESTATISTICAS_FINANCEIRO = "/estatisticas/financeiro",
   ESTATISTICAS_FINANCEIRO_COBRANCAS = "/estatisticas/financeiro/cobrancas",
   ESTATISTICAS_FINANCEIRO_BOLETOS = "/estatisticas/financeiro/boletos",
@@ -2426,7 +2426,7 @@ export enum FAVORITE_PAGES {
   // Administration - List Pages
   ADMINISTRACAO_CLIENTES_LISTAR = "/financeiro/clientes",
   ADMINISTRACAO_RESPONSAVEIS_LISTAR = "/financeiro/clientes/responsaveis",
-  ADMINISTRACAO_COLABORADORES_LISTAR = "/administracao/colaboradores",
+  ADMINISTRACAO_COLABORADORES_LISTAR = "/departamento-pessoal/colaboradores",
   ADMINISTRACAO_ORCAMENTOS_LISTAR = "/administracao/orcamentos",
   ADMINISTRACAO_REGISTROS_ALTERACOES_LISTAR = "/administracao/registros-de-alteracoes",
   ADMINISTRACAO_ARQUIVOS_LISTAR = "/administracao/arquivos",
@@ -2434,11 +2434,11 @@ export enum FAVORITE_PAGES {
   ADMINISTRACAO_METAS_LISTAR = "/administracao/metas",
   ADMINISTRACAO_NOTIFICACOES_LISTAR = "/administracao/notificacoes",
   ADMINISTRACAO_MENSAGENS_LISTAR = "/administracao/mensagens",
-  ADMINISTRACAO_FOLHA_DE_PAGAMENTO = "/recursos-humanos/folha-de-pagamento",
+  ADMINISTRACAO_FOLHA_DE_PAGAMENTO = "/departamento-pessoal/folha-de-pagamento",
 
   // Administration - Create Pages
   ADMINISTRACAO_CLIENTES_CADASTRAR = "/financeiro/clientes/cadastrar",
-  ADMINISTRACAO_COLABORADORES_CADASTRAR = "/administracao/colaboradores/cadastrar",
+  ADMINISTRACAO_COLABORADORES_CADASTRAR = "/departamento-pessoal/colaboradores/cadastrar",
   ADMINISTRACAO_ORCAMENTOS_CADASTRAR = "/administracao/orcamentos/cadastrar",
   ADMINISTRACAO_ARQUIVOS_CADASTRAR = "/administracao/arquivos/upload",
   ADMINISTRACAO_SETORES_CADASTRAR = "/administracao/setores/cadastrar",
@@ -2457,31 +2457,31 @@ export enum FAVORITE_PAGES {
   FINANCEIRO_CONCILIACAO_NOTAS = "/financeiro/conciliacao/notas",
 
   // Human Resources - List Pages
-  RECURSOS_HUMANOS_CARGOS_LISTAR = "/recursos-humanos/cargos",
-  RECURSOS_HUMANOS_FERIAS_LISTAR = "/recursos-humanos/ferias",
-  RECURSOS_HUMANOS_CALENDARIO = "/recursos-humanos/calendario",
-  RECURSOS_HUMANOS_FERIADOS_LISTAR = "/recursos-humanos/feriados",
-  RECURSOS_HUMANOS_AVISOS_LISTAR = "/recursos-humanos/avisos",
-  RECURSOS_HUMANOS_CALCULOS = "/recursos-humanos/calculos",
-  RECURSOS_HUMANOS_CONTROLE_PONTO_LISTAR = "/recursos-humanos/controle-ponto",
-  RECURSOS_HUMANOS_CONTROLE_PONTO_ASSINATURA_DIGITAL_LISTAR = "/recursos-humanos/controle-ponto/assinatura-digital",
-  RECURSOS_HUMANOS_EPI_LISTAR = "/recursos-humanos/epi",
-  RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR = "/recursos-humanos/epi/entregas",
-  RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR = "/recursos-humanos/epi/agendamentos",
-  RECURSOS_HUMANOS_EPI_TAMANHOS_LISTAR = "/recursos-humanos/epi/tamanhos",
-  RECURSOS_HUMANOS_SETORES_LISTAR = "/recursos-humanos/setores",
+  RECURSOS_HUMANOS_CARGOS_LISTAR = "/departamento-pessoal/cargos",
+  RECURSOS_HUMANOS_FERIAS_LISTAR = "/departamento-pessoal/ferias",
+  RECURSOS_HUMANOS_CALENDARIO = "/departamento-pessoal/calendario",
+  RECURSOS_HUMANOS_FERIADOS_LISTAR = "/departamento-pessoal/feriados",
+  RECURSOS_HUMANOS_AVISOS_LISTAR = "/departamento-pessoal/avisos",
+  RECURSOS_HUMANOS_CALCULOS = "/departamento-pessoal/calculos",
+  RECURSOS_HUMANOS_CONTROLE_PONTO_LISTAR = "/departamento-pessoal/controle-ponto",
+  RECURSOS_HUMANOS_CONTROLE_PONTO_ASSINATURA_DIGITAL_LISTAR = "/departamento-pessoal/controle-ponto/assinatura-digital",
+  RECURSOS_HUMANOS_EPI_LISTAR = "/departamento-pessoal/epi",
+  RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR = "/departamento-pessoal/epi/entregas",
+  RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR = "/departamento-pessoal/epi/agendamentos",
+  RECURSOS_HUMANOS_EPI_TAMANHOS_LISTAR = "/departamento-pessoal/epi/tamanhos",
+  RECURSOS_HUMANOS_SETORES_LISTAR = "/departamento-pessoal/setores",
 
   // Human Resources - Create Pages
-  RECURSOS_HUMANOS_CARGOS_CADASTRAR = "/recursos-humanos/cargos/cadastrar",
-  RECURSOS_HUMANOS_FERIAS_CADASTRAR = "/recursos-humanos/ferias/cadastrar",
-  RECURSOS_HUMANOS_FERIADOS_CADASTRAR = "/recursos-humanos/feriados/cadastrar",
-  RECURSOS_HUMANOS_AVISOS_CADASTRAR = "/recursos-humanos/avisos/cadastrar",
-  RECURSOS_HUMANOS_EPI_CADASTRAR = "/recursos-humanos/epi/cadastrar",
-  RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR = "/recursos-humanos/epi/entregas/cadastrar",
-  RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR = "/recursos-humanos/epi/agendamentos/cadastrar",
-  RECURSOS_HUMANOS_SETORES_CADASTRAR = "/recursos-humanos/setores/cadastrar",
-  RECURSOS_HUMANOS_BONUS_LISTAR = "/recursos-humanos/bonus",
-  RECURSOS_HUMANOS_NIVEIS_DESEMPENHO_LISTAR = "/recursos-humanos/niveis-de-desempenho",
+  RECURSOS_HUMANOS_CARGOS_CADASTRAR = "/departamento-pessoal/cargos/cadastrar",
+  RECURSOS_HUMANOS_FERIAS_CADASTRAR = "/departamento-pessoal/ferias/cadastrar",
+  RECURSOS_HUMANOS_FERIADOS_CADASTRAR = "/departamento-pessoal/feriados/cadastrar",
+  RECURSOS_HUMANOS_AVISOS_CADASTRAR = "/departamento-pessoal/avisos/cadastrar",
+  RECURSOS_HUMANOS_EPI_CADASTRAR = "/departamento-pessoal/epi/cadastrar",
+  RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR = "/departamento-pessoal/epi/entregas/cadastrar",
+  RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR = "/departamento-pessoal/epi/agendamentos/cadastrar",
+  RECURSOS_HUMANOS_SETORES_CADASTRAR = "/departamento-pessoal/setores/cadastrar",
+  RECURSOS_HUMANOS_BONUS_LISTAR = "/departamento-pessoal/bonus",
+  RECURSOS_HUMANOS_NIVEIS_DESEMPENHO_LISTAR = "/departamento-pessoal/niveis-de-desempenho",
 
   // Personal - List Pages
   PESSOAL_FERIADOS_LISTAR = "/pessoal/feriados",
@@ -2498,28 +2498,28 @@ export enum FAVORITE_PAGES {
   SERVIDOR_USUARIOS = "/servidor/usuarios",
 
   // Human Resources - Edit Pages
-  RECURSOS_HUMANOS_CARGOS_EDITAR = "/recursos-humanos/cargos/editar/:id",
-  RECURSOS_HUMANOS_FERIAS_EDITAR = "/recursos-humanos/ferias/editar/:id",
-  RECURSOS_HUMANOS_FERIADOS_EDITAR = "/recursos-humanos/feriados/editar/:id",
-  RECURSOS_HUMANOS_AVISOS_EDITAR = "/recursos-humanos/avisos/editar/:id",
-  RECURSOS_HUMANOS_SETORES_EDITAR = "/recursos-humanos/setores/editar/:id",
+  RECURSOS_HUMANOS_CARGOS_EDITAR = "/departamento-pessoal/cargos/editar/:id",
+  RECURSOS_HUMANOS_FERIAS_EDITAR = "/departamento-pessoal/ferias/editar/:id",
+  RECURSOS_HUMANOS_FERIADOS_EDITAR = "/departamento-pessoal/feriados/editar/:id",
+  RECURSOS_HUMANOS_AVISOS_EDITAR = "/departamento-pessoal/avisos/editar/:id",
+  RECURSOS_HUMANOS_SETORES_EDITAR = "/departamento-pessoal/setores/editar/:id",
 
   // Human Resources - Details Pages
-  RECURSOS_HUMANOS_CARGOS_DETALHES = "/recursos-humanos/cargos/detalhes/:id",
-  RECURSOS_HUMANOS_FERIAS_DETALHES = "/recursos-humanos/ferias/detalhes/:id",
-  RECURSOS_HUMANOS_FERIADOS_DETALHES = "/recursos-humanos/feriados/detalhes/:id",
-  RECURSOS_HUMANOS_AVISOS_DETALHES = "/recursos-humanos/avisos/detalhes/:id",
+  RECURSOS_HUMANOS_CARGOS_DETALHES = "/departamento-pessoal/cargos/detalhes/:id",
+  RECURSOS_HUMANOS_FERIAS_DETALHES = "/departamento-pessoal/ferias/detalhes/:id",
+  RECURSOS_HUMANOS_FERIADOS_DETALHES = "/departamento-pessoal/feriados/detalhes/:id",
+  RECURSOS_HUMANOS_AVISOS_DETALHES = "/departamento-pessoal/avisos/detalhes/:id",
 
   // Human Resources - Batch Edit Pages
-  RECURSOS_HUMANOS_CARGOS_EDITAR_LOTE = "/recursos-humanos/cargos/editar-lote",
-  RECURSOS_HUMANOS_FERIADOS_EDITAR_LOTE = "/recursos-humanos/feriados/editar-lote",
-  RECURSOS_HUMANOS_AVISOS_EDITAR_LOTE = "/recursos-humanos/avisos/editar-lote",
+  RECURSOS_HUMANOS_CARGOS_EDITAR_LOTE = "/departamento-pessoal/cargos/editar-lote",
+  RECURSOS_HUMANOS_FERIADOS_EDITAR_LOTE = "/departamento-pessoal/feriados/editar-lote",
+  RECURSOS_HUMANOS_AVISOS_EDITAR_LOTE = "/departamento-pessoal/avisos/editar-lote",
 
   // Human Resources - Calendar Pages
-  RECURSOS_HUMANOS_FERIADOS_CALENDARIO = "/recursos-humanos/feriados/calendario",
+  RECURSOS_HUMANOS_FERIADOS_CALENDARIO = "/departamento-pessoal/feriados/calendario",
 
   // Human Resources - Additional Pages
-  RECURSOS_HUMANOS_CARGOS_REMUNERACOES = "/recursos-humanos/cargos/:positionId/remuneracoes",
+  RECURSOS_HUMANOS_CARGOS_REMUNERACOES = "/departamento-pessoal/cargos/:positionId/remuneracoes",
 
   // Administration - Edit Pages
   ADMINISTRACAO_SETORES_EDITAR = "/administracao/setores/editar/:id",

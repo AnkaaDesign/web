@@ -15,6 +15,9 @@ import type { Icon as TablerIcon } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants";
+import { useAuth } from "@/contexts/auth-context";
+import { hasAnyPrivilege } from "@/utils";
+import { getRequiredPrivilegeForRoute } from "@/utils/route-privileges";
 
 interface ToolGroup {
   title: string;
@@ -90,6 +93,19 @@ const toolGroups: ToolGroup[] = [
 
 export function ToolsHubPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Hide tool cards the current sector cannot open (mirrors ROUTE_PRIVILEGES, incl.
+  // the ADMIN superuser bypass). Groups left with no accessible link are dropped.
+  const canAccess = (route: string): boolean => {
+    const required = getRequiredPrivilegeForRoute(route);
+    if (!required) return true;
+    const list = (Array.isArray(required) ? required : [required]) as Parameters<typeof hasAnyPrivilege>[1];
+    return hasAnyPrivilege(user as any, list);
+  };
+  const visibleGroups = toolGroups
+    .map((group) => ({ ...group, links: group.links.filter((link) => canAccess(link.route)) }))
+    .filter((group) => group.links.length > 0);
 
   return (
     <div className="h-full flex flex-col px-4 pt-4">
@@ -106,7 +122,7 @@ export function ToolsHubPage() {
 
       <div className="flex-1 overflow-y-auto pb-6">
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {toolGroups.map((group) => {
+          {visibleGroups.map((group) => {
             const GroupIcon = group.icon;
             return (
               <Card key={group.title} className="flex flex-col">

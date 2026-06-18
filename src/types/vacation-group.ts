@@ -23,7 +23,6 @@ export interface VacationGroup extends BaseEntity {
   acquisitiveEnd: Date;
   concessiveEnd: Date | null;
   status: VACATION_STATUS;
-  statusOrder: number;
   sectorIds: string[];
   positionIds: string[];
   notes: string | null;

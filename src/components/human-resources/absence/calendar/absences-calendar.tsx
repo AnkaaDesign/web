@@ -323,6 +323,14 @@ export function AbsencesCalendar() {
       return [];
     };
     let all = [...unwrap(absencesData), ...unwrap(unjustifiedData)];
+    // Dedupe: drop Secullum records that our DB already owns and renders. The
+    // Férias/Afastamento sync tags the Motivo with [ANKAA-VAC:<id>] /
+    // [ANKAA-LEAVE:<id>]; those are shown from our own data (vacations/leaves),
+    // so showing the mirrored Secullum copy too would double them up.
+    all = all.filter((a) => {
+      const motivo = a.Motivo ?? "";
+      return !motivo.includes("[ANKAA-VAC:") && !motivo.includes("[ANKAA-LEAVE:");
+    });
     if (selectedUserId !== ALL_USERS) {
       all = all.filter(
         (a) =>

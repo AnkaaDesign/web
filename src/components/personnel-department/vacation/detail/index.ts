@@ -1,4 +1,4 @@
-export { VacationStatusStepperCard, VACATION_STATUS_CHAIN, getNextVacationStatus } from "./vacation-status-stepper-card";
+export { VacationStatusStepperCard, getNextVacationStatus } from "./vacation-status-stepper-card";
 export { VacationSummaryCard } from "./vacation-summary-card";
 export { VacationBalanceCard } from "./vacation-balance-card";
 export { VacationReciboCard } from "./vacation-recibo-card";

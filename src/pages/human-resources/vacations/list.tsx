@@ -1,28 +1,30 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconPlus, IconCalendarStats } from "@tabler/icons-react";
+import { IconCalendarStats } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { AbsenceList, AbsenceFormDialog } from "@/components/human-resources/absence";
+import { AbsenceList } from "@/components/human-resources/absence";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
-export const VacationsListPage = () => {
+// Legacy Secullum-absence list (afastamentos sincronizados do ponto). NÃO é o
+// cadastro de Férias — as Férias têm seu próprio módulo em Departamento Pessoal
+// (DB-backed, espelha para o Secullum). O cadastro direto via Secullum foi
+// aposentado; esta página é somente leitura sobre os afastamentos do ponto.
+export const AbsencesListPage = () => {
   const navigate = useNavigate();
-  const [createOpen, setCreateOpen] = useState(false);
-  usePageTracker({ title: "Férias", icon: "vacation" });
+  usePageTracker({ title: "Afastamentos (Ponto)", icon: "vacation" });
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"
-          title="Férias"
+          title="Afastamentos (Ponto)"
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Férias" },
+            { label: "Afastamentos (Ponto)" },
           ]}
           actions={[
             {
@@ -32,23 +34,15 @@ export const VacationsListPage = () => {
               onClick: () => navigate(routes.humanResources.calendar.root),
               variant: "outline",
             },
-            {
-              key: "create",
-              label: "Adicionar",
-              icon: IconPlus,
-              onClick: () => setCreateOpen(true),
-              variant: "default",
-            },
           ]}
           className="flex-shrink-0"
         />
         <div className="flex-1 min-h-0 pb-6 flex flex-col">
           <AbsenceList className="h-full" />
         </div>
-        <AbsenceFormDialog open={createOpen} onOpenChange={setCreateOpen} />
       </div>
     </PrivilegeRoute>
   );
 };
 
-export default VacationsListPage;
+export default AbsencesListPage;

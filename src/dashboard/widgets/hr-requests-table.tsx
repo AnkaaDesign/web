@@ -1,5 +1,5 @@
 // HR requests widget — surfaces the same Secullum time-adjustment / justified-
-// absence approval queue that lives at /recursos-humanos/requisicoes.
+// absence approval queue that lives at /departamento-pessoal/requisicoes.
 //
 // Design decision: this widget mirrors the page's master-detail layout — a
 // compact card list on the left, detail panel on the right with vertical

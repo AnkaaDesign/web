@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useAdmission, useAdmissionMutations } from "@/hooks/personnel-department/use-admissions";
 
-const REQUIRED_PRIVILEGES = [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN];
+const REQUIRED_PRIVILEGES = [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER];
 
 export const AdmissionEditPage = () => {
   usePageTracker({ title: "Editar Admissão", icon: "user-plus" });

@@ -1,6 +1,6 @@
 // Cross-campaign skill-assessment analytics hooks.
 //
-// Three views power the /estatisticas/recursos-humanos/competencias page:
+// Three views power the /estatisticas/departamento-pessoal/competencias page:
 //   - useSkillStatsOverview     → KPIs + radar + ranking + topic histogram
 //   - useSkillStatsComparison   → multi-entity radar (user|sector vs company)
 //   - useSkillStatsEvolution    → per-assessment time series across campaigns

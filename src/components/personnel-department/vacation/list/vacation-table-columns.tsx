@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { VACATION_STATUS, VACATION_STATUS_LABELS } from "../../../../constants";
-import { formatDate, formatCurrency } from "../../../../utils";
+import { formatDate, formatCurrency, isVacationInProgress } from "../../../../utils";
 import type { Vacation } from "../../../../types/vacation";
 
 export interface VacationColumn {
@@ -19,15 +19,11 @@ export function isVacationFinal(vacation: Vacation): boolean {
   return FINAL_STATUSES.includes(vacation.status);
 }
 
-/** Maps the vacation status to a generic badge variant (no VACATION map in badge-colors yet). */
-export function getVacationStatusVariant(status: VACATION_STATUS): "secondary" | "warning" | "default" | "success" | "destructive" {
+/** Maps the vacation status to its centralized badge variant. */
+export function getVacationStatusVariant(status: VACATION_STATUS): "warning" | "success" | "destructive" | "secondary" {
   switch (status) {
-    case VACATION_STATUS.OPEN:
-      return "secondary";
     case VACATION_STATUS.SCHEDULED:
       return "warning";
-    case VACATION_STATUS.IN_PROGRESS:
-      return "default";
     case VACATION_STATUS.PAID:
       return "success";
     case VACATION_STATUS.EXPIRED:
@@ -203,13 +199,18 @@ export const createVacationColumns = (): VacationColumn[] => [
 
   // Status
   {
-    key: "statusOrder",
+    key: "status",
     header: "STATUS",
-    accessor: (vacation: Vacation) => (
-      <Badge variant={getVacationStatusVariant(vacation.status)} className="text-xs whitespace-nowrap">
-        {VACATION_STATUS_LABELS[vacation.status] || vacation.status}
-      </Badge>
-    ),
+    accessor: (vacation: Vacation) =>
+      isVacationInProgress(vacation) ? (
+        <Badge variant="active" className="text-xs whitespace-nowrap">
+          Em gozo
+        </Badge>
+      ) : (
+        <Badge variant={getVacationStatusVariant(vacation.status)} className="text-xs whitespace-nowrap">
+          {VACATION_STATUS_LABELS[vacation.status] || vacation.status}
+        </Badge>
+      ),
     sortable: true,
     className: "min-w-[130px]",
     align: "left",
@@ -260,4 +261,4 @@ export const createVacationColumns = (): VacationColumn[] => [
   },
 ];
 
-export const DEFAULT_VACATION_VISIBLE_COLUMNS = new Set(["user.name", "acquisitiveStart", "gozo", "concessiveEnd", "entitledDays", "abonoPecuniarioDays", "isDouble", "statusOrder"]);
+export const DEFAULT_VACATION_VISIBLE_COLUMNS = new Set(["user.name", "acquisitiveStart", "gozo", "concessiveEnd", "entitledDays", "abonoPecuniarioDays", "isDouble", "status"]);

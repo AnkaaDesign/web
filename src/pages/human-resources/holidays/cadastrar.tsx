@@ -28,7 +28,7 @@ export const HolidayCreatePage = () => {
     try {
       create(data, {
         onSuccess: () => {
-          navigate("/recursos-humanos/feriados");
+          navigate("/departamento-pessoal/feriados");
         },
       });
     } catch (error) {
@@ -39,7 +39,7 @@ export const HolidayCreatePage = () => {
   };
 
   const handleCancel = () => {
-    navigate("/recursos-humanos/feriados");
+    navigate("/departamento-pessoal/feriados");
   };
 
   const actions = [
@@ -73,8 +73,8 @@ export const HolidayCreatePage = () => {
               favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_CADASTRAR}
               breadcrumbs={[
                 { label: "Início", href: routes.home },
-                { label: "Recursos Humanos", href: routes.humanResources.root },
-                { label: "Feriados", href: "/recursos-humanos/feriados" },
+                { label: "Departamento Pessoal", href: routes.administration.collaborators.root },
+                { label: "Feriados", href: routes.humanResources.holidays.root },
                 { label: "Novo" },
               ]}
               actions={actions}

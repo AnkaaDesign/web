@@ -1,7 +1,7 @@
 // PPE delivery approval widget — for HR / ADMIN users to view, approve and
 // reject pending PPE deliveries inline from the home dashboard.
 //
-// Mirrors the standalone /recursos-humanos/epi/entregas list page but compact:
+// Mirrors the standalone /departamento-pessoal/epi/entregas list page but compact:
 //   • Default filter: PENDING + WAITING_SIGNATURE (the actionable states)
 //   • Inline action column with Approve (IconCircleCheck) / Reject (IconCircleX)
 //   • Reject opens AlertDialog with a reason Textarea

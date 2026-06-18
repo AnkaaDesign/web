@@ -1,4 +1,4 @@
-// DATA drill-down content for the /estatisticas/recursos-humanos/competencias
+// DATA drill-down content for the /estatisticas/departamento-pessoal/competencias
 // page. About the NUMBERS: each topic's average score, response count and score
 // distribution in the active scope; clicking a topic drills into the raw
 // evaluations behind it.
