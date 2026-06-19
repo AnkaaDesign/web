@@ -33,6 +33,8 @@ export interface ReceivableRow {
   hasBankSlip: boolean;
   /** Already conciliated against a bank credit. */
   reconciled: boolean;
+  /** Bank transaction this receipt was conciliated against (for row linking). */
+  transactionId: string | null;
 }
 
 export interface ReceivablesSummaryBucket {

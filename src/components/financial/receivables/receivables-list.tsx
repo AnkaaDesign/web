@@ -158,13 +158,15 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
 
   // --- Period scope: keep only the rows that belong to the selected month ----
   // A received row's month is its paidAt; otherwise its due date. Undated rows
-  // have no natural month, so they stay visible across every period.
+  // have no natural month — show them only in the CURRENT month so they aren't
+  // double-counted into every period's KPI cards.
   const monthRows = useMemo(() => {
     const key = monthKey(month);
+    const currentKey = monthKey(new Date());
     return allRows.filter((row) => {
       if (row.state === "RECEIVED") return row.paidAt ? monthKey(new Date(row.paidAt)) === key : false;
       if (row.dueDate) return monthKey(new Date(row.dueDate)) === key;
-      return true;
+      return key === currentKey;
     });
   }, [allRows, month]);
 
@@ -180,7 +182,9 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
     for (const row of monthRows) {
       const bucket = STATE_TO_BUCKET[row.state];
       out[bucket].count += 1;
-      out[bucket].total += row.amount;
+      // Open buckets show OUTSTANDING (amount − received); RECEIVED shows what
+      // came in — matching the API summary (was summing gross amount).
+      out[bucket].total += bucket === "RECEIVED" ? row.paidAmount : row.amount - row.paidAmount;
     }
     return out;
   }, [monthRows]);
@@ -214,10 +218,14 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
     return rows;
   }, [filteredRows]);
 
-  // Open the related invoice (NFS-e) detail when one is linked.
+  // A reconciled receipt links to the bank transaction it was matched against,
+  // where the operator can review / undo the reconciliation. Non-reconciled rows
+  // have no meaningful detail target yet, so they stay informational (no nav to
+  // an unrelated fiscal document — the previous behavior misrouted invoiceId into
+  // the NF-detail route).
   const handleRowClick = (row: ReceivableRow) => {
-    if (row.invoiceId) {
-      navigate(routes.financial.reconciliation.fiscalDocumentDetail(row.invoiceId));
+    if (row.transactionId) {
+      navigate(routes.financial.reconciliation.transactionDetail(row.transactionId));
     }
   };
 

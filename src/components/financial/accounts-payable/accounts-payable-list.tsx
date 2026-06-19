@@ -12,6 +12,7 @@ import {
   IconUsers,
   IconGift,
   IconArrowRight,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 
 import type { PayableRow, PayableState } from "../../../types";
@@ -37,6 +38,7 @@ import { useRecurrentPayableMutations } from "@/hooks/financial/use-recurrent-pa
 // not a real debt yet. ---------------------------------------------------------
 const PAYABLE_STATE_LABELS: Record<PayableState, string> = {
   AWAITING_PAYMENT: "Aguardando Pagamento",
+  OVERDUE: "Vencido",
   PARTIALLY_PAID: "Parcialmente Pago",
   EXPECTED: "Previsto/Recorrente",
   PAID: "Pago",
@@ -44,40 +46,44 @@ const PAYABLE_STATE_LABELS: Record<PayableState, string> = {
 
 const PAYABLE_STATE_BADGE: Record<PayableState, BadgeProps["variant"]> = {
   AWAITING_PAYMENT: "pending", // amber — open obligation awaiting payment
+  OVERDUE: "destructive", // red — past due
   PARTIALLY_PAID: "orange",
   EXPECTED: "outline", // muted — forecast/recurrent, not a real debt yet
   PAID: "completed", // green
 };
 
 // --- Summary cards double as clickable filter buckets (Conciliação pattern). ----
-type PayableBucketKey = "AWAITING" | "PARTIAL" | "EXPECTED" | "PAID";
+type PayableBucketKey = "AWAITING" | "OVERDUE" | "PARTIAL" | "EXPECTED" | "PAID";
 
 const PAYABLE_BUCKETS: Record<
   PayableBucketKey,
   { label: string; Icon: React.ComponentType<{ className?: string }>; tone: string; states: PayableState[] }
 > = {
   AWAITING: { label: "Aguardando Pagamento", Icon: IconProgressCheck, tone: "text-amber-600 bg-amber-500/10", states: ["AWAITING_PAYMENT"] },
+  OVERDUE: { label: "Vencido", Icon: IconAlertTriangle, tone: "text-red-600 bg-red-500/10", states: ["OVERDUE"] },
   PARTIAL: { label: "Parcialmente Pago", Icon: IconCoins, tone: "text-orange-600 bg-orange-500/10", states: ["PARTIALLY_PAID"] },
   EXPECTED: { label: "Previsto/Recorrente", Icon: IconRepeat, tone: "text-neutral-500 bg-neutral-500/10", states: ["EXPECTED"] },
   PAID: { label: "Pago no mês", Icon: IconCash, tone: "text-emerald-600 bg-emerald-500/10", states: ["PAID"] },
 };
 
-const BUCKET_ORDER: PayableBucketKey[] = ["AWAITING", "PARTIAL", "EXPECTED", "PAID"];
-// Default view: every open/forecast obligation; paid-this-month is opt-in (click the card).
-const DEFAULT_BUCKETS: PayableBucketKey[] = ["AWAITING", "PARTIAL", "EXPECTED"];
+const BUCKET_ORDER: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED", "PAID"];
+// Default view: every open/overdue/forecast obligation; paid-this-month is opt-in (click the card).
+const DEFAULT_BUCKETS: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED"];
 
 const STATE_TO_BUCKET: Record<PayableState, PayableBucketKey> = {
   AWAITING_PAYMENT: "AWAITING",
+  OVERDUE: "OVERDUE",
   PARTIALLY_PAID: "PARTIAL",
   EXPECTED: "EXPECTED",
   PAID: "PAID",
 };
 
-// Row ordering rank: open obligations first, then paid-this-month, then forecasts.
+// Row ordering rank: overdue first, then open obligations, then paid-this-month, then forecasts.
 function payableRank(state: PayableState): number {
-  if (state === "EXPECTED") return 2;
-  if (state === "PAID") return 1;
-  return 0;
+  if (state === "EXPECTED") return 3;
+  if (state === "PAID") return 2;
+  if (state === "OVERDUE") return 0;
+  return 1;
 }
 
 // Routes that the production schedule (cronograma) detail requires — ACCOUNTING

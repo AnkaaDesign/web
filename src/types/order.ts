@@ -508,7 +508,7 @@ export type PayableSettleVia =
   | "RECURRENT_PAYABLE"
   | "NONE";
 
-export type PayableState = "AWAITING_PAYMENT" | "PARTIALLY_PAID" | "EXPECTED" | "PAID";
+export type PayableState = "AWAITING_PAYMENT" | "OVERDUE" | "PARTIALLY_PAID" | "EXPECTED" | "PAID";
 
 /** One normalized payable row: an open order, an airbrushing painter payment, or a scheduled/expected outflow. */
 export interface PayableRow {
@@ -544,6 +544,7 @@ export interface PayableRow {
 
 export interface PayablesSummary {
   AWAITING_PAYMENT: OrderPaymentSummaryBucket;
+  OVERDUE: OrderPaymentSummaryBucket;
   PARTIALLY_PAID: OrderPaymentSummaryBucket;
   EXPECTED: OrderPaymentSummaryBucket;
   /** Settled this month. */
