@@ -56,9 +56,10 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/financeiro/orcamento": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
   "/financeiro/orcamento/cadastrar": ["ADMIN", "COMMERCIAL"],
   "/financeiro/orcamento/detalhes/:id": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
-  // Elotech NFS-e issuance pages — ACCOUNTING intentionally excluded (its "Notas
-  // Fiscais" is the reconciliation fiscal-documents page at /financeiro/conciliacao/notas).
-  "/financeiro/notas-fiscais": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
+  // Unified Notas Fiscais page (Emitidas via Elotech + Recebidas via SIEG) — the
+  // direction toggle is sector-defaulted; ACCOUNTING included for the Recebidas tab.
+  "/financeiro/notas-fiscais": ["FINANCIAL", "ADMIN", "COMMERCIAL", "ACCOUNTING"],
+  // NFS-e detail stays issuance-side (no ACCOUNTING).
   "/financeiro/notas-fiscais/:id": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
   // Contas a Pagar - orders by payment status (ACCOUNTING + FINANCIAL + ADMIN)
   "/financeiro/contas-a-pagar": ["ACCOUNTING", "FINANCIAL", "ADMIN"],

@@ -79,7 +79,7 @@ function RequisicosList() {
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Departamento Pessoal", href: routes.administration.collaborators.root },
-            { label: "Controle de Ponto", href: routes.humanResources.timeClock.root },
+            { label: "Controle de Ponto", href: routes.personnelDepartment.timeClock.root },
             { label: "Requisições" },
           ]}
           actions={getHeaderActions()}

@@ -27,14 +27,14 @@ export const WarningEditPage = () => {
   });
 
   if (!id) {
-    return <Navigate to={routes.humanResources.warnings.root} replace />;
+    return <Navigate to={routes.personnelDepartment.warnings.root} replace />;
   }
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <p className="text-destructive mb-4">Erro ao carregar advertência</p>
-        <Navigate to={routes.humanResources.warnings.root} replace />
+        <Navigate to={routes.personnelDepartment.warnings.root} replace />
       </div>
     );
   }
@@ -48,7 +48,7 @@ export const WarningEditPage = () => {
   }
 
   if (!warning || !warning.data) {
-    return <Navigate to={routes.humanResources.warnings.root} replace />;
+    return <Navigate to={routes.personnelDepartment.warnings.root} replace />;
   }
 
   return (
@@ -60,9 +60,9 @@ export const WarningEditPage = () => {
           icon={IconAlertTriangle}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Advertências", href: routes.humanResources.warnings.root },
-            { label: warning.data.collaborator?.name || "Advertência", href: routes.humanResources.warnings.details(id) },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+            { label: "Advertências", href: routes.personnelDepartment.warnings.root },
+            { label: warning.data.collaborator?.name || "Advertência", href: routes.personnelDepartment.warnings.details(id) },
             { label: "Editar" },
           ]}
           className="flex-shrink-0"

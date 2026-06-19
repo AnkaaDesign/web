@@ -137,10 +137,10 @@ const EpiDetailsPage = () => {
             <h2 className="text-xl sm:text-2xl font-semibold mb-3 text-foreground">EPI não encontrado</h2>
             <p className="text-sm sm:text-base text-muted-foreground mb-6 leading-relaxed">O EPI que você está procurando não existe ou foi removido do sistema.</p>
             <div className="space-y-3">
-              <Button onClick={() => navigate(routes.humanResources.ppe.root)} className="w-full sm:w-auto">
+              <Button onClick={() => navigate(routes.personnelDepartment.ppe.root)} className="w-full sm:w-auto">
                 Ir para Lista de EPIs
               </Button>
-              <Button variant="outline" onClick={() => navigate(routes.humanResources.root)} className="w-full sm:w-auto">
+              <Button variant="outline" onClick={() => navigate(routes.personnelDepartment.root)} className="w-full sm:w-auto">
                 Ir para RH
               </Button>
             </div>
@@ -151,7 +151,7 @@ const EpiDetailsPage = () => {
   }
 
   const handleEdit = () => {
-    navigate(routes.humanResources.ppe.edit(item.id));
+    navigate(routes.personnelDepartment.ppe.edit(item.id));
   };
 
   const handleRefresh = () => {
@@ -182,8 +182,8 @@ const EpiDetailsPage = () => {
           ]}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "RH", href: routes.humanResources.root },
-            { label: "EPIs", href: routes.humanResources.ppe.root },
+            { label: "RH", href: routes.personnelDepartment.root },
+            { label: "EPIs", href: routes.personnelDepartment.ppe.root },
             { label: item.name },
           ]}
           className="shadow-sm"

@@ -34,6 +34,9 @@ export function VacationSecullumStatusCard({ vacationId, className }: VacationSe
   const meta = STATE_META[status?.state ?? "UNKNOWN"];
 
   const handleSync = async () => {
+    // The sync endpoint returns HTTP 200 even when Secullum rejected the push;
+    // the real outcome is embedded at result.data.{success,message}. The hook
+    // already toasts the Secullum message on success === false; just re-read.
     await sync.mutateAsync(vacationId);
     refetch();
   };

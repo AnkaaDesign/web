@@ -20,8 +20,8 @@ export const PpeSizeListPage = () => {
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_TAMANHOS_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "RH", href: routes.humanResources.root },
-            { label: "EPIs", href: routes.humanResources.ppe.root },
+            { label: "RH", href: routes.personnelDepartment.root },
+            { label: "EPIs", href: routes.personnelDepartment.ppe.root },
             { label: "Tamanhos" },
           ]}
         />

@@ -15,7 +15,7 @@ export const SchedulesListPage = () => {
           title="Horários"
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
             { label: "Horários" },
           ]}
           className="flex-shrink-0"

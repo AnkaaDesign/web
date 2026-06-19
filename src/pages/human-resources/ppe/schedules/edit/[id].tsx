@@ -47,11 +47,11 @@ export const PPEScheduleEditPage = () => {
       id: id!,
       data,
     });
-    navigate(routes.humanResources.ppe.schedules.details(id!));
+    navigate(routes.personnelDepartment.ppe.schedules.details(id!));
   };
 
   const handleCancel = () => {
-    navigate(routes.humanResources.ppe.schedules.details(id!));
+    navigate(routes.personnelDepartment.ppe.schedules.details(id!));
   };
 
   const actions = [
@@ -86,9 +86,9 @@ export const PPEScheduleEditPage = () => {
             icon={IconCalendar}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Recursos Humanos", href: routes.humanResources.root },
-              { label: "EPIs", href: routes.humanResources.ppe.root },
-              { label: "Agendamentos", href: routes.humanResources.ppe.schedules.root },
+              { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+              { label: "EPIs", href: routes.personnelDepartment.ppe.root },
+              { label: "Agendamentos", href: routes.personnelDepartment.ppe.schedules.root },
               { label: "Editar" },
             ]}
             backButton={{
@@ -126,13 +126,13 @@ export const PPEScheduleEditPage = () => {
             icon={IconCalendar}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Recursos Humanos", href: routes.humanResources.root },
-              { label: "EPIs", href: routes.humanResources.ppe.root },
-              { label: "Agendamentos", href: routes.humanResources.ppe.schedules.root },
+              { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+              { label: "EPIs", href: routes.personnelDepartment.ppe.root },
+              { label: "Agendamentos", href: routes.personnelDepartment.ppe.schedules.root },
               { label: "Editar" },
             ]}
             backButton={{
-              onClick: () => navigate(routes.humanResources.ppe.schedules.root),
+              onClick: () => navigate(routes.personnelDepartment.ppe.schedules.root),
             }}
           />
 
@@ -141,7 +141,7 @@ export const PPEScheduleEditPage = () => {
               <IconCalendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold">Agendamento não encontrado</h3>
               <p className="text-muted-foreground mb-4">O agendamento de EPI solicitado não foi encontrado ou não existe.</p>
-              <Button onClick={() => navigate(routes.humanResources.ppe.schedules.root)}>Voltar para lista</Button>
+              <Button onClick={() => navigate(routes.personnelDepartment.ppe.schedules.root)}>Voltar para lista</Button>
             </CardContent>
           </Card>
         </div>
@@ -158,10 +158,10 @@ export const PPEScheduleEditPage = () => {
           icon={IconCalendar}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "EPIs", href: routes.humanResources.ppe.root },
-            { label: "Agendamentos", href: routes.humanResources.ppe.schedules.root },
-            { label: ppeSchedule.data.name || `#${ppeSchedule.data.id.slice(-8)}`, href: routes.humanResources.ppe.schedules.details(ppeSchedule.data.id) },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+            { label: "EPIs", href: routes.personnelDepartment.ppe.root },
+            { label: "Agendamentos", href: routes.personnelDepartment.ppe.schedules.root },
+            { label: ppeSchedule.data.name || `#${ppeSchedule.data.id.slice(-8)}`, href: routes.personnelDepartment.ppe.schedules.details(ppeSchedule.data.id) },
             { label: "Editar" },
           ]}
           actions={actions}

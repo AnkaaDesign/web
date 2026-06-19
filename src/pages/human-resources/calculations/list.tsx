@@ -24,7 +24,7 @@ export default function HumanResourcesCalculationsPage() {
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CALCULOS}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
             { label: "Cálculos de Ponto" }
           ]}
           headerExtra={

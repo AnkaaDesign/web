@@ -64,14 +64,14 @@ export const PositionDetailPage = () => {
   const position = response?.data;
 
   if (!id) {
-    return <Navigate to={routes.humanResources.positions.root} replace />;
+    return <Navigate to={routes.personnelDepartment.positions.root} replace />;
   }
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <p className="text-destructive mb-4">Erro ao carregar cargo</p>
-        <Navigate to={routes.humanResources.positions.root} replace />
+        <Navigate to={routes.personnelDepartment.positions.root} replace />
       </div>
     );
   }
@@ -85,13 +85,13 @@ export const PositionDetailPage = () => {
   }
 
   if (!position) {
-    return <Navigate to={routes.humanResources.positions.root} replace />;
+    return <Navigate to={routes.personnelDepartment.positions.root} replace />;
   }
 
   const handleDelete = async () => {
     try {
       await deleteAsync(id);
-      navigate(routes.humanResources.positions.root);
+      navigate(routes.personnelDepartment.positions.root);
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {
         console.error("Error deleting position:", error);
@@ -109,8 +109,8 @@ export const PositionDetailPage = () => {
           title={position.name}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Cargos", href: routes.humanResources.positions.root },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+            { label: "Cargos", href: routes.personnelDepartment.positions.root },
             { label: position.name },
           ]}
           actions={[
@@ -125,7 +125,7 @@ export const PositionDetailPage = () => {
               key: "edit",
               label: "Editar",
               icon: IconEdit,
-              onClick: () => navigate(routes.humanResources.positions.edit(id)),
+              onClick: () => navigate(routes.personnelDepartment.positions.edit(id)),
             },
             {
               key: "delete",

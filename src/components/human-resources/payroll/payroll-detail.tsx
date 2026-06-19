@@ -226,7 +226,7 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate(routes.humanResources.payroll.root)}
+            onClick={() => navigate(routes.personnelDepartment.payroll.root)}
           >
             <IconArrowLeft className="h-4 w-4" />
             Voltar

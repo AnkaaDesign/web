@@ -157,7 +157,7 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate(routes.humanResources.bonus.details(bonus.id))}
+            onClick={() => navigate(routes.personnelDepartment.bonus.details(bonus.id))}
           >
             <IconEye className="h-4 w-4" />
           </Button>
@@ -208,7 +208,7 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
               Simulação de Bônus
             </Button>
             {!showSimulation && (
-              <Button onClick={() => navigate(routes.humanResources.bonus.simulation)}>
+              <Button onClick={() => navigate(routes.personnelDepartment.bonus.simulation)}>
                 <IconPlus className="h-4 w-4 mr-2" />
                 Nova Simulação
               </Button>

@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Combobox } from "@/components/ui/combobox";
@@ -180,6 +181,9 @@ function DepartamentoMappingCard() {
   );
 
   const isLoading = departamentosQ.isLoading || sectorsQ.isLoading;
+  // Secullum catalog read failure: surface it instead of rendering an empty
+  // mapping section that looks like "no departamentos exist".
+  const isError = departamentosQ.isError;
   const linkedCount = groups.reduce((acc, g) => acc + g.linked.length, 0);
 
   return (
@@ -214,6 +218,12 @@ function DepartamentoMappingCard() {
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-24 w-full" />
           </div>
+        ) : isError ? (
+          <ErrorState
+            title="Erro ao carregar departamentos do Secullum"
+            description="Não foi possível ler o catálogo de departamentos do ponto (Secullum). Verifique a integração e tente novamente."
+            onRetry={() => departamentosQ.refetch()}
+          />
         ) : (
           <div className="space-y-3">
             {groups.map((g) => (
@@ -242,7 +252,7 @@ function DepartamentoMappingCard() {
           </div>
         )}
 
-        {!isLoading && unmappedSectors.length > 0 && (
+        {!isLoading && !isError && unmappedSectors.length > 0 && (
           <UnmappedPanel
             title="Setores Ankaa sem departamento Secullum"
             description="Crie um departamento equivalente no Secullum, ou vincule a um existente acima."
@@ -468,6 +478,8 @@ function FuncaoMappingCard() {
   );
 
   const isLoading = funcoesQ.isLoading || positionsQ.isLoading;
+  // Secullum catalog read failure: surface it instead of an empty mapping.
+  const isError = funcoesQ.isError;
   const linkedCount = groups.reduce((acc, g) => acc + g.linked.length, 0);
 
   return (
@@ -499,6 +511,12 @@ function FuncaoMappingCard() {
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
           </div>
+        ) : isError ? (
+          <ErrorState
+            title="Erro ao carregar funções do Secullum"
+            description="Não foi possível ler o catálogo de funções do ponto (Secullum). Verifique a integração e tente novamente."
+            onRetry={() => funcoesQ.refetch()}
+          />
         ) : (
           <div className="space-y-3">
             {groups.map((g) => (
@@ -521,7 +539,7 @@ function FuncaoMappingCard() {
           </div>
         )}
 
-        {!isLoading && unmappedPositions.length > 0 && (
+        {!isLoading && !isError && unmappedPositions.length > 0 && (
           <UnmappedPanel
             title="Cargos Ankaa sem função Secullum"
             description="Crie uma função equivalente no Secullum, ou vincule a uma existente acima."
@@ -751,6 +769,10 @@ function FuncionariosCard() {
   const ativosPending = ativos.filter((f) => matchUser(f)?.via === "payroll").length;
 
   const isLoading = ativosQ.isLoading || demitidosQ.isLoading || usersQ.isLoading;
+  // Secullum catalog read failures: surface them per-section instead of showing
+  // a "no funcionários" empty state when the read actually failed.
+  const ativosError = ativosQ.isError;
+  const demitidosError = demitidosQ.isError;
 
   return (
     <div className="space-y-6">
@@ -802,6 +824,12 @@ function FuncionariosCard() {
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
           </div>
+        ) : ativosError ? (
+          <ErrorState
+            title="Erro ao carregar funcionários ativos do Secullum"
+            description="Não foi possível ler os funcionários ativos do ponto (Secullum). Verifique a integração e tente novamente."
+            onRetry={() => ativosQ.refetch()}
+          />
         ) : (
           <FuncionariosTable rows={ativosFiltered} matchUser={matchUser} variant="ativo" />
         )}
@@ -822,6 +850,12 @@ function FuncionariosCard() {
 
         {isLoading ? (
           <Skeleton className="h-32 w-full" />
+        ) : demitidosError ? (
+          <ErrorState
+            title="Erro ao carregar funcionários demitidos do Secullum"
+            description="Não foi possível ler os funcionários desligados do ponto (Secullum). Verifique a integração e tente novamente."
+            onRetry={() => demitidosQ.refetch()}
+          />
         ) : (
           <FuncionariosTable rows={demitidosFiltered} matchUser={matchUser} variant="demitido" />
         )}

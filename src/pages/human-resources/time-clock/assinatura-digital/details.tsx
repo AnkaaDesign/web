@@ -25,11 +25,11 @@ export default function AssinaturaDigitalDetailsPage() {
           title={apuracaoId ? `Apuração #${apuracaoId}` : "Apuração inválida"}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Controle de Ponto", href: routes.humanResources.timeClock.list },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+            { label: "Controle de Ponto", href: routes.personnelDepartment.timeClock.list },
             {
               label: "Fechamento",
-              href: routes.humanResources.timeClock.fechamento.list,
+              href: routes.personnelDepartment.timeClock.fechamento.list,
             },
             { label: apuracaoId ? `#${apuracaoId}` : "—" },
           ]}

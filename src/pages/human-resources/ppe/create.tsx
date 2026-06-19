@@ -43,7 +43,7 @@ export const CreateEpiPage = () => {
       const result = await createAsync(validatedData);
       if (result?.success && result?.data) {
         // Clear URL parameters after successful submission
-        navigate(routes.humanResources.ppe.root, { replace: true });
+        navigate(routes.personnelDepartment.ppe.root, { replace: true });
       }
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
@@ -70,7 +70,7 @@ export const CreateEpiPage = () => {
 
   const handleCancel = () => {
     // Clear URL parameters when cancelling
-    navigate(routes.humanResources.ppe.root, { replace: true });
+    navigate(routes.personnelDepartment.ppe.root, { replace: true });
   };
 
   const actions = [
@@ -119,7 +119,7 @@ export const CreateEpiPage = () => {
         variant="form"
         title="Cadastrar EPI"
         icon={IconShield}
-        breadcrumbs={[{ label: "RH", href: routes.humanResources.root }, { label: "EPIs", href: routes.humanResources.ppe.root }, { label: "Cadastrar" }]}
+        breadcrumbs={[{ label: "RH", href: routes.personnelDepartment.root }, { label: "EPIs", href: routes.personnelDepartment.ppe.root }, { label: "Cadastrar" }]}
         actions={actions}
         favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_CADASTRAR}
       />

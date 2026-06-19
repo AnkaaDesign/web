@@ -33,12 +33,12 @@ export const EPIDeliveryCreate = () => {
     closeResultDialog();
     // Navigate to list after closing dialog if requested
     if (shouldNavigate) {
-      navigate(routes.humanResources.ppe.deliveries.root);
+      navigate(routes.personnelDepartment.ppe.deliveries.root);
     }
   };
 
   const handleCancel = () => {
-    navigate(routes.humanResources.ppe.deliveries.root);
+    navigate(routes.personnelDepartment.ppe.deliveries.root);
   };
 
   const actions = [
@@ -70,9 +70,9 @@ export const EPIDeliveryCreate = () => {
           icon={IconShield}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "RH", href: routes.humanResources.root },
-            { label: "EPI", href: routes.humanResources.ppe.root },
-            { label: "Entregas", href: routes.humanResources.ppe.deliveries.root },
+            { label: "RH", href: routes.personnelDepartment.root },
+            { label: "EPI", href: routes.personnelDepartment.ppe.root },
+            { label: "Entregas", href: routes.personnelDepartment.ppe.deliveries.root },
             { label: "Nova Entrega" },
           ]}
           actions={actions}

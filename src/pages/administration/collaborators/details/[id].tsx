@@ -14,6 +14,7 @@ import { UserPositionHistoryCard } from "@/components/personnel-department/user-
 import { UserBenefitsCard } from "@/components/personnel-department/user-benefit/user-benefits-card";
 import { DependentsCard } from "@/components/human-resources/dependent/dependents-card";
 import { CollaboratorLoansCard } from "@/components/personnel-department/collaborator-loans-card";
+import { CollaboratorThirteenthCard } from "@/components/personnel-department/collaborator-thirteenth-card";
 import { UserDetailSkeleton } from "@/components/administration/user/detail/user-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
@@ -204,6 +205,9 @@ const CollaboratorDetailsPage = () => {
 
             {/* Folha: Empréstimos / Adiantamentos — somente CLT */}
             {isCltCollaborator && <CollaboratorLoansCard userId={id} />}
+
+            {/* Folha: 13º Salário — gerido por colaborador (self-gated HR/ADMIN/Contabilidade) */}
+            <CollaboratorThirteenthCard userId={id} userName={user.name} />
 
             {/* Auditoria: Atividades + Histórico de Alterações (changelog) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

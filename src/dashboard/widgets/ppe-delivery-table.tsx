@@ -528,7 +528,7 @@ function PpeDeliveryTableRender({
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       viewAllHref={
         (config.display.showViewAllLink ?? true)
-          ? routes.humanResources.ppe.deliveries.root
+          ? routes.personnelDepartment.ppe.deliveries.root
           : undefined
       }
       headerExtra={headerExtra}
@@ -574,7 +574,7 @@ function PpeDeliveryTableRender({
                 className={`grid gap-x-3 items-center ${dens.row} cursor-pointer ${rowBorder} ${rowHover} ${stripeBg} transition-colors`}
                 style={{ gridTemplateColumns: gridTemplate }}
                 onClick={() =>
-                  navigate(routes.humanResources.ppe.deliveries.details(d.id))
+                  navigate(routes.personnelDepartment.ppe.deliveries.details(d.id))
                 }
                 onContextMenu={(e) => handleContextMenu(e, d)}
               >
@@ -608,7 +608,7 @@ function PpeDeliveryTableRender({
             <DropdownMenuItem
               onClick={() =>
                 contextMenu &&
-                navigate(routes.humanResources.ppe.deliveries.details(contextMenu.delivery.id))
+                navigate(routes.personnelDepartment.ppe.deliveries.details(contextMenu.delivery.id))
               }
             >
               <IconCircleCheck className="mr-2 h-4 w-4 opacity-0" />

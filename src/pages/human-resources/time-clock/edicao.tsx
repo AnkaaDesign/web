@@ -25,8 +25,8 @@ export default function TimeClockEdicaoPage() {
           title="Edição"
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Controle de Ponto", href: routes.humanResources.timeClock.root },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+            { label: "Controle de Ponto", href: routes.personnelDepartment.timeClock.root },
             { label: "Edição" },
           ]}
           headerExtra={

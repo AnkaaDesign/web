@@ -54,7 +54,7 @@ export const PositionBatchEditPage = () => {
   const allPositionsFound = positions.length === positionIds.length;
 
   const handleCancel = () => {
-    navigate(routes.humanResources.positions.root);
+    navigate(routes.personnelDepartment.positions.root);
   };
 
   if (positionIds.length === 0) {
@@ -131,7 +131,7 @@ export const PositionBatchEditPage = () => {
                     Voltar para Lista
                   </Button>
                   {positions.length > 0 && (
-                    <Button onClick={() => navigate(routes.humanResources.positions.root)}>
+                    <Button onClick={() => navigate(routes.personnelDepartment.positions.root)}>
                       <IconBriefcase className="mr-2 h-4 w-4" />
                       Ir para Lista de Cargos
                     </Button>
@@ -177,8 +177,8 @@ export const PositionBatchEditPage = () => {
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
           breadcrumbs={[
             { label: "Início", href: "/" },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Cargos", href: routes.humanResources.positions.root },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+            { label: "Cargos", href: routes.personnelDepartment.positions.root },
             { label: "Editar em Lote" },
           ]}
           actions={actions}

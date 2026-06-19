@@ -2,6 +2,7 @@
 // Férias (Departamento Pessoal) — Part C
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/components/ui/sonner";
 import {
   getVacations,
   getVacationById,
@@ -142,7 +143,14 @@ export function useVacationSyncSecullum() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => syncVacationSecullum(id),
-    onSuccess: (_data, id) => {
+    onSuccess: (response, id) => {
+      // The sync endpoint returns HTTP 200 even when Secullum rejected the push;
+      // the real outcome is embedded at response.data.{success,message}. Surface
+      // the Secullum message as an error toast instead of silently succeeding.
+      const result = response?.data;
+      if (result && result.success === false) {
+        toast.error(result.message || "Falha ao sincronizar as férias no ponto (Secullum).");
+      }
       queryClient.invalidateQueries({ queryKey: [...vacationKeys.detail(id), "secullum-status"] });
     },
   });

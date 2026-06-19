@@ -321,7 +321,7 @@ export function PayrollList({ className }: PayrollListProps) {
 
   // Handle row click
   const handleRowClick = (payroll: Payroll) => {
-    navigate(routes.humanResources.payroll.detail(payroll.id));
+    navigate(routes.personnelDepartment.payroll.detail(payroll.id));
   };
 
   // Handle batch operations

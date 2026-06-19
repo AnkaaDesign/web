@@ -10,6 +10,7 @@ import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { SchedulesTable, type SecullumHorario } from "./schedules-table";
 import { SchedulesEmpty } from "./schedules-empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
 
 interface SchedulesListProps {
   className?: string;
@@ -23,7 +24,7 @@ export function SchedulesList({ className }: SchedulesListProps) {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   // Fetch all schedules (Secullum API doesn't support pagination)
-  const { data: schedulesData, isLoading } = useSecullumHorarios({ incluirDesativados: true });
+  const { data: schedulesData, isLoading, isError, refetch } = useSecullumHorarios({ incluirDesativados: true });
 
   // State for URL params
   const [urlParams, setUrlParams] = useState(() => new URLSearchParams(window.location.search));
@@ -175,6 +176,14 @@ export function SchedulesList({ className }: SchedulesListProps) {
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
+            </div>
+          ) : isError ? (
+            <div className="flex items-center justify-center h-full">
+              <ErrorState
+                title="Erro ao carregar horários"
+                description="Não foi possível ler os horários do ponto (Secullum). Verifique a integração e tente novamente."
+                onRetry={() => refetch()}
+              />
             </div>
           ) : paginatedSchedules.length === 0 ? (
             <div className="flex items-center justify-center h-full">

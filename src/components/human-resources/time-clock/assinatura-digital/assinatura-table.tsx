@@ -197,7 +197,7 @@ export function AssinaturaTable({
                     "hover:bg-muted/30",
                     isSelected && "bg-primary/10 hover:bg-primary/15",
                   )}
-                  onClick={() => navigate(routes.humanResources.timeClock.fechamento.details(apuracao.Id))}
+                  onClick={() => navigate(routes.personnelDepartment.timeClock.fechamento.details(apuracao.Id))}
                   onContextMenu={(e) => openContextMenu(e, apuracao.Id)}
                 >
                   <TableCell

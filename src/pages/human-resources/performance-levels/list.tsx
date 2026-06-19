@@ -14,7 +14,7 @@ export default function PerformanceLevelsListPage() {
 
   const breadcrumbs = [
     { label: "Início", href: routes.home },
-    { label: "Recursos Humanos", href: routes.humanResources.root },
+    { label: "Recursos Humanos", href: routes.personnelDepartment.root },
     { label: "Níveis de Desempenho" },
   ];
 

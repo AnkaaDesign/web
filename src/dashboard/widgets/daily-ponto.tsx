@@ -827,14 +827,14 @@ function DailyPontoRender({
       tabIndex={0}
       onClick={() =>
         navigate(
-          `${routes.humanResources.timeClock.root}?view=colaborador-unico&userId=${row.user.id}`,
+          `${routes.personnelDepartment.timeClock.root}?view=colaborador-unico&userId=${row.user.id}`,
         )
       }
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           navigate(
-            `${routes.humanResources.timeClock.root}?view=colaborador-unico&userId=${row.user.id}`,
+            `${routes.personnelDepartment.timeClock.root}?view=colaborador-unico&userId=${row.user.id}`,
           );
         }
       }}

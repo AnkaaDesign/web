@@ -88,7 +88,7 @@ const EPIDeliveryDetails = () => {
   // Handlers
   const handleEdit = () => {
     if (ppeDelivery && canManageWarehouse) {
-      navigate(routes.humanResources.ppe.deliveries.edit(ppeDelivery.id));
+      navigate(routes.personnelDepartment.ppe.deliveries.edit(ppeDelivery.id));
     }
   };
 
@@ -135,7 +135,7 @@ const EPIDeliveryDetails = () => {
 
     try {
       await deleteMutation(ppeDelivery.id);
-      navigate(routes.humanResources.ppe.deliveries.root);
+      navigate(routes.personnelDepartment.ppe.deliveries.root);
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error deleting delivery:", error);
@@ -201,10 +201,10 @@ const EPIDeliveryDetails = () => {
                     A entrega de EPI que você está procurando não existe ou foi removida do sistema.
                   </p>
                   <div className="space-y-3">
-                    <Button onClick={() => navigate(routes.humanResources.ppe.deliveries.root)} className="w-full sm:w-auto">
+                    <Button onClick={() => navigate(routes.personnelDepartment.ppe.deliveries.root)} className="w-full sm:w-auto">
                       Ir para Lista de Entregas
                     </Button>
-                    <Button variant="outline" onClick={() => navigate(routes.humanResources.ppe.root)} className="w-full sm:w-auto">
+                    <Button variant="outline" onClick={() => navigate(routes.personnelDepartment.ppe.root)} className="w-full sm:w-auto">
                       Ir para EPIs
                     </Button>
                   </div>
@@ -264,9 +264,9 @@ const EPIDeliveryDetails = () => {
             className="shadow-sm"
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "RH", href: routes.humanResources.root },
-              { label: "EPIs", href: routes.humanResources.ppe.root },
-              { label: "Entregas", href: routes.humanResources.ppe.deliveries.root },
+              { label: "RH", href: routes.personnelDepartment.root },
+              { label: "EPIs", href: routes.personnelDepartment.ppe.root },
+              { label: "Entregas", href: routes.personnelDepartment.ppe.deliveries.root },
               { label: `${ppeDelivery.item?.name || "Item"} - ${ppeDelivery.user?.name || "Usuário"}` },
             ]}
             actions={[

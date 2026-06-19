@@ -22,6 +22,7 @@ import type {
 } from "../constants";
 import type { User, UserIncludes } from "./user";
 import type { File, FileIncludes } from "./file";
+import type { MedicalExam } from "./medical-exam";
 
 // =====================
 // Main Entity Interfaces
@@ -58,6 +59,7 @@ export interface Termination extends BaseEntity {
   initiatedBy?: User;
   items?: TerminationItem[];
   documents?: TerminationDocument[];
+  dismissalExam?: MedicalExam | null;
 }
 
 export interface TerminationItem extends BaseEntity {
@@ -109,6 +111,7 @@ export interface TerminationIncludes {
   initiatedBy?: boolean | { include?: UserIncludes };
   items?: boolean | { include?: TerminationItemIncludes; orderBy?: any };
   documents?: boolean | { include?: TerminationDocumentIncludes; orderBy?: any };
+  dismissalExam?: boolean;
 }
 
 export interface TerminationItemIncludes {

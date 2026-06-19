@@ -18,7 +18,7 @@ export const PositionListPage = () => {
         <PageHeader
           title="Cargos"
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.humanResources.root }, { label: "Cargos" }]}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.personnelDepartment.root }, { label: "Cargos" }]}
           actions={[
             {
               key: "adjustments",
@@ -31,14 +31,14 @@ export const PositionListPage = () => {
               key: "hierarchy",
               label: "Hierarquia",
               icon: IconArrowsSort,
-              onClick: () => navigate(routes.humanResources.positions.hierarchy),
+              onClick: () => navigate(routes.personnelDepartment.positions.hierarchy),
               variant: "outline",
             },
             {
               key: "new",
               label: "Cadastrar",
               icon: IconPlus,
-              onClick: () => navigate(routes.humanResources.positions.create),
+              onClick: () => navigate(routes.personnelDepartment.positions.create),
               variant: "default",
             },
           ]}

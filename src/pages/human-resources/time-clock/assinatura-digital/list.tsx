@@ -22,8 +22,8 @@ export default function AssinaturaDigitalListPage() {
           title="Fechamento de Cartão Ponto"
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Controle de Ponto", href: routes.humanResources.timeClock.list },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+            { label: "Controle de Ponto", href: routes.personnelDepartment.timeClock.list },
             { label: "Fechamento" },
           ]}
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CONTROLE_PONTO_ASSINATURA_DIGITAL_LISTAR}

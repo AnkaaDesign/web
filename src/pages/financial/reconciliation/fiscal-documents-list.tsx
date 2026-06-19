@@ -73,7 +73,7 @@ function parseFiltersFromUrl(params: URLSearchParams): FiscalDocumentsFiltersUi 
   };
 }
 
-export const ReconciliationFiscalDocumentsListPage = () => {
+export const FiscalDocumentsListContent = () => {
   usePageTracker({ title: "Notas Fiscais", icon: "receipt" });
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -245,7 +245,7 @@ export const ReconciliationFiscalDocumentsListPage = () => {
   }, [filters.year, filters.months]);
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING]}>
+    <>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"
@@ -338,8 +338,16 @@ export const ReconciliationFiscalDocumentsListPage = () => {
       />
 
       <XmlImportDialog open={importOpen} onOpenChange={setImportOpen} />
-    </PrivilegeRoute>
+    </>
   );
 };
+
+export const ReconciliationFiscalDocumentsListPage = () => (
+  <PrivilegeRoute
+    requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING]}
+  >
+    <FiscalDocumentsListContent />
+  </PrivilegeRoute>
+);
 
 export default ReconciliationFiscalDocumentsListPage;

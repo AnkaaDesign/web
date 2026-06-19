@@ -208,138 +208,14 @@ export const routes = {
     accountsPayable: {
       root: "/financeiro/contas-a-pagar",
     },
+    recurrentPayables: {
+      root: "/financeiro/contas-recorrentes",
+    },
     root: "/financeiro",
   },
 
   // Home - Página inicial
   home: "/",
-
-  // Human Resources - Recursos Humanos - Human Resources
-  humanResources: {
-    calculations: {
-      list: "/departamento-pessoal/calculos",
-      root: "/departamento-pessoal/calculos",
-    },
-    holidays: {
-      // URL moved: Feriados relocated from /departamento-pessoal/feriados* to /departamento-pessoal/feriados*
-      calendar: "/departamento-pessoal/feriados/calendario",
-      create: "/departamento-pessoal/feriados/cadastrar",
-      details: (id: string) => `/departamento-pessoal/feriados/detalhes/${id}`,
-      edit: (id: string) => `/departamento-pessoal/feriados/editar/${id}`,
-      list: "/departamento-pessoal/feriados",
-      root: "/departamento-pessoal/feriados",
-    },
-    horarios: {
-      root: "/departamento-pessoal/horarios",
-      list: "/departamento-pessoal/horarios",
-      details: (id: string) => `/departamento-pessoal/horarios/detalhes/${id}`,
-    },
-    integrations: {
-      // Secullum Ponto Web integration. Drives the user-form
-      // "Criar / sincronizar no Secullum" toggle and the bridge
-      // service in apps/api/src/modules/integrations/secullum.
-      secullum: {
-        root: "/departamento-pessoal/integracoes/secullum",
-      },
-    },
-    positions: {
-      batchEdit: "/departamento-pessoal/cargos/editar-em-lote",
-      create: "/departamento-pessoal/cargos/cadastrar",
-      details: (id: string) => `/departamento-pessoal/cargos/detalhes/${id}`,
-      edit: (id: string) => `/departamento-pessoal/cargos/editar/${id}`,
-      hierarchy: "/departamento-pessoal/cargos/hierarquia",
-      remunerations: (positionId: string) => `/departamento-pessoal/cargos/${positionId}/remuneracoes`,
-      root: "/departamento-pessoal/cargos",
-    },
-    ppe: {
-      create: "/departamento-pessoal/epi/cadastrar",
-      deliveries: {
-        create: "/departamento-pessoal/epi/entregas/cadastrar",
-        details: (id: string) => `/departamento-pessoal/epi/entregas/detalhes/${id}`,
-        edit: (id: string) => `/departamento-pessoal/epi/entregas/editar/${id}`,
-        root: "/departamento-pessoal/epi/entregas",
-      },
-      details: (id: string) => `/departamento-pessoal/epi/detalhes/${id}`,
-      edit: (id: string) => `/departamento-pessoal/epi/editar/${id}`,
-      reports: {
-        masks: "/departamento-pessoal/epi/relatorios/mascaras",
-        root: "/departamento-pessoal/epi/relatorios",
-        stock: "/departamento-pessoal/epi/relatorios/estoque",
-        usage: "/departamento-pessoal/epi/relatorios/uso",
-      },
-      root: "/departamento-pessoal/epi",
-      sizes: {
-        root: "/departamento-pessoal/epi/tamanhos",
-      },
-      schedules: {
-        create: "/departamento-pessoal/epi/agendamentos/cadastrar",
-        details: (id: string) => `/departamento-pessoal/epi/agendamentos/detalhes/${id}`,
-        edit: (id: string) => `/departamento-pessoal/epi/agendamentos/editar/${id}`,
-        root: "/departamento-pessoal/epi/agendamentos",
-      },
-    },
-    requisicoes: {
-      // URL moved: Requisições relocated from /departamento-pessoal/requisicoes to /departamento-pessoal/controle-ponto/requisicoes
-      list: "/departamento-pessoal/controle-ponto/requisicoes",
-      root: "/departamento-pessoal/controle-ponto/requisicoes",
-    },
-    root: "/departamento-pessoal",
-    timeClock: {
-      list: "/departamento-pessoal/controle-ponto",
-      root: "/departamento-pessoal/controle-ponto",
-      // Each view is its own subpage (with a sidebar submenu).
-      colaborador: "/departamento-pessoal/controle-ponto/colaborador",
-      dia: "/departamento-pessoal/controle-ponto/dia",
-      edicao: "/departamento-pessoal/controle-ponto/edicao",
-      ausencias: "/departamento-pessoal/controle-ponto/ausencias",
-      // Fechamento (formerly "Assinatura Digital").
-      fechamento: {
-        root: "/departamento-pessoal/controle-ponto/fechamento",
-        list: "/departamento-pessoal/controle-ponto/fechamento",
-        details: (id: string | number) =>
-          `/departamento-pessoal/controle-ponto/fechamento/${id}`,
-      },
-    },
-    vacations: {
-      // Férias migrated to Departamento Pessoal. RH still surfaces it in its
-      // menu (child of both), but the canonical pages/routes live under DP.
-      root: "/departamento-pessoal/ferias",
-      create: "/departamento-pessoal/ferias/cadastrar",
-      edit: (id: string) => `/departamento-pessoal/ferias/editar/${id}`,
-      details: (id: string) => `/departamento-pessoal/ferias/detalhes/${id}`,
-    },
-    calendar: {
-      root: "/departamento-pessoal/calendario",
-    },
-    warnings: {
-      batchEdit: "/departamento-pessoal/avisos/editar-em-lote",
-      create: "/departamento-pessoal/avisos/cadastrar",
-      details: (id: string) => `/departamento-pessoal/avisos/detalhes/${id}`,
-      edit: (id: string) => `/departamento-pessoal/avisos/editar/${id}`,
-      root: "/departamento-pessoal/avisos",
-    },
-    payroll: {
-      root: "/departamento-pessoal/folha-de-pagamento",
-      list: "/departamento-pessoal/folha-de-pagamento",
-      detail: (payrollId: string) => `/departamento-pessoal/folha-de-pagamento/detalhe/${payrollId}`,
-      create: "/departamento-pessoal/folha-de-pagamento/criar",
-      edit: (payrollId: string) => `/departamento-pessoal/folha-de-pagamento/editar/${payrollId}`,
-    },
-    loans: {
-      root: "/departamento-pessoal/emprestimos",
-      list: "/departamento-pessoal/emprestimos",
-    },
-    bonus: {
-      root: "/departamento-pessoal/bonus",
-      list: "/departamento-pessoal/bonus",
-      details: (id: string) => `/departamento-pessoal/bonus/${id}`,
-      simulation: "/departamento-pessoal/bonus/simulacao-de-bonus",
-      performanceLevels: {
-        list: "/departamento-pessoal/bonus/nivel-de-performance",
-        root: "/departamento-pessoal/bonus/nivel-de-performance",
-      },
-    },
-  },
 
   // Inventory - Estoque - Inventory Management
   inventory: {
@@ -648,6 +524,118 @@ export const routes = {
         root: "/departamento-pessoal/beneficios/adesoes",
       },
     },
+    calculations: {
+      list: "/departamento-pessoal/calculos",
+      root: "/departamento-pessoal/calculos",
+    },
+    holidays: {
+      calendar: "/departamento-pessoal/feriados/calendario",
+      create: "/departamento-pessoal/feriados/cadastrar",
+      details: (id: string) => `/departamento-pessoal/feriados/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/feriados/editar/${id}`,
+      list: "/departamento-pessoal/feriados",
+      root: "/departamento-pessoal/feriados",
+    },
+    horarios: {
+      root: "/departamento-pessoal/horarios",
+      list: "/departamento-pessoal/horarios",
+      details: (id: string) => `/departamento-pessoal/horarios/detalhes/${id}`,
+    },
+    integrations: {
+      // Secullum Ponto Web integration. Drives the user-form
+      // "Criar / sincronizar no Secullum" toggle and the bridge
+      // service in apps/api/src/modules/integrations/secullum.
+      secullum: {
+        root: "/departamento-pessoal/integracoes/secullum",
+      },
+    },
+    positions: {
+      batchEdit: "/departamento-pessoal/cargos/editar-em-lote",
+      create: "/departamento-pessoal/cargos/cadastrar",
+      details: (id: string) => `/departamento-pessoal/cargos/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/cargos/editar/${id}`,
+      hierarchy: "/departamento-pessoal/cargos/hierarquia",
+      remunerations: (positionId: string) => `/departamento-pessoal/cargos/${positionId}/remuneracoes`,
+      root: "/departamento-pessoal/cargos",
+    },
+    ppe: {
+      create: "/departamento-pessoal/epi/cadastrar",
+      deliveries: {
+        create: "/departamento-pessoal/epi/entregas/cadastrar",
+        details: (id: string) => `/departamento-pessoal/epi/entregas/detalhes/${id}`,
+        edit: (id: string) => `/departamento-pessoal/epi/entregas/editar/${id}`,
+        root: "/departamento-pessoal/epi/entregas",
+      },
+      details: (id: string) => `/departamento-pessoal/epi/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/epi/editar/${id}`,
+      reports: {
+        masks: "/departamento-pessoal/epi/relatorios/mascaras",
+        root: "/departamento-pessoal/epi/relatorios",
+        stock: "/departamento-pessoal/epi/relatorios/estoque",
+        usage: "/departamento-pessoal/epi/relatorios/uso",
+      },
+      root: "/departamento-pessoal/epi",
+      sizes: {
+        root: "/departamento-pessoal/epi/tamanhos",
+      },
+      schedules: {
+        create: "/departamento-pessoal/epi/agendamentos/cadastrar",
+        details: (id: string) => `/departamento-pessoal/epi/agendamentos/detalhes/${id}`,
+        edit: (id: string) => `/departamento-pessoal/epi/agendamentos/editar/${id}`,
+        root: "/departamento-pessoal/epi/agendamentos",
+      },
+    },
+    requisicoes: {
+      list: "/departamento-pessoal/controle-ponto/requisicoes",
+      root: "/departamento-pessoal/controle-ponto/requisicoes",
+    },
+    timeClock: {
+      list: "/departamento-pessoal/controle-ponto",
+      root: "/departamento-pessoal/controle-ponto",
+      // Each view is its own subpage (with a sidebar submenu).
+      colaborador: "/departamento-pessoal/controle-ponto/colaborador",
+      dia: "/departamento-pessoal/controle-ponto/dia",
+      edicao: "/departamento-pessoal/controle-ponto/edicao",
+      ausencias: "/departamento-pessoal/controle-ponto/ausencias",
+      // Fechamento (formerly "Assinatura Digital").
+      fechamento: {
+        root: "/departamento-pessoal/controle-ponto/fechamento",
+        list: "/departamento-pessoal/controle-ponto/fechamento",
+        details: (id: string | number) =>
+          `/departamento-pessoal/controle-ponto/fechamento/${id}`,
+      },
+    },
+    calendar: {
+      root: "/departamento-pessoal/calendario",
+    },
+    warnings: {
+      batchEdit: "/departamento-pessoal/avisos/editar-em-lote",
+      create: "/departamento-pessoal/avisos/cadastrar",
+      details: (id: string) => `/departamento-pessoal/avisos/detalhes/${id}`,
+      edit: (id: string) => `/departamento-pessoal/avisos/editar/${id}`,
+      root: "/departamento-pessoal/avisos",
+    },
+    payroll: {
+      root: "/departamento-pessoal/folha-de-pagamento",
+      list: "/departamento-pessoal/folha-de-pagamento",
+      detail: (payrollId: string) => `/departamento-pessoal/folha-de-pagamento/detalhe/${payrollId}`,
+      create: "/departamento-pessoal/folha-de-pagamento/criar",
+      edit: (payrollId: string) => `/departamento-pessoal/folha-de-pagamento/editar/${payrollId}`,
+    },
+    loans: {
+      root: "/departamento-pessoal/emprestimos",
+      list: "/departamento-pessoal/emprestimos",
+    },
+    bonus: {
+      root: "/departamento-pessoal/bonus",
+      list: "/departamento-pessoal/bonus",
+      details: (id: string) => `/departamento-pessoal/bonus/${id}`,
+      simulation: "/departamento-pessoal/bonus/simulacao-de-bonus",
+      performanceLevels: {
+        list: "/departamento-pessoal/bonus/nivel-de-performance",
+        root: "/departamento-pessoal/bonus/nivel-de-performance",
+      },
+    },
   },
 
   // Production - Produção - Production Management
@@ -765,7 +753,7 @@ export const routes = {
       nfse: "/estatisticas/financeiro/nfse",
       reconciliation: "/estatisticas/financeiro/conciliacao",
     },
-    humanResources: {
+    personnelDepartment: {
       root: "/estatisticas/departamento-pessoal",
       payroll: "/estatisticas/departamento-pessoal/folha",
       salaryCost: "/estatisticas/departamento-pessoal/custo-folha",

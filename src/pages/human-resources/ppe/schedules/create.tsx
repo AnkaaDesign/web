@@ -38,11 +38,11 @@ export const PPEScheduleCreatePage = () => {
       }
     }
 
-    navigate(routes.humanResources.ppe.schedules.root);
+    navigate(routes.personnelDepartment.ppe.schedules.root);
   };
 
   const handleCancel = () => {
-    navigate(routes.humanResources.ppe.schedules.root);
+    navigate(routes.personnelDepartment.ppe.schedules.root);
   };
 
   const actions = [
@@ -73,9 +73,9 @@ export const PPEScheduleCreatePage = () => {
         icon={IconCalendar}
         breadcrumbs={[
           { label: "Início", href: routes.home },
-          { label: "RH", href: routes.humanResources.root },
-          { label: "EPIs", href: routes.humanResources.ppe.root },
-          { label: "Agendamentos", href: routes.humanResources.ppe.schedules.root },
+          { label: "RH", href: routes.personnelDepartment.root },
+          { label: "EPIs", href: routes.personnelDepartment.ppe.root },
+          { label: "Agendamentos", href: routes.personnelDepartment.ppe.schedules.root },
           { label: "Criar" },
         ]}
         actions={actions}

@@ -23,7 +23,7 @@ export const AbsencesListPage = () => {
           title="Afastamentos (Ponto)"
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
             { label: "Afastamentos (Ponto)" },
           ]}
           actions={[
@@ -31,7 +31,7 @@ export const AbsencesListPage = () => {
               key: "calendar",
               label: "Calendário",
               icon: IconCalendarStats,
-              onClick: () => navigate(routes.humanResources.calendar.root),
+              onClick: () => navigate(routes.personnelDepartment.calendar.root),
               variant: "outline",
             },
           ]}

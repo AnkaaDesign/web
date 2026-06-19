@@ -44,7 +44,7 @@ export const WarningBatchEditPage = () => {
 
   useEffect(() => {
     if (selectedIds.length === 0) {
-      navigate(routes.humanResources.warnings.root);
+      navigate(routes.personnelDepartment.warnings.root);
     }
   }, [selectedIds, navigate]);
 
@@ -58,14 +58,14 @@ export const WarningBatchEditPage = () => {
             icon={IconAlertTriangle}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Recursos Humanos", href: routes.humanResources.root },
-              { label: "Advertências", href: routes.humanResources.warnings.root },
+              { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+              { label: "Advertências", href: routes.personnelDepartment.warnings.root },
               { label: "Edição em Lote" },
             ]}
             selection={{
               count: selectedIds.length,
               entityName: "advertências",
-              onClearSelection: () => navigate(routes.humanResources.warnings.root),
+              onClearSelection: () => navigate(routes.personnelDepartment.warnings.root),
             }}
           />
           <div className="flex items-center justify-center min-h-[400px]">
@@ -86,14 +86,14 @@ export const WarningBatchEditPage = () => {
             icon={IconAlertTriangle}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Recursos Humanos", href: routes.humanResources.root },
-              { label: "Advertências", href: routes.humanResources.warnings.root },
+              { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+              { label: "Advertências", href: routes.personnelDepartment.warnings.root },
               { label: "Edição em Lote" },
             ]}
             selection={{
               count: 0,
               entityName: "advertências",
-              onClearSelection: () => navigate(routes.humanResources.warnings.root),
+              onClearSelection: () => navigate(routes.personnelDepartment.warnings.root),
             }}
           />
           <Card>
@@ -123,7 +123,7 @@ export const WarningBatchEditPage = () => {
         }
       }
 
-      navigate(routes.humanResources.warnings.root);
+      navigate(routes.personnelDepartment.warnings.root);
     } catch (error) {
       toast.error("Erro ao atualizar advertências");
     } finally {
@@ -140,17 +140,17 @@ export const WarningBatchEditPage = () => {
           icon={IconAlertTriangle}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Advertências", href: routes.humanResources.warnings.root },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+            { label: "Advertências", href: routes.personnelDepartment.warnings.root },
             { label: "Edição em Lote" },
           ]}
           selection={{
             count: warnings.length,
             entityName: "advertências",
-            onClearSelection: () => navigate(routes.humanResources.warnings.root),
+            onClearSelection: () => navigate(routes.personnelDepartment.warnings.root),
           }}
           backButton={{
-            onClick: () => navigate(routes.humanResources.warnings.root),
+            onClick: () => navigate(routes.personnelDepartment.warnings.root),
             label: "Voltar para lista",
           }}
           className="flex-shrink-0"

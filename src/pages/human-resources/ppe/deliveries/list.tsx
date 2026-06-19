@@ -31,8 +31,8 @@ export const PpeDeliveryListPage = () => {
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "RH", href: routes.humanResources.root },
-            { label: "EPIs", href: routes.humanResources.ppe.root },
+            { label: "RH", href: routes.personnelDepartment.root },
+            { label: "EPIs", href: routes.personnelDepartment.ppe.root },
             { label: "Entregas" },
           ]}
           actions={[
@@ -43,7 +43,7 @@ export const PpeDeliveryListPage = () => {
                     key: "create",
                     label: "Nova Entrega",
                     icon: IconPlus,
-                    onClick: () => navigate(routes.humanResources.ppe.deliveries.create),
+                    onClick: () => navigate(routes.personnelDepartment.ppe.deliveries.create),
                     variant: "default" as const,
                   },
                 ]

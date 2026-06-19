@@ -25,8 +25,8 @@ export const PPESchedulesListPage = () => {
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "RH", href: routes.humanResources.root },
-            { label: "EPIs", href: routes.humanResources.ppe.root },
+            { label: "RH", href: routes.personnelDepartment.root },
+            { label: "EPIs", href: routes.personnelDepartment.ppe.root },
             { label: "Agendamentos" },
           ]}
           actions={[
@@ -34,7 +34,7 @@ export const PPESchedulesListPage = () => {
               key: "create",
               label: "Cadastrar",
               icon: IconPlus,
-              onClick: () => navigate(routes.humanResources.ppe.schedules.create),
+              onClick: () => navigate(routes.personnelDepartment.ppe.schedules.create),
               variant: "default",
             },
           ]}
@@ -42,8 +42,8 @@ export const PPESchedulesListPage = () => {
         <PpeScheduleList
           className="flex-1 min-h-0"
           scheduleRoutes={{
-            details: (id: string) => routes.humanResources.ppe.schedules.details(id),
-            edit: (id: string) => routes.humanResources.ppe.schedules.edit(id),
+            details: (id: string) => routes.personnelDepartment.ppe.schedules.details(id),
+            edit: (id: string) => routes.personnelDepartment.ppe.schedules.edit(id),
           }}
         />
       </div>

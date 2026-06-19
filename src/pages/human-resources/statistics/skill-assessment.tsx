@@ -1007,7 +1007,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
     deletePreset,
     isSavingPreset,
   } = useStatisticsPagePersistence({
-    pageKey: routes.statistics.humanResources.skillAssessment,
+    pageKey: routes.statistics.personnelDepartment.skillAssessment,
     schema: pageConfigSchema,
     current: pageConfig,
     apply: applyPageConfig,
@@ -2286,7 +2286,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
           breadcrumbs={[
             { label: 'Início', href: routes.home },
             { label: 'Estatísticas', href: routes.statistics.root },
-            { label: 'Recursos Humanos', href: routes.statistics.humanResources.root },
+            { label: 'Recursos Humanos', href: routes.statistics.personnelDepartment.root },
             { label: 'Competências' },
           ]}
           headerExtra={

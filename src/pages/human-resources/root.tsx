@@ -270,7 +270,7 @@ export const HumanResourcesRootPage = () => {
                 key: "create-position",
                 label: "Novo Cargo",
                 icon: TablerIconPlus,
-                onClick: () => navigate(routes.humanResources.positions.create),
+                onClick: () => navigate(routes.personnelDepartment.positions.create),
                 variant: "default",
               },
               {
@@ -293,31 +293,31 @@ export const HumanResourcesRootPage = () => {
                 <QuickAccessCard
                   title="Cargos"
                   icon={IconBriefcase}
-                  onClick={() => navigate(routes.humanResources.positions.root)}
+                  onClick={() => navigate(routes.personnelDepartment.positions.root)}
                   count={data?.positionMetrics?.totalPositions}
                   color="blue"
                 />
                 <QuickAccessCard
                   title="Férias"
                   icon={IconBeach}
-                  onClick={() => navigate(routes.humanResources.vacations.root)}
+                  onClick={() => navigate(routes.personnelDepartment.vacations.root)}
                   color="green"
                 />
                 <QuickAccessCard
                   title="Feriados"
                   icon={IconCalendarEvent}
-                  onClick={() => navigate(routes.humanResources.holidays.root)}
+                  onClick={() => navigate(routes.personnelDepartment.holidays.root)}
                   count={data?.holidayMetrics?.totalHolidays}
                   color="purple"
                 />
                 <QuickAccessCard
                   title="Avisos"
                   icon={IconBellRinging}
-                  onClick={() => navigate(routes.humanResources.warnings.root)}
+                  onClick={() => navigate(routes.personnelDepartment.warnings.root)}
                   count={data?.noticeMetrics?.totalNotices}
                   color="orange"
                 />
-                <QuickAccessCard title="EPIs" icon={IconShieldCheck} onClick={() => navigate(routes.humanResources.ppe.root)} count={data?.ppeMetrics?.totalPPE} color="red" />
+                <QuickAccessCard title="EPIs" icon={IconShieldCheck} onClick={() => navigate(routes.personnelDepartment.ppe.root)} count={data?.ppeMetrics?.totalPPE} color="red" />
                 <QuickAccessCard
                   title="Setores"
                   icon={IconHome}
@@ -423,7 +423,7 @@ export const HumanResourcesRootPage = () => {
                   type="PERFORMANCE"
                   data={getSeniorityAnalysis()}
                   icon={IconTrophy}
-                  onDetailsClick={() => navigate(routes.humanResources.positions.root)}
+                  onDetailsClick={() => navigate(routes.personnelDepartment.positions.root)}
                 />
               </div>
             </div>

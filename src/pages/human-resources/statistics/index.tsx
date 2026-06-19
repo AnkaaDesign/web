@@ -48,7 +48,7 @@ const pages: StatPage[] = [
   {
     title: "Folha de Pagamento",
     description: "Análise da folha, custos por setor e evolução salarial",
-    route: routes.statistics.humanResources.payroll,
+    route: routes.statistics.personnelDepartment.payroll,
     icon: IconReportMoney,
     tone: "emerald",
     bullets: [
@@ -61,7 +61,7 @@ const pages: StatPage[] = [
   {
     title: "Custo de Folha",
     description: "Custo total de pessoal com encargos, provisões e benefícios",
-    route: routes.statistics.humanResources.salaryCost,
+    route: routes.statistics.personnelDepartment.salaryCost,
     icon: IconReportMoney,
     tone: "cyan",
     bullets: [
@@ -74,7 +74,7 @@ const pages: StatPage[] = [
   {
     title: "Equipe",
     description: "Efetivo, admissões, desligamentos e taxa de rotatividade",
-    route: routes.statistics.humanResources.teamPerformance,
+    route: routes.statistics.personnelDepartment.teamPerformance,
     icon: IconUsers,
     tone: "blue",
     bullets: [
@@ -87,7 +87,7 @@ const pages: StatPage[] = [
   {
     title: "Faltas",
     description: "Faltas, atestados e atrasos consolidados ao vivo do Secullum",
-    route: routes.statistics.humanResources.absenteeism,
+    route: routes.statistics.personnelDepartment.absenteeism,
     icon: IconCalendarOff,
     tone: "rose",
     bullets: [
@@ -100,7 +100,7 @@ const pages: StatPage[] = [
   {
     title: "Competências",
     description: "Radar de avaliações, comparativo entre pessoas e setores, evolução por campanha",
-    route: routes.statistics.humanResources.skillAssessment,
+    route: routes.statistics.personnelDepartment.skillAssessment,
     icon: IconRadar,
     tone: "violet",
     bullets: [

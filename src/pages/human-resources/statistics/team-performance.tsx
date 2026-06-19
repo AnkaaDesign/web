@@ -1352,7 +1352,7 @@ const EquipePage = () => {
     deletePreset,
     isSavingPreset,
   } = useStatisticsPagePersistence({
-    pageKey: routes.statistics.humanResources.teamPerformance,
+    pageKey: routes.statistics.personnelDepartment.teamPerformance,
     schema: pageConfigSchema,
     current: pageConfig,
     apply: applyPageConfig,
@@ -1469,7 +1469,7 @@ const EquipePage = () => {
             breadcrumbs={[
               { label: 'Início', href: routes.home },
               { label: 'Estatísticas', href: routes.statistics.root },
-              { label: 'Recursos Humanos', href: routes.statistics.humanResources.root },
+              { label: 'Recursos Humanos', href: routes.statistics.personnelDepartment.root },
               { label: 'Equipe' },
             ]}
             headerExtra={

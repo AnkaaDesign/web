@@ -10,7 +10,7 @@ import type {
   BaseDeleteResponse,
   BaseBatchResponse,
 } from "./common";
-import type { CONTRACT_TYPE, CONTRACT_STATUS, EMPLOYEE_TYPE, TERMINATION_TYPE, INSALUBRITY_DEGREE, STABILITY_TYPE, ORDER_BY_DIRECTION } from "../constants";
+import type { CONTRACT_TYPE, CONTRACT_STATUS, EMPLOYEE_TYPE, TERMINATION_TYPE, INSALUBRITY_DEGREE, STABILITY_TYPE, ORDER_BY_DIRECTION, CHANGE_TRIGGERED_BY } from "../constants";
 import type { User, UserIncludes } from "./user";
 import type { Position } from "./position";
 import type { Sector } from "./sector";
@@ -79,10 +79,10 @@ export interface ContractPhaseHistory extends BaseEntity {
   contractId: string;
   userId: string;
   contractType: CONTRACT_TYPE;
-  startDate: Date | string;
-  endDate: Date | string | null;
-  triggeredBy?: string | null;
-  reason?: string | null;
+  startDate: Date;
+  endDate: Date | null;
+  triggeredBy: CHANGE_TRIGGERED_BY | null;
+  reason: string | null;
 }
 
 // =====================

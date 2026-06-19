@@ -493,7 +493,7 @@ function HrRequestsTableRender({
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       viewAllHref={
         (config.display.showViewAllLink ?? true)
-          ? routes.humanResources.requisicoes.list
+          ? routes.personnelDepartment.requisicoes.list
           : undefined
       }
       headerExtra={headerExtra}

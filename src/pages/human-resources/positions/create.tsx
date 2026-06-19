@@ -18,8 +18,8 @@ export const PositionCreatePage = () => {
         favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_CADASTRAR}
         breadcrumbs={[
           { label: "Início", href: routes.home },
-          { label: "Recursos Humanos", href: routes.humanResources.root },
-          { label: "Cargos", href: routes.humanResources.positions.root },
+          { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+          { label: "Cargos", href: routes.personnelDepartment.positions.root },
           { label: "Novo" },
         ]}
         className="flex-shrink-0"

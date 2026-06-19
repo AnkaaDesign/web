@@ -18,12 +18,12 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { label: "Colaborador", menuTitle: "Visualização Colaborador", path: routes.humanResources.timeClock.colaborador, hrOnly: false },
-  { label: "Dia", menuTitle: "Visualização Dia", path: routes.humanResources.timeClock.dia, hrOnly: false },
-  { label: "Edição", menuTitle: "Edição", path: routes.humanResources.timeClock.edicao, hrOnly: true },
-  { label: "Ausências", menuTitle: "Ausências", path: routes.humanResources.timeClock.ausencias, hrOnly: false },
-  { label: "Fechamento", menuTitle: "Fechamento", path: routes.humanResources.timeClock.fechamento.list, hrOnly: true },
-  { label: "Requisições", menuTitle: "Requisições", path: routes.humanResources.requisicoes.list, hrOnly: true },
+  { label: "Colaborador", menuTitle: "Visualização Colaborador", path: routes.personnelDepartment.timeClock.colaborador, hrOnly: false },
+  { label: "Dia", menuTitle: "Visualização Dia", path: routes.personnelDepartment.timeClock.dia, hrOnly: false },
+  { label: "Edição", menuTitle: "Edição", path: routes.personnelDepartment.timeClock.edicao, hrOnly: true },
+  { label: "Ausências", menuTitle: "Ausências", path: routes.personnelDepartment.timeClock.ausencias, hrOnly: false },
+  { label: "Fechamento", menuTitle: "Fechamento", path: routes.personnelDepartment.timeClock.fechamento.list, hrOnly: true },
+  { label: "Requisições", menuTitle: "Requisições", path: routes.personnelDepartment.requisicoes.list, hrOnly: true },
 ].sort((a, b) => a.menuTitle.localeCompare(b.menuTitle, "pt-BR", { sensitivity: "base" }));
 
 // The last Controle de Ponto subpage the user can access (used by the
@@ -36,7 +36,7 @@ export function getLastTimeClockPage(canEdit: boolean): string {
   } catch {
     /* storage unavailable */
   }
-  return routes.humanResources.timeClock.colaborador;
+  return routes.personnelDepartment.timeClock.colaborador;
 }
 
 // Segmented "tab" selector kept on every Controle de Ponto subpage — switching a

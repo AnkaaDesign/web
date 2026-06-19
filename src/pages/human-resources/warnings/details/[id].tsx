@@ -54,14 +54,14 @@ export const WarningDetailPage = () => {
   const { deleteMutation } = useWarningMutations();
 
   if (!id) {
-    return <Navigate to={routes.humanResources.warnings.root} replace />;
+    return <Navigate to={routes.personnelDepartment.warnings.root} replace />;
   }
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <p className="text-destructive mb-4">Erro ao carregar advertência</p>
-        <Navigate to={routes.humanResources.warnings.root} replace />
+        <Navigate to={routes.personnelDepartment.warnings.root} replace />
       </div>
     );
   }
@@ -75,13 +75,13 @@ export const WarningDetailPage = () => {
   }
 
   if (!warning) {
-    return <Navigate to={routes.humanResources.warnings.root} replace />;
+    return <Navigate to={routes.personnelDepartment.warnings.root} replace />;
   }
 
   const handleDelete = async () => {
     try {
       await deleteMutation.mutateAsync(id);
-      navigate(routes.humanResources.warnings.root);
+      navigate(routes.personnelDepartment.warnings.root);
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error deleting warning:", error);
@@ -98,8 +98,8 @@ export const WarningDetailPage = () => {
           title="Detalhes da Advertência"
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Advertências", href: routes.humanResources.warnings.root },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+            { label: "Advertências", href: routes.personnelDepartment.warnings.root },
             { label: warning.data?.collaborator?.name || "Advertência" },
           ]}
           actions={[
@@ -113,7 +113,7 @@ export const WarningDetailPage = () => {
               key: "edit",
               label: "Editar",
               icon: IconEdit,
-              onClick: () => navigate(routes.humanResources.warnings.edit(id)),
+              onClick: () => navigate(routes.personnelDepartment.warnings.edit(id)),
             },
             {
               key: "delete",

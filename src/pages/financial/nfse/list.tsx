@@ -364,7 +364,7 @@ function NfseFilterSheet({
 
 // ── Page ───────────────────────────────────────────────────
 
-export function NfseListPage() {
+export function NfseListContent() {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<NfseFilters>(defaultFilters);
   const [searchText, setSearchText] = useState("");
@@ -554,9 +554,7 @@ export function NfseListPage() {
     item.emitida && !item.cancelada && !!item.invoiceId && !!item.nfseDocumentId;
 
   return (
-    <PrivilegeRoute
-      requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ACCOUNTING]}
-    >
+    <>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"
@@ -777,6 +775,21 @@ export function NfseListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+export function NfseListPage() {
+  return (
+    <PrivilegeRoute
+      requiredPrivilege={[
+        SECTOR_PRIVILEGES.FINANCIAL,
+        SECTOR_PRIVILEGES.ADMIN,
+        SECTOR_PRIVILEGES.COMMERCIAL,
+        SECTOR_PRIVILEGES.ACCOUNTING,
+      ]}
+    >
+      <NfseListContent />
     </PrivilegeRoute>
   );
 }

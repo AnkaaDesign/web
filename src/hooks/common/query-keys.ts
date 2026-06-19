@@ -949,6 +949,31 @@ export const reconciliationKeys = {
 };
 
 // =====================================================
+// Recurrent Payables (Contas Recorrentes) Query Keys
+// =====================================================
+
+export const recurrentPayableKeys = {
+  all: ["recurrentPayable"] as const,
+  lists: () => ["recurrentPayable", "list"] as const,
+  list: (params?: Record<string, unknown>) =>
+    params
+      ? (["recurrentPayable", "list", params] as const)
+      : (["recurrentPayable", "list"] as const),
+  detail: (id: string) => ["recurrentPayable", "detail", id] as const,
+};
+
+// =====================================================
+// Receivables (Contas a Receber) Query Keys
+// =====================================================
+
+export const receivableKeys = {
+  all: ["receivable"] as const,
+  list: () => ["receivable", "list"] as const,
+  candidates: (transactionId: string) =>
+    ["receivable", "candidates", transactionId] as const,
+};
+
+// =====================================================
 // Skill Assessment Query Keys
 // =====================================================
 //
@@ -1121,7 +1146,6 @@ export const dependentKeys = createQueryKeyStore<Record<string, any>>("dependent
 
 // Área Andressa — Phase 3 new HR modules
 export const vacationKeys = createQueryKeyStore<Record<string, any>>("vacations");
-export const vacationGroupKeys = createQueryKeyStore<Record<string, any>>("vacation-groups");
 
 export const thirteenthKeys = createQueryKeyStore<Record<string, any>>("thirteenths");
 

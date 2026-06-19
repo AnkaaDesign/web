@@ -131,7 +131,9 @@ export {
 export * from "./services/deployment";
 export * from "./platform-utils";
 export * from "./push-notifications";
+export { receivableService } from "./receivable";
 export { reconciliationService } from "./reconciliation";
+export { recurrentPayableService } from "./recurrent-payable";
 export { siegService } from "./sieg";
 
 // Accounting area — Departamento Pessoal / Medicina do Trabalho

@@ -516,7 +516,7 @@ function HrCalendarRender({ config, size }: WidgetRenderProps<HrCalendarConfig>)
       headerExtra={headerExtra}
       viewAllHref={
         (config.display.showViewAllLink ?? true)
-          ? routes.humanResources.calendar.root
+          ? routes.personnelDepartment.calendar.root
           : undefined
       }
       showHeader={config.display.showHeader ?? true}

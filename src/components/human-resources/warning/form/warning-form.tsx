@@ -269,14 +269,14 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
           if (props.mode === "create") {
             const result = await createAsync(formData as any);
             // Success toast is handled automatically by API client
-            navigate(routes.humanResources.warnings.details(result.data?.id || ""));
+            navigate(routes.personnelDepartment.warnings.details(result.data?.id || ""));
           } else {
             await updateAsync({
               id: props.warning.id,
               data: formData as any,
             });
             // Success toast is handled automatically by API client
-            navigate(routes.humanResources.warnings.details(props.warning.id));
+            navigate(routes.personnelDepartment.warnings.details(props.warning.id));
           }
         }
       } else {
@@ -289,14 +289,14 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
           if (props.mode === "create") {
             const result = await createAsync(dataWithoutFiles as WarningCreateFormData);
             // Success toast is handled automatically by API client
-            navigate(routes.humanResources.warnings.details(result.data?.id || ""));
+            navigate(routes.personnelDepartment.warnings.details(result.data?.id || ""));
           } else {
             await updateAsync({
               id: props.warning.id,
               data: dataWithoutFiles as WarningUpdateFormData,
             });
             // Success toast is handled automatically by API client
-            navigate(routes.humanResources.warnings.details(props.warning.id));
+            navigate(routes.personnelDepartment.warnings.details(props.warning.id));
           }
         }
       }

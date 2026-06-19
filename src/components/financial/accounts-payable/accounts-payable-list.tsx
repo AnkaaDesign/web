@@ -30,6 +30,8 @@ import { StandardizedTable, type StandardizedColumn } from "@/components/ui/stan
 import { DropdownMenu, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { FinancialKpiCard } from "../common/financial-kpi-card";
+import { PaymentAmountDialog } from "./payment-amount-dialog";
+import { useRecurrentPayableMutations } from "@/hooks/financial/use-recurrent-payable";
 
 // --- Per-row payment-state badge. EXPECTED (previstos/recorrentes) is a forecast,
 // not a real debt yet. ---------------------------------------------------------
@@ -166,6 +168,7 @@ function PayableTypeBadge({ row }: { row: PayableRow }) {
         </Badge>
       );
     case "RECURRING":
+    case "RECURRENT_PAYABLE":
       return (
         <Badge variant="teal" className="whitespace-nowrap text-[10px]">
           <IconRepeat className="mr-1 h-3 w-3" />
@@ -205,6 +208,9 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
 
   // Right-click payment menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: PayableRow } | null>(null);
+
+  // VARIABLE recurrent bill awaiting its real paid amount (opens PaymentAmountDialog).
+  const [payAmountRow, setPayAmountRow] = useState<PayableRow | null>(null);
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -309,6 +315,9 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   const { updateAsync: updateAirbrushingAsync } = useAirbrushingMutations();
   const settlePayrollMonth = useSettlePayrollMonth();
   const triggerSchedule = useTriggerOrderSchedule();
+  // Recorrentes: pay one materialized occurrence (the payables query is keyed
+  // under orderKeys.all, so the pay action invalidates it and the row flips).
+  const { payAsync: payRecurrentAsync, payMutation: payRecurrentMutation } = useRecurrentPayableMutations();
 
   // --- Client-side filter: active buckets + search across tomador/description -
   const filteredRows = useMemo(() => {
@@ -365,6 +374,17 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   };
 
   const settleAirbrushing = (id: string, paymentStatus: AIRBRUSHING_PAYMENT_STATUS) => updateAirbrushingAsync({ id, data: { paymentStatus } }).then(() => refetch());
+
+  // Mark a recurrent occurrence paid. VARIABLE bills (isEstimate) collect the
+  // real value via PaymentAmountDialog; FIXED bills settle with the known value.
+  const handleRecurrentPay = (row: PayableRow) => {
+    setContextMenu(null);
+    if (row.isEstimate) {
+      setPayAmountRow(row);
+      return;
+    }
+    runAction(() => payRecurrentAsync({ occurrenceId: row.id, body: {} }));
+  };
 
   const parseCompetence = (c?: string | null): { year: number; month: number } | null => {
     const m = /^(\d{4})-(\d{2})$/.exec(c ?? "");
@@ -547,6 +567,13 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
                 </>
               )}
 
+              {ctxRow.source === "RECURRENT_PAYABLE" && ctxRow.paymentState !== "PAID" && (
+                <DropdownMenuItem onClick={() => handleRecurrentPay(ctxRow)}>
+                  <IconCash className="mr-2 h-4 w-4" />
+                  Marcar como pago
+                </DropdownMenuItem>
+              )}
+
               {ctxRow.settleVia === "SCHEDULE_TRIGGER" && (
                 <DropdownMenuItem onClick={() => handleSettle(ctxRow)}>
                   <IconPackage className="mr-2 h-4 w-4" />
@@ -578,6 +605,20 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
           )}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
+
+      {/* VARIABLE recurrent bill — collect the real paid amount before settling. */}
+      <PaymentAmountDialog
+        open={!!payAmountRow}
+        onOpenChange={(open) => !open && setPayAmountRow(null)}
+        estimate={payAmountRow?.amount ?? 0}
+        payeeName={payAmountRow?.payeeName}
+        isPending={payRecurrentMutation.isPending}
+        onConfirm={(paidAmount) => {
+          const row = payAmountRow;
+          if (!row) return;
+          runAction(() => payRecurrentAsync({ occurrenceId: row.id, body: { paidAmount } }).then(() => setPayAmountRow(null)));
+        }}
+      />
     </div>
   );
 }

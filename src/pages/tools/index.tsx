@@ -7,14 +7,17 @@ import {
   IconCalculator,
   IconClock,
   IconCalendarDollar,
+  IconCalendarStats,
   IconFlask,
   IconRecycle,
+  IconNote,
+  IconLayoutGrid,
 } from "@tabler/icons-react";
 import type { Icon as TablerIcon } from "@tabler/icons-react";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { routes } from "@/constants";
+import { routes, SECTOR_PRIVILEGES } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
 import { hasAnyPrivilege } from "@/utils";
 import { getRequiredPrivilegeForRoute } from "@/utils/route-privileges";
@@ -28,6 +31,10 @@ interface ToolGroup {
     description: string;
     route: string;
     icon: TablerIcon;
+    // Optional explicit gate that overrides the route-based privilege lookup.
+    // Use when the hub should mirror the navigation menu's curation rather than
+    // the (broader) page-access privileges of the route.
+    requiredPrivilege?: SECTOR_PRIVILEGES[];
   }[];
 }
 
@@ -87,6 +94,33 @@ const toolGroups: ToolGroup[] = [
         route: routes.tools.paintMix.root,
         icon: IconFlask,
       },
+      {
+        label: "Custo de Funcionário",
+        description: "Estime o custo total de um colaborador para a empresa",
+        route: routes.tools.employeeCost.root,
+        icon: IconCalendarDollar,
+        // Curated to Accounting in the nav (the route itself is broadly accessible).
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
+      },
+    ],
+  },
+  {
+    title: "Organização",
+    description: "Planejamento e anotações do dia a dia",
+    icon: IconLayoutGrid,
+    links: [
+      {
+        label: "Calendário",
+        description: "Agenda de eventos, feriados e marcações do departamento",
+        route: routes.personnelDepartment.calendar.root,
+        icon: IconCalendarStats,
+      },
+      {
+        label: "Post-its",
+        description: "Anotações rápidas e lembretes pessoais",
+        route: routes.tools.postIts.root,
+        icon: IconNote,
+      },
     ],
   },
 ];
@@ -95,16 +129,18 @@ export function ToolsHubPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Hide tool cards the current sector cannot open (mirrors ROUTE_PRIVILEGES, incl.
-  // the ADMIN superuser bypass). Groups left with no accessible link are dropped.
-  const canAccess = (route: string): boolean => {
-    const required = getRequiredPrivilegeForRoute(route);
+  // Hide tool cards the current sector cannot open. Uses the link's explicit
+  // requiredPrivilege when set (to mirror the nav's curation), otherwise falls back
+  // to ROUTE_PRIVILEGES. Both paths go through hasAnyPrivilege, which includes the
+  // ADMIN superuser bypass. Groups left with no accessible link are dropped.
+  const canAccess = (link: { route: string; requiredPrivilege?: SECTOR_PRIVILEGES[] }): boolean => {
+    const required = link.requiredPrivilege ?? getRequiredPrivilegeForRoute(link.route);
     if (!required) return true;
     const list = (Array.isArray(required) ? required : [required]) as Parameters<typeof hasAnyPrivilege>[1];
     return hasAnyPrivilege(user as any, list);
   };
   const visibleGroups = toolGroups
-    .map((group) => ({ ...group, links: group.links.filter((link) => canAccess(link.route)) }))
+    .map((group) => ({ ...group, links: group.links.filter((link) => canAccess(link)) }))
     .filter((group) => group.links.length > 0);
 
   return (

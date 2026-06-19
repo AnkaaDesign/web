@@ -186,7 +186,7 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
       if ((event.target as HTMLElement).closest('[role="checkbox"]') || (event.target as HTMLElement).closest('[role="menu"]')) {
         return;
       }
-      navigate(routes.humanResources.warnings.details(warning.id));
+      navigate(routes.personnelDepartment.warnings.details(warning.id));
     },
     [navigate],
   );
@@ -219,7 +219,7 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
 
   const handleView = useCallback(
     (warning: Warning) => {
-      window.open(routes.humanResources.warnings.details(warning.id), '_blank');
+      window.open(routes.personnelDepartment.warnings.details(warning.id), '_blank');
       setContextMenu(null);
     },
     [],
@@ -227,7 +227,7 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
 
   const handleEdit = useCallback(
     (warning: Warning) => {
-      navigate(routes.humanResources.warnings.edit(warning.id));
+      navigate(routes.personnelDepartment.warnings.edit(warning.id));
       setContextMenu(null);
     },
     [navigate],
@@ -520,7 +520,7 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
                       <DropdownMenuItem
                         onClick={() => {
                           const ids = contextMenu.warnings.map((w: Warning) => w.id).join(",");
-                          navigate(`${routes.humanResources.warnings.batchEdit}?ids=${ids}`);
+                          navigate(`${routes.personnelDepartment.warnings.batchEdit}?ids=${ids}`);
                           setContextMenu(null);
                         }}
                       >

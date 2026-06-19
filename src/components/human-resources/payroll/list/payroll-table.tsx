@@ -43,12 +43,12 @@ export function PayrollTable({
   const handleRowClick = (row: PayrollUserRow & { month?: number; year?: number }) => {
     // For saved payrolls with valid ID, navigate directly
     if (row.payrollId && !row.payrollId.startsWith('temp-')) {
-      navigate(routes.humanResources.payroll.detail(row.payrollId));
+      navigate(routes.personnelDepartment.payroll.detail(row.payrollId));
     } else if (row.id && row.month && (row.year || filters?.year)) {
       // For live calculations, create live ID with user info
       const year = row.year || filters?.year;
       const liveId = `live-${row.id}-${year}-${row.month}`;
-      navigate(routes.humanResources.payroll.detail(liveId));
+      navigate(routes.personnelDepartment.payroll.detail(liveId));
     }
   };
 

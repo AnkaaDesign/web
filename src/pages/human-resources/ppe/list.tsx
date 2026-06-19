@@ -23,13 +23,13 @@ export const PpeListPage = () => {
           variant="default"
           title="EPIs"
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "RH", href: routes.humanResources.root }, { label: "EPIs" }]}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "RH", href: routes.personnelDepartment.root }, { label: "EPIs" }]}
           actions={[
             {
               key: "create",
               label: "Novo EPI",
               icon: IconPlus,
-              onClick: () => navigate(routes.humanResources.ppe.create),
+              onClick: () => navigate(routes.personnelDepartment.ppe.create),
               variant: "default",
             },
           ]}

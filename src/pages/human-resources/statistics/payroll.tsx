@@ -787,7 +787,7 @@ const PayrollStatisticsPage = () => {
     deletePreset,
     isSavingPreset,
   } = useStatisticsPagePersistence({
-    pageKey: routes.statistics.humanResources.payroll,
+    pageKey: routes.statistics.personnelDepartment.payroll,
     schema: pageConfigSchema,
     current: pageConfig,
     apply: applyPageConfig,
@@ -999,7 +999,7 @@ const PayrollStatisticsPage = () => {
           breadcrumbs={[
             { label: 'Início', href: routes.home },
             { label: 'Estatísticas', href: routes.statistics.root },
-            { label: 'Recursos Humanos', href: routes.statistics.humanResources.root },
+            { label: 'Recursos Humanos', href: routes.statistics.personnelDepartment.root },
             { label: 'Folha de Pagamento' },
           ]}
           headerExtra={

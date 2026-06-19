@@ -17,7 +17,7 @@ export const WarningCreatePage = () => {
   });
 
   const handleCancel = () => {
-    navigate(routes.humanResources.warnings.root);
+    navigate(routes.personnelDepartment.warnings.root);
   };
 
   const handleSubmit = () => {
@@ -33,8 +33,8 @@ export const WarningCreatePage = () => {
         favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_CADASTRAR}
         breadcrumbs={[
           { label: "Início", href: routes.home },
-          { label: "Recursos Humanos", href: routes.humanResources.root },
-          { label: "Advertências", href: routes.humanResources.warnings.root },
+          { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+          { label: "Advertências", href: routes.personnelDepartment.warnings.root },
           { label: "Nova" },
         ]}
         actions={[

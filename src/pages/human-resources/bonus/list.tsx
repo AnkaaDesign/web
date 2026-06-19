@@ -757,7 +757,7 @@ export default function BonusListPage() {
 
   const handleRowClick = (row: BonusRow) => {
     if (row.bonusId) {
-      navigate(routes.humanResources.bonus.details(row.bonusId));
+      navigate(routes.personnelDepartment.bonus.details(row.bonusId));
     }
   };
 
@@ -884,7 +884,7 @@ export default function BonusListPage() {
             return "Bônus";
           })()}
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_BONUS_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.humanResources.root }, { label: "Bônus" }]}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.personnelDepartment.root }, { label: "Bônus" }]}
           actions={[
             {
               key: "rules",
@@ -939,7 +939,7 @@ export default function BonusListPage() {
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={() => navigate(routes.humanResources.bonus.simulation)}
+                  onClick={() => navigate(routes.personnelDepartment.bonus.simulation)}
                   variant="outline"
                   size="default"
                 >

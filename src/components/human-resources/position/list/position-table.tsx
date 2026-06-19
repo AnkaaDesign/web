@@ -208,7 +208,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
       if ((event.target as HTMLElement).closest('[role="checkbox"]') || (event.target as HTMLElement).closest('[role="menu"]')) {
         return;
       }
-      navigate(routes.humanResources.positions.details(position.id));
+      navigate(routes.personnelDepartment.positions.details(position.id));
     },
     [navigate],
   );
@@ -241,7 +241,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
 
   const handleView = useCallback(
     (position: Position) => {
-      window.open(routes.humanResources.positions.details(position.id), '_blank');
+      window.open(routes.personnelDepartment.positions.details(position.id), '_blank');
       setContextMenu(null);
     },
     [],
@@ -249,7 +249,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
 
   const handleEdit = useCallback(
     (position: Position) => {
-      navigate(routes.humanResources.positions.edit(position.id));
+      navigate(routes.personnelDepartment.positions.edit(position.id));
       setContextMenu(null);
     },
     [navigate],
@@ -509,7 +509,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
                     ) : (
                       <>
                         <div className="text-sm mb-4">Comece cadastrando o primeiro cargo.</div>
-                        <Button onClick={() => navigate(routes.humanResources.positions.create)} variant="outline">
+                        <Button onClick={() => navigate(routes.personnelDepartment.positions.create)} variant="outline">
                           <IconPlus className="h-4 w-4 mr-2" />
                           Cadastrar Cargo
                         </Button>
@@ -673,7 +673,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
                       <DropdownMenuItem
                         onClick={() => {
                           const ids = contextMenu.positions.map((p) => p.id).join(",");
-                          navigate(`${routes.humanResources.positions.batchEdit}?ids=${ids}`);
+                          navigate(`${routes.personnelDepartment.positions.batchEdit}?ids=${ids}`);
                           setContextMenu(null);
                         }}
                       >

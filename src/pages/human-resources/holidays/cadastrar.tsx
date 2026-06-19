@@ -74,7 +74,7 @@ export const HolidayCreatePage = () => {
               breadcrumbs={[
                 { label: "Início", href: routes.home },
                 { label: "Departamento Pessoal", href: routes.administration.collaborators.root },
-                { label: "Feriados", href: routes.humanResources.holidays.root },
+                { label: "Feriados", href: routes.personnelDepartment.holidays.root },
                 { label: "Novo" },
               ]}
               actions={actions}

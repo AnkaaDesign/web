@@ -144,7 +144,7 @@ export const PositionHierarchyPage = () => {
 
       // Navigate back to positions list after successful save
       setTimeout(() => {
-        navigate(routes.humanResources.positions.root);
+        navigate(routes.personnelDepartment.positions.root);
       }, 1000);
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {
@@ -159,10 +159,10 @@ export const PositionHierarchyPage = () => {
   const handleCancel = () => {
     if (hasChanges) {
       if (window.confirm("Você tem alterações não salvas. Deseja realmente cancelar?")) {
-        navigate(routes.humanResources.positions.root);
+        navigate(routes.personnelDepartment.positions.root);
       }
     } else {
-      navigate(routes.humanResources.positions.root);
+      navigate(routes.personnelDepartment.positions.root);
     }
   };
 
@@ -175,8 +175,8 @@ export const PositionHierarchyPage = () => {
             icon={IconBriefcase}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Recursos Humanos", href: routes.humanResources.root },
-              { label: "Cargos", href: routes.humanResources.positions.root },
+              { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+              { label: "Cargos", href: routes.personnelDepartment.positions.root },
               { label: "Hierarquia" },
             ]}
             actions={[

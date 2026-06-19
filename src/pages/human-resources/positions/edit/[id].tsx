@@ -22,14 +22,14 @@ export const PositionEditPage = () => {
   });
 
   if (!id) {
-    return <Navigate to={routes.humanResources.positions.root} replace />;
+    return <Navigate to={routes.personnelDepartment.positions.root} replace />;
   }
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <p className="text-destructive mb-4">Erro ao carregar cargo</p>
-        <Navigate to={routes.humanResources.positions.root} replace />
+        <Navigate to={routes.personnelDepartment.positions.root} replace />
       </div>
     );
   }
@@ -43,7 +43,7 @@ export const PositionEditPage = () => {
   }
 
   if (!position) {
-    return <Navigate to={routes.humanResources.positions.root} replace />;
+    return <Navigate to={routes.personnelDepartment.positions.root} replace />;
   }
 
   return (
@@ -55,9 +55,9 @@ export const PositionEditPage = () => {
           icon={IconBriefcase}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Cargos", href: routes.humanResources.positions.root },
-            { label: position?.data?.name || "Cargo", href: routes.humanResources.positions.details(id) },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+            { label: "Cargos", href: routes.personnelDepartment.positions.root },
+            { label: position?.data?.name || "Cargo", href: routes.personnelDepartment.positions.details(id) },
             { label: "Editar" },
           ]}
           className="flex-shrink-0"

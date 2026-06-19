@@ -54,7 +54,7 @@ export const EditEpiPage = () => {
       });
 
       if (result.success) {
-        navigate(routes.humanResources.ppe.root);
+        navigate(routes.personnelDepartment.ppe.root);
       }
     } catch (error) {
       // Error handled by mutation hook
@@ -65,7 +65,7 @@ export const EditEpiPage = () => {
   };
 
   const handleCancel = () => {
-    navigate(routes.humanResources.ppe.root);
+    navigate(routes.personnelDepartment.ppe.root);
   };
 
   if (isLoading) {
@@ -78,7 +78,7 @@ export const EditEpiPage = () => {
         <div className="text-center">
           <h2 className="text-2xl font-semibold mb-2">EPI não encontrado</h2>
           <p className="text-muted-foreground mb-4">O EPI que você está procurando não existe ou foi removido.</p>
-          <Button onClick={() => navigate(routes.humanResources.ppe.root)}>Voltar para lista</Button>
+          <Button onClick={() => navigate(routes.personnelDepartment.ppe.root)}>Voltar para lista</Button>
         </div>
       </div>
     );
@@ -110,9 +110,9 @@ export const EditEpiPage = () => {
         title={`Editar ${item.name}`}
         icon={IconShield}
         breadcrumbs={[
-          { label: "RH", href: routes.humanResources.root },
-          { label: "EPIs", href: routes.humanResources.ppe.root },
-          { label: item.name, href: routes.humanResources.ppe.details(id!) },
+          { label: "RH", href: routes.personnelDepartment.root },
+          { label: "EPIs", href: routes.personnelDepartment.ppe.root },
+          { label: item.name, href: routes.personnelDepartment.ppe.details(id!) },
           { label: "Editar" },
         ]}
         actions={actions}

@@ -56,7 +56,9 @@ export * from "./deployment";
 export * from "./url-state-types";
 export * from "./media";
 export * from "./push-notifications";
+export * from "./receivable";
 export * from "./reconciliation";
+export * from "./recurrent-payable";
 export * from "./skill";
 export * from "./questionnaire";
 // Accounting area — Departamento Pessoal / Medicina do Trabalho

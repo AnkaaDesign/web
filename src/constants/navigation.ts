@@ -653,7 +653,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Financeiro",
     icon: "financial",
     path: "/financeiro",
-    requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
+    // FINANCIAL must be here or the menu filter (which prunes a failed parent
+    // before its children) hides the entire group from FINANCIAL users.
+    requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
     children: [
       {
         id: "clientes-financeiro-menu",
@@ -679,13 +681,21 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       {
-        // Elotech NFS-e issuance pages — NOT what accounting needs (they use the
-        // reconciliation fiscal documents inside Conciliação Bancária).
+        // Unified Notas Fiscais surface — one page with a direction toggle
+        // (Emitidas = NFS-e we issue via Elotech; Recebidas = supplier NFs via
+        // SIEG). Sector-defaulted: FINANCIAL/COMMERCIAL → Emitidas, ACCOUNTING →
+        // Recebidas. Replaces both the old "NFS-e Emitidas" and the
+        // "Conciliação > Notas Fiscais" entries.
         id: "notas-fiscais",
-        title: "NFS-e Emitidas",
+        title: "Notas Fiscais",
         icon: "receipt",
         path: "/financeiro/notas-fiscais",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
+        requiredPrivilege: [
+          SECTOR_PRIVILEGES.ADMIN,
+          SECTOR_PRIVILEGES.FINANCIAL,
+          SECTOR_PRIVILEGES.COMMERCIAL,
+          SECTOR_PRIVILEGES.ACCOUNTING,
+        ],
       },
       {
         id: "orcamento",
@@ -717,44 +727,55 @@ export const NAVIGATION_MENU: MenuItem[] = [
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
           },
           {
-            // Reconciliation fiscal-documents list. Now the single home for
-            // "Notas Fiscais" (the top-level ACCOUNTING duplicate was removed), so
-            // ACCOUNTING is included here alongside ADMIN/FINANCIAL.
-            id: "conciliacao-notas",
-            title: "Notas Fiscais",
+            // Inflow ledger — open/overdue/received receivable installments
+            // (task-quotes + external operations + invoices). FINANCIAL emphasis.
+            id: "contas-a-receber",
+            title: "Contas a Receber",
             icon: "receipt",
-            path: "/financeiro/conciliacao/notas",
-            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
+            path: "/financeiro/conciliacao/entradas",
+            order: 2,
+            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
           },
           {
-            // Kept for ACCOUNTING as a utility entry: the four reconciliation pages
-            // categorize transactions, and Categorias is the only place to manage the
-            // category set (the page is already reachable via /financeiro/*).
+            // Outflow ledger — unified payables (orders + airbrushing + payroll +
+            // taxes + recurrents). ACCOUNTING emphasis. FINANCIAL also manages cash.
+            id: "contas-a-pagar",
+            title: "Contas a Pagar",
+            icon: "receipt",
+            path: "/financeiro/contas-a-pagar",
+            order: 3,
+            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+          },
+          {
+            // First-class recurrent bills (aluguel/internet/energia/água) — each
+            // materializes a monthly occurrence into Contas a Pagar.
+            id: "contas-recorrentes",
+            title: "Contas Recorrentes",
+            icon: "repeat",
+            path: "/financeiro/contas-recorrentes",
+            order: 4,
+            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+          },
+          {
+            // Legacy reconciliation recurring-categories view (distinct from the
+            // first-class Contas Recorrentes CRUD above).
+            id: "conciliacao-recorrentes",
+            title: "Recorrentes (categorias)",
+            icon: "repeat",
+            path: "/financeiro/conciliacao/recorrentes",
+            order: 5,
+            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL],
+          },
+          {
+            // Manage the transaction category set (the only place to edit it).
             id: "conciliacao-categorias",
             title: "Categorias",
             icon: "tags",
             path: "/financeiro/conciliacao/categorias",
+            order: 6,
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
           },
-          {
-            id: "conciliacao-recorrentes",
-            title: "Recorrentes",
-            icon: "repeat",
-            path: "/financeiro/conciliacao/recorrentes",
-            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL],
-          },
         ],
-      },
-      {
-        // Single payables hub — absorbed the former "Previsão de Saídas"
-        // (its forecast KPI strip + estimate styling live here now).
-        id: "contas-a-pagar",
-        title: "Contas a Pagar",
-        icon: "receipt",
-        path: "/financeiro/contas-a-pagar",
-        // ACCOUNTING-only: new accounting-sector payables hub (did not exist in the
-        // baseline menu). ADMIN/FINANCIAL keep their original Financeiro menu unchanged.
-        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
       },
     ],
   },

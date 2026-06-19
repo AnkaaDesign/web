@@ -33,6 +33,7 @@ import {
   TransactionMatchSection,
   type MatchSaveState,
 } from "@/components/financial/reconciliation/transaction-match-section";
+import { ReceivableMatchSection } from "@/components/financial/reconciliation/receivable-match-section";
 import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";
 
 // Module-scoped so it isn't redefined on every render (which would remount the
@@ -294,12 +295,17 @@ export function ReconciliationTransactionDetailPage() {
             </Card>
           </div>
 
-          {/* Notas vinculadas + Candidatas */}
-          <TransactionMatchSection
-            transaction={tx}
-            onRequestUnmatch={activeMatches.length > 0 ? () => setUnmatchOpen(true) : undefined}
-            onSaveStateChange={setMatchState}
-          />
+          {/* CREDIT → conciliar contra parcelas a receber (entrada). DEBIT →
+              fluxo de notas fiscais existente (saída). */}
+          {isCredit ? (
+            <ReceivableMatchSection transaction={tx} />
+          ) : (
+            <TransactionMatchSection
+              transaction={tx}
+              onRequestUnmatch={activeMatches.length > 0 ? () => setUnmatchOpen(true) : undefined}
+              onSaveStateChange={setMatchState}
+            />
+          )}
         </div>
       </div>
 

@@ -125,7 +125,7 @@ export function PositionBatchEditTable({ positions, onCancel: _onCancel, onSubmi
         setShowResultDialog(true);
       } else {
         // Even if we don't have detailed results, navigate back on apparent success
-        navigate(routes.humanResources.positions.root);
+        navigate(routes.personnelDepartment.positions.root);
       }
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
@@ -148,7 +148,7 @@ export function PositionBatchEditTable({ positions, onCancel: _onCancel, onSubmi
       setBatchResult(null);
       // If there were no failures, navigate back to list
       if (batchResult && batchResult.totalFailed === 0 && batchResult.totalSuccess > 0) {
-        navigate(routes.humanResources.positions.root);
+        navigate(routes.personnelDepartment.positions.root);
       }
     }
   };

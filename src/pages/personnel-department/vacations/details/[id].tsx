@@ -41,6 +41,11 @@ export const VacationDetailPage = () => {
 
   const { user } = useAuth();
   const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  // PM can view this detail, but only HR/Accounting/Admin may edit or pay.
+  const canManageVacations =
+    user?.sector?.privileges === SECTOR_PRIVILEGES.ACCOUNTING ||
+    user?.sector?.privileges === SECTOR_PRIVILEGES.HUMAN_RESOURCES ||
+    isAdmin;
 
   const [payPopoverOpen, setPayPopoverOpen] = useState(false);
   const [paymentDate, setPaymentDate] = useState<Date | null>(new Date());
@@ -139,14 +144,18 @@ export const VacationDetailPage = () => {
               variant: "outline" as const,
               loading: isRefetching,
             },
-            {
-              key: "edit",
-              label: "Editar",
-              icon: IconEdit,
-              onClick: () => navigate(routes.personnelDepartment.vacations.edit(id)),
-              group: "primary" as const,
-              disabled: isPaid,
-            },
+            ...(canManageVacations
+              ? [
+                  {
+                    key: "edit",
+                    label: "Editar",
+                    icon: IconEdit,
+                    onClick: () => navigate(routes.personnelDepartment.vacations.edit(id)),
+                    group: "primary" as const,
+                    disabled: isPaid,
+                  },
+                ]
+              : []),
             ...(isAdmin
               ? [
                   {
@@ -183,7 +192,7 @@ export const VacationDetailPage = () => {
 
             {/* Action bar — self-documenting "Marcar como pago" with an inline
                 payment-date popover (no separate edit round-trip). */}
-            {canMarkPaid && (
+            {canMarkPaid && canManageVacations && (
               <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium">Pagamento das férias</p>

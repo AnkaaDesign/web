@@ -84,16 +84,17 @@ const FinancialBillingDocumentPreview = lazy(() => import("@/pages/financial/bil
 const FinancialBudgetList = lazy(() => import("@/pages/financial/budget/list").then((module) => ({ default: module.BudgetListPage })));
 const FinancialBudgetCreate = lazy(() => import("@/pages/financial/budget/create").then((module) => ({ default: module.FinancialBudgetCreatePage })));
 const FinancialBudgetDetail = lazy(() => import("@/pages/financial/budget/details/[taskId]").then((module) => ({ default: module.FinancialBudgetDetailPage })));
-const FinancialNfseList = lazy(() => import("@/pages/financial/nfse/list").then((module) => ({ default: module.NfseListPage })));
+const FinancialNotasFiscais = lazy(() => import("@/pages/financial/notas-fiscais/list").then((module) => ({ default: module.NotasFiscaisPage })));
 const FinancialNfseDetail = lazy(() => import("@/pages/financial/nfse/detail").then((module) => ({ default: module.NfseDetailPage })));
 const ReconciliationTransactionDetail = lazy(() => import("@/pages/financial/reconciliation/transaction-detail").then((module) => ({ default: module.ReconciliationTransactionDetailPage })));
-const ReconciliationFiscalDocumentsList = lazy(() => import("@/pages/financial/reconciliation/fiscal-documents-list").then((module) => ({ default: module.ReconciliationFiscalDocumentsListPage })));
 const ReconciliationFiscalDocumentDetail = lazy(() => import("@/pages/financial/reconciliation/fiscal-document-detail").then((module) => ({ default: module.ReconciliationFiscalDocumentDetailPage })));
 const ReconciliationCategoriesList = lazy(() => import("@/pages/financial/reconciliation/categories-list").then((module) => ({ default: module.ReconciliationCategoriesListPage })));
 const ReconciliationRecurringForecast = lazy(() => import("@/pages/financial/reconciliation/recurring-forecast").then((module) => ({ default: module.ReconciliationRecurringForecastPage })));
 const ReconciliationStatement = lazy(() => import("@/pages/financial/reconciliation/statement").then((module) => ({ default: module.ReconciliationStatementPage })));
 const ReconciliationStatistics = lazy(() => import("@/pages/financial/statistics/reconciliation").then((module) => ({ default: module.ReconciliationStatisticsPage })));
 const AccountsPayableListPage = lazy(() => import("@/pages/financial/accounts-payable/list"));
+const ReceivablesListPage = lazy(() => import("@/pages/financial/receivables/list"));
+const RecurrentPayablesListPage = lazy(() => import("@/pages/financial/recurrent-payables/list"));
 const FinancialCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
 const FinancialCustomersBatchEdit = lazy(() => import("@/pages/administration/customers/batch-edit").then((module) => ({ default: module.CustomerBatchEditPage })));
 
@@ -1194,7 +1195,7 @@ function App() {
                 />
 
                 <Route
-                  path={routes.humanResources.payroll.root}
+                  path={routes.personnelDepartment.payroll.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPayrollList />
@@ -1212,7 +1213,7 @@ function App() {
                 />
                 {/* Bonus routes */}
                 <Route
-                  path={routes.humanResources.bonus.list}
+                  path={routes.personnelDepartment.bonus.list}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesBonusList />
@@ -1220,7 +1221,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.bonus.details(":id")}
+                  path={routes.personnelDepartment.bonus.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesBonusDetail />
@@ -1229,7 +1230,7 @@ function App() {
                 />
                 {/* Bonus simulation route - under bonus domain */}
                 <Route
-                  path={routes.humanResources.bonus.simulation}
+                  path={routes.personnelDepartment.bonus.simulation}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesBonusSimulation />
@@ -1239,7 +1240,7 @@ function App() {
                 {/* Legacy redirect for old simulation URL */}
                 <Route
                   path="/departamento-pessoal/simulacao-bonus"
-                  element={<Navigate to={routes.humanResources.bonus.simulation} replace />}
+                  element={<Navigate to={routes.personnelDepartment.bonus.simulation} replace />}
                 />
                 <Route
                   path={routes.administration.sectors.root}
@@ -1490,7 +1491,7 @@ function App() {
                   path={routes.financial.nfse.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <FinancialNfseList />
+                      <FinancialNotasFiscais />
                     </Suspense>
                   }
                 />
@@ -1524,9 +1525,15 @@ function App() {
                   path={routes.financial.reconciliation.outflows}
                   element={<Navigate to={routes.financial.reconciliation.statement} replace />}
                 />
+                {/* Entradas hosts "Contas a Receber" — the inflow analog of
+                    Contas a Pagar (receivable installments + boleto/conciliação). */}
                 <Route
                   path={routes.financial.reconciliation.inflows}
-                  element={<Navigate to={routes.financial.reconciliation.statement} replace />}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReceivablesListPage />
+                    </Suspense>
+                  }
                 />
                 {/* Previsão de Saídas was merged into Contas a Pagar. Old links
                     (current + legacy conciliação path) redirect there. */}
@@ -1556,7 +1563,7 @@ function App() {
                   path={routes.financial.reconciliation.fiscalDocuments}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <ReconciliationFiscalDocumentsList />
+                      <FinancialNotasFiscais defaultSegment="recebidas" />
                     </Suspense>
                   }
                 />
@@ -1589,6 +1596,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <AccountsPayableListPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.recurrentPayables.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RecurrentPayablesListPage />
                     </Suspense>
                   }
                 />
@@ -1631,7 +1646,7 @@ function App() {
                   element={<Suspense fallback={<PageLoader />}><FinancialStatisticsHub /></Suspense>}
                 />
                 <Route
-                  path={routes.statistics.humanResources.root}
+                  path={routes.statistics.personnelDepartment.root}
                   element={<Suspense fallback={<PageLoader />}><HRStatisticsHub /></Suspense>}
                 />
                 {/* Production Statistics routes */}
@@ -1672,23 +1687,23 @@ function App() {
 
                 {/* HR Statistics routes */}
                 <Route
-                  path={routes.statistics.humanResources.payroll}
+                  path={routes.statistics.personnelDepartment.payroll}
                   element={<Suspense fallback={<PageLoader />}><HRPayrollStatistics /></Suspense>}
                 />
                 <Route
-                  path={routes.statistics.humanResources.salaryCost}
+                  path={routes.statistics.personnelDepartment.salaryCost}
                   element={<Suspense fallback={<PageLoader />}><HRSalaryCostStatistics /></Suspense>}
                 />
                 <Route
-                  path={routes.statistics.humanResources.teamPerformance}
+                  path={routes.statistics.personnelDepartment.teamPerformance}
                   element={<Suspense fallback={<PageLoader />}><HRTeamPerformanceStatistics /></Suspense>}
                 />
                 <Route
-                  path={routes.statistics.humanResources.absenteeism}
+                  path={routes.statistics.personnelDepartment.absenteeism}
                   element={<Suspense fallback={<PageLoader />}><HRFaltasStatistics /></Suspense>}
                 />
                 <Route
-                  path={routes.statistics.humanResources.skillAssessment}
+                  path={routes.statistics.personnelDepartment.skillAssessment}
                   element={<Suspense fallback={<PageLoader />}><HRSkillAssessmentStatistics /></Suspense>}
                 />
 
@@ -2562,7 +2577,7 @@ function App() {
 
                 {/* Human Resources routes */}
                 <Route
-                  path={routes.humanResources.root}
+                  path={routes.personnelDepartment.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResources />
@@ -2570,7 +2585,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.warnings.root}
+                  path={routes.personnelDepartment.warnings.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesWarningsList />
@@ -2578,7 +2593,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.warnings.create}
+                  path={routes.personnelDepartment.warnings.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesWarningsCreate />
@@ -2586,7 +2601,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.warnings.edit(":id")}
+                  path={routes.personnelDepartment.warnings.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesWarningsEdit />
@@ -2594,7 +2609,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.warnings.details(":id")}
+                  path={routes.personnelDepartment.warnings.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesWarningsDetails />
@@ -2602,7 +2617,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.positions.root}
+                  path={routes.personnelDepartment.positions.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPositions />
@@ -2610,7 +2625,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.positions.create}
+                  path={routes.personnelDepartment.positions.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPositionsCreate />
@@ -2618,7 +2633,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.positions.hierarchy}
+                  path={routes.personnelDepartment.positions.hierarchy}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPositionsHierarchy />
@@ -2626,7 +2641,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.positions.edit(":id")}
+                  path={routes.personnelDepartment.positions.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPositionsEdit />
@@ -2634,7 +2649,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.positions.details(":id")}
+                  path={routes.personnelDepartment.positions.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPositionsDetails />
@@ -2642,7 +2657,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.positions.batchEdit}
+                  path={routes.personnelDepartment.positions.batchEdit}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPositionsBatchEdit />
@@ -2651,7 +2666,7 @@ function App() {
                 />
                 {/* Secullum integration — admin mapping page */}
                 <Route
-                  path={routes.humanResources.integrations.secullum.root}
+                  path={routes.personnelDepartment.integrations.secullum.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <SecullumMappingPage />
@@ -2660,7 +2675,7 @@ function App() {
                 />
                 {/* Note: employees routes are under administration.employees, not humanResources */}
                 <Route
-                  path={routes.humanResources.ppe.root}
+                  path={routes.personnelDepartment.ppe.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpe />
@@ -2668,7 +2683,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.create}
+                  path={routes.personnelDepartment.ppe.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeCreate />
@@ -2676,7 +2691,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.edit(":id")}
+                  path={routes.personnelDepartment.ppe.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeEdit />
@@ -2684,7 +2699,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.details(":id")}
+                  path={routes.personnelDepartment.ppe.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeDetails />
@@ -2692,7 +2707,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.deliveries.root}
+                  path={routes.personnelDepartment.ppe.deliveries.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeDeliveries />
@@ -2700,7 +2715,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.deliveries.create}
+                  path={routes.personnelDepartment.ppe.deliveries.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeDeliveriesCreate />
@@ -2708,7 +2723,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.deliveries.edit(":id")}
+                  path={routes.personnelDepartment.ppe.deliveries.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeDeliveriesEdit />
@@ -2716,7 +2731,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.deliveries.details(":id")}
+                  path={routes.personnelDepartment.ppe.deliveries.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeDeliveriesDetails />
@@ -2724,7 +2739,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.sizes.root}
+                  path={routes.personnelDepartment.ppe.sizes.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeSizes />
@@ -2732,7 +2747,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.schedules.root}
+                  path={routes.personnelDepartment.ppe.schedules.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeSchedules />
@@ -2740,7 +2755,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.schedules.create}
+                  path={routes.personnelDepartment.ppe.schedules.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeSchedulesCreate />
@@ -2748,7 +2763,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.schedules.edit(":id")}
+                  path={routes.personnelDepartment.ppe.schedules.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeSchedulesEdit />
@@ -2756,7 +2771,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.schedules.details(":id")}
+                  path={routes.personnelDepartment.ppe.schedules.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeSchedulesDetails />
@@ -2767,13 +2782,13 @@ function App() {
                     /departamento-pessoal/controle-ponto with `?view=` query
                     param selecting the mode (colaborador-unico is default). */}
                 <Route
-                  path={routes.humanResources.calculations.root}
+                  path={routes.personnelDepartment.calculations.root}
                   element={
-                    <Navigate to={routes.humanResources.timeClock.list} replace />
+                    <Navigate to={routes.personnelDepartment.timeClock.list} replace />
                   }
                 />
                 <Route
-                  path={routes.humanResources.requisicoes.root}
+                  path={routes.personnelDepartment.requisicoes.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesRequisitions />
@@ -2781,7 +2796,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.holidays.root}
+                  path={routes.personnelDepartment.holidays.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesHolidays />
@@ -2789,7 +2804,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.holidays.calendar}
+                  path={routes.personnelDepartment.holidays.calendar}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesHolidaysCalendar />
@@ -2797,7 +2812,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.holidays.create}
+                  path={routes.personnelDepartment.holidays.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesHolidaysCreate />
@@ -2805,7 +2820,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.horarios.root}
+                  path={routes.personnelDepartment.horarios.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesSchedules />
@@ -2813,7 +2828,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.calendar.root}
+                  path={routes.personnelDepartment.calendar.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesHRCalendar />
@@ -2821,7 +2836,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.timeClock.list}
+                  path={routes.personnelDepartment.timeClock.list}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesTimeClock />
@@ -2829,7 +2844,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.timeClock.colaborador}
+                  path={routes.personnelDepartment.timeClock.colaborador}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesTimeClockColaborador />
@@ -2837,7 +2852,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.timeClock.dia}
+                  path={routes.personnelDepartment.timeClock.dia}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesTimeClockDia />
@@ -2845,7 +2860,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.timeClock.edicao}
+                  path={routes.personnelDepartment.timeClock.edicao}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesTimeClockEdicao />
@@ -2853,7 +2868,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.timeClock.ausencias}
+                  path={routes.personnelDepartment.timeClock.ausencias}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesTimeClockAusencias />
@@ -2861,7 +2876,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.timeClock.fechamento.list}
+                  path={routes.personnelDepartment.timeClock.fechamento.list}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesFechamentoList />
@@ -2869,7 +2884,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.timeClock.fechamento.details(":id")}
+                  path={routes.personnelDepartment.timeClock.fechamento.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesFechamentoDetails />
@@ -2877,7 +2892,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.bonus.performanceLevels.list}
+                  path={routes.personnelDepartment.bonus.performanceLevels.list}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPerformanceLevels />
@@ -2999,7 +3014,7 @@ function App() {
                 <Route path={routes.personnelDepartment.thirteenth.edit(":id")} element={<Navigate to={routes.administration.collaborators.root} replace />} />
                 {/* Departamento Pessoal — Empréstimos */}
                 <Route
-                  path={routes.humanResources.loans.root}
+                  path={routes.personnelDepartment.loans.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PersonnelDepartmentLoansList />

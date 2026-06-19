@@ -1002,12 +1002,12 @@ export default function PayrollListPage() {
     // For saved payrolls, we can use the payrollId
     if (row.bonusStatus === 'saved' && row.payrollId) {
       // Saved payroll - navigate with ID
-      navigate(routes.humanResources.payroll.detail(row.payrollId));
+      navigate(routes.personnelDepartment.payroll.detail(row.payrollId));
     } else {
       // Live calculation - navigate with user/year/month parameters
       // Use 'live-' prefix format (matching bonus page pattern)
       const liveId = `live-${row.userId}-${row.year}-${row.month}`;
-      navigate(routes.humanResources.payroll.detail(liveId));
+      navigate(routes.personnelDepartment.payroll.detail(liveId));
     }
   };
 

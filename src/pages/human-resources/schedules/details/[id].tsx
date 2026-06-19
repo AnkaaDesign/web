@@ -45,7 +45,7 @@ export const ScheduleDetailsPage = () => {
   const schedule = response?.data?.data;
 
   if (!id) {
-    return <Navigate to={routes.humanResources.horarios.root} replace />;
+    return <Navigate to={routes.personnelDepartment.horarios.root} replace />;
   }
 
   if (error) {
@@ -54,7 +54,7 @@ export const ScheduleDetailsPage = () => {
         <div className="flex flex-col items-center justify-center h-full gap-4">
           <IconClock className="h-16 w-16 text-muted-foreground" />
           <p className="text-destructive">Erro ao carregar horário</p>
-          <Navigate to={routes.humanResources.horarios.root} replace />
+          <Navigate to={routes.personnelDepartment.horarios.root} replace />
         </div>
       </PrivilegeRoute>
     );
@@ -71,7 +71,7 @@ export const ScheduleDetailsPage = () => {
   }
 
   if (!schedule) {
-    return <Navigate to={routes.humanResources.horarios.root} replace />;
+    return <Navigate to={routes.personnelDepartment.horarios.root} replace />;
   }
 
   return (
@@ -82,8 +82,8 @@ export const ScheduleDetailsPage = () => {
           title={schedule.Descricao || schedule.Codigo || "Horário"}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Horários", href: routes.humanResources.horarios.root },
+            { label: "Recursos Humanos", href: routes.personnelDepartment.root },
+            { label: "Horários", href: routes.personnelDepartment.horarios.root },
             { label: schedule.Descricao || schedule.Codigo || "Detalhes" },
           ]}
           actions={[

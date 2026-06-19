@@ -126,14 +126,14 @@ export function PositionForm(props: PositionFormProps) {
         if (props.mode === "create") {
           await create(data as PositionCreateFormData);
           // Success toast is handled automatically by API client
-          navigate(routes.humanResources.positions.root);
+          navigate(routes.personnelDepartment.positions.root);
         } else {
           await update({
             id: props.position.id,
             data: data as PositionUpdateFormData,
           });
           // Success toast is handled automatically by API client
-          navigate(routes.humanResources.positions.details(props.position.id));
+          navigate(routes.personnelDepartment.positions.details(props.position.id));
         }
       }
     } catch (error) {
@@ -145,9 +145,9 @@ export function PositionForm(props: PositionFormProps) {
 
   const handleCancel = () => {
     if (props.mode === "create") {
-      navigate(routes.humanResources.positions.root);
+      navigate(routes.personnelDepartment.positions.root);
     } else {
-      navigate(routes.humanResources.positions.details(props.position.id));
+      navigate(routes.personnelDepartment.positions.details(props.position.id));
     }
   };
 
