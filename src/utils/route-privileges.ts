@@ -68,6 +68,13 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/financeiro/conciliacao/extrato": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
   "/financeiro/conciliacao/saidas": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
   "/financeiro/conciliacao/entradas": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
+  // Notas Fiscais (Recebidas tab) + Categorias + first-class/legacy recorrentes —
+  // explicit entries so they match the menu intent instead of the broad wildcard.
+  "/financeiro/conciliacao/notas": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
+  "/financeiro/conciliacao/notas/:id": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
+  "/financeiro/conciliacao/categorias": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
+  "/financeiro/conciliacao/recorrentes": ["ADMIN", "FINANCIAL"],
+  "/financeiro/contas-recorrentes": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
   // Previsão de Saídas — moved out of the conciliação domain to top-level Financeiro.
   "/financeiro/previsao-de-saidas": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
   "/financeiro/producao": "FINANCIAL", // Redirects to /producao

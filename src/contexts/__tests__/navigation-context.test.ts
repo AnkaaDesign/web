@@ -105,7 +105,8 @@ describe("winner resolution with recorded nav context", () => {
     const recorded = { id: "dp-colaboradores", path: "/departamento-pessoal/colaboradores" };
     const active = resolveActiveNav(ACCOUNTING, "/financeiro/contas-a-pagar", recorded);
     expect(active.id).toBe("contas-a-pagar");
-    expect(active.trail.map((t) => t.id)).toEqual(["financeiro"]);
+    // Contas a Pagar now lives under Conciliação Bancária, so the trail nests it.
+    expect(active.trail.map((t) => t.id)).toEqual(["financeiro", "conciliacao-bancaria"]);
   });
 });
 
@@ -209,52 +210,57 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
 
   it("Medicina do Trabalho: Agendamentos/Tamanhos nested under Entrega de EPIs", () => {
     const mt = byId(ACCOUNTING, "medicina-do-trabalho")!;
-    expect((mt.children || []).map((c) => c.title)).toEqual(["Afastamentos", "ASO", "Entrega de EPIs", "Exames Periódicos"]);
+    expect((mt.children || []).map((c) => c.title)).toEqual(["Afastamentos", "ASO", "CAT", "Entrega de EPIs", "Exames Periódicos"]);
     const entregas = (mt.children || []).find((c) => c.id === "mt-epi-entregas")!;
     const childTitles = (entregas.children || []).map((c) => c.title);
     expect(childTitles).toContain("Agendamentos");
     expect(childTitles).toContain("Tamanhos");
   });
 
-  it("Financeiro: Contas a Pagar + Conciliação Bancária (Notas Fiscais now lives inside Conciliação)", () => {
+  it("Financeiro (ACCOUNTING): unified Notas Fiscais at top level; Contas a Receber/Pagar/Recorrentes under Conciliação", () => {
     const fin = byId(ACCOUNTING, "financeiro")!;
-    // The top-level ACCOUNTING "Notas Fiscais" duplicate was removed; the fiscal
-    // documents list now lives only inside the Conciliação Bancária submenu.
-    // Previsão de Saídas now sits at the top level of Financeiro (a sibling of
-    // Conciliação Bancária, outside the conciliação domain). Sorted alphabetically.
+    // Notas Fiscais is now a single top-level entry (Emitidas+Recebidas toggle).
+    // Contas a Receber / a Pagar / Recorrentes were regrouped under Conciliação
+    // Bancária. Top-level children are sorted alphabetically.
     expect((fin.children || []).map((c) => c.title)).toEqual([
       "Conciliação Bancária",
-      "Contas a Pagar",
-      "Previsão de Saídas",
+      "Faturamento",
+      "Notas Fiscais",
     ]);
     const conc = (fin.children || []).find((c) => c.id === "conciliacao-bancaria")!;
+    // Ordered by the `order` field; "Recorrentes (categorias)" ([ADMIN,FINANCIAL])
+    // is hidden from ACCOUNTING.
     expect((conc.children || []).map((c) => ({ title: c.title, path: c.path }))).toEqual([
       { title: "Extrato", path: "/financeiro/conciliacao/extrato" },
-      { title: "Saídas", path: "/financeiro/conciliacao/saidas" },
-      { title: "Entradas", path: "/financeiro/conciliacao/entradas" },
+      { title: "Contas a Receber", path: "/financeiro/conciliacao/entradas" },
+      { title: "Contas a Pagar", path: "/financeiro/contas-a-pagar" },
+      { title: "Contas Recorrentes", path: "/financeiro/contas-recorrentes" },
       { title: "Categorias", path: "/financeiro/conciliacao/categorias" },
-      { title: "Notas Fiscais", path: "/financeiro/conciliacao/notas" },
     ]);
   });
 
-  it("ADMIN keeps Transações/Notas/Recorrentes; ACCOUNTING does not see them", () => {
+  it("ADMIN sees the legacy Recorrentes (categorias) view; ACCOUNTING does not", () => {
     // NOTE: FINANCIAL has a flat per-role nav and was never in the "Financeiro"
-    // SECTION audience ([ADMIN, COMMERCIAL, ACCOUNTING]) — it keeps page ACCESS via
-    // ROUTE_PRIVILEGES, unchanged. ADMIN is the section-nav role to verify here.
+    // SECTION audience — it keeps page ACCESS via ROUTE_PRIVILEGES.
     const conc = (byId(ADMIN, "financeiro")!.children || []).find((c: MenuItem) => c.id === "conciliacao-bancaria")!;
     const titles = (conc.children || []).map((c: MenuItem) => c.title);
-    expect(titles).toContain("Transações");
-    expect(titles).toContain("Recorrentes");
-    expect(titles).toContain("Notas Fiscais");
+    expect(titles).toEqual([
+      "Extrato",
+      "Contas a Receber",
+      "Contas a Pagar",
+      "Contas Recorrentes",
+      "Recorrentes (categorias)",
+      "Categorias",
+    ]);
 
     const accConc = (byId(ACCOUNTING, "financeiro")!.children || []).find((c) => c.id === "conciliacao-bancaria")!;
     const accTitles = (accConc.children || []).map((c) => c.title);
-    expect(accTitles).not.toContain("Transações");
-    expect(accTitles).not.toContain("Recorrentes");
+    expect(accTitles).not.toContain("Recorrentes (categorias)");
 
-    // FINANCIAL flat nav: no Financeiro section before, none after
+    // FINANCIAL was previously locked out of the Financeiro section (its parent
+    // privilege omitted FINANCIAL); it is now included, so the section shows.
     const FINANCIAL = menuFor(SECTOR_PRIVILEGES.FINANCIAL);
-    expect(byId(FINANCIAL, "financeiro")).toBeUndefined();
+    expect(byId(FINANCIAL, "financeiro")).toBeDefined();
   });
 
   it("Ferramentas: spec tools incl. Calculadora de Horas and Calendário; no QR Code/Paleta", () => {

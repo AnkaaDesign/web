@@ -19,6 +19,7 @@ import {
   useMatchCandidates,
   useUnmatchTransaction,
 } from "@/hooks/financial/use-reconciliation";
+import { useReceivableCandidates } from "@/hooks/financial/use-receivable";
 import { CategoryEditor } from "@/components/financial/reconciliation/category-editor";
 import {
   formatAccountNumber,
@@ -54,10 +55,14 @@ export function ReconciliationTransactionDetailPage() {
   const { data: tx, isLoading, error } = useBankTransaction(id);
   // Drive the status badge's "%" off the LIVE best candidate (deduped with the
   // match section's query) instead of the stored topMatchScore, which can go
-  // stale and show a confidence even when no candidate currently exists.
-  const { data: liveCandidates } = useMatchCandidates(id, true);
+  // stale. CREDITs are receivables (Installment pool, unified scorer); DEBITs are
+  // NF candidates — use the matching pool so the badge agrees with the panel below.
+  const isCreditTx = tx?.type === "CREDIT";
+  const { data: liveNfCandidates } = useMatchCandidates(id, tx ? !isCreditTx : false);
+  const { data: liveReceivableCandidates } = useReceivableCandidates(id, !!isCreditTx);
+  const liveCandidatePool = isCreditTx ? liveReceivableCandidates : liveNfCandidates;
   const liveTopScore =
-    liveCandidates && liveCandidates.length > 0 ? liveCandidates[0].confidence : null;
+    liveCandidatePool && liveCandidatePool.length > 0 ? liveCandidatePool[0].confidence : null;
   const unmatchMut = useUnmatchTransaction();
   const changeCategoryMut = useChangeCategory();
   const [unmatchOpen, setUnmatchOpen] = useState(false);
