@@ -47,13 +47,18 @@ export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
     const menu = menuRef.current;
     const menuRect = menu.getBoundingClientRect();
     const padding = 8;
+    // Use documentElement.clientWidth/Height (zoom-adjusted, same space as
+    // menuRect and the pointer-derived position) rather than window.innerWidth/
+    // Height (real viewport, not zoom-adjusted) so edges flip at the right spot.
+    const viewportWidth = document.documentElement.clientWidth;
+    const viewportHeight = document.documentElement.clientHeight;
 
     let adjustedX = position.x;
     let adjustedY = position.y;
 
     // Check right edge
-    if (position.x + menuRect.width > window.innerWidth - padding) {
-      adjustedX = window.innerWidth - menuRect.width - padding;
+    if (position.x + menuRect.width > viewportWidth - padding) {
+      adjustedX = viewportWidth - menuRect.width - padding;
     }
 
     // Check left edge
@@ -62,8 +67,8 @@ export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
     }
 
     // Check bottom edge
-    if (position.y + menuRect.height > window.innerHeight - padding) {
-      adjustedY = window.innerHeight - menuRect.height - padding;
+    if (position.y + menuRect.height > viewportHeight - padding) {
+      adjustedY = viewportHeight - menuRect.height - padding;
     }
 
     // Check top edge

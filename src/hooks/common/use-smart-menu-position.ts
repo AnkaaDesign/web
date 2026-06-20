@@ -71,10 +71,14 @@ export function useSmartMenuPosition(
   const recalculateTimeoutRef = useRef<number | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
-  // Get viewport dimensions safely
+  // Get viewport dimensions safely.
+  // Use documentElement.clientWidth/Height (zoom-adjusted, same coordinate space
+  // as getBoundingClientRect and pointer event.clientX/Y) instead of
+  // window.innerWidth/Height (real viewport, NOT zoom-adjusted) so edge flipping
+  // is computed in the same space as the rects/cursor positions it compares.
   const getViewport = useCallback(() => ({
-    width: typeof window !== 'undefined' ? window.innerWidth : 1920,
-    height: typeof window !== 'undefined' ? window.innerHeight : 1080,
+    width: typeof document !== 'undefined' ? document.documentElement.clientWidth : 1920,
+    height: typeof document !== 'undefined' ? document.documentElement.clientHeight : 1080,
   }), []);
 
   // Calculate safe position with intelligent edge avoidance

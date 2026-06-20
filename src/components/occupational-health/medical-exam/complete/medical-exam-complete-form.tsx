@@ -32,11 +32,16 @@ interface MedicalExamCompleteFormProps {
   className?: string;
 }
 
-const resultOptions = [
+const allResultOptions = [
   { value: MEDICAL_EXAM_RESULT.FIT, label: MEDICAL_EXAM_RESULT_LABELS[MEDICAL_EXAM_RESULT.FIT] },
   { value: MEDICAL_EXAM_RESULT.FIT_WITH_RESTRICTIONS, label: MEDICAL_EXAM_RESULT_LABELS[MEDICAL_EXAM_RESULT.FIT_WITH_RESTRICTIONS] },
   { value: MEDICAL_EXAM_RESULT.UNFIT, label: MEDICAL_EXAM_RESULT_LABELS[MEDICAL_EXAM_RESULT.UNFIT] },
 ];
+
+// O ASO demissional apenas atesta se, no desligamento, o colaborador está
+// Apto ou Inapto (este último pode indicar doença ocupacional / estabilidade).
+// "Apto com restrições" não se aplica a quem está saindo.
+const dismissalResultOptions = allResultOptions.filter((option) => option.value !== MEDICAL_EXAM_RESULT.FIT_WITH_RESTRICTIONS);
 
 /** Soma `months` meses a uma data (validade do ASO periódico: 12 ou 24 meses). */
 function addMonths(date: Date, months: number): Date {
@@ -88,6 +93,10 @@ export function MedicalExamCompleteForm({ exam, onCompleted, onCancel, disabled,
   const selectedResult = form.watch("result");
   const requiresRestrictions = selectedResult === MEDICAL_EXAM_RESULT.FIT_WITH_RESTRICTIONS;
   const isPeriodic = exam?.type === MEDICAL_EXAM_TYPE.PERIODIC;
+  // ASO demissional não tem validade (é um atestado pontual no desligamento) e
+  // só admite Apto/Inapto como resultado.
+  const isDismissal = exam?.type === MEDICAL_EXAM_TYPE.DISMISSAL;
+  const resultOptions = isDismissal ? dismissalResultOptions : allResultOptions;
 
   /**
    * Validade = data do exame + 12/24 meses. Também grava a periodicidade (em meses)
@@ -147,28 +156,31 @@ export function MedicalExamCompleteForm({ exam, onCompleted, onCancel, disabled,
   return (
     <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className={cn("space-y-4", className)}>
-        {/* Data do Exame | Validade (lado a lado) */}
+        {/* Data do Exame | Validade (lado a lado). O ASO demissional não tem
+            validade, então a data ocupa a linha inteira nesse caso. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField control={form.control} name="examDate" render={({ field }) => <DateTimeInput field={field as any} label="Data do Exame" mode="date" disabled={busy} required />} />
 
-          <FormField
-            control={form.control}
-            name="expiresAt"
-            render={({ field }) => (
-              <FormItem>
-                <DateTimeInput field={field as any} label="Validade (opcional)" mode="date" disabled={busy} />
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyExpiresPreset(12)} disabled={busy}>
-                    +12 meses
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyExpiresPreset(24)} disabled={busy}>
-                    +24 meses
-                  </Button>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {!isDismissal && (
+            <FormField
+              control={form.control}
+              name="expiresAt"
+              render={({ field }) => (
+                <FormItem>
+                  <DateTimeInput field={field as any} label="Validade (opcional)" mode="date" disabled={busy} />
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyExpiresPreset(12)} disabled={busy}>
+                      +12 meses
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyExpiresPreset(24)} disabled={busy}>
+                      +24 meses
+                    </Button>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
         </div>
 
         {/* Resultado | Anexar ASO (na mesma linha) */}

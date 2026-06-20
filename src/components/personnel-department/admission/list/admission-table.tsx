@@ -316,7 +316,7 @@ export function AdmissionTable({ visibleColumns, className, onCancel, onDelete, 
             Ver detalhes
           </DropdownMenuItem>
 
-          <DropdownMenuItem onClick={handleEdit}>
+          <DropdownMenuItem onClick={handleEdit} disabled={ctxIsFinal}>
             <IconEdit className="mr-2 h-4 w-4" />
             Editar
           </DropdownMenuItem>
@@ -343,7 +343,9 @@ export function AdmissionTable({ visibleColumns, className, onCancel, onDelete, 
             </>
           )}
 
-          {isAdmin && (
+          {/* Excluir — apenas ADMIN e em admissões finalizadas (canceladas/concluídas),
+              espelhando o guard do servidor: processos em andamento devem ser cancelados antes. */}
+          {isAdmin && ctxIsFinal && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleDelete} className="text-destructive">

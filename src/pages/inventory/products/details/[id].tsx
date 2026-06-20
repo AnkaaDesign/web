@@ -31,6 +31,7 @@ const ProductDetailsPage = () => {
       brands: true,
       category: true,
       supplier: true,
+      warehouseLocation: true,
       prices: {
         orderBy: { createdAt: "desc" },
         take: 10,

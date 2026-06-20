@@ -73,7 +73,7 @@ export function PPEScheduleDetailsPage() {
   // Handlers
   const handleEdit = () => {
     if (ppeSchedule && canManageWarehouse) {
-      navigate(routes.personnelDepartment.ppe.schedules.edit(ppeSchedule.id));
+      navigate(routes.occupationalHealth.ppe.schedules.edit(ppeSchedule.id));
     }
   };
 
@@ -145,7 +145,7 @@ export function PPEScheduleDetailsPage() {
     setIsProcessing(true);
     try {
       await deleteAsync(ppeSchedule.id);
-      navigate(routes.personnelDepartment.ppe.schedules.root);
+      navigate(routes.occupationalHealth.ppe.schedules.root);
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error deleting schedule:", error);
@@ -212,10 +212,10 @@ export function PPEScheduleDetailsPage() {
                     O agendamento de EPI que você está procurando não existe ou foi removido do sistema.
                   </p>
                   <div className="space-y-3">
-                    <Button onClick={() => navigate(routes.personnelDepartment.ppe.schedules.root)} className="w-full sm:w-auto">
+                    <Button onClick={() => navigate(routes.occupationalHealth.ppe.schedules.root)} className="w-full sm:w-auto">
                       Ir para Lista de Agendamentos
                     </Button>
-                    <Button variant="outline" onClick={() => navigate(routes.personnelDepartment.ppe.root)} className="w-full sm:w-auto">
+                    <Button variant="outline" onClick={() => navigate(routes.occupationalHealth.ppe.deliveries.root)} className="w-full sm:w-auto">
                       Ir para EPIs
                     </Button>
                   </div>
@@ -284,9 +284,9 @@ export function PPEScheduleDetailsPage() {
             className="shadow-sm"
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "RH", href: routes.personnelDepartment.root },
-              { label: "EPIs", href: routes.personnelDepartment.ppe.root },
-              { label: "Agendamentos", href: routes.personnelDepartment.ppe.schedules.root },
+              { label: "Medicina do Trabalho", href: routes.occupationalHealth.ppe.deliveries.root },
+              { label: "EPIs", href: routes.occupationalHealth.ppe.deliveries.root },
+              { label: "Agendamentos", href: routes.occupationalHealth.ppe.schedules.root },
               { label: ppeSchedule.name || `#${ppeSchedule.id.slice(-8)}` },
             ]}
             actions={[

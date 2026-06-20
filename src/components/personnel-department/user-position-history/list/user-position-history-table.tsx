@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { UserPositionHistory } from "../../../../types/user-position-history";
 import type { UserPositionHistoryGetManyFormData } from "../../../../schemas/user-position-history";
+import { routes } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { IconChevronUp, IconChevronDown, IconSelector, IconEye, IconAlertTriangle, IconArrowsExchange } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
@@ -18,11 +20,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface UserPositionHistoryTableProps {
   visibleColumns: Set<string>;
   className?: string;
-  onViewDetails?: (history: UserPositionHistory) => void;
   filters?: Partial<UserPositionHistoryGetManyFormData>;
 }
 
-export function UserPositionHistoryTable({ visibleColumns, className, onViewDetails, filters = {} }: UserPositionHistoryTableProps) {
+export function UserPositionHistoryTable({ visibleColumns, className, filters = {} }: UserPositionHistoryTableProps) {
+  const navigate = useNavigate();
+
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
 
@@ -105,7 +108,7 @@ export function UserPositionHistoryTable({ visibleColumns, className, onViewDeta
 
   const handleViewDetails = () => {
     if (contextMenu) {
-      onViewDetails?.(contextMenu.history);
+      navigate(routes.personnelDepartment.promotions.details(contextMenu.history.id));
       setContextMenu(null);
     }
   };
@@ -213,7 +216,7 @@ export function UserPositionHistoryTable({ visibleColumns, className, onViewDeta
                     // Hover state that works with alternating colors
                     "hover:bg-muted/20",
                   )}
-                  onClick={() => onViewDetails?.(history)}
+                  onClick={() => navigate(routes.personnelDepartment.promotions.details(history.id))}
                   onContextMenu={(e) => handleContextMenu(e, history)}
                 >
                   {columns.map((column) => (

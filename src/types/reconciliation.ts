@@ -126,6 +126,8 @@ export interface ReconciliationMatch {
   transactionId: string;
   fiscalDocumentId: string | null;
   bankSlipId: string | null;
+  /** Set when an inflow (entrada) is matched to a receivable installment. */
+  installmentId: string | null;
   allocatedAmount: number;
   matchType: MatchType;
   confidenceScore: number;
@@ -139,6 +141,30 @@ export interface ReconciliationMatch {
     id: string;
     nossoNumero: string;
     paidAmount: number | null;
+    /** The receivable this boleto settled (Sicredi liquidation path). */
+    installment?: ReconciliationMatchInstallment | null;
+  } | null;
+  /** Receivable installment linked to this match (entrada conciliation). */
+  installment?: ReconciliationMatchInstallment | null;
+}
+
+/** Installment relation nested on a receivable (entrada) match, with just
+ *  enough invoice/customer/task context to show what the credit settled. */
+export interface ReconciliationMatchInstallment {
+  id: string;
+  number: number;
+  dueDate: string;
+  amount: number;
+  paidAmount: number | null;
+  paidAt: string | null;
+  status: string;
+  invoice?: {
+    id: string;
+    totalAmount: number;
+    status: string;
+    customer?: { id: string; fantasyName: string } | null;
+    task?: { id: string; name: string | null; serialNumber: string | null } | null;
+    installments?: { id: string }[];
   } | null;
 }
 

@@ -75,12 +75,13 @@ export function SalaryAdjustmentModal({ open, onOpenChange, selectedPositions, o
       const positionIds = selectedPositions.map((p) => p.id);
       const response = await adjustPositionSalaries(positionIds, data.percentage);
 
+      // O sucesso/erro geral já é informado pelo interceptor do api-client
+      // (convenção anti-duplicação de toast). Aqui só emitimos os detalhes
+      // por-cargo que o interceptor não tem como mostrar.
       if (response.data) {
         const { totalSuccess, totalFailed, results } = response.data;
 
         if (response.success) {
-          toast.success(response.message);
-
           if (totalFailed > 0 && totalFailed <= 3 && results) {
             const failedPositions = results.filter((r: any) => !r.success);
             failedPositions.forEach((p: any) => {
@@ -93,25 +94,17 @@ export function SalaryAdjustmentModal({ open, onOpenChange, selectedPositions, o
             onSuccess?.();
             form.reset();
           }
-        } else {
-          toast.error(response.message || "Erro ao reajustar remunerações");
         }
-      } else {
-        if (response.success) {
-          toast.success(response.message);
-          onOpenChange(false);
-          onSuccess?.();
-          form.reset();
-        } else {
-          toast.error(response.message || "Erro ao reajustar remunerações");
-        }
+      } else if (response.success) {
+        onOpenChange(false);
+        onSuccess?.();
+        form.reset();
       }
     } catch (error: any) {
+      // Erro já tratado/toasted pelo interceptor do api-client.
       if (process.env.NODE_ENV !== "production") {
         console.error("Error adjusting salaries:", error);
       }
-      const errorMessage = error.response?.data?.message || error.message || "Erro ao reajustar remunerações";
-      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

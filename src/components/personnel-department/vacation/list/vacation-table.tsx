@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Vacation } from "../../../../types/vacation";
 import type { VacationGetManyFormData } from "../../../../schemas/vacation";
-import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
+import { routes, SECTOR_PRIVILEGES, VACATION_STATUS } from "../../../../constants";
 import { useAuth } from "../../../../hooks/common/use-auth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { IconChevronUp, IconChevronDown, IconSelector, IconEye, IconEdit, IconTrash, IconAlertTriangle, IconBeach } from "@tabler/icons-react";
@@ -14,7 +14,7 @@ import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { createVacationColumns, isVacationFinal } from "./vacation-table-columns";
+import { createVacationColumns } from "./vacation-table-columns";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { VacationListSkeleton } from "./vacation-list-skeleton";
 
@@ -131,7 +131,9 @@ export function VacationTable({ visibleColumns, className, onDelete, filters = {
     return <VacationListSkeleton />;
   }
 
-  const contextIsFinal = contextMenu ? isVacationFinal(contextMenu.vacation) : false;
+  // Only PAID is locked for editing (mirrors the API + edit page). VENCIDA
+  // (EXPIRED) stays editable so HR can adjust the gozo before paying in dobro.
+  const contextIsFinal = contextMenu ? contextMenu.vacation.status === VACATION_STATUS.PAID : false;
 
   return (
     <div className={cn("rounded-lg flex flex-col overflow-hidden", className)}>

@@ -317,7 +317,6 @@ export const HumanResourcesRootPage = () => {
                   count={data?.noticeMetrics?.totalNotices}
                   color="orange"
                 />
-                <QuickAccessCard title="EPIs" icon={IconShieldCheck} onClick={() => navigate(routes.personnelDepartment.ppe.root)} count={data?.ppeMetrics?.totalPPE} color="red" />
                 <QuickAccessCard
                   title="Setores"
                   icon={IconHome}

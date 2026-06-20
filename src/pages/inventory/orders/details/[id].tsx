@@ -369,7 +369,7 @@ const OrderDetailsPage = () => {
                 {canViewPrices && (
                   <>
                     <br />
-                    <strong>Valor Total:</strong> <OrderTotalBadge orderItems={order.items} discount={order.discount} />
+                    <strong>Valor Total:</strong> <OrderTotalBadge orderItems={order.items} discount={order.discount} freight={order.freight} />
                   </>
                 )}
               </AlertDialogDescription>
@@ -398,7 +398,7 @@ const OrderDetailsPage = () => {
                   </p>
                   {canViewPrices && (
                     <p className="text-sm">
-                      <span className="font-medium">Valor Total:</span> <OrderTotalBadge orderItems={order.items} discount={order.discount} />
+                      <span className="font-medium">Valor Total:</span> <OrderTotalBadge orderItems={order.items} discount={order.discount} freight={order.freight} />
                     </p>
                   )}
                   <p className="text-sm">
@@ -446,7 +446,7 @@ const OrderDetailsPage = () => {
                 {canViewPrices && (
                   <>
                     <br />
-                    <strong>Valor Total:</strong> <OrderTotalBadge orderItems={order.items} discount={order.discount} />
+                    <strong>Valor Total:</strong> <OrderTotalBadge orderItems={order.items} discount={order.discount} freight={order.freight} />
                   </>
                 )}
               </AlertDialogDescription>

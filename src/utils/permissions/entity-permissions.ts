@@ -553,6 +553,34 @@ export function canDeleteSuppliers(user: PermissionUser | null): boolean {
 }
 
 // =====================
+// WAREHOUSE LOCATION PERMISSIONS
+// =====================
+
+/**
+ * Can user create/edit warehouse locations?
+ * WAREHOUSE and ADMIN manage warehouse locations
+ */
+export function canEditWarehouseLocations(user: PermissionUser | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+/**
+ * Can user delete warehouse locations?
+ * WAREHOUSE and ADMIN can delete warehouse locations (matches API)
+ */
+export function canDeleteWarehouseLocations(user: PermissionUser | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+// =====================
 // HR ENTITY PERMISSIONS
 // =====================
 

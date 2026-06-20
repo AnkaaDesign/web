@@ -139,6 +139,7 @@ import {
   makeTableDisplaySchema,
   TABLE_DISPLAY_DEFAULTS,
   coerceRefreshMs,
+  getEffectiveZoom,
 } from "./_shared";
 import type {
   WidgetAccentColor,
@@ -1765,11 +1766,15 @@ function TaskTableRender({
         `[data-col-key="${columnKey}"]`,
       );
       if (!cell) return;
+      // Under the document's CSS `zoom`, getBoundingClientRect/clientX are in the
+      // scaled space; normalize to CSS-px (the space the width is written in) so
+      // the column tracks the cursor 1:1 instead of drifting by the zoom factor.
+      const zoom = getEffectiveZoom(cell);
       const startX = e.clientX;
-      const startWidth = cell.getBoundingClientRect().width;
+      const startWidth = cell.getBoundingClientRect().width / zoom;
 
       const onMove = (ev: PointerEvent) => {
-        const dx = ev.clientX - startX;
+        const dx = (ev.clientX - startX) / zoom;
         setColumnWidthPx(columnKey, startWidth + dx);
       };
       const onUp = () => {

@@ -182,7 +182,8 @@ export function FiscalDocumentsByDateAccordion({
       { key: "accessKey", header: "Chave", width: "150px" },
       { key: "emitter", header: "Emitente" },
       { key: "destinatario", header: "Destinatário" },
-      { key: "totalValue", header: "Valor", width: "140px", align: "right" },
+      { key: "entrada", header: "Entrada", width: "140px", align: "right" },
+      { key: "saida", header: "Saída", width: "140px", align: "right" },
       { key: "status", header: "Status", width: "120px", align: "center" },
       { key: "linked", header: "Vinculada", width: "220px" },
     ],
@@ -418,32 +419,27 @@ function DayGroup({
               </TableCell>
             );
           }
-          if (c.key === "totalValue") {
+          if (c.key === "entrada") {
             return (
               <TableCell key={c.key} className="p-0 !border-r-0 text-right">
-                {!isEmpty &&
-                (summary.entradaTotal > 0 || summary.saidaTotal > 0) ? (
-                  <div className="flex flex-col items-end gap-0.5 px-4 py-2.5 leading-tight">
-                    {summary.entradaTotal > 0 && (
-                      <span
-                        className={cn(
-                          "tabular-nums whitespace-nowrap font-semibold text-primary",
-                          summary.saidaTotal > 0 ? "text-xs" : "text-sm",
-                        )}
-                      >
-                        +{formatCurrency(summary.entradaTotal)}
-                      </span>
-                    )}
-                    {summary.saidaTotal > 0 && (
-                      <span
-                        className={cn(
-                          "tabular-nums whitespace-nowrap font-semibold text-red-700",
-                          summary.entradaTotal > 0 ? "text-xs" : "text-sm",
-                        )}
-                      >
-                        −{formatCurrency(summary.saidaTotal)}
-                      </span>
-                    )}
+                {!isEmpty && summary.entradaTotal > 0 ? (
+                  <div className="px-4 py-2.5 text-right leading-tight">
+                    <span className="text-sm font-semibold tabular-nums text-emerald-700 whitespace-nowrap">
+                      {formatCurrency(summary.entradaTotal)}
+                    </span>
+                  </div>
+                ) : null}
+              </TableCell>
+            );
+          }
+          if (c.key === "saida") {
+            return (
+              <TableCell key={c.key} className="p-0 !border-r-0 text-right">
+                {!isEmpty && summary.saidaTotal > 0 ? (
+                  <div className="px-4 py-2.5 text-right leading-tight">
+                    <span className="text-sm font-semibold tabular-nums text-red-700 whitespace-nowrap">
+                      {formatCurrency(summary.saidaTotal)}
+                    </span>
                   </div>
                 ) : null}
               </TableCell>
@@ -564,9 +560,18 @@ function renderCell(
                 : "—")}
         </span>
       );
-    case "totalValue":
-      return (
-        <span className="font-semibold tabular-nums whitespace-nowrap text-sm">
+    case "entrada":
+      // Entrada column — only ENTRADA documents carry a value here (the column
+      // header conveys direction, so no sign is needed).
+      return d.operationType === "ENTRADA" ? (
+        <span className="font-semibold tabular-nums whitespace-nowrap text-sm text-emerald-700">
+          {formatCurrency(d.totalValue)}
+        </span>
+      ) : null;
+    case "saida":
+      // Saída column — only SAIDA documents carry a value here.
+      return d.operationType === "ENTRADA" ? null : (
+        <span className="font-semibold tabular-nums whitespace-nowrap text-sm text-red-700">
           {formatCurrency(d.totalValue)}
         </span>
       );

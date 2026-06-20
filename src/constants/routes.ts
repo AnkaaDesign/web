@@ -331,6 +331,13 @@ export const routes = {
       edit: (id: string) => `/estoque/fornecedores/editar/${id}`,
       root: "/estoque/fornecedores",
     },
+    warehouseLocations: {
+      create: "/estoque/localizacoes/cadastrar",
+      details: (id: string) => `/estoque/localizacoes/detalhes/${id}`,
+      edit: (id: string) => `/estoque/localizacoes/editar/${id}`,
+      list: "/estoque/localizacoes",
+      root: "/estoque/localizacoes",
+    },
   },
 
   maintenance: {
@@ -367,6 +374,23 @@ export const routes = {
   // Occupational Health - Medicina do Trabalho - Occupational Health Management
   occupationalHealth: {
     root: "/medicina-do-trabalho",
+    // EPI delivery management. Moved here from the (now removed) Departamento
+    // Pessoal "EPI" section — the Medicina do Trabalho area owns "Entrega de EPIs".
+    // Note: the EPI item catalog and "Tamanhos" page were dropped entirely.
+    ppe: {
+      deliveries: {
+        create: "/medicina-do-trabalho/epi/entregas/cadastrar",
+        details: (id: string) => `/medicina-do-trabalho/epi/entregas/detalhes/${id}`,
+        edit: (id: string) => `/medicina-do-trabalho/epi/entregas/editar/${id}`,
+        root: "/medicina-do-trabalho/epi/entregas",
+      },
+      schedules: {
+        create: "/medicina-do-trabalho/epi/agendamentos/cadastrar",
+        details: (id: string) => `/medicina-do-trabalho/epi/agendamentos/detalhes/${id}`,
+        edit: (id: string) => `/medicina-do-trabalho/epi/agendamentos/editar/${id}`,
+        root: "/medicina-do-trabalho/epi/agendamentos",
+      },
+    },
     medicalExams: {
       create: "/medicina-do-trabalho/aso/cadastrar",
       details: (id: string) => `/medicina-do-trabalho/aso/detalhes/${id}`,
@@ -388,6 +412,14 @@ export const routes = {
       details: (id: string) => `/medicina-do-trabalho/cat/detalhes/${id}`,
       edit: (id: string) => `/medicina-do-trabalho/cat/editar/${id}`,
       root: "/medicina-do-trabalho/cat",
+    },
+    // FISPQ / FDS — Ficha de Informações de Segurança de Produtos Químicos
+    fispq: {
+      create: "/medicina-do-trabalho/fispq/cadastrar",
+      details: (id: string) => `/medicina-do-trabalho/fispq/detalhes/${id}`,
+      edit: (id: string) => `/medicina-do-trabalho/fispq/editar/${id}`,
+      list: "/medicina-do-trabalho/fispq",
+      root: "/medicina-do-trabalho/fispq",
     },
   },
 
@@ -510,6 +542,7 @@ export const routes = {
       root: "/departamento-pessoal/reajustes",
     },
     promotions: {
+      details: (id: string) => `/departamento-pessoal/promocoes/detalhes/${id}`,
       root: "/departamento-pessoal/promocoes",
     },
     benefits: {
@@ -557,33 +590,6 @@ export const routes = {
       hierarchy: "/departamento-pessoal/cargos/hierarquia",
       remunerations: (positionId: string) => `/departamento-pessoal/cargos/${positionId}/remuneracoes`,
       root: "/departamento-pessoal/cargos",
-    },
-    ppe: {
-      create: "/departamento-pessoal/epi/cadastrar",
-      deliveries: {
-        create: "/departamento-pessoal/epi/entregas/cadastrar",
-        details: (id: string) => `/departamento-pessoal/epi/entregas/detalhes/${id}`,
-        edit: (id: string) => `/departamento-pessoal/epi/entregas/editar/${id}`,
-        root: "/departamento-pessoal/epi/entregas",
-      },
-      details: (id: string) => `/departamento-pessoal/epi/detalhes/${id}`,
-      edit: (id: string) => `/departamento-pessoal/epi/editar/${id}`,
-      reports: {
-        masks: "/departamento-pessoal/epi/relatorios/mascaras",
-        root: "/departamento-pessoal/epi/relatorios",
-        stock: "/departamento-pessoal/epi/relatorios/estoque",
-        usage: "/departamento-pessoal/epi/relatorios/uso",
-      },
-      root: "/departamento-pessoal/epi",
-      sizes: {
-        root: "/departamento-pessoal/epi/tamanhos",
-      },
-      schedules: {
-        create: "/departamento-pessoal/epi/agendamentos/cadastrar",
-        details: (id: string) => `/departamento-pessoal/epi/agendamentos/detalhes/${id}`,
-        edit: (id: string) => `/departamento-pessoal/epi/agendamentos/editar/${id}`,
-        root: "/departamento-pessoal/epi/agendamentos",
-      },
     },
     requisicoes: {
       list: "/departamento-pessoal/controle-ponto/requisicoes",

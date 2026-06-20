@@ -61,9 +61,14 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 
     const menu = menuRef.current;
     const rect = menu.getBoundingClientRect();
+    // Use documentElement.clientWidth/Height (zoom-adjusted, same coordinate
+    // space as the menu's getBoundingClientRect and the pointer-derived x/y from
+    // e.clientX/Y) rather than window.innerWidth/Height (real viewport, NOT
+    // zoom-adjusted under root CSS zoom) so the edge flip happens at the right
+    // spot instead of letting the menu overflow.
     const viewport = {
-      width: window.innerWidth,
-      height: window.innerHeight,
+      width: document.documentElement.clientWidth,
+      height: document.documentElement.clientHeight,
     };
 
     let left = x;

@@ -90,7 +90,18 @@ export function VirtualizedTable<T>({
     getScrollElement: () => parentRef.current,
     estimateSize: getItemSize,
     overscan,
-    measureElement: estimateSize ? (element) => element?.getBoundingClientRect().height ?? rowHeight : undefined,
+    // measureElement feeds row sizes back into the virtualizer's CSS-px space
+    // (estimateSize + translateY are CSS px). Under the document's CSS `zoom`,
+    // getBoundingClientRect().height is in the scaled space, so divide by the
+    // element's effective zoom to keep measured rows consistent with the
+    // CSS-px translateY offsets (otherwise rows overlap under zoom).
+    measureElement: estimateSize
+      ? (element) => {
+          if (!element) return rowHeight;
+          const z = (element as { currentCSSZoom?: number }).currentCSSZoom || 1;
+          return element.getBoundingClientRect().height / z;
+        }
+      : undefined,
   });
 
   const virtualItems = virtualizer.getVirtualItems();

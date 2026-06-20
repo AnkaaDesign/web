@@ -302,6 +302,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   const monthBucketSummary = useMemo(() => {
     const out: Record<PayableBucketKey, { count: number; total: number }> = {
       AWAITING: { count: 0, total: 0 },
+      OVERDUE: { count: 0, total: 0 },
       PARTIAL: { count: 0, total: 0 },
       EXPECTED: { count: 0, total: 0 },
       PAID: { count: 0, total: 0 },

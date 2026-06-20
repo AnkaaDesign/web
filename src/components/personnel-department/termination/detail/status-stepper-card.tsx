@@ -1,20 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { IconProgress, IconAlertTriangle } from "@tabler/icons-react";
+import { IconProgress } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import {
-  MEDICAL_EXAM_RESULT,
-  MEDICAL_EXAM_STATUS,
-  MEDICAL_EXAM_TYPE,
   NOTICE_TYPE,
   TERMINATION_STATUS,
   TERMINATION_STATUS_LABELS,
   TERMINATION_TYPE,
 } from "../../../../constants";
 import type { Termination } from "../../../../types/termination";
-import { useLinkedMedicalExam } from "@/components/occupational-health/medical-exam/detail/linked-exam-status";
 import { WorkflowStepper, type WorkflowStep } from "../../shared/workflow-stepper";
-import { InlineExamPanel } from "../../shared/inline-exam-panel";
 
 /** Forward chain of the termination status machine (CANCELLED handled separately). */
 export const TERMINATION_STATUS_CHAIN: TERMINATION_STATUS[] = [
@@ -77,20 +71,10 @@ export function StatusStepperCard({ termination, className }: StatusStepperCardP
   const steps: WorkflowStep[] = chain.map((status) => ({ key: status, label: TERMINATION_STATUS_LABELS[status] }));
   const fullIndex = TERMINATION_STATUS_CHAIN.indexOf(termination.status);
   const currentIndex = fullIndex === -1 ? -1 : chain.findIndex((status) => TERMINATION_STATUS_CHAIN.indexOf(status) >= fullIndex);
-  const hasMedicalStep = chain.includes(TERMINATION_STATUS.MEDICAL_EXAM);
 
   // The step the process stopped on when cancelled (mapped into the applicable chain).
   const cancelledFullIndex = termination.cancelledFromStatus ? TERMINATION_STATUS_CHAIN.indexOf(termination.cancelledFromStatus) : -1;
   const cancelledAtIndex = cancelledFullIndex === -1 ? 0 : Math.max(0, chain.findIndex((status) => TERMINATION_STATUS_CHAIN.indexOf(status) >= cancelledFullIndex));
-
-  // DISMISSAL exam created for this termination process (auto-created by the
-  // server when the process enters the medical-exam step). Used for the guards.
-  const { exam: dismissalExam, isLoading: isExamLoading } = useLinkedMedicalExam(termination.userId, MEDICAL_EXAM_TYPE.DISMISSAL, termination.createdAt);
-  const reachedMedicalStep = hasMedicalStep && !isCancelled && fullIndex >= TERMINATION_STATUS_CHAIN.indexOf(TERMINATION_STATUS.MEDICAL_EXAM);
-  const showExamSection = reachedMedicalStep || !!dismissalExam;
-  const isExamCompleted = dismissalExam?.status === MEDICAL_EXAM_STATUS.COMPLETED;
-  const awaitingExam = termination.status === TERMINATION_STATUS.MEDICAL_EXAM && !isExamLoading && !isExamCompleted;
-  const isExamUnfit = isExamCompleted && dismissalExam?.result === MEDICAL_EXAM_RESULT.UNFIT;
 
   return (
     <Card className={cn("shadow-sm border border-border", className)}>
@@ -107,41 +91,8 @@ export function StatusStepperCard({ termination, className }: StatusStepperCardP
           isCompleted={isCompleted}
           cancelled={isCancelled ? { atIndex: cancelledAtIndex, reason: termination.cancellationReason } : null}
         />
-
-        {/* DISMISSAL exam (ASO demissional) handled inline at/after the medical step. */}
-        {showExamSection && (
-          <InlineExamPanel
-            userId={termination.userId}
-            type={MEDICAL_EXAM_TYPE.DISMISSAL}
-            processField="terminationId"
-            processId={termination.id}
-            createdAfter={termination.createdAt}
-            title="Exame Demissional (ASO)"
-            disabled={isCancelled || isCompleted}
-          />
-        )}
-
-        {/* Guard: leaving the medical step requires a COMPLETED dismissal exam */}
-        {awaitingExam && (
-          <div className="mt-4 flex items-center gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-            <IconAlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-            <div className="text-sm">
-              <p className="font-medium">Aguardando ASO demissional</p>
-              <p className="text-muted-foreground">O exame demissional precisa ser concluído para avançar para o cálculo das verbas.</p>
-            </div>
-          </div>
-        )}
-
-        {/* Warning: UNFIT dismissal exam — possible stability rules */}
-        {isExamUnfit && (
-          <Alert variant="destructive" className="mt-4">
-            <AlertTitle className="flex items-center gap-2">
-              <IconAlertTriangle className="h-4 w-4" />
-              Exame demissional com resultado Inapto
-            </AlertTitle>
-            <AlertDescription>Verifique possíveis regras de estabilidade antes de prosseguir com a rescisão.</AlertDescription>
-          </Alert>
-        )}
+        {/* The DISMISSAL exam (ASO) lives in its own half-width ExamCard now;
+            it used to render full-bleed inside this stepper card. */}
       </CardContent>
     </Card>
   );

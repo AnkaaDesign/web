@@ -4,18 +4,19 @@ import { useCanViewPrices } from "../../../../hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { IconCurrencyReal, IconPercentage } from "@tabler/icons-react";
+import { IconCurrencyReal, IconPercentage, IconTruck } from "@tabler/icons-react";
 import type { OrderItem as OrderItemType } from "../../../../types";
 
 interface OrderTotalCalculatorProps {
   orderItems?: OrderItemType[]; // Pass actual OrderItem objects from the order
   discount?: number; // Percentage discount applied to the goods subtotal
+  freight?: number; // Shipping cost added to the grand total
   className?: string;
   showItemBreakdown?: boolean;
   showTaxBreakdown?: boolean;
 }
 
-const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ orderItems = [], discount = 0, className, showItemBreakdown = false, showTaxBreakdown = false }) => {
+const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ orderItems = [], discount = 0, freight = 0, className, showItemBreakdown = false, showTaxBreakdown = false }) => {
   const canViewPrices = useCanViewPrices();
   // Calculate individual item totals, taxes, and grand total
   const itemCalculations = React.useMemo(() => {
@@ -55,8 +56,8 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
       { subtotal: 0, taxAmount: 0, grandTotal: 0 },
     );
     const discountAmount = discount > 0 ? base.subtotal * (discount / 100) : 0;
-    return { ...base, discountAmount, grandTotal: base.grandTotal - discountAmount };
-  }, [itemCalculations, discount]);
+    return { ...base, discountAmount, grandTotal: base.grandTotal - discountAmount + freight };
+  }, [itemCalculations, discount, freight]);
 
   const totalItems = orderItems.length;
   const totalQuantity = React.useMemo(() => {
@@ -136,6 +137,17 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
           </>
         )}
 
+        {/* Freight line (only when a freight cost is applied) */}
+        {freight > 0 && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground flex items-center">
+              <IconTruck className="w-3 h-3 mr-1" />
+              Frete:
+            </span>
+            <span className="font-medium">{formatCurrency(freight)}</span>
+          </div>
+        )}
+
         {/* Discount line (only when a discount is applied) */}
         {totals.discountAmount > 0 && (
           <div className="flex items-center justify-between text-sm">
@@ -175,7 +187,8 @@ export const OrderTotalCalculator = React.memo(OrderTotalCalculatorComponent);
 const OrderTotalBadgeComponent: React.FC<{
   orderItems?: OrderItemType[];
   discount?: number;
-}> = ({ orderItems = [], discount = 0 }) => {
+  freight?: number;
+}> = ({ orderItems = [], discount = 0, freight = 0 }) => {
   const canViewPrices = useCanViewPrices();
   const grandTotal = React.useMemo(() => {
     let goodsSubtotal = 0;
@@ -190,8 +203,8 @@ const OrderTotalBadgeComponent: React.FC<{
       return acc + subtotal + taxAmount;
     }, 0);
     const discountAmount = discount > 0 ? goodsSubtotal * (discount / 100) : 0;
-    return total - discountAmount;
-  }, [orderItems, discount]);
+    return total - discountAmount + freight;
+  }, [orderItems, discount, freight]);
 
   if (!canViewPrices) return null;
 

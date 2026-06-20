@@ -8,7 +8,7 @@ import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemU
 import { useItemCategories, useCanViewPrices } from "../../../../hooks";
 import { ITEM_CATEGORY_TYPE, ABC_CATEGORY_LABELS, XYZ_CATEGORY_LABELS, PPE_TYPE, STOCK_MODEL } from "../../../../constants";
 import { serializeItemFormToUrlParams, debounce } from "@/utils/url-form-state";
-import type { Supplier, ItemBrand, ItemCategory } from "../../../../types";
+import type { Supplier, ItemBrand, ItemCategory, WarehouseLocation } from "../../../../types";
 // import { FormValidationDebugger } from "@/components/debug/form-validation-debugger"; // Debug component removed
 
 // Import all form components
@@ -18,6 +18,7 @@ import { StatusToggle } from "./status-toggle";
 import { ItemBrandSelector } from "./brand-selector";
 import { CategorySelector } from "./category-selector";
 import { ItemSupplierSelector } from "./supplier-selector";
+import { ItemLocationSelector } from "./location-selector";
 import { QuantityInput } from "./quantity-input";
 import { BoxQuantityInput } from "./box-quantity-input";
 import { LeadTimeInput } from "./lead-time-input";
@@ -31,14 +32,18 @@ import { BorrowableToggle } from "./borrowable-toggle";
 import { StockModelSelector } from "./stock-model-selector";
 import { FixedTargetQuantityInput } from "./fixed-target-quantity-input";
 import { PpeConfigSection } from "./ppe-config-section";
+import { FispqItemCard } from "./fispq-item-card";
 
 interface BaseItemFormProps {
   isSubmitting?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
   onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
   initialSupplier?: Supplier;
+  initialWarehouseLocation?: WarehouseLocation;
   initialBrands?: ItemBrand[];
   initialCategory?: ItemCategory;
+  /** Existing item id (update mode) — enables the FISPQ / Segurança Química card. */
+  itemId?: string;
 }
 
 interface CreateItemFormProps extends BaseItemFormProps {
@@ -56,7 +61,7 @@ interface UpdateItemFormProps extends BaseItemFormProps {
 type ItemFormProps = CreateItemFormProps | UpdateItemFormProps;
 
 export function ItemForm(props: ItemFormProps) {
-  const { isSubmitting, defaultValues, mode, onFormStateChange, onDirtyChange, initialSupplier, initialBrands, initialCategory } = props;
+  const { isSubmitting, defaultValues, mode, onFormStateChange, onDirtyChange, initialSupplier, initialWarehouseLocation, initialBrands, initialCategory, itemId } = props;
   const [searchParams, setSearchParams] = useSearchParams();
   const canViewPrices = useCanViewPrices();
 
@@ -85,6 +90,9 @@ export function ItemForm(props: ItemFormProps) {
     brandIds: defaultValues?.brandIds ?? [],
     categoryId: defaultValues?.categoryId ?? undefined,
     supplierId: defaultValues?.supplierId ?? null,
+    warehouseLocationId: defaultValues?.warehouseLocationId ?? null,
+    locationLevel: defaultValues?.locationLevel ?? null,
+    locationColumn: defaultValues?.locationColumn ?? null,
     estimatedLeadTime: defaultValues?.estimatedLeadTime ?? 30,
     isActive: defaultValues?.isActive ?? true,
     price: defaultValues?.price ?? undefined,
@@ -329,6 +337,7 @@ export function ItemForm(props: ItemFormProps) {
                 <CategorySelector disabled={isSubmitting} onCategoryChange={setSelectedCategoryId} initialCategory={initialCategory} />
                 <ItemBrandSelector disabled={isSubmitting} initialBrands={initialBrands} />
                 <ItemSupplierSelector disabled={isSubmitting} initialSupplier={initialSupplier} />
+                <ItemLocationSelector disabled={isSubmitting} initialWarehouseLocation={initialWarehouseLocation} />
               </div>
             </CardContent>
           </Card>
@@ -483,6 +492,9 @@ export function ItemForm(props: ItemFormProps) {
               </div>
             </CardContent>
           </Card>
+
+          {/* FISPQ / Segurança Química — separate entity (create-on-first-save), update mode only */}
+          {mode === "update" && itemId && <FispqItemCard itemId={itemId} />}
           </div>
         </form>
       </FormProvider>

@@ -35,7 +35,7 @@ export function ExamCard({ admission, className }: ExamCardProps) {
           </div>
           {/* Status só quando NÃO concluído (Agendado). Concluído mostra os dados no corpo. */}
           {exam && !examCompleted && (
-            <Badge variant={getBadgeVariantFromStatus(exam.status, "MEDICAL_EXAM") as any} className="text-xs">
+            <Badge variant={getBadgeVariantFromStatus(exam.status, "MEDICAL_EXAM")} className="text-xs">
               {MEDICAL_EXAM_STATUS_LABELS[exam.status as MEDICAL_EXAM_STATUS] ?? exam.status}
             </Badge>
           )}

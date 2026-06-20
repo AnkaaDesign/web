@@ -58,6 +58,12 @@ export function SpecificationsCard({ item, className }: SpecificationsCardProps)
               <SpecRow label="Marcas" value={item.brands?.length ? item.brands.map((b) => b.name).join(", ") : <NotDefined />} />
               <SpecRow label="Categoria" value={item.category ? item.category.name : <NotDefined />} />
               {item.supplier && <SpecRow label="Fornecedor" value={item.supplier.fantasyName} />}
+              {item.warehouseLocation && (
+                <SpecRow
+                  label="Localização"
+                  value={`${item.warehouseLocation.name}${item.locationLevel != null ? `-P${item.locationLevel}` : ""}${item.locationColumn != null ? `-C${item.locationColumn}` : ""}`}
+                />
+              )}
             </div>
           </div>
 

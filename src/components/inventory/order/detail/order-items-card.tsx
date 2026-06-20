@@ -250,6 +250,10 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
     const discountAmount = discountPercent > 0 ? goodsSubtotal * (discountPercent / 100) : 0;
     totalValue -= discountAmount;
 
+    // Freight (frete) is a flat shipping cost added to the grand total.
+    const freight = order.freight ?? 0;
+    totalValue += freight;
+
     return {
       itemCount: items.length,
       totalOrdered,
@@ -258,9 +262,10 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
       receivedValue,
       discountPercent,
       discountAmount,
+      freight,
       percentComplete: totalOrdered > 0 ? (totalReceived / totalOrdered) * 100 : 0,
     };
-  }, [order.items, order.discount, getItemValue]);
+  }, [order.items, order.discount, order.freight, getItemValue]);
 
   // Get row status
   const getRowStatus = useCallback(
@@ -324,7 +329,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
       supplierName: order.supplier?.fantasyName || order.supplier?.corporateName || undefined,
       orderDate: order.createdAt,
       forecastDate: order.forecast,
-      freight: (order as any).freight ?? 0,
+      freight: order.freight ?? 0,
       discount: order.discount ?? 0,
       notes: order.notes,
       items: (order.items || []).map((item) => ({
@@ -408,6 +413,27 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
             </div>
           </div>
         </div>
+
+        {/* Freight / discount breakdown — mirrors the create/edit form footers. */}
+        {canViewPrices && (summary.freight > 0 || summary.discountAmount > 0) && (
+          <div className="bg-muted/50 rounded-lg px-4 py-3 space-y-2">
+            {summary.freight > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <IconTruck className="h-4 w-4" />
+                  Frete:
+                </span>
+                <span className="font-medium text-foreground">{formatCurrency(summary.freight)}</span>
+              </div>
+            )}
+            {summary.discountAmount > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Desconto ({summary.discountPercent}%):</span>
+                <span className="font-medium text-red-600 dark:text-red-400">- {formatCurrency(summary.discountAmount)}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">

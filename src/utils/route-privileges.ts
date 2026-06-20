@@ -115,6 +115,10 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/estoque/fornecedores/detalhes/:id": "WAREHOUSE", // Supplier detail
   "/estoque/fornecedores/editar/:id": "WAREHOUSE", // Supplier edit
   "/estoque/fornecedores/cadastrar": "WAREHOUSE", // Supplier create
+  [routes.inventory.warehouseLocations.root]: "WAREHOUSE",
+  "/estoque/localizacoes/detalhes/:id": "WAREHOUSE", // Warehouse location detail
+  "/estoque/localizacoes/editar/:id": "WAREHOUSE", // Warehouse location edit
+  "/estoque/localizacoes/cadastrar": "WAREHOUSE", // Warehouse location create
   [routes.inventory.orders.root]: ["WAREHOUSE", "ACCOUNTING", "ADMIN"], // ACCOUNTING reads orders (contas a pagar context)
   "/estoque/pedidos/detalhes/:id": ["WAREHOUSE", "FINANCIAL", "ACCOUNTING", "ADMIN"], // Order detail - FINANCIAL/ACCOUNTING read access (contas a pagar links here)
   "/estoque/pedidos/editar/:id": "WAREHOUSE", // Order edit
@@ -264,9 +268,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // "/departamento-pessoal/*" wildcard) so its audience is documented.
   "/departamento-pessoal/controle-ponto/requisicoes": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
   "/departamento-pessoal/avisos": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/departamento-pessoal/ppe": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/departamento-pessoal/ppe/entregas": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
-  "/departamento-pessoal/ppe/entregas/cadastrar": ["HUMAN_RESOURCES", "WAREHOUSE", "ACCOUNTING", "ADMIN"], // HR, Warehouse, Accounting, and Admin can create (matches API)
+  // EPI delivery management lives under "/medicina-do-trabalho/*" (covered by its wildcard).
 
   // Departamento Pessoal - Personnel Department (HR / ACCOUNTING / ADMIN)
   // Production Manager additionally manages its team's admissions, terminations and

@@ -38,11 +38,11 @@ export const PPEScheduleCreatePage = () => {
       }
     }
 
-    navigate(routes.personnelDepartment.ppe.schedules.root);
+    navigate(routes.occupationalHealth.ppe.schedules.root);
   };
 
   const handleCancel = () => {
-    navigate(routes.personnelDepartment.ppe.schedules.root);
+    navigate(routes.occupationalHealth.ppe.schedules.root);
   };
 
   const actions = [
@@ -73,9 +73,9 @@ export const PPEScheduleCreatePage = () => {
         icon={IconCalendar}
         breadcrumbs={[
           { label: "Início", href: routes.home },
-          { label: "RH", href: routes.personnelDepartment.root },
-          { label: "EPIs", href: routes.personnelDepartment.ppe.root },
-          { label: "Agendamentos", href: routes.personnelDepartment.ppe.schedules.root },
+          { label: "Medicina do Trabalho", href: routes.occupationalHealth.ppe.deliveries.root },
+          { label: "EPIs", href: routes.occupationalHealth.ppe.deliveries.root },
+          { label: "Agendamentos", href: routes.occupationalHealth.ppe.schedules.root },
           { label: "Criar" },
         ]}
         actions={actions}

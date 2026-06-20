@@ -489,3 +489,20 @@ export function coerceRefreshMs(raw: unknown): number {
   if (typeof raw === "string" && /^\d+$/.test(raw)) return Math.max(0, parseInt(raw, 10));
   return 0;
 }
+
+/**
+ * Effective CSS `zoom` factor in force on `el` (product of every ancestor's
+ * `zoom`, including the document root's always-on `zoom: 0.8`). Returns 1 when
+ * unsupported or unzoomed.
+ *
+ * Needed by the column-resize handlers: under CSS `zoom`, `getBoundingClientRect`
+ * and pointer `clientX` are reported in the *scaled* (post-zoom) coordinate
+ * space, but a CSS `px` width we write back is re-scaled by `zoom` at render
+ * time. Dividing the measured base width and the pointer delta by this factor
+ * converts both into the unzoomed CSS-px space the width is actually authored in,
+ * so the column tracks the cursor 1:1 instead of drifting by the zoom factor.
+ */
+export function getEffectiveZoom(el: Element | null | undefined): number {
+  const z = (el as { currentCSSZoom?: number } | null | undefined)?.currentCSSZoom;
+  return typeof z === "number" && z > 0 ? z : 1;
+}

@@ -115,16 +115,6 @@ export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[]
     className: "w-24",
   },
   {
-    key: "paymentRequestedAt",
-    header: "PAG. SOLICITADO EM",
-    accessor: (order) => (
-      <span className="text-sm text-muted-foreground whitespace-nowrap">{order.paymentRequestedAt ? formatDate(order.paymentRequestedAt) : "-"}</span>
-    ),
-    sortable: true,
-    align: "left",
-    className: "w-28",
-  },
-  {
     key: "paidAt",
     header: "PAGO EM",
     accessor: (order) => <span className="text-sm text-muted-foreground whitespace-nowrap">{order.paidAt ? formatDate(order.paidAt) : "-"}</span>,

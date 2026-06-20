@@ -253,6 +253,14 @@ export const createItemColumns = (): ItemColumn[] => [
     align: "left",
   },
   {
+    key: "warehouseLocation.name",
+    header: "LOCALIZAÇÃO",
+    accessor: (item: Item) => <div className="truncate">{item.warehouseLocation ? `${item.warehouseLocation.name}${item.locationLevel != null ? `-P${item.locationLevel}` : ""}${item.locationColumn != null ? `-C${item.locationColumn}` : ""}` : "-"}</div>,
+    sortable: true,
+    className: "w-40",
+    align: "left",
+  },
+  {
     key: "ppeType",
     header: "TIPO EPI",
     accessor: (item: Item) => {

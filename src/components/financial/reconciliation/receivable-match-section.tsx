@@ -11,7 +11,10 @@ import {
 } from "@/hooks/financial/use-receivable";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/utils";
-import type { BankTransaction } from "@/types/reconciliation";
+import type {
+  BankTransaction,
+  ReconciliationMatchInstallment,
+} from "@/types/reconciliation";
 import type { ReceivableCandidate } from "@/types/receivable";
 import { getConfidenceBadgeVariant } from "./match-status-badge";
 
@@ -76,7 +79,9 @@ export function ReceivableMatchSection({ transaction }: Props) {
     setSelections((prev) => {
       const next = { ...prev };
       if (next[c.installmentId] !== undefined) delete next[c.installmentId];
-      else next[c.installmentId] = c.amount.toFixed(2);
+      // Prefill the outstanding balance (full amount for untouched parcelas),
+      // not the gross amount, so topping up a partial receipt is correct.
+      else next[c.installmentId] = (c.remaining ?? c.amount).toFixed(2);
       return next;
     });
 
@@ -101,13 +106,17 @@ export function ReceivableMatchSection({ transaction }: Props) {
       amount: parseFloat(v),
     }));
     try {
-      // Single installment paid in full → simple match; anything else → allocate.
+      // Single installment settled to its FULL outstanding balance → simple
+      // match; anything else (multi, or a partial top-up) → allocate. Compare to
+      // the remaining balance, not the gross amount, so a partially-paid parcela
+      // routes to allocate (which accrues) instead of match (which overwrites).
       const single = allocations.length === 1 ? allocations[0] : null;
+      const cand = single ? candidateById.get(single.installmentId) : undefined;
       const singleFull =
         single &&
-        Math.abs(
-          (candidateById.get(single.installmentId)?.amount ?? 0) - single.amount,
-        ) <= TOLERANCE;
+        cand != null &&
+        (cand.paidAmount ?? 0) <= TOLERANCE &&
+        Math.abs((cand.remaining ?? cand.amount) - single.amount) <= TOLERANCE;
       if (single && singleFull) {
         await matchAsync({ transactionId: txId, installmentId: single.installmentId });
       } else {
@@ -128,6 +137,18 @@ export function ReceivableMatchSection({ transaction }: Props) {
   };
 
   if (isReconciled) {
+    // A credit settles a receivable either directly (PIX/TED → installment) or
+    // via a boleto (Sicredi liquidation → bankSlip → installment).
+    const linkedInstallments = (transaction.matches ?? [])
+      .filter((m) => !m.reversedAt)
+      .map((m) => ({
+        match: m,
+        installment: m.installment ?? m.bankSlip?.installment ?? null,
+      }))
+      .filter(
+        (x): x is { match: (typeof x)["match"]; installment: ReconciliationMatchInstallment } =>
+          x.installment != null,
+      );
     return (
       <Card className="shadow-sm border border-border">
         <CardHeader className="pb-4">
@@ -146,10 +167,23 @@ export function ReceivableMatchSection({ transaction }: Props) {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="pt-0">
-          <p className="text-sm text-muted-foreground">
-            Este crédito já está conciliado com uma ou mais parcelas a receber.
-          </p>
+        <CardContent className="pt-0 space-y-4">
+          {linkedInstallments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Este crédito já está conciliado com uma ou mais parcelas a receber.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Este crédito quitou{" "}
+                {linkedInstallments.length === 1
+                  ? "a parcela abaixo"
+                  : `${linkedInstallments.length} parcelas`}{" "}
+                a receber.
+              </p>
+              <LinkedInstallmentsTable rows={linkedInstallments} />
+            </>
+          )}
         </CardContent>
       </Card>
     );
@@ -214,6 +248,125 @@ export function ReceivableMatchSection({ transaction }: Props) {
   );
 }
 
+/** Maps an InstallmentStatus to a short PT label + badge variant. */
+const INSTALLMENT_STATUS: Record<
+  string,
+  { label: string; variant: "success" | "warning" | "secondary" | "destructive" }
+> = {
+  PAID: { label: "Pago", variant: "success" },
+  PARTIAL: { label: "Parcial", variant: "warning" },
+  PENDING: { label: "Pendente", variant: "secondary" },
+  OVERDUE: { label: "Vencida", variant: "destructive" },
+};
+
+/**
+ * Receivable installments a credit settled, as a column-header table mirroring
+ * the saída side's FiscalItemsTable: muted uppercase header, divided rows and a
+ * bold total footer. One row per parcela (a lump receipt may quit several).
+ */
+function LinkedInstallmentsTable({
+  rows,
+}: {
+  rows: { match: { id: string; allocatedAmount: number }; installment: ReconciliationMatchInstallment }[];
+}) {
+  const cell = "px-3 py-2.5";
+  const headCell = "px-3 h-11 align-middle";
+  const total = rows.reduce((s, r) => s + (r.match.allocatedAmount || 0), 0);
+  return (
+    <div className="rounded-md border border-border/60 overflow-x-auto">
+      <table className="w-full table-fixed text-sm">
+        <colgroup>
+          <col style={{ width: "90px" }} />
+          <col style={{ width: "150px" }} />
+          <col />
+          <col style={{ width: "100px" }} />
+          <col style={{ width: "120px" }} />
+          <col style={{ width: "120px" }} />
+          <col style={{ width: "130px" }} />
+          <col style={{ width: "140px" }} />
+        </colgroup>
+        <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+          <tr>
+            <th className={cn("text-left font-medium whitespace-nowrap", headCell)}>Parcela</th>
+            <th className={cn("text-left font-medium whitespace-nowrap", headCell)}>Tarefa</th>
+            <th className={cn("text-left font-medium", headCell)}>Cliente</th>
+            <th className={cn("text-left font-medium whitespace-nowrap", headCell)}>Situação</th>
+            <th className={cn("text-right font-medium whitespace-nowrap", headCell)}>Vencimento</th>
+            <th className={cn("text-right font-medium whitespace-nowrap", headCell)}>Pago em</th>
+            <th className={cn("text-right font-medium whitespace-nowrap", headCell)}>Fatura</th>
+            <th className={cn("text-right font-medium whitespace-nowrap", headCell)}>Valor</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/60">
+          {rows.map(({ match, installment: i }) => {
+            const invoice = i.invoice;
+            const totalParcelas = invoice?.installments?.length ?? 0;
+            const customerName = invoice?.customer?.fantasyName;
+            const task = invoice?.task;
+            const taskLabel = task
+              ? [task.serialNumber, task.name].filter(Boolean).join(" · ")
+              : null;
+            const status = INSTALLMENT_STATUS[i.status];
+            return (
+              <tr key={match.id} className="align-middle">
+                <td className={cell}>
+                  <Badge variant="secondary" className="whitespace-nowrap font-mono">
+                    {i.number}
+                    {totalParcelas > 1 ? `/${totalParcelas}` : ""}
+                  </Badge>
+                </td>
+                <td className={cell}>
+                  {taskLabel ? (
+                    <p className="truncate text-muted-foreground" title={taskLabel}>
+                      {taskLabel}
+                    </p>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className={cell}>
+                  <p className="truncate font-medium" title={customerName ?? undefined}>
+                    {customerName || "—"}
+                  </p>
+                </td>
+                <td className={cell}>
+                  {status ? (
+                    <Badge variant={status.variant} size="sm" className="whitespace-nowrap">
+                      {status.label}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className={cn("text-right tabular-nums whitespace-nowrap text-foreground", cell)}>
+                  {formatDate(i.dueDate)}
+                </td>
+                <td className={cn("text-right tabular-nums whitespace-nowrap text-muted-foreground", cell)}>
+                  {i.paidAt ? formatDate(i.paidAt) : "—"}
+                </td>
+                <td className={cn("text-right tabular-nums whitespace-nowrap text-muted-foreground", cell)}>
+                  {invoice ? formatCurrency(invoice.totalAmount) : "—"}
+                </td>
+                <td className={cn("text-right font-semibold tabular-nums whitespace-nowrap", cell)}>
+                  {formatCurrency(match.allocatedAmount)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot className="bg-muted/30 border-t-2 border-border">
+          <tr>
+            <td className={cell} colSpan={7} />
+            <td className={cn("text-right font-bold text-base tabular-nums whitespace-nowrap", cell)}>
+              {formatCurrency(total)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
 /** Open installment — click to (de)select; when selected, an editable amount lets
  *  the operator allocate a partial value. */
 function CandidateRow({
@@ -259,6 +412,11 @@ function CandidateRow({
           <span className="text-sm font-medium tabular-nums text-foreground whitespace-nowrap">
             {formatCurrency(c.amount)}
           </span>
+          {(c.paidAmount ?? 0) > 0 && (
+            <span className="text-xs text-amber-600 dark:text-amber-500 whitespace-nowrap tabular-nums">
+              Resta {formatCurrency(c.remaining ?? c.amount)}
+            </span>
+          )}
           <span className="text-xs text-muted-foreground whitespace-nowrap">
             Venc. {formatDate(c.dueDate)}
           </span>
@@ -282,7 +440,7 @@ function CandidateRow({
             className="h-8 w-36 tabular-nums"
           />
           <span className="text-xs text-muted-foreground">
-            de {formatCurrency(c.amount)}
+            de {formatCurrency(c.remaining ?? c.amount)}
           </span>
         </div>
       )}

@@ -193,8 +193,13 @@ export function ColumnHeader({
   const handleResizeMove = useCallback((e: MouseEvent) => {
     if (!isResizingRef.current) return;
 
-    // Calculate how far the cursor has moved from the starting position
-    const diff = e.clientX - startXRef.current;
+    // Calculate how far the cursor has moved from the starting position.
+    // Under the document's CSS `zoom`, clientX is in the scaled coordinate space
+    // while startWidth is a stored CSS-px value; divide the delta by the header's
+    // effective zoom so the divider tracks the cursor 1:1 instead of lagging by
+    // the zoom factor. `currentCSSZoom` is 1 (no-op) when unsupported/unzoomed.
+    const zoom = (headerRef.current as { currentCSSZoom?: number } | null)?.currentCSSZoom || 1;
+    const diff = (e.clientX - startXRef.current) / zoom;
     // New width = initial width + cursor movement
     const newWidth = startWidthRef.current + diff;
     const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));

@@ -9,6 +9,7 @@ export * from "./use-order-schedule";
 export * from "./use-order-form-url-state";
 export * from "./use-order-analytics";
 export * from "./use-supplier";
+export * from "./use-warehouse-location";
 // NOTE: use-supplier-filters excluded from barrel - import directly to avoid
 // convertToApiFilters/convertFromApiFilters name conflicts across domains
 export * from "./use-borrow";

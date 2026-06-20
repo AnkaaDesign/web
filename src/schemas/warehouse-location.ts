@@ -1,0 +1,453 @@
+// packages/schemas/src/warehouse-location.ts
+
+import { z } from "zod";
+import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy } from "./common";
+import { WAREHOUSE_LOCATION_TYPE } from "../constants";
+import type { WarehouseLocation } from "../types";
+
+// =====================
+// Field Schemas
+// =====================
+
+const nameSchema = z.string({ required_error: "Nome é obrigatório" }).trim().min(1, "Nome é obrigatório").max(200, "Nome deve ter no máximo 200 caracteres");
+
+const optionalTrimmedString = (max: number, label: string) =>
+  z
+    .string()
+    .trim()
+    .max(max, `${label} deve ter no máximo ${max} caracteres`)
+    .nullable()
+    .optional()
+    .transform((val) => (val === "" ? null : val));
+
+// =====================
+// Include Schema
+// =====================
+
+export const warehouseLocationIncludeSchema = z
+  .object({
+    items: z
+      .union([
+        z.boolean(),
+        z.object({
+          include: z
+            .object({
+              brands: z.boolean().optional(),
+              category: z.boolean().optional(),
+              supplier: z.boolean().optional(),
+              warehouseLocation: z.boolean().optional(),
+              price: z.boolean().optional(),
+            })
+            .optional(),
+        }),
+      ])
+      .optional(),
+    _count: z
+      .union([
+        z.boolean(),
+        z.object({
+          select: z
+            .object({
+              items: z.boolean().optional(),
+            })
+            .optional(),
+        }),
+      ])
+      .optional(),
+  })
+  .partial();
+
+// =====================
+// OrderBy Schema
+// =====================
+
+export const warehouseLocationOrderBySchema = z
+  .union([
+    z
+      .object({
+        id: orderByDirectionSchema.optional(),
+        name: orderByDirectionSchema.optional(),
+        section: orderByDirectionSchema.optional(),
+        code: orderByDirectionSchema.optional(),
+        type: orderByDirectionSchema.optional(),
+        description: orderByDirectionSchema.optional(),
+        isActive: orderByDirectionSchema.optional(),
+        createdAt: orderByDirectionSchema.optional(),
+        updatedAt: orderByDirectionSchema.optional(),
+        _count: z
+          .object({
+            items: orderByDirectionSchema.optional(),
+          })
+          .optional(),
+      })
+      .partial(),
+    z.array(
+      z
+        .object({
+          id: orderByDirectionSchema.optional(),
+          name: orderByDirectionSchema.optional(),
+          section: orderByDirectionSchema.optional(),
+          code: orderByDirectionSchema.optional(),
+          type: orderByDirectionSchema.optional(),
+          isActive: orderByDirectionSchema.optional(),
+          createdAt: orderByDirectionSchema.optional(),
+          updatedAt: orderByDirectionSchema.optional(),
+        })
+        .partial(),
+    ),
+  ])
+  .optional();
+
+// =====================
+// Where Schema
+// =====================
+
+export const warehouseLocationWhereSchema: z.ZodSchema = z.lazy(() =>
+  z
+    .object({
+      AND: z.union([warehouseLocationWhereSchema, z.array(warehouseLocationWhereSchema)]).optional(),
+      OR: z.array(warehouseLocationWhereSchema).optional(),
+      NOT: z.union([warehouseLocationWhereSchema, z.array(warehouseLocationWhereSchema)]).optional(),
+
+      id: z
+        .union([
+          z.string(),
+          z.object({
+            equals: z.string().optional(),
+            not: z.string().optional(),
+            in: z.array(z.string()).optional(),
+            notIn: z.array(z.string()).optional(),
+          }),
+        ])
+        .optional(),
+
+      name: z
+        .union([
+          z.string(),
+          z.object({
+            equals: z.string().optional(),
+            not: z.string().optional(),
+            contains: z.string().optional(),
+            startsWith: z.string().optional(),
+            endsWith: z.string().optional(),
+            mode: z.enum(["default", "insensitive"]).optional(),
+          }),
+        ])
+        .optional(),
+
+      section: z
+        .union([
+          z.string(),
+          z.null(),
+          z.object({
+            equals: z.string().nullable().optional(),
+            not: z.string().nullable().optional(),
+            in: z.array(z.string()).optional(),
+            notIn: z.array(z.string()).optional(),
+            contains: z.string().optional(),
+            mode: z.enum(["default", "insensitive"]).optional(),
+          }),
+        ])
+        .optional(),
+
+      code: z
+        .union([
+          z.string(),
+          z.null(),
+          z.object({
+            equals: z.string().nullable().optional(),
+            not: z.string().nullable().optional(),
+            contains: z.string().optional(),
+            mode: z.enum(["default", "insensitive"]).optional(),
+          }),
+        ])
+        .optional(),
+
+      type: z
+        .union([
+          z.nativeEnum(WAREHOUSE_LOCATION_TYPE),
+          z.object({
+            equals: z.nativeEnum(WAREHOUSE_LOCATION_TYPE).optional(),
+            not: z.nativeEnum(WAREHOUSE_LOCATION_TYPE).optional(),
+            in: z.array(z.nativeEnum(WAREHOUSE_LOCATION_TYPE)).optional(),
+            notIn: z.array(z.nativeEnum(WAREHOUSE_LOCATION_TYPE)).optional(),
+          }),
+        ])
+        .optional(),
+
+      isActive: z.union([z.boolean(), z.object({ equals: z.boolean().optional(), not: z.boolean().optional() })]).optional(),
+
+      items: z
+        .object({
+          some: z.lazy(() => z.any()).optional(),
+          every: z.lazy(() => z.any()).optional(),
+          none: z.lazy(() => z.any()).optional(),
+        })
+        .optional(),
+
+      createdAt: z
+        .union([
+          z.date(),
+          z.object({
+            equals: z.date().optional(),
+            not: z.date().optional(),
+            gt: z.coerce.date().optional(),
+            gte: z.coerce.date().optional(),
+            lt: z.coerce.date().optional(),
+            lte: z.coerce.date().optional(),
+          }),
+        ])
+        .optional(),
+
+      updatedAt: z
+        .union([
+          z.date(),
+          z.object({
+            equals: z.date().optional(),
+            not: z.date().optional(),
+            gt: z.coerce.date().optional(),
+            gte: z.coerce.date().optional(),
+            lt: z.coerce.date().optional(),
+            lte: z.coerce.date().optional(),
+          }),
+        ])
+        .optional(),
+    })
+    .partial(),
+);
+
+// =====================
+// Transform Function
+// =====================
+
+const warehouseLocationTransform = (data: any): any => {
+  if (data.orderBy) {
+    data.orderBy = normalizeOrderBy(data.orderBy);
+  }
+
+  if (data.take && !data.limit) {
+    data.limit = data.take;
+  }
+  delete data.take;
+
+  const andConditions: any[] = [];
+
+  // searchingFor - search in name, section, code, description
+  if (data.searchingFor && typeof data.searchingFor === "string" && data.searchingFor.trim()) {
+    const searchTerm = data.searchingFor.trim();
+    andConditions.push({
+      OR: [
+        { name: { contains: searchTerm, mode: "insensitive" } },
+        { section: { contains: searchTerm, mode: "insensitive" } },
+        { code: { contains: searchTerm, mode: "insensitive" } },
+        { description: { contains: searchTerm, mode: "insensitive" } },
+      ],
+    });
+    delete data.searchingFor;
+  }
+
+  // isActive
+  if (typeof data.isActive === "boolean") {
+    andConditions.push({ isActive: data.isActive });
+    delete data.isActive;
+  }
+
+  // sections filter
+  if (data.sections && Array.isArray(data.sections) && data.sections.length > 0) {
+    andConditions.push({ section: { in: data.sections } });
+    delete data.sections;
+  }
+
+  // types filter
+  if (data.types && Array.isArray(data.types) && data.types.length > 0) {
+    andConditions.push({ type: { in: data.types } });
+    delete data.types;
+  }
+
+  // hasItems
+  if (typeof data.hasItems === "boolean") {
+    if (data.hasItems) {
+      andConditions.push({ items: { some: {} } });
+    } else {
+      andConditions.push({ items: { none: {} } });
+    }
+    delete data.hasItems;
+  }
+
+  if (data.createdAt) {
+    andConditions.push({ createdAt: data.createdAt });
+    delete data.createdAt;
+  }
+
+  if (data.updatedAt) {
+    andConditions.push({ updatedAt: data.updatedAt });
+    delete data.updatedAt;
+  }
+
+  if (andConditions.length > 0) {
+    if (data.where) {
+      if (data.where.AND && Array.isArray(data.where.AND)) {
+        data.where.AND = [...data.where.AND, ...andConditions];
+      } else {
+        data.where = { AND: [data.where, ...andConditions] };
+      }
+    } else {
+      data.where = andConditions.length === 1 ? andConditions[0] : { AND: andConditions };
+    }
+  }
+
+  return data;
+};
+
+// =====================
+// Query Schema
+// =====================
+
+export const warehouseLocationGetManySchema = z
+  .object({
+    page: z.coerce.number().int().min(0).default(1).optional(),
+    limit: z.coerce.number().int().positive().max(100).default(20).optional(),
+    take: z.coerce.number().int().positive().max(100).optional(),
+    skip: z.coerce.number().int().min(0).optional(),
+
+    // Convenience filter fields
+    searchingFor: z.string().optional(),
+    isActive: z.boolean().optional(),
+    sections: z.array(z.string()).optional(),
+    types: z.array(z.nativeEnum(WAREHOUSE_LOCATION_TYPE)).optional(),
+    hasItems: z.boolean().optional(),
+    createdAt: z
+      .object({
+        gte: z.coerce.date().optional(),
+        lte: z.coerce.date().optional(),
+      })
+      .optional(),
+    updatedAt: z
+      .object({
+        gte: z.coerce.date().optional(),
+        lte: z.coerce.date().optional(),
+      })
+      .optional(),
+
+    // Standard query fields
+    where: warehouseLocationWhereSchema.optional(),
+    orderBy: warehouseLocationOrderBySchema.optional(),
+    include: warehouseLocationIncludeSchema.optional(),
+  })
+  .transform(warehouseLocationTransform);
+
+// =====================
+// CRUD Schemas
+// =====================
+
+const gridCountSchema = z.coerce.number().int().min(1, "Mínimo 1").max(100, "Máximo 100");
+const columnsPerLevelSchema = z.array(z.coerce.number().int().min(1).max(100));
+const positionSchema = z.coerce.number();
+
+export const warehouseLocationCreateSchema = z.object({
+  name: nameSchema,
+  section: optionalTrimmedString(100, "Setor"),
+  code: optionalTrimmedString(50, "Código"),
+  description: optionalTrimmedString(500, "Descrição"),
+  isActive: z.boolean().default(true),
+  type: z.nativeEnum(WAREHOUSE_LOCATION_TYPE).default(WAREHOUSE_LOCATION_TYPE.ESTANTE),
+  positionX: positionSchema.optional(),
+  positionY: positionSchema.optional(),
+  width: positionSchema.optional(),
+  height: positionSchema.optional(),
+  rotation: positionSchema.optional(),
+  levels: gridCountSchema.default(1),
+  columns: gridCountSchema.default(1),
+  columnsPerLevel: columnsPerLevelSchema.optional(),
+});
+
+export const warehouseLocationUpdateSchema = z.object({
+  name: nameSchema.optional(),
+  section: optionalTrimmedString(100, "Setor"),
+  code: optionalTrimmedString(50, "Código"),
+  description: optionalTrimmedString(500, "Descrição"),
+  isActive: z.boolean().optional(),
+  type: z.nativeEnum(WAREHOUSE_LOCATION_TYPE).optional(),
+  positionX: positionSchema.optional(),
+  positionY: positionSchema.optional(),
+  width: positionSchema.optional(),
+  height: positionSchema.optional(),
+  rotation: positionSchema.optional(),
+  levels: gridCountSchema.optional(),
+  columns: gridCountSchema.optional(),
+  columnsPerLevel: columnsPerLevelSchema.optional(),
+});
+
+// =====================
+// Batch Operations Schemas
+// =====================
+
+export const warehouseLocationBatchCreateSchema = z.object({
+  warehouseLocations: z.array(warehouseLocationCreateSchema),
+});
+
+export const warehouseLocationBatchUpdateSchema = z.object({
+  warehouseLocations: z
+    .array(
+      z.object({
+        id: z.string().uuid("Localização inválida"),
+        data: warehouseLocationUpdateSchema,
+      }),
+    )
+    .min(1, "Pelo menos uma localização deve ser fornecida"),
+});
+
+export const warehouseLocationBatchDeleteSchema = z.object({
+  warehouseLocationIds: z.array(z.string().uuid("Localização inválida")).min(1, "Pelo menos um ID deve ser fornecido"),
+});
+
+// Query schema for include parameter
+export const warehouseLocationQuerySchema = z.object({
+  include: warehouseLocationIncludeSchema.optional(),
+});
+
+// GetById Schema
+export const warehouseLocationGetByIdSchema = z.object({
+  include: warehouseLocationIncludeSchema.optional(),
+});
+
+// =====================
+// Type Inference (FormData types)
+// =====================
+
+export type WarehouseLocationGetManyFormData = z.infer<typeof warehouseLocationGetManySchema>;
+export type WarehouseLocationGetManyInput = z.input<typeof warehouseLocationGetManySchema>;
+export type WarehouseLocationGetByIdFormData = z.infer<typeof warehouseLocationGetByIdSchema>;
+export type WarehouseLocationQueryFormData = z.infer<typeof warehouseLocationQuerySchema>;
+
+export type WarehouseLocationCreateFormData = z.infer<typeof warehouseLocationCreateSchema>;
+export type WarehouseLocationUpdateFormData = z.infer<typeof warehouseLocationUpdateSchema>;
+
+export type WarehouseLocationBatchCreateFormData = z.infer<typeof warehouseLocationBatchCreateSchema>;
+export type WarehouseLocationBatchUpdateFormData = z.infer<typeof warehouseLocationBatchUpdateSchema>;
+export type WarehouseLocationBatchDeleteFormData = z.infer<typeof warehouseLocationBatchDeleteSchema>;
+
+export type WarehouseLocationInclude = z.infer<typeof warehouseLocationIncludeSchema>;
+export type WarehouseLocationOrderBy = z.infer<typeof warehouseLocationOrderBySchema>;
+export type WarehouseLocationWhere = z.infer<typeof warehouseLocationWhereSchema>;
+
+// =====================
+// Helper Functions
+// =====================
+
+export const mapWarehouseLocationToFormData = createMapToFormDataHelper<WarehouseLocation, WarehouseLocationUpdateFormData>((warehouseLocation) => ({
+  name: warehouseLocation.name,
+  section: warehouseLocation.section,
+  code: warehouseLocation.code,
+  description: warehouseLocation.description,
+  isActive: warehouseLocation.isActive,
+  type: warehouseLocation.type,
+  positionX: warehouseLocation.positionX,
+  positionY: warehouseLocation.positionY,
+  width: warehouseLocation.width,
+  height: warehouseLocation.height,
+  rotation: warehouseLocation.rotation,
+  levels: warehouseLocation.levels,
+  columns: warehouseLocation.columns,
+  columnsPerLevel: warehouseLocation.columnsPerLevel,
+}));

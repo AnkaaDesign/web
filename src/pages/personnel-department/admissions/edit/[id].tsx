@@ -33,12 +33,7 @@ export const AdmissionEditPage = () => {
   }
 
   if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <p className="text-destructive mb-4">Erro ao carregar admissão</p>
-        <Navigate to={routes.personnelDepartment.admissions.root} replace />
-      </div>
-    );
+    return <Navigate to={routes.personnelDepartment.admissions.root} replace />;
   }
 
   if (isLoading) {
@@ -95,24 +90,29 @@ export const AdmissionEditPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={REQUIRED_PRIVILEGES}>
-      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <div className="container mx-auto max-w-4xl flex-shrink-0">
-          <PageHeader
-            title={admission.user?.name ? `Editar Admissão — ${admission.user.name}` : "Editar Admissão"}
-            icon={IconUserPlus}
-            favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_ADMISSOES_LISTAR}
-            breadcrumbs={[
-              { label: "Início", href: "/" },
-              { label: "Departamento Pessoal" },
-              { label: "Admissões", href: routes.personnelDepartment.admissions.root },
-              { label: admission.user?.name || "Admissão", href: routes.personnelDepartment.admissions.details(id) },
-              { label: "Editar" },
-            ]}
-            actions={actions}
-          />
-        </div>
-        <div className="flex-1 overflow-y-auto pb-6">
-          <AdmissionForm mode="update" admission={admission} onSubmit={handleSubmit} isSubmitting={updateMutation.isPending} />
+      <div className="h-full flex flex-col bg-background px-4 pt-4">
+        {/* Header + form share ONE scroll container and ONE max-w-4xl column (igual
+            à tela de criação), mantendo o cabeçalho fixo (sticky) enquanto o
+            formulário rola por baixo. */}
+        <div className="flex-1 overflow-y-auto pb-6 [scrollbar-gutter:stable]">
+          <div className="container mx-auto max-w-4xl flex flex-col gap-4">
+            <div className="sticky top-0 z-20 bg-background pb-1">
+              <PageHeader
+                title={admission.user?.name ? `Editar Admissão — ${admission.user.name}` : "Editar Admissão"}
+                icon={IconUserPlus}
+                favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_ADMISSOES_LISTAR}
+                breadcrumbs={[
+                  { label: "Início", href: "/" },
+                  { label: "Departamento Pessoal" },
+                  { label: "Admissões", href: routes.personnelDepartment.admissions.root },
+                  { label: admission.user?.name || "Admissão", href: routes.personnelDepartment.admissions.details(id) },
+                  { label: "Editar" },
+                ]}
+                actions={actions}
+              />
+            </div>
+            <AdmissionForm mode="update" admission={admission} onSubmit={handleSubmit} isSubmitting={updateMutation.isPending} />
+          </div>
         </div>
       </div>
     </PrivilegeRoute>

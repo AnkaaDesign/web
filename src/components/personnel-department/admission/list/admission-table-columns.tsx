@@ -11,6 +11,7 @@ import type { ADMISSION_STATUS, CONTRACT_TYPE, MEDICAL_EXAM_RESULT as MEDICAL_EX
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import type { Admission } from "../../../../types/admission";
 import { getDocumentProgress } from "../utils";
+import { DocumentProgressBar } from "../document-progress";
 
 export interface AdmissionColumn {
   key: string;
@@ -152,17 +153,10 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
     accessor: (admission: Admission) => {
       const { done, total } = getDocumentProgress(admission.documents);
       if (total === 0) return <span className="text-sm text-muted-foreground">-</span>;
-      return (
-        <div className="text-sm whitespace-nowrap">
-          <span className={done === total ? "font-medium text-green-700 dark:text-green-500" : "font-medium"}>
-            {done}/{total}
-          </span>{" "}
-          <span className="text-xs text-muted-foreground">docs</span>
-        </div>
-      );
+      return <DocumentProgressBar done={done} total={total} />;
     },
     sortable: false,
-    className: "min-w-[100px]",
+    className: "min-w-[140px]",
     align: "left",
   },
 

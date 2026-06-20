@@ -23,14 +23,32 @@ import type { Termination, TerminationItem, TaxAssistResult } from "../../../../
 import { useTerminationCalculate, useTerminationComputeTaxes, useTerminationItemDelete } from "../../../../hooks/personnel-department/use-terminations";
 import { ItemFormDialog } from "./item-form-dialog";
 
+/**
+ * True when the verba description is effectively identical to its type label
+ * (case/accent/whitespace-insensitive) — e.g. "Saldo de salário" under the
+ * "Saldo de Salário" label. Such echoes add no information and are hidden.
+ */
+function descriptionEchoesLabel(description: string, label: string): boolean {
+  const normalize = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  return normalize(description) === normalize(label);
+}
+
 interface ItemsCardProps {
   termination: Termination;
   /** True when the termination is COMPLETED/CANCELLED — blocks every mutation. */
   disabled?: boolean;
+  /** Render without the outer Card chrome — used when embedded in a shared card. */
+  bare?: boolean;
   className?: string;
 }
 
-export function ItemsCard({ termination, disabled = false, className }: ItemsCardProps) {
+export function ItemsCard({ termination, disabled = false, bare = false, className }: ItemsCardProps) {
   const calculate = useTerminationCalculate();
   const computeTaxes = useTerminationComputeTaxes();
   const deleteItem = useTerminationItemDelete();
@@ -175,8 +193,10 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
     </Popover>
   );
 
+  const Wrapper = bare ? "div" : Card;
+
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
+    <Wrapper className={cn("flex flex-col", !bare && "shadow-sm border border-border", className)}>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="flex items-center gap-2">
@@ -226,11 +246,9 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[220px]">Verba</TableHead>
-                <TableHead className="text-right w-28">Referência</TableHead>
-                <TableHead className="text-right w-32">Base</TableHead>
-                <TableHead className="text-right w-36">Valor</TableHead>
-                <TableHead className="w-20"></TableHead>
+                <TableHead>Verba</TableHead>
+                <TableHead className="text-right w-32">Valor</TableHead>
+                <TableHead className="w-16"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -245,13 +263,9 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
                         </Badge>
                       )}
                     </div>
-                    {item.description && <div className="text-xs text-muted-foreground mt-0.5">{item.description}</div>}
-                  </TableCell>
-                  <TableCell className="text-right text-sm tabular-nums">
-                    {item.referenceQuantity ?? <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-right text-sm tabular-nums">
-                    {item.baseValue != null ? formatCurrency(item.baseValue) : <span className="text-muted-foreground">—</span>}
+                    {item.isCustom && item.description && !descriptionEchoesLabel(item.description, TERMINATION_ITEM_TYPE_LABELS[item.type] || item.type) && (
+                      <div className="text-xs text-muted-foreground mt-0.5">{item.description}</div>
+                    )}
                   </TableCell>
                   <TableCell className={cn("text-right text-sm font-medium tabular-nums", item.amount < 0 && "text-destructive")}>
                     {item.amount < 0 ? `-${formatCurrency(Math.abs(item.amount))}` : formatCurrency(item.amount)}
@@ -287,27 +301,27 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
             </TableBody>
             <TableFooter>
               <TableRow className="border-t-0 hover:bg-transparent">
-                <TableCell colSpan={3} className="text-right text-sm text-muted-foreground">
+                <TableCell className="py-1 text-right text-sm text-muted-foreground">
                   Proventos
                 </TableCell>
-                <TableCell className="text-right text-sm tabular-nums">{formatCurrency(totals.earnings)}</TableCell>
-                <TableCell />
+                <TableCell className="py-1 text-right text-sm tabular-nums">{formatCurrency(totals.earnings)}</TableCell>
+                <TableCell className="py-1" />
               </TableRow>
               <TableRow className="border-t-0 hover:bg-transparent">
-                <TableCell colSpan={3} className="text-right text-sm text-muted-foreground">
+                <TableCell className="py-1 text-right text-sm text-muted-foreground">
                   Descontos
                 </TableCell>
-                <TableCell className="text-right text-sm tabular-nums text-destructive">-{formatCurrency(totals.discounts)}</TableCell>
-                <TableCell />
+                <TableCell className="py-1 text-right text-sm tabular-nums text-destructive">-{formatCurrency(totals.discounts)}</TableCell>
+                <TableCell className="py-1" />
               </TableRow>
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={3} className="text-right text-base font-bold">
+                <TableCell className="py-1.5 text-right text-base font-bold">
                   Líquido
                 </TableCell>
-                <TableCell className={cn("text-right text-base font-bold tabular-nums", totals.net < 0 && "text-destructive")}>
+                <TableCell className={cn("py-1.5 text-right text-base font-bold tabular-nums", totals.net < 0 && "text-destructive")}>
                   {totals.net < 0 ? `-${formatCurrency(Math.abs(totals.net))}` : formatCurrency(totals.net)}
                 </TableCell>
-                <TableCell />
+                <TableCell className="py-1.5" />
               </TableRow>
             </TableFooter>
           </Table>
@@ -356,6 +370,6 @@ export function ItemsCard({ termination, disabled = false, className }: ItemsCar
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </Wrapper>
   );
 }

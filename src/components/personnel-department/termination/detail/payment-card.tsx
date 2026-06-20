@@ -23,10 +23,12 @@ interface PaymentCardProps {
   termination: Termination;
   /** True when the termination is COMPLETED/CANCELLED — blocks every mutation. */
   disabled?: boolean;
+  /** Render without the outer Card chrome — used when embedded in a shared card. */
+  bare?: boolean;
   className?: string;
 }
 
-export function PaymentCard({ termination, disabled = false, className }: PaymentCardProps) {
+export function PaymentCard({ termination, disabled = false, bare = false, className }: PaymentCardProps) {
   const { updateAsync, updateMutation } = useTerminationMutations();
   const overdue = isPaymentOverdue(termination);
 
@@ -63,8 +65,10 @@ export function PaymentCard({ termination, disabled = false, className }: Paymen
     }
   };
 
+  const Wrapper = bare ? "div" : Card;
+
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
+    <Wrapper className={cn("flex flex-col", !bare && "shadow-sm border border-border", className)}>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2">
           <IconCash className="h-5 w-5 text-muted-foreground" />
@@ -139,6 +143,6 @@ export function PaymentCard({ termination, disabled = false, className }: Paymen
           <AlertDescription>Ao concluir a rescisão o colaborador será demitido (contrato marcado como Demitido).</AlertDescription>
         </Alert>
       </CardContent>
-    </Card>
+    </Wrapper>
   );
 }

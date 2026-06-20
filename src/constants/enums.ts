@@ -291,6 +291,8 @@ export enum SALARY_ADJUSTMENT_TYPE {
   EQUALIZATION = "EQUALIZATION",
   REFRAME = "REFRAME",
   OTHER = "OTHER",
+  // System-applied bonus period reajuste (not a user-selectable salary type).
+  BONUS = "BONUS",
 }
 
 // CLT: rebaixamento unilateral é ilegal (CF art.7º VI + CLT art.468), por isso
@@ -2000,10 +2002,39 @@ export enum CHANGE_LOG_ENTITY_TYPE {
   DEPENDENT = "DEPENDENT",
   AGENDA_EVENT = "AGENDA_EVENT",
   POSTIT = "POSTIT",
+  FISPQ = "FISPQ",
 }
 
 // Alias for Prisma compatibility
 export { CHANGE_LOG_ENTITY_TYPE as ChangeLogEntityType };
+
+// =====================
+// FISPQ / FDS (Ficha de Informações de Segurança de Produtos Químicos / Safety Data Sheet)
+// =====================
+
+export enum GHS_PICTOGRAM {
+  GHS01_EXPLOSIVE = "GHS01_EXPLOSIVE",
+  GHS02_FLAMMABLE = "GHS02_FLAMMABLE",
+  GHS03_OXIDIZING = "GHS03_OXIDIZING",
+  GHS04_GAS_UNDER_PRESSURE = "GHS04_GAS_UNDER_PRESSURE",
+  GHS05_CORROSIVE = "GHS05_CORROSIVE",
+  GHS06_TOXIC = "GHS06_TOXIC",
+  GHS07_HARMFUL = "GHS07_HARMFUL",
+  GHS08_HEALTH_HAZARD = "GHS08_HEALTH_HAZARD",
+  GHS09_ENVIRONMENTAL = "GHS09_ENVIRONMENTAL",
+}
+
+export enum GHS_SIGNAL_WORD {
+  DANGER = "DANGER",
+  WARNING = "WARNING",
+}
+
+export enum FISPQ_STATUS {
+  DRAFT = "DRAFT",
+  ACTIVE = "ACTIVE",
+  EXPIRED = "EXPIRED",
+  ARCHIVED = "ARCHIVED",
+}
 
 export enum CHANGE_LOG_ACTION {
   CREATE = "CREATE",
@@ -2283,6 +2314,15 @@ export enum STOCK_MODEL {
   FIXED_TARGET = "FIXED_TARGET",
 }
 
+// Physical structure type of a warehouse location (used by the warehouse map).
+export enum WAREHOUSE_LOCATION_TYPE {
+  ESTANTE = "ESTANTE",
+  ESTANTE_DUPLA = "ESTANTE_DUPLA",
+  ESTANTE_KANBAN = "ESTANTE_KANBAN",
+  PAINEL = "PAINEL",
+  PALETE = "PALETE",
+}
+
 // Accounting classification (DRE bucket) for item/transaction categories.
 export enum ACCOUNTING_TYPE {
   SALARIOS = "SALARIOS",
@@ -2465,10 +2505,8 @@ export enum FAVORITE_PAGES {
   RECURSOS_HUMANOS_CALCULOS = "/departamento-pessoal/calculos",
   RECURSOS_HUMANOS_CONTROLE_PONTO_LISTAR = "/departamento-pessoal/controle-ponto",
   RECURSOS_HUMANOS_CONTROLE_PONTO_ASSINATURA_DIGITAL_LISTAR = "/departamento-pessoal/controle-ponto/assinatura-digital",
-  RECURSOS_HUMANOS_EPI_LISTAR = "/departamento-pessoal/epi",
-  RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR = "/departamento-pessoal/epi/entregas",
-  RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR = "/departamento-pessoal/epi/agendamentos",
-  RECURSOS_HUMANOS_EPI_TAMANHOS_LISTAR = "/departamento-pessoal/epi/tamanhos",
+  RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR = "/medicina-do-trabalho/epi/entregas",
+  RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR = "/medicina-do-trabalho/epi/agendamentos",
   RECURSOS_HUMANOS_SETORES_LISTAR = "/departamento-pessoal/setores",
 
   // Human Resources - Create Pages
@@ -2476,9 +2514,8 @@ export enum FAVORITE_PAGES {
   RECURSOS_HUMANOS_FERIAS_CADASTRAR = "/departamento-pessoal/ferias/cadastrar",
   RECURSOS_HUMANOS_FERIADOS_CADASTRAR = "/departamento-pessoal/feriados/cadastrar",
   RECURSOS_HUMANOS_AVISOS_CADASTRAR = "/departamento-pessoal/avisos/cadastrar",
-  RECURSOS_HUMANOS_EPI_CADASTRAR = "/departamento-pessoal/epi/cadastrar",
-  RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR = "/departamento-pessoal/epi/entregas/cadastrar",
-  RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR = "/departamento-pessoal/epi/agendamentos/cadastrar",
+  RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR = "/medicina-do-trabalho/epi/entregas/cadastrar",
+  RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR = "/medicina-do-trabalho/epi/agendamentos/cadastrar",
   RECURSOS_HUMANOS_SETORES_CADASTRAR = "/departamento-pessoal/setores/cadastrar",
   RECURSOS_HUMANOS_BONUS_LISTAR = "/departamento-pessoal/bonus",
   RECURSOS_HUMANOS_NIVEIS_DESEMPENHO_LISTAR = "/departamento-pessoal/niveis-de-desempenho",
@@ -2542,6 +2579,7 @@ export enum FAVORITE_PAGES {
   MEDICINA_DO_TRABALHO_ASO_LISTAR = "/medicina-do-trabalho/aso",
   MEDICINA_DO_TRABALHO_EXAMES_PERIODICOS_LISTAR = "/medicina-do-trabalho/exames-periodicos",
   MEDICINA_DO_TRABALHO_AFASTAMENTOS_LISTAR = "/medicina-do-trabalho/afastamentos",
+  MEDICINA_DO_TRABALHO_FISPQ_LISTAR = "/medicina-do-trabalho/fispq",
 
   // Financeiro - Contas a Pagar
   FINANCEIRO_CONTAS_A_PAGAR_LISTAR = "/financeiro/contas-a-pagar",

@@ -84,6 +84,12 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
       ledSector: true,
       ppeSize: true,
       currentContract: true,
+      // Most recent admission (with its document checklist) powers the
+      // DOCUMENTOS progress column — mirrors the Admissões table.
+      admissions: {
+        include: { documents: true },
+        orderBy: { createdAt: "desc" },
+      },
       _count: {
         select: {
           createdTasks: true,

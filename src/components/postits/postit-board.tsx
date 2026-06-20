@@ -889,8 +889,31 @@ function PostitCard({
   const setArchived = (isArchived: boolean) =>
     mutations.update.mutate({ id: postit.id, data: { isArchived } });
 
+  // Blindagem contra a seleção "fantasma" no clique-direito. Em certos cenários
+  // (nota dentro do canvas, com ancestral em `transform`/zoom) o próprio gesto
+  // que ABRE o menu de contexto também seleciona o item que ficou sob o cursor —
+  // arquivando/excluindo a nota sem intenção (e fazendo o menu apenas "piscar").
+  // Como toda ação destrutiva passa por `onSelect`, interceptamos ali: qualquer
+  // seleção disparada nos primeiros 250ms após abrir é considerada acidental;
+  // `event.preventDefault()` a ignora E mantém o menu ABERTO para o clique real
+  // (que sempre vem bem depois — o usuário precisa ver o menu, mover e clicar).
+  const openedAtRef = useRef(0);
+  const handleMenuOpenChange = useCallback((open: boolean) => {
+    if (open) openedAtRef.current = performance.now();
+  }, []);
+  const guardSelect = useCallback(
+    (action: () => void) => (event: Event) => {
+      if (performance.now() - openedAtRef.current < 250) {
+        event.preventDefault();
+        return;
+      }
+      action();
+    },
+    [],
+  );
+
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={handleMenuOpenChange}>
       <ContextMenuTrigger asChild>
         {/* Notes are always light-colored, so text/icons are FORCED dark (text-neutral-900)
             regardless of the app theme — otherwise the inherited foreground is white in dark
@@ -954,7 +977,7 @@ function PostitCard({
               </ContextMenuSubTrigger>
               <ContextMenuSubContent className="min-w-[150px]">
                 {POSTIT_COLOR_NAMES.map((name) => (
-                  <ContextMenuItem key={name} onSelect={() => setColor(name)}>
+                  <ContextMenuItem key={name} onSelect={guardSelect(() => setColor(name))}>
                     <span
                       className={cn(
                         "mr-2 h-3.5 w-3.5 rounded-full border",
@@ -970,11 +993,11 @@ function PostitCard({
             </ContextMenuSub>
             {onReorder && (
               <>
-                <ContextMenuItem onSelect={() => onReorder(postit, "front")}>
+                <ContextMenuItem onSelect={guardSelect(() => onReorder(postit, "front"))}>
                   <IconArrowUp className="mr-2 h-4 w-4" />
                   Trazer para frente
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => onReorder(postit, "back")}>
+                <ContextMenuItem onSelect={guardSelect(() => onReorder(postit, "back"))}>
                   <IconArrowDown className="mr-2 h-4 w-4" />
                   Enviar para trás
                 </ContextMenuItem>
@@ -985,19 +1008,19 @@ function PostitCard({
         )}
 
         {archivedView ? (
-          <ContextMenuItem onSelect={() => setArchived(false)}>
+          <ContextMenuItem onSelect={guardSelect(() => setArchived(false))}>
             <IconArchiveOff className="mr-2 h-4 w-4" />
             Restaurar
           </ContextMenuItem>
         ) : (
-          <ContextMenuItem onSelect={() => setArchived(true)}>
+          <ContextMenuItem onSelect={guardSelect(() => setArchived(true))}>
             <IconArchive className="mr-2 h-4 w-4" />
             Arquivar
           </ContextMenuItem>
         )}
 
         <ContextMenuItem
-          onSelect={() => onDelete(postit)}
+          onSelect={guardSelect(() => onDelete(postit))}
           className="text-destructive focus:text-destructive"
         >
           <IconTrash className="mr-2 h-4 w-4" />

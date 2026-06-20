@@ -134,8 +134,12 @@ export const bonusService = {
    * Set the period reajuste %. Recomputes all saved bonuses in the period
    * with the new adjustment baked into the salary-based logistic algorithm.
    */
-  applyPeriodAdjustment: (year: number, month: number, percentage: number) =>
-    apiClient.post<any>(`/bonus/period-adjustment/${year}/${month}`, { percentage }),
+  applyPeriodAdjustment: (year: number, month: number, percentage: number, effectiveDate?: Date, note?: string) =>
+    apiClient.post<any>(`/bonus/period-adjustment/${year}/${month}`, {
+      percentage,
+      ...(effectiveDate ? { effectiveDate: effectiveDate.toISOString() } : {}),
+      ...(note ? { note } : {}),
+    }),
 
   // =====================================================
   // Live Bonus Calculation Endpoints (NEW - Clean Implementation)

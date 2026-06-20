@@ -106,9 +106,10 @@ const isBelowFloorError = (message?: string): boolean => {
 };
 
 // Alvos do reajuste. A página de Reajustes aplica reajuste de SALÁRIO (cargos)
-// e/ou de BONIFICAÇÃO (período do bônus). O motor de bonificação já existe —
-// BonusPeriodConfig.adjustment via POST /bonus/period-adjustment/:year/:month —
-// então aqui apenas o reutilizamos (sem sistema paralelo, sem migração).
+// e/ou de BONIFICAÇÃO (período do bônus). A bonificação é aplicada via
+// POST /bonus/period-adjustment/:year/:month, que persiste um SalaryAdjustment
+// do tipo BONUS (delta) — a mesma fonte lida pelo badge "+X%" e pela lista de
+// Reajustes (sem sistema paralelo).
 type AdjustmentTarget = "salary" | "bonus";
 
 export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjustmentApplyDialogProps) {
@@ -238,10 +239,13 @@ export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjust
 
   const typeOptions = useMemo(
     () =>
-      Object.entries(SALARY_ADJUSTMENT_TYPE_LABELS).map(([value, label]) => ({
-        value,
-        label,
-      })),
+      Object.entries(SALARY_ADJUSTMENT_TYPE_LABELS)
+        // BONUS is system-applied (bonus period reajuste) — not selectable as a salary type.
+        .filter(([value]) => value !== SALARY_ADJUSTMENT_TYPE.BONUS)
+        .map(([value, label]) => ({
+          value,
+          label,
+        })),
     [],
   );
 
@@ -328,7 +332,7 @@ export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjust
       }
     }
     try {
-      await applyPeriodAdjustment.mutateAsync({ year, month, percentage: parsed });
+      await applyPeriodAdjustment.mutateAsync({ year, month, percentage: parsed, effectiveDate: vigencia });
       return true;
     } catch (error) {
       // Error toast handled by the API client interceptor
@@ -589,8 +593,8 @@ export function SalaryAdjustmentApplyDialog({ open, onOpenChange }: SalaryAdjust
         )}
 
         {/* Bonificação — reaproveita o motor de reajuste de bônus por período
-            (BonusPeriodConfig). Como um dissídio: um percentual + data de
-            vigência; aplica à bonificação do período da vigência em diante.
+            (SalaryAdjustment tipo BONUS). Como um dissídio: um percentual + data
+            de vigência; aplica à bonificação do período da vigência em diante.
             Os campos espelham EXATAMENTE os de salário (FormInput percentage +
             DateTimeInput de Data de Vigência). */}
         {target === "bonus" && (

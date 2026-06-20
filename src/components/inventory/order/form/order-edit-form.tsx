@@ -230,8 +230,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       supplierId: order.supplierId || undefined,
       forecast: order.forecast,
       notes: order.notes || "",
-      freight: (order as any).freight ?? 0,
-      discount: (order as any).discount ?? 0,
+      freight: order.freight ?? 0,
+      discount: order.discount ?? 0,
       selectedItems: initialSelectedItems,
       quantities: initialQuantities,
       prices: initialPrices,
@@ -244,8 +244,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     order.supplierId,
     order.forecast,
     order.notes,
-    (order as any).freight,
-    (order as any).discount,
+    order.freight,
+    order.discount,
     initialSelectedItems,
     initialQuantities,
     initialPrices,
@@ -319,8 +319,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     supplierId: supplierId || order.supplierId || undefined,
     forecast: forecast || order.forecast || undefined,
     notes: notes || order.notes || "",
-    freight: freight ?? (order as any).freight ?? 0,
-    discount: discount ?? (order as any).discount ?? 0,
+    freight: freight ?? order.freight ?? 0,
+    discount: discount ?? order.discount ?? 0,
     // Items list is computed from URL state at submit time.
     items: [],
     // Payment fields
@@ -611,8 +611,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     const supplierChanged = (supplierId || null) !== (order.supplierId || null);
     const forecastChanged = (forecast ? new Date(forecast).getTime() : null) !== (order.forecast ? new Date(order.forecast).getTime() : null);
     const notesChanged = (localNotes?.trim() || "") !== (order.notes?.trim() || "");
-    const freightChanged = Number(watchedFreight || 0) !== Number((order as any).freight || 0);
-    const discountChanged = Number(watchedDiscount || 0) !== Number((order as any).discount || 0);
+    const freightChanged = Number(watchedFreight || 0) !== Number(order.freight || 0);
+    const discountChanged = Number(watchedDiscount || 0) !== Number(order.discount || 0);
 
     // Payment fields
     const paymentMethodChanged = (watchedPaymentMethod || null) !== (order.paymentMethod || null);
@@ -768,6 +768,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const currentFreight = Number(form.getValues("freight")) || 0;
       const currentDiscount = Number(form.getValues("discount")) || 0;
 
+      // Resolve the selected supplier so PIX/boleto defaults shown in the form get persisted.
+      const currentSupplier = supplierId ? suppliers.find((s) => s.id === supplierId) : undefined;
+
       const data = {
         description: description!.trim(),
         supplierId: supplierId || undefined,
@@ -777,8 +780,15 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         discount: currentDiscount,
         items,
         paymentMethod: currentPaymentMethod || undefined,
-        paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
-        paymentDueDays: currentPaymentMethod === "BANK_SLIP" ? currentPaymentDueDays || undefined : undefined,
+        // Persist what was displayed: fall back to the supplier's default pix when the user left it empty.
+        paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || currentSupplier?.pix || undefined : undefined,
+        // Persist the default interval (30 days) shown for 2x+ boletos when none was explicitly chosen.
+        paymentDueDays:
+          currentPaymentMethod === "BANK_SLIP"
+            ? (currentInstallmentCount || 1) > 1
+              ? currentPaymentDueDays || 30
+              : currentPaymentDueDays || undefined
+            : undefined,
         paymentFirstDueDate: currentPaymentMethod === "BANK_SLIP" ? currentPaymentFirstDueDate || null : null,
         installmentCount: currentPaymentMethod === "BANK_SLIP" ? currentInstallmentCount || 1 : 1,
         paymentResponsibleId: currentPaymentResponsibleId || null,

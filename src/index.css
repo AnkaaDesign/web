@@ -8,6 +8,42 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * GLOBAL UI SCALE — replicate the user's preferred 80% browser zoom at 100%.
+ *
+ * The user always runs the app at 80% browser zoom. Applying `zoom: 0.8` at the
+ * document root makes the app render identically at the browser's default 100%
+ * zoom, with no per-component changes: `zoom` uniformly scales px, rem, images,
+ * borders and SVG. Chromium maps zoom into the same visual coordinate space used
+ * by getBoundingClientRect / clientX / scrollTop, so pointer + layout math stays
+ * consistent (avoid comparing against the NON-zoomed window.innerWidth/Height).
+ *
+ * Full-height chain: with root zoom, `100vh`/`h-screen` resolves against the
+ * physical viewport and is THEN scaled by 0.8, leaving an empty strip at the
+ * bottom. To keep the app shell filling the real screen we anchor a percentage
+ * height chain here (html/body/#root = 100%) and the top-level layouts use
+ * `h-full` instead of `h-screen` (see main-layout.tsx / auth-layout.tsx).
+ */
+html {
+  zoom: 0.8;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/*
+ * PRINT must stay full size — receipts, PDFs and reports are laid out for paper
+ * and must not be shrunk to 80%. Reset zoom for print only.
+ */
+@media print {
+  html {
+    zoom: 1;
+  }
+}
+
 /* Hide browser default date/time picker icons */
 
 /* WebKit browsers (Chrome, Safari, Edge) - hide calendar/clock icon */

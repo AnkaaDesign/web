@@ -86,8 +86,12 @@ function FlyoutColumn({
     if (!el) return;
     const width = el.offsetWidth;
     const height = el.offsetHeight;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    // documentElement.clientWidth/Height is zoom-adjusted, matching offsetWidth/
+    // Height and anchorRect (getBoundingClientRect). window.innerWidth/Height is
+    // the real viewport (not zoom-adjusted), so it would flip/clamp at the wrong
+    // threshold under the document-level CSS zoom.
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
 
     // Horizontal placement with edge flip.
     let resolvedSide = preferSide;

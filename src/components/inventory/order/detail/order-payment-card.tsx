@@ -129,16 +129,6 @@ export function OrderPaymentCard({ order, className }: OrderPaymentCardProps) {
             </div>
           )}
 
-          {order.paymentRequestedAt && (
-            <div className={rowCls}>
-              <span className={labelCls}>
-                <IconCalendar className="h-4 w-4" />
-                Pagamento Solicitado em
-              </span>
-              <span className={valueCls}>{formatDateTime(order.paymentRequestedAt)}</span>
-            </div>
-          )}
-
           {order.paidAt && (
             <div className={rowCls}>
               <span className={labelCls}>

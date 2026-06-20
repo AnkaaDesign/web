@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { IconEdit, IconTrash, IconBan, IconPlayerTrackNext, IconPlayerTrackPrev } from "@tabler/icons-react";
 
@@ -30,9 +30,9 @@ import {
 import {
   StatusStepperCard,
   SummaryCard,
-  ItemsCard,
+  ExamCard,
+  CalculationPaymentCard,
   DocumentsCard,
-  PaymentCard,
   TerminationDetailSkeleton,
   getNextTerminationStatus,
   getPreviousTerminationStatus,
@@ -102,6 +102,8 @@ export const TerminationDetailPage = () => {
     advanceDisabledReason = `Não é possível alterar o status de uma rescisão ${TERMINATION_STATUS_LABELS[termination.status].toLowerCase()}.`;
   } else if (nextStatus === TERMINATION_STATUS.PAYMENT && items.length === 0) {
     advanceDisabledReason = "Não é possível avançar para Pagamento: nenhuma verba rescisória foi calculada.";
+  } else if (nextIsCompleted && !termination.terminationDate) {
+    advanceDisabledReason = "Não é possível concluir a rescisão: a data de desligamento não foi informada.";
   } else if (nextIsCompleted && !termination.paymentDate) {
     advanceDisabledReason = "Não é possível concluir a rescisão: a data de pagamento não foi informada.";
   }
@@ -157,6 +159,30 @@ export const TerminationDetailPage = () => {
     }
     setShowDeleteDialog(false);
   };
+
+  // Card mostrado ao lado do Resumo, conforme a ETAPA atual do processo.
+  // ExamCard se auto-oculta (null) quando ainda não há ASO, então é o default
+  // seguro para as etapas iniciais.
+  let stepContextCard: ReactNode;
+  switch (termination.status) {
+    case TERMINATION_STATUS.CALCULATION:
+    case TERMINATION_STATUS.PAYMENT:
+    case TERMINATION_STATUS.HOMOLOGATION:
+    case TERMINATION_STATUS.COMPLETED:
+      stepContextCard = <CalculationPaymentCard termination={termination} disabled={isFinal} className="h-full" />;
+      break;
+    case TERMINATION_STATUS.MEDICAL_EXAM:
+      stepContextCard = <ExamCard termination={termination} className="h-full" />;
+      break;
+    case TERMINATION_STATUS.DOCUMENTS:
+      stepContextCard = <DocumentsCard termination={termination} disabled={isFinal} className="h-full" />;
+      break;
+    case TERMINATION_STATUS.CANCELLED:
+      stepContextCard = items.length > 0 ? <CalculationPaymentCard termination={termination} disabled={isFinal} className="h-full" /> : <ExamCard termination={termination} className="h-full" />;
+      break;
+    default:
+      stepContextCard = <ExamCard termination={termination} className="h-full" />;
+  }
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
@@ -217,7 +243,10 @@ export const TerminationDetailPage = () => {
                   },
                 ]
               : []),
-            ...(isAdmin
+            // Excluir só aparece para rescisões CANCELADAS (e admin): rescisões
+            // em andamento devem ser canceladas antes de excluídas; concluídas
+            // nunca são excluídas (mirror do guard no servidor).
+            ...(isAdmin && termination.status === TERMINATION_STATUS.CANCELLED
               ? [
                   {
                     key: "delete",
@@ -255,17 +284,20 @@ export const TerminationDetailPage = () => {
             {/* Status stepper */}
             <StatusStepperCard termination={termination} />
 
-            {/* Summary + Payment (Payment stretches to match the Summary height) */}
+            {/* Resumo sempre à esquerda; à direita fica o card relevante à ETAPA
+                atual do processo:
+                  • Exame Demissional  → card do ASO (concluir/visualizar)
+                  • Cálculo/Pagamento/Homologação/Concluída → Verbas + Pagamento
+                    num único card empilhado
+                  • Documentação       → checklist de documentos
+                Os demais cards aparecem em largura cheia logo abaixo. */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-              <SummaryCard termination={termination} />
-              <PaymentCard termination={termination} disabled={isFinal} className="h-full" />
+              <SummaryCard termination={termination} className="h-full" />
+              {stepContextCard}
             </div>
 
-            {/* Verbas + Documentos — half each */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-              <ItemsCard termination={termination} disabled={isFinal} />
-              <DocumentsCard termination={termination} disabled={isFinal} />
-            </div>
+            {/* Documentos — em largura cheia, exceto quando já é o card da etapa. */}
+            {termination.status !== TERMINATION_STATUS.DOCUMENTS && <DocumentsCard termination={termination} disabled={isFinal} />}
 
             {/* Histórico de Alterações — full width so the timeline has room */}
             <ChangelogHistory
@@ -357,17 +389,14 @@ export const TerminationDetailPage = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir a rescisão{termination.user?.name ? ` de "${termination.user.name}"` : ""}? Esta ação não pode ser desfeita.
-                {termination.status === TERMINATION_STATUS.COMPLETED && (
-                  <span className="block mt-2 font-medium text-destructive">Não é possível excluir uma rescisão concluída.</span>
-                )}
+                Tem certeza que deseja excluir a rescisão cancelada{termination.user?.name ? ` de "${termination.user.name}"` : ""}? Esta ação não pode ser desfeita.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Voltar</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDelete}
-                disabled={deleteMutation.isPending || termination.status === TERMINATION_STATUS.COMPLETED}
+                disabled={deleteMutation.isPending}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 Excluir

@@ -74,7 +74,7 @@ function LoanListContent() {
                       loans.map((loan) => (
                         <TableRow key={loan.id}>
                           {columns.map((col) => (
-                            <TableCell key={col.key} className={cn(alignClass(col.align), col.className)}>
+                            <TableCell key={col.key} className={cn("py-2", alignClass(col.align), col.className)}>
                               {col.accessor(loan)}
                             </TableCell>
                           ))}

@@ -82,6 +82,7 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
       brands: true,
       category: true,
       supplier: true,
+      warehouseLocation: true,
       measures: true,
       prices: {
         orderBy: { createdAt: "desc" },

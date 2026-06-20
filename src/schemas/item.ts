@@ -626,6 +626,7 @@ export const itemIncludeSchema = z
       ])
       .optional(),
     supplier: z.boolean().optional(),
+    warehouseLocation: z.boolean().optional(),
     prices: z
       .union([
         z.boolean(),
@@ -2300,6 +2301,9 @@ export const itemCreateSchemaBase = z.object({
   brandIds: z.array(z.string().uuid({ message: "Marca inválida" })).optional(),
   categoryId: z.string().uuid({ message: "Categoria inválida" }).nullable().optional(),
   supplierId: z.string().uuid({ message: "Fornecedor inválido" }).nullable().optional(),
+  warehouseLocationId: z.string().uuid({ message: "Localização inválida" }).nullable().optional(),
+  locationLevel: z.coerce.number().int().min(1).nullable().optional(),
+  locationColumn: z.coerce.number().int().min(1).nullable().optional(),
   estimatedLeadTime: z.number().int().nullable().default(30).optional(),
   isActive: z.boolean().default(true),
   categoryReviewNeeded: z.boolean().optional(),
@@ -2376,6 +2380,9 @@ export const itemUpdateSchemaBase = z.object({
   brandIds: z.array(z.string().uuid({ message: "Marca inválida" })).optional(),
   categoryId: z.string().uuid({ message: "Categoria inválida" }).nullable().optional(),
   supplierId: z.string().uuid({ message: "Fornecedor inválido" }).nullable().optional(),
+  warehouseLocationId: z.string().uuid({ message: "Localização inválida" }).nullable().optional(),
+  locationLevel: z.coerce.number().int().min(1).nullable().optional(),
+  locationColumn: z.coerce.number().int().min(1).nullable().optional(),
   estimatedLeadTime: z.number().int().nullable().optional(),
   isActive: z.boolean().optional(),
   categoryReviewNeeded: z.boolean().optional(),
@@ -2728,6 +2735,9 @@ export const mapItemToFormData = createMapToFormDataHelper<Item, ItemUpdateFormD
   brandIds: item.brands?.map((b) => b.id) ?? undefined,
   categoryId: item.categoryId || undefined,
   supplierId: item.supplierId || undefined,
+  warehouseLocationId: item.warehouseLocationId || undefined,
+  locationLevel: item.locationLevel ?? undefined,
+  locationColumn: item.locationColumn ?? undefined,
   estimatedLeadTime: item.estimatedLeadTime || undefined,
   isActive: item.isActive,
   categoryReviewNeeded: item.categoryReviewNeeded,

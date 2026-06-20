@@ -68,12 +68,7 @@ export const AdmissionDetailPage = () => {
   }
 
   if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <p className="text-destructive mb-4">Erro ao carregar admissão</p>
-        <Navigate to={routes.personnelDepartment.admissions.root} replace />
-      </div>
-    );
+    return <Navigate to={routes.personnelDepartment.admissions.root} replace />;
   }
 
   if (isLoading) {
@@ -185,12 +180,15 @@ export const AdmissionDetailPage = () => {
           },
         ]
       : []),
+    // Editar — desabilitado em processos finalizados (concluído/cancelado),
+    // espelhando a rescisão: registros finais não devem ser reabertos.
     {
       key: "edit",
       label: "Editar",
       icon: IconEdit,
       onClick: () => navigate(routes.personnelDepartment.admissions.edit(id)),
       group: "primary" as const,
+      disabled: isFinal,
     },
     ...(!isFinal
       ? [
@@ -205,7 +203,10 @@ export const AdmissionDetailPage = () => {
           },
         ]
       : []),
-    ...(isAdmin
+    // Excluir — ADMIN e apenas em admissões finalizadas (canceladas/concluídas),
+    // espelhando o guard do servidor: processos em andamento devem ser cancelados
+    // antes (para desfazer vínculo/ASO criados ao vivo).
+    ...(isAdmin && isFinal
       ? [
           {
             key: "delete",
@@ -317,7 +318,7 @@ export const AdmissionDetailPage = () => {
               <AlertDialogTitle>Cancelar admissão</AlertDialogTitle>
               <AlertDialogDescription>
                 A admissão{admission.user?.name ? ` de "${admission.user.name}"` : ""} será marcada como cancelada na etapa atual ({ADMISSION_STATUS_LABELS[admission.status]}) e
-                não poderá mais ser avançada. Informe o motivo de não ter sido concluída.
+                não poderá mais ser avançada. O vínculo criado por este processo será encerrado e o exame admissional (ASO) pendente, cancelado. Informe o motivo de não ter sido concluída.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-1.5">

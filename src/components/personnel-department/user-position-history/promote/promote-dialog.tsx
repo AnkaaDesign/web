@@ -225,10 +225,10 @@ export function PromoteDialog({ open, onOpenChange }: PromoteDialogProps) {
             {isPromoting ? (
               <>
                 <IconLoader2 className="h-4 w-4 mr-2 animate-spin" />
-                Salvando...
+                Aplicando...
               </>
             ) : (
-              "Confirmar"
+              "Promover Colaborador"
             )}
           </Button>
         </DialogFooter>

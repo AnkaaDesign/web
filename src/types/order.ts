@@ -128,8 +128,7 @@ export interface Order extends BaseEntity {
   statusOrder: number; // Status numeric order for sorting: 1=Created, 2=PartiallyFulfilled, 3=Fulfilled, 4=Overdue, 5=PartiallyReceived, 6=Received, 7=Cancelled
   // Payment workflow (contas a pagar)
   paymentStatus: ORDER_PAYMENT_STATUS;
-  paymentStatusOrder: number; // 1=NotRequested, 2=Requested, 3=AwaitingPayment, 4=Paid
-  paymentRequestedAt: Date | null;
+  paymentStatusOrder: number; // 1=AwaitingPayment, 2=PartiallyPaid, 3=Paid
   paidAt: Date | null;
   paidById: string | null;
   installmentCount: number;
@@ -256,6 +255,21 @@ export interface OrderIncludes {
         take?: number;
         skip?: number;
       };
+  installments?:
+    | boolean
+    | {
+        include?: any; // OrderInstallmentIncludes not yet defined
+      };
+  paymentResponsible?: boolean;
+  paymentAssignedBy?: boolean;
+  _count?:
+    | boolean
+    | {
+        select?: {
+          items?: boolean;
+          activities?: boolean;
+        };
+      };
 }
 
 export interface OrderItemIncludes {
@@ -329,7 +343,6 @@ export interface OrderWhere {
   statusOrder?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number };
   paymentStatus?: ORDER_PAYMENT_STATUS | { equals?: ORDER_PAYMENT_STATUS; not?: ORDER_PAYMENT_STATUS; in?: ORDER_PAYMENT_STATUS[]; notIn?: ORDER_PAYMENT_STATUS[] };
   paymentStatusOrder?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number };
-  paymentRequestedAt?: Date | null | { equals?: Date | null; not?: Date | null; lt?: Date; lte?: Date; gt?: Date; gte?: Date };
   paidAt?: Date | null | { equals?: Date | null; not?: Date | null; lt?: Date; lte?: Date; gt?: Date; gte?: Date };
   supplierId?: string | null | { equals?: string | null; not?: string | null; in?: string[]; notIn?: string[] };
   forecast?: Date | null | { equals?: Date | null; not?: Date | null; lt?: Date; lte?: Date; gt?: Date; gte?: Date };
@@ -398,7 +411,6 @@ export interface OrderOrderBy {
   statusOrder?: ORDER_BY_DIRECTION;
   paymentStatus?: ORDER_BY_DIRECTION;
   paymentStatusOrder?: ORDER_BY_DIRECTION;
-  paymentRequestedAt?: ORDER_BY_DIRECTION;
   paidAt?: ORDER_BY_DIRECTION;
   notes?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
@@ -523,7 +535,6 @@ export interface PayableRow {
   paymentState: PayableState;
   dueDate: string | null;
   method: string | null;
-  requestedAt: string | null;
   /** When the row was settled (PAID rows only). */
   paidAt?: string | null;
   /** Convenience link back to the originating task (airbrushing rows). */

@@ -448,13 +448,20 @@ export const useApplyPeriodAdjustment = () => {
       year,
       month,
       percentage,
+      effectiveDate,
+      note,
     }: {
       year: number;
       month: number;
       percentage: number;
-    }) => bonusService.applyPeriodAdjustment(year, month, percentage).then(r => r.data),
+      effectiveDate?: Date;
+      note?: string;
+    }) => bonusService.applyPeriodAdjustment(year, month, percentage, effectiveDate, note).then(r => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: bonusKeys.all });
+      // A bonus apply now also writes a SalaryAdjustment (BONUS) audit row, so
+      // refresh the Reajustes list/history.
+      queryClient.invalidateQueries({ queryKey: ["salaryAdjustments"] });
     },
   });
 };

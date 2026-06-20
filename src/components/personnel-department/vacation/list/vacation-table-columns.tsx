@@ -74,11 +74,11 @@ export const createVacationColumns = (): VacationColumn[] => [
             </Badge>
           )}
         </div>
-        {vacation.user?.position?.name && <div className="text-xs text-muted-foreground truncate">{vacation.user.position.name}</div>}
       </div>
     ),
     sortable: true,
-    className: "min-w-[220px]",
+    // table-fixed ignora min-width — é o `w-` que define a largura da coluna.
+    className: "w-[320px] min-w-[320px]",
     align: "left",
   },
 

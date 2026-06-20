@@ -175,7 +175,7 @@ export const createBenefitColumns = (): BenefitColumn[] => [
     key: "enrollmentsCount",
     header: "ADESÕES",
     accessor: (benefit: Benefit) => (
-      <Badge variant="default" className="w-10">
+      <Badge variant="default" className="inline-flex items-center justify-center min-w-[2.5rem] px-1.5 tabular-nums leading-none">
         {benefit._count?.enrollments ?? 0}
       </Badge>
     ),

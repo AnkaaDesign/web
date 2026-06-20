@@ -181,7 +181,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
 
   // Saved period reajuste (the "Reajuste: +X%" badge value). The simulation
   // applies it by sending the period (year/month) to /bonus/simulate; the API
-  // injects the saved BonusPeriodConfig adjustment so the simulated value
+  // injects the saved period adjustment (SalaryAdjustment BONUS) so the simulated value
   // matches the real, saved bonus. This hook is only for the display badge —
   // the calculation reads the same source server-side.
   const { data: periodAdjustmentData } = usePeriodAdjustment(periodYear, periodMonth);

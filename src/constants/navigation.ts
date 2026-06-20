@@ -725,6 +725,14 @@ export const NAVIGATION_MENU: MenuItem[] = [
             path: "/financeiro/conciliacao/extrato",
             order: 1,
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+            children: [
+              // Transaction detail opens from the Extrato list but lives at a
+              // sibling path (/transacoes/:id, not /extrato/:id). Register it as a
+              // dynamic child so the active-nav resolver maps it onto Extrato →
+              // Conciliação Bancária instead of falling back to the top-level
+              // "Financeiro" prefix match.
+              { id: "conciliacao-transacao-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/conciliacao/transacoes/:id", isDynamic: true },
+            ],
           },
           {
             // Inflow ledger — open/overdue/received receivable installments
@@ -896,6 +904,17 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "fornecedores-cadastrar", title: "Cadastrar", icon: "plus", path: "/estoque/fornecedores/cadastrar" },
           { id: "fornecedores-detalhes", title: "Detalhes", icon: "eye", path: "/estoque/fornecedores/detalhes/:id", isDynamic: true },
           { id: "fornecedores-editar", title: "Editar", icon: "edit", path: "/estoque/fornecedores/editar/:id", isDynamic: true },
+        ],
+      },
+      {
+        id: "localizacoes",
+        title: "Localizações",
+        icon: "location",
+        path: "/estoque/localizacoes",
+        children: [
+          { id: "localizacoes-cadastrar", title: "Cadastrar", icon: "plus", path: "/estoque/localizacoes/cadastrar" },
+          { id: "localizacoes-detalhes", title: "Detalhes", icon: "eye", path: "/estoque/localizacoes/detalhes/:id", isDynamic: true },
+          { id: "localizacoes-editar", title: "Editar", icon: "edit", path: "/estoque/localizacoes/editar/:id", isDynamic: true },
         ],
       },
       {
@@ -1892,43 +1911,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
       },
       {
-        // EPI catalog — HR/ADMIN only here. ACCOUNTING manages PPE delivery through the
-        // Medicina do Trabalho section ("Entrega de EPIs"), so it is not duplicated here.
-        id: "dp-epi",
-        title: "EPI",
-        icon: "helmet",
-        path: "/departamento-pessoal/epi",
-        requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-        children: [
-          {
-            id: "dp-epi-agendamentos",
-            title: "Agendamentos",
-            icon: "schedule",
-            path: "/departamento-pessoal/epi/agendamentos",
-            children: [
-              { id: "dp-epi-agendamentos-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/epi/agendamentos/cadastrar" },
-              { id: "dp-epi-agendamentos-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/epi/agendamentos/detalhes/:id", isDynamic: true },
-              { id: "dp-epi-agendamentos-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/epi/agendamentos/editar/:id", isDynamic: true },
-            ],
-          },
-          { id: "dp-epi-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/epi/cadastrar" },
-          { id: "dp-epi-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/epi/detalhes/:id", isDynamic: true },
-          { id: "dp-epi-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/epi/editar/:id", isDynamic: true },
-          { id: "dp-epi-tamanhos", title: "Tamanhos", icon: "sizes", path: "/departamento-pessoal/epi/tamanhos" },
-          {
-            id: "dp-epi-entregas",
-            title: "Entregas",
-            icon: "truck",
-            path: "/departamento-pessoal/epi/entregas",
-            children: [
-              { id: "dp-epi-entregas-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/epi/entregas/cadastrar" },
-              { id: "dp-epi-entregas-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/epi/entregas/detalhes/:id", isDynamic: true },
-              { id: "dp-epi-entregas-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/epi/entregas/editar/:id", isDynamic: true },
-            ],
-          },
-        ],
-      },
-      {
         // Feriados — Secullum-synced holiday list. HR/ADMIN only (matches the prior
         // Recursos Humanos placement; ACCOUNTING was intentionally excluded).
         id: "dp-feriados",
@@ -2046,7 +2028,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
     id: "medicina-do-trabalho",
     title: "Medicina do Trabalho",
     icon: "safety",
-    path: "/departamento-pessoal/epi/entregas",
+    path: "/medicina-do-trabalho/epi/entregas",
     // ACCOUNTING-only: new accounting-sector section. HR/ADMIN keep their original
     // "Recursos Humanos" menu and must NOT see this. (Route privileges unchanged.)
     requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
@@ -2055,33 +2037,25 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "mt-epi-entregas",
         title: "Entrega de EPIs",
         icon: "truck",
-        path: "/departamento-pessoal/epi/entregas",
+        path: "/medicina-do-trabalho/epi/entregas",
         requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
         children: [
-          // Spec (Área Andressa §3): Agendamentos and Tamanhos are CHILDREN of
-          // Entrega de EPIs, not section-level Medicina do Trabalho items.
+          // Agendamentos is a CHILD of Entrega de EPIs.
           {
             id: "mt-epi-agendamentos",
             title: "Agendamentos",
             icon: "schedule",
-            path: "/departamento-pessoal/epi/agendamentos",
+            path: "/medicina-do-trabalho/epi/agendamentos",
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
             children: [
-              { id: "mt-epi-agendamentos-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/epi/agendamentos/cadastrar" },
-              { id: "mt-epi-agendamentos-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/epi/agendamentos/detalhes/:id", isDynamic: true },
-              { id: "mt-epi-agendamentos-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/epi/agendamentos/editar/:id", isDynamic: true },
+              { id: "mt-epi-agendamentos-cadastrar", title: "Cadastrar", icon: "plus", path: "/medicina-do-trabalho/epi/agendamentos/cadastrar" },
+              { id: "mt-epi-agendamentos-detalhes", title: "Detalhes", icon: "eye", path: "/medicina-do-trabalho/epi/agendamentos/detalhes/:id", isDynamic: true },
+              { id: "mt-epi-agendamentos-editar", title: "Editar", icon: "edit", path: "/medicina-do-trabalho/epi/agendamentos/editar/:id", isDynamic: true },
             ],
           },
-          {
-            id: "mt-epi-tamanhos",
-            title: "Tamanhos",
-            icon: "sizes",
-            path: "/departamento-pessoal/epi/tamanhos",
-            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-          },
-          { id: "mt-epi-entregas-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/epi/entregas/cadastrar" },
-          { id: "mt-epi-entregas-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/epi/entregas/detalhes/:id", isDynamic: true },
-          { id: "mt-epi-entregas-editar", title: "Editar", icon: "edit", path: "/departamento-pessoal/epi/entregas/editar/:id", isDynamic: true },
+          { id: "mt-epi-entregas-cadastrar", title: "Cadastrar", icon: "plus", path: "/medicina-do-trabalho/epi/entregas/cadastrar" },
+          { id: "mt-epi-entregas-detalhes", title: "Detalhes", icon: "eye", path: "/medicina-do-trabalho/epi/entregas/detalhes/:id", isDynamic: true },
+          { id: "mt-epi-entregas-editar", title: "Editar", icon: "edit", path: "/medicina-do-trabalho/epi/entregas/editar/:id", isDynamic: true },
         ],
       },
       {
@@ -2125,6 +2099,18 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "mt-cat-cadastrar", title: "Cadastrar", icon: "plus", path: "/medicina-do-trabalho/cat/cadastrar" },
           { id: "mt-cat-detalhes", title: "Detalhes", icon: "eye", path: "/medicina-do-trabalho/cat/detalhes/:id", isDynamic: true },
           { id: "mt-cat-editar", title: "Editar", icon: "edit", path: "/medicina-do-trabalho/cat/editar/:id", isDynamic: true },
+        ],
+      },
+      {
+        id: "mt-fispq",
+        title: "FISPQ/FDS",
+        icon: "flask",
+        path: "/medicina-do-trabalho/fispq",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          { id: "mt-fispq-cadastrar", title: "Cadastrar", icon: "plus", path: "/medicina-do-trabalho/fispq/cadastrar" },
+          { id: "mt-fispq-detalhes", title: "Detalhes", icon: "eye", path: "/medicina-do-trabalho/fispq/detalhes/:id", isDynamic: true },
+          { id: "mt-fispq-editar", title: "Editar", icon: "edit", path: "/medicina-do-trabalho/fispq/editar/:id", isDynamic: true },
         ],
       },
     ],

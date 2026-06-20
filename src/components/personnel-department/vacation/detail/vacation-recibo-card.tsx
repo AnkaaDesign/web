@@ -32,13 +32,21 @@ function Line({ label, amount, negative }: { label: string; amount: number; nega
  * hydrates on load (the recibo is auto-calculated at create time). A fresh
  * recalculation via the action replaces this with the server response.
  */
+/** Coerce a possibly-string Decimal (or null/NaN) to a finite number. */
+function toNum(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function reciboFromEntity(vacation: Vacation): VacationRecibo | null {
   if (vacation.baseRemuneration == null) return null;
-  const baseRemuneration = vacation.baseRemuneration ?? 0;
-  const oneThird = vacation.oneThird ?? 0;
-  const abonoAmount = vacation.abonoAmount ?? 0;
-  const inss = vacation.inss ?? 0;
-  const irrf = vacation.irrf ?? 0;
+  // Monetary fields arrive as strings (Prisma Decimal over JSON); coerce before
+  // arithmetic, otherwise sums become string concatenation → NaN.
+  const baseRemuneration = toNum(vacation.baseRemuneration);
+  const oneThird = toNum(vacation.oneThird);
+  const abonoAmount = toNum(vacation.abonoAmount);
+  const inss = toNum(vacation.inss);
+  const irrf = toNum(vacation.irrf);
   const abonoOneThird = 0; // not persisted separately on the entity
   const earnings = baseRemuneration + oneThird + abonoAmount + abonoOneThird;
   const discounts = inss + irrf;

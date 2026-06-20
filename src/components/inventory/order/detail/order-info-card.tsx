@@ -111,7 +111,7 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
                   <IconCurrencyReal className="h-4 w-4" />
                   Valor Total
                 </span>
-                <OrderTotalBadge orderItems={order.items} discount={order.discount} />
+                <OrderTotalBadge orderItems={order.items} discount={order.discount} freight={order.freight} />
               </div>
             )}
 

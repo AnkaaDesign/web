@@ -13,7 +13,7 @@ import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import { DetailRow } from "@/components/ui/detail-row";
 import { cn } from "@/lib/utils";
 
-import { MEDICAL_EXAM_RESULT, MEDICAL_EXAM_RESULT_LABELS, MEDICAL_EXAM_STATUS, MEDICAL_EXAM_STATUS_LABELS, type MEDICAL_EXAM_TYPE, routes } from "../../../constants";
+import { MEDICAL_EXAM_RESULT, MEDICAL_EXAM_RESULT_LABELS, MEDICAL_EXAM_STATUS, MEDICAL_EXAM_STATUS_LABELS, MEDICAL_EXAM_TYPE, routes } from "../../../constants";
 import { formatDate } from "../../../utils";
 import { useMedicalExamMutations } from "@/hooks/occupational-health/use-medical-exams";
 import { useLinkedMedicalExam } from "@/components/occupational-health/medical-exam/detail/linked-exam-status";
@@ -116,7 +116,8 @@ export function InlineExamPanel({ userId, type, processField, processId, created
             <DetailRow label="Médico(a)" value={<span className="truncate">{exam.physicianName || "-"}</span>} />
             <DetailRow label="CRM" value={exam.crm || "-"} />
             <DetailRow label="Clínica" value={<span className="truncate">{exam.clinic || "-"}</span>} />
-            <DetailRow label="Validade" value={exam.expiresAt ? formatDate(new Date(exam.expiresAt)) : "-"} />
+            {/* ASO demissional não tem validade. */}
+            {type !== MEDICAL_EXAM_TYPE.DISMISSAL && <DetailRow label="Validade" value={exam.expiresAt ? formatDate(new Date(exam.expiresAt)) : "-"} />}
           </div>
           {exam.result === MEDICAL_EXAM_RESULT.FIT_WITH_RESTRICTIONS && exam.restrictions ? (
             <DetailRow label="Restrições" value={<span className="break-words">{exam.restrictions}</span>} block />

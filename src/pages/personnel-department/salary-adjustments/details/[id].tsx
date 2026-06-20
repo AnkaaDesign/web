@@ -2,8 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { IconTrash, IconRefresh, IconLoader2, IconAlertTriangle, IconPercentage, IconBriefcase } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, SALARY_ADJUSTMENT_TYPE_LABELS } from "../../../../constants";
-import type { SALARY_ADJUSTMENT_TYPE } from "../../../../constants";
+import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, SALARY_ADJUSTMENT_TYPE_LABELS, SALARY_ADJUSTMENT_TYPE } from "../../../../constants";
 import { useSalaryAdjustment, useSalaryAdjustmentMutations } from "@/hooks/personnel-department/use-salary-adjustment";
 import { useAuth } from "@/hooks/common/use-auth";
 import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
@@ -100,6 +99,7 @@ export const SalaryAdjustmentDetailPage = () => {
 
   const title = `${SALARY_ADJUSTMENT_TYPE_LABELS[adjustment.type as SALARY_ADJUSTMENT_TYPE] || adjustment.type} — ${formatDate(new Date(adjustment.effectiveDate))}`;
   const items = adjustment.items || [];
+  const isBonus = adjustment.type === SALARY_ADJUSTMENT_TYPE.BONUS;
 
   const actions = [
     {
@@ -165,7 +165,10 @@ export const SalaryAdjustmentDetailPage = () => {
                       }
                     />
                     <DetailRow label="Data de Vigência" value={formatDate(new Date(adjustment.effectiveDate))} />
-                    <DetailRow label="Cargos Afetados" value={<Badge variant="default">{items.length}</Badge>} />
+                    <DetailRow
+                      label={isBonus ? "Alvo" : "Cargos Afetados"}
+                      value={isBonus ? <Badge variant="secondary">Bonificação (todos)</Badge> : <Badge variant="default">{items.length}</Badge>}
+                    />
                     <DetailRow label="Aplicado Por" value={adjustment.appliedBy?.name || "-"} />
                     <DetailRow label="Criado Em" value={adjustment.createdAt ? formatDateTime(new Date(adjustment.createdAt)) : "-"} />
                     {adjustment.note && <DetailRow label="Observação" value={<span className="break-words">{adjustment.note}</span>} block />}
@@ -182,7 +185,23 @@ export const SalaryAdjustmentDetailPage = () => {
               />
             </div>
 
-            {/* Items table */}
+            {/* Bonus reajustes target the whole bonus period, not specific cargos. */}
+            {isBonus ? (
+              <Card className="shadow-sm border border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <IconPercentage className="h-5 w-5 text-muted-foreground" />
+                    Reajuste de Bonificação
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Este reajuste foi aplicado à bonificação do período (a partir da data de vigência), aumentando o bônus de todos os colaboradores elegíveis. Não altera a
+                    remuneração de cargos. Bônus já salvos não são recalculados automaticamente — execute "Calcular e Salvar" no período para incorporá-lo.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
             <Card className="shadow-sm border border-border">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -226,6 +245,7 @@ export const SalaryAdjustmentDetailPage = () => {
                 )}
               </CardContent>
             </Card>
+            )}
           </div>
         </div>
 
@@ -238,8 +258,17 @@ export const SalaryAdjustmentDetailPage = () => {
                 Confirmar Exclusão
               </DialogTitle>
               <DialogDescription>
-                Tem certeza que deseja excluir este reajuste salarial? A exclusão remove apenas o registro do histórico — as remunerações atuais dos cargos não serão
-                alteradas. Esta ação não poderá ser desfeita.
+                {isBonus ? (
+                  <>
+                    Tem certeza que deseja excluir este reajuste de bonificação? A bonificação dos períodos a partir da vigência deixará de incluí-lo e o bônus ao vivo será
+                    recalculado. Bônus já salvos não são alterados. Esta ação não poderá ser desfeita.
+                  </>
+                ) : (
+                  <>
+                    Tem certeza que deseja excluir este reajuste salarial? A exclusão remove apenas o registro do histórico — as remunerações atuais dos cargos não serão
+                    alteradas. Esta ação não poderá ser desfeita.
+                  </>
+                )}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

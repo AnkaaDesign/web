@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { useUsers, usePositions } from "../../../../hooks";
 import { formatDate } from "../../../../utils";
-import type { UserPositionHistory } from "../../../../types/user-position-history";
 import type { UserPositionHistoryGetManyFormData } from "../../../../schemas/user-position-history";
 import { POSITION_CHANGE_REASON_LABELS, POSITION_CHANGE_REASON } from "../../../../constants";
 
@@ -14,7 +13,6 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { UserPositionHistoryTable } from "./user-position-history-table";
 import { IconFilter } from "@tabler/icons-react";
 import { UserPositionHistoryFilters } from "./user-position-history-filters";
-import { UserPositionHistoryDetailDialog } from "../detail/user-position-history-detail-dialog";
 import { GenericColumnVisibilityManager } from "@/components/ui/generic-column-visibility-manager";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { createUserPositionHistoryColumns, DEFAULT_USER_POSITION_HISTORY_VISIBLE_COLUMNS } from "./user-position-history-table-columns";
@@ -32,7 +30,6 @@ export function UserPositionHistoryList({ className }: UserPositionHistoryListPr
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [detailDialog, setDetailDialog] = useState<UserPositionHistory | null>(null);
 
   // Load entity data for filter labels
   const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
@@ -243,15 +240,12 @@ export function UserPositionHistoryList({ className }: UserPositionHistoryListPr
 
         {/* Paginated table */}
         <div className="flex-1 min-h-0 overflow-auto">
-          <UserPositionHistoryTable visibleColumns={visibleColumns} onViewDetails={setDetailDialog} filters={queryFilters} className="h-full" />
+          <UserPositionHistoryTable visibleColumns={visibleColumns} filters={queryFilters} className="h-full" />
         </div>
       </CardContent>
 
       {/* Enhanced Filter Modal */}
       <UserPositionHistoryFilters open={showFilterModal} onOpenChange={setShowFilterModal} filters={filters} onFilterChange={handleFilterChange} />
-
-      {/* Detail Dialog */}
-      <UserPositionHistoryDetailDialog history={detailDialog} onOpenChange={(open) => !open && setDetailDialog(null)} />
     </Card>
   );
 }

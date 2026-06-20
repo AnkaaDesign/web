@@ -1,7 +1,6 @@
 import React from "react";
 import { formatCurrency, formatDate } from "../../../../utils";
-import { SALARY_ADJUSTMENT_TYPE_LABELS } from "../../../../constants";
-import type { SALARY_ADJUSTMENT_TYPE } from "../../../../constants";
+import { SALARY_ADJUSTMENT_TYPE_LABELS, SALARY_ADJUSTMENT_TYPE } from "../../../../constants";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import type { SalaryAdjustment } from "../../../../types/salary-adjustment";
@@ -68,11 +67,15 @@ export const createSalaryAdjustmentColumns = (): SalaryAdjustmentColumn[] => [
   {
     key: "itemsCount",
     header: "CARGOS AFETADOS",
-    accessor: (adjustment: SalaryAdjustment) => (
-      <Badge variant="default" className="w-10">
-        {adjustment.items?.length ?? 0}
-      </Badge>
-    ),
+    accessor: (adjustment: SalaryAdjustment) =>
+      // Bonus reajustes target the bonus period, not specific positions.
+      adjustment.type === SALARY_ADJUSTMENT_TYPE.BONUS ? (
+        <span className="text-sm text-muted-foreground whitespace-nowrap">Bônus (todos)</span>
+      ) : (
+        <Badge variant="default" className="inline-flex items-center justify-center min-w-[2.5rem] px-1.5 tabular-nums leading-none">
+          {adjustment.items?.length ?? 0}
+        </Badge>
+      ),
     sortable: false,
     className: "min-w-[150px]",
     align: "left",

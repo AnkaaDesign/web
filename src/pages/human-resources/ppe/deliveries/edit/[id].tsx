@@ -45,11 +45,11 @@ export const EPIDeliveryEdit = () => {
       id: id!,
       data,
     });
-    navigate(routes.personnelDepartment.ppe.deliveries.details(id!));
+    navigate(routes.occupationalHealth.ppe.deliveries.details(id!));
   };
 
   const handleCancel = () => {
-    navigate(routes.personnelDepartment.ppe.deliveries.details(id!));
+    navigate(routes.occupationalHealth.ppe.deliveries.details(id!));
   };
 
   const actions = [
@@ -84,9 +84,9 @@ export const EPIDeliveryEdit = () => {
             icon={IconShield}
             breadcrumbs={[
               { label: "Home", href: "/" },
-              { label: "RH", href: routes.personnelDepartment.root },
-              { label: "EPI", href: routes.personnelDepartment.ppe.root },
-              { label: "Entregas", href: routes.personnelDepartment.ppe.deliveries.root },
+              { label: "Medicina do Trabalho", href: routes.occupationalHealth.ppe.deliveries.root },
+              { label: "EPI", href: routes.occupationalHealth.ppe.deliveries.root },
+              { label: "Entregas", href: routes.occupationalHealth.ppe.deliveries.root },
               { label: "Editar" },
             ]}
             backButton={{
@@ -126,13 +126,13 @@ export const EPIDeliveryEdit = () => {
             icon={IconShield}
             breadcrumbs={[
               { label: "Home", href: "/" },
-              { label: "RH", href: routes.personnelDepartment.root },
-              { label: "EPI", href: routes.personnelDepartment.ppe.root },
-              { label: "Entregas", href: routes.personnelDepartment.ppe.deliveries.root },
+              { label: "Medicina do Trabalho", href: routes.occupationalHealth.ppe.deliveries.root },
+              { label: "EPI", href: routes.occupationalHealth.ppe.deliveries.root },
+              { label: "Entregas", href: routes.occupationalHealth.ppe.deliveries.root },
               { label: "Editar" },
             ]}
             backButton={{
-              onClick: () => navigate(routes.personnelDepartment.ppe.deliveries.root),
+              onClick: () => navigate(routes.occupationalHealth.ppe.deliveries.root),
             }}
           />
 
@@ -141,7 +141,7 @@ export const EPIDeliveryEdit = () => {
               <IconShield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold">Entrega não encontrada</h3>
               <p className="text-muted-foreground mb-4">A entrega de EPI solicitada não foi encontrada ou não existe.</p>
-              <Button onClick={() => navigate(routes.personnelDepartment.ppe.deliveries.root)}>Voltar para lista</Button>
+              <Button onClick={() => navigate(routes.occupationalHealth.ppe.deliveries.root)}>Voltar para lista</Button>
             </CardContent>
           </Card>
         </div>
@@ -159,12 +159,12 @@ export const EPIDeliveryEdit = () => {
           icon={IconShield}
           breadcrumbs={[
             { label: "Home", href: "/" },
-            { label: "RH", href: routes.personnelDepartment.root },
-            { label: "EPI", href: routes.personnelDepartment.ppe.root },
-            { label: "Entregas", href: routes.personnelDepartment.ppe.deliveries.root },
+            { label: "Medicina do Trabalho", href: routes.occupationalHealth.ppe.deliveries.root },
+            { label: "EPI", href: routes.occupationalHealth.ppe.deliveries.root },
+            { label: "Entregas", href: routes.occupationalHealth.ppe.deliveries.root },
             {
               label: ppeDeliveryResponse?.data?.id ? `#${ppeDeliveryResponse.data.id.slice(-8)}` : "Carregando...",
-              href: ppeDeliveryResponse?.data?.id ? routes.personnelDepartment.ppe.deliveries.details(ppeDeliveryResponse.data.id) : "#",
+              href: ppeDeliveryResponse?.data?.id ? routes.occupationalHealth.ppe.deliveries.details(ppeDeliveryResponse.data.id) : "#",
             },
             { label: "Editar" },
           ]}

@@ -52,6 +52,7 @@ export const orderIncludeSchema = z
       .optional(),
     paymentResponsible: z.boolean().optional(),
     paymentAssignedBy: z.boolean().optional(),
+    installments: z.boolean().optional(),
     ppeSchedule: z.boolean().optional(),
     items: z
       .union([
@@ -223,7 +224,6 @@ export const orderOrderBySchema = z.union([
       statusOrder: orderByDirectionSchema.optional(),
       paymentStatus: orderByDirectionSchema.optional(),
       paymentStatusOrder: orderByDirectionSchema.optional(),
-      paymentRequestedAt: orderByDirectionSchema.optional(),
       paidAt: orderByDirectionSchema.optional(),
       createdAt: orderByDirectionSchema.optional(),
       updatedAt: orderByDirectionSchema.optional(),
@@ -242,7 +242,6 @@ export const orderOrderBySchema = z.union([
         statusOrder: orderByDirectionSchema.optional(),
         paymentStatus: orderByDirectionSchema.optional(),
         paymentStatusOrder: orderByDirectionSchema.optional(),
-        paymentRequestedAt: orderByDirectionSchema.optional(),
         paidAt: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
@@ -442,21 +441,6 @@ export const orderWhereSchema: z.ZodSchema = z.lazy(() =>
             lte: z.number().optional(),
             gt: z.number().optional(),
             gte: z.number().optional(),
-          }),
-        ])
-        .optional(),
-
-      paymentRequestedAt: z
-        .union([
-          z.coerce.date(),
-          z.null(),
-          z.object({
-            equals: z.union([z.coerce.date(), z.null()]).optional(),
-            not: z.union([z.coerce.date(), z.null()]).optional(),
-            lt: z.coerce.date().optional(),
-            lte: z.coerce.date().optional(),
-            gt: z.coerce.date().optional(),
-            gte: z.coerce.date().optional(),
           }),
         ])
         .optional(),

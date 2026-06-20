@@ -116,6 +116,7 @@ const PersonnelDepartmentLoansList = lazy(() => import("@/pages/personnel-depart
 const PersonnelDepartmentSalaryAdjustmentsList = lazy(() => import("@/pages/personnel-department/salary-adjustments/list").then((module) => ({ default: module.SalaryAdjustmentListPage })));
 const PersonnelDepartmentSalaryAdjustmentDetails = lazy(() => import("@/pages/personnel-department/salary-adjustments/details/[id]").then((module) => ({ default: module.SalaryAdjustmentDetailPage })));
 const PersonnelDepartmentPromotionsList = lazy(() => import("@/pages/personnel-department/promotions/list").then((module) => ({ default: module.PromotionListPage })));
+const PersonnelDepartmentPromotionDetails = lazy(() => import("@/pages/personnel-department/promotions/details/[id]").then((module) => ({ default: module.PromotionDetailPage })));
 
 // Personnel Department - Admissões + Rescisões (W3B)
 const PersonnelDepartmentAdmissionsList = lazy(() => import("@/pages/personnel-department/admissions/list"));
@@ -139,6 +140,10 @@ const OccupationalHealthMedicalExamsCreate = lazy(() => import("@/pages/occupati
 const OccupationalHealthMedicalExamsEdit = lazy(() => import("@/pages/occupational-health/medical-exams/edit/[id]").then((module) => ({ default: module.MedicalExamEditPage })));
 const OccupationalHealthMedicalExamsDetails = lazy(() => import("@/pages/occupational-health/medical-exams/details/[id]").then((module) => ({ default: module.MedicalExamDetailPage })));
 const OccupationalHealthPeriodicExams = lazy(() => import("@/pages/occupational-health/periodic-exams/list").then((module) => ({ default: module.PeriodicExamsPage })));
+const OccupationalHealthFispqList = lazy(() => import("@/pages/occupational-health/fispq/list").then((module) => ({ default: module.FispqPage })));
+const OccupationalHealthFispqCreate = lazy(() => import("@/pages/occupational-health/fispq/create").then((module) => ({ default: module.FispqCreatePage })));
+const OccupationalHealthFispqEdit = lazy(() => import("@/pages/occupational-health/fispq/edit/[id]").then((module) => ({ default: module.FispqEditPage })));
+const OccupationalHealthFispqDetails = lazy(() => import("@/pages/occupational-health/fispq/details/[id]").then((module) => ({ default: module.FispqDetailPage })));
 const OccupationalHealthLeavesList = lazy(() => import("@/pages/occupational-health/leaves/list").then((module) => ({ default: module.LeaveListPage })));
 const OccupationalHealthLeavesCreate = lazy(() => import("@/pages/occupational-health/leaves/create").then((module) => ({ default: module.LeaveCreatePage })));
 const OccupationalHealthLeavesEdit = lazy(() => import("@/pages/occupational-health/leaves/edit/[id]").then((module) => ({ default: module.LeaveEditPage })));
@@ -219,6 +224,10 @@ const SuppliersCreate = lazy(() => import("@/pages/inventory/suppliers/create").
 const SuppliersEdit = lazy(() => import("@/pages/inventory/suppliers/edit/[id]").then((module) => ({ default: module.SupplierEditPage })));
 const SuppliersDetails = lazy(() => import("@/pages/inventory/suppliers/details/[id]").then((module) => ({ default: module.default })));
 const SuppliersBatchEdit = lazy(() => import("@/pages/inventory/suppliers/batch-edit").then((module) => ({ default: module.default })));
+const InventoryWarehouseLocations = lazy(() => import("@/pages/inventory/warehouse-locations/list").then((module) => ({ default: module.WarehouseLocationListPage })));
+const WarehouseLocationsCreate = lazy(() => import("@/pages/inventory/warehouse-locations/create").then((module) => ({ default: module.default })));
+const WarehouseLocationsEdit = lazy(() => import("@/pages/inventory/warehouse-locations/edit/[id]").then((module) => ({ default: module.WarehouseLocationEditPage })));
+const WarehouseLocationsDetails = lazy(() => import("@/pages/inventory/warehouse-locations/details/[id]").then((module) => ({ default: module.default })));
 
 // Testing pages (development only)
 const InventoryMaintenance = lazy(() => import("@/pages/inventory/maintenance/list"));
@@ -432,15 +441,12 @@ const HumanResourcesPositionsBatchEdit = lazy(() => import("@/pages/human-resour
 // Secullum integration mapping page (admin)
 const SecullumMappingPage = lazy(() => import("@/pages/integrations/secullum/mapping").then((module) => ({ default: module.default })));
 // Note: Employees pages are managed under Administration section, not Human Resources
-const HumanResourcesPpe = lazy(() => import("@/pages/human-resources/ppe/list").then((module) => ({ default: module.PpeListPage })));
-const HumanResourcesPpeCreate = lazy(() => import("@/pages/human-resources/ppe/create").then((module) => ({ default: module.CreateEpiPage })));
-const HumanResourcesPpeEdit = lazy(() => import("@/pages/human-resources/ppe/edit/[id]").then((module) => ({ default: module.EditEpiPage })));
-const HumanResourcesPpeDetails = lazy(() => import("@/pages/human-resources/ppe/details/[id]").then((module) => ({ default: module.default })));
+// EPI delivery & schedule pages now live under Medicina do Trabalho (Occupational Health).
+// The DP EPI item catalog and "Tamanhos" pages were removed entirely.
 const HumanResourcesPpeDeliveries = lazy(() => import("@/pages/human-resources/ppe/deliveries/list").then((module) => ({ default: module.PpeDeliveryListPage })));
 const HumanResourcesPpeDeliveriesCreate = lazy(() => import("@/pages/human-resources/ppe/deliveries/create").then((module) => ({ default: module.EPIDeliveryCreate })));
 const HumanResourcesPpeDeliveriesEdit = lazy(() => import("@/pages/human-resources/ppe/deliveries/edit/[id]").then((module) => ({ default: module.EPIDeliveryEdit })));
 const HumanResourcesPpeDeliveriesDetails = lazy(() => import("@/pages/human-resources/ppe/deliveries/details/[id]").then((module) => ({ default: module.EPIDeliveryDetails })));
-const HumanResourcesPpeSizes = lazy(() => import("@/pages/human-resources/ppe/sizes/list").then((module) => ({ default: module.PpeSizeListPage })));
 const HumanResourcesPpeSchedules = lazy(() => import("@/pages/human-resources/ppe/schedules/list").then((module) => ({ default: module.PPESchedulesListPage })));
 const HumanResourcesPpeSchedulesCreate = lazy(() => import("@/pages/human-resources/ppe/schedules/create").then((module) => ({ default: module.PPEScheduleCreatePage })));
 const HumanResourcesPpeSchedulesEdit = lazy(() => import("@/pages/human-resources/ppe/schedules/edit/[id]").then((module) => ({ default: module.PPEScheduleEditPage })));
@@ -1923,6 +1929,39 @@ function App() {
                 />
 
                 <Route
+                  path={routes.inventory.warehouseLocations.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <InventoryWarehouseLocations />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.inventory.warehouseLocations.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <WarehouseLocationsCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.inventory.warehouseLocations.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <WarehouseLocationsEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.inventory.warehouseLocations.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <WarehouseLocationsDetails />
+                    </Suspense>
+                  }
+                />
+
+                <Route
                   path={routes.inventory.maintenance.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -2674,40 +2713,9 @@ function App() {
                   }
                 />
                 {/* Note: employees routes are under administration.employees, not humanResources */}
+                {/* EPI delivery & schedule pages — now under Medicina do Trabalho. */}
                 <Route
-                  path={routes.personnelDepartment.ppe.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpe />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personnelDepartment.ppe.create}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeCreate />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personnelDepartment.ppe.edit(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeEdit />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personnelDepartment.ppe.details(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeDetails />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personnelDepartment.ppe.deliveries.root}
+                  path={routes.occupationalHealth.ppe.deliveries.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeDeliveries />
@@ -2715,7 +2723,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.personnelDepartment.ppe.deliveries.create}
+                  path={routes.occupationalHealth.ppe.deliveries.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeDeliveriesCreate />
@@ -2723,7 +2731,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.personnelDepartment.ppe.deliveries.edit(":id")}
+                  path={routes.occupationalHealth.ppe.deliveries.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeDeliveriesEdit />
@@ -2731,7 +2739,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.personnelDepartment.ppe.deliveries.details(":id")}
+                  path={routes.occupationalHealth.ppe.deliveries.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeDeliveriesDetails />
@@ -2739,15 +2747,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.personnelDepartment.ppe.sizes.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeSizes />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personnelDepartment.ppe.schedules.root}
+                  path={routes.occupationalHealth.ppe.schedules.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeSchedules />
@@ -2755,7 +2755,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.personnelDepartment.ppe.schedules.create}
+                  path={routes.occupationalHealth.ppe.schedules.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeSchedulesCreate />
@@ -2763,7 +2763,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.personnelDepartment.ppe.schedules.edit(":id")}
+                  path={routes.occupationalHealth.ppe.schedules.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeSchedulesEdit />
@@ -2771,7 +2771,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.personnelDepartment.ppe.schedules.details(":id")}
+                  path={routes.occupationalHealth.ppe.schedules.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPpeSchedulesDetails />
@@ -3046,6 +3046,14 @@ function App() {
                     </Suspense>
                   }
                 />
+                <Route
+                  path={routes.personnelDepartment.promotions.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentPromotionDetails />
+                    </Suspense>
+                  }
+                />
                 {/* Departamento Pessoal — Benefícios */}
                 <Route
                   path={routes.personnelDepartment.benefits.root}
@@ -3151,6 +3159,39 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <OccupationalHealthPeriodicExams />
+                    </Suspense>
+                  }
+                />
+                {/* Medicina do Trabalho — FISPQ / FDS */}
+                <Route
+                  path={routes.occupationalHealth.fispq.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthFispqList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.fispq.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthFispqCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.fispq.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthFispqEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.occupationalHealth.fispq.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OccupationalHealthFispqDetails />
                     </Suspense>
                   }
                 />

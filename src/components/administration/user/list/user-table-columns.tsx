@@ -4,6 +4,8 @@ import { getCollaboratorStatus } from "../../../../utils/user";
 import { Badge } from "@/components/ui/badge";
 import type { User } from "../../../../types";
 import type { UserColumn } from "./types";
+import { getDocumentProgress } from "../../../personnel-department/admission/utils";
+import { DocumentProgressBar } from "../../../personnel-department/admission/document-progress";
 
 export const createUserColumns = (): UserColumn[] => [
   // Número da Folha (Payroll Number)
@@ -103,12 +105,27 @@ export const createUserColumns = (): UserColumn[] => [
     align: "left",
   },
 
+  // Documentos (admission document checklist progress — most recent admission)
+  {
+    key: "documents",
+    header: "DOCUMENTOS",
+    accessor: (user: User) => {
+      const latestAdmission = user.admissions?.[0];
+      const { done, total } = getDocumentProgress(latestAdmission?.documents);
+      if (total === 0) return <span className="text-sm text-muted-foreground">-</span>;
+      return <DocumentProgressBar done={done} total={total} />;
+    },
+    sortable: false,
+    className: "min-w-[150px]",
+    align: "left",
+  },
+
   // Total de Tarefas (Task Count)
   {
     key: "tasksCount",
     header: "TAREFAS",
     accessor: (user: User) => (
-      <Badge variant="default" className="w-10">
+      <Badge variant="default" className="inline-flex items-center justify-center min-w-[2.5rem] px-1.5 tabular-nums leading-none">
         {user._count?.createdTasks || 0}
       </Badge>
     ),
@@ -182,7 +199,7 @@ export const createUserColumns = (): UserColumn[] => [
     key: "performanceLevel",
     header: "NÍVEL DE PERFORMANCE",
     accessor: (user: User) => (
-      <Badge variant="default" className="w-10">
+      <Badge variant="default" className="inline-flex items-center justify-center min-w-[2.5rem] px-1.5 tabular-nums leading-none">
         {user.performanceLevel || 0}
       </Badge>
     ),
@@ -379,4 +396,4 @@ export const createUserColumns = (): UserColumn[] => [
 ];
 
 // Export the default visible columns
-export const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "currentContractType"]);
+export const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "currentContractType", "documents"]);

@@ -542,6 +542,9 @@ export const OrderCreateForm = () => {
       const currentInstallmentCount = form.getValues("installmentCount");
       const currentPaymentResponsibleId = form.getValues("paymentResponsibleId");
 
+      // Resolve the selected supplier so PIX/boleto defaults shown in the form get persisted.
+      const currentSupplier = currentSupplierId ? suppliers.find((s) => s.id === currentSupplierId) : undefined;
+
       // Prepare the complete form data
       const orderData: OrderCreateFormData = {
         description: currentDescription?.trim() || "",
@@ -553,8 +556,15 @@ export const OrderCreateForm = () => {
         discount: Number(currentDiscount) || 0,
         items: itemsData,
         paymentMethod: currentPaymentMethod || undefined,
-        paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
-        paymentDueDays: currentPaymentMethod === "BANK_SLIP" ? currentPaymentDueDays || undefined : undefined,
+        // Persist what was displayed: fall back to the supplier's default pix when the user left it empty.
+        paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || currentSupplier?.pix || undefined : undefined,
+        // Persist the default interval (30 days) shown for 2x+ boletos when none was explicitly chosen.
+        paymentDueDays:
+          currentPaymentMethod === "BANK_SLIP"
+            ? (currentInstallmentCount || 1) > 1
+              ? currentPaymentDueDays || 30
+              : currentPaymentDueDays || undefined
+            : undefined,
         paymentFirstDueDate: currentPaymentMethod === "BANK_SLIP" ? currentPaymentFirstDueDate || undefined : undefined,
         installmentCount: currentPaymentMethod === "BANK_SLIP" ? currentInstallmentCount || 1 : 1,
         paymentResponsibleId: currentPaymentResponsibleId || undefined,

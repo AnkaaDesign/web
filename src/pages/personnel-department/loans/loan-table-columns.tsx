@@ -32,6 +32,13 @@ const TYPE_LABELS: Record<string, string> = {
   ADVANCE: "Adiantamento",
 };
 
+/** "YYYY-MM" → "MM/YYYY" (pt-BR reading order). Falls back to the raw value. */
+function formatCompetence(competence?: string | null): string {
+  if (!competence) return "—";
+  const match = /^(\d{4})-(\d{2})$/.exec(competence);
+  return match ? `${match[2]}/${match[1]}` : competence;
+}
+
 export function createLoanColumns(): LoanColumn[] {
   return [
     {
@@ -80,7 +87,7 @@ export function createLoanColumns(): LoanColumn[] {
       key: "startCompetence",
       header: "COMPETÊNCIA INICIAL",
       align: "center",
-      accessor: (loan) => loan.startCompetence ?? "—",
+      accessor: (loan) => formatCompetence(loan.startCompetence),
     },
     {
       key: "status",

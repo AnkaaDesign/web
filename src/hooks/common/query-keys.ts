@@ -35,6 +35,7 @@ import type {
   WarningGetManyFormData,
   ServiceOrderGetManyFormData,
   SupplierGetManyFormData,
+  WarehouseLocationGetManyFormData,
   TaskGetManyFormData,
   UserGetManyFormData,
   NotificationGetManyFormData,
@@ -710,6 +711,20 @@ export const supplierKeys = {
 };
 
 // =====================================================
+// Warehouse Location Query Keys
+// =====================================================
+
+export const warehouseLocationKeys = {
+  all: ["warehouseLocations"] as const,
+  lists: () => ["warehouseLocations", "list"] as const,
+  list: (filters?: Partial<WarehouseLocationGetManyFormData>) =>
+    filters ? (["warehouseLocations", "list", filters] as const) : (["warehouseLocations", "list"] as const),
+  details: () => ["warehouseLocations", "detail"] as const,
+  detail: (id: string, include?: any) => (include ? (["warehouseLocations", "detail", id, include] as const) : (["warehouseLocations", "detail", id] as const)),
+  byIds: (ids: string[]) => ["warehouseLocations", "byIds", ids] as const,
+};
+
+// =====================================================
 // Task Query Keys
 // =====================================================
 
@@ -1139,6 +1154,8 @@ export const medicalExamKeys = {
   // Specialized queries
   expiring: (days?: number) => (days !== undefined ? (["medicalExams", "expiring", days] as const) : (["medicalExams", "expiring"] as const)),
 };
+
+export const fispqKeys = createQueryKeyStore<Record<string, any>>("fispqs");
 
 export const leaveKeys = createQueryKeyStore<Record<string, any>>("leaves");
 

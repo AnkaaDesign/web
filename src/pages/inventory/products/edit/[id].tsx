@@ -29,6 +29,7 @@ export const EditProductPage = () => {
       brands: true,
       category: true,
       supplier: true,
+      warehouseLocation: true,
       prices: {
         orderBy: { createdAt: "desc" },
         take: 10, // Get the last 10 prices to ensure we have data

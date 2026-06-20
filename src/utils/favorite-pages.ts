@@ -96,9 +96,8 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/departamento-pessoal/calendario": FAVORITE_PAGES.RECURSOS_HUMANOS_CALENDARIO,
   "/departamento-pessoal/feriados": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_LISTAR,
   "/departamento-pessoal/avisos": FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_LISTAR,
-  "/departamento-pessoal/epi": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_LISTAR,
-  "/departamento-pessoal/epi/entregas": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR,
-  "/departamento-pessoal/epi/agendamentos": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR,
+  "/medicina-do-trabalho/epi/entregas": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR,
+  "/medicina-do-trabalho/epi/agendamentos": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR,
   "/departamento-pessoal/setores": FAVORITE_PAGES.RECURSOS_HUMANOS_SETORES_LISTAR,
 
   // Human Resources - Create Pages
@@ -106,9 +105,8 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/departamento-pessoal/ferias/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_CADASTRAR,
   "/departamento-pessoal/feriados/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_CADASTRAR,
   "/departamento-pessoal/avisos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_CADASTRAR,
-  "/departamento-pessoal/epi/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_CADASTRAR,
-  "/departamento-pessoal/epi/entregas/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR,
-  "/departamento-pessoal/epi/agendamentos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR,
+  "/medicina-do-trabalho/epi/entregas/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR,
+  "/medicina-do-trabalho/epi/agendamentos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR,
   "/departamento-pessoal/setores/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_SETORES_CADASTRAR,
 
   // Personal - List Pages

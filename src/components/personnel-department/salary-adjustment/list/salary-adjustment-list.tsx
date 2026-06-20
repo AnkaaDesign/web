@@ -3,7 +3,7 @@ import { useSalaryAdjustmentMutations } from "../../../../hooks/personnel-depart
 import { usePositions } from "../../../../hooks";
 import type { SalaryAdjustment } from "../../../../types/salary-adjustment";
 import type { SalaryAdjustmentGetManyFormData } from "../../../../schemas/salary-adjustment";
-import { SALARY_ADJUSTMENT_TYPE_LABELS, type SALARY_ADJUSTMENT_TYPE } from "../../../../constants";
+import { SALARY_ADJUSTMENT_TYPE_LABELS, SALARY_ADJUSTMENT_TYPE } from "../../../../constants";
 import { formatDate } from "../../../../utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -240,9 +240,19 @@ export function SalaryAdjustmentList({ className }: SalaryAdjustmentListProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir este reajuste salarial
-              {deleteDialog?.effectiveDate ? ` de ${formatDate(new Date(deleteDialog.effectiveDate))}` : ""}? A exclusão remove apenas o registro do histórico — as
-              remunerações atuais dos cargos não serão alteradas. Esta ação não pode ser desfeita.
+              {deleteDialog?.type === SALARY_ADJUSTMENT_TYPE.BONUS ? (
+                <>
+                  Tem certeza que deseja excluir este reajuste de bonificação
+                  {deleteDialog?.effectiveDate ? ` de ${formatDate(new Date(deleteDialog.effectiveDate))}` : ""}? A bonificação dos períodos a partir da vigência deixará de
+                  incluí-lo e o bônus ao vivo será recalculado. Bônus já salvos não são alterados. Esta ação não pode ser desfeita.
+                </>
+              ) : (
+                <>
+                  Tem certeza que deseja excluir este reajuste salarial
+                  {deleteDialog?.effectiveDate ? ` de ${formatDate(new Date(deleteDialog.effectiveDate))}` : ""}? A exclusão remove apenas o registro do histórico — as
+                  remunerações atuais dos cargos não serão alteradas. Esta ação não pode ser desfeita.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

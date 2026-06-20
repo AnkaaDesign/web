@@ -63,6 +63,10 @@ export interface ReceivableCandidate {
   installmentId: string;
   number: number;
   amount: number;
+  /** Already-received amount (prior partial allocations). */
+  paidAmount: number;
+  /** Outstanding balance = amount − paidAmount; what a credit can still settle. */
+  remaining: number;
   dueDate: string;
   customerName: string | null;
   invoiceId: string | null;

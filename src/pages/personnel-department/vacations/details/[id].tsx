@@ -231,12 +231,13 @@ export const VacationDetailPage = () => {
 
             <VacationStatusStepperCard vacation={vacation} />
 
-            {/* Resumo (left) stretches to match the right column = Saldo + Recibo. */}
+            {/* Resumo (left) e a coluna direita (Saldo + Recibo) preenchem a mesma
+                altura da linha; o Recibo cresce para ocupar o espaço restante. */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
               <VacationSummaryCard vacation={vacation} className="h-full" />
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4 h-full">
                 <VacationBalanceCard vacation={vacation} />
-                <VacationReciboCard vacation={vacation} />
+                <VacationReciboCard vacation={vacation} className="flex-1" />
               </div>
             </div>
 

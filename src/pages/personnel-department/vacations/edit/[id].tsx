@@ -38,7 +38,10 @@ export const VacationEditPage = () => {
     return <Navigate to={routes.personnelDepartment.vacations.root} replace />;
   }
 
-  const isFinal = vacation?.status === VACATION_STATUS.PAID || vacation?.status === VACATION_STATUS.EXPIRED;
+  // Only PAID is terminal/locked (mirrors the API guard, which blocks edits on
+  // PAID only). VENCIDA (EXPIRED) stays editable: HR may need to adjust the gozo
+  // before paying it in dobro (art. 137) — the EXPIRED → PAID exit.
+  const isFinal = vacation?.status === VACATION_STATUS.PAID;
 
   const handleSubmit = async (data: VacationUpdateFormData) => {
     try {
@@ -107,9 +110,7 @@ export const VacationEditPage = () => {
               {isFinal && (
                 <Alert variant="destructive">
                   <AlertTitle>Férias {VACATION_STATUS_LABELS[vacation.status].toLowerCase()}</AlertTitle>
-                  <AlertDescription>
-                    Estas férias estão {vacation.status === VACATION_STATUS.PAID ? "pagas" : "vencidas"} e não podem ser editadas.
-                  </AlertDescription>
+                  <AlertDescription>Estas férias já estão pagas e não podem ser editadas.</AlertDescription>
                 </Alert>
               )}
               <VacationForm mode="update" vacation={vacation} onSubmit={handleSubmit} isSubmitting={isSubmitting} disabled={isFinal} />

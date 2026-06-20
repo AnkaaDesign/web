@@ -1,7 +1,7 @@
 // PPE delivery approval widget — for HR / ADMIN users to view, approve and
 // reject pending PPE deliveries inline from the home dashboard.
 //
-// Mirrors the standalone /departamento-pessoal/epi/entregas list page but compact:
+// Mirrors the standalone /medicina-do-trabalho/epi/entregas list page but compact:
 //   • Default filter: PENDING + WAITING_SIGNATURE (the actionable states)
 //   • Inline action column with Approve (IconCircleCheck) / Reject (IconCircleX)
 //   • Reject opens AlertDialog with a reason Textarea
@@ -528,7 +528,7 @@ function PpeDeliveryTableRender({
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       viewAllHref={
         (config.display.showViewAllLink ?? true)
-          ? routes.personnelDepartment.ppe.deliveries.root
+          ? routes.occupationalHealth.ppe.deliveries.root
           : undefined
       }
       headerExtra={headerExtra}
@@ -574,7 +574,7 @@ function PpeDeliveryTableRender({
                 className={`grid gap-x-3 items-center ${dens.row} cursor-pointer ${rowBorder} ${rowHover} ${stripeBg} transition-colors`}
                 style={{ gridTemplateColumns: gridTemplate }}
                 onClick={() =>
-                  navigate(routes.personnelDepartment.ppe.deliveries.details(d.id))
+                  navigate(routes.occupationalHealth.ppe.deliveries.details(d.id))
                 }
                 onContextMenu={(e) => handleContextMenu(e, d)}
               >
@@ -608,7 +608,7 @@ function PpeDeliveryTableRender({
             <DropdownMenuItem
               onClick={() =>
                 contextMenu &&
-                navigate(routes.personnelDepartment.ppe.deliveries.details(contextMenu.delivery.id))
+                navigate(routes.occupationalHealth.ppe.deliveries.details(contextMenu.delivery.id))
               }
             >
               <IconCircleCheck className="mr-2 h-4 w-4 opacity-0" />
