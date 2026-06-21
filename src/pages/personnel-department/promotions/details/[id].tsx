@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Navigate } from "react-router-dom";
+import { useParams, Navigate } from "react-router-dom";
 import { IconRefresh, IconArrowsExchange, IconUser, IconBriefcase } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, POSITION_CHANGE_REASON_LABELS } from "../../../../constants";
@@ -26,7 +26,6 @@ const REQUIRED_PRIVILEGES = [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUM
 export const PromotionDetailPage = () => {
   usePageTracker({ title: "Detalhes da Promoção" });
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
 
   const {
     data: response,

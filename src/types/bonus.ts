@@ -25,6 +25,25 @@ export interface Bonus extends BaseEntity {
   weightedTasks: DecimalValue | number;
   averageTaskPerUser: DecimalValue | number;
 
+  // Audit-trail fields for the salary-based logistic algorithm.
+  // Populated when the bonus is saved; null on legacy rows from before the rewrite.
+  salaryUsed?: DecimalValue | number | null;
+  calculationVersion?: string | null;
+  calculationParams?: {
+    version: string;
+    salary: number;
+    salaryRange: { min: number; max: number };
+    averageTasksPerUser: number;
+    config: {
+      k: number;
+      x0: number;
+      piso: number;
+      pscale: number;
+      ceil: number;
+      adjustment: number;
+    };
+  } | null;
+
   // Note: Bonus status is NOT a Prisma column. Status was previously tracked
   // here but the database has no such field. Use derived state from
   // payrollId presence (saved/draft) instead.

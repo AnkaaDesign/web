@@ -5,6 +5,8 @@ import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreate
 import type { MEDICAL_EXAM_TYPE, MEDICAL_EXAM_STATUS, MEDICAL_EXAM_RESULT, ORDER_BY_DIRECTION } from "../constants";
 import type { User, UserIncludes } from "./user";
 import type { File } from "./file";
+import type { Admission } from "./admission";
+import type { Termination } from "./termination";
 
 // =====================
 // Main Entity Interface
@@ -33,6 +35,8 @@ export interface MedicalExam extends BaseEntity {
   // Relations (optional, populated based on query)
   user?: User;
   file?: File;
+  admission?: Admission;
+  termination?: Termination;
 }
 
 // =====================

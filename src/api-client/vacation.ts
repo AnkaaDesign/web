@@ -12,7 +12,6 @@ import type {
   VacationAdvanceFormData,
 } from "../schemas/vacation";
 import type {
-  Vacation,
   VacationGetUniqueResponse,
   VacationGetManyResponse,
   VacationCreateResponse,
@@ -125,13 +124,13 @@ export class VacationService {
   }
 
   // Batch Operations
-  async batchCreateVacations(data: VacationBatchCreateFormData, query?: any): Promise<VacationBatchCreateResponse<Vacation>> {
-    const response = await apiClient.post<VacationBatchCreateResponse<Vacation>>(`${this.basePath}/batch`, data, { params: query });
+  async batchCreateVacations(data: VacationBatchCreateFormData, query?: any): Promise<VacationBatchCreateResponse<VacationCreateFormData>> {
+    const response = await apiClient.post<VacationBatchCreateResponse<VacationCreateFormData>>(`${this.basePath}/batch`, data, { params: query });
     return response.data;
   }
 
-  async batchUpdateVacations(data: VacationBatchUpdateFormData, query?: any): Promise<VacationBatchUpdateResponse<Vacation>> {
-    const response = await apiClient.put<VacationBatchUpdateResponse<Vacation>>(`${this.basePath}/batch`, data, { params: query });
+  async batchUpdateVacations(data: VacationBatchUpdateFormData, query?: any): Promise<VacationBatchUpdateResponse<VacationUpdateFormData & { id: string }>> {
+    const response = await apiClient.put<VacationBatchUpdateResponse<VacationUpdateFormData & { id: string }>>(`${this.basePath}/batch`, data, { params: query });
     return response.data;
   }
 

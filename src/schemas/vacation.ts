@@ -22,6 +22,7 @@ export const vacationIncludeSchema = z
   .object({
     user: relationIncludeSchema.optional(),
     contract: relationIncludeSchema.optional(),
+    group: relationIncludeSchema.optional(),
   })
   .partial();
 

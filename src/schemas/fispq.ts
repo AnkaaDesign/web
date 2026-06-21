@@ -59,6 +59,7 @@ const fispqOrderByFields = {
   onuNumber: orderByDirectionSchema.optional(),
   signalWord: orderByDirectionSchema.optional(),
   status: orderByDirectionSchema.optional(),
+  issueDate: orderByDirectionSchema.optional(),
   validUntil: orderByDirectionSchema.optional(),
   revisionDate: orderByDirectionSchema.optional(),
   createdAt: orderByDirectionSchema.optional(),
@@ -219,7 +220,7 @@ const fispqCoreShape = {
 
   // Section 3 + 14
   casNumber: z.string().max(100).nullable().optional(),
-  onuNumber: z.string().max(100).nullable().optional(),
+  onuNumber: z.string().max(50).nullable().optional(),
   unRiskClass: z.string().max(100).nullable().optional(),
   packingGroup: z.string().max(50).nullable().optional(),
 
@@ -227,14 +228,14 @@ const fispqCoreShape = {
   physicalState: z.string().max(200).nullable().optional(),
   color: z.string().max(200).nullable().optional(),
   odor: z.string().max(200).nullable().optional(),
-  flashPoint: z.string().max(100).nullable().optional(),
+  flashPoint: z.string().max(200).nullable().optional(),
   phValue: z.string().max(100).nullable().optional(),
 
   // Sections 4–7
-  firstAidMeasures: z.string().max(4000).nullable().optional(),
-  fireFightingMeasures: z.string().max(4000).nullable().optional(),
-  accidentalRelease: z.string().max(4000).nullable().optional(),
-  handlingStorage: z.string().max(4000).nullable().optional(),
+  firstAidMeasures: z.string().max(5000).nullable().optional(),
+  fireFightingMeasures: z.string().max(5000).nullable().optional(),
+  accidentalRelease: z.string().max(5000).nullable().optional(),
+  handlingStorage: z.string().max(5000).nullable().optional(),
 
   // Section 8 — PPE
   requiredPpeText: z.string().max(2000).nullable().optional(),

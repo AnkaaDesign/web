@@ -50,7 +50,7 @@ const formSchema = z
     amountKind: z.enum(["FIXED", "VARIABLE"]),
     fixedAmount: z.coerce.number({ invalid_type_error: "valor inválido" }).optional(),
     estimatedAmount: z.coerce.number({ invalid_type_error: "valor inválido" }).optional(),
-    frequency: z.string().min(1),
+    frequency: z.enum(["MONTHLY", "BIMONTHLY", "QUARTERLY", "TRIANNUAL", "QUADRIMESTRAL", "SEMI_ANNUAL", "ANNUAL"]),
     dueDayOfMonth: z.coerce
       .number({ invalid_type_error: "dia inválido" })
       .int()

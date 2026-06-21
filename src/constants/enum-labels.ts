@@ -1315,6 +1315,14 @@ export const ENTITY_TYPE_LABELS: Record<ENTITY_TYPE, string> = {
   [ENTITY_TYPE.DEPENDENT]: "Dependente",
   [ENTITY_TYPE.AGENDA_EVENT]: "Evento de Agenda",
   [ENTITY_TYPE.POSTIT]: "Post-it",
+  [ENTITY_TYPE.FISPQ]: "FISPQ",
+  [ENTITY_TYPE.RESPONSIBLE]: "Responsável",
+  [ENTITY_TYPE.WAREHOUSE_LOCATION]: "Localização no Almoxarifado",
+  [ENTITY_TYPE.TASK_QUOTE]: "Orçamento de Tarefa",
+  [ENTITY_TYPE.TASK_QUOTE_ITEM]: "Item de Orçamento",
+  [ENTITY_TYPE.TASK_QUOTE_SERVICE]: "Serviço de Orçamento",
+  [ENTITY_TYPE.TASK_QUOTE_CUSTOMER_CONFIG]: "Configuração de Orçamento do Cliente",
+  [ENTITY_TYPE.VACATION_GROUP]: "Grupo de Férias",
 };
 
 export const FILE_ENTITY_TYPE_LABELS: Record<FILE_ENTITY_TYPE, string> = {
@@ -1769,6 +1777,12 @@ export const CHANGE_LOG_ENTITY_TYPE_LABELS: Record<CHANGE_LOG_ENTITY_TYPE, strin
   [CHANGE_LOG_ENTITY_TYPE.AGENDA_EVENT]: "Evento de Agenda",
   [CHANGE_LOG_ENTITY_TYPE.POSTIT]: "Post-it",
   [CHANGE_LOG_ENTITY_TYPE.FISPQ]: "FISPQ",
+  [CHANGE_LOG_ENTITY_TYPE.PREFERENCES]: "Preferências",
+  [CHANGE_LOG_ENTITY_TYPE.RESPONSIBLE]: "Responsável",
+  [CHANGE_LOG_ENTITY_TYPE.WAREHOUSE_LOCATION]: "Localização no Almoxarifado",
+  [CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_SERVICE]: "Serviço de Orçamento",
+  [CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_CUSTOMER_CONFIG]: "Configuração de Orçamento do Cliente",
+  [CHANGE_LOG_ENTITY_TYPE.VACATION_GROUP]: "Grupo de Férias",
 };
 
 export const CHANGE_LOG_ACTION_LABELS: Record<CHANGE_LOG_ACTION, string> = {

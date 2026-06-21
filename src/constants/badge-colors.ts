@@ -1032,6 +1032,11 @@ export const ACCOUNTING_TYPE_COLORS: Record<
     text: "text-teal-700 dark:text-teal-400",
     hover: "hover:bg-teal-200 dark:hover:bg-teal-900/30",
   },
+  [ACCOUNTING_TYPE.RECEITA_SERVICOS]: {
+    bg: "bg-emerald-100 dark:bg-emerald-900/20",
+    text: "text-emerald-700 dark:text-emerald-400",
+    hover: "hover:bg-emerald-200 dark:hover:bg-emerald-900/30",
+  },
 };
 
 /**

@@ -172,7 +172,7 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Tipo de Contrato</label>
-                <Select onValueChange={(value) => handleGlobalUpdate("contractKind", value === "none" ? null : value)}>
+                <Select onValueChange={(value) => handleGlobalUpdate("contractType", value === "none" ? null : value)}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue placeholder="Selecionar tipo de contrato para todos" />
                   </SelectTrigger>

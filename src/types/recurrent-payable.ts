@@ -1,6 +1,7 @@
 // Recurrent payables (Contas Recorrentes) — first-class rent/internet/energy/water
 // bills that materialize a monthly occurrence into Contas a Pagar.
-// Mirrors api/src/types/recurrent-payable.ts.
+// Mirrors the api recurrent-payable module (Prisma model + service include +
+// dto at api/src/modules/financial/recurrent-payable/).
 
 import type { Supplier } from "./supplier";
 import type { TransactionCategory } from "./reconciliation";
@@ -8,6 +9,9 @@ import type { TransactionCategory } from "./reconciliation";
 // FIXED bills carry a known value (fixedAmount); VARIABLE bills only carry an
 // estimate until the real paid amount is informed on settlement.
 export type AmountKind = "FIXED" | "VARIABLE";
+
+// Recurrence cadence accepted by the api dto.
+export type RecurrentFrequency = "MONTHLY" | "BIMONTHLY" | "QUARTERLY" | "TRIANNUAL" | "QUADRIMESTRAL" | "SEMI_ANNUAL" | "ANNUAL";
 
 // Lifecycle of a single materialized monthly bill.
 export type RecurrentPayableStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
@@ -25,7 +29,7 @@ export interface RecurrentPayable {
   fixedAmount: string | number | null;
   estimatedAmount: string | number | null;
   // Recurrence cadence — defaults to "MONTHLY" server-side.
-  frequency: string;
+  frequency: RecurrentFrequency;
   frequencyCount: number;
   // Day of month the bill is due (1-31).
   dueDayOfMonth: number;
@@ -79,7 +83,7 @@ export interface CreateRecurrentPayablePayload {
   // Required (> 0) when amountKind is FIXED.
   fixedAmount?: number | null;
   estimatedAmount?: number | null;
-  frequency?: string;
+  frequency?: RecurrentFrequency;
   frequencyCount?: number;
   dueDayOfMonth: number;
   paymentMethod?: "PIX" | "BANK_SLIP" | "CREDIT_CARD" | null;

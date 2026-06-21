@@ -581,10 +581,10 @@ function CandidateRow({
           </span>
           <Input
             type="number"
-            step="0.01"
-            min="0"
+            step={0.01}
+            min={0}
             value={amount ?? ""}
-            onChange={(e) => onAmountChange(e.target.value)}
+            onChange={(v) => onAmountChange(v == null ? "" : String(v))}
             onClick={(e) => e.stopPropagation()}
             className="h-8 w-36 tabular-nums"
           />

@@ -46,6 +46,8 @@ export interface Vacation extends BaseEntity {
 
   // Relations
   user?: User;
+  /** Férias coletivas group this individual vacation belongs to (when applicable). */
+  group?: any | null;
 }
 
 // =====================
