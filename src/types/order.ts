@@ -522,6 +522,18 @@ export type PayableSettleVia =
 
 export type PayableState = "AWAITING_PAYMENT" | "OVERDUE" | "PARTIALLY_PAID" | "EXPECTED" | "PAID";
 
+/**
+ * Axis B — the bank-confirmation (conciliação) state, INDEPENDENT of the
+ * payment assertion axis (paymentState / receivable state). Derived from the
+ * existence of a non-reversed ReconciliationMatch + an amount comparison:
+ *   - UNCLEARED — no confirming bank line yet (the "Pago · aguardando
+ *     conciliação" 3-5 day window).
+ *   - CLEARED   — a non-reversed match exists and its amount agrees.
+ *   - DISPUTED  — a match exists but the bank line differs beyond tolerance.
+ * Mirrors api/src/types/order.ts ClearanceState.
+ */
+export type ClearanceState = "UNCLEARED" | "CLEARED" | "DISPUTED";
+
 /** One normalized payable row: an open order, an airbrushing painter payment, or a scheduled/expected outflow. */
 export interface PayableRow {
   source: PayableSource;
@@ -551,6 +563,17 @@ export interface PayableRow {
   competence?: string | null;
   /** Deep-link target for RECONCILIATION/SCHEDULE settle actions. */
   settleHref?: string | null;
+  /**
+   * Axis B — bank-confirmation state, derived from a non-reversed
+   * ReconciliationMatch on this row's anchor. Independent of paymentState:
+   * a PAID row may still be UNCLEARED (awaiting the next OFX). Defaults to
+   * 'UNCLEARED' for rows that have no confirming bank line.
+   */
+  clearanceState?: ClearanceState;
+  /** When the confirming bank line cleared this row (CLEARED/DISPUTED only). */
+  clearedAt?: string | null;
+  /** The bank transaction that cleared this row (for row → extrato linking). */
+  bankTransactionId?: string | null;
 }
 
 export interface PayablesSummary {

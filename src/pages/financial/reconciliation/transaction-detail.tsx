@@ -153,7 +153,7 @@ export function ReconciliationTransactionDetailPage() {
             ? [
                 {
                   key: "save",
-                  label: "Salvar conciliação",
+                  label: matchState.label ?? "Salvar conciliação",
                   icon: IconDeviceFloppy,
                   onClick: () => matchState.save(),
                   disabled: !matchState.canSave,
@@ -303,7 +303,7 @@ export function ReconciliationTransactionDetailPage() {
           {/* CREDIT → conciliar contra parcelas a receber (entrada). DEBIT →
               fluxo de notas fiscais existente (saída). */}
           {isCredit ? (
-            <ReceivableMatchSection transaction={tx} />
+            <ReceivableMatchSection transaction={tx} onSaveStateChange={setMatchState} />
           ) : (
             <TransactionMatchSection
               transaction={tx}

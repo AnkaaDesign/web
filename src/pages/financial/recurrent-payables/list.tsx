@@ -145,11 +145,23 @@ export const RecurrentPayablesListPage = () => {
       header: "Nome",
       sortable: true,
       render: (p) => (
-        <div className={`flex flex-col min-w-0 ${p.isActive ? "" : "opacity-50"}`}>
+        <div className={`flex min-w-0 ${p.isActive ? "" : "opacity-50"}`}>
           <span className="truncate text-sm font-medium">{p.name}</span>
-          <span className="truncate text-xs text-muted-foreground">{p.supplier?.fantasyName ?? p.payeeName ?? "—"}</span>
         </div>
       ),
+    },
+    {
+      key: "payee",
+      header: "Tomador",
+      width: "200px",
+      render: (p) => {
+        const payee = p.supplier?.fantasyName ?? p.payeeName;
+        return payee ? (
+          <span className={`text-sm ${p.isActive ? "" : "opacity-50"}`}>{payee}</span>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        );
+      },
     },
     {
       key: "category",

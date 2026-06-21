@@ -336,17 +336,17 @@ export const ReconciliationStatementPage = () => {
               loading: runMut.isPending,
             },
             {
-              key: "import",
-              label: "Importar OFX",
-              icon: IconUpload,
-              onClick: () => setImportOpen(true),
-              variant: "outline" as const,
-            },
-            {
               key: "scoring-help",
               label: "Como funciona",
               icon: IconHelpCircle,
               onClick: () => setScoringHelpOpen(true),
+              variant: "outline" as const,
+            },
+            {
+              key: "import",
+              label: "Importar OFX",
+              icon: IconUpload,
+              onClick: () => setImportOpen(true),
               variant: "outline" as const,
             },
           ]}

@@ -8,10 +8,8 @@ export const MainLayout = () => {
   const { pricingVisible } = usePricing();
   return (
     <ContextMenuProvider>
-      {/* h-full (not h-screen): under root `zoom: 0.8` a 100vh box would be scaled
-          to 80% of the screen, leaving an empty strip at the bottom. The
-          html/body/#root height:100% chain (index.css) lets h-full fill the real
-          viewport correctly inside zoomed space. */}
+      {/* h-full off the html/body/#root height:100% chain (index.css) fills the
+          real viewport. */}
       <div className="flex h-full overflow-hidden relative" data-pricing-visible={pricingVisible}>
         {/* Main content area */}
         <div className="flex-1 flex flex-col overflow-hidden">

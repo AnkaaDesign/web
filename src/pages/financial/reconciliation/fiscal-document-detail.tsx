@@ -540,6 +540,45 @@ export function ReconciliationFiscalDocumentDetailPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Orçamento / Faturamento — direction-aware "vinculada" for
+                    SAIDA (emitted) notes. An emitted NFS-e never gets a bank
+                    match; its durable link is the faturamento (Invoice) or the
+                    orçamento (Task) it was generated from. */}
+                {doc.operationType === "SAIDA" &&
+                  (doc.nfseDocument?.invoiceId || doc.nfseDocument?.taskId) && (
+                    <div className="space-y-3">
+                      <SubHeading icon={IconArrowsExchange2}>
+                        Orçamento / Faturamento
+                      </SubHeading>
+                      <div className="flex flex-wrap gap-2">
+                        {doc.nfseDocument?.invoiceId && (
+                          <Button asChild variant="outline" size="sm">
+                            <Link
+                              to={routes.financial.billing.details(
+                                doc.nfseDocument.invoiceId,
+                              )}
+                            >
+                              Abrir faturamento
+                              <IconArrowUpRight className="h-3.5 w-3.5 ml-1" />
+                            </Link>
+                          </Button>
+                        )}
+                        {doc.nfseDocument?.taskId && (
+                          <Button asChild variant="outline" size="sm">
+                            <Link
+                              to={routes.financial.budget.details(
+                                doc.nfseDocument.taskId,
+                              )}
+                            >
+                              Abrir orçamento
+                              <IconArrowUpRight className="h-3.5 w-3.5 ml-1" />
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
               </div>
             </SectionCard>
           </div>

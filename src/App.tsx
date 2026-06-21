@@ -225,9 +225,6 @@ const SuppliersEdit = lazy(() => import("@/pages/inventory/suppliers/edit/[id]")
 const SuppliersDetails = lazy(() => import("@/pages/inventory/suppliers/details/[id]").then((module) => ({ default: module.default })));
 const SuppliersBatchEdit = lazy(() => import("@/pages/inventory/suppliers/batch-edit").then((module) => ({ default: module.default })));
 const InventoryWarehouseLocations = lazy(() => import("@/pages/inventory/warehouse-locations/list").then((module) => ({ default: module.WarehouseLocationListPage })));
-const WarehouseLocationsCreate = lazy(() => import("@/pages/inventory/warehouse-locations/create").then((module) => ({ default: module.default })));
-const WarehouseLocationsEdit = lazy(() => import("@/pages/inventory/warehouse-locations/edit/[id]").then((module) => ({ default: module.WarehouseLocationEditPage })));
-const WarehouseLocationsDetails = lazy(() => import("@/pages/inventory/warehouse-locations/details/[id]").then((module) => ({ default: module.default })));
 
 // Testing pages (development only)
 const InventoryMaintenance = lazy(() => import("@/pages/inventory/maintenance/list"));
@@ -1933,30 +1930,6 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <InventoryWarehouseLocations />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.inventory.warehouseLocations.create}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <WarehouseLocationsCreate />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.inventory.warehouseLocations.edit(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <WarehouseLocationsEdit />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.inventory.warehouseLocations.details(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <WarehouseLocationsDetails />
                     </Suspense>
                   }
                 />

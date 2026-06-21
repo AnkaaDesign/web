@@ -13,9 +13,11 @@ import {
   IconGift,
   IconArrowRight,
   IconAlertTriangle,
+  IconCheck,
+  IconClock,
 } from "@tabler/icons-react";
 
-import type { PayableRow, PayableState } from "../../../types";
+import type { ClearanceState, PayableRow, PayableState } from "../../../types";
 import { routes, SECTOR_PRIVILEGES, AIRBRUSHING_PAYMENT_STATUS, PAYMENT_METHOD, PAYMENT_METHOD_LABELS } from "../../../constants";
 import { useOrderPayables, useOrderMutations, useSettlePayrollMonth, useTriggerOrderSchedule } from "../../../hooks";
 import { MonthNav, monthKey, parseMonthKey } from "@/components/financial/reconciliation/month-nav";
@@ -53,7 +55,10 @@ const PAYABLE_STATE_BADGE: Record<PayableState, BadgeProps["variant"]> = {
 };
 
 // --- Summary cards double as clickable filter buckets (Conciliação pattern). ----
-type PayableBucketKey = "AWAITING" | "OVERDUE" | "PARTIAL" | "EXPECTED" | "PAID";
+// UNCLEARED is the cross-cutting "Pago mas não conciliado" bucket — it filters on
+// the conciliação axis (PAID && clearanceState UNCLEARED), NOT on paymentState, so
+// it overlaps the PAID bucket on purpose. It is the key 3-5 day-window view.
+type PayableBucketKey = "AWAITING" | "OVERDUE" | "PARTIAL" | "EXPECTED" | "PAID" | "UNCLEARED";
 
 const PAYABLE_BUCKETS: Record<
   PayableBucketKey,
@@ -64,19 +69,29 @@ const PAYABLE_BUCKETS: Record<
   PARTIAL: { label: "Parcialmente Pago", Icon: IconCoins, tone: "text-orange-600 bg-orange-500/10", states: ["PARTIALLY_PAID"] },
   EXPECTED: { label: "Previsto/Recorrente", Icon: IconRepeat, tone: "text-neutral-500 bg-neutral-500/10", states: ["EXPECTED"] },
   PAID: { label: "Pago no mês", Icon: IconCash, tone: "text-emerald-600 bg-emerald-500/10", states: ["PAID"] },
+  UNCLEARED: { label: "Pago, aguardando conciliação", Icon: IconClock, tone: "text-amber-600 bg-amber-500/10", states: ["PAID"] },
 };
 
-const BUCKET_ORDER: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED", "PAID"];
-// Default view: every open/overdue/forecast obligation; paid-this-month is opt-in (click the card).
+const BUCKET_ORDER: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED", "PAID", "UNCLEARED"];
+// Default view: every open/overdue/forecast obligation; paid-this-month and the
+// awaiting-conciliação view are opt-in (click the card).
 const DEFAULT_BUCKETS: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED"];
 
-const STATE_TO_BUCKET: Record<PayableState, PayableBucketKey> = {
+// paymentState → its primary bucket (the assertion axis). UNCLEARED is handled
+// separately (it cross-cuts on the conciliação axis).
+const STATE_TO_BUCKET: Record<PayableState, Exclude<PayableBucketKey, "UNCLEARED">> = {
   AWAITING_PAYMENT: "AWAITING",
   OVERDUE: "OVERDUE",
   PARTIALLY_PAID: "PARTIAL",
   EXPECTED: "EXPECTED",
   PAID: "PAID",
 };
+
+// A row belongs to the "Pago mas não conciliado" bucket when it is asserted PAID
+// but no confirming bank line has cleared it yet.
+function isAwaitingClearance(row: PayableRow): boolean {
+  return row.paymentState === "PAID" && (row.clearanceState ?? "UNCLEARED") === "UNCLEARED";
+}
 
 // Row ordering rank: overdue first, then open obligations, then paid-this-month, then forecasts.
 function payableRank(state: PayableState): number {
@@ -86,16 +101,11 @@ function payableRank(state: PayableState): number {
   return 1;
 }
 
-// Routes that the production schedule (cronograma) detail requires — ACCOUNTING
-// is NOT among them, so an airbrushing row must not navigate there for finance users.
-const PRODUCTION_VIEW_PRIVILEGES: SECTOR_PRIVILEGES[] = [
+// Privileges the airbrushing (aerografia) detail page itself accepts — mirror its
+// PrivilegeRoute so a payable row only links there for users who can actually open it.
+const AIRBRUSHING_VIEW_PRIVILEGES: SECTOR_PRIVILEGES[] = [
   SECTOR_PRIVILEGES.PRODUCTION,
-  SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
-  SECTOR_PRIVILEGES.WAREHOUSE,
-  SECTOR_PRIVILEGES.DESIGNER,
   SECTOR_PRIVILEGES.FINANCIAL,
-  SECTOR_PRIVILEGES.LOGISTIC,
-  SECTOR_PRIVILEGES.PLOTTING,
   SECTOR_PRIVILEGES.COMMERCIAL,
   SECTOR_PRIVILEGES.ADMIN,
 ];
@@ -122,6 +132,64 @@ function PayableStateBadge({ state }: { state: PayableState }) {
       {PAYABLE_STATE_LABELS[state]}
     </Badge>
   );
+}
+
+// --- Axis B (conciliação / bank truth) — orthogonal to paymentState. ----------
+// Default to UNCLEARED for rows the API doesn't yet populate (forecasts, etc.).
+function clearanceOf(row: PayableRow): ClearanceState {
+  return row.clearanceState ?? "UNCLEARED";
+}
+
+// Combined Pagamento × Conciliação badge per the reconciliation design:
+//   paymentState ≠ PAID                  → just the assertion badge (no clearance)
+//   PAID + UNCLEARED                     → "Pago · aguardando conciliação" (amber)
+//   PAID + CLEARED                       → "Pago e conciliado" (green) + clearedAt
+//   DISPUTED (any paymentState)          → "Divergência de valor" (red alert)
+function PayablePaymentCell({ row }: { row: PayableRow }) {
+  const clearance = clearanceOf(row);
+
+  // DISPUTED is an alert state regardless of the assertion axis.
+  if (clearance === "DISPUTED") {
+    return (
+      <Badge variant="red" className="font-medium whitespace-nowrap gap-1">
+        <IconAlertTriangle className="h-3 w-3" />
+        Divergência de valor
+      </Badge>
+    );
+  }
+
+  if (row.paymentState !== "PAID") {
+    return <PayableStateBadge state={row.paymentState} />;
+  }
+
+  if (clearance === "CLEARED") {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <Badge variant="completed" className="font-medium whitespace-nowrap gap-1 w-fit">
+          <IconCheck className="h-3 w-3" />
+          Pago e conciliado
+        </Badge>
+        {row.clearedAt && <span className="text-[10px] text-muted-foreground tabular-nums">em {formatDate(new Date(row.clearedAt))}</span>}
+      </div>
+    );
+  }
+
+  // PAID + UNCLEARED — the 3-5 day window awaiting the next OFX.
+  return (
+    <Badge variant="amber" className="font-medium whitespace-nowrap gap-1">
+      <IconClock className="h-3 w-3" />
+      Pago · aguardando conciliação
+    </Badge>
+  );
+}
+
+// "Conciliado" column cell — mirrors the receivables list checkmark, three-valued
+// on clearanceState (CLEARED ✓ / DISPUTED ⚠ / UNCLEARED —).
+function PayableClearanceCell({ row }: { row: PayableRow }) {
+  const clearance = clearanceOf(row);
+  if (clearance === "CLEARED") return <IconCheck className="mx-auto h-4 w-4 text-emerald-600" />;
+  if (clearance === "DISPUTED") return <IconAlertTriangle className="mx-auto h-4 w-4 text-red-600" />;
+  return <span className="text-sm text-muted-foreground">-</span>;
 }
 
 // Map the raw payment-method enum (any casing) to its PT label, falling back to
@@ -201,7 +269,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   const { hasAnyPrivilegeAccess } = usePrivileges();
 
   const canManagePayments = hasAnyPrivilegeAccess(PAYMENT_MANAGER_PRIVILEGES);
-  const canViewProduction = hasAnyPrivilegeAccess(PRODUCTION_VIEW_PRIVILEGES);
+  const canViewAirbrushing = hasAnyPrivilegeAccess(AIRBRUSHING_VIEW_PRIVILEGES);
 
   // --- URL state: debounced search + active filter buckets ------------------
   const urlSearch = searchParams.get(SEARCH_PARAM) || "";
@@ -306,11 +374,17 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       PARTIAL: { count: 0, total: 0 },
       EXPECTED: { count: 0, total: 0 },
       PAID: { count: 0, total: 0 },
+      UNCLEARED: { count: 0, total: 0 },
     };
     for (const row of monthRows) {
       const bucket = STATE_TO_BUCKET[row.paymentState];
       out[bucket].count += 1;
       out[bucket].total += row.amount;
+      // UNCLEARED cross-cuts: a PAID-but-unconfirmed row is counted here too.
+      if (isAwaitingClearance(row)) {
+        out.UNCLEARED.count += 1;
+        out.UNCLEARED.total += row.amount;
+      }
     }
     return out;
   }, [monthRows]);
@@ -330,7 +404,11 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   const filteredRows = useMemo(() => {
     const active = new Set(buckets);
     const term = debouncedSearch.trim().toLowerCase();
-    let base = monthRows.filter((row) => active.has(STATE_TO_BUCKET[row.paymentState]));
+    // A row matches if its assertion-axis bucket is active OR (the conciliação
+    // bucket is active and the row is paid-but-unconfirmed).
+    let base = monthRows.filter(
+      (row) => active.has(STATE_TO_BUCKET[row.paymentState]) || (active.has("UNCLEARED") && isAwaitingClearance(row)),
+    );
     if (term) base = base.filter((row) => row.payeeName.toLowerCase().includes(term) || row.description.toLowerCase().includes(term));
     return base;
   }, [monthRows, buckets, debouncedSearch]);
@@ -356,10 +434,29 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   }, [filteredRows]);
 
   const handleRowClick = (row: PayableRow) => {
+    // A DISPUTED row's most useful target is the bank line that diverged, so the
+    // operator can review/undo the match. Other cleared rows keep their natural
+    // source detail (order / cronograma).
+    if (clearanceOf(row) === "DISPUTED" && row.bankTransactionId) {
+      navigate(routes.financial.reconciliation.transactionDetail(row.bankTransactionId));
+      return;
+    }
+    // Recurrent rows (occurrences of a recurrent bill) have no own detail page —
+    // send the operator to the Contas Recorrentes management screen.
+    if (row.source === "RECURRENT_PAYABLE" || row.source === "RECURRING") {
+      navigate(routes.financial.recurrentPayables.root);
+      return;
+    }
     if (row.source === "ORDER") {
       navigate(routes.inventory.orders.details(row.id));
-    } else if (row.source === "AIRBRUSHING" && row.taskId && canViewProduction) {
-      navigate(routes.production.schedule.details(row.taskId));
+    } else if (row.source === "AIRBRUSHING") {
+      // row.id is the airbrushing id — open its own detail page (not the task
+      // cronograma, which finance/accounting users can't reach).
+      if (canViewAirbrushing) navigate(routes.production.airbrushings.details(row.id));
+    } else if (row.bankTransactionId) {
+      // Non-order/airbrushing cleared rows (folha/recorrentes/agendamentos) have
+      // no own detail page — link to the bank line that cleared them.
+      navigate(routes.financial.reconciliation.transactionDetail(row.bankTransactionId));
     }
   };
 
@@ -446,7 +543,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     },
     { key: "payee", header: "Tomador", className: "min-w-[12rem]", render: (row) => <TruncatedTextWithTooltip text={row.payeeName || "-"} className="text-sm font-medium" /> },
     { key: "amount", header: "Valor", width: 128, align: "right", render: (row) => <span className="text-sm font-medium tabular-nums">{formatCurrency(row.amount)}</span> },
-    { key: "payment", header: "Pagamento", width: 192, render: (row) => <PayableStateBadge state={row.paymentState} /> },
+    { key: "payment", header: "Pagamento", width: 232, render: (row) => <PayablePaymentCell row={row} /> },
     {
       key: "dueDate",
       header: "Vencimento",
@@ -465,13 +562,22 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       },
     },
     { key: "method", header: "Forma", width: 144, render: (row) => <span className="text-sm text-muted-foreground">{formatPaymentMethod(row.method)}</span> },
+    {
+      // Conciliação axis (bank truth) — mirrors the receivables list "Conciliado"
+      // column. Three-valued: CLEARED ✓ / DISPUTED ⚠ / UNCLEARED —.
+      key: "reconciled",
+      header: "Conciliado",
+      width: 110,
+      align: "center",
+      render: (row) => <PayableClearanceCell row={row} />,
+    },
   ];
 
   // --- Render ---------------------------------------------------------------
   return (
     <div className={cn("flex flex-col gap-4 h-full min-h-0", className)}>
       {/* Summary cards double as filter buckets — click to show only that status. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 flex-shrink-0">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 flex-shrink-0">
         {BUCKET_ORDER.map((key) => {
           const meta = PAYABLE_BUCKETS[key];
           const b = monthBucketSummary[key];

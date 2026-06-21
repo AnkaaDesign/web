@@ -94,12 +94,12 @@ export function FiscalItemsTable({
           candidate / linked-NF cards and the NF detail page) lines up identically. */}
       <table className="w-full table-fixed text-sm">
         <colgroup>
-          <col style={{ width: "120px" }} />
+          <col style={{ width: "7.5rem" }} />
           <col />
-          <col style={{ width: "320px" }} />
-          {showQtyCols && <col style={{ width: "110px" }} />}
-          {showQtyCols && <col style={{ width: "140px" }} />}
-          <col style={{ width: "150px" }} />
+          <col style={{ width: "20rem" }} />
+          {showQtyCols && <col style={{ width: "6.875rem" }} />}
+          {showQtyCols && <col style={{ width: "8.75rem" }} />}
+          <col style={{ width: "9.375rem" }} />
         </colgroup>
         <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
           <tr>

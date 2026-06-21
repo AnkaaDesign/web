@@ -332,10 +332,6 @@ export const routes = {
       root: "/estoque/fornecedores",
     },
     warehouseLocations: {
-      create: "/estoque/localizacoes/cadastrar",
-      details: (id: string) => `/estoque/localizacoes/detalhes/${id}`,
-      edit: (id: string) => `/estoque/localizacoes/editar/${id}`,
-      list: "/estoque/localizacoes",
       root: "/estoque/localizacoes",
     },
   },

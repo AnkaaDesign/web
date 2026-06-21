@@ -39,6 +39,8 @@ export interface MatchSaveState {
   valid: boolean;
   selectedCount: number;
   save: () => void;
+  /** Header action label — defaults to "Salvar conciliação" when omitted. */
+  label?: string;
 }
 
 interface Props {

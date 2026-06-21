@@ -299,6 +299,24 @@ export interface FiscalDocument {
   municipioPrestacao?: string | null;
   itemListaServico?: string | null;
   items?: FiscalDocumentItem[];
+  /**
+   * Direction-aware "vinculada", computed by the API (single source of truth):
+   * ENTRADA → has at least one open bank ReconciliationMatch; SAIDA (emitted) →
+   * its NfseDocument carries an Invoice/Task (faturamento) link. An emitted
+   * NFS-e can never get a bank match, so it relies on `nfseDocument`.
+   */
+  linked?: boolean;
+  /**
+   * Billing link for SAIDA (emitted) notes — the NfseDocument the note was
+   * generated from, carrying the durable Invoice/Task (faturamento) reference.
+   * Null/absent for ENTRADA documents.
+   */
+  nfseDocument?: {
+    id: string;
+    invoiceId: string | null;
+    taskId: string | null;
+    nfseNumber: number | null;
+  } | null;
   matches?: Array<{
     id: string;
     allocatedAmount?: number;

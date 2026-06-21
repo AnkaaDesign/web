@@ -6,9 +6,10 @@ import {
   IconCoins,
   IconProgressCheck,
   IconReceipt2,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 
-import type { ReceivableRow, ReceivableState } from "../../../types";
+import type { ClearanceState, ReceivableRow, ReceivableState } from "../../../types";
 import { routes } from "../../../constants";
 import { useReceivables } from "@/hooks/financial/use-receivable";
 import { MonthNav, monthKey, parseMonthKey } from "@/components/financial/reconciliation/month-nav";
@@ -80,6 +81,22 @@ function ReceivableStateBadge({ state }: { state: ReceivableState }) {
       {RECEIVABLE_STATE_LABELS[state]}
     </Badge>
   );
+}
+
+// --- Axis B (conciliação / bank truth) — prefer the three-valued clearanceState,
+// fall back to the legacy `reconciled` boolean for rows the API hasn't populated. -
+function clearanceOf(row: ReceivableRow): ClearanceState {
+  if (row.clearanceState) return row.clearanceState;
+  return row.reconciled ? "CLEARED" : "UNCLEARED";
+}
+
+// "Conciliado" column cell — CLEARED ✓ / DISPUTED ⚠ / UNCLEARED —. Mirrors the
+// Contas a Pagar clearance column for visual parity.
+function ReceivableClearanceCell({ row }: { row: ReceivableRow }) {
+  const clearance = clearanceOf(row);
+  if (clearance === "CLEARED") return <IconCheck className="mx-auto h-4 w-4 text-emerald-600" />;
+  if (clearance === "DISPUTED") return <IconAlertTriangle className="mx-auto h-4 w-4 text-red-600" />;
+  return <span className="text-sm text-muted-foreground">-</span>;
 }
 
 interface ReceivablesListProps {
@@ -224,7 +241,11 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
   // an unrelated fiscal document — the previous behavior misrouted invoiceId into
   // the NF-detail route).
   const handleRowClick = (row: ReceivableRow) => {
-    if (row.transactionId) {
+    // Task-quote receivables open their faturamento (task-quote) detail page; only
+    // fall back to the bank-transaction detail for non-task rows already conciliated.
+    if (row.taskId) {
+      navigate(routes.financial.billing.details(row.taskId));
+    } else if (row.transactionId) {
       navigate(routes.financial.reconciliation.transactionDetail(row.transactionId));
     }
   };
@@ -281,8 +302,7 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
       header: "Conciliado",
       width: 110,
       align: "center",
-      render: (row) =>
-        row.reconciled ? <IconCheck className="mx-auto h-4 w-4 text-emerald-600" /> : <span className="text-sm text-muted-foreground">-</span>,
+      render: (row) => <ReceivableClearanceCell row={row} />,
     },
   ];
 

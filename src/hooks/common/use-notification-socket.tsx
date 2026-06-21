@@ -117,7 +117,7 @@ export function useNotificationSocket() {
           (_id) => (
             <div
               className={`cursor-pointer rounded-lg border p-4 shadow-sm relative overflow-hidden ${colorClass}`}
-              style={{ zIndex: TOAST_Z_NOTIFICATION, width: 280, maxHeight: 128 }}
+              style={{ zIndex: TOAST_Z_NOTIFICATION, width: "17.5rem", maxHeight: "8rem" }}
               onClick={() => {
                 if (actionUrl.startsWith('http://') || actionUrl.startsWith('https://')) {
                   window.open(actionUrl, '_blank');

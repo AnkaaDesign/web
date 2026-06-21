@@ -108,7 +108,7 @@ const SkeletonBlock = ({ block }: { block: ContentBlock }) => {
       return <div style={{ height: 3 }} />;
 
     case 'image':
-      return <div style={{ width:'100%', height: 20, borderRadius: 2, background: C.faint }} />;
+      return <div style={{ width:'100%', height: "1.25rem", borderRadius: 2, background: C.faint }} />;
 
     case 'decorator':
       return <div style={{ width:'100%', height: 8, background:'linear-gradient(90deg,#0c884e 0%,hsl(var(--muted)) 100%)', borderRadius: 1 }} />;

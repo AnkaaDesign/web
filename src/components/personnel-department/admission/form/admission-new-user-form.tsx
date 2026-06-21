@@ -47,9 +47,10 @@ import { PpeSizesSection } from "@/components/administration/user/form/ppe-sizes
 
 import { admissionCollaboratorFormSchema } from "../../../../schemas/admission";
 import type { AdmissionCreateFormData, AdmissionCollaboratorFormData } from "../../../../schemas/admission";
-import { CONTRACT_TYPE, CONTRACT_STATUS, EMPLOYEE_TYPE, SECTOR_PRIVILEGES, ADMISSION_DOCUMENT_TYPE, ADMISSION_DOCUMENT_TYPE_LABELS } from "../../../../constants";
+import { CONTRACT_TYPE, CONTRACT_STATUS, EMPLOYEE_TYPE, SECTOR_PRIVILEGES, ADMISSION_DOCUMENT_TYPE, ADMISSION_DOCUMENT_TYPE_LABELS, ADMISSION_DOCUMENT_STATUS } from "../../../../constants";
 import { ADMISSION_CHECKLIST_DOC_TYPES } from "../utils";
 import { useSector } from "../../../../hooks";
+import { useAdmissionByUser } from "../../../../hooks/personnel-department/use-admissions";
 import { getUsers } from "../../../../api-client";
 import { uploadSingleFile } from "../../../../api-client/file";
 import { useDebouncedValue } from "@/hooks/common/use-debounced-value";
@@ -257,6 +258,21 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
     return [matchedUser.position?.name, matchedUser.sector?.name].filter(Boolean).join(" · ");
   }, [matchedUser]);
 
+  // Re-engajamento (CPF já existente, não-prestador): mostra os documentos que a
+  // pessoa JÁ tem na admissão anterior — eles são reaproveitados no servidor, então
+  // não precisam ser reenviados.
+  const { data: matchedAdmissionResp } = useAdmissionByUser(
+    matchedUser?.id,
+    { include: { documents: true } },
+    { enabled: !!matchedUser && !isProvider },
+  );
+  const alreadyReceivedDocLabels = useMemo(() => {
+    const docs = (matchedAdmissionResp?.data?.documents ?? []) as Array<{ type: string; status: string; fileId?: string | null }>;
+    return docs
+      .filter((d) => d.fileId && (d.status === ADMISSION_DOCUMENT_STATUS.RECEIVED || d.status === ADMISSION_DOCUMENT_STATUS.SIGNED))
+      .map((d) => ADMISSION_DOCUMENT_TYPE_LABELS[d.type as ADMISSION_DOCUMENT_TYPE] || d.type);
+  }, [matchedAdmissionResp]);
+
   const handleSubmit = async (data: AdmissionCollaboratorFormData) => {
     try {
       const { notes, employeeType: et, contractType: ct, exp1StartAt, providerName, providerCnpj, ...userData } =
@@ -264,9 +280,10 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
 
       const admissionDate = (exp1StartAt as Date | null) ?? (userData.admissionDate as Date | null) ?? null;
 
-      // Upload pending document files → fileIds.
+      // Upload pending document files → fileIds. Providers (terceirizado/PJ)
+      // skip the document checklist entirely, so don't send any attachments.
       const documents: Array<{ type: ADMISSION_DOCUMENT_TYPE; fileId: string }> = [];
-      for (const type of Object.keys(docFiles) as ADMISSION_DOCUMENT_TYPE[]) {
+      for (const type of isProvider ? [] : (Object.keys(docFiles) as ADMISSION_DOCUMENT_TYPE[])) {
         const file = docFiles[type];
         if (!file) continue;
         const res = await uploadSingleFile(file, { fileContext: "admissionDocument" } as any);
@@ -360,6 +377,11 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">Pessoa já cadastrada — {matchedUser.name}. Os dados foram preenchidos; ajuste o que precisar (as alterações atualizam o cadastro) e um novo vínculo será criado.</p>
                       {matchedUserMeta && <p className="text-xs text-muted-foreground truncate">{matchedUserMeta}</p>}
+                      {alreadyReceivedDocLabels.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Documentos já recebidos (não é necessário reenviar): {alreadyReceivedDocLabels.join(", ")}.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -450,7 +472,7 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <PositionSelector control={form.control} disabled={submitting} required />
+                <PositionSelector control={form.control} disabled={submitting} required={!isProvider} />
                 <SectorSelector disabled={submitting} required />
               </div>
 
@@ -517,40 +539,43 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
             </CardContent>
           </Card>
 
-          {/* Documentos */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconFileText className="h-5 w-5 text-muted-foreground" />
-                Documentos
-              </CardTitle>
-              <CardDescription>Anexe os documentos do colaborador. Os arquivos serão vinculados à admissão ao salvar.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {DOCUMENT_CHECKLIST.map((type) => (
-                  <div key={type} className="space-y-1.5">
-                    <div className="text-sm font-medium">{ADMISSION_DOCUMENT_TYPE_LABELS[type]}</div>
-                    <FileUploadField
-                      variant="compact"
-                      maxFiles={1}
-                      disabled={submitting}
-                      placeholder={`Anexar ${ADMISSION_DOCUMENT_TYPE_LABELS[type]}`}
-                      onFilesChange={(files: FileWithPreview[]) => {
-                        const file = (files[0] as unknown as File) ?? null;
-                        setDocFiles((prev) => {
-                          const next = { ...prev };
-                          if (file) next[type] = file;
-                          else delete next[type];
-                          return next;
-                        });
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Documentos — skipped for off-payroll providers (terceirizado/PJ),
+              who don't submit the standard CLT admission document checklist. */}
+          {!isProvider && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <IconFileText className="h-5 w-5 text-muted-foreground" />
+                  Documentos
+                </CardTitle>
+                <CardDescription>Anexe os documentos do colaborador. Os arquivos serão vinculados à admissão ao salvar.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {DOCUMENT_CHECKLIST.map((type) => (
+                    <div key={type} className="space-y-1.5">
+                      <div className="text-sm font-medium">{ADMISSION_DOCUMENT_TYPE_LABELS[type]}</div>
+                      <FileUploadField
+                        variant="compact"
+                        maxFiles={1}
+                        disabled={submitting}
+                        placeholder={`Anexar ${ADMISSION_DOCUMENT_TYPE_LABELS[type]}`}
+                        onFilesChange={(files: FileWithPreview[]) => {
+                          const file = (files[0] as unknown as File) ?? null;
+                          setDocFiles((prev) => {
+                            const next = { ...prev };
+                            if (file) next[type] = file;
+                            else delete next[type];
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Access Control */}
           <Card>

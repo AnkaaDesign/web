@@ -184,7 +184,7 @@ function renderCustomToast(
   return (
     <div
       className={`w-full rounded-lg border p-4 shadow-sm relative ${style.colors}`}
-      style={{ width: 280, zIndex }}
+      style={{ width: "17.5rem", zIndex }}
     >
       <button
         className="absolute top-2 right-2 p-0.5 rounded-full opacity-60 hover:opacity-100 transition-opacity"
@@ -279,7 +279,7 @@ const toast = {
       (_id) => (
         <div
           className="w-full rounded-lg border p-4 shadow-sm relative bg-muted/95 text-foreground border-border"
-          style={{ width: 280, zIndex: TOAST_Z_API }}
+          style={{ width: "17.5rem", zIndex: TOAST_Z_API }}
         >
           <div className="flex items-start gap-2">
             <IconLoader className="h-4 w-4 shrink-0 animate-spin" />

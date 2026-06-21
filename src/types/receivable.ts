@@ -3,6 +3,8 @@
 // Mirrors api/src/types/receivable.ts.
 // =====================
 
+import type { ClearanceState } from "./order";
+
 export type ReceivableSource = "TASK_QUOTE" | "EXTERNAL_OPERATION" | "INVOICE";
 
 export type ReceivableState =
@@ -18,6 +20,8 @@ export interface ReceivableRow {
   /** Installment id (the settle/conciliation target). */
   id: string;
   invoiceId: string | null;
+  /** Task-quote (faturamento) this receivable belongs to — row navigation target. */
+  taskId: string | null;
   customerId: string | null;
   customerName: string;
   description: string;
@@ -35,6 +39,16 @@ export interface ReceivableRow {
   reconciled: boolean;
   /** Bank transaction this receipt was conciliated against (for row linking). */
   transactionId: string | null;
+  /**
+   * Axis B — bank-confirmation state, the receivables analog of the payables
+   * `clearanceState`. Derived from the non-reversed ReconciliationMatch + amount
+   * comparison (UNCLEARED until a credit confirms it; DISPUTED on amount drift).
+   * `reconciled` stays as the simple boolean for back-compat; this is the
+   * three-valued field web/mobile should prefer.
+   */
+  clearanceState: ClearanceState;
+  /** When the confirming bank credit cleared this row. */
+  clearedAt: string | null;
 }
 
 export interface ReceivablesSummaryBucket {
@@ -68,9 +82,22 @@ export interface ReceivableCandidate {
   /** Outstanding balance = amount − paidAmount; what a credit can still settle. */
   remaining: number;
   dueDate: string;
+  /** Installment status (PENDING / OVERDUE / PARTIAL …). */
+  status: string;
   customerName: string | null;
   invoiceId: string | null;
   confidence: number;
+  /** Task-quote (faturamento) context — null for non-task receivables. */
+  taskId: string | null;
+  taskName: string | null;
+  taskSerialNumber: string | null;
+  /** Invoice total + how many parcelas it has, for the candidate card. */
+  invoiceTotal: number | null;
+  totalInstallments: number | null;
+  /** Set when this candidate is an already-PAID boleto awaiting its bank line:
+   *  matching it bridges the credit to the boleto (full link only, no partial). */
+  bankSlipId: string | null;
+  viaBankSlip: boolean;
 }
 
 export interface ReceivableCandidatesResponse {

@@ -61,6 +61,9 @@ export const BillingDetailPage = () => {
 
   const userPrivilege = currentUser?.sector?.privileges || "";
   const canEdit = canEditQuote(userPrivilege) || canUpdateQuoteStatus(userPrivilege);
+  // ACCOUNTING is a pure read-only viewer — collapse the multi-step wizard down to
+  // just the final review screen (no step indicator, no Anterior/Próximo nav).
+  const reviewOnly = userPrivilege === SECTOR_PRIVILEGES.ACCOUNTING;
   const canSeeBudgetInfoStep = [
     SECTOR_PRIVILEGES.COMMERCIAL,
     SECTOR_PRIVILEGES.ADMIN,
@@ -713,9 +716,9 @@ export const BillingDetailPage = () => {
     );
   }
 
-  // Build PageHeader actions
+  // Build PageHeader actions. Read-only review mode has no step navigation.
   const actions: any[] = [];
-  if (currentStep > 1) {
+  if (!reviewOnly && currentStep > 1) {
     actions.push({
       key: "prev",
       label: "Anterior",
@@ -728,7 +731,7 @@ export const BillingDetailPage = () => {
   // Step navigation is available to everyone (read-only viewers included) — only
   // "Salvar" is gated by canEdit. Read-only users skip the edit validation so
   // they can page through freely.
-  if (currentStep < totalSteps) {
+  if (!reviewOnly && currentStep < totalSteps) {
     actions.push({
       key: "next",
       label: "Próximo",
@@ -832,46 +835,50 @@ export const BillingDetailPage = () => {
           }
         />
 
-        <FormSteps steps={steps} currentStep={currentStep} className="flex-shrink-0" />
+        {!reviewOnly && <FormSteps steps={steps} currentStep={currentStep} className="flex-shrink-0" />}
 
         <div className="flex-1 overflow-y-auto pb-6">
           <FormProvider {...form}>
             {/* Tarefa, Serviços, and customer steps stay mounted (hidden via CSS) to preserve useFieldArray state */}
-            <div style={{ display: currentStep === 1 ? undefined : "none" }}>
-              <BillingStepTask
-                disabled={!canEdit}
-                customersCache={customersCache}
-                initialCustomer={task?.customer}
-              />
-            </div>
-
-            {isProposalStep && (
-              <BillingStepBudgetInfo
-                disabled={!canEdit}
-                layoutFiles={layoutFiles}
-                onLayoutFilesChange={setLayoutFiles}
-              />
-            )}
-
-            <div style={{ display: isServicesStep ? undefined : "none" }}>
-              <BillingStepServices disabled={!canEdit} />
-            </div>
-
-            {/* Customer steps — always mounted (hidden via CSS) so form values survive navigation */}
-            {customerConfigs.map((config: any, i: number) => {
-              const cachedCustomer = customersCache.current.get(config.customerId);
-              return (
-                <div key={config.customerId || i} style={{ display: currentStep === firstCustomerStepIdx + i ? undefined : "none" }}>
-                  <BillingStepCustomer
-                    configIndex={i}
-                    customer={cachedCustomer}
+            {!reviewOnly && (
+              <>
+                <div style={{ display: currentStep === 1 ? undefined : "none" }}>
+                  <BillingStepTask
                     disabled={!canEdit}
+                    customersCache={customersCache}
+                    initialCustomer={task?.customer}
                   />
                 </div>
-              );
-            })}
 
-            {isReviewStep && (
+                {isProposalStep && (
+                  <BillingStepBudgetInfo
+                    disabled={!canEdit}
+                    layoutFiles={layoutFiles}
+                    onLayoutFilesChange={setLayoutFiles}
+                  />
+                )}
+
+                <div style={{ display: isServicesStep ? undefined : "none" }}>
+                  <BillingStepServices disabled={!canEdit} />
+                </div>
+
+                {/* Customer steps — always mounted (hidden via CSS) so form values survive navigation */}
+                {customerConfigs.map((config: any, i: number) => {
+                  const cachedCustomer = customersCache.current.get(config.customerId);
+                  return (
+                    <div key={config.customerId || i} style={{ display: currentStep === firstCustomerStepIdx + i ? undefined : "none" }}>
+                      <BillingStepCustomer
+                        configIndex={i}
+                        customer={cachedCustomer}
+                        disabled={!canEdit}
+                      />
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            {(isReviewStep || reviewOnly) && (
               <BillingStepReview
                 task={task}
                 customersCache={customersCache}

@@ -9,23 +9,29 @@
 @tailwind utilities;
 
 /*
- * GLOBAL UI SCALE — replicate the user's preferred 80% browser zoom at 100%.
+ * GLOBAL UI SCALE — render the whole app at 80% density (what the user used to
+ * approximate by running the browser at 80% zoom).
  *
- * The user always runs the app at 80% browser zoom. Applying `zoom: 0.8` at the
- * document root makes the app render identically at the browser's default 100%
- * zoom, with no per-component changes: `zoom` uniformly scales px, rem, images,
- * borders and SVG. Chromium maps zoom into the same visual coordinate space used
- * by getBoundingClientRect / clientX / scrollTop, so pointer + layout math stays
- * consistent (avoid comparing against the NON-zoomed window.innerWidth/Height).
+ * HOW: pure rem scaling, NOT `zoom` and NOT `transform`. The UI is rem-based
+ * (Tailwind spacing/typography) and every stray `px` value is converted to rem
+ * at build time by postcss-pxtorem (see postcss.config.js), so shrinking the
+ * root font-size scales the ENTIRE design uniformly — the same visual result as
+ * 80% browser zoom. Tune this single value to change density.
  *
- * Full-height chain: with root zoom, `100vh`/`h-screen` resolves against the
- * physical viewport and is THEN scaled by 0.8, leaving an empty strip at the
- * bottom. To keep the app shell filling the real screen we anchor a percentage
- * height chain here (html/body/#root = 100%) and the top-level layouts use
- * `h-full` instead of `h-screen` (see main-layout.tsx / auth-layout.tsx).
+ * WHY not zoom/transform: both break Floating UI — the engine Radix uses to
+ * position EVERY popover, combobox, <Select>, dropdown and tooltip. `zoom`
+ * isn't understood by Floating UI at all, and a `transform` ancestor double-
+ * scales Radix's fixed-strategy popovers; either way the floating panel drifts
+ * away from its trigger. Rem scaling never touches layout coordinates, so
+ * getBoundingClientRect and pointer math stay in real pixels and every popover
+ * anchors exactly to its trigger.
+ *
+ * Hairline borders (≤1px) and media-query breakpoints are intentionally left
+ * un-scaled (postcss-pxtorem minPixelValue / mediaQuery:false) so 1px stays
+ * crisp and responsive breakpoints still track the real viewport.
  */
 html {
-  zoom: 0.8;
+  font-size: 80%;
 }
 
 html,
@@ -36,11 +42,13 @@ body,
 
 /*
  * PRINT must stay full size — receipts, PDFs and reports are laid out for paper
- * and must not be shrunk to 80%. Reset zoom for print only.
+ * and must not be shrunk to 80%. Resetting the root font-size returns every
+ * rem-based dimension to its original size; literal-px receipt layouts are
+ * unaffected.
  */
 @media print {
   html {
-    zoom: 1;
+    font-size: 100%;
   }
 }
 

@@ -1,3 +1,5 @@
+// Global UI scale is applied via postcss-pxtorem (postcss.config.js) + an 80%
+// root font-size (index.css) — see those files for rationale.
 import { defineConfig, type Plugin, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";

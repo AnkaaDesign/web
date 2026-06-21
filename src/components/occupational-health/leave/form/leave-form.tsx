@@ -7,7 +7,7 @@ import { IconCalendarOff, IconUser, IconNotes } from "@tabler/icons-react";
 import type { Leave } from "../../../../types/leave";
 import type { User } from "../../../../types";
 import { leaveCreateSchema, leaveUpdateSchema, type LeaveCreateFormData, type LeaveUpdateFormData } from "../../../../schemas/leave";
-import { routes, LEAVE_TYPE, LEAVE_STATUS, LEAVE_TYPE_LABELS, INSS_BENEFIT_SPECIES_LABELS } from "../../../../constants";
+import { routes, LEAVE_TYPE, LEAVE_STATUS, LEAVE_TYPE_LABELS, INSS_BENEFIT_SPECIES_LABELS, CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../../constants";
 import { useLeaveMutations } from "../../../../hooks/occupational-health/use-leaves";
 import { userService } from "../../../../api-client";
 
@@ -100,7 +100,9 @@ export function LeaveForm(props: LeaveFormProps) {
       page,
       take: 50,
       orderBy: { name: "asc" },
-      include: { position: true },
+      // Only CLT collaborators with an active employment contract.
+      employeeTypes: [EMPLOYEE_TYPE.CLT],
+      contractStatuses: [CONTRACT_STATUS.ACTIVE],
     };
 
     if (search && search.trim()) {
@@ -115,15 +117,7 @@ export function LeaveForm(props: LeaveFormProps) {
     };
   }, []);
 
-  const renderUserOption = useCallback(
-    (user: User) => (
-      <div>
-        <p className="font-medium">{user.name}</p>
-        {user.position && <p className="text-xs text-muted-foreground">{user.position.name}</p>}
-      </div>
-    ),
-    [],
-  );
+  const renderUserOption = useCallback((user: User) => <p className="font-medium">{user.name}</p>, []);
 
   const handleSubmit = async (data: LeaveCreateFormData | LeaveUpdateFormData) => {
     try {

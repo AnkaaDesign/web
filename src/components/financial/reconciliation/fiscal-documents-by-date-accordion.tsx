@@ -6,6 +6,7 @@ import {
   IconEye,
   IconLink,
   IconReceipt,
+  IconReceipt2,
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -28,6 +29,21 @@ import { docTypeLabel, docTypeVariant } from "./fiscal-doc-badge";
 import { formatDayHeader, toLocalDateKey } from "./date-utils";
 
 const DATE_COLUMN_WIDTH = 170;
+
+/**
+ * Direction-aware "vinculada" for a fiscal document. The API now returns a
+ * derived `linked` boolean (single source of truth): ENTRADA → has an open bank
+ * match; SAIDA (emitted) → its NfseDocument carries an Invoice/Task. We consume
+ * that when present, falling back to the same derivation so the column stays
+ * correct against an older API response that hasn't shipped `linked` yet.
+ */
+function isLinked(doc: FiscalDocument): boolean {
+  if (typeof doc.linked === "boolean") return doc.linked;
+  if (doc.operationType === "SAIDA") {
+    return !!doc.nfseDocument?.invoiceId || !!doc.nfseDocument?.taskId;
+  }
+  return (doc.matches?.length ?? 0) > 0;
+}
 
 interface Props {
   data: FiscalDocument[];
@@ -156,7 +172,7 @@ export function FiscalDocumentsByDateAccordion({
         const v = Number(doc.totalValue) || 0;
         if (doc.operationType === "ENTRADA") entradaTotal += v;
         else saidaTotal += v;
-        if ((doc.matches?.length ?? 0) > 0) linked += 1;
+        if (isLinked(doc)) linked += 1;
       }
       out.set(day, {
         count: docs.length,
@@ -593,6 +609,37 @@ function renderCell(
         </Badge>
       );
     case "linked": {
+      // SAIDA (emitted) notes can never carry a bank match — their "vinculada"
+      // is the faturamento/orçamento the note was generated from. Surface a link
+      // to the invoice (billing) or the task quote (budget) instead.
+      if (d.operationType === "SAIDA") {
+        const invoiceId = d.nfseDocument?.invoiceId ?? null;
+        const taskId = d.nfseDocument?.taskId ?? null;
+        if (!invoiceId && !taskId) {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        const to = invoiceId
+          ? routes.financial.billing.details(invoiceId)
+          : routes.financial.budget.details(taskId as string);
+        const badge = (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-500/30 px-2 py-0.5 text-xs font-semibold"
+            title={invoiceId ? "Faturamento vinculado" : "Orçamento vinculado"}
+          >
+            <IconReceipt2 className="h-3 w-3" />
+            {invoiceId ? "Faturamento" : "Orçamento"}
+          </span>
+        );
+        return (
+          <Link
+            to={to}
+            onClick={(e) => e.stopPropagation()}
+            className="hover:opacity-80 transition-opacity"
+          >
+            {badge}
+          </Link>
+        );
+      }
       const matches = d.matches ?? [];
       const count = matches.length;
       if (count === 0) {

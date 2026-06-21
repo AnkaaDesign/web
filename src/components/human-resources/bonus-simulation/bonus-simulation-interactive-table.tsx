@@ -1056,7 +1056,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
           {/* Left side - Inputs */}
           <div className="flex flex-col md:flex-row gap-4">
             {/* Task Quantity Input */}
-            <div className="flex flex-col" style={{ width: '120px' }}>
+            <div className="flex flex-col" style={{ width: '7.5rem' }}>
               <Label htmlFor="taskQuantity" className="text-sm font-medium mb-1.5">
                 Tarefas
               </Label>
@@ -1072,7 +1072,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
             </div>
 
             {/* Eligible Users Count - All filtered/selected users */}
-            <div className="flex flex-col" style={{ width: '120px' }}>
+            <div className="flex flex-col" style={{ width: '7.5rem' }}>
               <Label className="text-sm font-medium mb-1.5">
                 Colaboradores
               </Label>
@@ -1086,7 +1086,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
             </div>
 
             {/* Average Tasks per User - Editable for Reverse Calculation */}
-            <div className="flex flex-col" style={{ width: '120px' }}>
+            <div className="flex flex-col" style={{ width: '7.5rem' }}>
               <Label htmlFor="averagePerUser" className="text-sm font-medium mb-1.5">
                 Média
               </Label>
@@ -1103,7 +1103,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
             </div>
 
             {/* Total Bonus */}
-            <div className="flex flex-col" style={{ width: '160px' }}>
+            <div className="flex flex-col" style={{ width: '10rem' }}>
               <Label className="text-sm font-medium mb-1.5">
                 Total
               </Label>

@@ -150,7 +150,7 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
   const effective = useCallback((loc: WarehouseLocation): WarehouseLocation => ({ ...loc, ...(pending[loc.id] ?? {}) }), [pending]);
   const geomOf = useCallback((loc: WarehouseLocation): Geom => { const e = effective(loc); return { positionX: e.positionX, positionY: e.positionY, width: e.width, height: e.height, rotation: e.rotation }; }, [effective]);
 
-  const makeDraft = useCallback((loc: WarehouseLocation): StructureDraft => { const e = effective(loc); return { id: e.id, name: e.name, type: e.type, section: e.section, code: e.code, levels: e.levels, columns: e.columns, width: e.width, height: e.height, rotation: e.rotation, isActive: e.isActive, positionX: e.positionX, positionY: e.positionY }; }, [effective]);
+  const makeDraft = useCallback((loc: WarehouseLocation): StructureDraft => { const e = effective(loc); return { id: e.id, name: e.name, type: e.type, section: e.section, code: e.code, levels: e.levels, columns: e.columns, width: e.width, height: e.height, rotation: e.rotation, positionX: e.positionX, positionY: e.positionY }; }, [effective]);
   const [draft, setDraft] = useState<StructureDraft | null>(null);
   const selectStructure = useCallback((loc: WarehouseLocation) => { setSelectedId(loc.id); setDraft(makeDraft(loc)); }, [makeDraft]);
   const deselect = useCallback(() => { setSelectedId(null); setDraft(null); }, []);
@@ -281,8 +281,9 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
         const nx = snapPos(it.origin.positionX + (cur.x - it.startX));
         const ny = snapPos(it.origin.positionY + (cur.y - it.startY));
         if (nx !== it.origin.positionX || ny !== it.origin.positionY) it.moved = true;
-        setPending((p) => ({ ...p, [it.id]: { ...p[it.id], positionX: nx, positionY: ny } }));
-        setDraft((d) => (d && d.id === it.id ? { ...d, positionX: nx, positionY: ny } : d));
+        const section = sectorAt(ny, it.origin.height); // sector is derived from where the structure sits on the map
+        setPending((p) => ({ ...p, [it.id]: { ...p[it.id], positionX: nx, positionY: ny, section } }));
+        setDraft((d) => (d && d.id === it.id ? { ...d, positionX: nx, positionY: ny, section } : d));
       } else if (it.kind === "resize") {
         const ox = it.origin.positionX, oy = it.origin.positionY, ow = it.origin.width, oh = it.origin.height;
         const right = ox + ow, bottom = oy + oh;
