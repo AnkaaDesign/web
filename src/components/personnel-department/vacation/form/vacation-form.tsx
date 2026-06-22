@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { IconBeach, IconUser, IconCalendar, IconFileDescription, IconCash, IconCalendarStats, IconUsersGroup, IconChevronDown, IconAdjustments } from "@tabler/icons-react";
+import { IconBeach, IconUser, IconCalendar, IconFileDescription, IconCash, IconCalendarStats, IconUsersGroup } from "@tabler/icons-react";
 
 import { vacationUpdateSchema, type VacationUpdateFormData } from "../../../../schemas/vacation";
 import type { Vacation } from "../../../../types/vacation";
@@ -42,8 +42,6 @@ import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { cn } from "@/lib/utils";
 import { formatDate } from "../../../../utils";
@@ -101,7 +99,6 @@ export function VacationForm(props: VacationFormProps) {
 
   const isSubmitting = props.isSubmitting || form.formState.isSubmitting;
   const fieldsDisabled = props.disabled || isSubmitting;
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [selectingAll, setSelectingAll] = useState(false);
 
   // Selected collaborators (create, multi-select). The período aquisitivo preview
@@ -115,15 +112,18 @@ export function VacationForm(props: VacationFormProps) {
   const selectedUser: User | null = (selectedUserResponse?.data as User | undefined) ?? null;
 
   const watchedAbsences = useWatch({ control: form.control, name: "unjustifiedAbsencesInPeriod" as any });
-  const watchedAbono = useWatch({ control: form.control, name: "abonoPecuniarioDays" as any });
+  const watchedSoldThird = useWatch({ control: form.control, name: "soldThird" as any });
 
-  // Entitled days are derived (read-only) from the art. 130 scale by absences.
-  // On update, the persisted entitled days are shown.
-  const entitledDays =
-    props.mode === "update" ? vacation?.entitledDays ?? 30 : entitledDaysFromAbsences(Number(watchedAbsences) || 0);
+  // Entitled days are derived (read-only) from the art. 130 scale by the
+  // unjustified absences in the period.
+  const entitledDays = entitledDaysFromAbsences(Number(watchedAbsences) || 0);
 
-  // Gozo de direito available for this period (entitled − abono).
-  const gozoEntitled = Math.max(0, entitledDays - (Number(watchedAbono) || 0));
+  // Abono pecuniário = venda de 1/3 das férias (art. 143 CLT): até 10 dias,
+  // limitado a 1/3 do direito. É o ÚNICO controle de abono na tela (um toggle).
+  const abonoDays = watchedSoldThird ? Math.min(10, Math.floor(entitledDays / 3)) : 0;
+
+  // Gozo de direito disponível neste período (direito − abono).
+  const gozoEntitled = Math.max(0, entitledDays - abonoDays);
 
   // Derived período aquisitivo/concessivo for display (create).
   const derived = useMemo(() => {
@@ -172,18 +172,23 @@ export function VacationForm(props: VacationFormProps) {
 
   const handleSubmit = async (data: any) => {
     try {
+      // "Vender 1/3" é o único controle de abono: quando ligado, vende o limite
+      // legal (1/3 do direito, máx. 10 dias). Derivamos os dias aqui para manter
+      // o número de abono coerente com o guard de gozo do servidor.
+      const entitled = entitledDaysFromAbsences(Number(data.unjustifiedAbsencesInPeriod) || 0);
+      const abonoPecuniarioDays = data.soldThird ? Math.min(10, Math.floor(entitled / 3)) : 0;
       if (props.mode === "create") {
         await props.onSubmit({
           userIds: data.userIds,
           startDate: data.startDate,
           days: Number(data.days),
           unjustifiedAbsencesInPeriod: Number(data.unjustifiedAbsencesInPeriod) || 0,
-          abonoPecuniarioDays: Number(data.abonoPecuniarioDays) || 0,
+          abonoPecuniarioDays,
           soldThird: !!data.soldThird,
           notes: data.notes ?? null,
         });
       } else {
-        await props.onSubmit(data as VacationUpdateFormData);
+        await props.onSubmit({ ...data, abonoPecuniarioDays, soldThird: !!data.soldThird } as VacationUpdateFormData);
       }
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {
@@ -239,12 +244,7 @@ export function VacationForm(props: VacationFormProps) {
                           initialOptions={[]}
                           getOptionLabel={(user) => user.name}
                           getOptionValue={(user) => user.id}
-                          renderOption={(user) => (
-                            <div>
-                              <p className="font-medium">{user.name}</p>
-                              {user.position && <p className="text-xs text-muted-foreground">{user.position.name}</p>}
-                            </div>
-                          )}
+                          renderOption={(user) => <span className="font-medium">{user.name}</span>}
                           minSearchLength={0}
                           pageSize={50}
                           debounceMs={300}
@@ -383,7 +383,7 @@ export function VacationForm(props: VacationFormProps) {
                           mode="date"
                           value={field.value as Date | null | undefined}
                           onChange={(date) => field.onChange(date instanceof Date ? date : null)}
-                          label="Início do gozo *"
+                          label={<>Início do gozo <span className="text-destructive">*</span></>}
                           disabled={fieldsDisabled}
                           placeholder="Selecione a data de início"
                         />
@@ -432,48 +432,52 @@ export function VacationForm(props: VacationFormProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Dias de Direito — read-only (derivado da escala art. 130) */}
-                <FormItem>
-                  <FormLabel>Dias de Direito (art. 130)</FormLabel>
-                  <FormControl>
-                    <Input type="number" value={entitledDays} disabled readOnly />
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Derivado das faltas injustificadas em "Ajustes avançados".
-                  </p>
-                </FormItem>
-
+                {/* Faltas injustificadas — entrada direta (define a escala art. 130) */}
                 <FormField
                   control={form.control}
-                  name={"abonoPecuniarioDays" as any}
+                  name={"unjustifiedAbsencesInPeriod" as any}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Abono Pecuniário (0–10)</FormLabel>
+                      <FormLabel>Faltas injustificadas no período</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
                           min={0}
-                          max={10}
                           value={field.value ?? 0}
                           onChange={(value) => field.onChange(value === "" || value === null ? 0 : Number(value))}
                           disabled={fieldsDisabled}
                           placeholder="0"
                         />
                       </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Escala do art. 130: até 5 → 30 dias · 6–14 → 24 · 15–23 → 18 · 24–32 → 12 · acima de 32 → 0.
+                      </p>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                {/* Dias de Direito — read-only (derivado da escala art. 130) */}
+                <FormItem>
+                  <FormLabel>Dias de direito (art. 130)</FormLabel>
+                  <FormControl>
+                    <Input type="number" value={entitledDays} disabled readOnly />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground mt-1">Calculado automaticamente a partir das faltas.</p>
+                </FormItem>
               </div>
 
+              {/* Vender 1/3 — ÚNICO controle de abono pecuniário (art. 143 CLT) */}
               <FormField
                 control={form.control}
                 name={"soldThird" as any}
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-md border border-border p-3">
-                    <div>
-                      <FormLabel className="cursor-pointer">Vender 1/3 das férias (abono)</FormLabel>
-                      <p className="text-xs text-muted-foreground">Converte parte das férias em abono pecuniário (art. 143 CLT).</p>
+                    <div className="pr-3">
+                      <FormLabel className="cursor-pointer">Vender 1/3 das férias (abono pecuniário)</FormLabel>
+                      <p className="text-xs text-muted-foreground">
+                        O colaborador recebe {abonoDays > 0 ? `${abonoDays} dia(s)` : "até 10 dias"} em dinheiro e goza o restante (art. 143 CLT).
+                      </p>
                     </div>
                     <FormControl>
                       <Switch checked={!!field.value} onCheckedChange={field.onChange} disabled={fieldsDisabled} />
@@ -482,55 +486,19 @@ export function VacationForm(props: VacationFormProps) {
                 )}
               />
 
-              {/* Prominent dias de gozo de direito summary */}
+              {/* Resultado: dias de gozo de direito */}
               <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium">Gozo de direito</p>
-                  <p className="text-xs text-muted-foreground">Direito ({entitledDays}) − abono ({Number(watchedAbono) || 0})</p>
+                  <p className="text-sm font-medium">Dias de gozo de direito</p>
+                  <p className="text-xs text-muted-foreground">
+                    Direito ({entitledDays}){abonoDays > 0 ? ` − abono vendido (${abonoDays})` : ""}
+                  </p>
                 </div>
                 <div className="text-right">
                   <span className="text-2xl font-bold tabular-nums text-primary">{gozoEntitled}</span>
                   <span className="ml-1 text-sm text-muted-foreground">dias</span>
                 </div>
               </div>
-
-              {/* Ajustes avançados — faltas injustificadas (afeta a escala art. 130) */}
-              <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button type="button" variant="ghost" className="w-full justify-between px-2">
-                    <span className="flex items-center gap-2 text-sm font-medium">
-                      <IconAdjustments className="h-4 w-4" />
-                      Ajustes avançados
-                    </span>
-                    <IconChevronDown className={cn("h-4 w-4 transition-transform", advancedOpen && "rotate-180")} />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3 pt-3">
-                  <FormField
-                    control={form.control}
-                    name={"unjustifiedAbsencesInPeriod" as any}
-                    render={({ field }) => (
-                      <FormItem className="max-w-xs">
-                        <FormLabel>Faltas Injustificadas</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={field.value ?? 0}
-                            onChange={(value) => field.onChange(value === "" || value === null ? 0 : Number(value))}
-                            disabled={fieldsDisabled}
-                            placeholder="0"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Escala do art. 130: até 5 faltas → 30 dias · 6–14 → 24 · 15–23 → 18 · 24–32 → 12 · acima de 32 → 0.
-                  </p>
-                </CollapsibleContent>
-              </Collapsible>
             </CardContent>
           </Card>
 

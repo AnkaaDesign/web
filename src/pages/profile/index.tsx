@@ -2,16 +2,17 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "@/components/ui/sonner";
-import { Loader2, Camera, Trash2, User as UserIcon, MapPin, Ruler } from "lucide-react";
-import { IconUser, IconBell, IconRefresh, IconDeviceFloppy } from "@tabler/icons-react";
-import { getProfile, updateProfile, uploadPhoto, deletePhoto } from "@/api-client";
+import { Loader2, Camera, Trash2, User as UserIcon, MapPin, Ruler, KeyRound } from "lucide-react";
+import { IconUser, IconDeviceFloppy } from "@tabler/icons-react";
+import { getProfile, updateProfile, uploadPhoto, deletePhoto, authService } from "@/api-client";
 import type { User } from "@/types";
-import type { UserUpdateFormData } from "@/schemas";
-import { userUpdateSchema } from "@/schemas";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { UserUpdateFormData, ChangePasswordFormData } from "@/schemas";
+import { userUpdateSchema, changePasswordSchema } from "@/schemas";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { FormInput } from "@/components/ui/form-input";
+import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   routes,
@@ -23,7 +24,6 @@ import {
   SLEEVES_SIZE_LABELS,
   RAIN_BOOTS_SIZE_LABELS,
 } from "@/constants";
-import { useAuth } from "@/contexts/auth-context";
 import { useCepLookup } from "@/hooks/common/use-cep-lookup";
 import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 import { cn } from "@/lib/utils";
@@ -38,15 +38,35 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showDeletePhotoDialog, setShowDeletePhotoDialog] = useState(false);
-  const { refreshUser } = useAuth();
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [currentPasswordInput, setCurrentPasswordInput] = useState("");
+
+  // Separate form for the change-password card
+  const passwordForm = useForm<ChangePasswordFormData>({
+    resolver: zodResolver(changePasswordSchema),
+    mode: "onChange",
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmNewPassword: "",
+    },
+  });
 
   const form = useForm<UserUpdateFormData>({
     resolver: zodResolver(userUpdateSchema),
@@ -89,19 +109,6 @@ export function ProfilePage() {
 
   const handleSave = () => {
     form.handleSubmit(onSubmit)();
-  };
-
-  const handleRefresh = async () => {
-    try {
-      setIsRefreshing(true);
-      await refreshUser(); // Refresh auth context user data
-      await loadProfile(); // Reload profile data
-      toast.success("Dados atualizados com sucesso!");
-    } catch {
-      // Error toast is emitted by the axios error interceptor.
-    } finally {
-      setIsRefreshing(false);
-    }
   };
 
   // Load user profile
@@ -151,6 +158,36 @@ export function ProfilePage() {
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Step 1: validate the new password fields, then prompt for the current
+  // password in a confirmation dialog before actually changing it.
+  const handleRequestPasswordChange = async () => {
+    const isValid = await passwordForm.trigger(["newPassword", "confirmNewPassword"]);
+    if (isValid) {
+      setCurrentPasswordInput("");
+      setShowPasswordDialog(true);
+    }
+  };
+
+  // Step 2: confirm with the current password and submit.
+  const handleConfirmPasswordChange = async () => {
+    try {
+      setIsChangingPassword(true);
+      await authService.changePassword({
+        currentPassword: currentPasswordInput,
+        newPassword: passwordForm.getValues("newPassword"),
+        confirmNewPassword: passwordForm.getValues("confirmNewPassword"),
+      });
+      // Success toast is emitted by the axios success interceptor.
+      passwordForm.reset();
+      setCurrentPasswordInput("");
+      setShowPasswordDialog(false);
+    } catch {
+      // Error toast is emitted by the axios error interceptor (e.g. wrong password).
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -240,22 +277,6 @@ export function ProfilePage() {
           ]}
           actions={[
             {
-              key: "notifications",
-              label: "Notificações",
-              icon: IconBell,
-              onClick: () => window.location.href = routes.profileNotifications,
-              variant: "outline",
-            },
-            {
-              key: "refresh",
-              label: "Atualizar Dados",
-              icon: IconRefresh,
-              onClick: handleRefresh,
-              variant: "outline",
-              disabled: isRefreshing,
-              loading: isRefreshing,
-            },
-            {
               key: "save",
               label: "Salvar Alterações",
               icon: IconDeviceFloppy,
@@ -269,8 +290,8 @@ export function ProfilePage() {
       </div>
 
       <div className={cn("flex-1 min-h-0 overflow-auto", DETAIL_PAGE_SPACING.HEADER_TO_GRID)}>
-        <div className="h-full">
-          <div className="grid gap-6 md:grid-cols-[300px,1fr] h-full md:items-start">
+        <div className="min-h-full">
+          <div className="grid gap-6 md:grid-cols-[300px,1fr] min-h-full md:items-stretch">
             {/* First Column: Profile Photo (Full Height) */}
             <Card className="md:h-full">
             <CardHeader>
@@ -343,49 +364,89 @@ export function ProfilePage() {
           {/* Second Column: Basic Info, Measures, and Address */}
           <div className="space-y-6">
             {/* Basic Information Card with Email and Phone */}
-            <Form {...form}>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <UserIcon className="w-5 h-5" />
-                    Informações Básicas
-                  </CardTitle>
-                  <CardDescription>Seus dados básicos e de contato</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="text-sm font-medium">Nome</label>
-                    <p className="text-sm text-muted-foreground mt-1">{user.name}</p>
-                  </div>
-                  <FormInput
-                    name="email"
-                    type="email"
-                    label="E-mail"
-                    placeholder="Digite seu e-mail"
-                    disabled={isSaving}
-                  />
-                  <div>
-                    <label className="text-sm font-medium">Cargo</label>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {user.position?.name || "Não definido"}
-                    </p>
-                  </div>
-                  <FormInput
-                    name="phone"
-                    type="phone"
-                    label="Telefone"
-                    placeholder="Digite seu telefone"
-                    disabled={isSaving}
-                  />
-                  <div>
-                    <label className="text-sm font-medium">Setor</label>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {user.sector?.name || "Não definido"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Form>
+            <div className="grid gap-6 lg:grid-cols-2 items-stretch">
+              {/* Basic Information Card with Email and Phone */}
+              <Form {...form}>
+                <Card className="h-full flex flex-col">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <UserIcon className="w-5 h-5" />
+                      Informações Básicas
+                    </CardTitle>
+                    <CardDescription>Seus dados básicos e de contato</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 flex-1 content-start">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Nome</label>
+                      <Input value={user.name} disabled />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Cargo</label>
+                      <Input value={user.position?.name || "Não definido"} disabled />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Setor</label>
+                      <Input value={user.sector?.name || "Não definido"} disabled />
+                    </div>
+                    <FormInput
+                      name="email"
+                      type="email"
+                      label="E-mail"
+                      placeholder="Digite seu e-mail"
+                      disabled={isSaving}
+                    />
+                    <FormInput
+                      name="phone"
+                      type="phone"
+                      label="Telefone"
+                      placeholder="Digite seu telefone"
+                      disabled={isSaving}
+                    />
+                  </CardContent>
+                </Card>
+              </Form>
+
+              {/* Security Card: Change Password */}
+              <Form {...passwordForm}>
+                <Card className="h-full flex flex-col">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <KeyRound className="w-5 h-5" />
+                      Segurança
+                    </CardTitle>
+                    <CardDescription>Altere sua senha de acesso</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 flex-1 content-start">
+                    <FormInput
+                      name="newPassword"
+                      type="password"
+                      label="Nova senha"
+                      placeholder="Mínimo de 6 caracteres"
+                      disabled={isChangingPassword}
+                      autoComplete="new-password"
+                    />
+                    <FormInput
+                      name="confirmNewPassword"
+                      type="password"
+                      label="Confirmar nova senha"
+                      placeholder="Repita a nova senha"
+                      disabled={isChangingPassword}
+                      autoComplete="new-password"
+                    />
+                  </CardContent>
+                  <CardFooter className="justify-end">
+                    <Button
+                      type="button"
+                      onClick={handleRequestPasswordChange}
+                      disabled={isChangingPassword}
+                    >
+                      <KeyRound className="w-4 h-4 mr-2" />
+                      Alterar Senha
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </Form>
+            </div>
 
             {/* Bottom Row: Measures and Address */}
             <div className="grid gap-6 lg:grid-cols-2">
@@ -546,6 +607,70 @@ export function ProfilePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Confirm Current Password Dialog */}
+      <Dialog
+        open={showPasswordDialog}
+        onOpenChange={(open) => {
+          if (!isChangingPassword) {
+            setShowPasswordDialog(open);
+            if (!open) setCurrentPasswordInput("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5" />
+              Confirme sua senha atual
+            </DialogTitle>
+            <DialogDescription>
+              Para alterar sua senha, digite sua senha atual para confirmar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Senha atual</label>
+            <Input
+              type="password"
+              placeholder="Digite sua senha atual"
+              value={currentPasswordInput}
+              onChange={(value) => setCurrentPasswordInput((value as string) ?? "")}
+              disabled={isChangingPassword}
+              autoComplete="current-password"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && currentPasswordInput.length >= 6 && !isChangingPassword) {
+                  handleConfirmPasswordChange();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPasswordDialog(false);
+                setCurrentPasswordInput("");
+              }}
+              disabled={isChangingPassword}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmPasswordChange}
+              disabled={isChangingPassword || currentPasswordInput.length < 6}
+            >
+              {isChangingPassword ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Alterando...
+                </>
+              ) : (
+                "Alterar Senha"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

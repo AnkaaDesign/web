@@ -1,6 +1,7 @@
 // Authentication response types
 
 import type { User } from "./user";
+import type { File as AnkaaFile } from "./file";
 
 export interface AuthTokenResponse {
   success: boolean;
@@ -21,6 +22,8 @@ export interface AuthUser {
   currentEmployeeType?: string | null;
   requirePasswordChange?: boolean;
   verified?: boolean;
+  avatarId?: string | null;
+  avatar?: AnkaaFile | null;
   sectorId?: string | null;
   sector?: {
     id: string;

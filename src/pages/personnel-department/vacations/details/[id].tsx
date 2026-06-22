@@ -3,6 +3,7 @@ import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { IconEdit, IconTrash, IconRefresh, IconCash, IconCheck, IconLoader2 } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE, VACATION_STATUS } from "../../../../constants";
+import { formatDate } from "../../../../utils";
 import { useVacation, useVacationMutations, useVacationAdvance } from "../../../../hooks/personnel-department/use-vacations";
 import { useAuth } from "../../../../hooks/common/use-auth";
 
@@ -123,6 +124,49 @@ export const VacationDetailPage = () => {
     setShowDeleteDialog(false);
   };
 
+  // Payment action lives INSIDE the Recibo de Férias card (next to "Líquido a
+  // Receber"), since paying the férias is paying this recibo. Shows a "Pago em"
+  // confirmation once paid, the "Marcar como pago" popover while pending.
+  const paymentSlot = !canManageVacations ? null : isPaid ? (
+    <div className="flex items-center justify-between gap-2 text-sm">
+      <span className="flex items-center gap-1.5 font-medium text-green-600">
+        <IconCheck className="h-4 w-4" />
+        Férias paga
+      </span>
+      <span className="text-muted-foreground">{vacation.paymentDate ? formatDate(new Date(vacation.paymentDate)) : ""}</span>
+    </div>
+  ) : canMarkPaid ? (
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-xs text-muted-foreground">
+        {reciboReady ? "Informe a data de pagamento e conclua como Paga." : "O recibo ainda não foi calculado — não é possível concluir o pagamento."}
+      </p>
+      <Popover open={payPopoverOpen} onOpenChange={setPayPopoverOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="default" size="sm" disabled={!reciboReady || isMarkingPaid}>
+            {isMarkingPaid ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCash className="h-4 w-4 mr-2" />}
+            Marcar como pago
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-72 space-y-3">
+          <div>
+            <p className="text-sm font-medium">Data de pagamento</p>
+            <p className="text-xs text-muted-foreground">Será registrada no recibo de férias.</p>
+          </div>
+          <DateTimeInput
+            mode="date"
+            value={paymentDate}
+            onChange={(date) => setPaymentDate(date instanceof Date ? date : null)}
+            placeholder="Selecione a data de pagamento"
+          />
+          <Button className="w-full" onClick={handleMarkPaid} disabled={!paymentDate || isMarkingPaid}>
+            {isMarkingPaid ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCheck className="h-4 w-4 mr-2" />}
+            Confirmar pagamento
+          </Button>
+        </PopoverContent>
+      </Popover>
+    </div>
+  ) : null;
+
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
@@ -190,45 +234,6 @@ export const VacationDetailPage = () => {
               </Alert>
             )}
 
-            {/* Action bar — self-documenting "Marcar como pago" with an inline
-                payment-date popover (no separate edit round-trip). */}
-            {canMarkPaid && canManageVacations && (
-              <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">Pagamento das férias</p>
-                  <p className="text-xs text-muted-foreground">
-                    {reciboReady
-                      ? "Informe a data de pagamento e conclua como Paga."
-                      : "O recibo ainda não foi calculado — não é possível concluir o pagamento."}
-                  </p>
-                </div>
-                <Popover open={payPopoverOpen} onOpenChange={setPayPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="default" disabled={!reciboReady || isMarkingPaid}>
-                      {isMarkingPaid ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCash className="h-4 w-4 mr-2" />}
-                      Marcar como pago
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-72 space-y-3">
-                    <div>
-                      <p className="text-sm font-medium">Data de pagamento</p>
-                      <p className="text-xs text-muted-foreground">Será registrada no recibo de férias.</p>
-                    </div>
-                    <DateTimeInput
-                      mode="date"
-                      value={paymentDate}
-                      onChange={(date) => setPaymentDate(date instanceof Date ? date : null)}
-                      placeholder="Selecione a data de pagamento"
-                    />
-                    <Button className="w-full" onClick={handleMarkPaid} disabled={!paymentDate || isMarkingPaid}>
-                      {isMarkingPaid ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCheck className="h-4 w-4 mr-2" />}
-                      Confirmar pagamento
-                    </Button>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
-
             <VacationStatusStepperCard vacation={vacation} />
 
             {/* Resumo (left) e a coluna direita (Saldo + Recibo) preenchem a mesma
@@ -237,7 +242,7 @@ export const VacationDetailPage = () => {
               <VacationSummaryCard vacation={vacation} className="h-full" />
               <div className="flex flex-col gap-4 h-full">
                 <VacationBalanceCard vacation={vacation} />
-                <VacationReciboCard vacation={vacation} className="flex-1" />
+                <VacationReciboCard vacation={vacation} className="flex-1" paymentSlot={paymentSlot} />
               </div>
             </div>
 

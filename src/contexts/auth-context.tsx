@@ -253,6 +253,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
         setTokenProvider(updatedTokenProvider);
 
+        // The login token payload omits the avatar relation, so the nav avatar
+        // would render initials until the next reload. Enrich the cached user
+        // with the full /auth/me profile (avatar + relations) in the background
+        // — fire-and-forget so we don't block navigation.
+        void refreshUser();
+
         // Return success to let the Login component know login succeeded
         return { success: true } as const;
       } else {

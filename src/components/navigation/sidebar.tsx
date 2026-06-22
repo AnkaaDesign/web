@@ -15,6 +15,7 @@ import { IconLogout, IconUser, IconSettings, IconChevronRight, IconExternalLink 
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PricingToggle } from "@/components/ui/pricing-toggle";
 import { NotificationCenter } from "@/components/notification-center";
+import { UserAvatarDisplay } from "@/components/ui/avatar-display";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { SidebarFlyout, useFlyoutController } from "./sidebar-flyout";
@@ -859,7 +860,7 @@ export const Sidebar = memo(() => {
 
   return (
     <>
-      <aside className={cn("flex flex-col bg-card border-r border-border transition-all duration-300 relative", isOpen ? "w-72" : "w-16")}>
+      <aside className={cn("flex flex-col bg-card border-r border-border transition-all duration-300 relative", isOpen ? "w-80" : "w-16")}>
         {/* Header Section - User Profile & Theme Toggle */}
         <div className={cn(
           "border-b relative",
@@ -874,9 +875,13 @@ export const Sidebar = memo(() => {
                 className={cn("flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors flex-1 min-w-0", "hover:bg-muted/50 transition-colors")}
                 onClick={() => setShowUserMenu(!showUserMenu)}
               >
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-bold text-lg">{user?.name?.charAt(0)?.toUpperCase() || "U"}</span>
-                </div>
+                <UserAvatarDisplay
+                  avatar={user?.avatar}
+                  userName={user?.name || "Usuário"}
+                  size="md"
+                  shape="circle"
+                  className="flex-shrink-0"
+                />
                 <div className="flex-1 min-w-0">
                   <div className={cn("font-semibold text-base truncate", isDark ? "text-neutral-100" : "text-neutral-900")}>{user?.name || "Usuário"}</div>
                   <div className={cn("text-sm opacity-70 truncate", isDark ? "text-neutral-400" : "text-neutral-500")}>
@@ -886,7 +891,7 @@ export const Sidebar = memo(() => {
               </div>
 
               {/* Notification Center and Theme Toggle */}
-              <div className="flex-shrink-0 flex items-center gap-1 px-2">
+              <div className="flex-shrink-0 flex items-center gap-0 px-1 [&_button]:h-8 [&_button]:w-8">
                 <NotificationCenter />
                 <ThemeToggle />
                 <PricingToggle />
@@ -903,22 +908,27 @@ export const Sidebar = memo(() => {
               >
                 <div
                   className={cn(
-                    "w-8 h-8 bg-primary rounded-full flex items-center justify-center cursor-pointer transition-all duration-200",
-                    showUserMenu && "scale-110 shadow-sm",
+                    "cursor-pointer transition-all duration-200",
+                    showUserMenu && "scale-110 shadow-sm rounded-full",
                   )}
                   onClick={() => {
                     setShowAvatarTooltip(false);
                     setShowUserMenu(!showUserMenu);
                   }}
                 >
-                  <span className="text-white font-bold text-lg">{user?.name?.charAt(0)?.toUpperCase() || "U"}</span>
+                  <UserAvatarDisplay
+                    avatar={user?.avatar}
+                    userName={user?.name || "Usuário"}
+                    size="sm"
+                    shape="circle"
+                  />
                 </div>
 
                 {/* Hover info popup */}
                 {showAvatarTooltip && !showUserMenu && (
                   <div
                     className={cn(
-                      "absolute left-full top-0 ml-3 z-50 bg-card border border-border rounded-lg shadow-md p-3 min-w-[200px] animate-in fade-in-0 slide-in-from-left-1",
+                      "absolute right-full top-0 mr-3 z-50 bg-card border border-border rounded-lg shadow-md p-3 min-w-[200px] animate-in fade-in-0 slide-in-from-right-1",
                       isDark ? "border-neutral-700" : "border-neutral-200",
                     )}
                   >
@@ -954,7 +964,7 @@ export const Sidebar = memo(() => {
               <div
                 className={cn(
                   "absolute z-50 bg-card border border-border rounded-lg shadow-sm p-1 animate-in fade-in-0 zoom-in-95",
-                  isOpen ? "top-full left-3 right-3 mt-2" : "left-full top-0 ml-2 min-w-[200px]",
+                  isOpen ? "top-full left-3 right-3 mt-2" : "right-full top-0 mr-2 min-w-[200px]",
                 )}
               >
               <button

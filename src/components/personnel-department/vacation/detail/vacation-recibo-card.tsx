@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,12 @@ import { generateVacationReciboPDF } from "../../../../utils/vacation-recibo-pdf
 interface VacationReciboCardProps {
   vacation: Vacation;
   className?: string;
+  /**
+   * Payment action rendered at the foot of the recibo (e.g. "Marcar como pago"
+   * or a "Pago em …" confirmation). Lives here — next to the Líquido a Receber —
+   * because paying the vacation IS paying this recibo.
+   */
+  paymentSlot?: ReactNode;
 }
 
 function Line({ label, amount, negative }: { label: string; amount: number; negative?: boolean }) {
@@ -70,7 +76,7 @@ function reciboFromEntity(vacation: Vacation): VacationRecibo | null {
   };
 }
 
-export function VacationReciboCard({ vacation, className }: VacationReciboCardProps) {
+export function VacationReciboCard({ vacation, className, paymentSlot }: VacationReciboCardProps) {
   const calculate = useVacationCalculate();
   const [recalculated, setRecalculated] = useState<VacationRecibo | null>(null);
 
@@ -176,6 +182,8 @@ export function VacationReciboCard({ vacation, className }: VacationReciboCardPr
             </div>
           </>
         )}
+
+        {paymentSlot && <div className="border-t border-border pt-4">{paymentSlot}</div>}
       </CardContent>
     </Card>
   );
