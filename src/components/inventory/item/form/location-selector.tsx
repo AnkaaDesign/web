@@ -1,15 +1,16 @@
-import { useMemo, useRef, useCallback, useEffect } from "react";
+import { useMemo, useRef, useCallback, useEffect, useState } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
+import { Label } from "@/components/ui/label";
 import { useFormContext } from "react-hook-form";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
 import { getWarehouseLocations } from "../../../../api-client";
-import { warehouseLocationKeys, useWarehouseLocationDetail } from "../../../../hooks";
+import { warehouseLocationKeys, useWarehouseLocationDetail, useWarehouseLocations } from "../../../../hooks";
 import type { WarehouseLocation } from "../../../../types";
 import { WAREHOUSE_LOCATION_TYPE } from "../../../../constants";
 import { columnsForLevel } from "../../warehouse-location/map/warehouse-type-style";
 import { cn } from "@/lib/utils";
-import { IconMapPin } from "@tabler/icons-react";
+import { IconMapPin, IconBuildingWarehouse } from "@tabler/icons-react";
 
 type FormData = ItemCreateFormData | ItemUpdateFormData;
 
@@ -42,13 +43,23 @@ export function ItemLocationSelector({ disabled, initialWarehouseLocation }: Loc
     }
   }, [initialWarehouseLocation?.id]);
 
+  // ---- Setor filter: narrows the localização list to one warehouse sector ----
+  const [sector, setSector] = useState<string | null>(initialWarehouseLocation?.section ?? null);
+  const { data: allLocations } = useWarehouseLocations({ isActive: true, orderBy: { section: "asc" }, limit: 100 });
+  const sectorOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of allLocations?.data ?? []) if (l.section) set.add(l.section);
+    if (initialWarehouseLocation?.section) set.add(initialWarehouseLocation.section);
+    return Array.from(set).sort().map((s) => ({ value: s, label: s }));
+  }, [allLocations, initialWarehouseLocation?.section]);
+
   const fetchLocations = useCallback(async (searchTerm: string, page = 1) => {
     try {
       const response = await getWarehouseLocations({
         page,
         take: 50,
         orderBy: { name: "asc" },
-        where: { isActive: true },
+        where: { isActive: true, ...(sector ? { section: sector } : {}) },
         ...(searchTerm && searchTerm.trim()
           ? {
               searchingFor: searchTerm.trim(),
@@ -77,10 +88,18 @@ export function ItemLocationSelector({ disabled, initialWarehouseLocation }: Loc
         hasMore: false,
       };
     }
-  }, []);
+  }, [sector]);
 
   // Watch the chosen location + cell fields.
   const warehouseLocationId = form.watch("warehouseLocationId");
+
+  // Changing the setor clears a chosen localização that doesn't belong to it.
+  useEffect(() => {
+    if (!sector || !warehouseLocationId) return;
+    const sel = cacheRef.current.get(warehouseLocationId);
+    if (sel && sel.section && sel.section !== sector) form.setValue("warehouseLocationId", null, { shouldDirty: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sector]);
   const locationLevel = form.watch("locationLevel");
 
   // Fetch the chosen location's grid (levels / columns / columnsPerLevel).
@@ -125,45 +144,70 @@ export function ItemLocationSelector({ disabled, initialWarehouseLocation }: Loc
   }, [grid, isKanban, form]);
 
   const showCellSelectors = !!warehouseLocationId && (grid?.levels ?? 0) > 0;
-  const colCount = 1 + (showCellSelectors ? 1 : 0) + (showCellSelectors && isKanban ? 1 : 0);
-  const gridCls = cn("grid gap-4", colCount === 3 ? "md:grid-cols-3" : colCount === 2 ? "md:grid-cols-2" : "grid-cols-1");
+  const cellCols = (showCellSelectors ? 1 : 0) + (showCellSelectors && isKanban ? 1 : 0);
+  const cellGridCls = cn("grid gap-4", cellCols === 2 ? "md:grid-cols-2" : "grid-cols-1");
 
   return (
-    <div className={gridCls}>
-      <FormField
-        control={form.control}
-        name="warehouseLocationId"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel className="flex items-center gap-2">
-              <IconMapPin className="h-4 w-4" />
-              Localização
-            </FormLabel>
-            <FormControl>
-              <Combobox
-                value={field.value || ""}
-                onValueChange={field.onChange}
-                async={true}
-                queryKey={["warehouseLocations", "selector"]}
-                queryFn={fetchLocations}
-                initialOptions={initialOptions}
-                minSearchLength={0}
-                pageSize={50}
-                debounceMs={300}
-                placeholder="Selecione a localização"
-                emptyText="Nenhuma localização encontrada"
-                searchPlaceholder="Digite o nome ou setor..."
-                disabled={disabled}
-                clearable
-                queryKeysToInvalidate={[[warehouseLocationKeys.all]] as unknown[][]}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Setor — a local filter (not an item field); narrows the localização list to one sector. */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <IconBuildingWarehouse className="h-4 w-4" />
+            Setor
+          </Label>
+          <Combobox
+            value={sector ?? ""}
+            onValueChange={(v) => {
+              const s = Array.isArray(v) ? v[0] : v;
+              setSector(s || null);
+            }}
+            options={sectorOptions}
+            mode="single"
+            placeholder="Todos os setores"
+            emptyText="Nenhum setor"
+            searchable={false}
+            clearable
+            disabled={disabled}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="warehouseLocationId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="flex items-center gap-2">
+                <IconMapPin className="h-4 w-4" />
+                Localização
+              </FormLabel>
+              <FormControl>
+                <Combobox
+                  value={field.value || ""}
+                  onValueChange={field.onChange}
+                  async={true}
+                  queryKey={["warehouseLocations", "selector", sector ?? "all"]}
+                  queryFn={fetchLocations}
+                  initialOptions={initialOptions}
+                  minSearchLength={0}
+                  pageSize={50}
+                  debounceMs={300}
+                  placeholder={sector ? `Localizações do ${sector}` : "Selecione a localização"}
+                  emptyText="Nenhuma localização encontrada"
+                  searchPlaceholder="Digite o nome ou código..."
+                  disabled={disabled}
+                  clearable
+                  queryKeysToInvalidate={[[warehouseLocationKeys.all]] as unknown[][]}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
 
       {showCellSelectors && (
+        <div className={cellGridCls}>
         <FormField
           control={form.control}
           name="locationLevel"
@@ -190,9 +234,8 @@ export function ItemLocationSelector({ disabled, initialWarehouseLocation }: Loc
             </FormItem>
           )}
         />
-      )}
 
-      {showCellSelectors && isKanban && (
+        {isKanban && (
         <FormField
           control={form.control}
           name="locationColumn"
@@ -218,6 +261,8 @@ export function ItemLocationSelector({ disabled, initialWarehouseLocation }: Loc
             </FormItem>
           )}
         />
+        )}
+        </div>
       )}
     </div>
   );

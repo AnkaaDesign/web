@@ -27,7 +27,8 @@ export function WarehouseLocationFrontView({ location, highlightItemIds }: Wareh
   // is addressed by prateleira only (S1-E2-P4), no column.
   const hasColumns = isKanban;
   const levels = Math.max(1, location.levels);
-  const levelOrder = useMemo(() => { const arr: number[] = []; for (let lvl = levels; lvl >= 1; lvl--) arr.push(lvl); return arr; }, [levels]);
+  // levels read top → bottom (nível 1 no topo); columns left → right.
+  const levelOrder = useMemo(() => Array.from({ length: levels }, (_, i) => i + 1), [levels]);
   const codeStr = [location.section, location.code].filter(Boolean).join("-") || location.name;
   const totalBoxes = useMemo(() => (isKanban ? levelOrder.reduce((a, l) => a + columnsForLevel(location, l), 0) : 0), [isKanban, levelOrder, location]);
   const countText = isPallet

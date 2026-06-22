@@ -756,6 +756,7 @@ export const MEASURE_TYPE_LABELS: Record<MEASURE_TYPE, string> = {
   [MEASURE_TYPE.VOLUME]: "Volume",
   [MEASURE_TYPE.LENGTH]: "Comprimento",
   [MEASURE_TYPE.WIDTH]: "Largura",
+  [MEASURE_TYPE.THICKNESS]: "Espessura",
   [MEASURE_TYPE.AREA]: "Área",
   [MEASURE_TYPE.COUNT]: "Contagem",
   [MEASURE_TYPE.DIAMETER]: "Diâmetro",

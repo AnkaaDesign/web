@@ -1,9 +1,7 @@
-import { IconRotateClockwise2 } from "@tabler/icons-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Combobox } from "@/components/ui/combobox";
-import { WAREHOUSE_LOCATION_TYPE, WAREHOUSE_LOCATION_TYPE_LABELS } from "../../../../constants";
+import { cn } from "@/lib/utils";
+import { WAREHOUSE_LOCATION_TYPE } from "../../../../constants";
 
 /** Local editable copy of a structure while its editor modal is open. */
 export interface StructureDraft {
@@ -24,9 +22,9 @@ export interface StructureDraft {
 interface Props {
   draft: StructureDraft;
   onChange: (patch: Partial<StructureDraft>) => void;
+  /** True when the typed código collides with another structure in the same setor. */
+  duplicateCode?: boolean;
 }
-
-const TYPE_OPTIONS = Object.values(WAREHOUSE_LOCATION_TYPE).map((t) => ({ value: t, label: WAREHOUSE_LOCATION_TYPE_LABELS[t] }));
 
 const numberOr = (raw: string | number | null, fallback: number, min = 0) => {
   const n = typeof raw === "number" ? raw : Number(raw);
@@ -40,46 +38,32 @@ const textOrNull = (raw: string | number | null) => {
 
 const snap10 = (v: number) => Math.round(v / 10) * 10; // align to the 10 cm grid
 
-/** Form fields for the structure editor — rendered inside a modal Dialog. */
-export function WarehouseStructureFields({ draft, onChange }: Props) {
+/**
+ * Form fields for the structure editor — rendered inside a modal Dialog.
+ *
+ * The structure TYPE is fixed at creation (chosen from the "Adicionar" toolbar) and is shown in
+ * the dialog title, so it is intentionally not editable here. There is no separate "Nome": the
+ * map identifies every structure as "setor-código" (e.g. S1-E9), so the código is the only label
+ * that matters and the full name is derived from it. Orientation is not a toggle either — just
+ * make one side longer than the other (Largura vs Profundidade) and the rack turns to match.
+ */
+export function WarehouseStructureFields({ draft, onChange, duplicateCode }: Props) {
   const isKanban = draft.type === WAREHOUSE_LOCATION_TYPE.ESTANTE_KANBAN; // only kanban shelves have boxes (caixas)
-  // Swap width/height around the center → vertical / horizontal orientation.
-  const rotate90 = () => {
-    const cx = draft.positionX + draft.width / 2;
-    const cy = draft.positionY + draft.height / 2;
-    const nw = snap10(draft.height);
-    const nh = snap10(draft.width);
-    onChange({ width: nw, height: nh, positionX: snap10(cx - nw / 2), positionY: snap10(cy - nh / 2) });
-  };
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
-        <Label className="text-xs">Nome</Label>
-        <Input value={draft.name} onChange={(v) => onChange({ name: String(v ?? "") })} placeholder="Ex: Estante A1" />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs">Tipo</Label>
-        <Combobox
-          value={draft.type}
-          onValueChange={(v) => {
-            if (v && !Array.isArray(v)) {
-              const type = v as WAREHOUSE_LOCATION_TYPE;
-              // Only kanban shelves have boxes (caixas/columns); reset to 1 for the others.
-              onChange(type === WAREHOUSE_LOCATION_TYPE.ESTANTE_KANBAN ? { type } : { type, columns: 1 });
-            }
-          }}
-          options={TYPE_OPTIONS}
-          mode="single"
-          clearable={false}
-          placeholder="Selecione o tipo"
-          searchable={false}
-        />
-      </div>
-
-      <div className="space-y-1.5">
         <Label className="text-xs">Código</Label>
-        <Input value={draft.code ?? ""} onChange={(v) => onChange({ code: textOrNull(v) })} placeholder="A1" />
+        <Input
+          value={draft.code ?? ""}
+          onChange={(v) => onChange({ code: textOrNull(v) })}
+          placeholder="E9"
+          className={cn(duplicateCode && "border-destructive focus-visible:ring-destructive")}
+        />
+        {duplicateCode ? (
+          <p className="text-[11px] text-destructive">Já existe uma estrutura com este código neste setor.</p>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">Identificada no mapa como {[draft.section, draft.code].filter(Boolean).join("-") || "—"}.</p>
+        )}
       </div>
 
       <div className={isKanban ? "grid grid-cols-2 gap-3" : "space-y-1.5"}>
@@ -106,12 +90,8 @@ export function WarehouseStructureFields({ draft, onChange }: Props) {
         </div>
       </div>
 
-      <Button type="button" variant="outline" size="sm" className="w-full gap-1.5" onClick={rotate90}>
-        <IconRotateClockwise2 className="h-4 w-4" /> Girar 90° (deixar vertical / horizontal)
-      </Button>
-
       <p className="text-[11px] text-muted-foreground">
-        Posição: {Math.round(draft.positionX)}, {Math.round(draft.positionY)} cm · arraste a estrutura no mapa para reposicionar.
+        Posição: {Math.round(draft.positionX)}, {Math.round(draft.positionY)} cm · arraste a estrutura no mapa para reposicionar. Para deixar a estrutura na vertical ou horizontal, basta deixar um lado maior que o outro.
       </p>
     </div>
   );

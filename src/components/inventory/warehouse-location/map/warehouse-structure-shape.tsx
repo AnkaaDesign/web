@@ -91,15 +91,14 @@ export function StructureShape({ id, type, x, y, w, h, selected, columns = 1, sx
   }
 
   // ---- ESTANTE / DUPLA / KANBAN: steel rack -------------------------------
-  // Corner uprights drawn as FILLED angle-iron L-posts, sized PROPORTIONALLY to the box
-  // so they stay clearly visible at every zoom (a thin stroke vanished when zoomed in).
-  // Corner posts are a FIXED physical size (like real angle-iron uprights) so every rack —
-  // wide or narrow — has identical corners. Floor keeps them visible (min 5px) when zoomed
-  // out; the per-box clamp only shrinks them for unusually tiny structures.
+  // Corner uprights drawn as FILLED angle-iron L-posts — kept SLIM so they read as a thin
+  // angle-iron corner detail, not a chunky block. The leg gives a recognisable corner; the
+  // thickness is deliberately small. Floor keeps them visible when zoomed out; the per-box
+  // clamp only shrinks them for unusually tiny structures.
   const span = Math.min(w, h);
-  const postLen = Math.min(Math.max(7, cmx(5)), span * 0.4); // ~7 cm leg
-  const postTh = Math.min(Math.max(3, cmx(1.5)), span * 0.2); // ~3 cm thickness
-  const POST_FILL = "#2a2f38";
+  const postLen = Math.min(Math.max(5, cmx(3.5)), span * 0.28); // ~5 cm leg
+  const postTh = Math.min(Math.max(1.5, cmx(1)), span * 0.07); // ~1.5 cm thickness (slim)
+  const POST_FILL = "#3a414c";
   const lPost = (px: number, py: number, dx: number, dy: number) =>
     `M ${px} ${py} L ${px + dx * postLen} ${py} L ${px + dx * postLen} ${py + dy * postTh} L ${px + dx * postTh} ${py + dy * postTh} L ${px + dx * postTh} ${py + dy * postLen} L ${px} ${py + dy * postLen} Z`;
   const posts = [

@@ -50,8 +50,13 @@ interface ViewBox {
 const ZOOM_STEP = 1.2;
 const PADDING = 120;
 const GRID_CM = 10; // grid + placement snap = 10 cm
-const MAJOR_GRID_CM = 100; // bold line every 1 m
 const SNAP_CM = 10;
+const GRID_OPTIONS: { label: string; value: number }[] = [
+  { label: "Não mostrar", value: 0 },
+  { label: "10", value: 10 },
+  { label: "30", value: 30 },
+  { label: "60", value: 60 },
+]; // 0 = grid hidden
 const snapPos = (v: number) => Math.round(v / GRID_CM) * GRID_CM;
 const snapSize = (v: number) => Math.round(v / SNAP_CM) * SNAP_CM;
 const MIN_VIEW_W = 200;
@@ -94,14 +99,32 @@ const FUNNEL_Y: number | null = (() => {
   }
   return null;
 })();
+// Right wall of the narrow extension below the funnel (x where the L-shape steps inward).
+const FUNNEL_X: number | null = (() => {
+  for (let i = 1; i < FLOOR_POINTS.length; i++) {
+    if (FLOOR_POINTS[i][1] === FLOOR_POINTS[i - 1][1] && FLOOR_POINTS[i][0] < FLOOR_POINTS[i - 1][0]) return FLOOR_POINTS[i][0];
+  }
+  return null;
+})();
+// Clamp a structure rectangle so it stays fully INSIDE the L-shaped floor — structures may
+// never be placed/dragged/resized past the warehouse walls.
+const clampToFloor = (x: number, y: number, w: number, h: number) => {
+  const maxX = FLOOR_BOX.x + FLOOR_BOX.w - w;
+  const maxY = FLOOR_BOX.y + FLOOR_BOX.h - h;
+  let nx = Math.min(Math.max(x, FLOOR_BOX.x), Math.max(FLOOR_BOX.x, maxX));
+  let ny = Math.min(Math.max(y, FLOOR_BOX.y), Math.max(FLOOR_BOX.y, maxY));
+  // any part reaching into the narrow extension is bounded by its inner right wall
+  if (FUNNEL_Y != null && FUNNEL_X != null && ny + h > FUNNEL_Y) nx = Math.max(FLOOR_BOX.x, Math.min(nx, FUNNEL_X - w));
+  return { x: nx, y: ny };
+};
 const FALLBACK_VIEWBOX: ViewBox = { x: -PADDING, y: -PADDING, w: FLOOR_BOX.w + PADDING * 2, h: FLOOR_BOX.h + PADDING * 2 };
 
 const DEFAULT_SIZE: Record<WAREHOUSE_LOCATION_TYPE, { w: number; h: number }> = {
-  [WAREHOUSE_LOCATION_TYPE.ESTANTE]: { w: 70, h: 30 },
-  [WAREHOUSE_LOCATION_TYPE.ESTANTE_DUPLA]: { w: 70, h: 60 },
-  [WAREHOUSE_LOCATION_TYPE.ESTANTE_KANBAN]: { w: 70, h: 30 },
+  [WAREHOUSE_LOCATION_TYPE.ESTANTE]: { w: 90, h: 30 },
+  [WAREHOUSE_LOCATION_TYPE.ESTANTE_DUPLA]: { w: 90, h: 60 },
+  [WAREHOUSE_LOCATION_TYPE.ESTANTE_KANBAN]: { w: 90, h: 30 },
   [WAREHOUSE_LOCATION_TYPE.PAINEL]: { w: 100, h: 20 },
-  [WAREHOUSE_LOCATION_TYPE.PALETE]: { w: 120, h: 100 },
+  [WAREHOUSE_LOCATION_TYPE.PALETE]: { w: 120, h: 120 },
 };
 
 /** Pending local edits (geometry + fields), keyed by id, until Concluir. */
@@ -146,14 +169,20 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
   const [isNew, setIsNew] = useState(false);
   const [pending, setPending] = useState<Record<string, Pending>>({});
   const [confirmDelete, setConfirmDelete] = useState<WarehouseLocation | null>(null);
+  const [gridStep, setGridStep] = useState(GRID_CM); // visible minor-grid step (cm)
 
   const effective = useCallback((loc: WarehouseLocation): WarehouseLocation => ({ ...loc, ...(pending[loc.id] ?? {}) }), [pending]);
   const geomOf = useCallback((loc: WarehouseLocation): Geom => { const e = effective(loc); return { positionX: e.positionX, positionY: e.positionY, width: e.width, height: e.height, rotation: e.rotation }; }, [effective]);
 
   const makeDraft = useCallback((loc: WarehouseLocation): StructureDraft => { const e = effective(loc); return { id: e.id, name: e.name, type: e.type, section: e.section, code: e.code, levels: e.levels, columns: e.columns, width: e.width, height: e.height, rotation: e.rotation, positionX: e.positionX, positionY: e.positionY }; }, [effective]);
   const [draft, setDraft] = useState<StructureDraft | null>(null);
+  const draftRef = useRef<StructureDraft | null>(null);
+  draftRef.current = draft;
   const selectStructure = useCallback((loc: WarehouseLocation) => { setSelectedId(loc.id); setDraft(makeDraft(loc)); }, [makeDraft]);
   const deselect = useCallback(() => { setSelectedId(null); setDraft(null); }, []);
+  // The map identifies a structure as "setor-código"; keep the stored name in sync with that
+  // so lists/labels elsewhere stay correct (the form no longer has a separate Nome field).
+  const deriveName = (section: string | null, code: string | null, fallback: string) => [section, code].filter(Boolean).join("-") || fallback;
 
   // ---- Floor boundary ----
   const floor = FLOOR_BOX;
@@ -278,12 +307,14 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
       }
       const cur = clientToSvg(e.clientX, e.clientY);
       if (it.kind === "move") {
-        const nx = snapPos(it.origin.positionX + (cur.x - it.startX));
-        const ny = snapPos(it.origin.positionY + (cur.y - it.startY));
+        const clamped = clampToFloor(snapPos(it.origin.positionX + (cur.x - it.startX)), snapPos(it.origin.positionY + (cur.y - it.startY)), it.origin.width, it.origin.height);
+        const nx = clamped.x;
+        const ny = clamped.y;
         if (nx !== it.origin.positionX || ny !== it.origin.positionY) it.moved = true;
         const section = sectorAt(ny, it.origin.height); // sector is derived from where the structure sits on the map
-        setPending((p) => ({ ...p, [it.id]: { ...p[it.id], positionX: nx, positionY: ny, section } }));
-        setDraft((d) => (d && d.id === it.id ? { ...d, positionX: nx, positionY: ny, section } : d));
+        const name = deriveName(section, draftRef.current?.code ?? null, draftRef.current?.name ?? `${section}`);
+        setPending((p) => ({ ...p, [it.id]: { ...p[it.id], positionX: nx, positionY: ny, section, name } }));
+        setDraft((d) => (d && d.id === it.id ? { ...d, positionX: nx, positionY: ny, section, name } : d));
       } else if (it.kind === "resize") {
         const ox = it.origin.positionX, oy = it.origin.positionY, ow = it.origin.width, oh = it.origin.height;
         const right = ox + ow, bottom = oy + oh;
@@ -298,6 +329,13 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
         } else {
           nx = Math.min(snapPos(ox + dx), right - SNAP_CM); const nb = Math.max(oy + SNAP_CM, snapSize(bottom + dy)); nw = right - nx; nh = nb - oy;
         }
+        // keep the resized box inside the floor walls (clamp edges, never poke outside)
+        if (nx < FLOOR_BOX.x) { nw -= FLOOR_BOX.x - nx; nx = FLOOR_BOX.x; }
+        if (ny < FLOOR_BOX.y) { nh -= FLOOR_BOX.y - ny; ny = FLOOR_BOX.y; }
+        const rLimit = FUNNEL_Y != null && FUNNEL_X != null && ny + nh > FUNNEL_Y ? FUNNEL_X : FLOOR_BOX.x + FLOOR_BOX.w;
+        if (nx + nw > rLimit) nw = rLimit - nx;
+        if (ny + nh > FLOOR_BOX.y + FLOOR_BOX.h) nh = FLOOR_BOX.y + FLOOR_BOX.h - ny;
+        nw = Math.max(SNAP_CM, nw); nh = Math.max(SNAP_CM, nh);
         setPending((p) => ({ ...p, [it.id]: { ...p[it.id], positionX: nx, positionY: ny, width: nw, height: nh } }));
         setDraft((d) => (d && d.id === it.id ? { ...d, positionX: nx, positionY: ny, width: nw, height: nh } : d));
       }
@@ -359,11 +397,13 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
     async (type: WAREHOUSE_LOCATION_TYPE) => {
       const size = DEFAULT_SIZE[type];
       const vb = viewBoxRef.current;
-      let px = snapPos(vb.x + vb.w / 2 - size.w / 2);
-      let py = snapPos(vb.y + vb.h / 2 - size.h / 2);
+      // start near the viewport centre but always clamped inside the floor walls
+      const start = clampToFloor(snapPos(vb.x + vb.w / 2 - size.w / 2), snapPos(vb.y + vb.h / 2 - size.h / 2), size.w, size.h);
+      let px = start.x;
+      let py = start.y;
       const occupied = (x: number, y: number) => locations.some((l) => { const g = geomOf(l); return g.positionX === x && g.positionY === y; });
       let guard = 0;
-      while (occupied(px, py) && guard < 30) { px += GRID_CM; py += GRID_CM; guard++; }
+      while (occupied(px, py) && guard < 30) { const c = clampToFloor(px + GRID_CM, py + GRID_CM, size.w, size.h); px = c.x; py = c.y; guard++; }
       // auto sector (from position) + next free code in that sector (E1, K2, PL3…)
       const section = sectorAt(py, size.h);
       const prefix = TYPE_PREFIX[type];
@@ -380,9 +420,13 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
 
   const panelChange = useCallback(
     (patch: Partial<StructureDraft>) => {
-      if (!selectedId) return;
-      setDraft((d) => (d ? { ...d, ...patch } : d));
-      const { id: _omit, ...rest } = patch as any;
+      const cur = draftRef.current;
+      if (!selectedId || !cur || cur.id !== selectedId) return;
+      const next = { ...cur, ...patch };
+      // código (or setor) changed → re-derive the stored name from "setor-código"
+      if ("code" in patch || "section" in patch) next.name = deriveName(next.section, next.code, cur.name);
+      setDraft(next);
+      const { id: _omit, ...rest } = next;
       setPending((p) => ({ ...p, [selectedId]: { ...p[selectedId], ...rest } }));
     },
     [selectedId],
@@ -421,6 +465,17 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
   }, [deselect, queryClient]);
   useImperativeHandle(ref, () => ({ commit, discard }), [commit, discard]);
 
+  // código must be unique within its setor — flagged in the editor and blocks "Aplicar"
+  const codeDuplicate = useMemo(() => {
+    const code = draft?.code?.trim().toLowerCase();
+    if (!draft || !code) return false;
+    return locations.some((l) => {
+      if (l.id === draft.id) return false;
+      const e = effective(l);
+      return e.section === draft.section && String(e.code ?? "").trim().toLowerCase() === code;
+    });
+  }, [draft, locations, effective]);
+
   const isEdit = mode === "edit";
 
   // ---- projection ----
@@ -430,29 +485,47 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
   const pxPerCmX = canvasSize.w / viewBox.w;
   const pxPerCmY = canvasSize.h / viewBox.h;
   const project = (cx: number, cy: number) => ({ x: (cx - viewBox.x) * pxPerCmX, y: (cy - viewBox.y) * pxPerCmY });
-  const showMinorGrid = GRID_CM * pxPerCmX >= 4; // hide the 10 cm grid when zoomed far out
+  const showMinorGrid = gridStep > 0 && gridStep * pxPerCmX >= 4; // hidden when "Não mostrar" or zoomed far out
 
   return (
     <>
       <Card className={cn("relative flex flex-col overflow-hidden border border-border shadow-sm", className)}>
-        {/* top bar */}
-        <div className="flex-shrink-0 border-b border-border p-3">
-          {isEdit ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Adicionar:</span>
-              {Object.values(WAREHOUSE_LOCATION_TYPE).map((type) => {
-                const Icon = WAREHOUSE_TYPE_STYLE[type].icon;
-                return (
-                  <Button key={type} variant="outline" size="sm" className="gap-1.5" onClick={() => addStructure(type)} disabled={createMutation.isPending}>
-                    <Icon className="h-4 w-4" style={{ color: WAREHOUSE_TYPE_STYLE[type].color }} />
-                    {WAREHOUSE_LOCATION_TYPE_LABELS[type]}
-                  </Button>
-                );
-              })}
+        {/* top bar: search / add-toolbar on the left, grid selector on the right (same row) */}
+        <div className="flex-shrink-0 bg-muted/20 p-3">
+          <div className="flex items-center gap-2">
+            {isEdit ? (
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">Adicionar:</span>
+                {Object.values(WAREHOUSE_LOCATION_TYPE).map((type) => {
+                  const Icon = WAREHOUSE_TYPE_STYLE[type].icon;
+                  return (
+                    <Button key={type} variant="outline" size="sm" className="gap-1.5" onClick={() => addStructure(type)} disabled={createMutation.isPending}>
+                      <Icon className="h-4 w-4" style={{ color: WAREHOUSE_TYPE_STYLE[type].color }} />
+                      {WAREHOUSE_LOCATION_TYPE_LABELS[type]}
+                    </Button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex-1">
+                <TableSearchInput value={itemQuery} onChange={setItemQuery} placeholder="Buscar item no mapa..." isPending={searching} />
+              </div>
+            )}
+            {/* grid-step selector — same height as the search input */}
+            <div className="flex h-10 shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 text-xs text-muted-foreground">
+              <span className="mr-0.5 hidden font-medium sm:inline">Grade</span>
+              {GRID_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setGridStep(opt.value)}
+                  className={cn("rounded px-2 py-1.5 font-medium transition-colors", gridStep === opt.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
-          ) : (
-            <TableSearchInput value={itemQuery} onChange={setItemQuery} placeholder="Buscar item no mapa..." isPending={searching} />
-          )}
+          </div>
         </div>
 
         {/* canvas */}
@@ -478,19 +551,15 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
                 onPointerUp={handlePointerUp}
               >
                 <defs>
-                  <pattern id="wh-grid-minor" width={GRID_CM} height={GRID_CM} patternUnits="userSpaceOnUse">
-                    <path d={`M ${GRID_CM} 0 L 0 0 0 ${GRID_CM}`} fill="none" stroke="hsl(var(--muted-foreground))" strokeOpacity={0.2} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-                  </pattern>
-                  <pattern id="wh-grid-major" width={MAJOR_GRID_CM} height={MAJOR_GRID_CM} patternUnits="userSpaceOnUse">
-                    <path d={`M ${MAJOR_GRID_CM} 0 L 0 0 0 ${MAJOR_GRID_CM}`} fill="none" stroke="hsl(var(--muted-foreground))" strokeOpacity={0.34} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+                  <pattern id="wh-grid-minor" width={gridStep || GRID_CM} height={gridStep || GRID_CM} patternUnits="userSpaceOnUse">
+                    <path d={`M ${gridStep || GRID_CM} 0 L 0 0 0 ${gridStep || GRID_CM}`} fill="none" stroke="hsl(var(--muted-foreground))" strokeOpacity={0.1} strokeWidth={1} vectorEffect="non-scaling-stroke" />
                   </pattern>
                   <clipPath id="wh-floor-clip"><path d={FLOOR_PATH} /></clipPath>
                 </defs>
                 <rect data-role="bg" x={viewBox.x} y={viewBox.y} width={viewBox.w} height={viewBox.h} fill="transparent" />
-                <path data-role="bg" d={FLOOR_PATH} fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeOpacity={0.4} strokeWidth={2.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+                <path data-role="bg" d={FLOOR_PATH} fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeOpacity={0.28} strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
                 <g clipPath="url(#wh-floor-clip)" style={{ pointerEvents: "none" }} shapeRendering="crispEdges">
                   {showMinorGrid && <rect x={floor.x} y={floor.y} width={floor.w} height={floor.h} fill="url(#wh-grid-minor)" />}
-                  <rect x={floor.x} y={floor.y} width={floor.w} height={floor.h} fill="url(#wh-grid-major)" />
                   {/* interior walls separating the sectors — each placed in the AISLE GAP
                       between sector clusters so a divider never cuts through a structure */}
                   {(() => {
@@ -510,7 +579,7 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
                       const t = tops[SECTOR_BANDS[i + 1].id];
                       ys.push(snapPos(b != null && t != null && isFinite(b) && isFinite(t) && t >= b ? (b + t) / 2 : SECTOR_BANDS[i].yMax));
                     }
-                    return ys.map((yy) => <line key={yy} x1={floor.x} y1={yy} x2={floor.x + floor.w} y2={yy} stroke="hsl(var(--foreground))" strokeOpacity={0.4} strokeWidth={3} vectorEffect="non-scaling-stroke" />);
+                    return ys.map((yy) => <line key={yy} x1={floor.x} y1={yy} x2={floor.x + floor.w} y2={yy} stroke="hsl(var(--foreground))" strokeOpacity={0.25} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />);
                   })()}
                 </g>
 
@@ -606,7 +675,6 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => zoomBy(1 / ZOOM_STEP)} title="Afastar"><IconMinus className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetView} title="Ajustar à tela"><IconMaximize className="h-4 w-4" /></Button>
               </div>
-              <span className="pointer-events-none absolute bottom-3 left-3 z-10 rounded bg-card/70 px-1.5 py-0.5 text-[11px] text-muted-foreground">Grade: {showMinorGrid ? `${GRID_CM} cm` : `${MAJOR_GRID_CM} cm`}</span>
             </>
           )}
         </div>
@@ -615,13 +683,17 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
       {/* structure editor modal */}
       <Dialog open={editOpen} onOpenChange={(open) => { if (!open) setEditOpen(false); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
-          <DialogHeader><DialogTitle>{isNew ? "Nova estrutura" : "Editar estrutura"}</DialogTitle></DialogHeader>
-          {draft && <WarehouseStructureFields draft={draft} onChange={panelChange} />}
+          <DialogHeader>
+            <DialogTitle>
+              {(isNew ? "Nova estrutura" : "Editar estrutura") + (draft ? ` · ${WAREHOUSE_LOCATION_TYPE_LABELS[draft.type]}` : "")}
+            </DialogTitle>
+          </DialogHeader>
+          {draft && <WarehouseStructureFields draft={draft} onChange={panelChange} duplicateCode={codeDuplicate} />}
           <DialogFooter className="gap-2 sm:justify-between">
             <Button variant="destructive" className="gap-1" onClick={() => { const loc = locations.find((l) => l.id === draft?.id); if (loc) setConfirmDelete(loc); }} disabled={deleteMutation.isPending}>
               <IconTrash className="h-4 w-4" /> Excluir
             </Button>
-            <Button onClick={applyEditor}>Aplicar</Button>
+            <Button onClick={applyEditor} disabled={codeDuplicate}>Aplicar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

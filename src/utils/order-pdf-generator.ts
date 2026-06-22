@@ -118,7 +118,9 @@ export function buildOrderPdfHtml(data: OrderPdfData): string {
   // Header metadata line.
   const metaParts: string[] = [];
   if (orderDate) metaParts.push(`<strong>Data do Pedido:</strong> ${formatDate(orderDate)}`);
-  if (forecastDate) metaParts.push(`<strong>Entrega:</strong> ${formatDate(forecastDate)}`);
+  // The delivery forecast ("Entrega") only makes sense on an actual purchase order.
+  // A budget/quote request (includePricing=false) has no committed delivery date yet.
+  if (forecastDate && includePricing) metaParts.push(`<strong>Entrega:</strong> ${formatDate(forecastDate)}`);
   metaParts.push(`<strong>Fornecedor:</strong> ${escapeHtml(data.supplierName || "-")}`);
 
   const itemRowsHtml = rows
