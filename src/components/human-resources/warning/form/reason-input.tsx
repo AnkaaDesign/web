@@ -1,4 +1,4 @@
-import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 
 interface ReasonInputProps {
@@ -29,7 +29,6 @@ export function ReasonInput({ control, disabled, required }: ReasonInputProps) {
               maxLength={500}
             />
           </FormControl>
-          <FormDescription>Descreva claramente o motivo que levou à advertência (mínimo 10 caracteres)</FormDescription>
           <FormMessage />
         </FormItem>
       )}

@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES } from "@/constants";
+import { routes, SECTOR_PRIVILEGES } from "@/constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useLoanMasters } from "@/hooks";
 import { EmployeeLoanDialog } from "@/components/human-resources/payroll/employee-loan-dialog";
@@ -30,7 +30,7 @@ function LoanListContent() {
         <PageHeader
           variant="list"
           title="Empréstimos"
-          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal" }, { label: "Empréstimos" }]}
+          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal", href: routes.personnelDepartment.root }, { label: "Empréstimos" }]}
           actions={[
             {
               key: "register",

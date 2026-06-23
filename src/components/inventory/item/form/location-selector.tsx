@@ -9,7 +9,6 @@ import { warehouseLocationKeys, useWarehouseLocationDetail, useWarehouseLocation
 import type { WarehouseLocation } from "../../../../types";
 import { WAREHOUSE_LOCATION_TYPE } from "../../../../constants";
 import { columnsForLevel } from "../../warehouse-location/map/warehouse-type-style";
-import { cn } from "@/lib/utils";
 import { IconMapPin, IconBuildingWarehouse } from "@tabler/icons-react";
 
 type FormData = ItemCreateFormData | ItemUpdateFormData;
@@ -100,7 +99,7 @@ export function ItemLocationSelector({ disabled, initialWarehouseLocation }: Loc
     if (sel && sel.section && sel.section !== sector) form.setValue("warehouseLocationId", null, { shouldDirty: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sector]);
-  const locationLevel = form.watch("locationLevel");
+  const locationCells = form.watch("locationCells");
 
   // Fetch the chosen location's grid (levels / columns / columnsPerLevel).
   const { data: locationDetail } = useWarehouseLocationDetail(warehouseLocationId || "", {
@@ -117,35 +116,47 @@ export function ItemLocationSelector({ disabled, initialWarehouseLocation }: Loc
   useEffect(() => {
     if (prevLocationRef.current !== warehouseLocationId) {
       prevLocationRef.current = warehouseLocationId;
-      form.setValue("locationLevel", null, { shouldDirty: true });
-      form.setValue("locationColumn", null, { shouldDirty: true });
+      form.setValue("locationCells", [], { shouldDirty: true });
     }
   }, [warehouseLocationId, form]);
-
-  const levelOptions = useMemo(() => {
-    const levels = grid?.levels ?? 0;
-    return Array.from({ length: levels }, (_, i) => i + 1);
-  }, [grid?.levels]);
 
   // Columns (the "C" — caixa kanban) only exist on kanban racks.
   const isKanban = grid?.type === WAREHOUSE_LOCATION_TYPE.ESTANTE_KANBAN;
   const isPanel = grid?.type === WAREHOUSE_LOCATION_TYPE.PAINEL;
   const levelLabel = isPanel ? "Linha" : "Prateleira";
 
-  const columnOptions = useMemo(() => {
-    if (!grid || !isKanban || locationLevel == null) return [] as number[];
-    const cols = columnsForLevel(grid, Number(locationLevel));
-    return Array.from({ length: cols }, (_, i) => i + 1);
-  }, [grid, isKanban, locationLevel]);
+  // Selectable cells: one option per prateleira (estante/painel) or per
+  // prateleira×caixa (kanban). Tokens: "<level>" or "<level>:<column>".
+  const cellOptions = useMemo(() => {
+    if (!grid) return [] as { value: string; label: string }[];
+    const levels = grid.levels ?? 0;
+    const opts: { value: string; label: string }[] = [];
+    for (let lvl = 1; lvl <= levels; lvl++) {
+      if (isKanban) {
+        const cols = columnsForLevel(grid, lvl);
+        for (let col = 1; col <= cols; col++) opts.push({ value: `${lvl}:${col}`, label: `Prateleira ${lvl} · Caixa ${col}` });
+      } else {
+        opts.push({ value: String(lvl), label: `${levelLabel} ${lvl}` });
+      }
+    }
+    return opts;
+  }, [grid, isKanban, levelLabel]);
 
-  // A non-kanban location has no column — keep it null.
-  useEffect(() => {
-    if (grid && !isKanban && form.getValues("locationColumn") != null) form.setValue("locationColumn", null, { shouldDirty: true });
-  }, [grid, isKanban, form]);
+  // Form value (cells) <-> combobox tokens.
+  const selectedTokens = useMemo(
+    () => (locationCells ?? []).map((c) => (c.column != null ? `${c.level}:${c.column}` : String(c.level))),
+    [locationCells],
+  );
+  const handleCellsChange = (v: string | string[] | null | undefined) => {
+    const tokens = Array.isArray(v) ? v : v ? [v] : [];
+    const cells = tokens.map((t) => {
+      const [l, c] = t.split(":");
+      return { level: Number(l), column: c != null ? Number(c) : null };
+    });
+    form.setValue("locationCells", cells, { shouldDirty: true });
+  };
 
   const showCellSelectors = !!warehouseLocationId && (grid?.levels ?? 0) > 0;
-  const cellCols = (showCellSelectors ? 1 : 0) + (showCellSelectors && isKanban ? 1 : 0);
-  const cellGridCls = cn("grid gap-4", cellCols === 2 ? "md:grid-cols-2" : "grid-cols-1");
 
   return (
     <div className="space-y-4">
@@ -207,23 +218,19 @@ export function ItemLocationSelector({ disabled, initialWarehouseLocation }: Loc
       </div>
 
       {showCellSelectors && (
-        <div className={cellGridCls}>
         <FormField
           control={form.control}
-          name="locationLevel"
-          render={({ field }) => (
+          name="locationCells"
+          render={() => (
             <FormItem>
-              <FormLabel>{levelLabel}</FormLabel>
+              <FormLabel>{isKanban ? "Prateleiras e Caixas" : `${levelLabel}s`}</FormLabel>
               <FormControl>
                 <Combobox
-                  value={field.value != null ? String(field.value) : ""}
-                  onValueChange={(v) => {
-                    const s = Array.isArray(v) ? v[0] : v;
-                    field.onChange(s ? Number(s) : null);
-                    form.setValue("locationColumn", null, { shouldDirty: true });
-                  }}
-                  options={levelOptions.map((lvl) => ({ value: String(lvl), label: `${levelLabel} ${lvl}` }))}
-                  placeholder={`Selecione a ${levelLabel.toLowerCase()}`}
+                  mode="multiple"
+                  value={selectedTokens}
+                  onValueChange={handleCellsChange}
+                  options={cellOptions}
+                  placeholder={`Selecione as ${levelLabel.toLowerCase()}s`}
                   emptyText="Nenhuma opção"
                   searchable
                   clearable
@@ -234,35 +241,6 @@ export function ItemLocationSelector({ disabled, initialWarehouseLocation }: Loc
             </FormItem>
           )}
         />
-
-        {isKanban && (
-        <FormField
-          control={form.control}
-          name="locationColumn"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Caixa (Coluna)</FormLabel>
-              <FormControl>
-                <Combobox
-                  value={field.value != null ? String(field.value) : ""}
-                  onValueChange={(v) => {
-                    const s = Array.isArray(v) ? v[0] : v;
-                    field.onChange(s ? Number(s) : null);
-                  }}
-                  options={columnOptions.map((col) => ({ value: String(col), label: `Caixa ${col}` }))}
-                  placeholder={locationLevel == null ? "Selecione a prateleira primeiro" : "Selecione a caixa"}
-                  emptyText="Nenhuma opção"
-                  searchable
-                  clearable
-                  disabled={disabled || locationLevel == null}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        )}
-        </div>
       )}
     </div>
   );

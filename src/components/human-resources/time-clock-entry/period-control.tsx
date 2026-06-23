@@ -23,6 +23,9 @@ interface PeriodControlProps {
   startDate?: Date | null;
   endDate?: Date | null;
   onRangeChange?: (start: Date | null, end: Date | null) => void;
+  /** When provided, renders a footer action in the popover to clear the period (e.g. "Todos os períodos"). */
+  onClear?: () => void;
+  clearLabel?: string;
   className?: string;
   triggerClassName?: string;
 }
@@ -44,6 +47,8 @@ export function PeriodControl({
   startDate,
   endDate,
   onRangeChange,
+  onClear,
+  clearLabel = "Limpar período",
   className,
   triggerClassName,
 }: PeriodControlProps) {
@@ -107,6 +112,22 @@ export function PeriodControl({
               }
               {...({} as any)}
             />
+          )}
+          {onClear && (
+            <div className="border-t p-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full justify-center"
+                onClick={() => {
+                  onClear();
+                  setOpen(false);
+                }}
+              >
+                {clearLabel}
+              </Button>
+            </div>
           )}
         </PopoverContent>
       </Popover>

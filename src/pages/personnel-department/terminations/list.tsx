@@ -17,7 +17,7 @@ const TerminationListPage = () => {
           variant="list"
           title="Rescisões"
           favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_RESCISOES_LISTAR}
-          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal" }, { label: "Rescisões" }]}
+          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal", href: routes.personnelDepartment.root }, { label: "Rescisões" }]}
           actions={[
             {
               key: "create",

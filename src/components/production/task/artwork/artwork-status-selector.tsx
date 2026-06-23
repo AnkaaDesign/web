@@ -43,7 +43,8 @@ export function ArtworkStatusSelector({
       disabled={isDisabled}
       searchable={false}
       clearable={false}
-      className="w-[140px]"
+      className="w-auto min-w-[150px]"
+      triggerClassName="whitespace-nowrap"
     />
   );
 }

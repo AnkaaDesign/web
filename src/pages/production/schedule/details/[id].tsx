@@ -1234,6 +1234,7 @@ export const TaskDetailsPage = () => {
       },
       quote: {
         include: {
+          layoutFiles: true,
           customerConfigs: {
             include: {
               customer: {
@@ -3076,24 +3077,28 @@ export const TaskDetailsPage = () => {
                     ) : null;
                   })()}
 
-                  {/* Layout File Preview */}
-                  {task.quote.layoutFile && (
+                  {/* Layout File Preview (the layoutFiles array) */}
+                  {(task.quote.layoutFiles?.length ?? 0) > 0 && (
                     <div className="bg-muted/30 rounded-lg p-4">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
                         <IconPhoto className="h-4 w-4 text-muted-foreground" />
                         Layout Aprovado
                       </div>
-                      <div className="flex justify-start">
-                        <img
-                          src={`${getApiBaseUrl()}/files/thumbnail/${task.quote.layoutFile.id}`}
-                          alt="Layout aprovado"
-                          className="max-h-48 rounded-lg shadow-sm object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => {
-                            if (fileViewerContext && task.quote?.layoutFile) {
-                              fileViewerContext.actions.viewFile(task.quote.layoutFile);
-                            }
-                          }}
-                        />
+                      <div className="flex flex-wrap justify-start gap-3">
+                        {(task.quote.layoutFiles || [])
+                          .map((layoutFile: any) => (
+                            <img
+                              key={layoutFile.id}
+                              src={`${getApiBaseUrl()}/files/thumbnail/${layoutFile.id}`}
+                              alt="Layout aprovado"
+                              className="max-h-48 rounded-lg shadow-sm object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => {
+                                if (fileViewerContext) {
+                                  fileViewerContext.actions.viewFile(layoutFile);
+                                }
+                              }}
+                            />
+                          ))}
                       </div>
                     </div>
                   )}

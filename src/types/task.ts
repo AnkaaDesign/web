@@ -123,7 +123,7 @@ export interface TaskIncludes {
     | {
         include?: CustomerIncludes;
       };
-  quote?: boolean | { include?: { services?: boolean; layoutFile?: boolean; customerSignature?: boolean; customerConfigs?: boolean; responsible?: boolean } }; // Task quote (one-to-one: each task has its own unique quote)
+  quote?: boolean | { include?: { services?: boolean; layoutFiles?: boolean; customerSignature?: boolean; customerConfigs?: boolean; responsible?: boolean } }; // Task quote (one-to-one: each task has its own unique quote)
   reimbursements?: boolean; // Many-to-many relation
   reimbursementInvoices?: boolean; // Many-to-many relation
   observation?:

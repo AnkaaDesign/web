@@ -1351,6 +1351,18 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "dp-ferias-editar-pm", title: "Editar", icon: "edit", path: "/departamento-pessoal/ferias/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
         ],
       },
+      {
+        id: "dp-advertencias-production-manager",
+        title: "Advertências",
+        icon: "alertTriangle",
+        path: "/departamento-pessoal/avisos",
+        requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+        children: [
+          { id: "dp-advertencias-cadastrar-pm", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/avisos/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
+          { id: "dp-advertencias-detalhes-pm", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/avisos/detalhes/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
+          { id: "dp-advertencias-editar-pm", title: "Editar", icon: "edit", path: "/departamento-pessoal/avisos/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER },
+        ],
+      },
     ],
   },
   {
@@ -1827,7 +1839,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Advertências",
         icon: "alertTriangle",
         path: "/departamento-pessoal/avisos",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
         children: [
           { id: "dp-advertencias-cadastrar", title: "Cadastrar", icon: "plus", path: "/departamento-pessoal/avisos/cadastrar" },
           { id: "dp-advertencias-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/avisos/detalhes/:id", isDynamic: true },

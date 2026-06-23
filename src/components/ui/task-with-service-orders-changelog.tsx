@@ -2296,9 +2296,66 @@ const ChangelogTimelineItem = ({
                                 )}
                               </div>
                             </>
-                          ) : changelog.field === "layoutFileId" ||
-                            changelog.field === "customerSignatureId" ? (
-                            // Single-file fields (quote layout file, customer signature):
+                          ) : changelog.field === "layoutFileIds" ? (
+                            // Quote layout files: value is an array of File ids —
+                            // render Antes/Depois thumbnail lists.
+                            (() => {
+                              const parseIds = (val: any): string[] => {
+                                if (!val) return [];
+                                let arr = val;
+                                if (typeof val === "string") {
+                                  try {
+                                    arr = JSON.parse(val);
+                                  } catch {
+                                    return [];
+                                  }
+                                }
+                                if (!Array.isArray(arr)) return [];
+                                return arr
+                                  .map((v: any) =>
+                                    typeof v === "string" ? v : v?.id,
+                                  )
+                                  .filter(Boolean);
+                              };
+                              const oldIds = parseIds(changelog.oldValue);
+                              const newIds = parseIds(changelog.newValue);
+                              const renderList = (ids: string[], emptyClass: string) =>
+                                ids.length > 0 ? (
+                                  <div className="flex flex-wrap gap-2 mt-1">
+                                    {ids.map((fid, idx) => (
+                                      <LogoDisplay
+                                        key={fid}
+                                        logoId={fid}
+                                        size="w-12 h-12"
+                                        useThumbnail
+                                        onClick={() => openChangelogFiles(ids, idx)}
+                                      />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className={`${emptyClass} font-medium`}>
+                                    Nenhum arquivo
+                                  </span>
+                                );
+                              return (
+                                <>
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">
+                                      Antes:{" "}
+                                    </span>
+                                    {renderList(oldIds, "text-red-600 dark:text-red-400")}
+                                  </div>
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">
+                                      Depois:{" "}
+                                    </span>
+                                    {renderList(newIds, "text-green-600 dark:text-green-400")}
+                                  </div>
+                                </>
+                              );
+                            })()
+                          ) : changelog.field === "customerSignatureId" ? (
+                            // Single-file field (customer signature):
                             // values are raw file IDs — render real thumbnails like other file changelogs
                             (() => {
                               const parseFileId = (val: any): string | null => {

@@ -253,7 +253,10 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
         // Apply additional filters FIRST (e.g., category type filter for borrow)
         ...(additionalWhere || {}),
         // Then apply local filters
-        ...(!localFilters.showInactive && { isActive: true }),
+        // Status filter is stored as isActive (the drawer maps "Ativo"→true, "Inativo"→false,
+        // "Ambos"→absent). Only apply it when explicitly set so "Ambos" returns both active and
+        // inactive items. (showInactive is not reliably emitted by the drawer, so don't read it.)
+        ...(typeof localFilters.isActive === "boolean" && { isActive: localFilters.isActive }),
         ...(localFilters.categoryIds?.length && { categoryId: { in: localFilters.categoryIds } }),
         ...(localFilters.brandIds?.length && { brands: { some: { id: { in: localFilters.brandIds } } } }),
         ...(localFilters.supplierIds?.length && { supplierId: { in: localFilters.supplierIds } }),

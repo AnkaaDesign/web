@@ -150,8 +150,8 @@ export const taskQuoteCreateNestedSchema = z
       z.number().int().min(1).max(30).optional().nullable()
     ),
 
-    // Layout File
-    layoutFileId: z.string().uuid().optional().nullable(),
+    // Layout Files (max 2, ordered File ids)
+    layoutFileIds: z.array(z.string().uuid()).max(2).optional().nullable(),
 
     simultaneousTasks: z.preprocess(
       (val) => val === '' || val === null || val === undefined ? null : Number(val),

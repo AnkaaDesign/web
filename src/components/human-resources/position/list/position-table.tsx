@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconChevronDown, IconChevronUp, IconChevronRight, IconSelector, IconEdit, IconTrash, IconExternalLink, IconBriefcase, IconAlertTriangle, IconPlus, IconPercentage } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconExternalLink, IconBriefcase, IconAlertTriangle, IconPlus, IconPercentage } from "@tabler/icons-react";
 
 import type { Position } from "../../../../types";
 import type { PositionGetManyFormData } from "../../../../schemas";
@@ -45,20 +45,6 @@ interface ContextMenuState {
   positions: Position[];
 }
 
-// The API returns MonetaryValue records (value/current/createdAt) under the
-// `remunerations` relation on Position.
-interface RemunerationRecord {
-  id: string;
-  value: number;
-  current?: boolean;
-  createdAt: Date | string;
-}
-
-const getRemunerationHistory = (position: Position): RemunerationRecord[] => {
-  const records = (position.remunerations ?? []) as unknown as RemunerationRecord[];
-  return [...records].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-};
-
 export function PositionTable({ filters, onDataChange, className }: PositionTableProps) {
   const navigate = useNavigate();
   const { deleteAsync: removeAsync } = usePositionMutations();
@@ -66,19 +52,6 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ items: Position[]; isBulk: boolean } | null>(null);
   const [salaryAdjustmentModal, setSalaryAdjustmentModal] = useState<{ open: boolean; positions: Position[] }>({ open: false, positions: [] });
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-
-  const toggleExpanded = useCallback((positionId: string) => {
-    setExpandedIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(positionId)) {
-        next.delete(positionId);
-      } else {
-        next.add(positionId);
-      }
-      return next;
-    });
-  }, []);
 
   // Permission checks
   const { user } = useAuth();
@@ -119,11 +92,6 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       include: {
-        // Fetch remunerations (MonetaryValue records) for history
-        remunerations: {
-          orderBy: { createdAt: "desc" as const },
-          take: 5,
-        },
         _count: {
           select: { users: true },
         },
@@ -449,7 +417,6 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
                   </div>
                 </TableHead>
               )}
-              <TableHead className="w-10 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0" />
               {columns.map((column) => (
                 <TableHead
                   key={column.key}
@@ -490,7 +457,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
           <TableBody>
             {error ? (
               <TableRow>
-                <TableCell colSpan={columns.length + 2} className="p-0">
+                <TableCell colSpan={columns.length + 1} className="p-0">
                   <div className="flex flex-col items-center justify-center p-8 text-center text-destructive">
                     <IconAlertTriangle className="h-8 w-8 mb-4" />
                     <div className="text-lg font-medium mb-2">Não foi possível carregar os cargos</div>
@@ -500,7 +467,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
               </TableRow>
             ) : positions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length + 2} className="p-0">
+                <TableCell colSpan={columns.length + 1} className="p-0">
                   <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
                     <IconBriefcase className="h-12 w-12 text-muted-foreground/50 mb-4" />
                     <div className="text-lg font-medium mb-2">Nenhum cargo encontrado</div>
@@ -521,11 +488,9 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
             ) : (
               positions.map((position, index) => {
                 const isPositionSelected = isSelected(position.id);
-                const isExpanded = expandedIds.has(position.id);
-                const history = getRemunerationHistory(position);
                 return (
-                  <React.Fragment key={position.id}>
                   <TableRow
+                    key={position.id}
                     className={cn(
                       "cursor-pointer transition-colors border-b border-border",
                       // Alternating row colors
@@ -534,7 +499,6 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
                       "hover:bg-muted/20",
                       // Selected state overrides alternating colors
                       isPositionSelected && "bg-muted/30 hover:bg-muted/40",
-                      isExpanded && "bg-muted/30 hover:bg-muted/40",
                     )}
                     onClick={(e) => handleRowClick(position, e)}
                     onContextMenu={(e) => handleContextMenu(e, position)}
@@ -554,63 +518,12 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
                         </div>
                       </TableCell>
                     )}
-                    {/* Expand toggle — shows remuneration history without leaving the page */}
-                    <TableCell className="w-10 p-0 !border-r-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleExpanded(position.id);
-                        }}
-                        className="flex items-center justify-center h-full w-full px-2 py-2 text-muted-foreground hover:text-foreground"
-                        aria-label={isExpanded ? "Recolher histórico" : "Expandir histórico"}
-                      >
-                        {isExpanded ? <IconChevronDown className="h-4 w-4" /> : <IconChevronRight className="h-4 w-4" />}
-                      </button>
-                    </TableCell>
                     {columns.map((column) => (
                       <TableCell key={column.key} className={cn("p-0 !border-r-0", column.className)}>
                         <div className={cn("px-4 py-2 text-sm")}>{column.accessor(position)}</div>
                       </TableCell>
                     ))}
                   </TableRow>
-
-                  {/* Expanded row: MonetaryValue history timeline */}
-                  {isExpanded && (
-                    <TableRow className="hover:bg-transparent border-b border-border">
-                      <TableCell colSpan={columns.length + 2} className="bg-muted/10 p-4">
-                        {history.length === 0 ? (
-                          <div className="text-sm text-muted-foreground">Nenhum histórico de remuneração para este cargo.</div>
-                        ) : (
-                          <div className="space-y-0">
-                            <div className="text-sm font-medium mb-3">Histórico de Remunerações</div>
-                            <div className="relative pl-5 space-y-4 before:absolute before:left-1.5 before:top-1 before:bottom-1 before:w-px before:bg-border">
-                              {history.map((record) => (
-                                <div key={record.id} className="relative">
-                                  <span
-                                    className={cn(
-                                      "absolute -left-5 top-1.5 h-3 w-3 rounded-full border-2 border-background",
-                                      record.current ? "bg-green-700" : "bg-muted-foreground/40",
-                                    )}
-                                  />
-                                  <div className="flex items-center gap-3 text-sm">
-                                    <span className="font-medium">{formatCurrency(record.value)}</span>
-                                    <span className="text-muted-foreground">{formatDate(new Date(record.createdAt))}</span>
-                                    {record.current && (
-                                      <Badge variant="active" className="text-xs">
-                                        Atual
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  </React.Fragment>
                 );
               })
             )}

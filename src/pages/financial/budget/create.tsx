@@ -195,7 +195,7 @@ export const FinancialBudgetCreatePage = () => {
       guaranteeYears: null as number | null,
       customGuaranteeText: null as string | null,
       customForecastDays: null as number | null,
-      layoutFileId: null as string | null,
+      layoutFileIds: [] as string[],
       simultaneousTasks: null as number | null,
       customerConfigs: [] as any[],
       services: [
@@ -438,21 +438,26 @@ export const FinancialBudgetCreatePage = () => {
         }
       }
 
-      // 3. Upload layout file
-      let layoutFileId = data.layoutFileId;
-      const newLayoutFiles = layoutFiles.filter((f) => !f.uploaded);
-      if (newLayoutFiles.length > 0) {
-        try {
-          const response = await uploadSingleFile(newLayoutFiles[0], {
-            fileContext: "quote-layout",
-          });
-          if (response.success && response.data) {
-            layoutFileId = response.data.id;
+      // 3. Upload layout files (up to 2 ordered slots). Always use FILE ids.
+      const resolvedLayoutIds: string[] = [];
+      for (const lf of layoutFiles) {
+        if (!lf.uploaded) {
+          try {
+            const response = await uploadSingleFile(lf, {
+              fileContext: "quote-layout",
+            });
+            if (response.success && response.data) {
+              resolvedLayoutIds.push(response.data.id);
+            }
+          } catch (error: any) {
+            toast.error(`Erro ao enviar layout: ${error.message}`);
           }
-        } catch (error: any) {
-          toast.error(`Erro ao enviar layout: ${error.message}`);
+        } else {
+          const existingId = (lf as any).uploadedFileId || lf.id || null;
+          if (existingId) resolvedLayoutIds.push(existingId);
         }
       }
+      const layoutFileIds = resolvedLayoutIds;
 
       // 4. Build responsible data
       const existingRepIds = responsibleRows
@@ -616,7 +621,7 @@ export const FinancialBudgetCreatePage = () => {
               guaranteeYears: data.guaranteeYears || null,
               customGuaranteeText: data.customGuaranteeText || null,
               customForecastDays: data.customForecastDays || null,
-              layoutFileId: layoutFileId || null,
+              layoutFileIds,
               simultaneousTasks: data.simultaneousTasks || null,
               customerConfigs: data.customerConfigs || [],
               services: validServices.map((item: any) => ({

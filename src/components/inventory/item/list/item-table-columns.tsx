@@ -1,4 +1,4 @@
-import { formatCurrency } from "../../../../utils";
+import { formatCurrency, formatItemLocation } from "../../../../utils";
 import { PPE_TYPE_LABELS, ACCOUNTING_TYPE_LABELS } from "../../../../constants";
 import type { Item } from "../../../../types";
 import { Badge } from "../../../ui/badge";
@@ -255,7 +255,7 @@ export const createItemColumns = (): ItemColumn[] => [
   {
     key: "warehouseLocation.name",
     header: "LOCALIZAÇÃO",
-    accessor: (item: Item) => <div className="truncate">{item.warehouseLocation ? `${item.warehouseLocation.name}${item.locationLevel != null ? `-P${item.locationLevel}` : ""}${item.locationColumn != null ? `-C${item.locationColumn}` : ""}` : "-"}</div>,
+    accessor: (item: Item) => <div className="truncate">{formatItemLocation(item)}</div>,
     sortable: true,
     className: "w-40",
     align: "left",

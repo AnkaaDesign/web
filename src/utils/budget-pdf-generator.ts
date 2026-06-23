@@ -366,9 +366,10 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
   // Get layout file URL if available - use direct URL (no fetch needed)
   // The <img> tag in the print window will load the image directly without CORS restrictions
   const apiBaseUrl = getApiBaseUrl();
-  const layoutImageUrl: string | null = task.quote.layoutFile?.id
-    ? `${apiBaseUrl}/files/serve/${task.quote.layoutFile.id}`
-    : null;
+  const layoutImageUrls: string[] = (task.quote.layoutFiles || [])
+    .map((f: any) => f?.id)
+    .filter(Boolean)
+    .map((id: string) => `${apiBaseUrl}/files/serve/${id}`);
 
   // Get customer signature URL if available - read from the first config
   const signatureImageUrl: string | null = firstConfig?.customerSignature?.id
@@ -389,7 +390,7 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     customDeliveryDays,
     paymentText,
     guaranteeText,
-    layoutImageUrl,
+    layoutImageUrls,
     customerSignatureUrl: signatureImageUrl,
     // Vehicle identification
     serialNumber: task.serialNumber || null,
@@ -439,7 +440,7 @@ export interface BudgetHtmlData {
   customDeliveryDays: number | null; // Custom delivery time in working days
   paymentText: string;
   guaranteeText: string;
-  layoutImageUrl: string | null;
+  layoutImageUrls: string[];
   customerSignatureUrl: string | null;
   // Vehicle identification
   serialNumber: string | null;
@@ -580,17 +581,20 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     </div>
   `;
 
-  // Layout section for page 2 (only if layout exists)
-  const layoutHtml = data.layoutImageUrl
-    ? `
+  // Layout section for page 2 (one section per layout image)
+  const layoutHtml = (data.layoutImageUrls || [])
+    .filter(Boolean)
+    .map(
+      (url) => `
       <section class="layout-section">
         <h2 class="section-title-green">Layout aprovado</h2>
         <div class="layout-image-container">
-          <img src="${data.layoutImageUrl}" alt="Layout aprovado" class="layout-image" />
+          <img src="${url}" alt="Layout aprovado" class="layout-image" />
         </div>
       </section>
-    `
-    : "";
+    `,
+    )
+    .join("");
 
   // Customer signature image
   const customerSignatureHtml = data.customerSignatureUrl

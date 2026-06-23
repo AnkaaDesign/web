@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconInfoCircle } from "@tabler/icons-react";
 import type { Item, Measure } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { measureUtils } from "../../../../utils";
+import { measureUtils, formatItemLocation } from "../../../../utils";
 import { MEASURE_TYPE_LABELS, MEASURE_TYPE_ORDER, MEASURE_UNIT_LABELS } from "../../../../constants";
 
 interface SpecificationsCardProps {
@@ -61,7 +61,7 @@ export function SpecificationsCard({ item, className }: SpecificationsCardProps)
               {item.warehouseLocation && (
                 <SpecRow
                   label="Localização"
-                  value={`${item.warehouseLocation.name}${item.locationLevel != null ? `-P${item.locationLevel}` : ""}${item.locationColumn != null ? `-C${item.locationColumn}` : ""}`}
+                  value={formatItemLocation(item)}
                 />
               )}
             </div>

@@ -57,6 +57,7 @@ const GRID_OPTIONS: { label: string; value: number }[] = [
   { label: "30", value: 30 },
   { label: "60", value: 60 },
 ]; // 0 = grid hidden
+const GRID_STORAGE_KEY = "warehouse-map-grid-step"; // persist the grid selector across reload/navigation
 const snapPos = (v: number) => Math.round(v / GRID_CM) * GRID_CM;
 const snapSize = (v: number) => Math.round(v / SNAP_CM) * SNAP_CM;
 const MIN_VIEW_W = 200;
@@ -169,7 +170,27 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
   const [isNew, setIsNew] = useState(false);
   const [pending, setPending] = useState<Record<string, Pending>>({});
   const [confirmDelete, setConfirmDelete] = useState<WarehouseLocation | null>(null);
-  const [gridStep, setGridStep] = useState(GRID_CM); // visible minor-grid step (cm)
+  const [gridStep, setGridStep] = useState<number>(() => {
+    // restore the last grid selection (persists reload + navigation)
+    try {
+      const raw = localStorage.getItem(GRID_STORAGE_KEY);
+      if (raw != null) {
+        const n = Number(raw);
+        if (GRID_OPTIONS.some((o) => o.value === n)) return n;
+      }
+    } catch {
+      /* localStorage unavailable */
+    }
+    return GRID_CM;
+  }); // visible minor-grid step (cm)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(GRID_STORAGE_KEY, String(gridStep));
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, [gridStep]);
 
   const effective = useCallback((loc: WarehouseLocation): WarehouseLocation => ({ ...loc, ...(pending[loc.id] ?? {}) }), [pending]);
   const geomOf = useCallback((loc: WarehouseLocation): Geom => { const e = effective(loc); return { positionX: e.positionX, positionY: e.positionY, width: e.width, height: e.height, rotation: e.rotation }; }, [effective]);
@@ -491,7 +512,7 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
     <>
       <Card className={cn("relative flex flex-col overflow-hidden border border-border shadow-sm", className)}>
         {/* top bar: search / add-toolbar on the left, grid selector on the right (same row) */}
-        <div className="flex-shrink-0 bg-muted/20 p-3">
+        <div className="flex-shrink-0 p-3">
           <div className="flex items-center gap-2">
             {isEdit ? (
               <div className="flex flex-1 flex-wrap items-center gap-2">
@@ -512,7 +533,7 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
               </div>
             )}
             {/* grid-step selector — same height as the search input */}
-            <div className="flex h-10 shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 text-xs text-muted-foreground">
+            <div className="flex h-10 shrink-0 items-center gap-1 rounded-md border border-border bg-transparent px-2 text-xs text-muted-foreground">
               <span className="mr-0.5 hidden font-medium sm:inline">Grade</span>
               {GRID_OPTIONS.map((opt) => (
                 <button
@@ -528,8 +549,10 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
           </div>
         </div>
 
-        {/* canvas */}
-        <div ref={canvasRef} className="relative min-h-0 flex-1 overflow-hidden bg-muted/20">
+        {/* map area — recessed panel framed by the card surface. Top inset matches the
+            toolbar gap (pt-3); left/right/bottom are wider for more breathing room */}
+        <div className="min-h-0 flex-1 px-5 pb-5 pt-3">
+          <div ref={canvasRef} className="relative h-full w-full overflow-hidden rounded-lg border border-border bg-background dark:bg-[hsl(0_0%_13%)]">
           {isLoading ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Carregando mapa...</div>
           ) : locations.length === 0 ? (
@@ -677,6 +700,7 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
               </div>
             </>
           )}
+          </div>
         </div>
       </Card>
 

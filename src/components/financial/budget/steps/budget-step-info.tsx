@@ -10,6 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FileUploadField } from "@/components/common/file/file-upload-field";
 import { useFileViewer } from "@/components/common/file/file-viewer";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
@@ -19,8 +20,11 @@ import {
   IconPhoto,
   IconUpload,
   IconX,
-  IconArrowLeft,
+  IconCheck,
+  IconEye,
+  IconCirclePlus,
 } from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
 import { formatCNPJ } from "@/utils";
 import { getCustomers } from "@/api-client";
 import { getApiBaseUrl } from "@/config/api";
@@ -32,16 +36,41 @@ interface ArtworkOption {
   filename?: string;
   originalName?: string;
   thumbnailUrl?: string | null;
+  // Object-URL for brand-new, not-yet-uploaded local files (no server id yet).
+  preview?: string | null;
   status?: string;
   mimetype?: string;
+  // Remote storage path (http URL) when available — lets the viewer serve the file.
+  path?: string | null;
   size?: number;
 }
+
+// Map an image file extension to a real image MIME type. Used so the in-app file
+// viewer's determineFileViewAction categorizes the file as an "image" → opens the
+// MODAL. An empty/unknown mimetype would fall through to download/new-tab.
+const IMAGE_EXT_TO_MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  bmp: "image/bmp",
+};
+
+const mimeFromName = (name?: string | null): string | null => {
+  const ext = (name || "").toLowerCase().split(".").pop() || "";
+  return IMAGE_EXT_TO_MIME[ext] || null;
+};
 
 interface BudgetStepInfoProps {
   disabled?: boolean;
   layoutFiles: FileWithPreview[];
   onLayoutFilesChange: (files: FileWithPreview[]) => void;
   artworks?: ArtworkOption[];
+  // Called when a task-artwork is added/removed as the quote "Layout Aprovado".
+  // Adding marks the artwork APPROVED; removing reverts it to DRAFT. Keyed by File id.
+  onArtworkLayoutApprovalChange?: (fileId: string, approved: boolean) => void;
   customersCache: React.MutableRefObject<Map<string, any>>;
   selectedCustomers: Map<string, any>;
   setSelectedCustomers: (customers: Map<string, any>) => void;
@@ -71,6 +100,7 @@ export function BudgetStepInfo({
   layoutFiles,
   onLayoutFilesChange,
   artworks,
+  onArtworkLayoutApprovalChange,
   customersCache,
   selectedCustomers: _selectedCustomers,
   setSelectedCustomers,
@@ -78,8 +108,11 @@ export function BudgetStepInfo({
   const { setValue, getValues, control } = useFormContext();
   const fileViewer = useFileViewer();
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
-  const [showLayoutUploadMode, setShowLayoutUploadMode] = useState(false);
   const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
+  // Which layout-candidate tile has its action popover open (mirrors FileSuggestions).
+  const [openLayoutPopoverId, setOpenLayoutPopoverId] = useState<string | null>(
+    null,
+  );
 
   // Stores the last single customer config before it was removed, so discount can be
   // carried over when the user does a remove-then-add instead of atomic replacement.
@@ -87,7 +120,16 @@ export function BudgetStepInfo({
 
   // Watch form values
   const quoteExpiresAt = useWatch({ control, name: "expiresAt" });
-  const currentLayoutFileId = useWatch({ control, name: "layoutFileId" });
+  // Ordered layout File ids (max 2), derived from the layoutFiles array (source of
+  // truth). Drives the multi-select picker AND the layoutFileIds form field.
+  const currentLayoutFileIds = useMemo(
+    () =>
+      layoutFiles
+        .map((f) => (f as any).uploadedFileId || f.id)
+        .filter(Boolean)
+        .slice(0, 2) as string[],
+    [layoutFiles],
+  );
   const guaranteeYears = useWatch({ control, name: "guaranteeYears" });
   const customGuaranteeText = useWatch({ control, name: "customGuaranteeText" });
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
@@ -122,37 +164,12 @@ export function BudgetStepInfo({
     return "";
   }, [guaranteeYears, customGuaranteeText]);
 
-  const UPLOAD_NEW_SENTINEL = "__UPLOAD_NEW__";
+  // Image artworks available to pick as layouts (max 2 chosen). No upload sentinel —
+  // uploading is a separate, always-available FileUploadField below.
   const artworkOptions = useMemo(() => {
     if (!artworks || artworks.length === 0) return [];
-    const imageArtworks = artworks.filter((a) =>
-      (a.mimetype || "").startsWith("image/"),
-    );
-    if (imageArtworks.length === 0) return [];
-    return [
-      ...imageArtworks,
-      { id: UPLOAD_NEW_SENTINEL, filename: "Enviar novo arquivo" } as ArtworkOption,
-    ];
+    return artworks.filter((a) => (a.mimetype || "").startsWith("image/"));
   }, [artworks]);
-
-  // True when the loaded layout file came from an artwork selection (id exists in artworkOptions)
-  const isLayoutFromArtwork = useMemo(() => {
-    if (!currentLayoutFileId || artworkOptions.length === 0) return false;
-    return artworkOptions.some(
-      (a) => a.id === currentLayoutFileId && a.id !== UPLOAD_NEW_SENTINEL,
-    );
-  }, [currentLayoutFileId, artworkOptions]);
-
-  // When form.reset() populates a layout that was a standalone upload (not an artwork),
-  // switch to upload-mode view so the FileUploadField renders with the existing file.
-  useEffect(() => {
-    if (!currentLayoutFileId || artworkOptions.length === 0 || showLayoutUploadMode) return;
-    if (!isLayoutFromArtwork) {
-      setShowLayoutUploadMode(true);
-    }
-  // Run whenever the layoutFileId changes (e.g. after form.reset())
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLayoutFileId]);
 
   const handleGuaranteeOptionChange = useCallback(
     (value: string) => {
@@ -304,30 +321,83 @@ export function BudgetStepInfo({
 
   const selectedCustomerIds = customerConfigs.map((c: any) => c.customerId);
 
-  // Layout file handling
-  const handleLayoutFileChange = useCallback(
+  // Layout file handling — drives the layoutFileIds array (ordered File ids, max 2).
+  const syncLayoutIds = useCallback(
     (files: FileWithPreview[]) => {
-      onLayoutFilesChange(files);
-      if (files.length > 0 && files[0].uploadedFileId) {
-        setValue("layoutFileId", files[0].uploadedFileId);
-      } else if (files.length === 0) {
-        setValue("layoutFileId", null);
-      }
+      const ids = files
+        .map((f) => (f as any).uploadedFileId || f.id)
+        .filter(Boolean)
+        .slice(0, 2);
+      setValue("layoutFileIds", ids, { shouldDirty: true });
     },
-    [setValue, onLayoutFilesChange],
+    [setValue],
   );
 
+  // The upload field manages ONLY the uploaded (non-artwork) layout files. Merge its
+  // output with the currently-selected artwork layouts so both sources combine into
+  // one ordered array, capped at 2 total. Artwork selections come first.
+  const handleLayoutFileChange = useCallback(
+    (uploadedFiles: FileWithPreview[]) => {
+      const optionIds = new Set(artworkOptions.map((a) => a.id));
+      const artworkLayoutFiles = layoutFiles.filter((f) => {
+        const id = (f as any).uploadedFileId || f.id;
+        return optionIds.has(id);
+      });
+      // Drop any uploaded file that is actually an artwork option (avoid dupes).
+      const pureUploads = uploadedFiles.filter((f) => {
+        const id = (f as any).uploadedFileId || f.id;
+        return !optionIds.has(id);
+      });
+      const next = [...artworkLayoutFiles, ...pureUploads].slice(0, 2);
+      onLayoutFilesChange(next);
+      syncLayoutIds(next);
+    },
+    [artworkOptions, layoutFiles, onLayoutFilesChange, syncLayoutIds],
+  );
+
+  // Only the uploaded (non-artwork) files are shown in the FileUploadField.
+  const uploadedLayoutFiles = useMemo(() => {
+    const optionIds = new Set(artworkOptions.map((a) => a.id));
+    return layoutFiles.filter((f) => {
+      const id = (f as any).uploadedFileId || f.id;
+      return !optionIds.has(id);
+    });
+  }, [artworkOptions, layoutFiles]);
+
+  // The artwork ids currently selected as layouts.
+  const selectedArtworkLayoutIds = useMemo(() => {
+    const optionIds = new Set(artworkOptions.map((a) => a.id));
+    return currentLayoutFileIds.filter((id) => optionIds.has(id));
+  }, [artworkOptions, currentLayoutFileIds]);
+
+  // Multi-select: the chosen artworks + any uploaded files combine into ONE ordered
+  // layoutFiles array, clamped to 2 total (drives layoutFiles/layoutFileIds).
   const handleArtworkSelect = useCallback(
     (value: string | string[] | null | undefined) => {
-      const fileId = typeof value === "string" ? value : null;
-      if (fileId === "__UPLOAD_NEW__") {
-        setShowLayoutUploadMode(true);
-        return;
-      }
-      if (fileId) {
-        const artwork = artworks?.find((a) => a.id === fileId);
-        if (artwork) {
-          const filePreview = {
+      const selectedIds: string[] = Array.isArray(value)
+        ? value
+        : value
+          ? [value]
+          : [];
+
+      // Files that are NOT artwork options (i.e. plain uploads) are preserved.
+      const optionIds = new Set(artworkOptions.map((a) => a.id));
+      const uploadedNonArtworkFiles = layoutFiles.filter((f) => {
+        const id = (f as any).uploadedFileId || f.id;
+        return !optionIds.has(id);
+      });
+
+      // Build a layoutFile for each selected artwork (reuse an existing preview when
+      // already present to preserve identity/thumbnail).
+      const artworkLayoutFiles = selectedIds
+        .map((id) => {
+          const existing = layoutFiles.find(
+            (f) => ((f as any).uploadedFileId || f.id) === id,
+          );
+          if (existing) return existing;
+          const artwork = artworks?.find((a) => a.id === id);
+          if (!artwork) return null;
+          return {
             id: artwork.id,
             name: artwork.originalName || artwork.filename || "artwork",
             size: artwork.size || 0,
@@ -338,60 +408,115 @@ export function BudgetStepInfo({
             uploadedFileId: artwork.id,
             thumbnailUrl: artwork.thumbnailUrl,
           } as FileWithPreview;
-          onLayoutFilesChange([filePreview]);
-          setValue("layoutFileId", artwork.id);
-          setShowLayoutUploadMode(false);
-        }
-      } else {
-        onLayoutFilesChange([]);
-        setValue("layoutFileId", null);
+        })
+        .filter(Boolean) as FileWithPreview[];
+
+      // Keep uploads (they were placed first by the user) and fill remaining slots
+      // with the chosen artworks — never exceeding 2 total. Uploads are appended
+      // last so an artwork selection can't silently evict a just-uploaded file.
+      const slotsForArtworks = Math.max(0, 2 - uploadedNonArtworkFiles.length);
+      const next = [
+        ...artworkLayoutFiles.slice(0, slotsForArtworks),
+        ...uploadedNonArtworkFiles,
+      ].slice(0, 2);
+      onLayoutFilesChange(next);
+      syncLayoutIds(next);
+
+      // Approve task-artworks added to the layout selection; revert removed ones to
+      // DRAFT. Only the artwork-sourced ids that actually LAND in a slot count as
+      // selected (an id squeezed out by the 2-slot cap is treated as not selected).
+      // `value` here is always an artwork-option id array, so every id is a task
+      // artwork — no need to filter out pure Step-2 uploads. Last action wins because
+      // we diff against the previous selection on every change.
+      if (onArtworkLayoutApprovalChange) {
+        const nextArtworkIds = new Set(
+          next
+            .map((f) => (f as any).uploadedFileId || f.id)
+            .filter((id) => optionIds.has(id)),
+        );
+        const prevArtworkIds = new Set(selectedArtworkLayoutIds);
+        nextArtworkIds.forEach((id) => {
+          if (!prevArtworkIds.has(id)) onArtworkLayoutApprovalChange(id, true);
+        });
+        prevArtworkIds.forEach((id) => {
+          if (!nextArtworkIds.has(id)) onArtworkLayoutApprovalChange(id, false);
+        });
       }
     },
-    [artworks, setValue, onLayoutFilesChange],
+    [
+      artworks,
+      artworkOptions,
+      layoutFiles,
+      onLayoutFilesChange,
+      syncLayoutIds,
+      onArtworkLayoutApprovalChange,
+      selectedArtworkLayoutIds,
+    ],
   );
 
-  const renderArtworkOption = useCallback((artwork: ArtworkOption) => {
-    if (artwork.id === "__UPLOAD_NEW__") {
-      return (
-        <div className="flex items-center gap-3 w-full py-1 text-muted-foreground">
-          <div className="w-12 h-12 rounded-md border border-dashed border-border overflow-hidden shrink-0 bg-muted/50 flex items-center justify-center">
-            <IconUpload className="h-5 w-5" />
-          </div>
-          <p className="text-sm">Enviar novo arquivo</p>
-        </div>
-      );
-    }
-    const thumbnailSrc =
-      artwork.thumbnailUrl || `${getApiBaseUrl()}/files/thumbnail/${artwork.id}`;
-    return (
-      <div className="flex items-center gap-3 w-full py-1">
-        <div className="w-12 h-12 rounded-md border border-border overflow-hidden shrink-0 bg-muted">
-          <img
-            src={thumbnailSrc}
-            alt={artwork.originalName || artwork.filename || "artwork"}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm truncate">
-            {artwork.originalName || artwork.filename || "Arquivo"}
-          </p>
-          {artwork.status && (
-            <p className="text-xs text-muted-foreground">
-              {artwork.status === "APPROVED"
-                ? "Aprovado"
-                : artwork.status === "REPROVED"
-                  ? "Reprovado"
-                  : "Rascunho"}
-            </p>
-          )}
-        </div>
-      </div>
-    );
+  // Card-grid toggle: add the artwork if not selected, remove it if selected. Routes
+  // through handleArtworkSelect so the approval diff, layoutFiles/layoutFileIds sync
+  // and the 2-slot cap all still apply.
+  const toggleArtworkLayout = useCallback(
+    (fileId: string) => {
+      const isSelected = selectedArtworkLayoutIds.includes(fileId);
+      const nextIds = isSelected
+        ? selectedArtworkLayoutIds.filter((id) => id !== fileId)
+        : [...selectedArtworkLayoutIds, fileId];
+      handleArtworkSelect(nextIds);
+    },
+    [selectedArtworkLayoutIds, handleArtworkSelect],
+  );
+
+  // Resolve a renderable image src for an artwork option:
+  //  1. server thumbnailUrl when present,
+  //  2. object-URL preview for brand-new not-yet-uploaded local files,
+  //  3. otherwise the server thumbnail endpoint keyed by the real File id.
+  // Brand-new local files have a generated local `id` (not a real File id), so the
+  // thumbnail endpoint would 404 for them — hence the preview fallback.
+  const getArtworkThumbnailSrc = useCallback((artwork: ArtworkOption): string => {
+    if (artwork.thumbnailUrl) return artwork.thumbnailUrl;
+    if (artwork.preview) return artwork.preview;
+    return `${getApiBaseUrl()}/files/thumbnail/${artwork.id}`;
   }, []);
+
+  // Open an artwork in the in-app file-viewer MODAL (FileViewerProvider is mounted at
+  // the App root). determineFileViewAction categorizes by mimetype, then falls back to
+  // the filename extension; a missing/blank mimetype AND extension-less filename slips
+  // to download/new-tab. So we pass a COMPLETE object (like FileSuggestions does):
+  // a guaranteed image mimetype (derived from the filename ext when the option's is
+  // empty), a filename WITH extension, id, size, thumbnailUrl and path.
+  const openArtworkInViewer = useCallback(
+    (artwork: ArtworkOption) => {
+      const filename =
+        artwork.filename || artwork.originalName || "layout.png";
+      const mimetype =
+        (artwork.mimetype && artwork.mimetype.startsWith("image/")
+          ? artwork.mimetype
+          : null) ||
+        mimeFromName(filename) ||
+        mimeFromName(artwork.originalName) ||
+        "image/png";
+      fileViewer.actions.viewFile({
+        id: artwork.id,
+        filename,
+        originalName: artwork.originalName || filename,
+        mimetype,
+        size: artwork.size || 0,
+        thumbnailUrl: artwork.thumbnailUrl || null,
+        path: artwork.path || null,
+      } as any);
+    },
+    [fileViewer],
+  );
+
+  // Total layout slots consumed = selected artworks + uploaded files (max 2).
+  const totalLayoutsSelected =
+    selectedArtworkLayoutIds.length + uploadedLayoutFiles.length;
+  const layoutLimitReached = totalLayoutsSelected >= 2;
+  // Free upload slots remaining out of the 2-total cap.
+  const remainingLayoutSlots =
+    2 - selectedArtworkLayoutIds.length - uploadedLayoutFiles.length;
 
   return (
     <div className="space-y-4">
@@ -597,102 +722,195 @@ export function BudgetStepInfo({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Artwork selector: only shown when artworks exist, not in upload mode,
-              and the current layout (if any) is one of those artworks */}
-          {artworkOptions.length > 0 && !showLayoutUploadMode && (!currentLayoutFileId || isLayoutFromArtwork) && (
-            <div className="space-y-3">
-              <Combobox<ArtworkOption>
-                value={currentLayoutFileId || ""}
-                onValueChange={handleArtworkSelect}
-                options={artworkOptions}
-                getOptionValue={(a) => a.id}
-                getOptionLabel={(a) =>
-                  a.originalName || a.filename || "Arquivo"
-                }
-                renderOption={renderArtworkOption}
-                placeholder="Selecionar uma arte existente..."
-                emptyText="Nenhuma arte de imagem encontrada"
-                disabled={disabled}
-                clearable
-                searchable
-              />
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Selecione até 2 layouts: escolha artes existentes e/ou envie novos
+              arquivos (no máximo 2 no total).
+            </p>
 
-              {currentLayoutFileId && isLayoutFromArtwork && (
-                  <div className="bg-muted/30 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs text-muted-foreground">
-                        {artworkOptions.find((a) => a.id === currentLayoutFileId)
-                          ?.originalName ||
-                          artworkOptions.find(
-                            (a) => a.id === currentLayoutFileId,
-                          )?.filename ||
-                          "Layout selecionado"}
-                      </span>
-                      {!disabled && (
-                        <button
-                          type="button"
-                          onClick={() => handleArtworkSelect(null)}
-                          className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded-md hover:bg-muted"
+            {/* Candidate grid mirroring FileSuggestions' "see or select" flow. Each
+                tile opens a small Popover with Ver (modal) / Selecionar / Remover.
+                Selected tiles keep their ring + check badge. Selecionar is disabled
+                when the 2-slot total (artworks + uploads) is reached and the tile
+                isn't already selected. Selecting routes through toggleArtworkLayout
+                → handleArtworkSelect (approval + layoutFileIds + cap all apply). */}
+            {artworkOptions.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Artes existentes
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {totalLayoutsSelected}/2 selecionados
+                  </span>
+                </div>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-3">
+                  {artworkOptions.map((artwork) => {
+                    const isSelected = selectedArtworkLayoutIds.includes(
+                      artwork.id,
+                    );
+                    const selectDisabled =
+                      !isSelected && (disabled || layoutLimitReached);
+                    return (
+                      <Popover
+                        key={artwork.id}
+                        open={openLayoutPopoverId === artwork.id}
+                        onOpenChange={(open) =>
+                          setOpenLayoutPopoverId(open ? artwork.id : null)
+                        }
+                      >
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className={cn(
+                              "group relative block w-full max-w-[140px] overflow-hidden rounded-lg border-2 bg-card text-left transition-all",
+                              isSelected
+                                ? "border-primary ring-2 ring-primary/30"
+                                : "border-border hover:border-primary/50",
+                              openLayoutPopoverId === artwork.id &&
+                                "ring-2 ring-primary/40",
+                            )}
+                          >
+                            <div className="relative h-28 w-full bg-muted">
+                              <img
+                                src={getArtworkThumbnailSrc(artwork)}
+                                alt={
+                                  artwork.originalName ||
+                                  artwork.filename ||
+                                  "layout"
+                                }
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  (
+                                    e.target as HTMLImageElement
+                                  ).style.visibility = "hidden";
+                                }}
+                              />
+                              {isSelected && (
+                                <div className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
+                                  <IconCheck className="h-3.5 w-3.5" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="px-2 py-1.5">
+                              <p className="truncate text-[11px] font-medium">
+                                {artwork.originalName ||
+                                  artwork.filename ||
+                                  "Arquivo"}
+                              </p>
+                              {artwork.status && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  {artwork.status === "APPROVED"
+                                    ? "Aprovado"
+                                    : artwork.status === "REPROVED"
+                                      ? "Reprovado"
+                                      : "Rascunho"}
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        </PopoverTrigger>
+
+                        <PopoverContent
+                          className="flex w-auto gap-1 p-1"
+                          side="top"
+                          sideOffset={4}
+                          align="center"
                         >
-                          <IconX className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex justify-start">
-                      <img
-                        src={`${getApiBaseUrl()}/files/thumbnail/${currentLayoutFileId}`}
-                        alt="Layout aprovado"
-                        className="max-h-48 rounded-lg shadow-sm object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                        onClick={() => {
-                          const selectedArtwork = artworkOptions.find(
-                            (a) => a.id === currentLayoutFileId,
-                          );
-                          if (selectedArtwork) {
-                            fileViewer.actions.viewFile({
-                              id: selectedArtwork.id,
-                              filename: selectedArtwork.filename,
-                              originalName: selectedArtwork.originalName,
-                              mimetype: selectedArtwork.mimetype || "image/png",
-                              size: selectedArtwork.size,
-                            } as any);
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-            </div>
-          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenLayoutPopoverId(null);
+                              openArtworkInViewer(artwork);
+                            }}
+                            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+                          >
+                            <IconEye size={14} />
+                            Ver
+                          </button>
+                          {isSelected ? (
+                            <button
+                              type="button"
+                              disabled={disabled}
+                              onClick={() => {
+                                setOpenLayoutPopoverId(null);
+                                toggleArtworkLayout(artwork.id);
+                              }}
+                              className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                            >
+                              <IconX size={14} />
+                              Remover
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={selectDisabled}
+                              onClick={() => {
+                                setOpenLayoutPopoverId(null);
+                                toggleArtworkLayout(artwork.id);
+                              }}
+                              className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <IconCirclePlus size={14} />
+                              Selecionar
+                            </button>
+                          )}
+                        </PopoverContent>
+                      </Popover>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-          {/* File uploader: shown when no artworks, user chose upload mode,
-              or the current layout was uploaded (not selected from artworks) */}
-          {(artworkOptions.length === 0 || showLayoutUploadMode || (currentLayoutFileId && !isLayoutFromArtwork)) && (
-            <div className="space-y-2">
-              {artworkOptions.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowLayoutUploadMode(false)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
-                >
-                  <IconArrowLeft className="h-3.5 w-3.5" />
-                  Voltar para seleção de layouts
-                </button>
-              )}
-              <FileUploadField
-                onFilesChange={handleLayoutFileChange}
-                existingFiles={layoutFiles}
-                maxFiles={1}
-                maxSize={10 * 1024 * 1024}
-                acceptedFileTypes={{
-                  "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],
-                }}
-                disabled={disabled}
-                variant="compact"
-                placeholder="Arraste ou clique para selecionar o layout"
-                showPreview={true}
-              />
-            </div>
-          )}
+            {/* Upload new layout files (combines with artwork selections, max 2).
+                Capacity-aware: show the compact dropzone only while slots remain;
+                when full, show just the uploaded-file thumbnails (mini, removable)
+                so the user can drop one; render nothing when full with no uploads. */}
+            {remainingLayoutSlots > 0 ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <IconUpload className="h-3.5 w-3.5" />
+                  Ou envie um novo arquivo de layout
+                </div>
+                <FileUploadField
+                  onFilesChange={handleLayoutFileChange}
+                  existingFiles={uploadedLayoutFiles}
+                  // Cap at the actual remaining capacity so the field never renders
+                  // its own "limite atingido" box — we hide it instead.
+                  maxFiles={uploadedLayoutFiles.length + remainingLayoutSlots}
+                  maxSize={10 * 1024 * 1024}
+                  acceptedFileTypes={{
+                    "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],
+                  }}
+                  disabled={disabled}
+                  variant="compact"
+                  placeholder="Arraste ou clique para selecionar o layout"
+                  showPreview={true}
+                />
+              </div>
+            ) : uploadedLayoutFiles.length > 0 ? (
+              <div className="space-y-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Arquivo enviado
+                </span>
+                {/* Mini variant hides the add tile when at limit → only the
+                    removable thumbnails show, no ugly empty dropzone. */}
+                <FileUploadField
+                  onFilesChange={handleLayoutFileChange}
+                  existingFiles={uploadedLayoutFiles}
+                  maxFiles={uploadedLayoutFiles.length}
+                  maxSize={10 * 1024 * 1024}
+                  acceptedFileTypes={{
+                    "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],
+                  }}
+                  disabled={disabled}
+                  variant="mini"
+                  showPreview={true}
+                />
+              </div>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
     </div>

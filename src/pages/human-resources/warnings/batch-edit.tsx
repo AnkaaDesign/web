@@ -50,7 +50,7 @@ export const WarningBatchEditPage = () => {
 
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
         <div className="container mx-auto max-w-7xl p-4 sm:p-4 space-y-6">
           <PageHeader
             variant="batch"
@@ -78,7 +78,7 @@ export const WarningBatchEditPage = () => {
 
   if (warnings.length === 0) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
         <div className="container mx-auto max-w-7xl p-4 sm:p-4 space-y-6">
           <PageHeader
             variant="batch"
@@ -132,7 +132,7 @@ export const WarningBatchEditPage = () => {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col bg-background px-4 pt-4">
         <PageHeader
           variant="batch"

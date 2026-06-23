@@ -234,8 +234,10 @@ export function PublicBudgetPage() {
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
   const configSignature = activeConfig?.customerSignature;
   const hasExistingSignature = !!configSignature?.id;
-  // Use serve endpoint for full quality images
-  const layoutImageUrl = quote.layoutFile?.id ? getFileServeUrl(quote.layoutFile) : null;
+  // Use serve endpoint for full quality images (layoutFiles array, up to 2)
+  const layoutImageUrls: string[] = (quote.layoutFiles || [])
+    .filter((f: any) => f?.id)
+    .map((f: any) => getFileServeUrl(f));
   // Use serve endpoint for signature to preserve PNG transparency
   const signatureImageUrl = configSignature?.id ? getFileServeUrl(configSignature) : null;
 
@@ -284,7 +286,7 @@ export function PublicBudgetPage() {
         customDeliveryDays,
         paymentText,
         guaranteeText,
-        layoutImageUrl,
+        layoutImageUrls,
         customerSignatureUrl: signatureImageUrl,
         serialNumber: quote.task?.serialNumber || null,
         plate: quote.task?.truck?.plate || null,
@@ -612,18 +614,21 @@ export function PublicBudgetPage() {
               </div>
             )}
 
-            {/* Layout Image - Full Width */}
-            {layoutImageUrl && (
+            {/* Layout Image(s) - Full Width (layoutFiles array) */}
+            {layoutImageUrls.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
                   Layout aprovado
                 </h3>
-                <div className="w-full">
-                  <img
-                    src={layoutImageUrl}
-                    alt="Layout aprovado"
-                    className="w-full h-auto rounded-lg shadow-md"
-                  />
+                <div className="w-full space-y-4">
+                  {layoutImageUrls.map((url, i) => (
+                    <img
+                      key={i}
+                      src={url}
+                      alt="Layout aprovado"
+                      className="w-full h-auto rounded-lg shadow-md"
+                    />
+                  ))}
                 </div>
               </div>
             )}

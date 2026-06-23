@@ -458,6 +458,21 @@ export function formatItemQuantityWithMeasureValue(item: Item): string {
   return `${formattedQuantity} ${unitLabel}`;
 }
 
+/**
+ * Human-readable warehouse location for an item, e.g. "S1-E7-P8-P9-P10"
+ * (estante) or "S1-E7-P8-C2" (kanban box). Returns "-" when unplaced.
+ * Cells are sorted by (level, column); a null column omits the "-C" segment.
+ */
+export function formatItemLocation(item: Pick<Item, "warehouseLocation" | "locationCells">): string {
+  const base = item.warehouseLocation?.name;
+  if (!base) return "-";
+  const cells = (item.locationCells ?? [])
+    .slice()
+    .sort((a, b) => a.level - b.level || (a.column ?? 0) - (b.column ?? 0));
+  const suffix = cells.map((c) => `-P${c.level}${c.column != null ? `-C${c.column}` : ""}`).join("");
+  return `${base}${suffix}`;
+}
+
 // Export all item utilities as a namespace object
 export const itemUtils = {
   getStockStatus,
@@ -501,4 +516,5 @@ export const itemUtils = {
   getItemIssueTypeLabel,
   formatItemQuantity,
   formatItemQuantityWithMeasureValue,
+  formatItemLocation,
 };

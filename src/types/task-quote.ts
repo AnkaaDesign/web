@@ -76,8 +76,7 @@ export interface TaskQuote extends BaseEntity {
 
   customForecastDays: number | null;
 
-  layoutFileId: string | null;
-  layoutFile?: File;
+  layoutFiles?: File[];
 
   simultaneousTasks: number | null;
 

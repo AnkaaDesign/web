@@ -1,4 +1,4 @@
-import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 
 interface DescriptionTextareaProps {
@@ -21,14 +21,13 @@ export function DescriptionTextarea({ control, disabled }: DescriptionTextareaPr
               onBlur={field.onBlur}
               name={field.name}
               ref={field.ref}
-              placeholder="Forneça detalhes adicionais sobre o incidente (opcional)..."
+              placeholder="Detalhes adicionais sobre o incidente (opcional)..."
               disabled={disabled}
-              rows={4}
+              rows={3}
               className="resize-none"
               maxLength={1000}
             />
           </FormControl>
-          <FormDescription>Inclua informações relevantes sobre o contexto, circunstâncias e impacto do incidente.</FormDescription>
           <FormMessage />
         </FormItem>
       )}

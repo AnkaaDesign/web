@@ -7,7 +7,7 @@ import { useInvoicesByTask } from "@/hooks/production/use-invoice";
 import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
 import { taskQuoteService } from "@/api-client/task-quote";
 import { customerService } from "@/api-client/customer";
-import { uploadSingleFile, getFileById } from "@/api-client/file";
+import { uploadSingleFile } from "@/api-client/file";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
@@ -98,6 +98,7 @@ export const BillingDetailPage = () => {
       quote: {
         include: {
           services: true,
+          layoutFiles: true,
           customerConfigs: {
             include: {
               customer: { include: { logo: true } },
@@ -165,7 +166,7 @@ export const BillingDetailPage = () => {
       customGuaranteeText: null as string | null,
       customForecastDays: null as number | null,
       simultaneousTasks: null as number | null,
-      layoutFileId: null as string | null,
+      layoutFileIds: [] as string[],
     },
   });
 
@@ -219,7 +220,7 @@ export const BillingDetailPage = () => {
       customGuaranteeText: quote.customGuaranteeText,
       customForecastDays: quote.customForecastDays ?? null,
       simultaneousTasks: quote.simultaneousTasks ?? null,
-      layoutFileId: quote.layoutFileId || null,
+      layoutFileIds: (quote.layoutFiles || []).map((f: any) => f.id),
       services: (quote.services || []).map((s: any) => ({
         id: s.id,
         description: s.description || "",
@@ -262,45 +263,20 @@ export const BillingDetailPage = () => {
       })),
     }, { keepDirtyValues: true }); // preserve user edits on background refetch
 
-    // Load layout file if present
-    if (quote.layoutFile) {
-      setLayoutFiles([
-        {
-          id: quote.layoutFile.id,
-          name: quote.layoutFile.filename || "layout",
-          size: quote.layoutFile.size || 0,
-          type: quote.layoutFile.mimetype || "application/octet-stream",
-          lastModified: Date.now(),
-          uploaded: true,
-          uploadProgress: 100,
-          uploadedFileId: quote.layoutFile.id,
-          thumbnailUrl: quote.layoutFile.thumbnailUrl,
-        } as FileWithPreview,
-      ]);
-    } else if (quote.layoutFileId) {
-      getFileById(quote.layoutFileId)
-        .then((response) => {
-          const file = response?.data;
-          if (file?.id) {
-            setLayoutFiles([
-              {
-                id: file.id,
-                name: file.filename || "layout",
-                size: file.size || 0,
-                type: file.mimetype || "application/octet-stream",
-                lastModified: Date.now(),
-                uploaded: true,
-                uploadProgress: 100,
-                uploadedFileId: file.id,
-                thumbnailUrl: file.thumbnailUrl,
-              } as FileWithPreview,
-            ]);
-          }
-        })
-        .catch(() => {});
-    } else {
-      setLayoutFiles([]);
-    }
+    // Load layout files from the included layoutFiles relation (array, up to 2)
+    const toLayoutFile = (file: any): FileWithPreview => ({
+      id: file.id,
+      name: file.filename || "layout",
+      size: file.size || 0,
+      type: file.mimetype || "application/octet-stream",
+      lastModified: Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview);
+
+    setLayoutFiles((quote.layoutFiles || []).map(toLayoutFile));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, quote?.id]); // use IDs — object refs change on every refetch and would wipe unsaved edits
 
@@ -491,22 +467,29 @@ export const BillingDetailPage = () => {
         }
       }
 
-      // 3. Upload new layout file if any (COMMERCIAL/ADMIN step)
-      let layoutFileId = formData.layoutFileId || null;
+      // 3. Upload new layout files if any (COMMERCIAL/ADMIN step). Up to 2 ordered
+      // File ids.
+      let layoutFileIds: string[] = (formData.layoutFileIds as string[]) || [];
       if (canSeeBudgetInfoStep) {
-        const newLayoutFiles = layoutFiles.filter((f) => !f.uploaded);
-        if (newLayoutFiles.length > 0) {
-          try {
-            const response = await uploadSingleFile(newLayoutFiles[0], {
-              fileContext: "quote-layout",
-            });
-            if (response.success && response.data) {
-              layoutFileId = response.data.id;
+        const resolvedLayoutIds: string[] = [];
+        for (const lf of layoutFiles) {
+          if (!lf.uploaded) {
+            try {
+              const response = await uploadSingleFile(lf, {
+                fileContext: "quote-layout",
+              });
+              if (response.success && response.data) {
+                resolvedLayoutIds.push(response.data.id);
+              }
+            } catch (error: any) {
+              toast.error(`Erro ao enviar layout: ${error.message}`);
             }
-          } catch (error: any) {
-            toast.error(`Erro ao enviar layout: ${error.message}`);
+          } else {
+            const existingId = (lf as any).uploadedFileId || lf.id || null;
+            if (existingId) resolvedLayoutIds.push(existingId);
           }
         }
+        layoutFileIds = resolvedLayoutIds;
       }
 
       // 4. Update quote data
@@ -523,7 +506,7 @@ export const BillingDetailPage = () => {
             customGuaranteeText: formData.customGuaranteeText,
             customForecastDays: canSeeBudgetInfoStep ? formData.customForecastDays : undefined,
             simultaneousTasks: canSeeBudgetInfoStep ? formData.simultaneousTasks : undefined,
-            layoutFileId: canSeeBudgetInfoStep ? layoutFileId : undefined,
+            layoutFileIds: canSeeBudgetInfoStep ? layoutFileIds : undefined,
           }
         : {
             expiresAt: formData.expiresAt,
@@ -533,7 +516,7 @@ export const BillingDetailPage = () => {
             customGuaranteeText: formData.customGuaranteeText,
             customForecastDays: canSeeBudgetInfoStep ? formData.customForecastDays : undefined,
             simultaneousTasks: canSeeBudgetInfoStep ? formData.simultaneousTasks : undefined,
-            layoutFileId: canSeeBudgetInfoStep ? layoutFileId : undefined,
+            layoutFileIds: canSeeBudgetInfoStep ? layoutFileIds : undefined,
             services: formData.services
               .filter((s: any) => s.description?.trim())
               .map((s: any) => ({

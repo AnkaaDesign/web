@@ -51,9 +51,10 @@ export function createFormDataWithContext(
 
   // Add regular form data
   Object.entries(data).forEach(([key, value]) => {
-    // Explicitly handle null values - send empty string to indicate field should be cleared
+    // Explicitly handle null values - send "null" so ArrayFixPipe converts it back to null.
+    // Sending "" would fail UUID/enum validation on the API side.
     if (value === null) {
-      formData.append(key, '');
+      formData.append(key, 'null');
       return;
     }
 
@@ -239,9 +240,7 @@ export function createAirbrushingFormData(
 export function createOrderFormData(
   data: Record<string, any>,
   files: {
-    budgets?: File[];
     receipts?: File[];
-    invoices?: File[];
   },
   supplier?: FormDataOptions['supplier']
 ): FormData {

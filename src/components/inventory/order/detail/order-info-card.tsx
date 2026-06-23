@@ -5,7 +5,7 @@ import { OrderStatusBadge } from "../common/order-status-badge";
 import { OrderTotalBadge } from "../common/order-total-calculator";
 import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFileText, IconId } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { formatDate, formatDateTime, formatCNPJ } from "../../../../utils";
+import { formatDate, formatDateTime, formatCNPJ, formatCurrency } from "../../../../utils";
 import { formatOrderNumber } from "@/utils/order-code";
 import { useCanViewPrices } from "../../../../hooks";
 import type { Order } from "../../../../types";
@@ -105,16 +105,6 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
               <span className="text-sm font-semibold text-foreground">{order.description || "-"}</span>
             </div>
 
-            {canViewPrices && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <IconCurrencyReal className="h-4 w-4" />
-                  Valor Total
-                </span>
-                <OrderTotalBadge orderItems={order.items} discount={order.discount} freight={order.freight} />
-              </div>
-            )}
-
             <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
               <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <IconCalendar className="h-4 w-4" />
@@ -141,15 +131,32 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
               </div>
             )}
 
-            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-              <span className="text-sm font-medium text-muted-foreground">Total de Itens</span>
-              <Badge variant="secondary" className="text-sm">{order.items?.length || 0} itens</Badge>
-            </div>
-
             {order.orderSchedule && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground">Origem</span>
                 <Badge variant="outline">Agendado</Badge>
+              </div>
+            )}
+
+            {/* Frete — moved here from the items card. */}
+            {canViewPrices && (order.freight ?? 0) > 0 && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconTruck className="h-4 w-4" />
+                  Frete
+                </span>
+                <span className="text-sm font-semibold text-foreground">{formatCurrency(order.freight ?? 0)}</span>
+              </div>
+            )}
+
+            {/* Valor Total — closes out the Detalhes do Pedido section. */}
+            {canViewPrices && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconCurrencyReal className="h-4 w-4" />
+                  Valor Total
+                </span>
+                <OrderTotalBadge orderItems={order.items} discount={order.discount} freight={order.freight} />
               </div>
             )}
 

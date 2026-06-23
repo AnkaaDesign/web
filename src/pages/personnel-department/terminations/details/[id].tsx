@@ -192,7 +192,7 @@ export const TerminationDetailPage = () => {
           title={termination.user?.name ? `Rescisão — ${termination.user.name}` : "Rescisão"}
           breadcrumbs={[
             { label: "Início", href: "/" },
-            { label: "Departamento Pessoal" },
+            { label: "Departamento Pessoal", href: routes.personnelDepartment.root },
             { label: "Rescisões", href: routes.personnelDepartment.terminations.root },
             { label: termination.user?.name || "Detalhes" },
           ]}

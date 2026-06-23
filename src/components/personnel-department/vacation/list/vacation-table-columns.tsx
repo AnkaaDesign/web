@@ -78,7 +78,7 @@ export const createVacationColumns = (): VacationColumn[] => [
     ),
     sortable: true,
     // table-fixed ignora min-width — é o `w-` que define a largura da coluna.
-    className: "w-[320px] min-w-[320px]",
+    className: "w-[300px] min-w-[300px]",
     align: "left",
   },
 
@@ -96,7 +96,7 @@ export const createVacationColumns = (): VacationColumn[] => [
       </div>
     ),
     sortable: true,
-    className: "min-w-[200px]",
+    className: "w-[230px] min-w-[230px]",
     align: "left",
   },
 
@@ -127,7 +127,7 @@ export const createVacationColumns = (): VacationColumn[] => [
       );
     },
     sortable: true,
-    className: "min-w-[180px]",
+    className: "w-[210px] min-w-[210px]",
     align: "left",
   },
 
@@ -149,7 +149,7 @@ export const createVacationColumns = (): VacationColumn[] => [
       </div>
     ),
     sortable: false,
-    className: "min-w-[170px]",
+    className: "w-[210px] min-w-[210px]",
     align: "left",
   },
 
@@ -159,7 +159,7 @@ export const createVacationColumns = (): VacationColumn[] => [
     header: "DIAS DE DIREITO",
     accessor: (vacation: Vacation) => <div className="text-sm font-medium tabular-nums">{vacation.entitledDays}</div>,
     sortable: true,
-    className: "min-w-[140px]",
+    className: "w-[100px] min-w-[100px]",
     align: "center",
   },
 
@@ -176,7 +176,7 @@ export const createVacationColumns = (): VacationColumn[] => [
         <span className="text-sm text-muted-foreground">-</span>
       ),
     sortable: false,
-    className: "min-w-[110px]",
+    className: "w-[90px] min-w-[90px]",
     align: "center",
   },
 
@@ -193,7 +193,7 @@ export const createVacationColumns = (): VacationColumn[] => [
         <span className="text-sm text-muted-foreground">-</span>
       ),
     sortable: false,
-    className: "min-w-[110px]",
+    className: "w-[100px] min-w-[100px]",
     align: "center",
   },
 
@@ -212,7 +212,7 @@ export const createVacationColumns = (): VacationColumn[] => [
         </Badge>
       ),
     sortable: true,
-    className: "min-w-[130px]",
+    className: "w-[140px] min-w-[140px]",
     align: "left",
   },
 

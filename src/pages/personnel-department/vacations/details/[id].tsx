@@ -175,7 +175,7 @@ export const VacationDetailPage = () => {
           title={vacation.user?.name ? `Férias — ${vacation.user.name}` : "Férias"}
           breadcrumbs={[
             { label: "Início", href: "/" },
-            { label: "Departamento Pessoal" },
+            { label: "Departamento Pessoal", href: routes.personnelDepartment.root },
             { label: "Férias", href: routes.personnelDepartment.vacations.root },
             { label: vacation.user?.name || "Detalhes" },
           ]}

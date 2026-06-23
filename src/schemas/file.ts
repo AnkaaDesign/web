@@ -18,8 +18,6 @@ export const fileIncludeSchema = z
     warning: z.boolean().optional(),
     airbrushingReceipts: z.boolean().optional(),
     airbrushingInvoices: z.boolean().optional(),
-    orderBudgets: z.boolean().optional(),
-    orderInvoices: z.boolean().optional(),
     orderReceipts: z.boolean().optional(),
     taskBudgets: z.boolean().optional(),
     taskInvoices: z.boolean().optional(),
@@ -261,22 +259,6 @@ export const fileWhereSchema: z.ZodType<any> = z.lazy(() =>
         })
         .optional(),
 
-      orderBudgets: z
-        .object({
-          some: z.any().optional(),
-          every: z.any().optional(),
-          none: z.any().optional(),
-        })
-        .optional(),
-
-      orderInvoices: z
-        .object({
-          some: z.any().optional(),
-          every: z.any().optional(),
-          none: z.any().optional(),
-        })
-        .optional(),
-
       orderReceipts: z
         .object({
           some: z.any().optional(),
@@ -475,8 +457,6 @@ const fileTransform = (data: any) => {
           { warning: { none: {} } },
           { airbrushingReceipts: { none: {} } },
           { airbrushingInvoices: { none: {} } },
-          { orderBudgets: { none: {} } },
-          { orderInvoices: { none: {} } },
           { orderReceipts: { none: {} } },
           { taskBudgets: { none: {} } },
           { taskInvoices: { none: {} } },
@@ -497,8 +477,6 @@ const fileTransform = (data: any) => {
           { warning: { some: {} } },
           { airbrushingReceipts: { some: {} } },
           { airbrushingInvoices: { some: {} } },
-          { orderBudgets: { some: {} } },
-          { orderInvoices: { some: {} } },
           { orderReceipts: { some: {} } },
           { taskBudgets: { some: {} } },
           { taskInvoices: { some: {} } },
@@ -523,8 +501,6 @@ const fileTransform = (data: any) => {
           { warning: { some: {} } },
           { airbrushingReceipts: { some: {} } },
           { airbrushingInvoices: { some: {} } },
-          { orderBudgets: { some: {} } },
-          { orderInvoices: { some: {} } },
           { orderReceipts: { some: {} } },
           { taskBudgets: { some: {} } },
           { taskInvoices: { some: {} } },
@@ -544,8 +520,6 @@ const fileTransform = (data: any) => {
           { warning: { none: {} } },
           { airbrushingReceipts: { none: {} } },
           { airbrushingInvoices: { none: {} } },
-          { orderBudgets: { none: {} } },
-          { orderInvoices: { none: {} } },
           { orderReceipts: { none: {} } },
           { taskBudgets: { none: {} } },
           { taskInvoices: { none: {} } },

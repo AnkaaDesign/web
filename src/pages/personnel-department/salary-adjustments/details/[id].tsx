@@ -130,7 +130,7 @@ export const SalaryAdjustmentDetailPage = () => {
           title={title}
           breadcrumbs={[
             { label: "Início", href: "/" },
-            { label: "Departamento Pessoal" },
+            { label: "Departamento Pessoal", href: routes.personnelDepartment.root },
             { label: "Reajustes", href: routes.personnelDepartment.salaryAdjustments.root },
             { label: formatDate(new Date(adjustment.effectiveDate)) },
           ]}

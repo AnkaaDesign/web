@@ -9,14 +9,14 @@
 @tailwind utilities;
 
 /*
- * GLOBAL UI SCALE — render the whole app at 80% density (what the user used to
- * approximate by running the browser at 80% zoom).
+ * GLOBAL UI SCALE — render the whole app at 90% density (what the user used to
+ * approximate by running the browser at reduced zoom).
  *
  * HOW: pure rem scaling, NOT `zoom` and NOT `transform`. The UI is rem-based
  * (Tailwind spacing/typography) and every stray `px` value is converted to rem
  * at build time by postcss-pxtorem (see postcss.config.js), so shrinking the
  * root font-size scales the ENTIRE design uniformly — the same visual result as
- * 80% browser zoom. Tune this single value to change density.
+ * a reduced browser zoom. Tune this single value to change density.
  *
  * WHY not zoom/transform: both break Floating UI — the engine Radix uses to
  * position EVERY popover, combobox, <Select>, dropdown and tooltip. `zoom`
@@ -31,7 +31,7 @@
  * crisp and responsive breakpoints still track the real viewport.
  */
 html {
-  font-size: 80%;
+  font-size: 90%;
 }
 
 html,
@@ -42,7 +42,7 @@ body,
 
 /*
  * PRINT must stay full size — receipts, PDFs and reports are laid out for paper
- * and must not be shrunk to 80%. Resetting the root font-size returns every
+ * and must not be shrunk to 90%. Resetting the root font-size returns every
  * rem-based dimension to its original size; literal-px receipt layouts are
  * unaffected.
  */

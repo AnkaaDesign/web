@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconExternalLink, IconAlertTriangle, IconPaperclip } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconExternalLink, IconAlertTriangle } from "@tabler/icons-react";
 
 import type { Warning } from "../../../../types";
 import type { WarningGetManyFormData } from "../../../../schemas";
@@ -94,7 +94,8 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
         page: page + 1, // Convert 0-based to 1-based for API
         take: pageSize,
         include: {
-          collaborator: true,
+          collaborator: { include: { position: true } },
+          supervisor: true,
           attachments: true,
         },
         // Convert sortConfigs to orderBy format for API
@@ -263,18 +264,43 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
     }
   };
 
+  const getSeverityVariant = (severity: string) => {
+    switch (severity) {
+      case "VERBAL": return "warning" as const;
+      case "WRITTEN": return "secondary" as const;
+      case "SUSPENSION": return "destructive" as const;
+      case "FINAL_WARNING": return "error" as const;
+      default: return "default" as const;
+    }
+  };
+
   // Define columns
   const columns = useMemo(
     () => [
       {
         key: "collaborator.name",
-        header: "FUNCIONÁRIO",
+        header: "COLABORADOR",
         sortable: true,
-        className: "min-w-[200px]",
+        className: "min-w-[280px] max-w-[320px]",
+        accessor: (warning: Warning) => {
+          const collaborator = warning.collaborator as any;
+          return (
+            <span className="font-medium truncate block">{collaborator?.name || "—"}</span>
+          );
+        },
+      },
+      {
+        key: "severity",
+        header: "GRAVIDADE",
+        sortable: true,
+        className: "min-w-[140px]",
         accessor: (warning: Warning) => (
-          <span className="font-medium truncate block" title={warning.collaborator?.name}>
-            {warning.collaborator?.name || "—"}
-          </span>
+          <Badge variant={getSeverityVariant(warning.severity)} className="font-normal whitespace-nowrap">
+            {WARNING_SEVERITY_LABELS[warning.severity]}
+            {warning.severity === "SUSPENSION" && warning.suspensionDays
+              ? ` (${warning.suspensionDays}d)`
+              : ""}
+          </Badge>
         ),
       },
       {
@@ -283,50 +309,46 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
         sortable: true,
         className: "min-w-[150px]",
         accessor: (warning: Warning) => (
-          <Badge variant="primary" className="font-normal">
+          <Badge variant="outline" className="font-normal">
             {WARNING_CATEGORY_LABELS[warning.category]}
           </Badge>
         ),
       },
       {
-        key: "severity",
-        header: "SEVERIDADE",
+        key: "supervisor.name",
+        header: "SUPERVISOR",
+        sortable: false,
+        className: "min-w-[180px]",
+        accessor: (warning: Warning) => {
+          const supervisor = warning.supervisor as any;
+          return supervisor?.name
+            ? <span className="text-sm">{supervisor.name}</span>
+            : <span className="text-sm text-muted-foreground">—</span>;
+        },
+      },
+      {
+        key: "isActive",
+        header: "STATUS",
         sortable: true,
-        className: "min-w-[150px]",
+        className: "min-w-[110px]",
         accessor: (warning: Warning) => (
-          <Badge variant="secondary" className="font-normal">
-            {WARNING_SEVERITY_LABELS[warning.severity]}
-            {warning.severity === "SUSPENSION" && warning.suspensionDays
-              ? ` (${warning.suspensionDays} ${warning.suspensionDays === 1 ? "dia" : "dias"})`
-              : ""}
+          <Badge variant={warning.isActive ? "secondary" : "success"} className="font-normal">
+            {warning.isActive ? "Ativa" : "Resolvida"}
           </Badge>
         ),
       },
       {
         key: "followUpDate",
-        header: "DATA",
+        header: "ACOMPANHAMENTO",
         sortable: true,
-        className: "min-w-[120px]",
+        className: "min-w-[140px]",
         accessor: (warning: Warning) => <span className="text-sm">{formatDate(warning.followUpDate)}</span>,
-      },
-      {
-        key: "attachments",
-        header: "ANEXO",
-        sortable: false,
-        className: "min-w-[80px]",
-        align: "center" as const,
-        accessor: (warning: Warning) =>
-          warning.attachments && warning.attachments.length > 0 ? (
-            <IconPaperclip className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <span className="text-sm text-muted-foreground">—</span>
-          ),
       },
       {
         key: "createdAt",
         header: "CRIADO EM",
         sortable: true,
-        className: "min-w-[120px]",
+        className: "min-w-[110px]",
         accessor: (warning: Warning) => <span className="text-sm text-muted-foreground">{formatDate(warning.createdAt)}</span>,
       },
     ],

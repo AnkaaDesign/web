@@ -40,8 +40,8 @@ export function WarehouseLocationFrontView({ location, highlightItemIds }: Wareh
         : `${levels} ${levels === 1 ? "prateleira" : "prateleiras"}`;
 
   // bucket items: pallet → one bin; kanban → level×column cells; estante → per level.
-  // An item bound to the location with NO level (locationLevel == null) occupies the WHOLE
-  // structure → it is shown on EVERY shelf/cell (wholeItems), not on a single lonely shelf.
+  // An item can occupy MULTIPLE cells (locationCells) → it appears on every listed shelf/cell.
+  // An item with NO cells occupies the WHOLE structure → shown on EVERY shelf/cell (wholeItems).
   const { byCell, byLevel, palletItems, wholeItems, unplaced } = useMemo(() => {
     const cell = new Map<string, Item[]>();
     const lvl = new Map<number, Item[]>();
@@ -51,21 +51,30 @@ export function WarehouseLocationFrontView({ location, highlightItemIds }: Wareh
     const push = (m: Map<string | number, Item[]>, k: string | number, it: Item) => { const a = m.get(k) ?? []; a.push(it); m.set(k, a); };
     for (const item of items) {
       if (isPallet) { pallet.push(item); continue; }
-      const L = item.locationLevel;
-      if (L == null) { whole.push(item); continue; } // whole structure → every shelf
-      if (L < 1 || L > levels) { noPos.push(item); continue; }
-      if (hasColumns) {
-        const C = item.locationColumn;
-        if (C == null || C < 1 || C > columnsForLevel(location, L)) { noPos.push(item); continue; }
-        push(cell as Map<string | number, Item[]>, `${L}:${C}`, item);
-      } else push(lvl as Map<string | number, Item[]>, L, item);
+      const cells = item.locationCells ?? [];
+      if (cells.length === 0) { whole.push(item); continue; } // whole structure → every shelf
+      let placed = false;
+      let bad = false;
+      for (const { level: L, column: C } of cells) {
+        if (L == null || L < 1 || L > levels) { bad = true; continue; }
+        if (hasColumns) {
+          if (C == null || C < 1 || C > columnsForLevel(location, L)) { bad = true; continue; }
+          push(cell as Map<string | number, Item[]>, `${L}:${C}`, item);
+          placed = true;
+        } else {
+          push(lvl as Map<string | number, Item[]>, L, item);
+          placed = true;
+        }
+      }
+      if (bad && !placed) noPos.push(item); // every listed cell was out of range
     }
     return { byCell: cell, byLevel: lvl, palletItems: pallet, wholeItems: whole, unplaced: noPos };
   }, [items, isPallet, hasColumns, levels, location]);
 
   const itemLabel = (it: Item) => (it.uniCode ? `${it.uniCode} - ${it.name}` : it.name);
-  // every item badge is a FIXED-size card (uniform width/height, room for 2 lines).
-  // `fullWidth` lets kanban cells fill their (already uniform) grid column.
+  // Item badge. On full-width shelf rows (estante per-level, pallet) the card sizes to its
+  // content and stays on ONE line (truncating only pathological names). `fullWidth` kanban
+  // cells fill their narrow grid column and keep the 2-line clamp.
   const renderBadge = (item: Item, fullWidth = false) => {
     const hot = highlightItemIds?.has(item.id);
     return (
@@ -74,11 +83,11 @@ export function WarehouseLocationFrontView({ location, highlightItemIds }: Wareh
         title={`${itemLabel(item)} (${item.quantity})`}
         className={cn(
           "flex h-12 items-center rounded-md border px-2 text-[11px] leading-tight",
-          fullWidth ? "w-full" : "w-36",
+          fullWidth ? "w-full" : "w-auto max-w-full",
           hot ? "animate-pulse border-red-500/60 bg-red-500/20 text-foreground" : "border-border bg-secondary text-secondary-foreground",
         )}
       >
-        <span className="line-clamp-2 w-full text-left">{itemLabel(item)}</span>
+        <span className={cn("w-full text-left", fullWidth ? "line-clamp-2" : "truncate")}>{itemLabel(item)}</span>
       </div>
     );
   };

@@ -467,14 +467,14 @@ export const warningCreateSchema = z
       errorMap: () => ({ message: "categoria inválida" }),
     }),
     reason: createDescriptionSchema(10, 500, true),
-    description: createDescriptionSchema(0, 1000).nullable().optional(),
+    description: createDescriptionSchema(0, 1000, false).nullable().optional(),
     isActive: z.boolean().default(true),
     collaboratorId: z.string().uuid({ message: "Colaborador inválido" }),
     supervisorId: z.string().uuid({ message: "Supervisor inválido" }),
     witnessIds: z.array(z.string().uuid({ message: "Testemunha inválida" })).optional(),
     attachmentIds: z.array(z.string().uuid({ message: "Arquivo inválido" })).optional(),
     followUpDate: z.coerce.date(),
-    hrNotes: createDescriptionSchema(0, 1000).nullable().optional(),
+    hrNotes: createDescriptionSchema(0, 1000, false).nullable().optional(),
     resolvedAt: z.coerce.date().nullable().optional(),
     // Dias de suspensão (severity = SUSPENSION). CLT art. 474 limita a 30 dias.
     suspensionDays: z
@@ -502,7 +502,7 @@ export const warningUpdateSchema = z
       })
       .optional(),
     reason: createDescriptionSchema(10, 500).optional(),
-    description: createDescriptionSchema(0, 1000).nullable().optional(),
+    description: createDescriptionSchema(0, 1000, false).nullable().optional(),
     isActive: z.boolean().optional(),
     collaboratorId: z.string().uuid({ message: "Colaborador inválido" }).optional(),
     supervisorId: z.string().uuid({ message: "Supervisor inválido" }).optional(),
@@ -510,7 +510,7 @@ export const warningUpdateSchema = z
     attachmentIds: z.array(z.string().uuid({ message: "Arquivo inválido" })).optional(),
     // CORRECTED: Keep as optional for updates, but removed nullable since Prisma field is required
     followUpDate: z.coerce.date().optional(),
-    hrNotes: createDescriptionSchema(0, 1000).nullable().optional(),
+    hrNotes: createDescriptionSchema(0, 1000, false).nullable().optional(),
     resolvedAt: z.coerce.date().nullable().optional(),
     // Dias de suspensão (severity = SUSPENSION). CLT art. 474 limita a 30 dias.
     suspensionDays: z
@@ -588,4 +588,8 @@ export const mapToWarningFormData = createMapToFormDataHelper<Warning, WarningUp
   followUpDate: warning.followUpDate,
   hrNotes: warning.hrNotes,
   resolvedAt: warning.resolvedAt,
+  suspensionDays: warning.suspensionDays,
+  terminationId: warning.terminationId,
+  witnessIds: (warning.witness as any[])?.map((w: any) => w.id) ?? [],
+  attachmentIds: (warning.attachments as any[])?.map((a: any) => a.id) ?? [],
 }));

@@ -229,7 +229,7 @@ export function TaskPreparationView({
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
-    return ["preparation", "production", "completed"];
+    return ["preparation", "production"];
   });
 
   // Persist visible tables to localStorage
@@ -247,11 +247,16 @@ export function TaskPreparationView({
       setProductionTableData([]);
       setProductionOrderedIds([]);
     }
-    if (!visibleTables.includes("completed")) {
+    // Financial users always need completed-task data (their single table shows
+    // completed tasks), so only clear it for non-financial users.
+    if (
+      currentUser?.sector?.privileges !== SECTOR_PRIVILEGES.FINANCIAL &&
+      !visibleTables.includes("completed")
+    ) {
       setCompletedTableData([]);
       setCompletedOrderedIds([]);
     }
-  }, [visibleTables]);
+  }, [visibleTables, currentUser]);
 
   // Persist expanded groups to localStorage whenever it changes
   useEffect(() => {
@@ -586,7 +591,7 @@ export function TaskPreparationView({
             id: true,
             total: true,
             status: true,
-            layoutFileId: true,
+            layoutFiles: { select: { id: true } },
             customerConfigs: {
               select: {
                 customer: {
@@ -1034,38 +1039,6 @@ export function TaskPreparationView({
                   showSelectedOnly={showSelectedOnly}
                   allOrderedTaskIds={allOrderedTaskIds}
                   sortStorageKey="task-preparation-sort-preparation"
-                />
-              </div>
-            )}
-
-            {/* Table 3: Concluído */}
-            {visibleTables.includes("completed") && (
-              <div>
-                <TaskPreparationTable
-                  refetchOnWindowFocus="always"
-                  filters={{
-                    ...queryFilters,
-                    status: [TASK_STATUS.COMPLETED],
-                    limit: 1000,
-                  }}
-                  visibleColumns={visibleColumns}
-                  columnOrder={columnOrder}
-                  getColumnWidth={getColumnWidth}
-                  setColumnWidth={setColumnWidth}
-                  onDataChange={handleCompletedTableDataChange}
-                  advancedActionsRef={advancedActionsRef}
-                  onStartCopyFromTask={handleStartCopyFromTask}
-                  isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
-                  onSourceTaskSelect={handleSourceTaskSelected}
-                  onShiftClickSelect={handleShiftClickSelect}
-                  onSingleClickSelect={handleSingleClickSelect}
-                  externalExpandedGroups={expandedGroups}
-                  onExpandedGroupsChange={setExpandedGroups}
-                  onGroupsDetected={handleGroupsDetected}
-                  onOrderedTaskIdsChange={handleCompletedOrderedIdsChange}
-                  showSelectedOnly={showSelectedOnly}
-                  allOrderedTaskIds={allOrderedTaskIds}
-                  sortStorageKey="task-preparation-sort-completed"
                 />
               </div>
             )}

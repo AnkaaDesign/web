@@ -42,6 +42,7 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
       categoryId: item.categoryId,
       supplierId: item.supplierId,
       warehouseLocationId: item.warehouseLocationId,
+      locationCells: item.locationCells ?? [],
       estimatedLeadTime: item.estimatedLeadTime,
       isActive: item.isActive,
       price: currentPrice,

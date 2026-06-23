@@ -4,7 +4,7 @@ import { IconUserUp } from "@tabler/icons-react";
 import { UserPositionHistoryList } from "@/components/personnel-department/user-position-history/list/user-position-history-list";
 import { PromoteDialog } from "@/components/personnel-department/user-position-history/promote/promote-dialog";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../constants";
+import { FAVORITE_PAGES, routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const PromotionListPage = () => {
@@ -18,7 +18,7 @@ export const PromotionListPage = () => {
           variant="list"
           title="Promoções"
           favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_PROMOCOES_LISTAR}
-          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal" }, { label: "Promoções" }]}
+          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal", href: routes.personnelDepartment.root }, { label: "Promoções" }]}
           actions={[
             {
               key: "promote",

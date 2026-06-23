@@ -111,7 +111,7 @@ export const PromotionDetailPage = () => {
           title={title}
           breadcrumbs={[
             { label: "Início", href: "/" },
-            { label: "Departamento Pessoal" },
+            { label: "Departamento Pessoal", href: routes.personnelDepartment.root },
             { label: "Promoções", href: routes.personnelDepartment.promotions.root },
             { label: history.user?.name || "Detalhes" },
           ]}

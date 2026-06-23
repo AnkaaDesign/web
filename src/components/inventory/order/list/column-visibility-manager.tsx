@@ -17,10 +17,13 @@ type OrderColumn = StandardizedColumn<Order>;
 interface ColumnVisibilityManagerProps {
   columns: OrderColumn[];
   visibleColumns: Set<string>;
+  // Privilege-aware default from the list; used by "Restaurar" so reset matches the
+  // initial state (admins keep payment status, warehouse never gets it).
+  defaultVisibleColumns?: Set<string>;
   onVisibilityChange: (columns: Set<string>) => void;
 }
 
-export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityChange }: ColumnVisibilityManagerProps) {
+export function ColumnVisibilityManager({ columns, visibleColumns, defaultVisibleColumns, onVisibilityChange }: ColumnVisibilityManagerProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [localVisible, setLocalVisible] = useState(visibleColumns);
@@ -57,7 +60,7 @@ export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityC
   };
 
   const handleReset = () => {
-    setLocalVisible(getDefaultVisibleColumns());
+    setLocalVisible(new Set(defaultVisibleColumns ?? getDefaultVisibleColumns()));
   };
 
   const handleApply = () => {

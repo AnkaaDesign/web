@@ -75,7 +75,7 @@ export function Breadcrumb({ items, onNavigate }: BreadcrumbProps = {}) {
                 <span className="truncate">{crumb.title}</span>
               </button>
             ) : (
-              <span className={cn("flex items-center gap-1 max-w-[200px]", isLast && "text-foreground font-medium")}>
+              <span className={cn("flex items-center gap-1 max-w-[200px] select-none cursor-default", isLast && "text-foreground font-medium")}>
                 {isHome && <IconHome2 className="w-4 h-4 shrink-0" />}
                 <span className="truncate" title={crumb.title}>{crumb.title}</span>
               </span>

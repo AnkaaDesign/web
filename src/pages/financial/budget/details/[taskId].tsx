@@ -33,7 +33,7 @@ import { FormSteps } from "@/components/ui/form-steps";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "@/components/ui/sonner";
-import { uploadSingleFile, getFileById } from "@/api-client/file";
+import { uploadSingleFile } from "@/api-client/file";
 import { getCustomers } from "@/api-client";
 import { customerService } from "@/api-client/customer";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -132,6 +132,25 @@ export const FinancialBudgetDetailPage = () => {
     setArtworkStatuses((prev) => ({ ...prev, [fileId]: status }));
   }, []);
 
+  // Selecting a task-artwork as the quote "Layout Aprovado" approves it; deselecting
+  // reverts it to DRAFT. Keyed by File id — same map the submit remap reads, so the
+  // change persists and shows in Step 1 on reload. Also mirror onto artworkFiles so
+  // the Step-1 dropdown reflects it immediately. Last action wins.
+  const handleArtworkLayoutApprovalChange = useCallback(
+    (fileId: string, approved: boolean) => {
+      const status = approved ? "APPROVED" : "DRAFT";
+      setArtworkStatuses((prev) => ({ ...prev, [fileId]: status }));
+      setArtworkFiles((prev) =>
+        prev.map((f) => {
+          const fId = (f as any).uploadedFileId || f.id;
+          if (fId !== fileId) return f;
+          return { ...f, name: f.name, size: f.size, type: f.type, status } as FileWithPreview;
+        }),
+      );
+    },
+    [],
+  );
+
   const handleResponsibleRowsChange = useCallback(
     (rows: ResponsibleRowData[]) => {
       setResponsibleRows(rows);
@@ -171,7 +190,7 @@ export const FinancialBudgetDetailPage = () => {
       guaranteeYears: null as number | null,
       customGuaranteeText: null as string | null,
       customForecastDays: null as number | null,
-      layoutFileId: null as string | null,
+      layoutFileIds: [] as string[],
       simultaneousTasks: null as number | null,
       customerConfigs: [] as any[],
       services: [
@@ -215,7 +234,7 @@ export const FinancialBudgetDetailPage = () => {
         guaranteeYears: null,
         customGuaranteeText: null,
         customForecastDays: null,
-        layoutFileId: null,
+        layoutFileIds: [],
         simultaneousTasks: null,
         customerConfigs: [],
         services: [
@@ -243,7 +262,7 @@ export const FinancialBudgetDetailPage = () => {
       guaranteeYears: existingQuote.guaranteeYears || null,
       customGuaranteeText: existingQuote.customGuaranteeText || null,
       customForecastDays: existingQuote.customForecastDays || null,
-      layoutFileId: existingQuote.layoutFileId || null,
+      layoutFileIds: (existingQuote.layoutFiles || []).map((f: any) => f.id),
       simultaneousTasks: existingQuote.simultaneousTasks || null,
       customerConfigs:
         existingQuote.customerConfigs?.map((c: any) => ({
@@ -315,44 +334,21 @@ export const FinancialBudgetDetailPage = () => {
     formInitializedRef.current = true;
     setFormInitialized(true);
 
-    // Set layout files from included data, or fetch separately when the API
-    // doesn't include the layoutFile relation (e.g. running an older build).
-    if (existingQuote.layoutFile) {
-      setLayoutFiles([
-        {
-          id: existingQuote.layoutFile.id,
-          name: existingQuote.layoutFile.filename || "layout",
-          size: existingQuote.layoutFile.size || 0,
-          type:
-            existingQuote.layoutFile.mimetype || "application/octet-stream",
-          lastModified: Date.now(),
-          uploaded: true,
-          uploadProgress: 100,
-          uploadedFileId: existingQuote.layoutFile.id,
-          thumbnailUrl: existingQuote.layoutFile.thumbnailUrl,
-        } as FileWithPreview,
-      ]);
-    } else if (existingQuote.layoutFileId) {
-      getFileById(existingQuote.layoutFileId)
-        .then((response) => {
-          const file = response?.data;
-          if (file?.id) {
-            setLayoutFiles([
-              {
-                id: file.id,
-                name: file.filename || "layout",
-                size: file.size || 0,
-                type: file.mimetype || "application/octet-stream",
-                lastModified: Date.now(),
-                uploaded: true,
-                uploadProgress: 100,
-                uploadedFileId: file.id,
-                thumbnailUrl: file.thumbnailUrl,
-              } as FileWithPreview,
-            ]);
-          }
-        })
-        .catch(() => { /* layout will still display via artwork selector if applicable */ });
+    // Set layout files from the included layoutFiles relation (array, up to 2).
+    const toLayoutFile = (file: any): FileWithPreview => ({
+      id: file.id,
+      name: file.filename || "layout",
+      size: file.size || 0,
+      type: file.mimetype || "application/octet-stream",
+      lastModified: Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview);
+
+    if (existingQuote.layoutFiles && existingQuote.layoutFiles.length > 0) {
+      setLayoutFiles(existingQuote.layoutFiles.map(toLayoutFile));
     }
 
     // Initialize customers cache from existing configs, then fetch full data
@@ -458,6 +454,9 @@ export const FinancialBudgetDetailPage = () => {
           uploadProgress: 100,
           uploadedFileId: file.id,
           thumbnailUrl: file.thumbnailUrl,
+          // Carry the persisted status so the per-file dropdown shows the real
+          // value (APPROVED/REPROVED) instead of always defaulting to DRAFT.
+          status: artwork.status || "DRAFT",
         } as FileWithPreview;
       });
       setArtworkFiles(artworkFilesList);
@@ -583,14 +582,24 @@ export const FinancialBudgetDetailPage = () => {
     setIsSubmitting(true);
     try {
       // 1. Upload new artwork files
+      // Maps a freshly-uploaded file's LOCAL id -> its real server File id, so a
+      // layout the user selected from a brand-new Step-1 artwork (still a local id
+      // at selection time) can be remapped to the real File id below (see Bug 1).
+      const localIdToRealFileId: Record<string, string> = {};
       const uploadedArtworkIds: string[] = [];
       const remappedArtworkStatuses: Record<string, string> = {};
+      // The status dropdown keys onStatusChange by `uploadedFileId || id`, so a
+      // persisted artwork's status lands under its File id while a brand-new file's
+      // lands under its local id. Read BOTH so neither case is missed.
+      const statusForFile = (file: FileWithPreview): string | undefined =>
+        artworkStatuses[(file as any).uploadedFileId] ?? artworkStatuses[file.id];
       for (const file of artworkFiles) {
         if (file.uploaded && file.uploadedFileId) {
           uploadedArtworkIds.push(file.uploadedFileId);
-          if (artworkStatuses[file.id]) {
-            remappedArtworkStatuses[file.uploadedFileId] =
-              artworkStatuses[file.id];
+          localIdToRealFileId[file.id] = file.uploadedFileId;
+          const status = statusForFile(file);
+          if (status) {
+            remappedArtworkStatuses[file.uploadedFileId] = status;
           }
         } else if (!file.error) {
           try {
@@ -599,9 +608,10 @@ export const FinancialBudgetDetailPage = () => {
             });
             if (response.success && response.data) {
               uploadedArtworkIds.push(response.data.id);
-              if (artworkStatuses[file.id]) {
-                remappedArtworkStatuses[response.data.id] =
-                  artworkStatuses[file.id];
+              localIdToRealFileId[file.id] = response.data.id;
+              const status = statusForFile(file);
+              if (status) {
+                remappedArtworkStatuses[response.data.id] = status;
               }
             }
           } catch (error: any) {
@@ -631,26 +641,49 @@ export const FinancialBudgetDetailPage = () => {
         }
       }
 
-      // 2. Resolve layoutFileId from the current layoutFiles state — NOT from
-      // form.data.layoutFileId, which isn't updated when the user removes the
-      // file via the upload widget. Empty layoutFiles ⇒ null ⇒ backend disconnects.
-      let layoutFileId: string | null = null;
-      const newLayoutFiles = layoutFiles.filter((f) => !f.uploaded);
-      if (newLayoutFiles.length > 0) {
-        try {
-          const response = await uploadSingleFile(newLayoutFiles[0], {
-            fileContext: "quote-layout",
-          });
-          if (response.success && response.data) {
-            layoutFileId = response.data.id;
+      // 2. Resolve the ordered layout File ids (up to 2 slots) from the current
+      // layoutFiles state — NOT from form.data, which isn't updated when the user
+      // removes a file via the upload widget. Upload any new files, preserve the
+      // connection for pre-existing ones. Always use FILE ids, never Artwork ids.
+      //
+      // A layout may have been selected from a brand-new Step-1 artwork file that
+      // had no server File id yet at selection time (only a local id). Those Step-1
+      // files are uploaded in section 1 above, so remap any local id here to the
+      // real File id via localIdToRealFileId before sending it (Bug 1).
+      const resolvedLayoutIds: string[] = [];
+      for (const lf of layoutFiles) {
+        const existingId = (lf as any).uploadedFileId || lf.id || null;
+        // Already uploaded by the Step-1 artwork pass? Use the real File id.
+        const remapped = existingId ? localIdToRealFileId[existingId] : null;
+        if (remapped) {
+          resolvedLayoutIds.push(remapped);
+        } else if (!lf.uploaded) {
+          try {
+            const response = await uploadSingleFile(lf, {
+              fileContext: "quote-layout",
+            });
+            if (response.success && response.data) {
+              resolvedLayoutIds.push(response.data.id);
+            }
+          } catch (error: any) {
+            toast.error(`Erro ao enviar layout: ${error.message}`);
           }
-        } catch (error: any) {
-          toast.error(`Erro ao enviar layout: ${error.message}`);
+        } else if (existingId) {
+          resolvedLayoutIds.push(existingId);
         }
-      } else if (layoutFiles.length > 0) {
-        // Pre-existing layout, no new upload — preserve the connection.
-        layoutFileId = (layoutFiles[0] as any).uploadedFileId || layoutFiles[0].id || null;
       }
+      // Dedupe (a layout could resolve to the same File id as another slot) and
+      // clamp to the 2-slot maximum.
+      const seenLayoutIds = new Set<string>();
+      const dedupedLayoutIds = resolvedLayoutIds
+        .filter((id) => {
+          if (seenLayoutIds.has(id)) return false;
+          seenLayoutIds.add(id);
+          return true;
+        })
+        .slice(0, 2);
+      resolvedLayoutIds.length = 0;
+      resolvedLayoutIds.push(...dedupedLayoutIds);
 
       // 3. Build responsible data
       const existingRepIds = responsibleRows
@@ -768,7 +801,7 @@ export const FinancialBudgetDetailPage = () => {
         guaranteeYears: data.guaranteeYears || null,
         customGuaranteeText: data.customGuaranteeText || null,
         customForecastDays: data.customForecastDays || null,
-        layoutFileId: layoutFileId || null,
+        layoutFileIds: resolvedLayoutIds,
         simultaneousTasks: data.simultaneousTasks || null,
         customerConfigs: data.customerConfigs || [],
         services: validServices.map((item: any) => ({
@@ -783,13 +816,17 @@ export const FinancialBudgetDetailPage = () => {
         // round-tripping through the quote endpoint. The API also filters
         // no-ops defensively, but skipping the call is cheaper.
         const dirty = form.formState.dirtyFields as Record<string, unknown>;
-        const newLayoutUploaded = newLayoutFiles.length > 0;
-        // Detect layout removal: had a layoutFile before, none now.
-        const layoutRemoved =
-          !!existingQuote.layoutFileId && layoutFiles.length === 0;
+        // Detect layout change via ordered comparison of resolved File ids vs the
+        // persisted ones. Covers new uploads, removals, reordering AND selecting
+        // an EXISTING file (which a dirty-flag check alone would miss).
+        const persistedLayoutIds = (existingQuote.layoutFiles || []).map(
+          (f: any) => f.id,
+        ) as string[];
+        const layoutChanged =
+          resolvedLayoutIds.length !== persistedLayoutIds.length ||
+          resolvedLayoutIds.some((id, i) => id !== persistedLayoutIds[i]);
         const quoteFieldDirty =
-          newLayoutUploaded ||
-          layoutRemoved ||
+          layoutChanged ||
           Boolean(
             dirty.expiresAt ||
               dirty.subtotal ||
@@ -797,7 +834,7 @@ export const FinancialBudgetDetailPage = () => {
               dirty.guaranteeYears ||
               dirty.customGuaranteeText ||
               dirty.customForecastDays ||
-              dirty.layoutFileId ||
+              dirty.layoutFileIds ||
               dirty.simultaneousTasks ||
               dirty.customerConfigs ||
               dirty.services,
@@ -936,9 +973,18 @@ export const FinancialBudgetDetailPage = () => {
     : 0;
   const isLastStep = currentStep === totalSteps;
 
-  const artworks = (task.artworks || []).map((artwork: any) => {
+  // Step-2's "Layout Aprovado" picker is sourced from these options. Build them
+  // from the LIVE artworkFiles state (what the user is editing in Step 1) merged
+  // with the persisted task.artworks, deduped by File id, images only. This makes
+  // a layout just added in Step 1 immediately selectable in Step 2 (Bug 1).
+  // For a not-yet-uploaded file the option `id` is the file's stable LOCAL id; at
+  // submit it is remapped to the real File id (see localIdToRealFileId).
+  const artworksById = new Map<string, any>();
+  // Persisted artworks first (so live state can override with fresher data).
+  (task.artworks || []).forEach((artwork: any) => {
     const file = artwork.file || artwork;
-    return {
+    if (!(file.mimetype || "").startsWith("image/")) return;
+    artworksById.set(file.id, {
       id: file.id,
       artworkId: artwork.artworkId || artwork.id,
       filename: file.filename,
@@ -946,9 +992,29 @@ export const FinancialBudgetDetailPage = () => {
       thumbnailUrl: file.thumbnailUrl,
       status: artwork.status,
       mimetype: file.mimetype,
+      // Remote storage path (http) when present — lets the viewer serve the file.
+      path: file.path || null,
       size: file.size,
-    };
+    });
   });
+  // Live Step-1 files — including brand-new ones with only a local id.
+  artworkFiles.forEach((file: any) => {
+    if (!(file.type || "").startsWith("image/")) return;
+    const key = file.uploadedFileId || file.id;
+    artworksById.set(key, {
+      id: key,
+      artworkId: artworksById.get(key)?.artworkId,
+      filename: file.name,
+      originalName: file.name,
+      thumbnailUrl: file.thumbnailUrl || artworksById.get(key)?.thumbnailUrl,
+      // Object-URL preview for not-yet-uploaded local files (no server thumbnail).
+      preview: file.preview || null,
+      status: file.status || artworksById.get(key)?.status,
+      mimetype: file.type,
+      size: file.size,
+    });
+  });
+  const artworks = Array.from(artworksById.values());
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
@@ -1033,6 +1099,7 @@ export const FinancialBudgetDetailPage = () => {
               layoutFiles={layoutFiles}
               onLayoutFilesChange={setLayoutFiles}
               artworks={artworks}
+              onArtworkLayoutApprovalChange={handleArtworkLayoutApprovalChange}
               customersCache={customersCache}
               selectedCustomers={selectedCustomers}
               setSelectedCustomers={setSelectedCustomers}

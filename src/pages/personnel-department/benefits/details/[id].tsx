@@ -94,7 +94,7 @@ export const BenefitDetailPage = () => {
           title={benefit.name}
           breadcrumbs={[
             { label: "Início", href: "/" },
-            { label: "Departamento Pessoal" },
+            { label: "Departamento Pessoal", href: routes.personnelDepartment.root },
             { label: "Benefícios", href: routes.personnelDepartment.benefits.root },
             { label: benefit.name },
           ]}

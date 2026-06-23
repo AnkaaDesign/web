@@ -1,13 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
-import { IconFilter, IconProgress, IconCalendar, IconUser } from "@tabler/icons-react";
+import { IconFilter, IconProgress, IconCalendar } from "@tabler/icons-react";
 import { VACATION_STATUS_LABELS } from "../../../../constants";
 import type { VacationGetManyFormData } from "../../../../schemas/vacation";
-import type { User } from "../../../../types";
-import { getUsers } from "../../../../api-client";
 import { getConcessiveDateRange } from "./filter-utils";
 
 interface VacationFiltersProps {
@@ -27,7 +25,6 @@ export function VacationFilters({ open, onOpenChange, filters, onFilterChange }:
   }, [open, filters]);
 
   const selectedStatuses = localFilters.statuses || [];
-  const selectedUserIds = localFilters.userIds || [];
   const dateRange = getConcessiveDateRange(localFilters);
 
   const handleApplyFilters = () => {
@@ -36,17 +33,18 @@ export function VacationFilters({ open, onOpenChange, filters, onFilterChange }:
   };
 
   const handleResetFilters = () => {
-    onFilterChange({});
-    setLocalFilters({});
+    // Preserve toolbar-owned controls (collaborator + gozo period); only clear
+    // this drawer's own fields (status + limite concessivo).
+    const preserved: Partial<VacationGetManyFormData> = {};
+    if (filters.userIds) preserved.userIds = filters.userIds;
+    if ((filters as any).gozoPeriod) (preserved as any).gozoPeriod = (filters as any).gozoPeriod;
+    onFilterChange(preserved);
+    setLocalFilters(preserved);
     onOpenChange(false);
   };
 
   const handleStatusesChange = (statuses: string[]) => {
     setLocalFilters({ ...localFilters, statuses: statuses.length > 0 ? statuses : undefined });
-  };
-
-  const handleUsersChange = (userIds: string[]) => {
-    setLocalFilters({ ...localFilters, userIds: userIds.length > 0 ? userIds : undefined });
   };
 
   const setDateRange = (range: { gte?: Date; lte?: Date } | undefined) => {
@@ -64,25 +62,9 @@ export function VacationFilters({ open, onOpenChange, filters, onFilterChange }:
 
   const statusOptions = Object.entries(VACATION_STATUS_LABELS).map(([value, label]) => ({ value, label }));
 
-  const queryUsers = useCallback(async (search: string, page: number = 1) => {
-    const queryParams: any = {
-      page,
-      take: 50,
-      orderBy: { name: "asc" },
-      include: { position: true },
-    };
-    if (search && search.trim()) {
-      queryParams.searchingFor = search.trim();
-    }
-    const response = await getUsers(queryParams);
-    return {
-      data: response.data || [],
-      hasMore: response.meta?.hasNextPage || false,
-    };
-  }, []);
-
   const activeFilterCount = Object.entries(localFilters).filter(([key, value]) => {
-    if (key === "page" || key === "limit" || key === "itemsPerPage" || key === "orderBy" || key === "sortOrder") return false;
+    // userIds + gozoPeriod are driven by the toolbar controls, not this drawer.
+    if (key === "page" || key === "limit" || key === "itemsPerPage" || key === "orderBy" || key === "sortOrder" || key === "userIds" || key === "gozoPeriod") return false;
     if (Array.isArray(value)) return value.length > 0;
     if (typeof value === "object" && value !== null) return Object.keys(value).length > 0;
     return value !== undefined && value !== null && value !== "";
@@ -94,41 +76,13 @@ export function VacationFilters({ open, onOpenChange, filters, onFilterChange }:
       onOpenChange={onOpenChange}
       title="Filtros Avançados"
       titleIcon={<IconFilter className="h-5 w-5" />}
-      description="Filtre as férias por colaborador, status e limite concessivo"
+      description="Filtre as férias por status e limite concessivo"
       activeFilterCount={activeFilterCount}
       onApply={handleApplyFilters}
       onReset={handleResetFilters}
       applyLabel="Aplicar Filtros"
       resetLabel="Limpar Filtros"
     >
-      <div>
-        <Label className="flex items-center gap-2 mb-2">
-          <IconUser className="h-4 w-4" />
-          Colaborador
-        </Label>
-        <Combobox<User>
-          mode="multiple"
-          value={selectedUserIds}
-          onValueChange={(value) => {
-            const arr = Array.isArray(value) ? value : value ? [value] : [];
-            handleUsersChange(arr);
-          }}
-          placeholder="Selecione os colaboradores"
-          emptyText="Nenhum colaborador encontrado"
-          searchPlaceholder="Buscar colaborador..."
-          async={true}
-          queryKey={["users", "vacation-filter-collaborator"]}
-          queryFn={queryUsers}
-          initialOptions={[]}
-          getOptionLabel={(user) => user.name}
-          getOptionValue={(user) => user.id}
-          minSearchLength={0}
-          pageSize={50}
-          debounceMs={300}
-          searchable={true}
-        />
-      </div>
-
       <div>
         <Label className="flex items-center gap-2 mb-2">
           <IconProgress className="h-4 w-4" />

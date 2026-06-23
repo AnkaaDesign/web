@@ -88,7 +88,7 @@ export function BudgetStepReview({
   const subtotalValue = useWatch({ control, name: "subtotal" });
   const totalValue = useWatch({ control, name: "total" });
   const expiresAt = useWatch({ control, name: "expiresAt" });
-  const layoutFileId = useWatch({ control, name: "layoutFileId" });
+  const layoutFileIds = (useWatch({ control, name: "layoutFileIds" }) as string[] | undefined) || [];
 
   // In create mode, read task fields directly from the form
   const formPlates = useWatch({ control, name: "plates" });
@@ -630,24 +630,36 @@ export function BudgetStepReview({
         </div>
       )}
 
-      {/* Layout Preview */}
+      {/* Layout Preview (renders the layoutFiles array, up to 2) */}
       {(() => {
-        const layoutFile = layoutFiles?.[0];
-        const thumbnailSrc = layoutFileId
-          ? `${getApiBaseUrl()}/files/thumbnail/${layoutFileId}`
-          : layoutFile?.thumbnailUrl || (layoutFile?.uploadedFileId ? `${getApiBaseUrl()}/files/thumbnail/${layoutFile.uploadedFileId}` : null);
-        if (!thumbnailSrc) return null;
+        const thumbFor = (slotFileId: string | null | undefined, slot?: any) => {
+          if (slotFileId) return `${getApiBaseUrl()}/files/thumbnail/${slotFileId}`;
+          if (slot?.thumbnailUrl) return slot.thumbnailUrl;
+          if (slot?.uploadedFileId) return `${getApiBaseUrl()}/files/thumbnail/${slot.uploadedFileId}`;
+          return null;
+        };
+        // Prefer the resolved layoutFiles array (has thumbnails); fall back to ids.
+        const count = Math.max(layoutFiles?.length || 0, layoutFileIds.length);
+        const slots = Array.from({ length: count })
+          .map((_, i) => thumbFor(layoutFileIds[i], layoutFiles?.[i]))
+          .filter(Boolean) as string[];
+        if (slots.length === 0) return null;
         return (
           <div className="bg-muted/30 rounded-lg p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
               <IconPhoto className="h-4 w-4 text-muted-foreground" />
               Layout
             </div>
-            <img
-              src={thumbnailSrc}
-              alt="Layout aprovado"
-              className="max-h-48 rounded-lg shadow-sm object-contain"
-            />
+            <div className="flex flex-wrap gap-3">
+              {slots.map((src, i) => (
+                <img
+                  key={i}
+                  src={src}
+                  alt="Layout aprovado"
+                  className="max-h-48 rounded-lg shadow-sm object-contain"
+                />
+              ))}
+            </div>
           </div>
         );
       })()}

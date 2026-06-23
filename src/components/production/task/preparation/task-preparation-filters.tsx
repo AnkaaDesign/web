@@ -12,7 +12,6 @@ import { getCustomers } from "@/api-client/customer";
 const TABLE_VISIBILITY_OPTIONS = [
   { value: "preparation", label: "Em Preparação" },
   { value: "production", label: "Em Produção" },
-  { value: "completed", label: "Concluído" },
 ];
 
 interface TaskPreparationFiltersProps {

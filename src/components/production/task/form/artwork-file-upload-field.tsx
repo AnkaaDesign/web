@@ -329,6 +329,7 @@ export function ArtworkFileUploadField({
                   </div>
 
                   {/* Status Selector */}
+                  <div className="shrink-0">
                   <ArtworkStatusSelector
                     value={file.status || 'DRAFT'}
                     onChange={(newStatus) => {
@@ -357,6 +358,7 @@ export function ArtworkFileUploadField({
                     }}
                     disabled={disabled}
                   />
+                  </div>
 
                   {/* Remove button */}
                   <Button

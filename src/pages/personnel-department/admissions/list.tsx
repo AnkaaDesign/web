@@ -17,7 +17,7 @@ const AdmissionListPage = () => {
           variant="list"
           title="Admissões"
           favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_ADMISSOES_LISTAR}
-          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal" }, { label: "Admissões" }]}
+          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal", href: routes.personnelDepartment.root }, { label: "Admissões" }]}
           actions={[
             {
               key: "create",

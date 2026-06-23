@@ -28,10 +28,29 @@ import { toast } from "@/components/ui/sonner";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { StockStatusIndicator } from "../../item/list/stock-status-indicator";
 
+// Order-level lifecycle / payment actions (Marcar como Feito / Recebido / Pago …),
+// rendered in this card's toolbar instead of the page header.
+interface OrderActionButton {
+  key: string;
+  label: string;
+  icon?: any;
+  // Colors the button to match the status it produces: blue = Feito (FULFILLED),
+  // green = Pago/Recebido (PAID/RECEIVED).
+  tone?: "blue" | "green";
+  onClick: () => void;
+}
+
+// Solid status-colored button styles (override the default/outline variant).
+const ACTION_TONE_CLASS: Record<string, string> = {
+  blue: "bg-blue-700 hover:bg-blue-800 text-white border-transparent",
+  green: "bg-green-700 hover:bg-green-800 text-white border-transparent",
+};
+
 interface OrderItemsCardProps {
   order: Order;
   className?: string;
   onOrderUpdate?: () => void;
+  orderActions?: OrderActionButton[];
 }
 
 interface ItemChanges {
@@ -45,7 +64,7 @@ interface SelectedItems {
   [itemId: string]: boolean;
 }
 
-export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCardProps) {
+export function OrderItemsCard({ order, className, onOrderUpdate, orderActions = [] }: OrderItemsCardProps) {
   const canViewPrices = useCanViewPrices();
   const { isWarehouse } = usePrivileges();
   const { batchUpdate } = useOrderItemBatchMutations({
@@ -414,42 +433,50 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
           </div>
         </div>
 
-        {/* Freight / discount breakdown — mirrors the create/edit form footers. */}
-        {canViewPrices && (summary.freight > 0 || summary.discountAmount > 0) && (
+        {/* Discount breakdown. Frete now lives in the "Detalhes do Pedido" card. */}
+        {canViewPrices && summary.discountAmount > 0 && (
           <div className="bg-muted/50 rounded-lg px-4 py-3 space-y-2">
-            {summary.freight > 0 && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <IconTruck className="h-4 w-4" />
-                  Frete:
-                </span>
-                <span className="font-medium text-foreground">{formatCurrency(summary.freight)}</span>
-              </div>
-            )}
-            {summary.discountAmount > 0 && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Desconto ({summary.discountPercent}%):</span>
-                <span className="font-medium text-red-600 dark:text-red-400">- {formatCurrency(summary.discountAmount)}</span>
-              </div>
-            )}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Desconto ({summary.discountPercent}%):</span>
+              <span className="font-medium text-red-600 dark:text-red-400">- {formatCurrency(summary.discountAmount)}</span>
+            </div>
           </div>
         )}
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Order-level lifecycle / payment actions (moved here from the page header).
+              "Marcar como Feito" / "Marcar como Recebido" act on the WHOLE order + all its
+              items; partial fulfilment/receipt is done by selecting individual items below. */}
+          {orderActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Button
+                key={action.key}
+                variant={action.tone ? "default" : "outline"}
+                size="sm"
+                className={action.tone ? ACTION_TONE_CLASS[action.tone] : undefined}
+                onClick={action.onClick}
+              >
+                {Icon && <Icon className="mr-2 h-4 w-4" />}
+                {action.label}
+              </Button>
+            );
+          })}
+
           {/* Edit action buttons - only visible when can edit */}
           {canEditItems && (
             <>
               {selectedCount > 0 && (
                 <>
-                  <Button variant="outline" size="sm" onClick={handleBatchMarkFulfilled} disabled={isSaving}>
+                  <Button size="sm" className={ACTION_TONE_CLASS.blue} onClick={handleBatchMarkFulfilled} disabled={isSaving}>
                     <IconShoppingCart className="mr-2 h-4 w-4" />
-                    Marcar como Feito ({selectedCount})
+                    Marcar Selecionados como Feito ({selectedCount})
                   </Button>
                   {canReceiveItems && (
-                    <Button variant="outline" size="sm" onClick={handleBatchMarkReceived} disabled={isSaving}>
+                    <Button size="sm" className={ACTION_TONE_CLASS.green} onClick={handleBatchMarkReceived} disabled={isSaving}>
                       <IconTruck className="mr-2 h-4 w-4" />
-                      Marcar como Recebido ({selectedCount})
+                      Marcar Selecionados como Recebido ({selectedCount})
                     </Button>
                   )}
                 </>

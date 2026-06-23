@@ -131,11 +131,23 @@ export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[]
     className: "w-24",
   },
   ];
-  return columns.filter((column) => canViewPrices || column.key !== "total");
+  // Payment status is financial information: WAREHOUSE (no price visibility) must not
+  // even have the column available in the picker. Gate it with the same flag as "total".
+  return columns.filter((column) => canViewPrices || (column.key !== "total" && column.key !== "paymentStatusOrder"));
 };
 
-// Default visible columns
-export const getDefaultVisibleColumns = (canViewPrices: boolean = true): Set<string> => {
-  const base = ["orderNumber", "description", "supplier.fantasyName", "statusOrder", "itemCount", "total", "forecast"];
-  return new Set(base.filter((key) => canViewPrices || key !== "total"));
+// Default visible columns — single source of truth for both the initial list state
+// and the column-manager "Restaurar" reset. Privilege-aware: admins see payment
+// status by default; warehouse (no price visibility) never gets total/payment status.
+export const getDefaultVisibleColumns = (canViewPrices: boolean = true, isAdmin: boolean = false): Set<string> => {
+  return new Set([
+    "orderNumber",
+    "description",
+    "supplier.fantasyName",
+    "statusOrder",
+    ...(isAdmin ? ["paymentStatusOrder"] : []),
+    "itemCount",
+    ...(canViewPrices ? ["total"] : []),
+    "forecast",
+  ]);
 };

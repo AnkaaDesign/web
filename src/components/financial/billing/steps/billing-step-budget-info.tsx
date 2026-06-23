@@ -104,11 +104,11 @@ export function BillingStepBudgetInfo({
   const handleLayoutFileChange = useCallback(
     (files: FileWithPreview[]) => {
       onLayoutFilesChange(files);
-      if (files.length > 0 && files[0].uploadedFileId) {
-        setValue("layoutFileId", files[0].uploadedFileId);
-      } else if (files.length === 0) {
-        setValue("layoutFileId", null);
-      }
+      const ids = files
+        .map((f) => (f as any).uploadedFileId || f.id)
+        .filter(Boolean)
+        .slice(0, 2);
+      setValue("layoutFileIds", ids, { shouldDirty: true });
     },
     [setValue, onLayoutFilesChange],
   );
@@ -250,7 +250,7 @@ export function BillingStepBudgetInfo({
           <FileUploadField
             onFilesChange={handleLayoutFileChange}
             existingFiles={layoutFiles}
-            maxFiles={1}
+            maxFiles={2}
             maxSize={10 * 1024 * 1024}
             acceptedFileTypes={{
               "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],

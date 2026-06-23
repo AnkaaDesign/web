@@ -35,8 +35,6 @@ export interface File extends BaseEntity {
   airbrushingReceipts?: Airbrushing[];
   airbrushingInvoices?: Airbrushing[];
   airbrushingArtworks?: Airbrushing[];
-  orderBudgets?: Order[];
-  orderInvoices?: Order[];
   orderReceipts?: Order[];
   taskBudgets?: Task[];
   taskInvoices?: Task[];
@@ -93,16 +91,6 @@ export interface FileIncludes {
     | boolean
     | {
         include?: AirbrushingIncludes;
-      };
-  orderBudgets?:
-    | boolean
-    | {
-        include?: OrderIncludes;
-      };
-  orderInvoices?:
-    | boolean
-    | {
-        include?: OrderIncludes;
       };
   orderReceipts?:
     | boolean

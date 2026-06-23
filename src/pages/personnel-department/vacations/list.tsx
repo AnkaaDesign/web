@@ -28,7 +28,7 @@ const VacationListPage = () => {
           variant="list"
           title="Férias"
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_LISTAR}
-          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal" }, { label: "Férias" }]}
+          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal", href: routes.personnelDepartment.root }, { label: "Férias" }]}
           actions={
             canManageVacations
               ? [

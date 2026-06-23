@@ -75,11 +75,7 @@ const OrderDetailsPage = () => {
           logo: true,
         },
       },
-      budgets: true,
-      invoices: true,
       receipts: true,
-      reimbursements: true,
-      invoiceReimbursements: true,
       paymentResponsible: true,
       paymentAssignedBy: true,
       installments: true,
@@ -245,6 +241,7 @@ const OrderDetailsPage = () => {
       key: "fulfill",
       label: "Marcar como Feito",
       icon: IconShoppingCart,
+      tone: "blue",
       onClick: async () => {
         try {
           await updateAsync({
@@ -275,27 +272,20 @@ const OrderDetailsPage = () => {
       key: "complete",
       label: "Marcar como Recebido",
       icon: IconCheck,
+      tone: "green",
       onClick: () => setShowCompleteDialog(true),
     });
   }
 
   // Show "Marcar como Pago" while the order is still awaiting payment
-  // (any non-PAID state); once PAID, offer "Desfazer pagamento" to revert.
-  if (canManagePayments && order.paymentStatus !== ORDER_PAYMENT_STATUS.PAID) {
-    orderActions.push({
-      key: "mark-paid",
-      label: "Marcar como Pago",
-      icon: IconCircleCheck,
-      onClick: () => setShowMarkPaidDialog(true),
-    });
-  } else if (canManagePayments && order.paymentStatus === ORDER_PAYMENT_STATUS.PAID) {
-    orderActions.push({
-      key: "mark-awaiting-payment",
-      label: "Desfazer pagamento",
-      icon: IconHourglass,
-      onClick: () => handleMarkAwaitingPayment(),
-    });
-  }
+  // Payment settle actions (Marcar como Pago / Desfazer pagamento) live in the Pagamento
+  // card now — not next to the items — so they're not pushed into orderActions here.
+
+  // Top row composition: Informações do Pedido on the left; on the right, Pagamento
+  // (price-viewers only) and Documentos (only when the order actually has files) are
+  // stacked. The second column only exists when there's at least one side card.
+  const hasDocuments = (order.receipts?.length || 0) > 0;
+  const hasSideCards = canViewPrices || hasDocuments;
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN]}>
@@ -316,7 +306,8 @@ const OrderDetailsPage = () => {
               icon: IconRefresh,
               onClick: handleRefresh,
             },
-            ...(orderActions as PageAction[]),
+            // Order lifecycle / payment actions (Feito / Recebido / Pago …) now live in the
+            // "Itens do Pedido" card toolbar, not the page header.
             ...(canEdit
               ? [
                   {
@@ -333,17 +324,24 @@ const OrderDetailsPage = () => {
         />
         <div className="flex-1 overflow-y-auto pb-6">
           <div className="space-y-4">
-            {/* Top: order info + payment side by side (payment financial-only) */}
-            <div className={cn("grid grid-cols-1 gap-4", canViewPrices && "lg:grid-cols-2")}>
+            {/* Top: Informações do Pedido on the left; Pagamento + Documentos stacked on the
+                right (Pagamento for price-viewers, Documentos only when the order has files). */}
+            <div className={cn("grid grid-cols-1 gap-4", hasSideCards && "lg:grid-cols-2")}>
               <OrderInfoCard order={order} className="h-full" />
-              {canViewPrices && <OrderPaymentCard order={order} className="h-full" />}
+              {hasSideCards && (
+                <div className="flex flex-col gap-4">
+                  {/* Side cards grow (flex-1) to fill the column when content is short, so it
+                      matches the Informações height — but NEVER shrink below their own content
+                      (no min-h-0), otherwise tall cards like the boleto installment list would
+                      overflow behind the card below. */}
+                  {canViewPrices && <OrderPaymentCard order={order} className="flex-1" />}
+                  {hasDocuments && <OrderDocumentsCard order={order} className="flex-1" />}
+                </div>
+              )}
             </div>
 
             {/* Items */}
-            <OrderItemsCard order={order} className="w-full" onOrderUpdate={handleOrderUpdate} />
-
-            {/* Documents */}
-            <OrderDocumentsCard order={order} className="w-full" />
+            <OrderItemsCard order={order} className="w-full" onOrderUpdate={handleOrderUpdate} orderActions={orderActions as any} />
 
             {/* Change history — full width, after the items table. */}
             <ChangelogHistory

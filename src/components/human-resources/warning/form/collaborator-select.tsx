@@ -12,53 +12,66 @@ interface CollaboratorSelectProps {
   disabled?: boolean;
   required?: boolean;
   initialCollaborator?: User;
+  /** Called with the full user object (including sector.leader) when selection changes. */
+  onUserSelect?: (user: User | null) => void;
 }
 
-export function CollaboratorSelect({ control, disabled, required, initialCollaborator }: CollaboratorSelectProps) {
-  // Memoize initialOptions to prevent infinite loop
+export function CollaboratorSelect({ control, disabled, required, initialCollaborator, onUserSelect }: CollaboratorSelectProps) {
   const initialOptions = useMemo(() => initialCollaborator ? [initialCollaborator] : [], [initialCollaborator?.id]);
 
-  // Memoize callbacks to prevent infinite loop
   const getOptionLabel = useCallback((user: User) => user.name, []);
   const getOptionValue = useCallback((user: User) => user.id, []);
 
-  // Memoize queryFn - filter by isActive: true for warning collaborators
-  const queryFn = useCallback(async (search: string, page: number = 1) => {
+  const queryFn = useCallback(async (search: string) => {
     const queryParams: any = {
-      page,
       take: 50,
       where: { isActive: true },
-      select: {
-        id: true,
-        name: true,
-        position: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
     };
-
     if (search && search.trim()) {
       queryParams.searchingFor = search.trim();
     }
-
     const response = await userService.getUsers(queryParams);
-
     return {
       data: response.data || [],
       hasMore: response.meta?.hasNextPage || false,
     };
   }, []);
 
-  // Memoize renderOption
   const renderOption = useCallback((user: User) => (
     <div>
       <p className="font-medium">{user.name}</p>
-      {user.position && <p className="text-xs text-muted-foreground">{user.position.name}</p>}
+      {(user as any).position && <p className="text-xs text-muted-foreground">{(user as any).position.name}</p>}
     </div>
   ), []);
+
+  const handleValueChange = useCallback(async (value: string | string[] | null | undefined) => {
+    if (!onUserSelect) return;
+
+    if (!value) {
+      onUserSelect(null);
+      return;
+    }
+
+    const id = value as string;
+    try {
+      // Fetch the full user including sector.leader via a direct GET /users/:id
+      const response = await userService.getUserById(id, {
+        include: {
+          position: true,
+          sector: {
+            include: {
+              leader: {
+                include: { position: true },
+              },
+            },
+          },
+        },
+      } as any);
+      onUserSelect((response.data as User) ?? null);
+    } catch {
+      onUserSelect(null);
+    }
+  }, [onUserSelect]);
 
   return (
     <FormField
@@ -75,7 +88,10 @@ export function CollaboratorSelect({ control, disabled, required, initialCollabo
           <FormControl>
             <Combobox<User>
               value={field.value}
-              onValueChange={field.onChange}
+              onValueChange={(value) => {
+                field.onChange(value);
+                handleValueChange(value);
+              }}
               disabled={disabled}
               placeholder="Selecione o colaborador"
               emptyText="Nenhum colaborador encontrado"

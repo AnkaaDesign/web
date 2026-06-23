@@ -710,7 +710,7 @@ const ChangelogTimelineItem = ({
           return entityDetails.suppliers.get(value) || "Fornecedor";
         }
         if (
-          (field === "assignedToUserId" || field === "createdById" || field === "startedById" || field === "completedById" || field === "approvedById" || field === "assignedToId" || field === "paymentResponsibleId" || field === "paymentAssignedById") &&
+          (field === "assignedToUserId" || field === "createdById" || field === "startedById" || field === "completedById" || field === "approvedById" || field === "assignedToId" || field === "paymentResponsibleId" || field === "paymentAssignedById" || field === "paidById") &&
           entityDetails.users.has(value)
         ) {
           const user = entityDetails.users.get(value);
@@ -755,7 +755,7 @@ const ChangelogTimelineItem = ({
       if (field === "categoryId") return "Categoria (carregando...)";
       if (field === "brandId") return "Marca (carregando...)";
       if (field === "supplierId") return "Fornecedor (carregando...)";
-      if (field === "assignedToUserId" || field === "createdById" || field === "startedById" || field === "completedById" || field === "approvedById" || field === "assignedToId" || field === "paymentResponsibleId" || field === "paymentAssignedById")
+      if (field === "assignedToUserId" || field === "createdById" || field === "startedById" || field === "completedById" || field === "approvedById" || field === "assignedToId" || field === "paymentResponsibleId" || field === "paymentAssignedById" || field === "paidById")
         return "Usuário (carregando...)";
       if (field === "customerId" || field === "invoiceToId") return "Cliente (carregando...)";
       if (field === "sectorId") return "Setor (carregando...)";
@@ -1312,22 +1312,6 @@ const ChangelogTimelineItem = ({
           {entityType === CHANGE_LOG_ENTITY_TYPE.ORDER &&
             firstChange.action === CHANGE_LOG_ACTION.UPDATE &&
             (() => {
-              const orderStatusLabels: Record<string, string> = {
-                CREATED: "Criado",
-                PARTIALLY_FULFILLED: "Parcialmente Feito",
-                FULFILLED: "Feito",
-                OVERDUE: "Atrasado",
-                PARTIALLY_RECEIVED: "Parcialmente Recebido",
-                RECEIVED: "Recebido",
-                CANCELLED: "Cancelado",
-              };
-
-              const paymentMethodLabels: Record<string, string> = {
-                PIX: "Pix",
-                BANK_SLIP: "Boleto",
-                CREDIT_CARD: "Cartão de Crédito",
-              };
-
               // Group related field changes intelligently
               const statusChange = changelogGroup.find(
                 (c) => c.field === "status" || c.field === "status_transition",
@@ -1355,10 +1339,16 @@ const ChangelogTimelineItem = ({
               if (statusChange) {
                 const newStatus = statusChange.newValue;
                 const oldStatus = statusChange.oldValue;
-                const newStatusLabel =
-                  orderStatusLabels[newStatus as string] || String(newStatus);
-                const oldStatusLabel =
-                  orderStatusLabels[oldStatus as string] || String(oldStatus);
+                const newStatusLabel = formatFieldValue(
+                  newStatus,
+                  "status",
+                  CHANGE_LOG_ENTITY_TYPE.ORDER,
+                ) as string;
+                const oldStatusLabel = formatFieldValue(
+                  oldStatus,
+                  "status",
+                  CHANGE_LOG_ENTITY_TYPE.ORDER,
+                ) as string;
 
                 statusSummary = {
                   title: `${oldStatusLabel} → ${newStatusLabel}`,
@@ -1409,19 +1399,10 @@ const ChangelogTimelineItem = ({
                         const formatOrderValue = (val: any, field: string | null) => {
                           if (val === null || val === undefined) return "Nenhum";
 
-                          // Payment method enum
-                          if (field === "paymentMethod" && typeof val === "string") {
-                            return paymentMethodLabels[val] || val;
-                          }
-
-                          // Payment due days
-                          if (field === "paymentDueDays" && typeof val === "number") {
-                            return `${val} ${val === 1 ? "dia" : "dias"}`;
-                          }
-
-                          // Date fields
+                          // Date fields — render with date+time consistently.
                           if (
-                            (field === "forecast" || field === "deliveryDate" || field === "receivedDate" || field === "scheduledFor") &&
+                            (field === "forecast" || field === "deliveryDate" || field === "receivedDate" || field === "scheduledFor" ||
+                              field === "paidAt" || field === "doneAt" || field === "receivedAt" || field === "fulfilledAt" || field === "paymentFirstDueDate") &&
                             val
                           ) {
                             let dateValue = val;
@@ -1431,22 +1412,20 @@ const ChangelogTimelineItem = ({
                             return formatDateTime(dateValue);
                           }
 
-                          // Currency fields
-                          if (field === "totalAmount" && typeof val === "number") {
-                            return formatCurrency(val);
-                          }
-
-                          // Supplier ID - resolve from entity details
+                          // Relation IDs — resolve to human names from entity details.
                           if (field === "supplierId" && typeof val === "string" && entityDetails?.suppliers?.has(val)) {
                             return entityDetails.suppliers.get(val) || "Fornecedor";
                           }
-
-                          // User IDs - resolve from entity details
-                          if ((field === "paymentResponsibleId" || field === "paymentAssignedById") && typeof val === "string" && entityDetails?.users?.has(val)) {
+                          if ((field === "paymentResponsibleId" || field === "paymentAssignedById" || field === "paidById") && typeof val === "string" && entityDetails?.users?.has(val)) {
                             const user = entityDetails.users.get(val);
                             return (typeof user === "object" && user !== null && "name" in user) ? user.name : user || "Usuário";
                           }
 
+                          // Everything else (status, paymentStatus, paymentMethod, paymentDueDays,
+                          // installmentCount, freight→R$, discount→%, paymentPix, …) flows through the
+                          // single shared formatter so labels and formatting never drift between views.
+                          const central = formatFieldValue(val, field, CHANGE_LOG_ENTITY_TYPE.ORDER, changelog.metadata);
+                          if (typeof central === "string") return central;
                           return formatValueWithEntity(val, field, changelog.metadata);
                         };
 

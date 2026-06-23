@@ -30,7 +30,7 @@ export const WarehouseLocationListPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <div className="h-full flex flex-col gap-4 bg-background p-4">
         <PageHeader
           variant="list"
           title="Localizações"
@@ -38,7 +38,7 @@ export const WarehouseLocationListPage = () => {
           actions={actions}
           className="flex-shrink-0"
         />
-        <div className="flex-1 min-h-0 pb-6 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col">
           <WarehouseMap ref={mapRef} className="h-full" canEdit={canManage} mode={mode} onModeChange={setMode} />
         </div>
       </div>

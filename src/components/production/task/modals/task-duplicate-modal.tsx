@@ -31,7 +31,7 @@ const DUPLICATE_TASK_INCLUDE = {
   quote: {
     include: {
       services: true,
-      layoutFile: true,
+      layoutFiles: true,
       customerConfigs: true,
     },
   },
@@ -228,7 +228,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
               customGuaranteeText: sourceTask.quote.customGuaranteeText,
               customForecastDays: sourceTask.quote.customForecastDays != null ? Number(sourceTask.quote.customForecastDays) : null,
               simultaneousTasks: sourceTask.quote.simultaneousTasks != null ? Number(sourceTask.quote.simultaneousTasks) : null,
-              layoutFileId: sourceTask.quote.layoutFile?.id || sourceTask.quote.layoutFileId || null,
+              layoutFileIds: (sourceTask.quote.layoutFiles || []).map((f: any) => f.id),
               customerConfigs: sourceTask.quote.customerConfigs?.map((config: any) => ({
                 customerId: config.customerId,
                 subtotal: Number(config.subtotal) || 0,

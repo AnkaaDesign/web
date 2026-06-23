@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { OrderTable } from "./order-table";
-import { createOrderColumns } from "./order-table-columns";
+import { createOrderColumns, getDefaultVisibleColumns } from "./order-table-columns";
 import { IconFilter } from "@tabler/icons-react";
 import { OrderFilters } from "./order-filters";
 import { FilterIndicators } from "./filter-indicator";
@@ -20,6 +20,7 @@ import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { OrderExport } from "./order-export";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
+import usePrivileges from "@/hooks/common/use-privileges";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +41,7 @@ const DEFAULT_PAGE_SIZE = 40;
 export function OrderList({ className }: OrderListProps) {
   const navigate = useNavigate();
   const canViewPrices = useCanViewPrices();
+  const { isAdmin } = usePrivileges();
   const { batchDelete } = useOrderBatchMutations();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -186,10 +188,13 @@ export function OrderList({ className }: OrderListProps) {
   });
 
   // Use column visibility hook with localStorage persistence
-  const { visibleColumns, setVisibleColumns } = useColumnVisibility(
-    "order-list-visible-columns",
-    new Set(["orderNumber", "description", "supplier.fantasyName", "statusOrder", "itemCount", ...(canViewPrices ? ["total"] : []), "forecast"])
-  );
+  // Single privilege-aware default, shared with the column manager's reset so the two
+  // never drift. Admins get the payment-status column by default; warehouse never does.
+  const defaultVisibleColumns = useMemo(() => getDefaultVisibleColumns(canViewPrices, isAdmin), [canViewPrices, isAdmin]);
+
+  // Storage key bumped to v2 so the privilege-aware defaults take effect for existing
+  // users on next load.
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility("order-list-visible-columns-v2", defaultVisibleColumns);
 
   // Get all available columns for column visibility manager
   const allColumns = useMemo(() => createOrderColumns(canViewPrices), [canViewPrices]);
@@ -298,7 +303,7 @@ export function OrderList({ className }: OrderListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} defaultVisibleColumns={defaultVisibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button
               variant={hasActiveFilters ? "default" : "outline"}
               size="default"

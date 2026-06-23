@@ -43,7 +43,7 @@ export interface CompleteDossiePdfOptions {
   discountReference?: string | null;
   paymentText: string | null;
   guaranteeText: string | null;
-  layoutImageUrl: string | null;
+  layoutImageUrls: string[];
   serviceOrders: ServiceOrderFiles[];
   bankSlipPdfUrls: string[];
   nfsePdfUrls: string[];
@@ -295,6 +295,11 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
     return { displaySvc, priceText: formatCurrency(Number(svc.amount) || 0) };
   });
 
+  // Page 1 shows the first layout image inline (with slack math); any additional
+  // layout images get their own dedicated full pages after the page-1 content.
+  const firstLayoutUrl = opts.layoutImageUrls[0] || null;
+  const extraLayoutUrls = opts.layoutImageUrls.slice(1);
+
   // Mandatory section heights (text lines only; padding distributed below).
   const titleH = 14 + 2;                              // "DOSSIÊ" + 0.5pt underline
   const salutationH = opts.contactName ? 14 : 0;      // 11pt × 1.4 ≈ 14pt
@@ -312,7 +317,7 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
     : 0;
   // Layout image gets whatever vertical space is left after every other section
   // (capped to its natural ratio at the assigned width). Reserve a minimum.
-  const minLayoutImgH = opts.layoutImageUrl ? 80 : 0;
+  const minLayoutImgH = firstLayoutUrl ? 80 : 0;
 
   // Number of inter-section gaps (inserted between every pair of present sections).
   const sectionsPresent = [
@@ -324,7 +329,7 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
     true,                       // totals block
     !!opts.paymentText,         // payment
     !!opts.guaranteeText,       // guarantee
-    !!opts.layoutImageUrl,      // layout image
+    !!firstLayoutUrl,           // layout image
   ].filter(Boolean).length;
   const interSectionGapCount = Math.max(0, sectionsPresent - 1);
 
@@ -345,7 +350,7 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
   //   totals→payment, payment→guarantee, guarantee→layout). These absorb slack.
   // - When a layout image is present, the image itself absorbs most of the slack
   //   (it grows to fill the leftover vertical space), so we cap section pad lower.
-  const layoutImagePresent = !!opts.layoutImageUrl;
+  const layoutImagePresent = !!firstLayoutUrl;
   const TIGHT_PAD = 10;                              // title↔salutation↔intro
   const SECTION_MAX = layoutImagePresent ? 14 : 22;  // looser when no image to fill space
   const SECTION_MIN = 12;
@@ -454,8 +459,8 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
 
   // Layout image — uses whatever vertical space is left, contains aspect ratio,
   // and centers horizontally inside the content column.
-  if (opts.layoutImageUrl) {
-    const layoutBytes = await fetchImageBytes(opts.layoutImageUrl);
+  if (firstLayoutUrl) {
+    const layoutBytes = await fetchImageBytes(firstLayoutUrl);
     if (layoutBytes) {
       const layoutImg = await embedImage(doc, layoutBytes);
       if (layoutImg) {
@@ -474,6 +479,29 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
         y -= drawH;
       }
     }
+  }
+
+  // Additional layout images — each on its own dedicated full page.
+  for (const extraUrl of extraLayoutUrls) {
+    const extraBytes = await fetchImageBytes(extraUrl);
+    if (!extraBytes) continue;
+    const extraImg = await embedImage(doc, extraBytes);
+    if (!extraImg) continue;
+    const layoutPage = doc.addPage([W, H]);
+    let ly = await drawHeader(layoutPage, doc, font, fontBold, opts.budgetNumber);
+    drawFooter(layoutPage, font, fontBold);
+    layoutPage.drawText('Layout Aprovado', { x: ML, y: ly, size: 12, font: fontBold, color: GREEN });
+    ly -= 16;
+    const availableImgH = ly - FOOTER_TOP_Y;
+    const naturalRatio = extraImg.width / extraImg.height;
+    let drawW = CW;
+    let drawH = CW / naturalRatio;
+    if (drawH > availableImgH) {
+      drawH = availableImgH;
+      drawW = availableImgH * naturalRatio;
+    }
+    const offsetX = (CW - drawW) / 2;
+    layoutPage.drawImage(extraImg, { x: ML + offsetX, y: ly - drawH, width: drawW, height: drawH });
   }
 
   // ═══════════════════════════════════════
@@ -639,7 +667,7 @@ export async function exportDossiePdf(opts: { taskDisplayName: string; customerN
     truckCategory: opts.truckCategory ?? null, truckImplementType: opts.truckImplementType ?? null,
     finishedAt: null,
     services: [], subtotal: 0, discountAmount: 0, total: 0, hasDiscount: false,
-    paymentText: null, guaranteeText: null, layoutImageUrl: null, serviceOrders: opts.serviceOrders,
+    paymentText: null, guaranteeText: null, layoutImageUrls: [], serviceOrders: opts.serviceOrders,
     bankSlipPdfUrls: [], nfsePdfUrls: [],
   });
 }

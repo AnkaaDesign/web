@@ -71,7 +71,7 @@ export const AdmissionCreatePage = () => {
                 favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_ADMISSOES_LISTAR}
                 breadcrumbs={[
                   { label: "Início", href: "/" },
-                  { label: "Departamento Pessoal" },
+                  { label: "Departamento Pessoal", href: routes.personnelDepartment.root },
                   { label: "Admissões", href: routes.personnelDepartment.admissions.root },
                   { label: "Nova" },
                 ]}

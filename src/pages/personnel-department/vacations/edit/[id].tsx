@@ -90,7 +90,7 @@ export const VacationEditPage = () => {
             icon={IconBeach}
             breadcrumbs={[
               { label: "Início", href: "/" },
-              { label: "Departamento Pessoal" },
+              { label: "Departamento Pessoal", href: routes.personnelDepartment.root },
               { label: "Férias", href: routes.personnelDepartment.vacations.root },
               { label: vacation?.user?.name || "Férias", href: routes.personnelDepartment.vacations.details(id) },
               { label: "Editar" },

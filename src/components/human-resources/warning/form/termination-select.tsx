@@ -65,7 +65,7 @@ export function TerminationSelect({ disabled, collaboratorId }: TerminationSelec
       queryKey={["terminations", "warning-link", collaboratorId ?? "all"]}
       queryFn={queryTerminations}
       minSearchLength={0}
-      placeholder="Vincular a uma rescisão (opcional)"
+      placeholder="Vincular a uma rescisão"
       emptyText="Nenhuma rescisão encontrada"
       disabled={disabled}
     />

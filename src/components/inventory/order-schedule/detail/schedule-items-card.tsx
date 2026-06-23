@@ -45,7 +45,7 @@ interface ScheduleItemsCardProps {
 }
 
 const DEFAULT_PAGE_SIZE = 20;
-const STORAGE_KEY = "order-schedule-items-visible-columns";
+const STORAGE_KEY = "order-schedule-items-visible-columns-v2";
 
 // Projection columns are not part of the base Item model, so they sort via an
 // explicit accessor over the projection map rather than a property path.
@@ -174,10 +174,10 @@ export function ScheduleItemsCard({ items, projection, projectionMeta, hasGapOpt
 
   // Default visible: the original schedule columns + the projection columns.
   const defaultColumns = useMemo(() => {
-    const keys = ["uniCode", "name", "brand.name", "category.name", "quantity", "measures"];
+    const keys = ["uniCode", "name", "brand.name", "category.name", "quantity", "price", "measures"];
     if (hasGapOption) keys.push("gapOnlyQty", "gapOnlyPrice");
     keys.push("expectedQty", "expectedPrice");
-    return new Set(canViewPrices ? keys : keys.filter((k) => k !== "gapOnlyPrice" && k !== "expectedPrice"));
+    return new Set(canViewPrices ? keys : keys.filter((k) => k !== "price" && k !== "gapOnlyPrice" && k !== "expectedPrice"));
   }, [hasGapOption, canViewPrices]);
 
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(STORAGE_KEY, defaultColumns);

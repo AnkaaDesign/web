@@ -4,7 +4,7 @@ import { IconPercentage } from "@tabler/icons-react";
 import { SalaryAdjustmentList } from "@/components/personnel-department/salary-adjustment/list/salary-adjustment-list";
 import { SalaryAdjustmentApplyDialog } from "@/components/personnel-department/salary-adjustment/apply/salary-adjustment-apply-dialog";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../constants";
+import { FAVORITE_PAGES, routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const SalaryAdjustmentListPage = () => {
@@ -18,7 +18,7 @@ export const SalaryAdjustmentListPage = () => {
           variant="list"
           title="Reajustes"
           favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_REAJUSTES_LISTAR}
-          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal" }, { label: "Reajustes" }]}
+          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal", href: routes.personnelDepartment.root }, { label: "Reajustes" }]}
           actions={[
             {
               key: "apply",

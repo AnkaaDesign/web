@@ -72,7 +72,7 @@ export const VacationCreatePage = () => {
             icon={IconBeach}
             breadcrumbs={[
               { label: "Início", href: "/" },
-              { label: "Departamento Pessoal" },
+              { label: "Departamento Pessoal", href: routes.personnelDepartment.root },
               { label: "Férias", href: routes.personnelDepartment.vacations.root },
               { label: "Novas" },
             ]}

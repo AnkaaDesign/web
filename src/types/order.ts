@@ -132,11 +132,7 @@ export interface Order extends BaseEntity {
   paidAt: Date | null;
   paidById: string | null;
   installmentCount: number;
-  budgetIds?: string[];
-  invoiceIds?: string[];
   receiptIds?: string[];
-  reimbursementIds?: string[];
-  reimbursementInvoiceIds?: string[];
   supplierId: string | null;
   orderScheduleId: string | null;
   orderRuleId: string | null;
@@ -156,11 +152,7 @@ export interface Order extends BaseEntity {
   paymentAssignedBy?: User;
   paidBy?: User;
   installments?: OrderInstallment[];
-  budgets?: File[];
-  invoices?: File[];
   receipts?: File[];
-  reimbursements?: File[];
-  invoiceReimbursements?: File[];
   supplier?: Supplier;
   orderSchedule?: OrderSchedule;
   ppeSchedule?: PpeDeliverySchedule;
@@ -197,27 +189,7 @@ export interface OrderInstallment {
 // =====================
 
 export interface OrderIncludes {
-  budgets?:
-    | boolean
-    | {
-        include?: FileIncludes;
-      };
-  invoices?:
-    | boolean
-    | {
-        include?: FileIncludes;
-      };
   receipts?:
-    | boolean
-    | {
-        include?: FileIncludes;
-      };
-  reimbursements?:
-    | boolean
-    | {
-        include?: FileIncludes;
-      };
-  invoiceReimbursements?:
     | boolean
     | {
         include?: FileIncludes;

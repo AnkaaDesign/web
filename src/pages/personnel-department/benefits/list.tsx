@@ -17,7 +17,7 @@ export const BenefitListPage = () => {
           variant="list"
           title="Benefícios"
           favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_BENEFICIOS_LISTAR}
-          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal" }, { label: "Benefícios" }]}
+          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal", href: routes.personnelDepartment.root }, { label: "Benefícios" }]}
           actions={[
             {
               key: "enrollments",

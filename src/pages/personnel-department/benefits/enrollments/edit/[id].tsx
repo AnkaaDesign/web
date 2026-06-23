@@ -81,7 +81,7 @@ export const UserBenefitEditPage = () => {
             icon={IconHeartHandshake}
             breadcrumbs={[
               { label: "Início", href: "/" },
-              { label: "Departamento Pessoal" },
+              { label: "Departamento Pessoal", href: routes.personnelDepartment.root },
               { label: "Benefícios", href: routes.personnelDepartment.benefits.root },
               { label: "Adesões", href: routes.personnelDepartment.benefits.enrollments.root },
               { label: userBenefit.user?.name || "Adesão", href: routes.personnelDepartment.benefits.enrollments.details(id) },

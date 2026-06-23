@@ -12,6 +12,7 @@ import {
   IconRepeat,
   IconPlayerPlay,
   IconPlayerPause,
+  IconTruck,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +56,7 @@ export function OrderScheduleDetailsPage() {
       weeklyConfig: true,
       monthlyConfig: true,
       yearlyConfig: true,
+      supplier: true,
     },
     enabled: !!id,
   });
@@ -279,7 +281,7 @@ export function OrderScheduleDetailsPage() {
         <div className="space-y-4">
           {/* Configuration + Changelog Grid */}
           <div className="animate-in fade-in-50 duration-700">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
               {/* Schedule Configuration Card */}
               <Card className="shadow-sm border border-border flex flex-col h-full">
                 <CardHeader className="pb-4">
@@ -290,15 +292,22 @@ export function OrderScheduleDetailsPage() {
                 </CardHeader>
                 <CardContent className="pt-0 flex-1">
                   <div className="space-y-6">
-                    {/* Description */}
-                    {schedule.description && (
+                    {/* Fornecedor */}
+                    {schedule.supplier && (
                       <div>
-                        <p className="text-sm text-muted-foreground">{schedule.description}</p>
+                        <h4 className="text-sm font-semibold mb-3 text-foreground">Fornecedor</h4>
+                        <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                          <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                            <IconTruck className="h-4 w-4" />
+                            Fornecedor
+                          </span>
+                          <span className="text-sm font-semibold text-foreground text-right">{schedule.supplier.fantasyName}</span>
+                        </div>
                       </div>
                     )}
 
-                    {/* Frequency */}
-                    <div className={cn(schedule.description && "pt-4 border-t border-border")}>
+                    {/* Periodicidade — frequency, recurrence detail and status as separate rows */}
+                    <div className={cn(schedule.supplier && "pt-4 border-t border-border")}>
                       <h4 className="text-sm font-semibold mb-3 text-foreground">Periodicidade</h4>
                       <div className="space-y-3">
                         <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -306,15 +315,19 @@ export function OrderScheduleDetailsPage() {
                             <IconRepeat className="h-4 w-4" />
                             Frequência
                           </span>
-                          <div className="text-right">
-                            <span className="text-sm font-semibold text-foreground">
-                              {getDynamicFrequencyLabel(schedule.frequency, schedule.frequencyCount)}
-                            </span>
-                            {getScheduleDetails() && (
-                              <div className="text-xs text-muted-foreground mt-1">{getScheduleDetails()}</div>
-                            )}
-                          </div>
+                          <span className="text-sm font-semibold text-foreground">
+                            {getDynamicFrequencyLabel(schedule.frequency, schedule.frequencyCount)}
+                          </span>
                         </div>
+                        {getScheduleDetails() && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                            <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <IconCalendarEvent className="h-4 w-4" />
+                              Recorrência
+                            </span>
+                            <span className="text-sm font-semibold text-foreground text-right">{getScheduleDetails()}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                           <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                             <IconCircleCheck className="h-4 w-4" />
@@ -392,13 +405,14 @@ export function OrderScheduleDetailsPage() {
                 </CardContent>
               </Card>
 
-              {/* Changelog History — next to the schedule info */}
+              {/* Changelog History — bounded height so it scrolls internally instead of
+                  stretching to match the (often taller) configuration card. */}
               <ChangelogHistory
                 entityType={CHANGE_LOG_ENTITY_TYPE.ORDER_SCHEDULE}
                 entityId={schedule.id}
                 entityName={schedule.name || `Agendamento #${schedule.id.slice(-8)}`}
                 entityCreatedAt={schedule.createdAt}
-                className="h-full"
+                maxHeight="500px"
               />
             </div>
           </div>

@@ -53,7 +53,7 @@ export function TaskHistoryContextMenu({
   const { user } = useAuth();
   const navigate = useNavigate();
   const returnTo = useReturnTo();
-  const { update, delete: deleteTask } = useTaskMutations();
+  const { update, updateAsync, delete: deleteTask } = useTaskMutations();
   const { batchUpdate, batchDeleteAsync } = useTaskBatchMutations();
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
@@ -367,19 +367,26 @@ export function TaskHistoryContextMenu({
 
   const handleFinish = async () => {
     try {
-      // Finish all IN_PRODUCTION tasks — the API auto-completes any remaining production SOs
+      // Finish all IN_PRODUCTION tasks. The API blocks completion unless every
+      // production service order is already concluded, so use the async mutation
+      // and surface its error message to the user.
       for (const t of tasks) {
         if (t.status === TASK_STATUS.IN_PRODUCTION) {
-          await update({
+          await updateAsync({
             id: t.id,
             data: { status: TASK_STATUS.COMPLETED, finishedAt: new Date() },
           });
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error finishing task(s):", error);
       }
+      const description =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Não foi possível finalizar a tarefa. Tente novamente.";
+      toast.error("Erro ao finalizar tarefa(s)", { description });
     }
     setDropdownOpen(false);
   };
@@ -723,7 +730,7 @@ export function TaskHistoryContextMenu({
                   <DropdownMenuItem onClick={handleQuoteLayout} onSelect={(e) => e.preventDefault()}>
                     <IconPhoto className="mr-2 h-4 w-4" />
                     <span className="truncate">
-                      {tasks.some((t) => (t as any).quote?.layoutFileId) ? "Alterar Layout" : "Adicionar Layout"}
+                      {tasks.some((t) => ((t as any).quote?.layoutFiles?.length ?? 0) > 0) ? "Alterar Layout" : "Adicionar Layout"}
                     </span>
                   </DropdownMenuItem>
                 )}

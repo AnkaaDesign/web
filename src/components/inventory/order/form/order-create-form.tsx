@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconTruck, IconNotes, IconClipboardList, IconCreditCard, IconPercentage } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconReceipt, IconFileText, IconTruck, IconNotes, IconClipboardList, IconCreditCard, IconPercentage } from "@tabler/icons-react";
 import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useSuppliers, useCanViewPrices, useNextOrderNumber } from "../../../../hooks";
@@ -37,9 +37,7 @@ export const OrderCreateForm = () => {
   const canViewPrices = useCanViewPrices();
 
   // File upload state
-  const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>([]);
   const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
-  const [invoiceFiles, setInvoiceFiles] = useState<FileWithPreview[]>([]);
 
   // URL state management for item selection and form navigation (includes step)
   const {
@@ -407,9 +405,15 @@ export const OrderCreateForm = () => {
     }
   }, [currentStep, form, selectedItems, prices, temporaryItems]);
 
-  // Consolidate filters for ItemSelectorTable
+  // Consolidate filters for ItemSelectorTable.
+  // The item selector/drawer speak `isActive` (the canonical status field): true = "Ativo",
+  // false = "Inativo", absent = "Ambos" (both). The URL state only stores the boolean
+  // `showInactive`, so map it here and carry `isActive` explicitly. This must round-trip so the
+  // table's filtersProp re-sync doesn't drop the status when other filters (category/brand/...)
+  // change. `showInactive=false` is treated as "Ambos" (no isActive filter → both shown), which
+  // is the default the Status combobox displays.
   const filters = useMemo<Partial<ItemGetManyFormData>>(() => ({
-    showInactive,
+    isActive: showInactive ? false : undefined,
     categoryIds: categoryIds.length > 0 ? categoryIds : undefined,
     brandIds: brandIds.length > 0 ? brandIds : undefined,
     supplierIds: supplierIds.length > 0 ? supplierIds : undefined,
@@ -417,27 +421,21 @@ export const OrderCreateForm = () => {
 
   // Handle filter changes from ItemSelectorTable
   const handleFiltersChange = useCallback((newFilters: Partial<ItemGetManyFormData>) => {
-    if (newFilters.showInactive !== undefined) setShowInactive(newFilters.showInactive);
+    // Drawer emits `isActive`; only `false` ("Inativo") flips showInactive on. "Ambos" (absent)
+    // and "Ativo" (true) both leave showInactive false so the default keeps showing both.
+    setShowInactive(newFilters.isActive === false);
     if (newFilters.categoryIds !== undefined) setCategoryIds(newFilters.categoryIds);
     if (newFilters.brandIds !== undefined) setBrandIds(newFilters.brandIds);
     if (newFilters.supplierIds !== undefined) setSupplierIds(newFilters.supplierIds);
   }, [setShowInactive, setCategoryIds, setBrandIds, setSupplierIds]);
 
   // Handle file changes
-  // Note: We don't set budgetIds/receiptIds/invoiceIds here because:
-  // 1. Files are tracked in separate state (budgetFiles, receiptFiles, invoiceFiles)
+  // Note: We don't set receiptIds here because:
+  // 1. Files are tracked in separate state (receiptFiles)
   // 2. Setting ["pending"] would fail UUID validation in the schema
   // 3. The actual file IDs are set by the backend after upload
-  const handleBudgetFilesChange = useCallback((files: FileWithPreview[]) => {
-    setBudgetFiles(files);
-  }, []);
-
   const handleReceiptFilesChange = useCallback((files: FileWithPreview[]) => {
     setReceiptFiles(files);
-  }, []);
-
-  const handleInvoiceFilesChange = useCallback((files: FileWithPreview[]) => {
-    setInvoiceFiles(files);
   }, []);
 
   // Handle item selection
@@ -588,12 +586,8 @@ export const OrderCreateForm = () => {
           toast.error("Erro nos itens do pedido");
         } else if (errors.paymentPix) {
           toast.error(errors.paymentPix.message || "Erro na chave Pix");
-        } else if (errors.budgetIds) {
-          toast.error("Erro nos arquivos de orçamento");
         } else if (errors.receiptIds) {
-          toast.error("Erro nos arquivos de recibo");
-        } else if (errors.invoiceIds) {
-          toast.error("Erro nos arquivos de nota fiscal");
+          toast.error("Erro nos comprovantes");
         } else {
           // Log all error keys for debugging
           const errorKeys = Object.keys(errors);
@@ -612,11 +606,9 @@ export const OrderCreateForm = () => {
       }
 
       // Check if there are files to upload (all files in FileWithPreview arrays are new for create)
-      const newBudgetFiles = budgetFiles.filter(f => f instanceof File);
       const newReceiptFiles = receiptFiles.filter(f => f instanceof File);
-      const newInvoiceFiles = invoiceFiles.filter(f => f instanceof File);
 
-      const hasFiles = newBudgetFiles.length > 0 || newReceiptFiles.length > 0 || newInvoiceFiles.length > 0;
+      const hasFiles = newReceiptFiles.length > 0;
 
       let result;
       if (hasFiles) {
@@ -625,9 +617,7 @@ export const OrderCreateForm = () => {
         const formDataWithFiles = createOrderFormData(
           orderData,
           {
-            budgets: newBudgetFiles.length > 0 ? newBudgetFiles as File[] : undefined,
             receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
-            invoices: newInvoiceFiles.length > 0 ? newInvoiceFiles as File[] : undefined,
           },
           supplier ? {
             id: supplier.id,
@@ -666,7 +656,7 @@ export const OrderCreateForm = () => {
       }
       // Error is handled by the mutation hook, but let's log it
     }
-  }, [validateCurrentStep, description, supplierId, forecast, notes, freight, discount, selectedItems, quantities, prices, icmses, ipis, temporaryItems, budgetFiles, receiptFiles, invoiceFiles, suppliers, createAsync, form, clearAllSelections, clearTemporaryItems, navigate]);
+  }, [validateCurrentStep, description, supplierId, forecast, notes, freight, discount, selectedItems, quantities, prices, icmses, ipis, temporaryItems, receiptFiles, suppliers, createAsync, form, clearAllSelections, clearTemporaryItems, navigate]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.orders.root);
@@ -1009,37 +999,14 @@ export const OrderCreateForm = () => {
                           {/* File uploads */}
                           <div className="space-y-4">
                             <Separator />
-                            <Label className="text-sm font-medium">Documentos (Opcional)</Label>
+                            <Label className="text-sm font-medium">Comprovantes (Opcional)</Label>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              {/* Budget File */}
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium flex items-center gap-2">
-                                  <IconCurrencyReal className="h-4 w-4" />
-                                  Orçamento
-                                </Label>
-                                <FileUploadField
-                                  onFilesChange={handleBudgetFilesChange}
-                                  existingFiles={budgetFiles}
-                                  maxFiles={10}
-                                  maxSize={10 * 1024 * 1024} // 10MB
-                                  acceptedFileTypes={{
-                                    "application/pdf": [".pdf"],
-                                    "image/*": [".jpg", ".jpeg", ".png"],
-                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-                                    "application/vnd.ms-excel": [".xls"],
-                                  }}
-                                  showPreview={true}
-                                  variant="compact"
-                                  placeholder="Adicionar orçamento"
-                                />
-                              </div>
-
+                            <div className="grid grid-cols-1 gap-4">
                               {/* Receipt File */}
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium flex items-center gap-2">
                                   <IconReceipt className="h-4 w-4" />
-                                  Recibo
+                                  Comprovante
                                 </Label>
                                 <FileUploadField
                                   onFilesChange={handleReceiptFilesChange}
@@ -1052,29 +1019,7 @@ export const OrderCreateForm = () => {
                                   }}
                                   showPreview={true}
                                   variant="compact"
-                                  placeholder="Adicionar recibo"
-                                />
-                              </div>
-
-                              {/* NFE File */}
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium flex items-center gap-2">
-                                  <IconFileInvoice className="h-4 w-4" />
-                                  Nota Fiscal
-                                </Label>
-                                <FileUploadField
-                                  onFilesChange={handleInvoiceFilesChange}
-                                  existingFiles={invoiceFiles}
-                                  maxFiles={10}
-                                  maxSize={10 * 1024 * 1024} // 10MB
-                                  acceptedFileTypes={{
-                                    "application/pdf": [".pdf"],
-                                    "application/xml": [".xml"],
-                                    "image/*": [".jpg", ".jpeg", ".png"],
-                                  }}
-                                  showPreview={true}
-                                  variant="compact"
-                                  placeholder="Adicionar NF-e"
+                                  placeholder="Adicionar comprovante"
                                 />
                               </div>
                             </div>
@@ -1111,7 +1056,7 @@ export const OrderCreateForm = () => {
                         name: 'Essencial para identificar o item sendo pedido',
                       },
                     }}
-                    defaultColumns={['uniCode', 'name', 'quantity', 'price', 'monthlyConsumption', 'monthlyConsumptionTrendPercent', 'orderSubtotal']}
+                    defaultColumns={['uniCode', 'name', 'quantity', 'price', 'monthlyConsumption', 'orderSubtotal']}
                     storageKey="order-item-selector"
                     // URL state management
                     page={page}

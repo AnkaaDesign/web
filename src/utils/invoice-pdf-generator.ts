@@ -91,19 +91,19 @@ export function exportInvoicePdf(options: ServiceReportPdfOptions): void {
       <div class="section-content">${escapeHtml(paymentText)}</div>
     </div>` : "";
 
-  // ── Page 2: Layout Image (if available) ──
-  const layoutFileId = task.quote?.layoutFile?.id;
-  const layoutPageHtml = layoutFileId ? `
+  // ── Page 2: Layout Image(s) (the layoutFiles array) ──
+  const layoutFileIds = (task.quote?.layoutFiles || []).map((f: any) => f.id).filter(Boolean);
+  const layoutPageHtml = layoutFileIds.map((id: string) => `
     <div class="page">
       ${buildHeader(formattedBudgetNumber, false)}
       <div class="page-content layout-page">
         <div class="section-title" style="margin-bottom:4mm">Layout Aprovado</div>
         <div class="layout-container">
-          <img src="${apiUrl}/files/serve/${layoutFileId}" alt="Layout" class="layout-img" />
+          <img src="${apiUrl}/files/serve/${id}" alt="Layout" class="layout-img" />
         </div>
       </div>
       ${buildFooter()}
-    </div>` : "";
+    </div>`).join("");
 
   // ── Pages 3+: Dossiê (check-in/check-out photos per service order) ──
   const productionSOs = (serviceOrders || task.serviceOrders || [])

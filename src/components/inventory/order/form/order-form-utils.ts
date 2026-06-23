@@ -51,7 +51,6 @@ export interface OrderFormData {
   prices: Record<string, number>;
   icmses: Record<string, number>;
   ipis: Record<string, number>;
-  budgetId?: string | null;
   receiptId?: string | null;
 }
 
@@ -354,7 +353,6 @@ export function transformFormDataForAPI(formData: OrderFormData): OrderCreateFor
     status: ORDER_STATUS.CREATED,
     supplierId: formData.supplierId || undefined,
     notes: formData.notes?.trim() || undefined,
-    budgetIds: formData.budgetId ? [formData.budgetId] : undefined,
     receiptIds: formData.receiptId ? [formData.receiptId] : undefined,
     items,
   };
@@ -409,7 +407,6 @@ export function transformAPIDataToFormData(order: Order, items: Item[]): Partial
     forecast: order.forecast,
     supplierId: order.supplierId,
     notes: order.notes,
-    budgetId: order.budgetIds?.[0] || null,
     receiptId: order.receiptIds?.[0] || null,
     selectedItems,
     quantities,
@@ -428,7 +425,6 @@ export function cloneFormData(formData: OrderFormData): OrderFormData {
     forecast: formData.forecast,
     supplierId: formData.supplierId,
     notes: formData.notes,
-    budgetId: formData.budgetId,
     receiptId: formData.receiptId,
     selectedItems: new Map(formData.selectedItems),
     quantities: { ...formData.quantities },

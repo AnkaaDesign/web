@@ -38,8 +38,6 @@ export const FILE_RELATIONSHIP_MAP = {
   airbrushingInvoices: { entityType: ENTITY_TYPE.AIRBRUSHING, description: "nota fiscal da aerografia" },
 
   // Order relationships
-  orderBudgets: { entityType: ENTITY_TYPE.ORDER, description: "orçamento do pedido" },
-  orderInvoices: { entityType: ENTITY_TYPE.ORDER, description: "nota fiscal do pedido" },
   orderReceipts: { entityType: ENTITY_TYPE.ORDER, description: "recibo do pedido" },
 
   // External withdrawal relationships

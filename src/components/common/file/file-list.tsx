@@ -171,8 +171,6 @@ export function FileList({ className }: FileListProps) {
         tasksArtworks: true,
         customerLogo: true,
         supplierLogo: true,
-        orderBudgets: true,
-        orderInvoices: true,
         orderReceipts: true,
         taskBudgets: true,
         taskInvoices: true,
@@ -270,11 +268,6 @@ export function FileList({ className }: FileListProps) {
                   {file.customerLogo && file.customerLogo.length > 0 && (
                     <div className="text-xs text-green-600 mt-1">
                       🏢 {file.customerLogo.length} cliente{file.customerLogo.length > 1 ? "s" : ""}
-                    </div>
-                  )}
-                  {file.orderBudgets && file.orderBudgets.length > 0 && (
-                    <div className="text-xs text-purple-600 mt-1">
-                      📄 {file.orderBudgets.length} orçamento{file.orderBudgets.length > 1 ? "s" : ""}
                     </div>
                   )}
                   {file.warning && file.warning.length > 0 && (

@@ -22,7 +22,8 @@ export function PublicServiceReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [layoutImageUrl, setLayoutImageUrl] = useState<string | null>(null);
+  // Validated layout image URLs (the layoutFiles array, those that load OK)
+  const [layoutImageUrls, setLayoutImageUrls] = useState<string[]>([]);
 
   const selectedCustomerId = useMemo(() => {
     if (!customerId || !quote?.customerConfigs) return null;
@@ -50,15 +51,30 @@ export function PublicServiceReportPage() {
 
   useEffect(() => { fetchQuote(); }, [fetchQuote]);
 
-  // Validate layout image exists (avoid 404s)
-  const layoutFileUrl = quote?.layoutFile?.id ? `${getApiBaseUrl()}/files/serve/${quote.layoutFile.id}` : null;
+  // Validate layout images exist (avoid 404s) — the layoutFiles array, order preserved
+  const layoutFileUrls = ((quote?.layoutFiles || []) as any[])
+    .filter((f) => f?.id)
+    .map((f) => `${getApiBaseUrl()}/files/serve/${f.id}`);
+  const layoutFileUrlsKey = layoutFileUrls.join("|");
   useEffect(() => {
-    if (!layoutFileUrl) { setLayoutImageUrl(null); return; }
-    const img = new Image();
-    img.onload = () => setLayoutImageUrl(layoutFileUrl);
-    img.onerror = () => setLayoutImageUrl(null);
-    img.src = layoutFileUrl;
-  }, [layoutFileUrl]);
+    const urls = layoutFileUrlsKey ? layoutFileUrlsKey.split("|") : [];
+    if (urls.length === 0) { setLayoutImageUrls([]); return; }
+    let cancelled = false;
+    Promise.all(
+      urls.map(
+        (url) =>
+          new Promise<string | null>((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(url);
+            img.onerror = () => resolve(null);
+            img.src = url;
+          }),
+      ),
+    ).then((results) => {
+      if (!cancelled) setLayoutImageUrls(results.filter(Boolean) as string[]);
+    });
+    return () => { cancelled = true; };
+  }, [layoutFileUrlsKey]);
 
   // Derived data (safe to compute even if quote is null — guarded by early return below)
   const apiUrl = getApiBaseUrl();
@@ -179,7 +195,7 @@ export function PublicServiceReportPage() {
         discountReference: activeConfig?.discountReference || null,
         paymentText,
         guaranteeText,
-        layoutImageUrl,
+        layoutImageUrls,
         serviceOrders,
         bankSlipPdfUrls: bankSlipInstallments.map((s: any) => s.pdfUrl),
         nfsePdfUrls: nfseDocuments.map((doc: any) => `${apiUrl}/nfse/public/${doc.elotechNfseId}/pdf`),
@@ -460,14 +476,16 @@ export function PublicServiceReportPage() {
               </div>
             )}
 
-            {/* Layout Image */}
-            {layoutImageUrl && (
+            {/* Layout Image(s) — the layoutFiles array */}
+            {layoutImageUrls.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
                   Layout aprovado
                 </h3>
-                <div className="w-full">
-                  <img src={layoutImageUrl} alt="Layout aprovado" className="w-full h-auto rounded-lg shadow-md" />
+                <div className="w-full space-y-4">
+                  {layoutImageUrls.map((url, i) => (
+                    <img key={i} src={url} alt="Layout aprovado" className="w-full h-auto rounded-lg shadow-md" />
+                  ))}
                 </div>
               </div>
             )}

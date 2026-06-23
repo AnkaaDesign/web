@@ -492,8 +492,10 @@ export function coerceRefreshMs(raw: unknown): number {
 
 /**
  * Effective CSS `zoom` factor in force on `el` (product of every ancestor's
- * `zoom`, including the document root's always-on `zoom: 0.8`). Returns 1 when
- * unsupported or unzoomed.
+ * `zoom`). Returns 1 when unsupported or unzoomed — which is the normal case,
+ * since the global UI scale is done via root rem font-size, NOT `zoom` (see
+ * index.css). This reads the live `currentCSSZoom`, so it stays correct even if
+ * a `zoom` is ever applied to an ancestor.
  *
  * Needed by the column-resize handlers: under CSS `zoom`, `getBoundingClientRect`
  * and pointer `clientX` are reported in the *scaled* (post-zoom) coordinate

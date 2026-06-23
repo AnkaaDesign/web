@@ -12,11 +12,7 @@ import { ORDER_STATUS, ORDER_PAYMENT_STATUS, PAYMENT_METHOD, SCHEDULE_FREQUENCY,
 export const orderIncludeSchema = z
   .object({
     // Direct Order relations
-    budgets: z.boolean().optional(),
-    invoices: z.boolean().optional(),
-    invoiceReimbursements: z.boolean().optional(),
     receipts: z.boolean().optional(),
-    reimbursements: z.boolean().optional(),
     supplier: z
       .union([
         z.boolean(),
@@ -128,11 +124,7 @@ export const orderItemIncludeSchema = z
         z.object({
           include: z
             .object({
-              budgets: z.boolean().optional(),
-              invoices: z.boolean().optional(),
-              invoiceReimbursements: z.boolean().optional(),
               receipts: z.boolean().optional(),
-              reimbursements: z.boolean().optional(),
               supplier: z.boolean().optional(),
               orderSchedule: z.boolean().optional(),
               items: z.boolean().optional(),
@@ -1396,11 +1388,7 @@ export const orderCreateSchema = z
       .optional(),
     paymentResponsibleId: z.string().uuid({ message: "Responsável pelo pagamento inválido" }).nullable().optional(),
     // File arrays
-    budgetIds: z.array(z.string().uuid("Orçamento inválido")).optional(),
-    invoiceIds: z.array(z.string().uuid("NFe inválida")).optional(),
     receiptIds: z.array(z.string().uuid("Recibo inválido")).optional(),
-    reimbursementIds: z.array(z.string().uuid("Reimbursement inválido")).optional(),
-    reimbursementInvoiceIds: z.array(z.string().uuid("NFe de reimbursement inválida")).optional(),
     items: z
       .array(
         z.object({
@@ -1501,10 +1489,7 @@ export const orderUpdateSchema = z
       .optional(),
     paymentResponsibleId: z.string().uuid({ message: "Responsável pelo pagamento inválido" }).nullable().optional(),
     // File arrays
-    budgetIds: z.array(z.string().uuid("Orçamento inválido")).optional(),
-    invoiceIds: z.array(z.string().uuid("NFe inválida")).optional(),
     receiptIds: z.array(z.string().uuid("Recibo inválido")).optional(),
-    reimbursementIds: z.array(z.string().uuid("Reimbursement inválido")).optional(),
     // Items array for updating order items
     items: z
       .array(
@@ -1965,11 +1950,7 @@ export const mapOrderToFormData = createMapToFormDataHelper<Order, OrderUpdateFo
   status: order.status as ORDER_STATUS,
   supplierId: order.supplierId || undefined,
   orderScheduleId: order.orderScheduleId || undefined,
-  budgetIds: order.budgets?.map((budget) => budget.id),
-  invoiceIds: order.invoices?.map((invoice) => invoice.id),
   receiptIds: order.receipts?.map((receipt) => receipt.id),
-  reimbursementIds: order.reimbursements?.map((reimbursement) => reimbursement.id),
-  reimbursementInvoiceIds: order.invoiceReimbursements?.map((reimbursementInvoice) => reimbursementInvoice.id),
   notes: order.notes || undefined,
   freight: (order as any).freight ?? 0,
   discount: (order as any).discount ?? 0,

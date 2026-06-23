@@ -73,10 +73,9 @@ export interface Item extends BaseEntity {
   categoryId?: string;
   supplierId: string | null;
   warehouseLocationId: string | null;
-  /** 1-based level (nível) within the warehouse location grid. */
-  locationLevel: number | null;
-  /** 1-based column (coluna) within the warehouse location grid. */
-  locationColumn: number | null;
+  /** Cells the item occupies within the warehouse location grid (1-based).
+   *  column is null on non-kanban structures. Empty/null = whole structure. */
+  locationCells: Array<{ level: number; column: number | null }> | null;
   estimatedLeadTime: number | null;
   isActive: boolean;
   categoryReviewNeeded: boolean;

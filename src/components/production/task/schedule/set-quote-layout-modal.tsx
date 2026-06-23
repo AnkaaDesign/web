@@ -21,38 +21,43 @@ interface SetQuoteLayoutModalProps {
 
 /**
  * Commercial counterpart of the admin "Adicionar Layouts" bulk form.
- * Instead of editing task artworks, it sets the quote's approved layout
- * (TaskQuote.layoutFileId) for every selected task that has a quote.
- * layoutFileId is a safe-after-billing field, so this also works on locked quotes.
+ * Instead of editing task artworks, it sets the quote's approved layout files
+ * (TaskQuote.layoutFiles, up to 2) for every selected task that has a quote.
+ * layoutFileIds is a safe-after-billing field, so this also works on locked quotes.
  */
 export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayoutModalProps) {
   const queryClient = useQueryClient();
   const [files, setFiles] = useState<FileWithPreview[]>([]);
-  const [prefilledFileId, setPrefilledFileId] = useState<string | null>(null);
+  const [prefilledFileIds, setPrefilledFileIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Tasks refetched with their quote on open — the list rows passed in may not
-  // include the quote relation (or may carry a stale layoutFileId)
-  const [quoteTasks, setQuoteTasks] = useState<Array<{ id: string; quote: { id: string; layoutFileId: string | null } }>>([]);
+  // include the quote relation (or may carry a stale layoutFiles set)
+  const [quoteTasks, setQuoteTasks] = useState<Array<{ id: string; quote: { id: string; layoutFileIds: string[] } }>>([]);
 
   const tasksWithoutQuote = tasks.length - quoteTasks.length;
 
-  // All selected quotes share the same existing layout?
-  const commonLayoutFileId = useMemo(() => {
+  // Ordered layout File-id array for a quote.
+  const orderedIds = (q: { layoutFileIds: string[] }) => q.layoutFileIds;
+  const idsEqual = (a: string[], b: string[]) =>
+    a.length === b.length && a.every((id, i) => id === b[i]);
+
+  // All selected quotes share the same existing ordered layout set?
+  const commonLayoutIds = useMemo<string[] | null>(() => {
     if (quoteTasks.length === 0) return null;
-    const first = quoteTasks[0].quote.layoutFileId ?? null;
-    if (!first) return null;
-    return quoteTasks.every((t) => (t.quote.layoutFileId ?? null) === first) ? first : null;
+    const first = orderedIds(quoteTasks[0].quote);
+    if (first.length === 0) return null;
+    return quoteTasks.every((t) => idsEqual(orderedIds(t.quote), first)) ? first : null;
   }, [quoteTasks]);
 
-  const hasMixedLayouts = !commonLayoutFileId && quoteTasks.some((t) => t.quote.layoutFileId);
+  const hasMixedLayouts = !commonLayoutIds && quoteTasks.some((t) => orderedIds(t.quote).length > 0);
 
   // Fetch fresh quote data for the selected tasks, then prefill the current
   // layout when every selected quote shares the same one
   useEffect(() => {
     if (!open) return;
     setFiles([]);
-    setPrefilledFileId(null);
+    setPrefilledFileIds([]);
     setQuoteTasks([]);
     if (tasks.length === 0) return;
 
@@ -69,37 +74,39 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
         }
         const responses = await Promise.all(
           chunks.map((chunk) =>
-            taskService.getTasks({ where: { id: { in: chunk } }, include: { quote: true }, limit: chunk.length }),
+            taskService.getTasks({ where: { id: { in: chunk } }, include: { quote: { include: { layoutFiles: true } } }, limit: chunk.length }),
           ),
         );
         if (cancelled) return;
         const fetched = responses
           .flatMap((r) => r.data || [])
           .filter((t: any) => t.quote?.id)
-          .map((t: any) => ({ id: t.id, quote: { id: t.quote.id, layoutFileId: t.quote.layoutFileId ?? null } }));
+          .map((t: any) => ({ id: t.id, quote: { id: t.quote.id, layoutFileIds: (t.quote.layoutFiles || []).map((f: any) => f.id) } }));
         setQuoteTasks(fetched);
 
-        const first = fetched[0]?.quote.layoutFileId ?? null;
-        const shared = first && fetched.every((t) => (t.quote.layoutFileId ?? null) === first) ? first : null;
+        const first = fetched.length > 0 ? orderedIds(fetched[0].quote) : [];
+        const shared = first.length > 0 && fetched.every((t) => idsEqual(orderedIds(t.quote), first)) ? first : null;
         if (!shared) return;
 
-        const res = await getFileById(shared);
-        if (cancelled || !res.data) return;
-        const file = res.data;
-        setPrefilledFileId(file.id);
-        setFiles([
-          {
-            id: file.id,
-            name: file.originalName || file.filename || "layout",
-            size: file.size || 0,
-            type: file.mimetype || "application/octet-stream",
-            lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
-            uploaded: true,
-            uploadProgress: 100,
-            uploadedFileId: file.id,
-            thumbnailUrl: file.thumbnailUrl,
-          } as FileWithPreview,
-        ]);
+        const resolved = await Promise.all(shared.map((id) => getFileById(id)));
+        if (cancelled) return;
+        setPrefilledFileIds(shared);
+        setFiles(
+          resolved
+            .map((res) => res.data)
+            .filter(Boolean)
+            .map((file: any) => ({
+              id: file.id,
+              name: file.originalName || file.filename || "layout",
+              size: file.size || 0,
+              type: file.mimetype || "application/octet-stream",
+              lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+              uploaded: true,
+              uploadProgress: 100,
+              uploadedFileId: file.id,
+              thumbnailUrl: file.thumbnailUrl,
+            } as FileWithPreview)),
+        );
       } catch {
         // Error toast comes from the axios interceptor
       } finally {
@@ -111,15 +118,22 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
     };
   }, [open, tasks]);
 
-  const newFile = files.find((f) => f instanceof File) as File | undefined;
-  const removedPrefill = !!prefilledFileId && files.length === 0;
-  const canApply = !isLoading && !isSubmitting && quoteTasks.length > 0 && (!!newFile || removedPrefill);
+  // Current ordered FILE ids in the uploader (existing files only — new uploads
+  // resolve at submit). Used to detect any change vs the prefilled set.
+  const currentExistingIds = files
+    .filter((f) => !(f instanceof File))
+    .map((f) => (f as any).uploadedFileId || (f as any).id)
+    .filter(Boolean) as string[];
+  const hasNewFile = files.some((f) => f instanceof File);
+  const layoutChanged =
+    hasNewFile || !idsEqual(currentExistingIds, prefilledFileIds);
+  const canApply = !isLoading && !isSubmitting && quoteTasks.length > 0 && layoutChanged;
 
   const handleClose = (next: boolean) => {
     if (isSubmitting) return;
     if (!next) {
       setFiles([]);
-      setPrefilledFileId(null);
+      setPrefilledFileIds([]);
     }
     onOpenChange(next);
   };
@@ -128,25 +142,30 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
     if (!canApply) return;
     setIsSubmitting(true);
     try {
-      let layoutFileId: string | null = null;
-      if (newFile) {
-        const response = await uploadSingleFile(newFile, { fileContext: "quote-layout" });
-        if (!response.success || !response.data) {
-          toast.error("Erro ao enviar o layout");
-          return;
+      // Resolve ordered FILE ids (up to 2), uploading any new files.
+      const resolvedIds: string[] = [];
+      for (const f of files) {
+        if (f instanceof File) {
+          const response = await uploadSingleFile(f, { fileContext: "quote-layout" });
+          if (!response.success || !response.data) {
+            toast.error("Erro ao enviar o layout");
+            return;
+          }
+          resolvedIds.push(response.data.id);
+        } else {
+          const existingId = (f as any).uploadedFileId || (f as any).id;
+          if (existingId) resolvedIds.push(existingId);
         }
-        layoutFileId = response.data.id;
       }
-
       const results = await Promise.allSettled(
-        quoteTasks.map((t) => taskQuoteService.updateLayoutFile(t.quote.id, layoutFileId)),
+        quoteTasks.map((t) => taskQuoteService.updateLayoutFile(t.quote.id, resolvedIds)),
       );
       const failed = results.filter((r) => r.status === "rejected").length;
       const succeeded = results.length - failed;
 
       if (succeeded > 0) {
         toast.success(
-          layoutFileId
+          resolvedIds.length > 0
             ? `Layout do orçamento atualizado em ${succeeded} tarefa${succeeded > 1 ? "s" : ""}`
             : `Layout do orçamento removido de ${succeeded} tarefa${succeeded > 1 ? "s" : ""}`,
         );
@@ -158,7 +177,7 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
       }
       if (failed === 0) {
         setFiles([]);
-        setPrefilledFileId(null);
+        setPrefilledFileIds([]);
         onOpenChange(false);
       }
     } finally {
@@ -213,7 +232,7 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
             <FileUploadField
               onFilesChange={setFiles}
               existingFiles={files}
-              maxFiles={1}
+              maxFiles={2}
               maxSize={10 * 1024 * 1024}
               acceptedFileTypes={{ "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"] }}
               disabled={isSubmitting}

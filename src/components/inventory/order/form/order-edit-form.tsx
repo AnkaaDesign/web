@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconNotes, IconClipboardList, IconCreditCard, IconPercentage } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconCalendar, IconReceipt, IconFileText, IconNotes, IconClipboardList, IconCreditCard, IconPercentage } from "@tabler/icons-react";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import type { OrderTemporaryItem } from "@/hooks/inventory/use-order-form-url-state";
@@ -10,7 +10,7 @@ import type { OrderUpdateFormData } from "../../../../schemas";
 import type { Order, OrderItem } from "../../../../types";
 import { orderUpdateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useCanViewPrices } from "../../../../hooks";
-import { routes } from "../../../../constants";
+import { routes, ORDER_STATUS, ORDER_PAYMENT_STATUS, ORDER_PAYMENT_STATUS_LABELS } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,12 +25,14 @@ import { FormSteps } from "@/components/ui/form-steps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useOrderFormUrlState, composeTempItemDescription } from "@/hooks/inventory/use-order-form-url-state";
-import { formatCurrency, formatDate, formatPixKey } from "../../../../utils";
+import { formatCurrency, formatDate, formatPixKey, isValidStatusTransition } from "../../../../utils";
 import { exportOrderPdf } from "@/utils/order-pdf-generator";
 import { buildOrderCode } from "@/utils/order-code";
 import { OrderPdfExportButton } from "../common/order-pdf-export-button";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { OrderStatusBadge } from "../common/order-status-badge";
 import { useSuppliers } from "../../../../hooks";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Separator } from "@/components/ui/separator";
@@ -46,6 +48,17 @@ interface OrderEditFormProps {
     } | null;
   };
 }
+
+// Whole-order statuses a user can set directly from the form. PARTIALLY_FULFILLED /
+// PARTIALLY_RECEIVED are derived from per-item progress (mark individual items as
+// feito/recebido), and OVERDUE is derived automatically from the forecast date — so none
+// of them are offered as a manual choice here.
+const MANUAL_ORDER_STATUSES: ORDER_STATUS[] = [
+  ORDER_STATUS.CREATED,
+  ORDER_STATUS.FULFILLED,
+  ORDER_STATUS.RECEIVED,
+  ORDER_STATUS.CANCELLED,
+];
 
 // Items step now mixes inventory selections + free-text temporary items in a single screen.
 const STEPS = [
@@ -161,21 +174,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   );
 
   // Initialize file state with existing files from order
-  const initialBudgetFiles = useMemo(() => {
-    const files = (order.budgets || []).map(file => ({
-      id: file.id,
-      name: file.filename || file.originalName,
-      size: file.size || 0,
-      type: file.mimetype || 'application/octet-stream',
-      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
-      uploaded: true,
-      uploadProgress: 100,
-      uploadedFileId: file.id,
-      thumbnailUrl: file.thumbnailUrl,
-    } as FileWithPreview));
-    return files;
-  }, [order.budgets]);
-
   const initialReceiptFiles = useMemo(() => {
     const files = (order.receipts || []).map(file => ({
       id: file.id,
@@ -191,33 +189,14 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     return files;
   }, [order.receipts]);
 
-  const initialInvoiceFiles = useMemo(() => {
-    const files = (order.invoices || []).map(file => ({
-      id: file.id,
-      name: file.filename || file.originalName,
-      size: file.size || 0,
-      type: file.mimetype || 'application/octet-stream',
-      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
-      uploaded: true,
-      uploadProgress: 100,
-      uploadedFileId: file.id,
-      thumbnailUrl: file.thumbnailUrl,
-    } as FileWithPreview));
-    return files;
-  }, [order.invoices]);
-
   // File upload state
-  const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>(initialBudgetFiles);
   const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>(initialReceiptFiles);
-  const [invoiceFiles, setInvoiceFiles] = useState<FileWithPreview[]>(initialInvoiceFiles);
   const [hasFileChanges, setHasFileChanges] = useState(false);
 
   // Sync file state when order files change
   useEffect(() => {
-    setBudgetFiles(initialBudgetFiles);
     setReceiptFiles(initialReceiptFiles);
-    setInvoiceFiles(initialInvoiceFiles);
-  }, [initialBudgetFiles, initialReceiptFiles, initialInvoiceFiles]);
+  }, [initialReceiptFiles]);
 
   // Local state for notes input to avoid slow typing from URL state updates
   const [localNotes, setLocalNotes] = useState(order.notes || "");
@@ -316,6 +295,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   // Form setup with default values from URL state.
   const defaultValues: Partial<OrderUpdateFormData> = {
     description: description || order.description,
+    // Order lifecycle status — editable so an order can be advanced (e.g. marked
+    // Recebido) directly from the form, including retroactive registrations.
+    status: order.status,
     supplierId: supplierId || order.supplierId || undefined,
     forecast: forecast || order.forecast || undefined,
     notes: notes || order.notes || "",
@@ -432,7 +414,13 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   }, [discount]);
 
   // Mutations - use update instead of create
-  const { updateAsync, isLoading: isSubmitting } = useOrderMutations();
+  const { updateAsync, markPaidAsync, markAwaitingPaymentAsync, isLoading: isSubmitting } = useOrderMutations();
+
+  // Payment status is settled through dedicated endpoints (installment cascade + paidAt
+  // stamping), not a raw field write — so we track the selection separately and fire the
+  // right mutation on submit. Only AWAITING_PAYMENT ↔ PAID are user-settable; PARTIALLY_PAID
+  // is derived from installments.
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string>(order.paymentStatus);
 
   // Fetch suppliers for combobox
   const { data: suppliersResponse } = useSuppliers({
@@ -582,18 +570,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   }, [currentStep, setSearchParams]);
 
   // File change handlers
-  const handleBudgetFilesChange = useCallback((files: FileWithPreview[]) => {
-    setBudgetFiles(files);
-    setHasFileChanges(true);
-  }, []);
-
   const handleReceiptFilesChange = useCallback((files: FileWithPreview[]) => {
     setReceiptFiles(files);
-    setHasFileChanges(true);
-  }, []);
-
-  const handleInvoiceFilesChange = useCallback((files: FileWithPreview[]) => {
-    setInvoiceFiles(files);
     setHasFileChanges(true);
   }, []);
 
@@ -604,10 +582,13 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   const watchedPaymentFirstDueDate = form.watch("paymentFirstDueDate");
   const watchedInstallmentCount = form.watch("installmentCount");
   const watchedPaymentResponsibleId = form.watch("paymentResponsibleId");
+  const watchedStatus = form.watch("status");
 
   // Detect if form has actual changes from original order.
   const hasFormChanges = useMemo(() => {
     const descriptionChanged = description?.trim() !== order.description?.trim();
+    const statusChanged = (watchedStatus || order.status) !== order.status;
+    const paymentStatusChanged = selectedPaymentStatus !== order.paymentStatus;
     const supplierChanged = (supplierId || null) !== (order.supplierId || null);
     const forecastChanged = (forecast ? new Date(forecast).getTime() : null) !== (order.forecast ? new Date(order.forecast).getTime() : null);
     const notesChanged = (localNotes?.trim() || "") !== (order.notes?.trim() || "");
@@ -662,11 +643,11 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     });
 
     return (
-      descriptionChanged || supplierChanged || forecastChanged || notesChanged || freightChanged || discountChanged ||
+      descriptionChanged || statusChanged || paymentStatusChanged || supplierChanged || forecastChanged || notesChanged || freightChanged || discountChanged ||
       inventoryItemsChanged || inventoryDetailsChanged || tempCountChanged || tempContentChanged ||
       hasFileChanges || paymentMethodChanged || paymentPixChanged || paymentDueDaysChanged || paymentFirstDueDateChanged || installmentCountChanged || paymentResponsibleChanged
     );
-  }, [description, supplierId, forecast, localNotes, watchedFreight, watchedDiscount, selectedItems, quantities, prices, icmses, ipis, temporaryItems, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedPaymentFirstDueDate, watchedInstallmentCount, watchedPaymentResponsibleId]);
+  }, [description, watchedStatus, selectedPaymentStatus, supplierId, forecast, localNotes, watchedFreight, watchedDiscount, selectedItems, quantities, prices, icmses, ipis, temporaryItems, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedPaymentFirstDueDate, watchedInstallmentCount, watchedPaymentResponsibleId]);
 
   // Stage validation
   const validateCurrentStep = useCallback((): boolean => {
@@ -767,12 +748,16 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const currentPaymentResponsibleId = form.getValues("paymentResponsibleId");
       const currentFreight = Number(form.getValues("freight")) || 0;
       const currentDiscount = Number(form.getValues("discount")) || 0;
+      const currentStatus = form.getValues("status");
 
       // Resolve the selected supplier so PIX/boleto defaults shown in the form get persisted.
       const currentSupplier = supplierId ? suppliers.find((s) => s.id === supplierId) : undefined;
 
       const data = {
         description: description!.trim(),
+        // Only send status when the user actually changed it, so an unrelated edit
+        // doesn't trigger a no-op (same → same) status transition on the API.
+        ...(currentStatus && currentStatus !== order.status ? { status: currentStatus } : {}),
         supplierId: supplierId || undefined,
         forecast: forecast, // Keep null to allow clearing the forecast date
         notes: notes?.trim() || undefined,
@@ -795,11 +780,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       };
 
       // Check if there are new files to upload (files without uploadedFileId)
-      const newBudgetFiles = budgetFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
       const newReceiptFiles = receiptFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
-      const newInvoiceFiles = invoiceFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
 
-      const hasNewFiles = newBudgetFiles.length > 0 || newReceiptFiles.length > 0 || newInvoiceFiles.length > 0;
+      const hasNewFiles = newReceiptFiles.length > 0;
 
 
       if (hasNewFiles) {
@@ -810,21 +793,15 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         } : undefined;
 
         // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
-        const currentBudgetIds = budgetFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
         const currentReceiptIds = receiptFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-        const currentInvoiceIds = invoiceFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
         // Always send file IDs arrays when any file operation occurs
-        (data as any).budgetIds = currentBudgetIds;
         (data as any).receiptIds = currentReceiptIds;
-        (data as any).invoiceIds = currentInvoiceIds;
 
         const formData = createOrderFormData(
           data,
           {
-            budgets: newBudgetFiles.length > 0 ? newBudgetFiles as File[] : undefined,
             receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
-            invoices: newInvoiceFiles.length > 0 ? newInvoiceFiles as File[] : undefined,
           },
           supplierInfo
         );
@@ -838,19 +815,25 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         // Use regular JSON payload when no files
         // But still check for deleted files
         // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
-        const currentBudgetIds = budgetFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
         const currentReceiptIds = receiptFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-        const currentInvoiceIds = invoiceFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
         // Always send file IDs arrays when any file operation occurs
-        (data as any).budgetIds = currentBudgetIds;
         (data as any).receiptIds = currentReceiptIds;
-        (data as any).invoiceIds = currentInvoiceIds;
 
         await updateAsync({
           id: order.id,
           data,
         });
+      }
+
+      // Settle payment status through its dedicated endpoint (after the field update) so
+      // the installment cascade / paidAt logic runs. Only the two user-settable targets.
+      if (selectedPaymentStatus !== order.paymentStatus) {
+        if (selectedPaymentStatus === ORDER_PAYMENT_STATUS.PAID) {
+          await markPaidAsync(order.id);
+        } else if (selectedPaymentStatus === ORDER_PAYMENT_STATUS.AWAITING_PAYMENT) {
+          await markAwaitingPaymentAsync(order.id);
+        }
       }
 
       // Success toast is handled automatically by API client
@@ -867,7 +850,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       }
       // Error is handled by the mutation hook
     }
-  }, [validateCurrentStep, selectedItems, quantities, prices, icmses, ipis, temporaryItems, description, supplierId, forecast, notes, budgetFiles, receiptFiles, invoiceFiles, updateAsync, order, navigate, form]);
+  }, [validateCurrentStep, selectedItems, quantities, prices, icmses, ipis, temporaryItems, description, supplierId, forecast, notes, receiptFiles, updateAsync, order, navigate, form]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === steps.length;
@@ -1151,37 +1134,14 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                         {/* File uploads */}
                         <div className="space-y-4">
                           <Separator />
-                          <Label className="text-sm font-medium">Documentos (Opcional)</Label>
+                          <Label className="text-sm font-medium">Comprovantes (Opcional)</Label>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {/* Budget File */}
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium flex items-center gap-2">
-                                <IconCurrencyReal className="h-4 w-4" />
-                                Orçamento
-                              </Label>
-                              <FileUploadField
-                                onFilesChange={handleBudgetFilesChange}
-                                existingFiles={budgetFiles}
-                                maxFiles={10}
-                                maxSize={10 * 1024 * 1024}
-                                acceptedFileTypes={{
-                                  "application/pdf": [".pdf"],
-                                  "image/*": [".jpg", ".jpeg", ".png"],
-                                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-                                  "application/vnd.ms-excel": [".xls"],
-                                }}
-                                showPreview={true}
-                                variant="compact"
-                                placeholder="Adicionar orçamento"
-                              />
-                            </div>
-
+                          <div className="grid grid-cols-1 gap-4">
                             {/* Receipt File */}
                             <div className="space-y-2">
                               <Label className="text-sm font-medium flex items-center gap-2">
                                 <IconReceipt className="h-4 w-4" />
-                                Recibo
+                                Comprovante
                               </Label>
                               <FileUploadField
                                 onFilesChange={handleReceiptFilesChange}
@@ -1194,28 +1154,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 }}
                                 showPreview={true}
                                 variant="compact"
-                                placeholder="Adicionar recibo"
-                              />
-                            </div>
-
-                            {/* NFE File */}
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium flex items-center gap-2">
-                                <IconFileInvoice className="h-4 w-4" />
-                                Nota Fiscal
-                              </Label>
-                              <FileUploadField
-                                onFilesChange={handleInvoiceFilesChange}
-                                existingFiles={invoiceFiles}
-                                maxFiles={10}
-                                maxSize={10 * 1024 * 1024}
-                                acceptedFileTypes={{
-                                  "application/pdf": [".pdf"],
-                                  "image/*": [".jpg", ".jpeg", ".png"],
-                                }}
-                                showPreview={true}
-                                variant="compact"
-                                placeholder="Adicionar nota fiscal"
+                                placeholder="Adicionar comprovante"
                               />
                             </div>
                           </div>
@@ -1249,7 +1188,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                       fixedColumns: ['name'],
                       fixedReasons: { name: 'Essencial para identificar o item sendo pedido' },
                     }}
-                    defaultColumns={['uniCode', 'name', 'quantity', 'price', 'monthlyConsumption', 'monthlyConsumptionTrendPercent', 'orderSubtotal']}
+                    defaultColumns={['uniCode', 'name', 'quantity', 'price', 'monthlyConsumption', 'orderSubtotal']}
                     storageKey="order-item-selector"
                     page={page}
                     pageSize={pageSize}
@@ -1292,6 +1231,40 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-0 space-y-3">
+                          {/* Order Status — first row, shown as the workflow-colored badge and
+                              editable via dropdown. Only whole-order states are offered (partial
+                              fulfilment/receipt come from marking individual items; OVERDUE is
+                              derived from the forecast date). */}
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Status do Pedido</span>
+                            {(() => {
+                              const currentStatus = (form.watch("status") || order.status) as ORDER_STATUS;
+                              const statusOptions = MANUAL_ORDER_STATUSES.filter(
+                                (s) => s === currentStatus || isValidStatusTransition(currentStatus, s),
+                              );
+                              return (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button type="button" className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                      <OrderStatusBadge status={currentStatus} className="cursor-pointer" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {statusOptions.map((s) => (
+                                      <DropdownMenuItem
+                                        key={s}
+                                        className="cursor-pointer"
+                                        onSelect={() => form.setValue("status", s, { shouldDirty: true })}
+                                      >
+                                        <OrderStatusBadge status={s} />
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              );
+                            })()}
+                          </div>
+
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                             <span className="text-sm text-muted-foreground">Descrição</span>
                             <span className="text-sm font-semibold text-foreground truncate ml-4 text-right">{description || "-"}</span>
@@ -1345,13 +1318,41 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                         <CardHeader className="pb-4">
                           <CardTitle className="flex items-center gap-2">
                             <IconCreditCard className="h-5 w-5" />
-                            Método de Pagamento
+                            Pagamento
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-0 space-y-3">
+                          {/* Payment Status — settles via dedicated mark-paid / mark-awaiting
+                              endpoints on submit (installment cascade). Financial-only card. */}
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
+                            <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Status de Pagamento</span>
+                            <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
+                              <Combobox
+                                value={selectedPaymentStatus}
+                                clearable={false}
+                                onValueChange={(value) => {
+                                  const stringValue = Array.isArray(value) ? value[0] : value;
+                                  if (stringValue) setSelectedPaymentStatus(stringValue);
+                                }}
+                                options={[
+                                  { value: ORDER_PAYMENT_STATUS.AWAITING_PAYMENT, label: ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.AWAITING_PAYMENT] },
+                                  { value: ORDER_PAYMENT_STATUS.PAID, label: ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.PAID] },
+                                  // Current PARTIALLY_PAID is installment-derived: shown so the value
+                                  // renders, but the user only moves to Aguardando/Pago.
+                                  ...(order.paymentStatus === ORDER_PAYMENT_STATUS.PARTIALLY_PAID
+                                    ? [{ value: ORDER_PAYMENT_STATUS.PARTIALLY_PAID, label: ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.PARTIALLY_PAID] }]
+                                    : []),
+                                ]}
+                                placeholder="Status de pagamento"
+                                emptyText="Nenhuma opção"
+                                className="h-8 w-full"
+                              />
+                            </div>
+                          </div>
+
                           {/* Payment Responsible */}
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
-                            <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Responsável</span>
+                            <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Responsável pelo Pagamento</span>
                             <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
                               <Combobox
                                 async={true}

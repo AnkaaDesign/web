@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useRef }
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { IconAlertTriangle, IconUsers, IconCalendar } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCalendar, IconUser, IconAlertCircle } from "@tabler/icons-react";
 import { debounce } from "../../../../utils";
 import { createWarningFormData } from "@/utils/form-data-helper";
 import type { Warning } from "../../../../types";
@@ -10,13 +10,12 @@ import type { WarningCreateFormData, WarningUpdateFormData } from "../../../../s
 import { warningCreateSchema, warningUpdateSchema } from "../../../../schemas";
 import { routes } from "../../../../constants";
 import { useWarningMutations } from "../../../../hooks";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SeveritySelect } from "./severity-select";
 import { CategorySelect } from "./category-select";
 import { ReasonInput } from "./reason-input";
 import { DescriptionTextarea } from "./description-textarea";
 import { CollaboratorSelect } from "./collaborator-select";
-import { SupervisorSelect } from "./supervisor-select";
 import { FollowUpDatePicker } from "./follow-up-date-picker";
 import { HrNotesTextarea } from "./hr-notes-textarea";
 import { ActiveSwitch } from "./active-switch";
@@ -48,6 +47,7 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [attachmentFiles, setAttachmentFiles] = useState<FileWithPreview[]>([]);
+  const [supervisorFromSector, setSupervisorFromSector] = useState<any>(null);
   const { createAsync, updateAsync } = useWarningMutations();
 
   // Create a custom resolver based on mode
@@ -202,7 +202,8 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
     }
   }, [isValid, isDirty, props.onFormStateChange]);
 
-  // Initialize form from URL params (create mode only)
+  // Initialize form from URL params (create mode only).
+  // Must use shouldTouch + shouldValidate so the resolver runs and isValid updates.
   useEffect(() => {
     if (props.mode === "create") {
       const severity = searchParams.get("severity");
@@ -210,10 +211,16 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
       const collaboratorId = searchParams.get("collaboratorId");
       const supervisorId = searchParams.get("supervisorId");
 
-      if (severity) form.setValue("severity", severity as any);
-      if (category) form.setValue("category", category as any);
-      if (collaboratorId) form.setValue("collaboratorId", collaboratorId);
-      if (supervisorId) form.setValue("supervisorId", supervisorId);
+      const opts = { shouldDirty: true, shouldTouch: true, shouldValidate: true } as const;
+      if (severity) form.setValue("severity", severity as any, opts);
+      if (category) form.setValue("category", category as any, opts);
+      if (collaboratorId) form.setValue("collaboratorId", collaboratorId, opts);
+      if (supervisorId) form.setValue("supervisorId", supervisorId, opts);
+
+      // Trigger full validation so isValid reflects the pre-populated state.
+      if (severity || category || collaboratorId || supervisorId) {
+        form.trigger();
+      }
     }
   }, []);
 
@@ -316,107 +323,107 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
 
   return (
     <FormProvider {...form}>
-      <form id="warning-form" onSubmit={form.handleSubmit(handleSubmit)}>
-        {/* Hidden submit button for programmatic form submission */}
-        <button id="warning-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
-          Submit
-        </button>
+      <form id="warning-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-4xl">
+        <button id="warning-form-submit" type="submit" className="hidden" disabled={isSubmitting} />
 
-        {/* Wrapper div with space-y-4 for consistent card spacing */}
         <div className="space-y-4">
-          {/* Basic Information Card */}
+          {/* Card 1 — Advertência + Pessoas */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconAlertTriangle className="h-5 w-5 text-muted-foreground" />
-                Informações da Advertência
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <IconAlertTriangle className="h-4 w-4 text-muted-foreground" />
+                Advertência
               </CardTitle>
-              <CardDescription>Preencha os detalhes da advertência ao colaborador</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Reason - First field */}
-              <ReasonInput control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
-
-              {/* Severity and Category */}
+              {/* Severity, Category and Reason in one row */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <SeveritySelect control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
-
                 <CategorySelect control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
               </div>
 
-              {/* Suspension days (only enabled when severity = SUSPENSION) */}
               <SuspensionDaysInput control={form.control} disabled={isSubmitting} />
 
-              {/* Description */}
+              <ReasonInput control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
               <DescriptionTextarea control={form.control} disabled={isSubmitting} />
-            </CardContent>
-          </Card>
 
-          {/* People Involved Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconUsers className="h-5 w-5 text-muted-foreground" />
-                Pessoas Envolvidas
-              </CardTitle>
-              <CardDescription>Selecione o colaborador, supervisor e testemunhas</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Collaborator and Supervisor */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <CollaboratorSelect
-                  control={form.control}
-                  disabled={isSubmitting}
-                  required={props.mode === "create"}
-                  initialCollaborator={props.mode === "update" ? props.warning.collaborator : undefined}
-                />
+              <div className="space-y-4 pt-2">
+                  <CollaboratorSelect
+                    control={form.control}
+                    disabled={isSubmitting}
+                    required={props.mode === "create"}
+                    initialCollaborator={props.mode === "update" ? props.warning.collaborator : undefined}
+                    onUserSelect={(user) => {
+                      const leader = (user as any)?.sector?.leader;
+                      if (leader?.id) {
+                        form.setValue("supervisorId", leader.id, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+                        setSupervisorFromSector(leader);
+                      } else {
+                        form.setValue("supervisorId", "", { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+                        setSupervisorFromSector(null);
+                      }
+                    }}
+                  />
 
-                <SupervisorSelect
-                  control={form.control}
-                  disabled={isSubmitting}
-                  required={props.mode === "create"}
-                  initialSupervisor={props.mode === "update" ? props.warning.supervisor : undefined}
-                />
+                  {/* Derived supervisor — read-only */}
+                  {(() => {
+                    const supervisor =
+                      props.mode === "update"
+                        ? props.warning.supervisor
+                        : supervisorFromSector;
+                    const collaboratorId = form.watch("collaboratorId");
+
+                    if (!collaboratorId) return null;
+
+                    if (!supervisor) {
+                      return (
+                        <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 rounded-md px-3 py-2 border border-amber-200 dark:border-amber-800">
+                          <IconAlertCircle className="h-4 w-4 shrink-0" />
+                          Setor sem líder definido — atribua um líder ao setor do colaborador
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <IconUser className="h-4 w-4" />
+                          Supervisor
+                        </div>
+                        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                          <p className="font-medium">{(supervisor as any).name}</p>
+                          {(supervisor as any).position?.name && (
+                            <p className="text-xs text-muted-foreground">{(supervisor as any).position.name}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <WitnessMultiSelect
+                    control={form.control}
+                    disabled={isSubmitting}
+                    excludeIds={[form.watch("collaboratorId"), form.watch("supervisorId")].filter((id: string | undefined): id is string => Boolean(id))}
+                    initialWitnesses={props.mode === "update" ? props.warning.witness : undefined}
+                  />
               </div>
-
-              {/* Witnesses */}
-              <WitnessMultiSelect
-                control={form.control}
-                disabled={isSubmitting}
-                excludeIds={[form.watch("collaboratorId"), form.watch("supervisorId")].filter((id: string | undefined): id is string => Boolean(id))}
-                initialWitnesses={props.mode === "update" ? props.warning.witness : undefined}
-              />
             </CardContent>
           </Card>
 
-          {/* Follow-up and Notes Card */}
+          {/* Card 2 — Acompanhamento + Anexos */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconCalendar className="h-5 w-5 text-muted-foreground" />
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <IconCalendar className="h-4 w-4 text-muted-foreground" />
                 Acompanhamento
               </CardTitle>
-              <CardDescription>Defina a data de acompanhamento e adicione observações</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Follow-up Date and Status */}
-              {props.mode === "create" ? (
-                <FollowUpDatePicker control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <FollowUpDatePicker control={form.control} disabled={isSubmitting} required={false} />
+              <FollowUpDatePicker control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
+              {props.mode === "update" && <ActiveSwitch control={form.control} disabled={isSubmitting} />}
 
-                  <ActiveSwitch control={form.control} disabled={isSubmitting} />
-                </div>
-              )}
-
-              {/* Linked termination (justa-causa context) */}
               <TerminationSelect disabled={isSubmitting} collaboratorId={form.watch("collaboratorId") || undefined} />
-
-              {/* HR Notes */}
               <HrNotesTextarea control={form.control} disabled={isSubmitting} />
 
-              {/* File Upload */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Anexos</label>
                 <FileUploadField
