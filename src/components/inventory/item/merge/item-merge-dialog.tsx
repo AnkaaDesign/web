@@ -1,31 +1,17 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { IconAlertTriangle, IconArrowRight, IconCheck, IconLoader2, IconInfoCircle } from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
+import { IconAlertTriangle, IconArrowRight, IconCheck, IconLoader2, IconChevronLeft, IconTrash, IconShieldCheck, IconRulerMeasure } from "@tabler/icons-react";
 import type { Item } from "../../../../types";
 import { formatCurrency } from "../../../../utils";
 import { useCanViewPrices } from "../../../../hooks";
-
-interface ConflictField {
-  field: string;
-  label: string;
-  values: Array<{ itemId: string; itemName: string; value: any; formatted?: string }>;
-  type: "single" | "number" | "array" | "boolean";
-}
-
-interface MergeResolution {
-  field: string;
-  action: "select" | "sum" | "max" | "custom" | "combine";
-  selectedItemId?: string;
-  customValue?: any;
-  selectedIds?: string[];
-}
+import { MeasureDisplayCompact } from "../common/measure-display";
 
 interface ItemMergeDialogProps {
   open: boolean;
@@ -34,201 +20,148 @@ interface ItemMergeDialogProps {
   onMerge: (targetItemId: string, resolutions: Record<string, any>) => Promise<void>;
 }
 
+type WizardStep = 1 | 2 | 3;
+
+const STEPS: Array<{ n: WizardStep; label: string }> = [
+  { n: 1, label: "Manter" },
+  { n: 2, label: "Conflitos" },
+  { n: 3, label: "Revisar" },
+];
+
+// User-owned scalar fields the backend can actually apply (mirrors
+// ALLOWED_MERGE_FIELDS in the API merge() + itemMergeConflictsSchema). Each
+// conflict is resolved by picking which item's value wins (default: the kept
+// item). Derived/forced fields (quantity, totalPrice, monthlyConsumption,
+// reorder thresholds) are NOT here — the server computes them.
+interface ResolvableField {
+  field: string; // payload key
+  label: string;
+  get: (item: Item) => any; // value sent to the API
+  display: (item: Item) => string; // human-readable label
+  priceField?: boolean; // hidden when the user can't view prices
+}
+
+const RESOLVABLE_FIELDS: ResolvableField[] = [
+  { field: "name", label: "Nome", get: (i) => i.name, display: (i) => i.name },
+  { field: "uniCode", label: "Código", get: (i) => i.uniCode, display: (i) => i.uniCode ?? "—" },
+  { field: "categoryId", label: "Categoria", get: (i) => i.categoryId, display: (i) => (i as any).category?.name ?? "—" },
+  { field: "supplierId", label: "Fornecedor", get: (i) => i.supplierId, display: (i) => (i as any).supplier?.fantasyName ?? (i as any).supplier?.corporateName ?? "—" },
+  { field: "boxQuantity", label: "Qtd. por caixa", get: (i) => i.boxQuantity, display: (i) => i.boxQuantity?.toString() ?? "—" },
+  { field: "estimatedLeadTime", label: "Lead time", get: (i) => i.estimatedLeadTime, display: (i) => (i.estimatedLeadTime != null ? `${i.estimatedLeadTime} dias` : "—") },
+  { field: "shouldAssignToUser", label: "Atribuir ao usuário", get: (i) => i.shouldAssignToUser, display: (i) => (i.shouldAssignToUser ? "Sim" : "Não") },
+  { field: "isActive", label: "Ativo", get: (i) => i.isActive, display: (i) => (i.isActive ? "Sim" : "Não") },
+  { field: "ppeType", label: "Tipo de EPI", get: (i) => i.ppeType, display: (i) => (i.ppeType ?? "—") },
+  { field: "ppeCA", label: "CA do EPI", get: (i) => i.ppeCA, display: (i) => (i.ppeCA ?? "—") },
+  { field: "ppeDeliveryMode", label: "Modo de entrega EPI", get: (i) => i.ppeDeliveryMode, display: (i) => (i.ppeDeliveryMode ?? "—") },
+  { field: "ppeStandardQuantity", label: "Qtd. padrão EPI", get: (i) => i.ppeStandardQuantity, display: (i) => i.ppeStandardQuantity?.toString() ?? "—" },
+  { field: "icms", label: "ICMS (%)", get: (i) => i.icms, display: (i) => (i.icms != null ? `${i.icms}%` : "—"), priceField: true },
+  { field: "ipi", label: "IPI (%)", get: (i) => i.ipi, display: (i) => (i.ipi != null ? `${i.ipi}%` : "—"), priceField: true },
+];
+
+// Stable signature of an item's measures so we can detect divergence.
+function measureSignature(item: Item): string {
+  const ms = ((item as any).measures ?? []) as Array<{ measureType: string; value: number | null; unit: string | null }>;
+  return ms
+    .map((m) => `${m.measureType}:${m.value ?? ""}:${m.unit ?? ""}`)
+    .sort()
+    .join("|");
+}
+
+function latestPriceOf(item: Item): { value: number; createdAt: string } | null {
+  const p = (item as any).prices?.[0];
+  return p ? { value: p.value, createdAt: p.createdAt } : null;
+}
+
 export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMergeDialogProps) {
   const canViewPrices = useCanViewPrices();
+  const [step, setStep] = useState<WizardStep>(1);
   const [targetItemId, setTargetItemId] = useState<string>("");
-  const [resolutions, setResolutions] = useState<Map<string, MergeResolution>>(new Map());
-  const [customValues, setCustomValues] = useState<Map<string, string>>(new Map());
+  // field -> chosen itemId whose value wins (default: target)
+  const [fieldResolutions, setFieldResolutions] = useState<Map<string, string>>(new Map());
+  const [selectedBrandIds, setSelectedBrandIds] = useState<string[]>([]);
+  const [brandsCustomized, setBrandsCustomized] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Detect conflicts between items
-  const conflicts = useMemo((): ConflictField[] => {
+  const targetItem = useMemo(() => items.find((i) => i.id === targetItemId) ?? null, [items, targetItemId]);
+  const sourceItems = useMemo(() => items.filter((i) => i.id !== targetItemId), [items, targetItemId]);
+
+  // Scalar conflicts: resolvable fields whose value differs across items.
+  const conflicts = useMemo(() => {
     if (items.length < 2) return [];
-
-    const conflictFields: ConflictField[] = [];
-    const priceFields = new Set(["icms", "ipi", "totalPrice"]);
-    const fieldsToCheck = [
-      { field: "name", label: "Nome", type: "single" as const },
-      { field: "uniCode", label: "Código Único", type: "single" as const },
-      { field: "quantity", label: "Quantidade", type: "number" as const },
-      { field: "maxQuantity", label: "Quantidade Máxima", type: "number" as const },
-      { field: "reorderPoint", label: "Ponto de Reposição", type: "number" as const },
-      { field: "reorderQuantity", label: "Quantidade de Reposição", type: "number" as const },
-      { field: "boxQuantity", label: "Quantidade por Caixa", type: "number" as const },
-      { field: "icms", label: "ICMS (%)", type: "number" as const },
-      { field: "ipi", label: "IPI (%)", type: "number" as const },
-      { field: "totalPrice", label: "Preço Total", type: "number" as const },
-      { field: "monthlyConsumption", label: "Consumo Mensal", type: "number" as const },
-      { field: "estimatedLeadTime", label: "Lead Time Estimado", type: "number" as const },
-      { field: "barcodes", label: "Códigos de Barras", type: "array" as const },
-      { field: "shouldAssignToUser", label: "Atribuir ao Usuário", type: "boolean" as const },
-      { field: "isActive", label: "Ativo", type: "boolean" as const },
-      { field: "brands", label: "Marcas", type: "array" as const },
-      { field: "categoryId", label: "Categoria", type: "single" as const },
-      { field: "supplierId", label: "Fornecedor", type: "single" as const },
-    ].filter((f) => canViewPrices || !priceFields.has(f.field));
-
-    for (const { field, label, type } of fieldsToCheck) {
-      const values = items
-        .map((item) => {
-          const value = (item as any)[field];
-          let formatted: string | undefined;
-
-          if (value === null || value === undefined) return null;
-
-          // Format value for display
-          if (type === "number" && typeof value === "number") {
-            if (field === "totalPrice") {
-              formatted = formatCurrency(value);
-            } else if (field === "icms" || field === "ipi") {
-              formatted = `${value}%`;
-            } else {
-              formatted = value.toString();
-            }
-          } else if (type === "array" && Array.isArray(value)) {
-            const display =
-              field === "brands"
-                ? value.map((b: any) => (typeof b === "string" ? b : b?.name)).filter(Boolean)
-                : value;
-            formatted = display.length > 0 ? display.join(", ") : "Nenhum";
-          } else if (type === "boolean") {
-            formatted = value ? "Sim" : "Não";
-          } else {
-            formatted = String(value);
-          }
-
-          return {
-            itemId: item.id,
-            itemName: item.name,
-            value,
-            formatted,
-          };
-        })
-        .filter((v) => v !== null) as Array<{ itemId: string; itemName: string; value: any; formatted?: string }>;
-
-      // Check if there's a conflict (different values)
-      if (values.length > 1) {
-        const hasConflict =
-          type === "array"
-            ? !values.every((v) => JSON.stringify(v.value) === JSON.stringify(values[0].value))
-            : !values.every((v) => v.value === values[0].value);
-
-        if (hasConflict) {
-          conflictFields.push({
-            field,
-            label,
-            values,
-            type,
-          });
-        }
-      }
-    }
-
-    return conflictFields;
+    return RESOLVABLE_FIELDS.filter((f) => canViewPrices || !f.priceField).filter((f) => {
+      const distinct = new Set(items.map((i) => JSON.stringify(f.get(i) ?? null)));
+      return distinct.size > 1;
+    });
   }, [items, canViewPrices]);
 
-  // Auto-select first item as target if not set
-  useMemo(() => {
-    if (items.length > 0 && !targetItemId) {
-      setTargetItemId(items[0].id);
+  // Measure divergence (data-loss surface). Source measures that differ from the
+  // kept item's are discarded server-side; flag them so the user sees the loss.
+  const measureConflict = useMemo(() => {
+    if (!targetItem) return null;
+    const targetSig = measureSignature(targetItem);
+    const diverging = sourceItems.filter((s) => measureSignature(s) !== targetSig && ((s as any).measures?.length ?? 0) > 0);
+    return diverging.length > 0 ? diverging : null;
+  }, [targetItem, sourceItems]);
+
+  // All brands across the items (union is the merge default).
+  const allBrands = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const i of items) for (const b of ((i as any).brands ?? []) as Array<{ id: string; name: string }>) map.set(b.id, b);
+    return [...map.values()];
+  }, [items]);
+
+  // Resulting current price = newest price across all merged items.
+  const mergedLatestPrice = useMemo(() => {
+    const prices = items.map(latestPriceOf).filter(Boolean) as Array<{ value: number; createdAt: string }>;
+    if (prices.length === 0) return null;
+    return prices.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0].value;
+  }, [items]);
+
+  const finalQuantity = useMemo(() => items.reduce((sum, i) => sum + (i.quantity || 0), 0), [items]);
+
+  // Reset the wizard whenever it (re)opens. Target defaults to the first ACTIVE
+  // item (never silently items[0]) and is always shown highlighted.
+  useEffect(() => {
+    if (open) {
+      const def = items.find((i) => i.isActive) ?? items[0];
+      setTargetItemId(def?.id ?? "");
+      setStep(1);
+      setFieldResolutions(new Map());
+      setSelectedBrandIds(allBrands.map((b) => b.id));
+      setBrandsCustomized(false);
+      setConfirmDelete(false);
+      setIsLoading(false);
     }
-  }, [items, targetItemId]);
+    // allBrands is derived from items; intentionally not a dep to avoid resets on memo identity
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, items]);
 
-  // Get preview of merged result
-  const mergedPreview = useMemo(() => {
-    if (!targetItemId) return null;
-
-    const target = items.find((i) => i.id === targetItemId);
-    if (!target) return null;
-
-    const preview: Record<string, any> = { ...target };
-
-    // Apply resolutions
-    resolutions.forEach((resolution, field) => {
-      switch (resolution.action) {
-        case "select":
-          if (resolution.selectedItemId) {
-            const selectedItem = items.find((i) => i.id === resolution.selectedItemId);
-            if (selectedItem) {
-              preview[field] = (selectedItem as any)[field];
-            }
-          }
-          break;
-        case "sum":
-          preview[field] = items.reduce((sum, item) => sum + ((item as any)[field] || 0), 0);
-          break;
-        case "max":
-          preview[field] = Math.max(...items.map((item) => (item as any)[field] || 0));
-          break;
-        case "custom":
-          preview[field] = resolution.customValue;
-          break;
-        case "combine":
-          if (resolution.selectedIds) {
-            const arrays = items
-              .filter((item) => resolution.selectedIds!.includes(item.id))
-              .map((item) => (item as any)[field] || [])
-              .flat();
-            preview[field] = [...new Set(arrays)]; // Remove duplicates
-          }
-          break;
-      }
-    });
-
-    return preview;
-  }, [targetItemId, items, resolutions]);
-
-  const handleResolutionChange = (field: string, resolution: MergeResolution) => {
-    setResolutions(new Map(resolutions.set(field, resolution)));
-  };
-
-  const handleCustomValueChange = (field: string, value: string) => {
-    setCustomValues(new Map(customValues.set(field, value)));
+  const resolvedValueDisplay = (f: ResolvableField) => {
+    const chosenId = fieldResolutions.get(f.field) ?? targetItemId;
+    const chosen = items.find((i) => i.id === chosenId) ?? targetItem;
+    return chosen ? f.display(chosen) : "—";
   };
 
   const handleMerge = async () => {
-    if (!targetItemId || isLoading) return;
-
+    if (!targetItemId || !confirmDelete || isLoading) return;
     setIsLoading(true);
     try {
-      // Build resolution object
       const resolvedData: Record<string, any> = {};
-
-      resolutions.forEach((resolution, field) => {
-        switch (resolution.action) {
-          case "select":
-            if (resolution.selectedItemId) {
-              const selectedItem = items.find((i) => i.id === resolution.selectedItemId);
-              if (selectedItem) {
-                resolvedData[field] = (selectedItem as any)[field];
-              }
-            }
-            break;
-          case "sum":
-            resolvedData[field] = items.reduce((sum, item) => sum + ((item as any)[field] || 0), 0);
-            break;
-          case "max":
-            resolvedData[field] = Math.max(...items.map((item) => (item as any)[field] || 0));
-            break;
-          case "custom":
-            resolvedData[field] = resolution.customValue;
-            break;
-          case "combine":
-            if (resolution.selectedIds) {
-              const arrays = items
-                .filter((item) => resolution.selectedIds!.includes(item.id))
-                .map((item) => (item as any)[field] || [])
-                .flat();
-              resolvedData[field] = [...new Set(arrays)];
-            }
-            break;
-        }
-      });
+      for (const f of conflicts) {
+        const chosenId = fieldResolutions.get(f.field) ?? targetItemId;
+        const chosen = items.find((i) => i.id === chosenId);
+        if (chosen) resolvedData[f.field] = f.get(chosen);
+      }
+      // Only send brands when the user customized the set; otherwise let the
+      // server auto-union all source brands into the target.
+      if (brandsCustomized) resolvedData.brands = selectedBrandIds;
 
       await onMerge(targetItemId, resolvedData);
       onOpenChange(false);
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
         console.error("Merge failed:", error);
       }
     } finally {
@@ -236,7 +169,10 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
     }
   };
 
-  const hasUnresolvedConflicts = conflicts.some((conflict) => !resolutions.has(conflict.field));
+  const goNext = () => setStep((s) => (s < 3 ? ((s + 1) as WizardStep) : s));
+  const goBack = () => setStep((s) => (s > 1 ? ((s - 1) as WizardStep) : s));
+
+  const brandsDiffer = allBrands.length > 0 && items.some((i) => ((i as any).brands?.length ?? 0) !== allBrands.length);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -244,271 +180,299 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
         <DialogHeader>
           <DialogTitle>Mesclar Itens</DialogTitle>
           <DialogDescription>
-            Consolide {items.length} itens em um único. O item principal receberá todas as quantidades, pedidos e histórico dos demais.
+            Consolide {items.length} itens em um único. O item mantido recebe todas as quantidades, preços, movimentações, pedidos e histórico dos demais, que
+            são excluídos permanentemente.
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[60vh] pr-4">
-          <div className="space-y-6">
-            {/* Info Alert */}
-            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20 p-4">
-              <div className="flex gap-3">
-                <IconInfoCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                <div className="space-y-1 text-sm">
-                  <p className="font-medium text-blue-900 dark:text-blue-100">Como funciona a mesclagem:</p>
-                  <ul className="text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
-                    <li>O item principal será mantido e receberá todos os dados</li>
-                    <li>Os outros itens serão removidos após transferir seus dados</li>
-                    <li>Quantidades serão somadas automaticamente</li>
-                    <li>Todos os pedidos, movimentações, histórico e relações serão preservados</li>
-                    <li>Você pode resolver conflitos entre campos diferentes</li>
-                  </ul>
+        {/* Stepper */}
+        <div className="flex items-center justify-center gap-2 px-2">
+          {STEPS.map((s, idx) => (
+            <div key={s.n} className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <div
+                  className={cn(
+                    "flex h-7 w-7 items-center justify-center rounded-full border text-sm font-semibold transition-colors",
+                    step === s.n && "border-primary bg-primary text-primary-foreground",
+                    step > s.n && "border-green-600 bg-green-600 text-white",
+                    step < s.n && "border-border bg-muted text-muted-foreground",
+                  )}
+                >
+                  {step > s.n ? <IconCheck className="h-4 w-4" /> : s.n}
                 </div>
+                <span className={cn("text-sm font-medium", step === s.n ? "text-foreground" : "text-muted-foreground")}>{s.label}</span>
               </div>
+              {idx < STEPS.length - 1 && <div className={cn("h-px w-8", step > s.n ? "bg-green-600" : "bg-border")} />}
             </div>
+          ))}
+        </div>
 
-            {/* Target Item Selection */}
-            <div className="space-y-3">
-              <Label className="text-base font-semibold">Item Principal</Label>
-              <p className="text-sm text-muted-foreground">
-                Selecione o item que será mantido. Os demais itens serão consolidados nele e depois removidos.
-              </p>
-              <RadioGroup value={targetItemId} onValueChange={setTargetItemId}>
-                {items.map((item) => (
-                  <div key={item.id} className="flex items-center space-x-2 rounded-md border border-border p-3 hover:bg-muted/50 transition-colors">
-                    <RadioGroupItem value={item.id} id={`target-${item.id}`} />
-                    <Label htmlFor={`target-${item.id}`} className="flex-1 cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{item.name}</span>
-                        <div className="flex gap-2">
-                          {item.uniCode && <Badge variant="secondary">{item.uniCode}</Badge>}
-                          <Badge variant="outline">Qtd: {item.quantity}</Badge>
-                        </div>
-                      </div>
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-
-            {/* Conflicts Section */}
-            {conflicts.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <IconAlertTriangle className="h-5 w-5 text-warning" />
-                  <h3 className="text-lg font-semibold">Conflitos Detectados</h3>
-                </div>
+        <ScrollArea className="max-h-[58vh] pr-4">
+          <div className="space-y-6">
+            {/* STEP 1 — Choose the item to keep */}
+            {step === 1 && (
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Qual item será mantido?</Label>
                 <p className="text-sm text-muted-foreground">
-                  Os seguintes campos possuem valores diferentes. Escolha como resolver cada conflito:
+                  O item em verde <strong>permanecerá</strong>. Todos os outros serão consolidados nele e depois excluídos permanentemente.
                 </p>
-
-                {conflicts.map((conflict) => (
-                  <div key={conflict.field} className="space-y-3 rounded-lg border border-border p-4 bg-muted/20">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base font-semibold">{conflict.label}</Label>
-                      {resolutions.has(conflict.field) && <IconCheck className="h-5 w-5 text-success" />}
-                    </div>
-
-                    {conflict.type === "number" && (
-                      <div className="space-y-2">
-                        <RadioGroup
-                          value={resolutions.get(conflict.field)?.action ?? undefined}
-                          onValueChange={(action) => {
-                            if (action === "sum" || action === "max") {
-                              handleResolutionChange(conflict.field, { field: conflict.field, action: action as any });
-                            }
-                          }}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="sum" id={`${conflict.field}-sum`} />
-                            <Label htmlFor={`${conflict.field}-sum`} className="cursor-pointer">
-                              Somar todos os valores (Total:{" "}
-                              {conflict.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0)})
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="max" id={`${conflict.field}-max`} />
-                            <Label htmlFor={`${conflict.field}-max`} className="cursor-pointer">
-                              Usar o maior valor (Máximo: {Math.max(...conflict.values.map((v) => (typeof v.value === "number" ? v.value : 0)))})
-                            </Label>
-                          </div>
-                          {conflict.values.map((value) => (
-                            <div key={value.itemId} className="flex items-center space-x-2">
-                              <RadioGroupItem
-                                value={`select-${value.itemId}`}
-                                id={`${conflict.field}-${value.itemId}`}
-                                onClick={() =>
-                                  handleResolutionChange(conflict.field, {
-                                    field: conflict.field,
-                                    action: "select",
-                                    selectedItemId: value.itemId,
-                                  })
-                                }
-                              />
-                              <Label htmlFor={`${conflict.field}-${value.itemId}`} className="cursor-pointer flex items-center gap-2">
-                                <span>{value.itemName}:</span>
-                                <Badge variant="outline">{value.formatted}</Badge>
-                              </Label>
-                            </div>
-                          ))}
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="custom" id={`${conflict.field}-custom`} />
-                            <Label htmlFor={`${conflict.field}-custom`} className="cursor-pointer">
-                              Valor personalizado
-                            </Label>
-                          </div>
-                        </RadioGroup>
-                        {resolutions.get(conflict.field)?.action === "custom" && (
-                          <Input
-                            type="number"
-                            placeholder="Digite o valor personalizado"
-                            value={customValues.get(conflict.field) ?? ""}
-                            onChange={(value: string | number | null) => {
-                              const stringValue = String(value ?? '');
-                              const numValue = parseFloat(stringValue || '0');
-                              handleCustomValueChange(conflict.field, stringValue);
-                              handleResolutionChange(conflict.field, {
-                                field: conflict.field,
-                                action: "custom",
-                                customValue: isNaN(numValue) ? null : numValue,
-                              });
-                            }}
-                          />
+                <RadioGroup value={targetItemId} onValueChange={setTargetItemId} className="gap-2">
+                  {items.map((item) => {
+                    const isTarget = item.id === targetItemId;
+                    const price = latestPriceOf(item);
+                    return (
+                      <label
+                        key={item.id}
+                        htmlFor={`target-${item.id}`}
+                        className={cn(
+                          "flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors",
+                          isTarget ? "border-green-500 bg-green-50 ring-1 ring-green-400/50 dark:bg-green-950/20" : "border-border hover:bg-muted/50",
                         )}
-                      </div>
-                    )}
-
-                    {conflict.type === "single" && (
-                      <RadioGroup
-                        value={resolutions.get(conflict.field)?.selectedItemId ?? undefined}
-                        onValueChange={(itemId) =>
-                          handleResolutionChange(conflict.field, {
-                            field: conflict.field,
-                            action: "select",
-                            selectedItemId: itemId,
-                          })
-                        }
                       >
-                        {conflict.values.map((value) => (
-                          <div key={value.itemId} className="flex items-center space-x-2">
-                            <RadioGroupItem value={value.itemId} id={`${conflict.field}-${value.itemId}`} />
-                            <Label htmlFor={`${conflict.field}-${value.itemId}`} className="cursor-pointer flex items-center gap-2">
-                              <span>{value.itemName}:</span>
-                              <Badge variant="outline">{value.formatted}</Badge>
-                            </Label>
+                        <RadioGroupItem value={item.id} id={`target-${item.id}`} className="mt-1" />
+                        <div className="flex flex-1 flex-col gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={cn("font-medium", !isTarget && "text-muted-foreground")}>{item.name}</span>
+                            {isTarget ? (
+                              <Badge variant="success" className="shrink-0">
+                                <IconCheck className="mr-1 h-3 w-3" />
+                                Mantido
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive" className="shrink-0 opacity-80">
+                                <IconTrash className="mr-1 h-3 w-3" />
+                                Será removido
+                              </Badge>
+                            )}
                           </div>
-                        ))}
-                      </RadioGroup>
-                    )}
-
-                    {conflict.type === "boolean" && (
-                      <RadioGroup
-                        value={resolutions.get(conflict.field)?.selectedItemId ?? undefined}
-                        onValueChange={(itemId) =>
-                          handleResolutionChange(conflict.field, {
-                            field: conflict.field,
-                            action: "select",
-                            selectedItemId: itemId,
-                          })
-                        }
-                      >
-                        {conflict.values.map((value) => (
-                          <div key={value.itemId} className="flex items-center space-x-2">
-                            <RadioGroupItem value={value.itemId} id={`${conflict.field}-${value.itemId}`} />
-                            <Label htmlFor={`${conflict.field}-${value.itemId}`} className="cursor-pointer flex items-center gap-2">
-                              <span>{value.itemName}:</span>
-                              <Badge variant={value.value ? "default" : "secondary"}>{value.formatted}</Badge>
-                            </Label>
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                            {item.uniCode && <Badge variant="secondary">{item.uniCode}</Badge>}
+                            <Badge variant="outline">Qtd: {item.quantity}</Badge>
+                            {canViewPrices && price && <Badge variant="outline">{formatCurrency(price.value)}</Badge>}
+                            {(item as any).category?.name && <Badge variant="outline">{(item as any).category.name}</Badge>}
+                            {((item as any).measures?.length ?? 0) > 0 && <MeasureDisplayCompact item={item} className="text-muted-foreground" />}
                           </div>
-                        ))}
-                      </RadioGroup>
-                    )}
-
-                    {conflict.type === "array" && (
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">Selecione quais valores manter:</p>
-                        {conflict.values.map((value) => (
-                          <div key={value.itemId} className="flex items-start space-x-2">
-                            <Checkbox
-                              id={`${conflict.field}-${value.itemId}`}
-                              checked={resolutions.get(conflict.field)?.selectedIds?.includes(value.itemId) ?? false}
-                              onCheckedChange={(checked) => {
-                                const currentIds = resolutions.get(conflict.field)?.selectedIds ?? [];
-                                const newIds = checked
-                                  ? [...currentIds, value.itemId]
-                                  : currentIds.filter((id) => id !== value.itemId);
-
-                                handleResolutionChange(conflict.field, {
-                                  field: conflict.field,
-                                  action: "combine",
-                                  selectedIds: newIds,
-                                });
-                              }}
-                            />
-                            <Label htmlFor={`${conflict.field}-${value.itemId}`} className="cursor-pointer">
-                              <div>
-                                <span className="font-medium">{value.itemName}</span>
-                                <p className="text-sm text-muted-foreground">{value.formatted}</p>
-                              </div>
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </RadioGroup>
               </div>
             )}
 
-            {/* Preview Section */}
-            {mergedPreview && (
-              <div className="space-y-3 rounded-lg border border-border p-4 bg-primary/5">
-                <div className="flex items-center gap-2">
-                  <IconArrowRight className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-semibold">Pré-visualização do Resultado</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-muted-foreground">Nome</Label>
-                    <p className="font-medium">{mergedPreview.name}</p>
+            {/* STEP 2 — Resolve real (server-applied) conflicts */}
+            {step === 2 && (
+              <div className="space-y-4">
+                {conflicts.length === 0 && !brandsDiffer && !measureConflict ? (
+                  <div className="flex items-center gap-3 rounded-lg border border-green-300 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/20">
+                    <IconCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <p className="text-sm">Nenhum conflito de campos. Os dados serão transferidos diretamente para o item mantido.</p>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">Código</Label>
-                    <p className="font-medium">{mergedPreview.uniCode ?? "N/A"}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Quantidade</Label>
-                    <p className="font-medium">{mergedPreview.quantity}</p>
-                  </div>
-                  {canViewPrices && (
-                    <div>
-                      <Label className="text-muted-foreground">Preço Total</Label>
-                      <p className="font-medium">{mergedPreview.totalPrice !== null && mergedPreview.totalPrice !== undefined ? formatCurrency(mergedPreview.totalPrice) : "N/A"}</p>
+                ) : (
+                  <>
+                    {conflicts.length > 0 && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <IconAlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                          <h3 className="text-base font-semibold">Campos divergentes</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground">Escolha qual valor manter em cada campo. O padrão é o valor do item mantido.</p>
+                        {conflicts.map((f) => (
+                          <div key={f.field} className="space-y-2 rounded-lg border border-border bg-muted/20 p-4">
+                            <Label className="text-sm font-semibold">{f.label}</Label>
+                            <RadioGroup
+                              value={fieldResolutions.get(f.field) ?? targetItemId}
+                              onValueChange={(itemId) => setFieldResolutions((prev) => new Map(prev).set(f.field, itemId))}
+                            >
+                              {items.map((item) => (
+                                <div key={item.id} className="flex items-center gap-2">
+                                  <RadioGroupItem value={item.id} id={`${f.field}-${item.id}`} />
+                                  <Label htmlFor={`${f.field}-${item.id}`} className="flex cursor-pointer items-center gap-2 text-sm font-normal">
+                                    <span className="text-muted-foreground">{item.id === targetItemId ? "Mantido" : item.name}:</span>
+                                    <Badge variant="outline">{f.display(item)}</Badge>
+                                  </Label>
+                                </div>
+                              ))}
+                            </RadioGroup>
+                          </div>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Brands (union, customizable) */}
+                    {allBrands.length > 0 && (
+                      <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-4">
+                        <Label className="text-sm font-semibold">Marcas</Label>
+                        <p className="text-xs text-muted-foreground">Por padrão, as marcas de todos os itens são unidas. Desmarque para remover.</p>
+                        {allBrands.map((b) => (
+                          <div key={b.id} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`brand-${b.id}`}
+                              checked={selectedBrandIds.includes(b.id)}
+                              onCheckedChange={(checked) => {
+                                setBrandsCustomized(true);
+                                setSelectedBrandIds((prev) => (checked ? [...new Set([...prev, b.id])] : prev.filter((id) => id !== b.id)));
+                              }}
+                            />
+                            <Label htmlFor={`brand-${b.id}`} className="cursor-pointer text-sm font-normal">
+                              {b.name}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Measure divergence — informational warning; resolved in review */}
+                    {measureConflict && (
+                      <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/20">
+                        <IconRulerMeasure className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <p className="text-sm">
+                          As medidas dos itens diferem. As do <strong>item mantido</strong> serão preservadas e as divergentes descartadas (detalhes na revisão).
+                          Isso costuma indicar que são produtos diferentes — confirme antes de mesclar.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* STEP 3 — Review disposal + confirm */}
+            {step === 3 && targetItem && (
+              <div className="space-y-5">
+                {/* Disposal: keep vs remove */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_1fr] md:items-stretch">
+                  {/* Kept */}
+                  <div className="space-y-2 rounded-lg border border-green-300 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/20">
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                      <IconShieldCheck className="h-5 w-5" />
+                      <span className="text-sm font-semibold uppercase tracking-wide">Será mantido</span>
                     </div>
-                  )}
+                    <p className="font-semibold">{resolvedValueDisplay(RESOLVABLE_FIELDS[0])}</p>
+                    <div className="flex flex-wrap gap-1.5 text-sm">
+                      <Badge variant="outline">Qtd. final: {finalQuantity}</Badge>
+                      {canViewPrices && mergedLatestPrice != null && <Badge variant="outline">{formatCurrency(mergedLatestPrice)}</Badge>}
+                    </div>
+                    {((targetItem as any).measures?.length ?? 0) > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        Medidas mantidas: <MeasureDisplayCompact item={targetItem} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="hidden items-center justify-center md:flex">
+                    <IconArrowRight className="h-6 w-6 text-muted-foreground" />
+                  </div>
+
+                  {/* Removed */}
+                  <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+                    <div className="flex items-center gap-2 text-destructive">
+                      <IconTrash className="h-5 w-5" />
+                      <span className="text-sm font-semibold uppercase tracking-wide">Serão removidos ({sourceItems.length})</span>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {sourceItems.map((item) => (
+                        <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="font-medium line-through decoration-destructive/50">{item.name}</span>
+                          <div className="flex shrink-0 gap-1.5">
+                            {item.uniCode && <Badge variant="secondary">{item.uniCode}</Badge>}
+                            <Badge variant="outline">Qtd: {item.quantity}</Badge>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Quantity breakdown — read-only, always summed */}
+                <div className="space-y-1.5 rounded-lg border border-border bg-muted/20 p-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold">Quantidade (sempre somada)</span>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    {items.map((item) => (
+                      <div key={item.id} className="flex justify-between text-muted-foreground">
+                        <span>{item.id === targetItemId ? `${item.name} (mantido)` : item.name}</span>
+                        <span>{item.id === targetItemId ? item.quantity : `+ ${item.quantity}`}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between border-t border-border pt-1 font-semibold">
+                      <span>Quantidade final</span>
+                      <span>{finalQuantity}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Measure-loss warning */}
+                {measureConflict && (
+                  <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/20">
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                      <IconRulerMeasure className="h-5 w-5" />
+                      <span className="text-sm font-semibold">Medidas divergentes serão descartadas</span>
+                    </div>
+                    <ul className="space-y-1 text-sm">
+                      {measureConflict.map((item) => (
+                        <li key={item.id} className="flex items-center gap-2 text-muted-foreground">
+                          <span className="line-through decoration-amber-500/60">{item.name}:</span>
+                          <MeasureDisplayCompact item={item} />
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-amber-700 dark:text-amber-300">Verifique se realmente são o mesmo produto antes de continuar.</p>
+                  </div>
+                )}
+
+                {/* Irreversibility confirmation */}
+                <div className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+                  <div className="flex items-center gap-2 text-destructive">
+                    <IconAlertTriangle className="h-5 w-5" />
+                    <p className="text-sm font-semibold">Esta ação é irreversível.</p>
+                  </div>
+                  <label htmlFor="confirm-delete" className="flex cursor-pointer items-start gap-3">
+                    <Checkbox id="confirm-delete" checked={confirmDelete} onCheckedChange={(c) => setConfirmDelete(c === true)} className="mt-0.5" />
+                    <span className="text-sm">
+                      Confirmo a exclusão permanente {sourceItems.length === 1 ? "do item" : `dos ${sourceItems.length} itens`}:
+                      <span className="mt-1 block font-medium">{sourceItems.map((i) => i.name).join(" · ")}</span>
+                    </span>
+                  </label>
                 </div>
               </div>
             )}
           </div>
         </ScrollArea>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-            Cancelar
-          </Button>
-          <Button onClick={handleMerge} disabled={isLoading || hasUnresolvedConflicts || !targetItemId}>
-            {isLoading ? (
-              <>
-                <IconLoader2 className="h-4 w-4 animate-spin" />
-                Mesclando...
-              </>
+        <DialogFooter className="flex items-center justify-between sm:justify-between">
+          <Button variant="outline" onClick={step === 1 ? () => onOpenChange(false) : goBack} disabled={isLoading}>
+            {step === 1 ? (
+              "Cancelar"
             ) : (
               <>
-                <IconCheck className="h-4 w-4" />
-                Mesclar
+                <IconChevronLeft className="h-4 w-4" />
+                Voltar
               </>
             )}
           </Button>
+
+          {step < 3 ? (
+            <Button onClick={goNext} disabled={step === 1 && !targetItemId}>
+              Próximo
+              <IconArrowRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button variant="destructive" onClick={handleMerge} disabled={isLoading || !confirmDelete || !targetItemId}>
+              {isLoading ? (
+                <>
+                  <IconLoader2 className="h-4 w-4 animate-spin" />
+                  Mesclando...
+                </>
+              ) : (
+                <>
+                  <IconCheck className="h-4 w-4" />
+                  Mesclar {sourceItems.length} {sourceItems.length === 1 ? "item" : "itens"}
+                </>
+              )}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

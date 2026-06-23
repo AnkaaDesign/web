@@ -2780,12 +2780,27 @@ export const mapPriceToFormData = createMapToFormDataHelper<Price, PriceUpdateFo
 // Item Merge Schema
 // =====================
 
+// Per-field conflict resolution — each key holds the chosen winning value for a
+// user-owned scalar field. MUST mirror the API's itemMergeConflictsSchema and
+// the ALLOWED_MERGE_FIELDS allowlist in item.service.ts merge(). Derived/forced
+// fields (quantity, totalPrice, monthlyConsumption, reorder thresholds) are
+// computed server-side and intentionally not resolvable here.
 export const itemMergeConflictsSchema = z
   .object({
-    keepPrimaryPrice: z.boolean().optional(),
-    keepPrimaryDescription: z.boolean().optional(),
-    combineBarcodes: z.boolean().optional(),
-    combineTags: z.boolean().optional(),
+    name: z.string().nullish(),
+    uniCode: z.string().nullish(),
+    categoryId: z.string().nullish(),
+    supplierId: z.string().nullish(),
+    boxQuantity: z.number().int().nullish(),
+    estimatedLeadTime: z.number().int().nullish(),
+    shouldAssignToUser: z.boolean().optional(),
+    isActive: z.boolean().optional(),
+    ppeType: z.string().nullish(),
+    ppeCA: z.string().nullish(),
+    ppeDeliveryMode: z.string().nullish(),
+    ppeStandardQuantity: z.number().int().nullish(),
+    icms: z.number().nullish(),
+    ipi: z.number().nullish(),
     // Many-to-many brands: resolved set sent as brand objects (or ids); the API
     // translates it into a relation `set` write.
     brands: z.array(z.union([z.string(), z.object({ id: z.string() }).passthrough()])).optional(),
