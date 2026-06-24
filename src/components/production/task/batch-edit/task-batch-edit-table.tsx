@@ -7,6 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { IconListNumbers } from "@tabler/icons-react";
 import { Form } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
@@ -152,6 +154,40 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
     }
   }, [tasks, fields, replace]);
 
+  // Parse a serial into its leading prefix, trailing numeric part (with its
+  // zero-padding width) and any non-numeric suffix. Returns null when there is
+  // no numeric part to sequence on. e.g. "ABC-007X" -> {prefix:"ABC-", num:7, pad:3, suffix:"X"}
+  const parseSerial = (raw: string) => {
+    const match = raw.trim().match(/^(.*?)(\d+)(\D*)$/);
+    if (!match) return null;
+    return { prefix: match[1], num: parseInt(match[2], 10), pad: match[2].length, suffix: match[3] };
+  };
+
+  // Fill the serial numbers of all rows by sequentially incrementing the numeric
+  // part of the first row's serial. The user types the serial only in the top row
+  // and triggers this: e.g. first row "20" fills the rest as 21, 22, 23, ...
+  // The prefix, suffix and zero-padding from the first serial are preserved.
+  const handleFillSerialNumbers = () => {
+    const rows = form.getValues("tasks");
+    if (!rows || rows.length < 2) {
+      alert("É necessário ter ao menos 2 tarefas para preencher os números de série.");
+      return;
+    }
+
+    const first = parseSerial(rows[0]?.data?.serialNumber || "");
+    if (!first) {
+      alert("Informe um número de série com parte numérica na primeira linha antes de preencher.");
+      return;
+    }
+
+    for (let i = 1; i < rows.length; i++) {
+      const value = first.num + i;
+      const numStr = String(value).padStart(first.pad, "0");
+      const formatted = `${first.prefix}${numStr}${first.suffix}`.toUpperCase();
+      form.setValue(`tasks.${i}.data.serialNumber`, formatted, { shouldDirty: true, shouldValidate: true });
+    }
+  };
+
   const handleSubmit = async (data: TaskBatchEditFormData) => {
     try {
       setIsSubmitting(true);
@@ -224,13 +260,28 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
         <button id="task-batch-form-submit" type="button" onClick={form.handleSubmit(handleSubmit)} style={{ display: "none" }} disabled={isSubmitting} />
         <CardContent className="p-4 flex-1 overflow-hidden flex flex-col">
           <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-              <h3 className="text-sm font-medium text-foreground">
-                Editando {tasks.length} {tasks.length === 1 ? "tarefa selecionada" : "tarefas selecionadas"}
-              </h3>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                  <h3 className="text-sm font-medium text-foreground">
+                    Editando {tasks.length} {tasks.length === 1 ? "tarefa selecionada" : "tarefas selecionadas"}
+                  </h3>
+                </div>
+                <p className="text-xs text-muted-foreground">As alterações serão aplicadas apenas aos campos modificados em cada tarefa</p>
+              </div>
+              {tasks.length >= 2 && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <p className="text-xs text-muted-foreground max-w-[16rem] text-right">
+                    Preencha o Nº de Série da primeira linha e gere a sequência das demais automaticamente
+                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={handleFillSerialNumbers}>
+                    <IconListNumbers className="mr-2 h-4 w-4" />
+                    Preencher Nº de Série
+                  </Button>
+                </div>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">As alterações serão aplicadas apenas aos campos modificados em cada tarefa</p>
           </div>
 
           {/* Tasks Table */}

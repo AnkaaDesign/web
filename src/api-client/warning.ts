@@ -64,6 +64,18 @@ export class WarningService {
     return response.data;
   }
 
+  /**
+   * Fetches the warning term as a real PDF (sealed term if signed, otherwise a
+   * freshly-rendered preview). Returns the raw bytes; fetched via the authenticated
+   * client so the auth token is sent (opening the URL directly would not send it).
+   */
+  async getWarningDocument(id: string): Promise<Blob> {
+    const response = await apiClient.get(`${this.basePath}/${id}/document`, {
+      responseType: "blob",
+    });
+    return response.data as Blob;
+  }
+
   // =====================
   // Mutation Operations
   // =====================

@@ -16,7 +16,6 @@ import type {
   ReconciliationPaginatedResponse,
   ReconciliationStatistics,
   ReconciliationSuggestion,
-  RecurringForecast,
   SetFiscalItemCategoryPayload,
   TransactionCategory,
   TransactionCategoryListParams,
@@ -194,14 +193,6 @@ export const reconciliationService = {
     apiClient.post<CategorizeResult>(
       "/financial/reconciliation/categorize",
       body,
-    ),
-
-  getRecurringForecast: (params: { from: string; to: string }) =>
-    apiClient.get<RecurringForecast>(
-      "/financial/reconciliation/recurring/forecast",
-      {
-        params,
-      },
     ),
 
   // Composite "Previsão de Saídas": pedidos + impostos (aprox.) + folha (com

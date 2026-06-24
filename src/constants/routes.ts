@@ -196,7 +196,6 @@ export const routes = {
       fiscalDocuments: "/financeiro/conciliacao/notas",
       fiscalDocumentDetail: (id: string) => `/financeiro/conciliacao/notas/${id}`,
       categories: "/financeiro/conciliacao/categorias",
-      recurring: "/financeiro/conciliacao/recorrentes",
       // Conciliação Bancária workflow views (spec §4: Extrato, Saídas,
       // Previsão de Saídas, Entradas).
       statement: "/financeiro/conciliacao/extrato",
@@ -210,6 +209,8 @@ export const routes = {
     },
     recurrentPayables: {
       root: "/financeiro/contas-recorrentes",
+      create: "/financeiro/contas-recorrentes/cadastrar",
+      edit: (id: string) => `/financeiro/contas-recorrentes/editar/${id}`,
     },
     root: "/financeiro",
   },

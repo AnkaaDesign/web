@@ -3802,6 +3802,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                         existingFiles={uploadedFiles}
                         placeholder="Adicione layouts relacionados à tarefa"
                         label="Layouts anexados"
+                        variant="card"
                       >
                         <FileSuggestions
                           customerId={task.customerId ?? undefined}

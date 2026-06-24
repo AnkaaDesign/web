@@ -38,7 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { FileUploadField } from "@/components/common/file";
 import { ArtworkFileUploadField } from "@/components/production/task/form/artwork-file-upload-field";
-import type { FileWithPreview } from "@/components/common/file";
+import { FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import type { ResponsibleRowData } from "@/types/responsible";
 
 interface BudgetStepTaskProps {
@@ -506,7 +506,33 @@ export function BudgetStepTask({
                     existingFiles={artworkFiles}
                     placeholder="Adicione layouts relacionados à tarefa"
                     label="Layouts anexados"
-                  />
+                    variant="card"
+                  >
+                    {/* Reuse a layout already used for this customer (no re-upload). */}
+                    <FileSuggestions
+                      customerId={customerIdValue ?? undefined}
+                      fileContext="tasksArtworks"
+                      excludeFileIds={artworkFiles
+                        .map((f) => (f as any).uploadedFileId || f.id)
+                        .filter(Boolean)}
+                      onSelect={(newFile) => {
+                        const fileWithPreview = {
+                          id: newFile.id,
+                          name: newFile.filename || newFile.originalName || "artwork",
+                          size: newFile.size || 0,
+                          type: newFile.mimetype || "application/octet-stream",
+                          lastModified: Date.now(),
+                          uploaded: true,
+                          uploadProgress: 100,
+                          uploadedFileId: newFile.id,
+                          thumbnailUrl: newFile.thumbnailUrl || undefined,
+                          status: "DRAFT",
+                        } as FileWithPreview;
+                        onArtworkFilesChange([...artworkFiles, fileWithPreview]);
+                      }}
+                      disabled={disabled}
+                    />
+                  </ArtworkFileUploadField>
                 </CardContent>
               </AccordionContent>
             </Card>

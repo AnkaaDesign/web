@@ -62,7 +62,7 @@ export const createOrderColumns = (canViewPrices: boolean = true): OrderColumn[]
     // paymentStatusOrder mirror, same pattern as statusOrder.
     key: "paymentStatusOrder",
     header: "PAGAMENTO",
-    accessor: (order) => <OrderPaymentStatusBadge status={order.paymentStatus} />,
+    accessor: (order) => <OrderPaymentStatusBadge status={order.paymentStatus} paymentMethod={order.paymentMethod} />,
     sortable: true,
     align: "left",
     className: "w-48",

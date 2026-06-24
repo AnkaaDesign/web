@@ -281,7 +281,7 @@ export function OrderScheduleDetailsPage() {
         <div className="space-y-4">
           {/* Configuration + Changelog Grid */}
           <div className="animate-in fade-in-50 duration-700">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
               {/* Schedule Configuration Card */}
               <Card className="shadow-sm border border-border flex flex-col h-full">
                 <CardHeader className="pb-4">
@@ -405,15 +405,21 @@ export function OrderScheduleDetailsPage() {
                 </CardContent>
               </Card>
 
-              {/* Changelog History — bounded height so it scrolls internally instead of
-                  stretching to match the (often taller) configuration card. */}
-              <ChangelogHistory
-                entityType={CHANGE_LOG_ENTITY_TYPE.ORDER_SCHEDULE}
-                entityId={schedule.id}
-                entityName={schedule.name || `Agendamento #${schedule.id.slice(-8)}`}
-                entityCreatedAt={schedule.createdAt}
-                maxHeight="500px"
-              />
+              {/* Changelog History — always matches the configuration card's height.
+                  On lg+ the grid stretches this wrapper to the (content-driven) config
+                  card; the changelog fills it via absolute inset and scrolls internally,
+                  so it never drives the row height. When stacked (1 col) the wrapper
+                  falls back to a fixed height so the absolute child still has a box. */}
+              <div className="relative h-[500px] lg:h-auto">
+                <ChangelogHistory
+                  entityType={CHANGE_LOG_ENTITY_TYPE.ORDER_SCHEDULE}
+                  entityId={schedule.id}
+                  entityName={schedule.name || `Agendamento #${schedule.id.slice(-8)}`}
+                  entityCreatedAt={schedule.createdAt}
+                  fillParent
+                  className="absolute inset-0"
+                />
+              </div>
             </div>
           </div>
 

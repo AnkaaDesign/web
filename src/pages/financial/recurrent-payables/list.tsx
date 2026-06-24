@@ -1,12 +1,33 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { IconRepeat, IconEdit, IconArchive, IconArchiveOff, IconTrash, IconPlus } from "@tabler/icons-react";
+import { useNavigate } from "react-router-dom";
+import { useForm, FormProvider } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { addMonths, format, startOfMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import {
+  IconRepeat,
+  IconEdit,
+  IconArchive,
+  IconArchiveOff,
+  IconTrash,
+  IconPlus,
+  IconCash,
+  IconCheck,
+  IconClockHour4,
+  IconTrendingUp,
+  IconChevronLeft,
+  IconChevronRight,
+  IconCircleCheck,
+} from "@tabler/icons-react";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TableSearchInput } from "@/components/ui/table-search-input";
-import { useTableState } from "@/hooks/common/use-table-state";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,51 +38,55 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { FormMoneyInput } from "@/components/ui/form-money-input";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
-import { RecurrentPayableForm } from "@/components/financial/recurrent-payables/recurrent-payable-form";
 
-import { useRecurrentPayables, useRecurrentPayableMutations } from "@/hooks/financial/use-recurrent-payable";
+import {
+  useRecurrentPayables,
+  useRecurrentPayableMonthly,
+  useRecurrentPayableMutations,
+} from "@/hooks/financial/use-recurrent-payable";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { SECTOR_PRIVILEGES, routes, PAYMENT_METHOD_LABELS, SCHEDULE_FREQUENCY_LABELS, PAYMENT_METHOD, SCHEDULE_FREQUENCY } from "@/constants";
+import { SECTOR_PRIVILEGES, routes, SCHEDULE_FREQUENCY_LABELS, SCHEDULE_FREQUENCY } from "@/constants";
 import { formatCurrency } from "@/utils";
-import type { RecurrentPayable } from "@/types/recurrent-payable";
+import type {
+  RecurrentPayable,
+  RecurrentPayableMonthlyItem,
+} from "@/types/recurrent-payable";
 
-const DEFAULT_PAGE_SIZE = 40;
-
-const DEFAULT_SORT: Array<{ column: string; direction: "asc" | "desc" }> = [
-  { column: "isActive", direction: "desc" },
-  { column: "name", direction: "asc" },
-];
-
-const SORTABLE_COLUMNS = ["name", "amount", "dueDayOfMonth", "isActive"];
-
-// Resolves the displayed value: the fixed amount for FIXED bills, else the
-// estimate for VARIABLE bills (null when none informed yet).
+// Resolves the displayed cadastro value: the fixed amount for FIXED bills, else
+// the estimate for VARIABLE bills (null when none informed yet).
 const amountOf = (p: RecurrentPayable): number | null => {
   const raw = p.amountKind === "FIXED" ? p.fixedAmount : p.estimatedAmount;
   return raw == null ? null : Number(raw);
 };
 
-const SORT_ACCESSORS: Record<string, (p: RecurrentPayable) => number | string> = {
-  name: (p) => p.name,
-  amount: (p) => amountOf(p) ?? -1,
-  dueDayOfMonth: (p) => p.dueDayOfMonth,
-  isActive: (p) => (p.isActive ? 1 : 0),
-};
-
 export const RecurrentPayablesListPage = () => {
-  usePageTracker({ title: "Contas Recorrentes", icon: "repeat" });
+  usePageTracker({ title: "Recorrentes", icon: "repeat" });
+  const navigate = useNavigate();
 
-  const { data: payables, isLoading } = useRecurrentPayables();
-  const { create, update, delete: remove, createMutation, updateMutation, deleteMutation } = useRecurrentPayableMutations();
+  // Month/competence model — occurrences are keyed by competence (YYYY-MM), so a
+  // single month is the natural unit (no payroll-period range needed).
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => startOfMonth(new Date()));
+  const competence = format(selectedMonth, "yyyy-MM");
 
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editing, setEditing] = useState<RecurrentPayable | null>(null);
+  const { data: monthly, isLoading: monthlyLoading } = useRecurrentPayableMonthly(competence);
+  const { data: payables, isLoading: listLoading } = useRecurrentPayables();
+  const { update, delete: remove, pay, deleteMutation, payMutation } = useRecurrentPayableMutations();
+
   const [deleteTarget, setDeleteTarget] = useState<RecurrentPayable | null>(null);
+  const [payTarget, setPayTarget] = useState<{ payable: RecurrentPayable; item: RecurrentPayableMonthlyItem } | null>(null);
   const [searchText, setSearchText] = useState("");
-
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: RecurrentPayable } | null>(null);
 
   useEffect(() => {
@@ -70,49 +95,35 @@ export const RecurrentPayablesListPage = () => {
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
-  const { page, pageSize, setPage, setPageSize, sortConfigs, toggleSort, getSortDirection, getSortOrder } = useTableState({
-    defaultPageSize: DEFAULT_PAGE_SIZE,
-    defaultSort: DEFAULT_SORT,
-    allowedSortColumns: SORTABLE_COLUMNS,
-  });
+  // Index the month's occurrences by payable id so each bill row is enriched with
+  // its Pago/Pendente status, paid amount and forecast for the selected month.
+  const monthlyById = useMemo(() => {
+    const map = new Map<string, RecurrentPayableMonthlyItem>();
+    for (const item of monthly?.items ?? []) map.set(item.id, item);
+    return map;
+  }, [monthly]);
 
-  const sorted = useMemo(() => {
-    return [...(payables ?? [])].sort((a, b) => {
-      for (const { column, direction } of sortConfigs) {
-        const accessor = SORT_ACCESSORS[column];
-        if (!accessor) continue;
-        const av = accessor(a);
-        const bv = accessor(b);
-        const cmp = typeof av === "string" && typeof bv === "string" ? av.localeCompare(bv, "pt-BR") : Number(av) - Number(bv);
-        if (cmp !== 0) return direction === "asc" ? cmp : -cmp;
-      }
+  // Rows are driven by the full cadastro (so inactive bills remain manageable),
+  // enriched with the month occurrence for active ones.
+  const rows = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    const base = [...(payables ?? [])].sort((a, b) => {
+      if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+      if (a.dueDayOfMonth !== b.dueDayOfMonth) return a.dueDayOfMonth - b.dueDayOfMonth;
       return a.name.localeCompare(b.name, "pt-BR");
     });
-  }, [payables, sortConfigs]);
-
-  const filtered = useMemo(() => {
-    const q = searchText.trim().toLowerCase();
-    if (!q) return sorted;
-    return sorted.filter(
+    if (!q) return base;
+    return base.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
         (p.supplier?.fantasyName ?? p.payeeName ?? "").toLowerCase().includes(q) ||
         (p.category?.name ?? "").toLowerCase().includes(q),
     );
-  }, [sorted, searchText]);
+  }, [payables, searchText]);
 
-  const totalRecords = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+  const isLoading = monthlyLoading || listLoading;
 
-  const pageItems = useMemo(() => filtered.slice(page * pageSize, page * pageSize + pageSize), [filtered, page, pageSize]);
-
-  const handleSearch = useCallback(
-    (value: string) => {
-      setSearchText(value);
-      setPage(0);
-    },
-    [setPage],
-  );
+  const stepMonth = (delta: number) => setSelectedMonth((m) => addMonths(m, delta));
 
   const handleContextMenu = useCallback((e: React.MouseEvent, item: RecurrentPayable) => {
     e.preventDefault();
@@ -120,11 +131,13 @@ export const RecurrentPayablesListPage = () => {
     setContextMenu({ x: e.clientX, y: e.clientY, item });
   }, []);
 
-  const openEdit = useCallback((p: RecurrentPayable) => {
-    setEditing(p);
-    setEditorOpen(true);
-    setContextMenu(null);
-  }, []);
+  const openEdit = useCallback(
+    (p: RecurrentPayable) => {
+      setContextMenu(null);
+      navigate(routes.financial.recurrentPayables.edit(p.id));
+    },
+    [navigate],
+  );
 
   const toggleActive = useCallback(
     (p: RecurrentPayable) => {
@@ -139,27 +152,39 @@ export const RecurrentPayablesListPage = () => {
     setContextMenu(null);
   }, []);
 
+  // FIXED bills settle with their known amount immediately; VARIABLE bills
+  // (água/energia) require the real paid amount, so we prompt for it.
+  const startPay = useCallback(
+    (p: RecurrentPayable) => {
+      setContextMenu(null);
+      const item = monthlyById.get(p.id);
+      // Needs a materialized occurrence (current month or an already-created one).
+      if (!item || !item.occurrenceId || item.status === "PAID") return;
+      if (p.amountKind === "FIXED") {
+        pay({ occurrenceId: item.occurrenceId, body: {} });
+      } else {
+        setPayTarget({ payable: p, item });
+      }
+    },
+    [monthlyById, pay],
+  );
+
   const columns: StandardizedColumn<RecurrentPayable>[] = [
     {
       key: "name",
-      header: "Nome",
-      sortable: true,
-      render: (p) => (
-        <div className={`flex min-w-0 ${p.isActive ? "" : "opacity-50"}`}>
-          <span className="truncate text-sm font-medium">{p.name}</span>
-        </div>
-      ),
-    },
-    {
-      key: "payee",
-      header: "Tomador",
-      width: "200px",
+      header: "Conta",
       render: (p) => {
-        const payee = p.supplier?.fantasyName ?? p.payeeName;
-        return payee ? (
-          <span className={`text-sm ${p.isActive ? "" : "opacity-50"}`}>{payee}</span>
-        ) : (
-          <span className="text-muted-foreground text-xs">—</span>
+        const item = monthlyById.get(p.id);
+        return (
+          <div className={`flex items-center gap-2 min-w-0 ${p.isActive ? "" : "opacity-50"}`}>
+            {item?.category?.color && (
+              <span
+                className="h-3 w-3 rounded-full flex-shrink-0 border border-border"
+                style={{ backgroundColor: item.category.color }}
+              />
+            )}
+            <span className="truncate text-sm font-medium">{p.name}</span>
+          </div>
         );
       },
     },
@@ -175,34 +200,76 @@ export const RecurrentPayablesListPage = () => {
         ),
     },
     {
-      key: "amount",
-      header: "Valor",
+      key: "dueDay",
+      header: "Vencimento",
+      width: "120px",
+      align: "center",
+      render: (p) => <span className="text-sm whitespace-nowrap">Dia {p.dueDayOfMonth}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
       width: "150px",
-      align: "right",
-      sortable: true,
+      align: "center",
       render: (p) => {
-        const value = amountOf(p);
-        const isVariable = p.amountKind === "VARIABLE";
-        return (
-          <span className={`text-sm font-medium tabular-nums ${isVariable ? "italic text-muted-foreground" : ""}`}>
-            {value != null ? formatCurrency(value) : "—"}
-            {isVariable && value != null ? " (est.)" : ""}
-          </span>
+        if (!p.isActive)
+          return (
+            <Badge variant="muted" size="sm">
+              Inativa
+            </Badge>
+          );
+        const item = monthlyById.get(p.id);
+        return item?.status === "PAID" ? (
+          <Badge variant="completed" size="sm">
+            <IconCheck className="h-3 w-3 mr-1" /> Pago
+          </Badge>
+        ) : (
+          <Badge variant="pending" size="sm">
+            <IconClockHour4 className="h-3 w-3 mr-1" /> Pendente
+          </Badge>
         );
       },
     },
     {
-      key: "dueDayOfMonth",
-      header: "Vencimento",
-      width: "120px",
-      align: "center",
-      sortable: true,
-      render: (p) => <span className="text-sm whitespace-nowrap">Dia {p.dueDayOfMonth}</span>,
+      key: "paid",
+      header: "Pago no mês",
+      width: "160px",
+      align: "right",
+      render: (p) => {
+        const item = monthlyById.get(p.id);
+        return item?.paidAmount != null ? (
+          <span className="font-semibold tabular-nums text-sm">{formatCurrency(item.paidAmount)}</span>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        );
+      },
+    },
+    {
+      key: "forecast",
+      header: "Previsão",
+      width: "150px",
+      align: "right",
+      render: (p) => {
+        const item = monthlyById.get(p.id);
+        const value = item ? item.forecastAmount : amountOf(p);
+        const isVariable = p.amountKind === "VARIABLE";
+        return value != null ? (
+          <span
+            className={`tabular-nums text-sm ${isVariable ? "italic text-muted-foreground" : "text-muted-foreground"}`}
+            title={isVariable ? "Valor estimado (média dos últimos 3 meses)" : "Valor fixo"}
+          >
+            {formatCurrency(value)}
+            {isVariable ? " (est.)" : ""}
+          </span>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        );
+      },
     },
     {
       key: "frequency",
       header: "Frequência",
-      width: "140px",
+      width: "130px",
       render: (p) => (
         <span className="text-sm text-muted-foreground">
           {SCHEDULE_FREQUENCY_LABELS[p.frequency as SCHEDULE_FREQUENCY] ?? p.frequency}
@@ -210,32 +277,14 @@ export const RecurrentPayablesListPage = () => {
       ),
     },
     {
-      key: "method",
-      header: "Forma",
-      width: "140px",
-      render: (p) =>
-        p.paymentMethod ? (
-          <span className="text-sm text-muted-foreground">{PAYMENT_METHOD_LABELS[p.paymentMethod as PAYMENT_METHOD] ?? p.paymentMethod}</span>
-        ) : (
-          <span className="text-muted-foreground text-xs">—</span>
-        ),
-    },
-    {
-      key: "isActive",
-      header: "Status",
-      width: "130px",
+      key: "transactions",
+      header: "Transações",
+      width: "120px",
       align: "center",
-      sortable: true,
-      render: (p) =>
-        p.isActive ? (
-          <Badge variant="completed" size="sm">
-            Ativa
-          </Badge>
-        ) : (
-          <Badge variant="muted" size="sm">
-            Inativa
-          </Badge>
-        ),
+      render: (p) => {
+        const item = monthlyById.get(p.id);
+        return <span className="tabular-nums text-sm">{item?.transactionCount ?? 0}</span>;
+      },
     },
   ];
 
@@ -244,62 +293,58 @@ export const RecurrentPayablesListPage = () => {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"
-          title="Contas Recorrentes"
+          title="Recorrentes — Pagamentos do mês"
           icon={IconRepeat}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Financeiro", href: routes.financial.root },
-            { label: "Contas Recorrentes" },
+            { label: "Conciliação Bancária", href: routes.financial.reconciliation.root },
+            { label: "Recorrentes" },
           ]}
           actions={[
             {
               key: "create",
               label: "Nova conta",
               icon: IconPlus,
-              onClick: () => {
-                setEditing(null);
-                setEditorOpen(true);
-              },
+              onClick: () => navigate(routes.financial.recurrentPayables.create),
               variant: "default" as const,
             },
           ]}
           className="flex-shrink-0"
         />
 
+        <SummaryGrid
+          totalPaid={monthly?.totalPaid ?? 0}
+          totalForecast={monthly?.totalForecast ?? 0}
+          paidCount={monthly?.paidCount ?? 0}
+          pendingCount={monthly?.pendingCount ?? 0}
+          isLoading={monthlyLoading}
+        />
+
         <div className="flex-1 min-h-0 pb-6 flex flex-col">
           <Card className="flex flex-col shadow-sm border border-border h-full">
             <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
-              <div className="flex flex-shrink-0 items-center gap-4">
-                <TableSearchInput value={searchText} onChange={handleSearch} placeholder="Buscar por nome, tomador ou categoria..." />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-shrink-0">
+                <div className="flex flex-1 min-w-0">
+                  <TableSearchInput
+                    value={searchText}
+                    onChange={setSearchText}
+                    placeholder="Buscar por nome, tomador ou categoria..."
+                  />
+                </div>
+                <MonthNav month={selectedMonth} onPrev={() => stepMonth(-1)} onNext={() => stepMonth(1)} />
               </div>
 
               <div className="flex-1 min-h-0 overflow-auto">
                 <StandardizedTable
                   className="h-full"
                   columns={columns}
-                  data={pageItems}
+                  data={rows}
                   getItemKey={(p) => p.id}
                   onContextMenu={handleContextMenu}
-                  onSort={toggleSort}
-                  getSortDirection={getSortDirection}
-                  getSortOrder={getSortOrder}
-                  sortConfigs={sortConfigs.map((s) => ({ field: s.column, direction: s.direction }))}
                   isLoading={isLoading}
                   emptyMessage="Nenhuma conta recorrente cadastrada"
                   emptyIcon={IconRepeat}
-                  currentPage={page}
-                  totalPages={totalPages}
-                  pageSize={pageSize}
-                  totalRecords={totalRecords}
-                  onPageChange={setPage}
-                  onPageSizeChange={(size) => {
-                    setPageSize(size);
-                    setPage(0);
-                  }}
-                  pageSizeOptions={[40, 60, 100]}
-                  showPageSizeSelector
-                  showGoToPage
-                  showPageInfo
                 />
               </div>
             </CardContent>
@@ -312,6 +357,17 @@ export const RecurrentPayablesListPage = () => {
         <PositionedDropdownMenuContent position={contextMenu} isOpen={!!contextMenu} className="w-48 ![position:fixed]" onCloseAutoFocus={(e) => e.preventDefault()}>
           {contextMenu && (
             <>
+              {contextMenu.item.isActive &&
+                monthlyById.get(contextMenu.item.id)?.status === "PENDING" &&
+                monthlyById.get(contextMenu.item.id)?.occurrenceId && (
+                <>
+                  <DropdownMenuItem onClick={() => startPay(contextMenu.item)}>
+                    <IconCircleCheck className="mr-2 h-4 w-4" />
+                    Marcar como paga
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem onClick={() => openEdit(contextMenu.item)}>
                 <IconEdit className="mr-2 h-4 w-4" />
                 Editar
@@ -338,17 +394,16 @@ export const RecurrentPayablesListPage = () => {
         </PositionedDropdownMenuContent>
       </DropdownMenu>
 
-      <RecurrentPayableForm
-        open={editorOpen}
-        onOpenChange={setEditorOpen}
-        payable={editing}
-        isPending={createMutation.isPending || updateMutation.isPending}
-        onSubmit={(payload, id) => {
-          if (id) {
-            update({ id, body: payload }, { onSuccess: () => setEditorOpen(false) });
-          } else {
-            create(payload, { onSuccess: () => setEditorOpen(false) });
-          }
+      <PayOccurrenceDialog
+        target={payTarget}
+        isPending={payMutation.isPending}
+        onClose={() => setPayTarget(null)}
+        onConfirm={(paidAmount) => {
+          if (!payTarget?.item.occurrenceId) return;
+          pay(
+            { occurrenceId: payTarget.item.occurrenceId, body: { paidAmount } },
+            { onSuccess: () => setPayTarget(null) },
+          );
         }}
       />
 
@@ -377,5 +432,148 @@ export const RecurrentPayablesListPage = () => {
     </PrivilegeRoute>
   );
 };
+
+// ---------------------------------------------------------------------------
+// Month navigation (prev/next chevrons + month label)
+// ---------------------------------------------------------------------------
+function MonthNav({ month, onPrev, onNext }: { month: Date; onPrev: () => void; onNext: () => void }) {
+  return (
+    <div className="flex items-center gap-1 flex-shrink-0">
+      <Button variant="outline" size="icon" onClick={onPrev} aria-label="Mês anterior">
+        <IconChevronLeft className="h-4 w-4" />
+      </Button>
+      <div className="min-w-[140px] text-center text-sm font-medium capitalize">
+        {format(month, "MMMM yyyy", { locale: ptBR })}
+      </div>
+      <Button variant="outline" size="icon" onClick={onNext} aria-label="Próximo mês">
+        <IconChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mark-paid dialog (VARIABLE bills — captures the real paid amount)
+// ---------------------------------------------------------------------------
+const payFormSchema = z.object({
+  paidAmount: z.coerce.number({ invalid_type_error: "valor inválido" }).positive("Informe o valor pago"),
+});
+type PayFormData = z.infer<typeof payFormSchema>;
+
+function PayOccurrenceDialog({
+  target,
+  isPending,
+  onClose,
+  onConfirm,
+}: {
+  target: { payable: RecurrentPayable; item: RecurrentPayableMonthlyItem } | null;
+  isPending: boolean;
+  onClose: () => void;
+  onConfirm: (paidAmount: number) => void;
+}) {
+  const form = useForm<PayFormData>({
+    resolver: zodResolver(payFormSchema),
+    defaultValues: { paidAmount: undefined as unknown as number },
+  });
+
+  // Seed the input with the forecast each time a new bill is targeted.
+  useEffect(() => {
+    if (target) form.reset({ paidAmount: target.item.forecastAmount || (undefined as unknown as number) });
+  }, [target, form]);
+
+  return (
+    <Dialog open={target !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Marcar como paga</DialogTitle>
+          <DialogDescription>
+            {target ? `Informe o valor pago de "${target.payable.name}" neste mês.` : ""}
+          </DialogDescription>
+        </DialogHeader>
+        <FormProvider {...form}>
+          <form
+            onSubmit={form.handleSubmit((data) => onConfirm(data.paidAmount))}
+            className="space-y-4"
+          >
+            <FormMoneyInput<PayFormData> name="paidAmount" label="Valor pago" required disabled={isPending} />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Salvando..." : "Confirmar pagamento"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </FormProvider>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// KPI summary cards
+// ---------------------------------------------------------------------------
+function SummaryGrid({
+  totalPaid,
+  totalForecast,
+  paidCount,
+  pendingCount,
+  isLoading,
+}: {
+  totalPaid: number;
+  totalForecast: number;
+  paidCount: number;
+  pendingCount: number;
+  isLoading: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <KpiCard label="Total pago no mês" value={isLoading ? null : formatCurrency(totalPaid)} Icon={IconCash} tone="emerald" />
+      <KpiCard label="Previsão total" value={isLoading ? null : formatCurrency(totalForecast)} Icon={IconTrendingUp} tone="violet" />
+      <KpiCard label="Recorrentes pagas" value={isLoading ? null : String(paidCount)} Icon={IconCheck} tone="blue" />
+      <KpiCard label="Recorrentes pendentes" value={isLoading ? null : String(pendingCount)} Icon={IconClockHour4} tone="amber" />
+    </div>
+  );
+}
+
+const TONE_STYLES: Record<"emerald" | "amber" | "blue" | "violet", string> = {
+  emerald: "text-emerald-600 bg-emerald-500/10",
+  amber: "text-amber-600 bg-amber-500/10",
+  blue: "text-blue-600 bg-blue-500/10",
+  violet: "text-violet-600 bg-violet-500/10",
+};
+
+function KpiCard({
+  label,
+  value,
+  Icon,
+  tone,
+}: {
+  label: string;
+  value: string | null;
+  Icon: typeof IconCheck;
+  tone: "emerald" | "amber" | "blue" | "violet";
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className={`p-2 rounded-lg ${TONE_STYLES[tone]}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-muted-foreground truncate">{label}</p>
+          {value === null ? (
+            <Skeleton className="h-6 w-24 mt-1" />
+          ) : (
+            <p className="text-lg font-semibold truncate" title={value}>
+              {value}
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default RecurrentPayablesListPage;

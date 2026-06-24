@@ -21,6 +21,72 @@ import { ColumnHeader } from "@/components/ui/column-header";
 import { COLUMN_WIDTH_CONSTRAINTS } from "@/hooks/common/use-column-widths";
 import { IconAlertTriangle } from "@tabler/icons-react";
 
+// Columns that hold dates and must be compared chronologically (nulls last).
+const DATE_SORT_COLUMNS = new Set(["forecastDate", "entryDate", "startedAt", "finishedAt", "term", "createdAt"]);
+
+// Extract the comparable value + its type for a given sortable column. Mirrors the
+// accessors used by the task columns so a client-side sort matches the cells.
+function getTaskSortValue(task: Task, columnId: string): { type: "date" | "number" | "string"; value: number | string | null } {
+  switch (columnId) {
+    case "identificador":
+      return { type: "string", value: task.serialNumber || task.truck?.plate || "" };
+    case "name":
+      return { type: "string", value: task.name || "" };
+    case "customer.fantasyName":
+      return { type: "string", value: task.customer?.corporateName || task.customer?.fantasyName || "" };
+    case "sector.name":
+      return { type: "string", value: task.sector?.name || "" };
+    case "chassisNumber":
+      return { type: "string", value: task.truck?.chassisNumber || "" };
+    case "truckCategory":
+      return { type: "string", value: task.truck?.category || "" };
+    case "implementType":
+      return { type: "string", value: task.truck?.implementType || "" };
+    case "status":
+      return { type: "number", value: (task as any).statusOrder ?? null };
+    case "price":
+      return { type: "number", value: task.quote?.total ?? null };
+    default:
+      if (DATE_SORT_COLUMNS.has(columnId)) {
+        const raw = (task as any)[columnId];
+        return { type: "date", value: raw ? new Date(raw).getTime() : null };
+      }
+      const fallback = (task as any)[columnId];
+      return { type: "string", value: fallback == null ? "" : String(fallback) };
+  }
+}
+
+// Client-side comparator that honors the active multi-column sort. Strings use a
+// numeric-aware (natural) collation so serial numbers sort 9 < 10 < 100 instead of
+// lexicographically; nulls/empties always sort last, matching the server's `nulls: "last"`.
+function compareTasksBySort(a: Task, b: Task, sortConfigs: Array<{ column: string; direction: "asc" | "desc" }>): number {
+  for (const { column, direction } of sortConfigs) {
+    const dir = direction === "desc" ? -1 : 1;
+    const av = getTaskSortValue(a, column);
+    const bv = getTaskSortValue(b, column);
+    let cmp = 0;
+
+    if (av.type === "date" || av.type === "number") {
+      const an = av.value as number | null;
+      const bn = bv.value as number | null;
+      if (an === bn) cmp = 0;
+      else if (an === null) cmp = 1; // nulls last regardless of direction
+      else if (bn === null) cmp = -1;
+      else cmp = (an < bn ? -1 : 1) * dir;
+    } else {
+      const as = (av.value as string) || "";
+      const bs = (bv.value as string) || "";
+      if (!as && !bs) cmp = 0;
+      else if (!as) cmp = 1; // empties last regardless of direction
+      else if (!bs) cmp = -1;
+      else cmp = as.localeCompare(bs, "pt-BR", { numeric: true, sensitivity: "base" }) * dir;
+    }
+
+    if (cmp !== 0) return cmp;
+  }
+  return 0;
+}
+
 interface TaskPreparationTableProps {
   visibleColumns: Set<string>;
   columnOrder?: string[];
@@ -139,7 +205,15 @@ export function TaskPreparationTable({
 
   // Fetch tasks
   const { data, isLoading, error } = useTasks({ ...queryParams, refetchOnWindowFocus });
-  const tasks = data?.data || [];
+  // The server sorts `identificador` (serialNumber) lexicographically, so "10" lands
+  // before "9". When that column is part of the active sort, re-sort client-side with a
+  // numeric-aware comparator so serial numbers order naturally. This same order flows to
+  // the batch-edit page, since the context menu builds its URL from this list.
+  const tasks = useMemo(() => {
+    const base = data?.data || [];
+    if (!sortConfigs.some((c) => c.column === "identificador")) return base;
+    return [...base].sort((a, b) => compareTasksBySort(a, b, sortConfigs));
+  }, [data?.data, sortConfigs]);
   const totalRecords = data?.meta?.totalRecords || 0;
 
   // Notify parent of data changes

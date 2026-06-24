@@ -6,6 +6,7 @@ import type {
   RecurrentPayableDetailResponse,
   RecurrentPayableListParams,
   RecurrentPayableListResponse,
+  RecurrentPayableMonthlyResponse,
   RecurrentPayableMutationResponse,
   UpdateRecurrentPayablePayload,
 } from "@/types/recurrent-payable";
@@ -15,6 +16,12 @@ const basePath = "/financial/recurrent-payables";
 export const recurrentPayableService = {
   getRecurrentPayables: (params?: RecurrentPayableListParams) =>
     apiClient.get<RecurrentPayableListResponse>(basePath, { params }),
+
+  // Per-bill monthly dashboard. `competence` is YYYY-MM; omit for current month.
+  getMonthly: (competence?: string) =>
+    apiClient.get<RecurrentPayableMonthlyResponse>(`${basePath}/monthly`, {
+      params: competence ? { competence } : undefined,
+    }),
 
   getRecurrentPayable: (id: string) =>
     apiClient.get<RecurrentPayableDetailResponse>(`${basePath}/${id}`),

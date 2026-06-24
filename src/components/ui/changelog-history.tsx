@@ -78,6 +78,11 @@ interface ChangelogHistoryProps {
   entityCreatedAt?: Date;
   className?: string;
   maxHeight?: string;
+  // Fill the parent's height instead of imposing a fixed one. The Card becomes
+  // h-full (no inline height), so a stretched grid/flex cell can size it to a
+  // sibling card; it still scrolls internally. Pair with a parent that defines
+  // the height (e.g. an items-stretch grid, or an absolute-inset wrapper).
+  fillParent?: boolean;
   limit?: number;
 }
 
@@ -2590,6 +2595,7 @@ export function ChangelogHistory({
   entityCreatedAt,
   className,
   maxHeight,
+  fillParent = false,
   limit = 50,
 }: ChangelogHistoryProps) {
   // Rollback loading state
@@ -3093,9 +3099,10 @@ export function ChangelogHistory({
     <Card
       className={cn(
         "shadow-sm border border-border flex flex-col overflow-hidden",
+        fillParent && "h-full",
         className,
       )}
-      style={maxHeight ? { maxHeight, height: maxHeight } : undefined}
+      style={!fillParent && maxHeight ? { maxHeight, height: maxHeight } : undefined}
     >
       <CardHeader className="pb-4 flex-shrink-0">
         <CardTitle className="flex items-center gap-2">

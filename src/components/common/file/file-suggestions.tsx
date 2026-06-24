@@ -1,9 +1,16 @@
 import React, { useState } from "react";
 import type { File as AnkaaFile } from "../../../types";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { IconLoader2, IconFile, IconPhoto, IconFileTypePdf, IconEye, IconCirclePlus } from "@tabler/icons-react";
+import {
+  IconLoader2,
+  IconFile,
+  IconPhoto,
+  IconFileTypePdf,
+  IconEye,
+  IconCirclePlus,
+  IconSparkles,
+} from "@tabler/icons-react";
 import { useFileSuggestions, useCreateFileFromExisting } from "../../../hooks/common/use-file";
 import { useFileViewer } from "@/components/common/file/file-viewer";
 import { formatRelativeTime } from "@/utils/date";
@@ -20,33 +27,28 @@ export interface FileSuggestionsProps {
 const getThumbnailUrl = (file: AnkaaFile): string | null => {
   if (file.thumbnailUrl) return file.thumbnailUrl;
   if (file.mimetype?.startsWith("image/")) {
-    const baseUrl = getApiBaseUrl();
-    return `${baseUrl}/files/thumbnail/${file.id}?size=small`;
+    return `${getApiBaseUrl()}/files/thumbnail/${file.id}?size=small`;
   }
   return null;
 };
 
 const getFileIcon = (file: AnkaaFile) => {
   if (file.mimetype === "application/pdf") {
-    return <IconFileTypePdf size={20} className="text-red-500" />;
+    return <IconFileTypePdf size={36} className="text-red-500" />;
   }
   if (file.mimetype?.startsWith("image/")) {
-    return <IconPhoto size={20} className="text-blue-500" />;
+    return <IconPhoto size={36} className="text-blue-500" />;
   }
-  return <IconFile size={20} className="text-muted-foreground" />;
+  return <IconFile size={36} className="text-muted-foreground" />;
 };
 
-const truncateFilename = (name: string, maxLen = 20): string => {
-  if (name.length <= maxLen) return name;
-  const ext = name.lastIndexOf(".");
-  if (ext > 0) {
-    const extension = name.slice(ext);
-    const base = name.slice(0, maxLen - extension.length - 3);
-    return `${base}...${extension}`;
-  }
-  return `${name.slice(0, maxLen - 3)}...`;
-};
-
+/**
+ * Renders ONLY the recommendation cards — as a fragment of flex items — so they sit in
+ * the SAME horizontal strip as the attached-layout cards (the ArtworkFileUploadField
+ * card row places this between the layouts and the add-card). Same size/shape as a
+ * layout card, but a dashed border + amber "Recomendado" badge + "Usar" action make it
+ * unmistakably a recommendation, not a selected layout.
+ */
 export const FileSuggestions: React.FC<FileSuggestionsProps> = ({
   customerId,
   fileContext,
@@ -55,7 +57,9 @@ export const FileSuggestions: React.FC<FileSuggestionsProps> = ({
   disabled = false,
 }) => {
   const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
-  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+  // "Usar" clones the file (new id), so the ORIGINAL won't be in excludeFileIds and
+  // would keep showing as a recommendation. Track the originals we've used and hide them.
+  const [usedIds, setUsedIds] = useState<Set<string>>(() => new Set());
 
   const { data: suggestions, isLoading } = useFileSuggestions({
     customerId,
@@ -68,11 +72,13 @@ export const FileSuggestions: React.FC<FileSuggestionsProps> = ({
 
   const handleSelect = async (file: AnkaaFile) => {
     if (disabled || loadingFileId) return;
-    setOpenPopoverId(null);
     setLoadingFileId(file.id);
     try {
       const result = await createFromExisting.mutateAsync(file.id);
+      // The API now generates the clone's own thumbnail, so the attached card shows the
+      // preview. (Backend also excludes the source by path on refetch.)
       onSelect(result.data);
+      setUsedIds((prev) => new Set(prev).add(file.id)); // drop it from the shelf now
     } catch {
       // Error handled by react-query
     } finally {
@@ -80,110 +86,109 @@ export const FileSuggestions: React.FC<FileSuggestionsProps> = ({
     }
   };
 
-  const handleView = (file: AnkaaFile) => {
-    setOpenPopoverId(null);
-    fileViewer.actions.viewFile(file);
-  };
+  const handleView = (file: AnkaaFile) => fileViewer.actions.viewFile(file);
 
   if (!customerId) return null;
 
   if (isLoading) {
     return (
-      <div className="mt-1.5">
-        <p className="text-[11px] text-muted-foreground/80 mb-1">Arquivos recentes do cliente</p>
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-[72px] w-[72px] shrink-0 rounded" />
-          ))}
-        </div>
-      </div>
+      <>
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-[300px] w-[280px] shrink-0 rounded-lg" />
+        ))}
+      </>
     );
   }
 
-  if (!suggestions || suggestions.length === 0) return null;
+  const visible = (suggestions ?? []).filter((f) => !usedIds.has(f.id));
+  if (visible.length === 0) return null;
 
   return (
-    <div className="mt-1.5">
-      <p className="text-[11px] text-muted-foreground/80 mb-1">Arquivos recentes do cliente</p>
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-        {suggestions.map((file) => {
-          const thumbnailUrl = getThumbnailUrl(file);
-          const isCurrentLoading = loadingFileId === file.id;
-
-          return (
-            <Popover
-              key={file.id}
-              open={openPopoverId === file.id}
-              onOpenChange={(open) => setOpenPopoverId(open ? file.id : null)}
+    <>
+      {visible.map((file) => {
+        const thumbnailUrl = getThumbnailUrl(file);
+        const isCurrentLoading = loadingFileId === file.id;
+        return (
+          <div
+            key={file.id}
+            className="group/sug relative w-[280px] shrink-0 overflow-hidden rounded-lg border-2 border-dashed border-border bg-card/40"
+          >
+            {/* Clicking the preview USES the layout directly (one-click reuse). */}
+            <button
+              type="button"
+              onClick={() => handleSelect(file)}
+              disabled={disabled || !!loadingFileId}
+              title="Usar este layout"
+              className="relative block h-52 w-full bg-muted disabled:cursor-not-allowed"
             >
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  disabled={disabled || !!loadingFileId}
-                  className={cn(
-                    "relative flex flex-col items-center gap-0.5 p-1 rounded border border-border/40 bg-muted/30 hover:bg-muted/60 transition-colors shrink-0 w-[72px] cursor-pointer",
-                    "disabled:opacity-50 disabled:cursor-not-allowed",
-                    isCurrentLoading && "opacity-70",
-                    openPopoverId === file.id && "ring-1 ring-primary/50 border-primary/50",
-                  )}
-                >
-                  {isCurrentLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded z-10">
-                      <IconLoader2 size={16} className="animate-spin text-primary" />
-                    </div>
-                  )}
-                  <div className="w-11 h-11 rounded-sm flex items-center justify-center overflow-hidden bg-muted/60">
-                    {thumbnailUrl ? (
-                      <img
-                        src={thumbnailUrl}
-                        alt={file.filename}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = "none";
-                          (e.target as HTMLImageElement).nextElementSibling?.classList.remove("hidden");
-                        }}
-                      />
-                    ) : null}
-                    <span className={thumbnailUrl ? "hidden" : ""}>
-                      {getFileIcon(file)}
-                    </span>
-                  </div>
-                  <span className="text-[9px] text-muted-foreground leading-tight text-center w-full truncate" title={file.filename}>
-                    {truncateFilename(file.filename)}
-                  </span>
-                  <span className="text-[8px] text-muted-foreground/60 leading-tight">
-                    {formatRelativeTime(file.createdAt)}
-                  </span>
-                </button>
-              </PopoverTrigger>
-
-              <PopoverContent
-                className="w-auto p-1 flex gap-1"
-                side="top"
-                sideOffset={4}
-                align="center"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleView(file)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
-                >
-                  <IconEye size={14} />
-                  Ver
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelect(file)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-                >
+              {thumbnailUrl ? (
+                <img
+                  src={thumbnailUrl}
+                  alt={file.filename}
+                  className="h-full w-full object-cover opacity-90"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.visibility = "hidden";
+                  }}
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  {getFileIcon(file)}
+                </div>
+              )}
+              {/* Recommendation badge — amber + sparkle. NEVER a selection check. */}
+              <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-medium text-white shadow">
+                <IconSparkles className="h-3 w-3" />
+                Recomendado
+              </span>
+              <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover/sug:bg-black/40 group-hover/sug:opacity-100">
+                <span className="flex items-center gap-1 text-xs font-medium text-white">
                   <IconCirclePlus size={14} />
-                  Selecionar
-                </button>
-              </PopoverContent>
-            </Popover>
-          );
-        })}
-      </div>
-    </div>
+                  Usar
+                </span>
+              </div>
+              {isCurrentLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60">
+                  <IconLoader2 size={20} className="animate-spin text-primary" />
+                </div>
+              )}
+            </button>
+            <div className="space-y-2 p-2">
+              <div>
+                <p className="truncate text-xs font-medium" title={file.filename}>
+                  {file.filename}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {formatRelativeTime(file.createdAt)}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 flex-1 px-2"
+                  onClick={() => handleView(file)}
+                >
+                  <IconEye className="mr-1 h-3.5 w-3.5" />
+                  Ver
+                </Button>
+                {/* OUTLINE "Usar" (add) — distinct from the filled green "Selecionado". */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 flex-[2] px-2"
+                  disabled={disabled || !!loadingFileId}
+                  onClick={() => handleSelect(file)}
+                >
+                  <IconCirclePlus className="mr-1 h-3.5 w-3.5" />
+                  Usar este layout
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </>
   );
 };

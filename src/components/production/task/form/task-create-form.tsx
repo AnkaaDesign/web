@@ -49,7 +49,7 @@ import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { LayoutForm } from "@/components/production/layout/layout-form";
 import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
-import { FileUploadField, type FileWithPreview } from "@/components/common/file";
+import { FileUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import { ArtworkFileUploadField } from "./artwork-file-upload-field";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole } from "@/types/responsible";
@@ -1052,7 +1052,33 @@ export const TaskCreateForm = () => {
                             existingFiles={uploadedFiles}
                             placeholder="Adicione layouts relacionados à tarefa"
                             label="Layouts anexados"
-                          />
+                            variant="card"
+                          >
+                            {/* Reuse a layout already used for this customer (no re-upload). */}
+                            <FileSuggestions
+                              customerId={customerIdValue ?? undefined}
+                              fileContext="tasksArtworks"
+                              excludeFileIds={uploadedFiles
+                                .map((f) => (f as any).uploadedFileId || f.id)
+                                .filter(Boolean)}
+                              onSelect={(newFile) => {
+                                const fileWithPreview = {
+                                  id: newFile.id,
+                                  name: newFile.filename || newFile.originalName || "artwork",
+                                  size: newFile.size || 0,
+                                  type: newFile.mimetype || "application/octet-stream",
+                                  lastModified: Date.now(),
+                                  uploaded: true,
+                                  uploadProgress: 100,
+                                  uploadedFileId: newFile.id,
+                                  thumbnailUrl: newFile.thumbnailUrl || undefined,
+                                  status: "DRAFT",
+                                } as FileWithPreview;
+                                setUploadedFiles((prev) => [...prev, fileWithPreview]);
+                              }}
+                              disabled={isSubmitting}
+                            />
+                          </ArtworkFileUploadField>
                         </CardContent>
                       </AccordionContent>
                     </Card>

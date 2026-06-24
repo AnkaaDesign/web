@@ -78,6 +78,8 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
+    // Newest warnings first — the most intuitive default for a disciplinary log.
+    defaultSort: [{ column: "createdAt", direction: "desc" }],
   });
 
   // Check if we should use the my-warnings or team-staff endpoint
@@ -264,12 +266,14 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
     }
   };
 
+  // Severity escalates in color intensity: VERBAL (mildest) → FINAL_WARNING (most severe).
+  // Mirrors the centralized BADGE_VARIANTS.WARNING config in constants/badge-colors.ts.
   const getSeverityVariant = (severity: string) => {
     switch (severity) {
-      case "VERBAL": return "warning" as const;
-      case "WRITTEN": return "secondary" as const;
-      case "SUSPENSION": return "destructive" as const;
-      case "FINAL_WARNING": return "error" as const;
+      case "VERBAL": return "info" as const;
+      case "WRITTEN": return "pending" as const;
+      case "SUSPENSION": return "warning" as const;
+      case "FINAL_WARNING": return "destructive" as const;
       default: return "default" as const;
     }
   };
@@ -290,7 +294,7 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
         key: "collaborator.name",
         header: "COLABORADOR",
         sortable: true,
-        className: "min-w-[280px] max-w-[320px]",
+        className: "min-w-[340px] max-w-[440px]",
         accessor: (warning: Warning) => {
           const collaborator = warning.collaborator as any;
           return (
@@ -327,11 +331,11 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
         key: "supervisor.name",
         header: "SUPERVISOR",
         sortable: false,
-        className: "min-w-[180px]",
+        className: "min-w-[160px] max-w-[200px]",
         accessor: (warning: Warning) => {
           const supervisor = warning.supervisor as any;
           return supervisor?.name
-            ? <span className="text-sm">{supervisor.name}</span>
+            ? <span className="text-sm truncate block" title={supervisor.name}>{supervisor.name}</span>
             : <span className="text-sm text-muted-foreground">—</span>;
         },
       },
@@ -339,9 +343,9 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
         key: "isActive",
         header: "STATUS",
         sortable: true,
-        className: "min-w-[110px]",
+        className: "min-w-[96px] max-w-[110px]",
         accessor: (warning: Warning) => (
-          <Badge variant={warning.isActive ? "secondary" : "success"} className="font-normal">
+          <Badge variant={warning.isActive ? "active" : "inactive"} className="font-normal">
             {warning.isActive ? "Ativa" : "Resolvida"}
           </Badge>
         ),
@@ -357,7 +361,7 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
         key: "createdAt",
         header: "CRIADO EM",
         sortable: true,
-        className: "min-w-[110px]",
+        className: "min-w-[96px] max-w-[110px]",
         accessor: (warning: Warning) => <span className="text-sm text-muted-foreground">{formatDate(warning.createdAt)}</span>,
       },
     ],

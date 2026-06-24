@@ -154,15 +154,15 @@ export function useAccordionScroll() {
           // Check if user prefers reduced motion
           const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-          // Use native scrollIntoView which respects CSS scroll-margin-top
-          // This is more reliable than manual calculation
+          // `block: 'nearest'` does NOTHING when the section header is already on
+          // screen (it is — the user just clicked it), so opening a section no longer
+          // YANKS the whole page (header + nav scrolling off). Off-screen sections
+          // still get the minimal scroll needed to become visible.
           element.scrollIntoView({
             behavior: prefersReduced ? 'auto' : 'smooth',
-            block: 'start',
+            block: 'nearest',
             inline: 'nearest'
           });
-
-          console.log('Scrolled to accordion:', accordionId);
         } catch (error) {
           console.error('Accordion scroll failed:', error);
           // Fallback to instant scroll

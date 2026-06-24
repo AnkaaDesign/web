@@ -89,12 +89,13 @@ const FinancialNfseDetail = lazy(() => import("@/pages/financial/nfse/detail").t
 const ReconciliationTransactionDetail = lazy(() => import("@/pages/financial/reconciliation/transaction-detail").then((module) => ({ default: module.ReconciliationTransactionDetailPage })));
 const ReconciliationFiscalDocumentDetail = lazy(() => import("@/pages/financial/reconciliation/fiscal-document-detail").then((module) => ({ default: module.ReconciliationFiscalDocumentDetailPage })));
 const ReconciliationCategoriesList = lazy(() => import("@/pages/financial/reconciliation/categories-list").then((module) => ({ default: module.ReconciliationCategoriesListPage })));
-const ReconciliationRecurringForecast = lazy(() => import("@/pages/financial/reconciliation/recurring-forecast").then((module) => ({ default: module.ReconciliationRecurringForecastPage })));
 const ReconciliationStatement = lazy(() => import("@/pages/financial/reconciliation/statement").then((module) => ({ default: module.ReconciliationStatementPage })));
 const ReconciliationStatistics = lazy(() => import("@/pages/financial/statistics/reconciliation").then((module) => ({ default: module.ReconciliationStatisticsPage })));
 const AccountsPayableListPage = lazy(() => import("@/pages/financial/accounts-payable/list"));
 const ReceivablesListPage = lazy(() => import("@/pages/financial/receivables/list"));
 const RecurrentPayablesListPage = lazy(() => import("@/pages/financial/recurrent-payables/list"));
+const CreateRecurrentPayablePage = lazy(() => import("@/pages/financial/recurrent-payables/create"));
+const EditRecurrentPayablePage = lazy(() => import("@/pages/financial/recurrent-payables/edit/[id]"));
 const FinancialCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
 const FinancialCustomersBatchEdit = lazy(() => import("@/pages/administration/customers/batch-edit").then((module) => ({ default: module.CustomerBatchEditPage })));
 
@@ -1587,14 +1588,6 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.financial.reconciliation.recurring}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ReconciliationRecurringForecast />
-                    </Suspense>
-                  }
-                />
-                <Route
                   path={routes.financial.accountsPayable.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -1607,6 +1600,22 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <RecurrentPayablesListPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.recurrentPayables.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <CreateRecurrentPayablePage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.recurrentPayables.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <EditRecurrentPayablePage />
                     </Suspense>
                   }
                 />

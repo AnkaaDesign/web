@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useContext, useMemo } from "react";
+import React, { useState, useCallback, useContext, useMemo, useRef, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { FileViewerContext } from "@/components/common/file/file-viewer";
 import type { File as AnkaaFile } from "@/types";
@@ -37,6 +37,9 @@ export interface ArtworkFileUploadFieldProps {
   placeholder?: string;
   label?: string;
   children?: React.ReactNode;
+  // "list" (default) = compact rows; "card" = image-on-top cards in a single
+  // horizontal-scroll row (no wrapping), matching the budget "Layout Aprovado" cards.
+  variant?: "list" | "card";
 }
 
 const defaultAcceptedTypes = {
@@ -101,9 +104,31 @@ export function ArtworkFileUploadField({
   placeholder,
   label,
   children,
+  variant = "list",
 }: ArtworkFileUploadFieldProps) {
   const [files, setFiles] = useState<FileWithPreview[]>(existingFiles);
   const [thumbnailErrors, setThumbnailErrors] = useState<Record<string, boolean>>({});
+
+  // Card row is a single horizontal-scroll strip. Let a normal vertical mouse wheel
+  // scroll it sideways (no Shift) — but SMARTLY: only hijack the wheel while the strip
+  // can still scroll that way, so at either end the page scrolls normally (no trap).
+  // Non-passive listener so preventDefault works.
+  const cardScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = cardScrollRef.current;
+    if (!el || variant !== "card") return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY === 0) return;
+      if (el.scrollWidth <= el.clientWidth) return; // no overflow → let the page scroll
+      const atStart = el.scrollLeft <= 0;
+      const atEnd = Math.ceil(el.scrollLeft + el.clientWidth) >= el.scrollWidth;
+      if ((e.deltaY < 0 && atStart) || (e.deltaY > 0 && atEnd)) return; // edge → page scroll
+      el.scrollLeft += e.deltaY;
+      e.preventDefault();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [variant]);
 
   // Sync with external file changes (important for parent components managing file state)
   React.useEffect(() => {
@@ -212,6 +237,166 @@ export function ArtworkFileUploadField({
     };
   }, []);
 
+  // Per-file CARD (image-on-top) for the `card` variant grid — mirrors the budget
+  // "Layout Aprovado" card: preview (click → Ver), filename + size, colored status
+  // selector, and a remove ✕ over the image.
+  const renderFileCard = (file: FileWithPreview) => {
+    const IconComponent = getFileIcon(file);
+    const hasError = !!file.error;
+    const isUploaded = !!file.uploaded;
+    const isUploading =
+      file.uploadProgress !== undefined &&
+      file.uploadProgress > 0 &&
+      file.uploadProgress < 100 &&
+      !isUploaded &&
+      !hasError;
+    const thumbnailError = thumbnailErrors[file.id] || false;
+    // An IMAGE that's already persisted (has a real File id) can always be previewed
+    // via the /files/thumbnail/<id> endpoint even when `thumbnailUrl` wasn't loaded —
+    // otherwise it falls back to a generic "JPG" icon. (onError still degrades to the
+    // icon if the endpoint 404s.)
+    const isImageFile =
+      (file.type || "").startsWith("image/") ||
+      /\.(jpe?g|png|gif|webp|svg|bmp)$/i.test(file.name || "");
+    const shouldShowThumbnail =
+      showPreview &&
+      !thumbnailError &&
+      !!(file.preview || file.thumbnailUrl || (isImageFile && file.uploadedFileId));
+    const getThumbnailSrc = () => {
+      const apiBaseUrl = getApiBaseUrl();
+      if (file.thumbnailUrl) {
+        if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
+        if (file.thumbnailUrl.startsWith("http")) return rewriteCdnUrl(file.thumbnailUrl);
+        return file.thumbnailUrl;
+      }
+      if (file.preview) return file.preview;
+      if (file.uploadedFileId) return `${apiBaseUrl}/files/thumbnail/${file.uploadedFileId}`;
+      return "";
+    };
+    const handleStatusChange = (newStatus: string) => {
+      setFiles((prev) =>
+        prev.map((f) => {
+          if (f.id !== file.id) return f;
+          if (f instanceof File) {
+            return Object.assign(f, { status: newStatus }) as FileWithPreview;
+          }
+          const fileObj = f as FileWithPreview;
+          return {
+            ...fileObj,
+            name: fileObj.name,
+            size: fileObj.size,
+            type: fileObj.type,
+            status: newStatus as any,
+          };
+        }),
+      );
+      onStatusChange(file.uploadedFileId || file.id, newStatus as any);
+    };
+    return (
+      <div
+        key={file.id}
+        className={cn(
+          "relative w-[280px] shrink-0 overflow-hidden rounded-lg border-2 border-border bg-card",
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => !isUploading && openFilePreview(file)}
+          title="Ver"
+          className="relative block h-52 w-full bg-muted"
+        >
+          {isUploading ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <div className="h-5 w-5 animate-spin rounded-full border border-primary/30 border-t-primary" />
+            </div>
+          ) : shouldShowThumbnail ? (
+            <img
+              src={getThumbnailSrc()}
+              alt={file.name}
+              className="h-full w-full object-cover"
+              onError={() => setThumbnailErrors((prev) => ({ ...prev, [file.id]: true }))}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <IconComponent
+                className={cn("h-8 w-8", isUploaded ? "text-primary" : "text-muted-foreground")}
+              />
+            </div>
+          )}
+        </button>
+        {!disabled && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              removeFile(file.id);
+            }}
+            title="Remover"
+            className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-destructive hover:text-white"
+          >
+            <IconX className="h-3.5 w-3.5" />
+          </button>
+        )}
+        <div className="space-y-2 p-2">
+          <div>
+            <p className="truncate text-xs font-medium text-foreground" title={file.name}>
+              {file.name}
+            </p>
+            <p className="text-[10px] text-muted-foreground">{formatFileSize(file.size || 0)}</p>
+          </div>
+          {hasError && <p className="text-[10px] text-destructive">{file.error}</p>}
+          <ArtworkStatusSelector
+            value={file.status || "DRAFT"}
+            onChange={handleStatusChange}
+            disabled={disabled}
+            className="w-full"
+            triggerClassName="h-8 w-full justify-between"
+          />
+        </div>
+      </div>
+    );
+  };
+
+  // The dropzone rendered as an "add" CARD the same size as the layout cards, placed
+  // at the END of the grid (no separate top dropzone, no "anexados" header).
+  const renderAddCard = () => (
+    <div
+      {...getRootProps()}
+      className={cn(
+        "flex min-h-[300px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/20 p-4 text-center transition-colors",
+        !disabled && "hover:border-primary/50 hover:bg-muted/30",
+        isDragActive && "border-primary bg-primary/5",
+        disabled && "cursor-not-allowed opacity-50",
+        "w-[280px] shrink-0",
+      )}
+    >
+      <input {...getInputProps()} />
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+        <IconUpload
+          className={cn("h-5 w-5", isDragActive ? "text-primary" : "text-muted-foreground")}
+        />
+      </div>
+      <p className="text-xs font-medium text-foreground">
+        {isDragActive ? "Solte aqui..." : placeholder || "Adicionar layout"}
+      </p>
+      <p className="text-[10px] text-muted-foreground">{acceptedFilesList}</p>
+    </div>
+  );
+
+  // CARD variant — ONE horizontal-scroll strip: attached layout cards, then any
+  // `children` (e.g. FileSuggestions' inline "Recomendado" cards), then the add card.
+  if (variant === "card") {
+    return (
+      <div className={cn("w-full", className)}>
+        <div ref={cardScrollRef} className="flex gap-3 overflow-x-auto pb-2">
+          {files.map((file) => renderFileCard(file))}
+          {children}
+          {!isAtLimit && renderAddCard()}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("space-y-3 w-full", className)}>
       {/* Upload Area */}
@@ -282,7 +467,13 @@ export function ArtworkFileUploadField({
               const isUploading = file.uploadProgress !== undefined && file.uploadProgress > 0 && file.uploadProgress < 100 && !isUploaded && !hasError;
 
               const thumbnailError = thumbnailErrors[file.id] || false;
-              const shouldShowThumbnail = showPreview && !thumbnailError && (file.preview || (isUploaded && file.thumbnailUrl));
+              const isImageFile =
+                (file.type || "").startsWith("image/") ||
+                /\.(jpe?g|png|gif|webp|svg|bmp)$/i.test(file.name || "");
+              const shouldShowThumbnail =
+                showPreview &&
+                !thumbnailError &&
+                !!(file.preview || file.thumbnailUrl || (isImageFile && file.uploadedFileId));
 
               const getThumbnailSrc = () => {
                 const apiBaseUrl = getApiBaseUrl();
@@ -294,6 +485,28 @@ export function ArtworkFileUploadField({
                 if (file.preview) return file.preview;
                 if (file.uploadedFileId) return `${apiBaseUrl}/files/thumbnail/${file.uploadedFileId}`;
                 return "";
+              };
+
+              // Status change — preserve the File instance (Object.assign) so submit's
+              // `instanceof File` filter still works; rebuild plain objects explicitly.
+              const handleStatusChange = (newStatus: string) => {
+                setFiles((prev) =>
+                  prev.map((f) => {
+                    if (f.id !== file.id) return f;
+                    if (f instanceof File) {
+                      return Object.assign(f, { status: newStatus }) as FileWithPreview;
+                    }
+                    const fileObj = f as FileWithPreview;
+                    return {
+                      ...fileObj,
+                      name: fileObj.name,
+                      size: fileObj.size,
+                      type: fileObj.type,
+                      status: newStatus as any,
+                    };
+                  }),
+                );
+                onStatusChange(file.uploadedFileId || file.id, newStatus as any);
               };
 
               return (
@@ -332,30 +545,7 @@ export function ArtworkFileUploadField({
                   <div className="shrink-0">
                   <ArtworkStatusSelector
                     value={file.status || 'DRAFT'}
-                    onChange={(newStatus) => {
-                      // Update file status in local state
-                      setFiles(prev => prev.map(f => {
-                        if (f.id !== file.id) return f;
-
-                        // For File objects (new uploads), use Object.assign to preserve the File instance
-                        // This is important because form submission uses `instanceof File` to filter files
-                        if (f instanceof File) {
-                          return Object.assign(f, { status: newStatus }) as FileWithPreview;
-                        }
-
-                        // For plain objects (existing files from server), create new object with
-                        // explicit name/size/type properties. These properties are normally getters
-                        // on File prototype and wouldn't be copied by spread operator alone.
-                        const fileObj = f as FileWithPreview;
-                        return { ...fileObj, name: fileObj.name, size: fileObj.size, type: fileObj.type, status: newStatus as any };
-                      }));
-
-                      // Notify parent of status change
-                      // Use uploadedFileId for existing files, or id for new uploads
-                      const fileId = file.uploadedFileId || file.id;
-                      console.log('[ArtworkFileUploadField] Status changed:', { fileId, uploadedFileId: file.uploadedFileId, id: file.id, newStatus });
-                      onStatusChange(fileId, newStatus as any);
-                    }}
+                    onChange={handleStatusChange}
                     disabled={disabled}
                   />
                   </div>

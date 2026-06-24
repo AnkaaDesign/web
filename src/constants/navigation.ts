@@ -755,24 +755,16 @@ export const NAVIGATION_MENU: MenuItem[] = [
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
           },
           {
-            // First-class recurrent bills (aluguel/internet/energia/água) — each
-            // materializes a monthly occurrence into Contas a Pagar.
+            // Recurring monthly bills (aluguel/internet/energia/água). One page:
+            // a monthly Pago/Pendente/Previsão dashboard + full CRUD. Each bill
+            // materializes a monthly occurrence into Contas a Pagar. (Consolidated
+            // — absorbed the former legacy "Recorrentes (categorias)" forecast.)
             id: "contas-recorrentes",
-            title: "Contas Recorrentes",
+            title: "Recorrentes",
             icon: "repeat",
             path: "/financeiro/contas-recorrentes",
             order: 4,
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
-          },
-          {
-            // Legacy reconciliation recurring-categories view (distinct from the
-            // first-class Contas Recorrentes CRUD above).
-            id: "conciliacao-recorrentes",
-            title: "Recorrentes (categorias)",
-            icon: "repeat",
-            path: "/financeiro/conciliacao/recorrentes",
-            order: 5,
-            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL],
           },
           {
             // Manage the transaction category set (the only place to edit it).
@@ -780,7 +772,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
             title: "Categorias",
             icon: "tags",
             path: "/financeiro/conciliacao/categorias",
-            order: 6,
+            order: 5,
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
           },
         ],

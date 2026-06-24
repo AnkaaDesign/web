@@ -57,7 +57,16 @@ export const TaskBatchEditPage = () => {
     enabled: taskIds.length > 0,
   });
 
-  const tasks = tasksResponse?.data || [];
+  // Preserve the exact order the task IDs arrived in from the URL. The originating
+  // page (e.g. the task preparation table) selects them in its currently-applied
+  // sort order, so honoring the URL order reproduces whatever sort the user had
+  // active there — including any column sort they changed. The API returns the
+  // tasks in DB order, so we reorder the fetched rows to match the `ids` order.
+  const tasks = useMemo(() => {
+    const fetched = tasksResponse?.data || [];
+    const orderIndex = new Map(taskIds.map((id, index) => [id, index]));
+    return [...fetched].sort((a, b) => (orderIndex.get(a.id) ?? Infinity) - (orderIndex.get(b.id) ?? Infinity));
+  }, [tasksResponse?.data, taskIds]);
 
   // Validate that we have tasks to edit
   const hasValidTasks = tasks.length > 0;

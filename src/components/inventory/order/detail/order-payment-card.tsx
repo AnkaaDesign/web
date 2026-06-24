@@ -109,7 +109,7 @@ export function OrderPaymentCard({ order, className }: OrderPaymentCardProps) {
                 <IconCreditCard className="h-4 w-4" />
                 Status de Pagamento
               </span>
-              <OrderPaymentStatusBadge status={order.paymentStatus} />
+              <OrderPaymentStatusBadge status={order.paymentStatus} paymentMethod={order.paymentMethod} />
             </div>
           )}
 

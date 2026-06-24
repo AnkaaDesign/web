@@ -1230,6 +1230,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
               existingFiles={artworkFiles}
               placeholder="Selecione layouts para as tarefas"
               label="Layouts"
+              variant="card"
             >
               <FileSuggestions
                 customerId={commonCustomerId}
@@ -1472,7 +1473,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className={`${operationType === "layout" || operationType === "serviceOrder" ? "sm:max-w-4xl" : "sm:max-w-2xl"} max-h-[85vh] flex flex-col`}>
+      <DialogContent className={`${operationType === "layout" || operationType === "serviceOrder" ? "sm:max-w-4xl" : operationType === "arts" ? "sm:max-w-3xl" : "sm:max-w-2xl"} max-h-[85vh] flex flex-col`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getModalIcon()}

@@ -476,6 +476,9 @@ export const warningCreateSchema = z
     followUpDate: z.coerce.date(),
     hrNotes: createDescriptionSchema(0, 1000, false).nullable().optional(),
     resolvedAt: z.coerce.date().nullable().optional(),
+    // Encerrar automaticamente ao fim do acompanhamento (decurso de prazo).
+    // A API nunca aplica auto-resolução em SUSPENSION / FINAL_WARNING.
+    autoResolve: z.boolean().default(false),
     // Dias de suspensão (severity = SUSPENSION). CLT art. 474 limita a 30 dias.
     suspensionDays: z
       .number()
@@ -512,6 +515,8 @@ export const warningUpdateSchema = z
     followUpDate: z.coerce.date().optional(),
     hrNotes: createDescriptionSchema(0, 1000, false).nullable().optional(),
     resolvedAt: z.coerce.date().nullable().optional(),
+    // Encerrar automaticamente ao fim do acompanhamento (decurso de prazo).
+    autoResolve: z.boolean().optional(),
     // Dias de suspensão (severity = SUSPENSION). CLT art. 474 limita a 30 dias.
     suspensionDays: z
       .number()
@@ -586,6 +591,7 @@ export const mapToWarningFormData = createMapToFormDataHelper<Warning, WarningUp
   collaboratorId: warning.collaboratorId,
   supervisorId: warning.supervisorId,
   followUpDate: warning.followUpDate,
+  autoResolve: warning.autoResolve,
   hrNotes: warning.hrNotes,
   resolvedAt: warning.resolvedAt,
   suspensionDays: warning.suspensionDays,

@@ -26,6 +26,21 @@ export function useRecurrentPayables(params?: RecurrentPayableListParams) {
   });
 }
 
+/**
+ * Per-bill monthly dashboard for the unified Recorrentes page. `competence` is
+ * YYYY-MM; omit for the current month. Lazily materializes each active bill's
+ * occurrence server-side, so KPI totals + Pago/Pendente per row are always
+ * populated for the selected month.
+ */
+export function useRecurrentPayableMonthly(competence?: string) {
+  return useQuery({
+    queryKey: recurrentPayableKeys.monthly(competence),
+    queryFn: () =>
+      recurrentPayableService.getMonthly(competence).then((r) => r.data.data),
+    staleTime: 30_000,
+  });
+}
+
 /** Single recurrent payable with its last 12 occurrences. */
 export function useRecurrentPayable(id: string | undefined) {
   return useQuery({

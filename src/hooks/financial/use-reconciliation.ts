@@ -412,17 +412,6 @@ export function useConfirmSuggestion() {
   });
 }
 
-export function useRecurringForecast(from: string, to: string) {
-  return useQuery({
-    queryKey: reconciliationKeys.recurringForecast(from, to),
-    queryFn: () =>
-      reconciliationService
-        .getRecurringForecast({ from, to })
-        .then((r) => r.data),
-    staleTime: 60_000,
-  });
-}
-
 export function useSiegStatus() {
   return useQuery({
     queryKey: reconciliationKeys.siegStatus(),

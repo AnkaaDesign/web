@@ -7,5 +7,6 @@ export * from "./collaborator-select";
 export * from "./supervisor-select";
 export * from "./follow-up-date-picker";
 export * from "./active-switch";
+export * from "./auto-resolve-switch";
 export * from "./witness-multi-select";
 export * from "./hr-notes-textarea";

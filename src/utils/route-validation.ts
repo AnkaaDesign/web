@@ -223,7 +223,6 @@ const VALID_ROUTES = [
   routes.financial.reconciliation.fiscalDocuments,
   routes.financial.reconciliation.fiscalDocumentDetail(":id"),
   routes.financial.reconciliation.categories,
-  routes.financial.reconciliation.recurring,
   routes.financial.reconciliation.outflows,
   routes.financial.reconciliation.inflows,
 

@@ -975,6 +975,10 @@ export const recurrentPayableKeys = {
       ? (["recurrentPayable", "list", params] as const)
       : (["recurrentPayable", "list"] as const),
   detail: (id: string) => ["recurrentPayable", "detail", id] as const,
+  monthly: (competence?: string) =>
+    competence
+      ? (["recurrentPayable", "monthly", competence] as const)
+      : (["recurrentPayable", "monthly"] as const),
 };
 
 // =====================================================

@@ -572,6 +572,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
                     showPreview={true}
                     placeholder="Adicione os layouts da aerografia"
                     label="Layouts anexados"
+                    variant="card"
                   />
                 </FormControl>
               </FormItem>

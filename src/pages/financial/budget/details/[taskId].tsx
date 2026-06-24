@@ -133,23 +133,24 @@ export const FinancialBudgetDetailPage = () => {
     setBaseFiles(files);
   }, []);
 
-  const handleArtworkStatusChange = useCallback((fileId: string, status: string) => {
-    setArtworkStatuses((prev) => ({ ...prev, [fileId]: status }));
-  }, []);
-
-  // Selecting a task-artwork as the quote "Layout Aprovado" approves it; deselecting
-  // reverts it to DRAFT. Keyed by File id — same map the submit remap reads, so the
-  // change persists and shows in Step 1 on reload. Also mirror onto artworkFiles so
-  // the Step-1 dropdown reflects it immediately. Last action wins.
-  const handleArtworkLayoutApprovalChange = useCallback(
-    (fileId: string, approved: boolean) => {
-      const status = approved ? "APPROVED" : "DRAFT";
+  // Set a task-artwork's status (DRAFT/APPROVED/REPROVED) from the layout card's
+  // colored selector. Keyed by File id — same map the submit remap reads, so the change
+  // persists and shows in Step 1 on reload. Also mirror onto artworkFiles so the Step-1
+  // dropdown reflects it immediately. Last action wins.
+  const handleArtworkLayoutStatusChange = useCallback(
+    (fileId: string, status: string) => {
       setArtworkStatuses((prev) => ({ ...prev, [fileId]: status }));
       setArtworkFiles((prev) =>
         prev.map((f) => {
           const fId = (f as any).uploadedFileId || f.id;
           if (fId !== fileId) return f;
-          return { ...f, name: f.name, size: f.size, type: f.type, status } as FileWithPreview;
+          // Mutate status IN PLACE — a spread ({ ...f }) downgrades a freshly-dropped
+          // File instance to a plain object and DROPS the underlying blob, so the
+          // submit upload sends an empty body and the API rejects it ("Nenhum arquivo
+          // enviado."). Object.assign keeps the File instance (and its bytes) intact.
+          // `prev.map` still returns a new array, so React re-renders. Mirrors
+          // ArtworkFileUploadField's own status-change pattern.
+          return Object.assign(f, { status }) as FileWithPreview;
         }),
       );
     },
@@ -516,7 +517,13 @@ export const FinancialBudgetDetailPage = () => {
     loadedBaseFileIdsRef.current = ((task as any).baseFiles || []).map(
       (file: any) => file.id,
     );
-  }, [task]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Seed editable state by task IDENTITY only — NOT the full `task` object ref,
+    // which changes on every react-query background refetch. Re-running on a refetch
+    // called setArtworkFiles/setBaseFiles and WIPED unsaved uploads the user had just
+    // added (and selected as a quote layout). That left the layout pointing at a local
+    // temp id with no file left to upload, so submit sent the temp id and the API
+    // rejected it ("Invalid uuid"). Mirrors the sibling effect's `[task?.id]` guard.
+  }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dynamic steps based on customer count
   const customerConfigs = form.watch("customerConfigs");
@@ -655,9 +662,11 @@ export const FinancialBudgetDetailPage = () => {
 
       // 1b. Upload new base files (already-uploaded ones keep their id)
       const uploadedBaseFileIds: string[] = [];
+      const baseLocalIdToRealFileId: Record<string, string> = {};
       for (const file of baseFiles) {
         if (file.uploaded && file.uploadedFileId) {
           uploadedBaseFileIds.push(file.uploadedFileId);
+          baseLocalIdToRealFileId[file.id] = file.uploadedFileId;
         } else if (!file.error) {
           try {
             const response = await uploadSingleFile(file, {
@@ -665,12 +674,35 @@ export const FinancialBudgetDetailPage = () => {
             });
             if (response.success && response.data) {
               uploadedBaseFileIds.push(response.data.id);
+              baseLocalIdToRealFileId[file.id] = response.data.id;
             }
           } catch (error: any) {
             toast.error(`Erro ao enviar arquivo ${file.name}: ${error.message}`);
           }
         }
       }
+
+      // Persist the just-uploaded state back onto the file lists so a retry (after a
+      // later step fails) does NOT re-upload the same bytes and create duplicate File
+      // records. Mutate IN PLACE (Object.assign) to keep each File instance — a spread
+      // would drop the blob. `localIdToRealFileId` is keyed by each file's local id.
+      const markUploaded = (
+        list: FileWithPreview[],
+        idMap: Record<string, string>,
+      ): FileWithPreview[] =>
+        list.map((f) => {
+          const realId = idMap[f.id];
+          if (realId && !f.uploaded) {
+            return Object.assign(f, {
+              uploaded: true,
+              uploadedFileId: realId,
+              uploadProgress: 100,
+            }) as FileWithPreview;
+          }
+          return f;
+        });
+      setArtworkFiles((prev) => markUploaded(prev, localIdToRealFileId));
+      setBaseFiles((prev) => markUploaded(prev, baseLocalIdToRealFileId));
 
       // 2. Resolve the ordered layout File ids (up to 2 slots) from the current
       // layoutFiles state — NOT from form.data, which isn't updated when the user
@@ -681,7 +713,15 @@ export const FinancialBudgetDetailPage = () => {
       // had no server File id yet at selection time (only a local id). Those Step-1
       // files are uploaded in section 1 above, so remap any local id here to the
       // real File id via localIdToRealFileId before sending it (Bug 1).
+      // A persisted File id is always a UUID; a not-yet-uploaded file carries a local
+      // temp id (`<timestamp>-<random>`). The API only accepts UUIDs, so a temp id must
+      // never be sent — guard the raw push below so a stale synthetic layout (e.g. a
+      // selection whose source file was dropped from state) fails loudly here instead
+      // of as a cryptic 400 that loses the whole save.
+      const isUuid = (id: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       const resolvedLayoutIds: string[] = [];
+      let droppedStaleLayout = false;
       for (const lf of layoutFiles) {
         const existingId = (lf as any).uploadedFileId || lf.id || null;
         // Already uploaded by the Step-1 artwork pass? Use the real File id.
@@ -699,9 +739,19 @@ export const FinancialBudgetDetailPage = () => {
           } catch (error: any) {
             toast.error(`Erro ao enviar layout: ${error.message}`);
           }
-        } else if (existingId) {
+        } else if (existingId && isUuid(existingId)) {
           resolvedLayoutIds.push(existingId);
+        } else if (existingId) {
+          // Marked uploaded but still a local temp id with no remap and no blob to
+          // re-upload — the source file was lost (e.g. wiped by a background refetch).
+          // Drop it rather than poison the request with a non-UUID.
+          droppedStaleLayout = true;
         }
+      }
+      if (droppedStaleLayout) {
+        toast.error(
+          "Um layout selecionado não pôde ser salvo. Reenvie o arquivo de layout e tente novamente.",
+        );
       }
       // Dedupe (a layout could resolve to the same File id as another slot) and
       // clamp to the 2-slot maximum.
@@ -1083,39 +1133,38 @@ export const FinancialBudgetDetailPage = () => {
   // a layout just added in Step 1 immediately selectable in Step 2 (Bug 1).
   // For a not-yet-uploaded file the option `id` is the file's stable LOCAL id; at
   // submit it is remapped to the real File id (see localIdToRealFileId).
-  const artworksById = new Map<string, any>();
-  // Persisted artworks first (so live state can override with fresher data).
+  // Persisted-artwork METADATA keyed by File id — used only to enrich the live entries
+  // below (path/originalName/thumbnail). NOT a source of options on its own.
+  const persistedArtworkByFileId = new Map<string, any>();
   (task.artworks || []).forEach((artwork: any) => {
     const file = artwork.file || artwork;
     if (!(file.mimetype || "").startsWith("image/")) return;
-    artworksById.set(file.id, {
-      id: file.id,
-      artworkId: artwork.artworkId || artwork.id,
-      filename: file.filename,
-      originalName: file.originalName,
-      thumbnailUrl: file.thumbnailUrl,
-      status: artwork.status,
-      mimetype: file.mimetype,
-      // Remote storage path (http) when present — lets the viewer serve the file.
-      path: file.path || null,
-      size: file.size,
-    });
+    persistedArtworkByFileId.set(file.id, { file, artwork });
   });
-  // Live Step-1 files — including brand-new ones with only a local id.
+  // Options come from the LIVE Step-1 files (artworkFiles) — the single source of truth
+  // for which layouts the task currently has. artworkFiles is seeded from task.artworks
+  // on load and reflects every add/remove, so a layout REMOVED in Step 1 no longer shows
+  // here (the old code merged task.artworks first, so removed arts lingered — the bug),
+  // and a layout just ADDED is immediately selectable.
+  const artworksById = new Map<string, any>();
   artworkFiles.forEach((file: any) => {
     if (!(file.type || "").startsWith("image/")) return;
     const key = file.uploadedFileId || file.id;
+    const persisted = persistedArtworkByFileId.get(key);
+    const pf = persisted?.file;
     artworksById.set(key, {
       id: key,
-      artworkId: artworksById.get(key)?.artworkId,
-      filename: file.name,
-      originalName: file.name,
-      thumbnailUrl: file.thumbnailUrl || artworksById.get(key)?.thumbnailUrl,
+      artworkId: persisted?.artwork?.artworkId || persisted?.artwork?.id,
+      filename: file.name || pf?.filename,
+      originalName: file.name || pf?.originalName,
+      thumbnailUrl: file.thumbnailUrl || pf?.thumbnailUrl || null,
       // Object-URL preview for not-yet-uploaded local files (no server thumbnail).
       preview: file.preview || null,
-      status: file.status || artworksById.get(key)?.status,
-      mimetype: file.type,
-      size: file.size,
+      status: file.status || persisted?.artwork?.status,
+      mimetype: file.type || pf?.mimetype,
+      // Remote storage path (http) when present — lets the viewer serve the file.
+      path: pf?.path || null,
+      size: file.size ?? pf?.size,
     });
   });
   const artworks = Array.from(artworksById.values());
@@ -1193,7 +1242,7 @@ export const FinancialBudgetDetailPage = () => {
               onBaseFilesChange={handleBaseFilesChange}
               artworkFiles={artworkFiles}
               onArtworkFilesChange={handleArtworkFilesChange}
-              onArtworkStatusChange={handleArtworkStatusChange}
+              onArtworkStatusChange={handleArtworkLayoutStatusChange}
             />
           </div>
 
@@ -1203,7 +1252,6 @@ export const FinancialBudgetDetailPage = () => {
               layoutFiles={layoutFiles}
               onLayoutFilesChange={setLayoutFiles}
               artworks={artworks}
-              onArtworkLayoutApprovalChange={handleArtworkLayoutApprovalChange}
               customersCache={customersCache}
               selectedCustomers={selectedCustomers}
               setSelectedCustomers={setSelectedCustomers}

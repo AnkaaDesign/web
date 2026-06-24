@@ -29,12 +29,14 @@ interface SummaryCardProps {
   className?: string;
 }
 
+// Severity escalates in color intensity: VERBAL (mildest) → FINAL_WARNING (most severe).
+// Mirrors the centralized BADGE_VARIANTS.WARNING config in constants/badge-colors.ts.
 function getSeverityVariant(severity: string) {
   switch (severity) {
-    case "VERBAL": return "warning" as const;
-    case "WRITTEN": return "secondary" as const;
-    case "SUSPENSION": return "destructive" as const;
-    case "FINAL_WARNING": return "error" as const;
+    case "VERBAL": return "info" as const;
+    case "WRITTEN": return "pending" as const;
+    case "SUSPENSION": return "warning" as const;
+    case "FINAL_WARNING": return "destructive" as const;
     default: return "default" as const;
   }
 }
@@ -73,9 +75,16 @@ export function SummaryCard({ warning, className }: SummaryCardProps) {
             icon={IconCircleCheck}
             label="Status"
             value={
-              <Badge variant={warning.isActive ? "secondary" : "success"}>
-                {warning.isActive ? "Ativa" : "Resolvida"}
-              </Badge>
+              <div className="flex flex-col items-end gap-0.5">
+                <Badge variant={warning.isActive ? "active" : "inactive"}>
+                  {warning.isActive ? "Ativa" : "Resolvida"}
+                </Badge>
+                {!warning.isActive && warning.autoResolved && (
+                  <span className="text-xs text-muted-foreground">
+                    Resolvida automaticamente por decurso de prazo
+                  </span>
+                )}
+              </div>
             }
           />
           {warning.severity === "SUSPENSION" && (

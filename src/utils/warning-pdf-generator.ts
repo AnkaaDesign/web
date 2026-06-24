@@ -70,22 +70,9 @@ export function buildWarningPdfHtml(data: WarningPdfData): string {
       </tr>`
     : "";
 
-  const witnessRows = witnesses
-    .map(
-      (w) =>
-        `<tr>
-          <td class="id-label">Testemunha</td>
-          <td class="id-value">
-            ${escapeHtml(w.name)}
-            ${w.position ? `<br><span class="id-sub">${escapeHtml(w.position)}</span>` : ""}
-          </td>
-        </tr>`,
-    )
-    .join("");
-
   const descriptionSection = data.description
     ? `<div class="section-title">Descrição Detalhada</div>
-       <p class="body-text">${escapeHtml(data.description)}</p>`
+       <p class="desc-text">${escapeHtml(data.description)}</p>`
     : "";
 
   // Witnesses grouped 2 per sign-row
@@ -131,17 +118,17 @@ export function buildWarningPdfHtml(data: WarningPdfData): string {
       color: ${BRAND_COLORS.textDark};
       background: #fff;
     }
-    .sheet { padding: 14mm 14mm 12mm 14mm; min-height: 297mm; display: flex; flex-direction: column; }
-    .content { flex: 1 0 auto; }
+    .sheet { padding: 12mm 16mm 10mm 16mm; min-height: 297mm; display: flex; flex-direction: column; }
+    .content { flex: 0 0 auto; }
+    .spacer { flex: 1 1 auto; min-height: 18px; }
 
     /* Header */
-    .header { display: flex; align-items: flex-start; padding-bottom: 8px; }
-    .logo { height: 18mm; width: auto; }
-    .header-line { height: 2px; background: linear-gradient(to right, #888 0%, ${BRAND_COLORS.primaryGreen} 35%); margin: 4px 0 12px 0; }
+    .header { display: flex; align-items: flex-start; padding-bottom: 6px; }
+    .logo { height: 16mm; width: auto; }
+    .header-line { height: 2px; background: linear-gradient(to right, #888 0%, ${BRAND_COLORS.primaryGreen} 35%); margin: 4px 0 14px 0; }
 
     /* Title */
-    .doc-title { font-size: 18px; font-weight: bold; color: ${BRAND_COLORS.primaryGreen}; margin-bottom: 2px; }
-    .doc-subtitle { font-size: 12px; color: ${BRAND_COLORS.textDark}; margin-bottom: 14px; }
+    .doc-title { font-size: 18px; font-weight: bold; color: ${BRAND_COLORS.primaryGreen}; margin-bottom: 10px; }
 
     .severity-badge {
       display: inline-block;
@@ -187,23 +174,44 @@ export function buildWarningPdfHtml(data: WarningPdfData): string {
       border-radius: 0 4px 4px 0;
     }
 
-    /* Acknowledgement box */
-    .ack-box {
-      margin-top: 14px;
-      padding: 10px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      font-size: 10.5px;
+    /* Plain justified paragraph (lighter than the highlighted body-text box) */
+    .desc-text {
+      font-size: 11px;
+      line-height: 1.65;
       color: ${BRAND_COLORS.textDark};
-      background: #fafafa;
+      text-align: justify;
+      margin: 4px 2px 10px;
     }
-    .ack-box strong { color: ${BRAND_COLORS.primaryGreen}; }
+
+    /* Acknowledgement note — lightweight, no heavy box */
+    .ack-note {
+      margin-top: 12px;
+      font-size: 10px;
+      line-height: 1.6;
+      color: ${BRAND_COLORS.textGray};
+      text-align: justify;
+    }
+    /* Suspension legal notice keeps a subtle box (it is a formal CLT warning) */
+    .ack-box {
+      margin-top: 12px;
+      padding: 9px 12px;
+      border: 1px solid #e5e7eb;
+      border-left: 3px solid #b91c1c;
+      border-radius: 0 4px 4px 0;
+      font-size: 10px;
+      color: ${BRAND_COLORS.textDark};
+      background: #fef7f7;
+    }
+    .ack-box strong { color: #b91c1c; }
 
     /* Place & date */
-    .place-date { margin-top: 20px; font-size: 11px; }
+    .place-date { margin-top: 18px; font-size: 11px; }
+
+    /* Closing block (place-date + signatures) sits near the bottom of the sheet */
+    .closing { flex: 0 0 auto; }
 
     /* Signatures */
-    .signatures { margin-top: 28px; }
+    .signatures { margin-top: 14px; }
     .sign-row {
       display: flex;
       gap: 28px;
@@ -259,7 +267,6 @@ export function buildWarningPdfHtml(data: WarningPdfData): string {
         Advertência
         <span class="severity-badge${severityClass}">${escapeHtml(severityLabel(data.severity))}</span>
       </div>
-      <div class="doc-subtitle">${escapeHtml(COMPANY_INFO.name)}</div>
 
       <div class="section-title">Identificação</div>
       <table class="id-table">
@@ -284,10 +291,6 @@ export function buildWarningPdfHtml(data: WarningPdfData): string {
             <td class="id-label">Categoria da Ocorrência</td>
             <td class="id-value">${escapeHtml(categoryLabel(data.category))}</td>
           </tr>
-          <tr>
-            <td class="id-label">Gravidade</td>
-            <td class="id-value">${escapeHtml(severityLabel(data.severity))}</td>
-          </tr>
           ${suspensionRow}
           <tr>
             <td class="id-label">Data de Emissão</td>
@@ -297,7 +300,6 @@ export function buildWarningPdfHtml(data: WarningPdfData): string {
             <td class="id-label">Data de Acompanhamento</td>
             <td class="id-value">${formatDate(followUp)}</td>
           </tr>` : ""}
-          ${witnessRows}
         </tbody>
       </table>
 
@@ -316,12 +318,16 @@ export function buildWarningPdfHtml(data: WarningPdfData): string {
           </div>`
         : ""}
 
-      <div class="ack-box" style="margin-top: ${isSuspension ? "10px" : "14px"};">
-        O colaborador declara ter sido cientificado do conteúdo desta advertência.
-        A recusa em assinar não invalida o documento, devendo a testemunha registrar
-        a ocorrência no campo destinado à sua assinatura.
-      </div>
+      <p class="ack-note">
+        O colaborador declara ter sido cientificado do conteúdo desta advertência. A recusa em
+        assinar não invalida o documento, devendo as testemunhas registrarem a ocorrência no campo
+        destinado à sua assinatura.
+      </p>
+    </div>
 
+    <div class="spacer"></div>
+
+    <div class="closing">
       <div class="place-date">Ibiporã-PR, ${formatDate(issued)}.</div>
 
       <div class="signatures">
@@ -367,19 +373,28 @@ export function buildWarningPdfHtml(data: WarningPdfData): string {
 </html>`;
 }
 
-export function generateWarningPDF(data: WarningPdfData): void {
+/**
+ * Opens the warning document in a new tab for VIEWING (no print dialog).
+ * The browser's own viewer lets the user print or save-as-PDF if they want.
+ * Used as the on-demand preview for warnings that don't yet have a server-sealed term.
+ *
+ * Uses a Blob URL + anchor click rather than `window.open("")` + document.write:
+ * the latter is silently suppressed by popup blockers (returns null with no prompt),
+ * whereas a real-URL navigation triggered inside the user gesture is allowed.
+ */
+export function openWarningDocument(data: WarningPdfData): void {
   const html = buildWarningPdfHtml(data);
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    alert("Por favor, permita pop-ups para gerar o documento de advertência");
-    return;
-  }
-  printWindow.document.write(html);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.onload = () => {
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
-  };
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.target = "_blank";
+  anchor.rel = "noopener noreferrer";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+
+  // Revoke after the new tab has had time to load the document.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

@@ -56,7 +56,7 @@ interface BudgetStepReviewProps {
   userRole?: string;
   selectedCustomers: Map<string, any>;
   onStatusChange?: (status: string) => void;
-  layoutFiles?: Array<{ thumbnailUrl?: string; uploadedFileId?: string; id?: string }>;
+  layoutFiles?: Array<{ thumbnailUrl?: string; uploadedFileId?: string; id?: string; preview?: string | null }>;
   isCreateMode?: boolean;
 }
 
@@ -632,10 +632,20 @@ export function BudgetStepReview({
 
       {/* Layout Preview (renders the layoutFiles array, up to 2) */}
       {(() => {
+        // A persisted File id is a UUID; a not-yet-uploaded file carries a local temp
+        // id (`<timestamp>-<random>`) the thumbnail endpoint would 404 on (→ broken
+        // image). So resolve a local object-URL preview first, then a server
+        // thumbnailUrl, and only fall back to the thumbnail endpoint for a real UUID.
+        const isUuid = (id: string) =>
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
         const thumbFor = (slotFileId: string | null | undefined, slot?: any) => {
-          if (slotFileId) return `${getApiBaseUrl()}/files/thumbnail/${slotFileId}`;
-          if (slot?.thumbnailUrl) return slot.thumbnailUrl;
-          if (slot?.uploadedFileId) return `${getApiBaseUrl()}/files/thumbnail/${slot.uploadedFileId}`;
+          if (slot?.preview) return slot.preview as string;
+          if (slot?.thumbnailUrl) return slot.thumbnailUrl as string;
+          const realId =
+            (slot?.uploadedFileId && isUuid(slot.uploadedFileId) && slot.uploadedFileId) ||
+            (slotFileId && isUuid(slotFileId) && slotFileId) ||
+            null;
+          if (realId) return `${getApiBaseUrl()}/files/thumbnail/${realId}`;
           return null;
         };
         // Prefer the resolved layoutFiles array (has thumbnails); fall back to ids.
@@ -650,13 +660,20 @@ export function BudgetStepReview({
               <IconPhoto className="h-4 w-4 text-muted-foreground" />
               Layout
             </div>
-            <div className="flex flex-wrap gap-3">
+            {/* Near full-width preview: a single layout spans the whole row; two split
+                into a responsive 2-up grid. object-contain keeps the wrap's aspect. */}
+            <div
+              className={cn(
+                "grid gap-3",
+                slots.length <= 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2",
+              )}
+            >
               {slots.map((src, i) => (
                 <img
                   key={i}
                   src={src}
                   alt="Layout aprovado"
-                  className="max-h-48 rounded-lg shadow-sm object-contain"
+                  className="w-full max-h-[420px] rounded-lg bg-background object-contain shadow-sm"
                 />
               ))}
             </div>

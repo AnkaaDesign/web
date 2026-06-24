@@ -21,8 +21,10 @@ export interface RecurrentPayable {
   name: string;
   description: string | null;
   supplierId: string | null;
-  // Free-text payee when no cadastrado supplier applies.
+  // Free-text payee (imobiliária, concessionária…).
   payeeName: string | null;
+  // Optional CNPJ of the payee — enables NF auto-linking by emitter CNPJ.
+  payeeCnpj: string | null;
   categoryId: string;
   amountKind: AmountKind;
   // Decimal columns arrive as string|number depending on the serializer.
@@ -78,6 +80,7 @@ export interface CreateRecurrentPayablePayload {
   description?: string | null;
   supplierId?: string | null;
   payeeName?: string | null;
+  payeeCnpj?: string | null;
   categoryId: string;
   amountKind: AmountKind;
   // Required (> 0) when amountKind is FIXED.
@@ -95,6 +98,44 @@ export type UpdateRecurrentPayablePayload = Partial<CreateRecurrentPayablePayloa
 
 export interface RecurrentPayableListParams {
   isActive?: boolean;
+}
+
+// One row of the monthly Recorrentes dashboard — a bill plus its occurrence for
+// the selected competence (status/paid/forecast folded in).
+export interface RecurrentPayableMonthlyItem {
+  id: string;
+  // Null for past/future months with no materialized occurrence yet (read-only
+  // estimate); present for the current month and any already-materialized month.
+  occurrenceId: string | null;
+  name: string;
+  category: { id: string; name: string; color: string | null } | null;
+  payeeName: string | null;
+  amountKind: AmountKind;
+  isVariable: boolean;
+  frequency: RecurrentFrequency;
+  paymentMethod: "PIX" | "BANK_SLIP" | "CREDIT_CARD" | null;
+  dueDate: string;
+  status: RecurrentPayableStatus;
+  paidAmount: number | null;
+  paidAt: string | null;
+  forecastAmount: number;
+  nfLinked: boolean;
+  transactionCount: number;
+}
+
+export interface RecurrentPayableMonthly {
+  competence: string;
+  items: RecurrentPayableMonthlyItem[];
+  totalPaid: number;
+  totalForecast: number;
+  paidCount: number;
+  pendingCount: number;
+}
+
+export interface RecurrentPayableMonthlyResponse {
+  success: boolean;
+  message: string;
+  data: RecurrentPayableMonthly;
 }
 
 export interface PayRecurrentOccurrencePayload {
