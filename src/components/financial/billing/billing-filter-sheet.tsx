@@ -15,6 +15,7 @@ const QUOTE_STATUS_OPTIONS = [
   { value: "DUE", label: "Vencido" },
   { value: "PARTIAL", label: "Parcial" },
   { value: "SETTLED", label: "Liquidado" },
+  { value: "CANCELLED", label: "Cancelado" },
 ];
 
 export interface BillingFilters {

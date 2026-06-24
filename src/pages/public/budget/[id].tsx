@@ -279,7 +279,10 @@ export function PublicBudgetPage() {
     try {
       toast.info("Gerando PDF...");
       await exportBudgetPdfFromData({
-        corporateName,
+        // Match the on-screen intro: use the active-config (invoice-to) customer's
+        // name + document, falling back to the task's main customer name when absent.
+        corporateName: invoiceName || corporateName,
+        customerDocument: invoiceDoc || null,
         taskName: quote.task?.name || '',
         contactName,
         currentDate: formatDate(quote.createdAt),

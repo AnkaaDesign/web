@@ -2323,6 +2323,7 @@ export const TaskDetailsPage = () => {
                               DUE: 'Vencido',
                               PARTIAL: 'Parcial',
                               SETTLED: 'Liquidado',
+                              CANCELLED: 'Cancelado',
                             };
 
                             // Task detail page focuses on the early phase (PENDING/

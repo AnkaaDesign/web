@@ -162,7 +162,8 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       paintId: sourceTask.paintId,
       customerId: sourceTask.customerId,
       sectorId: sourceTask.sectorId,
-      bonification: sourceTask.bonification,
+      // Bonification is NOT copied — a fresh duplicate has done zero work
+      bonification: null,
 
       // Responsibles (shared references)
       responsibleIds: sourceTask.responsibles?.map((r: any) => r.id) || [],
@@ -184,16 +185,19 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       paintIds: sourceTask.logoPaints?.map((paint: any) => paint.id) || [],
 
       // Service orders (creates NEW records with status reset)
-      serviceOrders: sourceTask.serviceOrders?.map((service: any) => ({
-        description: service.description,
-        type: service.type,
-        status: SERVICE_ORDER_STATUS.PENDING,
-        statusOrder: 1,
-        assignedToId: service.assignedTo?.id || service.assignedToId || null,
-        observation: service.observation || null,
-        startedAt: null,
-        finishedAt: null,
-      })) || [],
+      // Cancelled SOs are skipped so they don't get resurrected as PENDING on copies
+      serviceOrders: sourceTask.serviceOrders
+        ?.filter((service: any) => service.status !== SERVICE_ORDER_STATUS.CANCELLED)
+        .map((service: any) => ({
+          description: service.description,
+          type: service.type,
+          status: SERVICE_ORDER_STATUS.PENDING,
+          statusOrder: 1,
+          assignedToId: service.assignedTo?.id || service.assignedToId || null,
+          observation: service.observation || null,
+          startedAt: null,
+          finishedAt: null,
+        })) || [],
 
       // Truck - copy all fields, use form values for plate/chassis (no fallback to avoid duplicates)
       // Layouts are SHARED (connect to existing layout IDs)
@@ -201,7 +205,8 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
         ? {
             plate: copyData.plate || null,
             chassisNumber: copyData.chassisNumber || null,
-            spot: truckData?.spot || null,
+            // Spot is a UNIQUE physical garage location — never copy it to a duplicate
+            spot: null,
             category: truckData?.category || null,
             implementType: truckData?.implementType || null,
             // Share existing layouts (connect to same layout records)

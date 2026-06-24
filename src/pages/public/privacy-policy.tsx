@@ -61,8 +61,8 @@ export function PrivacyPolicyPage() {
         <div className="space-y-8">
           <p className="text-sm leading-relaxed text-muted-foreground">
             Esta Política de Privacidade descreve como o aplicativo <strong className="text-foreground">Ankaa Design</strong> coleta,
-            utiliza e protege as informações dos usuários. O Ankaa Design é uma ferramenta de uso interno e profissional destinada à
-            gestão das operações da empresa.
+            utiliza e protege as informações dos usuários. O Ankaa Design é um aplicativo profissional de gestão e produtividade
+            voltado à administração de operações de negócios, como produção, estoque, recursos humanos e tarefas.
           </p>
 
           <Section icon={IconDatabase} title="1. Dados que coletamos">
@@ -103,7 +103,7 @@ export function PrivacyPolicyPage() {
           <Section icon={IconShare} title="3. Compartilhamento de dados">
             <p>
               Não vendemos, alugamos nem compartilhamos seus dados pessoais com terceiros para fins de marketing ou publicidade. Os
-              dados são armazenados em servidores próprios da empresa e acessados apenas por pessoal autorizado.
+              dados são armazenados em servidores seguros e acessados somente por usuários autenticados e autorizados pela conta.
             </p>
           </Section>
 
@@ -117,8 +117,7 @@ export function PrivacyPolicyPage() {
           <Section icon={IconUserCheck} title="5. Seus direitos">
             <p>
               Você pode solicitar acesso, correção ou exclusão dos seus dados pessoais entrando em contato conosco pelo e-mail abaixo.
-              Como o aplicativo é de uso corporativo interno, algumas solicitações podem estar sujeitas às políticas de retenção da
-              empresa.
+              Algumas solicitações podem estar sujeitas a obrigações legais de retenção de registros.
             </p>
           </Section>
 

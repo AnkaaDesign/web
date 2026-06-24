@@ -42,6 +42,10 @@ export function QuoteStatusBadge({ status, className, size = 'default', paidCoun
       label: 'Liquidado',
       variant: 'completed',
     },
+    CANCELLED: {
+      label: 'Cancelado',
+      variant: 'cancelled',
+    },
   };
 
   // Normalize casing so an unexpectedly-cased value (e.g. "budget_approved"

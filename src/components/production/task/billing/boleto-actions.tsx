@@ -393,10 +393,17 @@ export function BoletoActions({
   const canCopyDigitableLine =
     !!bankSlip?.digitableLine && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canChangeDueDate = canManage && bankSlip && (bankSlip.status === 'OVERDUE' || bankSlip.status === 'ACTIVE');
-  // Allow mark-as-paid whenever the installment itself is unpaid (PENDING, ACTIVE, or OVERDUE).
-  // PENDING is included for the generateBankSlip=false flow where no bank slip is created (PIX/transfer).
+  // Allow mark-as-paid whenever the installment is not already paid: PENDING, ACTIVE,
+  // OVERDUE — or CANCELLED. PENDING is the generateBankSlip=false flow (PIX/transfer, no
+  // bank slip). CANCELLED is included so a cancelled installment can be revived straight
+  // to PAID (boleto cancelled but customer paid by PIX/cash); receipts are then attached
+  // via this same dialog or the manage-receipts button that appears once it is paid.
   const canMarkPaid =
-    canManage && (installmentStatus === 'ACTIVE' || installmentStatus === 'OVERDUE' || installmentStatus === 'PENDING');
+    canManage &&
+    (installmentStatus === 'ACTIVE' ||
+      installmentStatus === 'OVERDUE' ||
+      installmentStatus === 'PENDING' ||
+      installmentStatus === 'CANCELLED');
 
   // Receipt management: any paid installment can open the manage-receipts dialog.
   const canManageReceipts = canManage && isPaid;

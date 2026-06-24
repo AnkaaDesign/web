@@ -417,6 +417,21 @@ export const FinancialBudgetCreatePage = () => {
         return;
       }
 
+      // With 2+ billing customers every service MUST be assigned to one — an
+      // unassigned service is excluded from every per-customer total, so its
+      // amount would silently vanish from the budget (and the API's billing-
+      // approval guard blocks approval anyway). Block the save here.
+      if (
+        (data.customerConfigs || []).length >= 2 &&
+        validServices.some((item: any) => !item.invoiceToCustomerId)
+      ) {
+        toast.error(
+          "Atribua um cliente a todos os serviços antes de salvar (orçamento com múltiplos clientes).",
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       if (!data.expiresAt) {
         toast.error("A data de validade é obrigatória.");
         setIsSubmitting(false);
@@ -717,9 +732,6 @@ export const FinancialBudgetCreatePage = () => {
     navigate,
   ]);
 
-  const customerCount = Array.isArray(customerConfigs)
-    ? customerConfigs.length
-    : 0;
   const isLastStep = currentStep === totalSteps;
 
   // Permission check
@@ -832,22 +844,28 @@ export const FinancialBudgetCreatePage = () => {
             />
           </div>
 
-          {/* Dynamic customer steps — conditional mount is fine (no field arrays) */}
-          {currentStep > 3 && currentStep <= 3 + customerCount && (() => {
-            const configIndex = currentStep - 4;
-            const config = customerConfigs?.[configIndex];
+          {/* Dynamic customer steps — kept MOUNTED (hidden via CSS), like steps 1-3,
+              so each step's local UI state (CPF/CNPJ toggle, "Data específica"
+              visibility) survives Next/Back navigation. A conditional mount dropped
+              that state on every step change because it isn't lifted into the form. */}
+          {(customerConfigs || []).map((config: any, configIndex: number) => {
+            const stepNumber = 4 + configIndex;
             const customer = config
               ? customersCache.current.get(config.customerId)
               : null;
             return (
-              <BudgetStepCustomerPayment
-                key={`customer-config-${configIndex}`}
-                configIndex={configIndex}
-                customer={customer}
-                disabled={isSubmitting}
-              />
+              <div
+                key={`customer-config-${config?.customerId ?? configIndex}`}
+                style={{ display: currentStep === stepNumber ? undefined : "none" }}
+              >
+                <BudgetStepCustomerPayment
+                  configIndex={configIndex}
+                  customer={customer}
+                  disabled={isSubmitting}
+                />
+              </div>
             );
-          })()}
+          })}
 
           {currentStep === totalSteps && (
             <BudgetStepReview
