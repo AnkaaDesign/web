@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { BadgeProps } from "@/components/ui/badge";
 import {
@@ -111,24 +112,112 @@ interface CategoryChipsProps {
  * muted label. Beyond `maxVisible` tags a "+N" overflow chip is shown whose
  * tooltip lists the remaining names.
  */
-export function CategoryChips({
+/** Renders the inner chip content (colored badge + optional cost-group label).
+ *  Shared between the off-screen measurement row and the visible row so both
+ *  produce identical widths. */
+function ChipContent({
+  tag,
+  showAccountingType,
+}: {
+  tag: BankTransactionCategoryTag;
+  showAccountingType: boolean;
+}) {
+  const color = tag.category.color;
+  const accountingLabel = getAccountingTypeLabel(tag.category);
+  return (
+    <span className="inline-flex flex-col items-start gap-0.5">
+      <Badge
+        variant={color ? undefined : "secondary"}
+        size="sm"
+        className="whitespace-nowrap border-transparent"
+        style={
+          color
+            ? { backgroundColor: color, color: getCategoryTextColor(color) ?? "#fff" }
+            : undefined
+        }
+      >
+        {tag.category.name}
+      </Badge>
+      {showAccountingType && accountingLabel && (
+        <span className="text-[10px] leading-none text-muted-foreground">
+          {accountingLabel}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function CategoryChips(props: CategoryChipsProps) {
+  if (!props.categories || props.categories.length === 0) {
+    return <span className="text-muted-foreground text-xs">—</span>;
+  }
+  return <CategoryChipsRow {...props} />;
+}
+
+/**
+ * Single-line chip row. Never wraps: as many category chips as fit on one line
+ * are shown, and the remainder collapse into a trailing "+N" overflow chip whose
+ * tooltip lists the hidden names. The visible count is measured against the
+ * container width (re-measured on resize) using an off-screen mirror row, with
+ * `maxVisible` acting as an upper cap when provided.
+ */
+function CategoryChipsRow({
   categories,
-  maxVisible = 3,
+  maxVisible,
   showAccountingType = false,
   className,
 }: CategoryChipsProps) {
-  if (!categories || categories.length === 0) {
-    return <span className="text-muted-foreground text-xs">—</span>;
-  }
+  const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const cap = maxVisible ?? categories.length;
+  const [visibleCount, setVisibleCount] = useState(Math.min(cap, categories.length));
 
-  const visible = categories.slice(0, maxVisible);
-  const overflow = categories.slice(maxVisible);
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const measure = measureRef.current;
+    if (!container || !measure) return;
+
+    const GAP = 4; // matches gap-1 (0.25rem)
+    const recompute = () => {
+      const available = container.clientWidth;
+      if (available <= 0) return;
+      const chipEls = Array.from(measure.querySelectorAll<HTMLElement>("[data-chip]"));
+      const overflowEl = measure.querySelector<HTMLElement>("[data-overflow]");
+      const overflowW = overflowEl ? overflowEl.offsetWidth + GAP : 0;
+
+      let used = 0;
+      let count = 0;
+      for (let i = 0; i < chipEls.length; i++) {
+        const w = chipEls[i].offsetWidth + (count > 0 ? GAP : 0);
+        const isLast = i === chipEls.length - 1;
+        // Reserve room for the "+N" chip unless this is the final category.
+        const reserve = isLast ? 0 : overflowW;
+        if (used + w + reserve <= available) {
+          used += w;
+          count++;
+        } else {
+          break;
+        }
+      }
+      setVisibleCount(Math.min(cap, Math.max(1, count)));
+    };
+
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [categories, cap, showAccountingType]);
+
+  const visible = categories.slice(0, visibleCount);
+  const overflow = categories.slice(visibleCount);
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
+      <div
+        ref={containerRef}
+        className={`flex flex-nowrap items-center gap-1 overflow-hidden ${className ?? ""}`}
+      >
         {visible.map(tag => {
-          const color = tag.category.color;
           const confidenceText =
             typeof tag.confidence === "number" ? ` · ${Math.round(tag.confidence)}%` : "";
           const accountingLabel = getAccountingTypeLabel(tag.category);
@@ -137,24 +226,8 @@ export function CategoryChips({
           return (
             <Tooltip key={tag.id}>
               <TooltipTrigger asChild>
-                <span className="inline-flex flex-col items-start gap-0.5">
-                  <Badge
-                    variant={color ? undefined : "secondary"}
-                    size="sm"
-                    className="whitespace-nowrap border-transparent"
-                    style={
-                      color
-                        ? { backgroundColor: color, color: getCategoryTextColor(color) ?? "#fff" }
-                        : undefined
-                    }
-                  >
-                    {tag.category.name}
-                  </Badge>
-                  {showAccountingType && accountingLabel && (
-                    <span className="text-[10px] leading-none text-muted-foreground">
-                      {accountingLabel}
-                    </span>
-                  )}
+                <span className="shrink-0">
+                  <ChipContent tag={tag} showAccountingType={showAccountingType} />
                 </span>
               </TooltipTrigger>
               <TooltipContent>{tooltip}</TooltipContent>
@@ -164,7 +237,7 @@ export function CategoryChips({
         {overflow.length > 0 && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge variant="secondary" size="sm" className="whitespace-nowrap">
+              <Badge variant="secondary" size="sm" className="shrink-0 whitespace-nowrap">
                 +{overflow.length}
               </Badge>
             </TooltipTrigger>
@@ -173,6 +246,22 @@ export function CategoryChips({
             </TooltipContent>
           </Tooltip>
         )}
+      </div>
+
+      {/* Off-screen mirror used only to measure natural chip widths. */}
+      <div
+        ref={measureRef}
+        aria-hidden
+        className="pointer-events-none invisible fixed -left-[9999px] top-0 flex flex-nowrap items-center gap-1"
+      >
+        {categories.map(tag => (
+          <span key={tag.id} data-chip className="shrink-0">
+            <ChipContent tag={tag} showAccountingType={showAccountingType} />
+          </span>
+        ))}
+        <Badge data-overflow variant="secondary" size="sm" className="whitespace-nowrap">
+          +{categories.length}
+        </Badge>
       </div>
     </TooltipProvider>
   );

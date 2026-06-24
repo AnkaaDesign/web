@@ -154,6 +154,7 @@ const TEMPLATES: MessageTemplate[] = [
     category: 'Anúncio',
     blocks: [
       { id: 'tg1-1', type: 'decorator', variant: 'header-logo' },
+      { id: 'tg1-1b', type: 'spacer', height: 'sm' },
       { id: 'tg1-2', type: 'heading1', content: 'Comunicado Geral', fontSize: '2xl', fontWeight: 'bold' },
       { id: 'tg1-3', type: 'paragraph', content: '[Assunto do Comunicado]', fontSize: 'sm', fontWeight: 'normal' },
       { id: 'tg1-4', type: 'divider' },
@@ -176,6 +177,7 @@ const TEMPLATES: MessageTemplate[] = [
     category: 'Aviso',
     blocks: [
       { id: 'tg2-1', type: 'decorator', variant: 'header-logo' },
+      { id: 'tg2-1b', type: 'spacer', height: 'sm' },
       { id: 'tg2-2', type: 'heading1', content: '⚠️ Aviso Urgente', fontSize: '2xl', fontWeight: 'bold' },
       { id: 'tg2-3', type: 'paragraph', content: 'Esta mensagem requer atenção imediata de todos os colaboradores. Leia com atenção e siga as orientações abaixo.', fontSize: 'base', fontWeight: 'normal' },
       { id: 'tg2-4', type: 'divider' },
@@ -194,6 +196,7 @@ const TEMPLATES: MessageTemplate[] = [
     category: 'RH',
     blocks: [
       { id: 'tg4-1', type: 'decorator', variant: 'header-logo' },
+      { id: 'tg4-1b', type: 'spacer', height: 'sm' },
       { id: 'tg4-2', type: 'heading1', content: 'Seja Bem-Vindo(a)! 🎉', fontSize: '2xl', fontWeight: 'bold' },
       { id: 'tg4-3', type: 'heading3', content: 'Estamos muito felizes em tê-lo(a) em nossa equipe!', fontSize: 'lg', fontWeight: 'semibold' },
       { id: 'tg4-4', type: 'paragraph', content: 'É com grande satisfação que recebemos você em nosso time. Sua trajetória e habilidades serão fundamentais para o crescimento de todos. Esperamos que esta jornada seja repleta de aprendizado, colaboração e conquistas.', fontSize: 'base', fontWeight: 'normal' },
@@ -217,6 +220,7 @@ const TEMPLATES: MessageTemplate[] = [
     category: 'Evento',
     blocks: [
       { id: 'tg5-1', type: 'decorator', variant: 'header-logo' },
+      { id: 'tg5-1b', type: 'spacer', height: 'sm' },
       { id: 'tg5-2', type: 'heading1', content: 'Você Está Convidado(a)! 🎊', fontSize: '2xl', fontWeight: 'bold' },
       { id: 'tg5-3', type: 'paragraph', content: 'Temos o prazer de convidá-lo(a) para um evento especial. A sua presença é muito importante e tornará este momento ainda mais significativo para todos nós.', fontSize: 'base', fontWeight: 'normal' },
       { id: 'tg5-4', type: 'divider' },
@@ -239,6 +243,7 @@ const TEMPLATES: MessageTemplate[] = [
     category: 'Normativo',
     blocks: [
       { id: 'tg7-1', type: 'decorator', variant: 'header-logo' },
+      { id: 'tg7-1b', type: 'spacer', height: 'sm' },
       { id: 'tg7-2', type: 'heading1', content: 'Política Interna', fontSize: '2xl', fontWeight: 'bold' },
       { id: 'tg7-3', type: 'paragraph', content: '[Nome da Política]\nVersão: 1.0  ·  Vigência: [Data]  ·  Responsável: [Departamento]', fontSize: 'sm', fontWeight: 'normal' },
       { id: 'tg7-4', type: 'divider' },
@@ -264,6 +269,7 @@ const TEMPLATES: MessageTemplate[] = [
     category: 'Ata',
     blocks: [
       { id: 'ta1-1', type: 'decorator', variant: 'header-logo' },
+      { id: 'ta1-1b', type: 'spacer', height: 'sm' },
       { id: 'ta1-2', type: 'heading1', content: 'Ata de Reunião', fontSize: '2xl', fontWeight: 'bold' },
       { id: 'ta1-3', type: 'paragraph', content: 'Reunião: [Tipo / Título]\nData: [Data]  ·  Horário: [Início] às [Término]\nLocal: [Sala / Link da videochamada]\nModerador: [Nome e Cargo]', fontSize: 'sm', fontWeight: 'normal' },
       { id: 'ta1-4', type: 'divider' },

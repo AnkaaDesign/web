@@ -138,7 +138,17 @@ export const exportMessageToPdf = (data: Pick<MessageFormData, "title" | "blocks
       }
       case "decorator": {
         const imgSrc = DECORATOR_IMAGES[block.variant] ?? DECORATOR_IMAGES["footer-wave-dark"];
-        return `<img src="${window.location.origin}${imgSrc}" style="width:100%;display:block" />`;
+        const src = `${window.location.origin}${imgSrc}`;
+        const isHeader = String(block.variant ?? "").startsWith("header-");
+        if (isHeader) {
+          // Header logos: inset the left edge so the logo lines up with the body
+          // content padding (8mm), and crop the asset's baked-in vertical
+          // whitespace (object-fit: cover on a fixed aspect ratio) so there is no
+          // gap above the logo. The right edge still bleeds so striped headers
+          // keep reaching the page edge.
+          return `<div style="padding:8mm 0 0 4mm"><div style="width:100%;aspect-ratio:15.3;overflow:hidden"><img src="${src}" style="width:100%;height:100%;object-fit:cover;object-position:left center;display:block" /></div></div>`;
+        }
+        return `<img src="${src}" style="width:100%;display:block" />`;
       }
       case "company-asset": {
         const url = block.asset === "logo" ? "/logo.png" : "/android-chrome-192x192.png";

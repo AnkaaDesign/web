@@ -16,6 +16,7 @@ import { CategorySelect } from "./category-select";
 import { ReasonInput } from "./reason-input";
 import { DescriptionTextarea } from "./description-textarea";
 import { CollaboratorSelect } from "./collaborator-select";
+import { SupervisorSelect } from "./supervisor-select";
 import { FollowUpDatePicker } from "./follow-up-date-picker";
 import { HrNotesTextarea } from "./hr-notes-textarea";
 import { ActiveSwitch } from "./active-switch";
@@ -48,6 +49,10 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
   const [searchParams, setSearchParams] = useSearchParams();
   const [attachmentFiles, setAttachmentFiles] = useState<FileWithPreview[]>([]);
   const [supervisorFromSector, setSupervisorFromSector] = useState<any>(null);
+  // True once a collaborator is selected whose sector has NO leader → fall back
+  // to a manual SupervisorSelect so supervisorId can be filled and the form stays
+  // submittable (Sector.leaderId is optional, so leaderless is a valid state).
+  const [sectorHasNoLeader, setSectorHasNoLeader] = useState(false);
   const { createAsync, updateAsync } = useWarningMutations();
 
   // Create a custom resolver based on mode
@@ -358,9 +363,13 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
                       if (leader?.id) {
                         form.setValue("supervisorId", leader.id, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
                         setSupervisorFromSector(leader);
+                        setSectorHasNoLeader(false);
                       } else {
+                        // Leaderless sector: clear the derived supervisor and switch to the
+                        // manual SupervisorSelect fallback. Don't keep a stale leader id.
                         form.setValue("supervisorId", "", { shouldDirty: true, shouldTouch: true, shouldValidate: true });
                         setSupervisorFromSector(null);
+                        setSectorHasNoLeader(!!user);
                       }
                     }}
                   />
@@ -376,10 +385,21 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
                     if (!collaboratorId) return null;
 
                     if (!supervisor) {
+                      // Leaderless sector (create mode): show an informational note and a
+                      // manual SupervisorSelect so the user can still assign a supervisor.
                       return (
-                        <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 rounded-md px-3 py-2 border border-amber-200 dark:border-amber-800">
-                          <IconAlertCircle className="h-4 w-4 shrink-0" />
-                          Setor sem líder definido — atribua um líder ao setor do colaborador
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 rounded-md px-3 py-2 border border-amber-200 dark:border-amber-800">
+                            <IconAlertCircle className="h-4 w-4 shrink-0" />
+                            Setor sem líder definido — selecione o supervisor manualmente
+                          </div>
+                          {props.mode === "create" && sectorHasNoLeader && (
+                            <SupervisorSelect
+                              control={form.control}
+                              disabled={isSubmitting}
+                              required
+                            />
+                          )}
                         </div>
                       );
                     }

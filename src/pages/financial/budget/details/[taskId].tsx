@@ -7,10 +7,7 @@ import {
   IconLoader2,
   IconCheck,
 } from "@tabler/icons-react";
-import {
-  routes,
-  IMPLEMENT_TYPE,
-} from "@/constants";
+import { routes } from "@/constants";
 import { useTaskDetail, useTaskMutations } from "@/hooks";
 import {
   useTaskQuoteByTask,
@@ -119,6 +116,14 @@ export const FinancialBudgetDetailPage = () => {
   const [artworkFiles, setArtworkFiles] = useState<FileWithPreview[]>([]);
   const [artworkStatuses, setArtworkStatuses] = useState<Record<string, string>>({});
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
+  // Snapshots of the relation sets as loaded from the task. Used at submit time to
+  // tell whether the user actually changed each set; if not, we OMIT the key so
+  // the API preserves it (absence = preserve). Sending an empty array would WIPE
+  // the relation (finding I40).
+  const loadedBaseFileIdsRef = useRef<string[]>([]);
+  const loadedArtworkFileIdsRef = useRef<string[]>([]);
+  const loadedArtworkStatusesRef = useRef<Record<string, string>>({});
+  const loadedResponsibleIdsRef = useRef<string[]>([]);
 
   const handleArtworkFilesChange = useCallback((files: FileWithPreview[]) => {
     setArtworkFiles(files);
@@ -172,7 +177,11 @@ export const FinancialBudgetDetailPage = () => {
       serialNumber: "" as string,
       chassisNumber: "" as string,
       category: "" as string,
-      implementType: IMPLEMENT_TYPE.REFRIGERATED as string,
+      // Do NOT default to a concrete enum — an unset implementType must stay
+      // empty so an untouched budget save never clobbers the truck's real value
+      // (the load effect below seeds it from the task; submit only sends it when
+      // the user actually changed it). See findings I39/I40.
+      implementType: "" as string,
       forecastDate: null as Date | null,
       term: null as Date | null,
       details: "" as string,
@@ -215,7 +224,10 @@ export const FinancialBudgetDetailPage = () => {
       serialNumber: task.serialNumber || "",
       chassisNumber: task.truck?.chassisNumber || "",
       category: task.truck?.category || "",
-      implementType: task.truck?.implementType || IMPLEMENT_TYPE.REFRIGERATED,
+      // Seed from the loaded truck; leave empty when absent. NEVER default to a
+      // concrete enum here — that silently rewrites the truck's implementType to
+      // REFRIGERATED on every save (finding I39).
+      implementType: task.truck?.implementType || "",
       forecastDate: task.forecastDate ? new Date(task.forecastDate) : null,
       term: task.term ? new Date(task.term) : null,
       details: task.details || "",
@@ -439,8 +451,22 @@ export const FinancialBudgetDetailPage = () => {
         })),
       );
     }
+    loadedResponsibleIdsRef.current = (task.responsibles || []).map(
+      (r: any) => r.id,
+    );
 
     // Artworks
+    loadedArtworkFileIdsRef.current = (task.artworks || []).map(
+      (artwork: any) => (artwork.file || artwork).id,
+    );
+    loadedArtworkStatusesRef.current = (task.artworks || []).reduce(
+      (acc: Record<string, string>, artwork: any) => {
+        const fileId = (artwork.file || artwork).id;
+        if (artwork.status) acc[fileId] = artwork.status;
+        return acc;
+      },
+      {},
+    );
     if (task.artworks && task.artworks.length > 0) {
       const artworkFilesList = task.artworks.map((artwork: any) => {
         const file = artwork.file || artwork;
@@ -485,6 +511,11 @@ export const FinancialBudgetDetailPage = () => {
         }) as FileWithPreview),
       );
     }
+    // Snapshot the loaded base-file ids (empty when the task has none) so submit
+    // can detect a real user change and avoid sending an empty wipe array.
+    loadedBaseFileIdsRef.current = ((task as any).baseFiles || []).map(
+      (file: any) => file.id,
+    );
   }, [task]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dynamic steps based on customer count
@@ -702,51 +733,124 @@ export const FinancialBudgetDetailPage = () => {
           customerId: data.customerId || undefined,
         }));
 
-      // 4. Update task
-      const serviceOrders = (data.serviceOrders || []).filter(
-        (so: any) => so?.description?.trim()?.length >= 3,
-      );
-      const taskUpdateData: any = {
-        name: data.name || undefined,
-        customerId: data.customerId || undefined,
-        details: data.details || undefined,
-        forecastDate: data.forecastDate || undefined,
-        term: data.term || undefined,
-        paintId: data.paintId || null,
-        paintIds:
+      // 4. Update task — but ONLY for fields the user actually changed.
+      //
+      // This page is otherwise a full-replace form that always called updateTask
+      // with every field, so correctness hinged entirely on the query `include`
+      // being complete and on relation state being loaded. A missing include or
+      // empty array silently WIPED data (findings I39/I40). Instead, build the
+      // payload from the dirty fields only and OMIT anything unchanged so the
+      // API's "absence = preserve" semantics protect untouched data. Only an
+      // explicit user action ever clears or replaces a field.
+      const dirtyFields = form.formState.dirtyFields as Record<string, unknown>;
+      const taskUpdateData: any = {};
+
+      // Scalar task fields — include only when dirty.
+      if (dirtyFields.name) taskUpdateData.name = data.name || undefined;
+      if (dirtyFields.customerId)
+        taskUpdateData.customerId = data.customerId || undefined;
+      if (dirtyFields.details)
+        taskUpdateData.details = data.details || undefined;
+      if (dirtyFields.forecastDate)
+        taskUpdateData.forecastDate = data.forecastDate || undefined;
+      if (dirtyFields.term) taskUpdateData.term = data.term || undefined;
+      if (dirtyFields.paintId) taskUpdateData.paintId = data.paintId || null;
+      if (dirtyFields.serialNumber)
+        taskUpdateData.serialNumber = data.serialNumber || null;
+
+      // paintIds (logo paints) — include only when changed.
+      if (dirtyFields.paintIds) {
+        taskUpdateData.paintIds =
           data.paintIds && data.paintIds.length > 0
             ? data.paintIds
-            : undefined,
-        serialNumber: data.serialNumber || null,
-        serviceOrders: serviceOrders.length > 0 ? serviceOrders : undefined,
-        artworkIds:
-          uploadedArtworkIds.length > 0 ? uploadedArtworkIds : undefined,
-        artworkStatuses:
-          Object.keys(remappedArtworkStatuses).length > 0
-            ? remappedArtworkStatuses
-            : undefined,
-        // Full set (existing kept + newly uploaded) so adds AND removals persist.
-        // baseFiles is loaded into state from the task query, so this won't wipe
-        // pre-existing files.
-        baseFileIds: uploadedBaseFileIds,
-        responsibleIds:
-          existingRepIds.length > 0 ? existingRepIds : undefined,
-        newResponsibles:
-          newResponsibles.length > 0 ? newResponsibles : undefined,
-        truck: {
-          plate: data.plate || undefined,
-          chassisNumber: data.chassisNumber || undefined,
-          category: data.category || undefined,
-          implementType: data.implementType || undefined,
-        },
-      };
+            : [];
+      }
 
-      try {
-        await updateTaskAsync({ id: taskId, data: taskUpdateData });
-      } catch {
-        // Error toast is emitted by the axios error interceptor.
-        setIsSubmitting(false);
-        return;
+      // serviceOrders — include only when changed.
+      if (dirtyFields.serviceOrders) {
+        const serviceOrders = (data.serviceOrders || []).filter(
+          (so: any) => so?.description?.trim()?.length >= 3,
+        );
+        taskUpdateData.serviceOrders = serviceOrders;
+      }
+
+      // Truck fields live under data.* (plate/chassisNumber/category/
+      // implementType). Add each ONLY when its own field is dirty, and only
+      // build the truck object when at least one of them changed — so an
+      // untouched save never re-writes (and never clobbers) the truck's
+      // implementType. This is the core of finding I39.
+      const truckPayload: Record<string, unknown> = {};
+      if (dirtyFields.plate) truckPayload.plate = data.plate || undefined;
+      if (dirtyFields.chassisNumber)
+        truckPayload.chassisNumber = data.chassisNumber || undefined;
+      if (dirtyFields.category)
+        truckPayload.category = data.category || undefined;
+      if (dirtyFields.implementType)
+        truckPayload.implementType = data.implementType || undefined;
+      if (Object.keys(truckPayload).length > 0) {
+        taskUpdateData.truck = truckPayload;
+      }
+
+      // Artworks live in separate state (not RHF). Detect a real change by
+      // comparing the resolved File-id set and per-file statuses against the
+      // loaded snapshot. Only then send artworkIds/artworkStatuses; otherwise
+      // omit so existing artworks are preserved (not wiped).
+      const loadedArtworkIds = loadedArtworkFileIdsRef.current;
+      const artworkIdsChanged =
+        uploadedArtworkIds.length !== loadedArtworkIds.length ||
+        uploadedArtworkIds.some((id, i) => id !== loadedArtworkIds[i]);
+      const loadedStatuses = loadedArtworkStatusesRef.current;
+      const statusKeys = new Set([
+        ...Object.keys(remappedArtworkStatuses),
+        ...Object.keys(loadedStatuses),
+      ]);
+      const artworkStatusesChanged = Array.from(statusKeys).some(
+        (k) => remappedArtworkStatuses[k] !== loadedStatuses[k],
+      );
+      if (artworkIdsChanged || artworkStatusesChanged) {
+        // Send the full resolved set so adds AND removals persist.
+        taskUpdateData.artworkIds = uploadedArtworkIds;
+        if (Object.keys(remappedArtworkStatuses).length > 0) {
+          taskUpdateData.artworkStatuses = remappedArtworkStatuses;
+        }
+      }
+
+      // Base files live in separate state. Send baseFileIds ONLY when the set
+      // differs from the loaded snapshot — never an empty wipe array on an
+      // untouched save (finding I40).
+      const loadedBaseFileIds = loadedBaseFileIdsRef.current;
+      const baseFilesChanged =
+        uploadedBaseFileIds.length !== loadedBaseFileIds.length ||
+        uploadedBaseFileIds.some((id, i) => id !== loadedBaseFileIds[i]);
+      if (baseFilesChanged) {
+        taskUpdateData.baseFileIds = uploadedBaseFileIds;
+      }
+
+      // Responsibles — newly added ones are always sent. The existing-id set is
+      // sent only when it differs from what was loaded (an add/removal), so an
+      // untouched save never re-writes the responsible list.
+      if (newResponsibles.length > 0) {
+        taskUpdateData.newResponsibles = newResponsibles;
+      }
+      const loadedResponsibleIds = loadedResponsibleIdsRef.current;
+      const responsibleIdsChanged =
+        existingRepIds.length !== loadedResponsibleIds.length ||
+        existingRepIds.some((id) => !loadedResponsibleIds.includes(id)) ||
+        loadedResponsibleIds.some((id) => !existingRepIds.includes(id));
+      if (responsibleIdsChanged && existingRepIds.length > 0) {
+        taskUpdateData.responsibleIds = existingRepIds;
+      }
+
+      // Only hit the task endpoint when something task-owned actually changed.
+      // Skips a no-op write when the user only edited the quote half.
+      if (Object.keys(taskUpdateData).length > 0) {
+        try {
+          await updateTaskAsync({ id: taskId, data: taskUpdateData });
+        } catch {
+          // Error toast is emitted by the axios error interceptor.
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       // 5. Update customer data (address, CNPJ, etc.)

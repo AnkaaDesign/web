@@ -189,6 +189,10 @@ export function ItemForm(props: ItemFormProps) {
             (measure): measure is { measureType: string; value?: number | null; unit?: string | null } =>
               measure !== undefined && measure.measureType !== undefined && typeof measure.measureType === "string",
           ),
+          locationCells: values.locationCells?.filter(
+            (cell): cell is { level: number; column: number | null } =>
+              cell !== undefined && typeof cell.level === "number" && (cell.column === null || typeof cell.column === "number"),
+          ),
         };
         debouncedUpdateUrl(cleanValues);
       });

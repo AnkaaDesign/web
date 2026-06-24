@@ -1291,14 +1291,14 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [
           {
             id: "controle-ponto-colaborador-production-manager",
-            title: "Visualização Colaborador",
+            title: "Espelho de Ponto",
             icon: "user",
             path: "/departamento-pessoal/controle-ponto/colaborador",
             requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
           },
           {
             id: "controle-ponto-dia-production-manager",
-            title: "Visualização Dia",
+            title: "Resumo do Dia",
             icon: "calendar",
             path: "/departamento-pessoal/controle-ponto/dia",
             requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
@@ -1856,8 +1856,8 @@ export const NAVIGATION_MENU: MenuItem[] = [
         path: "/departamento-pessoal/controle-ponto",
         requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
         children: [
-          { id: "dp-controle-ponto-colaborador", title: "Visualização Colaborador", icon: "user", path: "/departamento-pessoal/controle-ponto/colaborador" },
-          { id: "dp-controle-ponto-dia", title: "Visualização Dia", icon: "calendar", path: "/departamento-pessoal/controle-ponto/dia" },
+          { id: "dp-controle-ponto-colaborador", title: "Espelho de Ponto", icon: "user", path: "/departamento-pessoal/controle-ponto/colaborador" },
+          { id: "dp-controle-ponto-dia", title: "Resumo do Dia", icon: "calendar", path: "/departamento-pessoal/controle-ponto/dia" },
           { id: "dp-controle-ponto-edicao", title: "Edição", icon: "edit", path: "/departamento-pessoal/controle-ponto/edicao", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
           { id: "dp-controle-ponto-ausencias", title: "Ausências", icon: "list", path: "/departamento-pessoal/controle-ponto/ausencias", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },
           { id: "dp-controle-ponto-fechamento", title: "Fechamento", icon: "signature", path: "/departamento-pessoal/controle-ponto/fechamento", requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN] },

@@ -666,7 +666,11 @@ export const WarehouseMap = forwardRef<WarehouseMapHandle, WarehouseMapProps>(fu
                   const tl = project(eff.positionX, eff.positionY); // top-left corner
                   const wPx = eff.width * pxPerCmX;
                   const hPx = eff.height * pxPerCmY;
-                  if (Math.min(wPx, hPx) < 16 || Math.max(wPx, hPx) < 34) return null;
+                  // gate on the LONGER on-screen dimension — the pill sits above the box and runs
+                  // horizontally, so a wide-but-shallow shelf has plenty of room to be labelled.
+                  // a tiny min floor only weeds out invisible slivers; using 16 here wrongly hid
+                  // long thin estantes whose depth renders a few px under that of their neighbours.
+                  if (Math.min(wPx, hPx) < 6 || Math.max(wPx, hPx) < 34) return null;
                   const isDimmed = searchActive && !matchedLocationIds.has(loc.id);
                   const segs = [eff.section, eff.code || eff.name].filter(Boolean) as string[];
                   if (segs.length === 0) return null;

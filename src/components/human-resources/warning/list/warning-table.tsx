@@ -275,7 +275,16 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
   };
 
   // Define columns
-  const columns = useMemo(
+  const columns = useMemo<
+    {
+      key: string;
+      header: string;
+      sortable: boolean;
+      className: string;
+      align?: "left" | "center" | "right";
+      accessor: (warning: Warning) => React.ReactNode;
+    }[]
+  >(
     () => [
       {
         key: "collaborator.name",

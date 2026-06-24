@@ -1,9 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useOrder, useOrderMutations, useCanViewPrices } from "../../../../hooks";
-import { routes, ORDER_STATUS, ORDER_PAYMENT_STATUS, CHANGE_LOG_ENTITY_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
-import { hasAnyPrivilege } from "@/utils/user";
+import { routes, ORDER_STATUS, CHANGE_LOG_ENTITY_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
 import { Button } from "@/components/ui/button";
-import { IconAlertTriangle, IconShoppingCart, IconTrash, IconRefresh, IconEdit, IconLoader2, IconCheck, IconCircleCheck, IconHourglass } from "@tabler/icons-react";
+import { IconAlertTriangle, IconShoppingCart, IconTrash, IconRefresh, IconEdit, IconLoader2, IconCheck } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import type { PageAction } from "@/components/ui/page-header";
 import { OrderInfoCard, OrderPaymentCard, OrderItemsCard, OrderDocumentsCard } from "@/components/inventory/order/detail";
@@ -32,19 +31,10 @@ const OrderDetailsPage = () => {
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-  const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
   const { user } = useAuth();
   const canViewPrices = useCanViewPrices();
   const canManageWarehouse = canEditOrders(user);
-  const { deleteMutation, updateAsync, markPaidAsync, markAwaitingPaymentAsync } = useOrderMutations();
-
-  // Payment management is financial-only (FINANCIAL / ACCOUNTING / ADMIN), matching
-  // the API. WAREHOUSE may view the order (page route below) but never its payment side.
-  const canManagePayments = hasAnyPrivilege(user as any, [
-    SECTOR_PRIVILEGES.FINANCIAL,
-    SECTOR_PRIVILEGES.ACCOUNTING,
-    SECTOR_PRIVILEGES.ADMIN,
-  ]);
+  const { deleteMutation, updateAsync } = useOrderMutations();
 
   // Track page access
   usePageTracker({
@@ -159,29 +149,6 @@ const OrderDetailsPage = () => {
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error completing order:", error);
-      }
-    }
-  };
-
-  const handleMarkPaid = async () => {
-    try {
-      await markPaidAsync(order.id);
-      setShowMarkPaidDialog(false);
-      refetch();
-    } catch (error) {
-      if (process.env.NODE_ENV !== "production") {
-        console.error("Error marking order paid:", error);
-      }
-    }
-  };
-
-  const handleMarkAwaitingPayment = async () => {
-    try {
-      await markAwaitingPaymentAsync(order.id);
-      refetch();
-    } catch (error) {
-      if (process.env.NODE_ENV !== "production") {
-        console.error("Error reverting payment:", error);
       }
     }
   };
@@ -426,34 +393,6 @@ const OrderDetailsPage = () => {
                     Confirmar Recebimento
                   </>
                 )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Mark Paid Confirmation Dialog */}
-        <AlertDialog open={showMarkPaidDialog} onOpenChange={setShowMarkPaidDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Marcar como Pago</AlertDialogTitle>
-              <AlertDialogDescription>
-                Deseja marcar este pedido como pago? O pedido será registrado como liquidado em Contas a Pagar.
-                <br />
-                <br />
-                <strong>Fornecedor:</strong> {order.supplier?.fantasyName || "Não especificado"}
-                {canViewPrices && (
-                  <>
-                    <br />
-                    <strong>Valor Total:</strong> <OrderTotalBadge orderItems={order.items} discount={order.discount} freight={order.freight} />
-                  </>
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleMarkPaid}>
-                <IconCircleCheck className="mr-2 h-4 w-4" />
-                Marcar como Pago
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

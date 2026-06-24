@@ -18,8 +18,8 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { label: "Colaborador", menuTitle: "Visualização Colaborador", path: routes.personnelDepartment.timeClock.colaborador, hrOnly: false },
-  { label: "Dia", menuTitle: "Visualização Dia", path: routes.personnelDepartment.timeClock.dia, hrOnly: false },
+  { label: "Espelho de Ponto", menuTitle: "Espelho de Ponto", path: routes.personnelDepartment.timeClock.colaborador, hrOnly: false },
+  { label: "Resumo do Dia", menuTitle: "Resumo do Dia", path: routes.personnelDepartment.timeClock.dia, hrOnly: false },
   { label: "Edição", menuTitle: "Edição", path: routes.personnelDepartment.timeClock.edicao, hrOnly: true },
   { label: "Ausências", menuTitle: "Ausências", path: routes.personnelDepartment.timeClock.ausencias, hrOnly: false },
   { label: "Fechamento", menuTitle: "Fechamento", path: routes.personnelDepartment.timeClock.fechamento.list, hrOnly: true },

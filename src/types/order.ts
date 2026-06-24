@@ -64,6 +64,7 @@ export interface OrderSchedule extends BaseEntity {
   originalScheduleId: string | null;
 
   // Relations (optional, populated based on query)
+  supplier?: Supplier;
   weeklyConfig?: WeeklyScheduleConfig;
   monthlyConfig?: MonthlyScheduleConfig;
   yearlyConfig?: YearlyScheduleConfig;

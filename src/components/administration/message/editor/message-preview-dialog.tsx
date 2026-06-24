@@ -31,20 +31,56 @@ const DECORATOR_IMAGES: Record<string, string> = {
   'footer-geometric': '/footer-geometric.webp',
 };
 
-const DecoratorPreview = ({ variant }: { variant: DecoratorVariant }) => {
+const DecoratorPreview = ({ variant, mobile }: { variant: DecoratorVariant; mobile?: boolean }) => {
   const src = DECORATOR_IMAGES[variant] ?? DECORATOR_IMAGES['footer-wave-dark'];
   const isHeader = variant.startsWith('header-');
-  return (
-    <img
-      src={src}
-      alt="Decoração"
-      style={{
-        width: '100%',
-        display: 'block',
-        ...(isHeader ? { height: '80px', objectFit: 'cover', objectPosition: 'left center' } : {}),
-      }}
-    />
-  );
+  if (isHeader) {
+    if (mobile) {
+      // Match the real mobile app: it renders the logo from a pre-cropped
+      // 575×226 banner, so the logo fills the width and reads clearly on a
+      // narrow screen instead of being a tiny mark on a wide letterhead band.
+      // We reproduce that crop by clipping the wide asset to its left logo
+      // region (575/2482 ≈ 23%) at a capped size, left-aligned edge-to-edge.
+      return (
+        <div style={{ paddingTop: '8px', paddingLeft: '18px' }}>
+          <div style={{ width: '230px', maxWidth: '66%', aspectRatio: '575 / 158', overflow: 'hidden' }}>
+            <img
+              src={src}
+              alt="Decoração"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'left center',
+                display: 'block',
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+    // Desktop: wide letterhead band (matches the PDF export). Inset the left
+    // edge so the logo aligns with the body content padding, and crop the
+    // asset's baked-in vertical whitespace so it sits flush with the top.
+    return (
+      <div style={{ paddingTop: '24px', paddingLeft: '13px' }}>
+        <div style={{ width: '100%', aspectRatio: '15.3', overflow: 'hidden' }}>
+          <img
+            src={src}
+            alt="Decoração"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'left center',
+              display: 'block',
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+  return <img src={src} alt="Decoração" style={{ width: '100%', display: 'block' }} />;
 };
 
 export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePreviewDialogProps) => {
@@ -267,10 +303,10 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
         );
       case 'spacer':
         const spacerHeights = {
-          sm: 'h-4',  // 1rem / 16px
-          md: 'h-8',  // 2rem / 32px
-          lg: 'h-12', // 3rem / 48px
-          xl: 'h-16', // 4rem / 64px
+          sm: 'h-2',  // 8px
+          md: 'h-4',  // 16px
+          lg: 'h-6',  // 24px
+          xl: 'h-10', // 40px
         };
         return <div className={spacerHeights[(block.height || 'md') as keyof typeof spacerHeights]} />;
       case 'icon':
@@ -303,7 +339,7 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
           </div>
         ) : iconContent;
       case 'decorator':
-        return <DecoratorPreview variant={block.variant} />;
+        return <DecoratorPreview variant={block.variant} mobile={viewMode === 'mobile'} />;
       case 'company-asset': {
         const assetUrl = block.asset === 'logo' ? '/logo.png' : '/android-chrome-192x192.png';
         const sizeStyle = block.size ? { maxWidth: block.size } : { maxWidth: '75%' };
