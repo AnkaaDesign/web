@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate, toTitleCase } from "./index";
+import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "./index";
 import type { Task } from "../types/task";
 import { generatePaymentText, generateGuaranteeText } from "./quote-text-generators";
 import { getApiBaseUrl } from "./file";
@@ -321,14 +321,15 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
   const corporateName = task.customer?.corporateName || task.customer?.fantasyName || "Cliente";
   // Find the first customer config to read per-config fields
   const firstConfig = task.quote?.customerConfigs?.[0];
-  // Prefer the explicitly selected budget responsible; then OWNER-role task responsible; then the first
-  const ownerResponsible = (task.responsibles as Array<{ name?: string; role?: string }> | undefined)?.find(
-    (r) => r?.role === "OWNER",
-  );
-  const contactName = firstConfig?.responsible?.name
-    || ownerResponsible?.name
-    || task.responsibles?.[0]?.name
-    || "";
+  // The contact is ALWAYS the task's first responsible — the quote no longer carries its
+  // own (which went stale after duplicating a task + changing its responsible).
+  const contactName = task.responsibles?.[0]?.name || "";
+  // Invoice-to document (CNPJ/CPF), woven into the intro next to the corporate name.
+  const customerDocument = task.customer?.cnpj
+    ? `CNPJ ${formatCNPJ(task.customer.cnpj)}`
+    : task.customer?.cpf
+      ? `CPF ${task.customer.cpf}`
+      : null;
 
   // Get dates
   const currentDate = formatDate(new Date());
@@ -378,6 +379,7 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
 
   const htmlContent = generateBudgetHtml({
     corporateName,
+    customerDocument,
     taskName: task.name || '',
     contactName,
     currentDate,
@@ -428,6 +430,7 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
 
 export interface BudgetHtmlData {
   corporateName: string;
+  customerDocument?: string | null;
   taskName: string;
   contactName: string;
   currentDate: string;
@@ -1011,7 +1014,11 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       <!-- Customer Info -->
       <div class="customer-section">
         ${data.contactName ? `<div class="customer-name">À ${escapeHtml(data.contactName)}</div>` : ''}
-        <p class="intro-text">Conforme solicitado, apresentamos nossa proposta de preço para execução dos serviços abaixo descriminados${(() => {
+        <p class="intro-text">Conforme solicitado, apresentamos nossa proposta de preço${
+          data.corporateName && data.corporateName !== 'Cliente'
+            ? ` para a <strong style="font-weight: 600;">${escapeHtml(data.corporateName)}</strong>${data.customerDocument ? ` (${escapeHtml(data.customerDocument)})` : ''},`
+            : ''
+        } para execução dos serviços abaixo descriminados${(() => {
           const parts: string[] = [];
           if (data.serialNumber) parts.push(` nº série: <strong>${escapeHtml(data.serialNumber)}</strong>`);
           if (data.plate) parts.push(` placa: <strong style="font-weight: 600;">${escapeHtml(data.plate)}</strong>`);

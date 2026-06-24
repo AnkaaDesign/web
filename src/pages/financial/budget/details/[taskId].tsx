@@ -1282,7 +1282,6 @@ export const FinancialBudgetDetailPage = () => {
                   configIndex={configIndex}
                   customer={customer}
                   disabled={isSubmitting || !canEdit}
-                  taskResponsibles={task?.responsibles}
                 />
               );
             })()}

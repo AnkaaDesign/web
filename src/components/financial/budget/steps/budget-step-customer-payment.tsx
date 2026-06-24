@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,6 @@ import { Switch } from "@/components/ui/switch";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { formatCurrency } from "@/utils";
 import { useCnpjLookup } from "@/hooks/common/use-cnpj-lookup";
-import { RESPONSIBLE_ROLE_LABELS } from "@/types/responsible";
 import { IconCreditCard, IconBuilding, IconIdBadge2 } from "@tabler/icons-react";
 import {
   legacyToConfig,
@@ -47,14 +46,12 @@ interface BudgetStepCustomerPaymentProps {
   configIndex: number;
   customer: any;
   disabled?: boolean;
-  taskResponsibles?: Array<{ id: string; name: string; role: string }>;
 }
 
 export function BudgetStepCustomerPayment({
   configIndex,
   customer,
   disabled,
-  taskResponsibles,
 }: BudgetStepCustomerPaymentProps) {
   const { control, setValue: setFormValue } = useFormContext();
   const config = useWatch({ control, name: `customerConfigs.${configIndex}` });
@@ -136,29 +133,6 @@ export function BudgetStepCustomerPayment({
     patchPayment({ entryDays: Number(val), specificDate: undefined });
     setShowDateInput(false);
   }, [patchPayment]);
-
-  // Default budget responsible to the first task responsible (only on mount).
-  // shouldDirty: true so the auto-default persists on save — otherwise an edit
-  // form with a previously-null responsibleId would never write the default back.
-  const hasAutoDefaulted = useRef(false);
-  useEffect(() => {
-    if (hasAutoDefaulted.current) return;
-    if (
-      taskResponsibles &&
-      taskResponsibles.length > 0 &&
-      !config?.responsibleId
-    ) {
-      hasAutoDefaulted.current = true;
-      const firstValid = taskResponsibles.find((r) => !r.id.startsWith("temp-"));
-      if (firstValid) {
-        setFormValue(
-          `customerConfigs.${configIndex}.responsibleId`,
-          firstValid.id,
-          { shouldDirty: true },
-        );
-      }
-    }
-  }, [taskResponsibles, config?.responsibleId, setFormValue, configIndex]);
 
   const configSubtotal = typeof config?.subtotal === "number" ? config.subtotal : Number(config?.subtotal) || 0;
   const configTotal = typeof config?.total === "number" ? config.total : Number(config?.total) || 0;
@@ -533,26 +507,6 @@ export function BudgetStepCustomerPayment({
                   disabled={disabled}
                   hideLabel
                   showClearButton
-                />
-              </div>
-            )}
-            {taskResponsibles && taskResponsibles.length > 0 && (
-              <div className="space-y-1.5 flex-1 min-w-[130px]">
-                <Label className="text-sm font-medium">Responsável</Label>
-                <Combobox
-                  value={config?.responsibleId || ""}
-                  onValueChange={(value) => setConfigField("responsibleId", value || null)}
-                  options={taskResponsibles
-                    .filter((r) => !r.id.startsWith("temp-"))
-                    .map((r) => ({
-                      value: r.id,
-                      label: `${r.name} (${RESPONSIBLE_ROLE_LABELS[r.role as keyof typeof RESPONSIBLE_ROLE_LABELS] || r.role})`,
-                    }))}
-                  placeholder="Selecione"
-                  emptyText="Nenhum responsável"
-                  disabled={disabled}
-                  searchable={false}
-                  clearable={true}
                 />
               </div>
             )}

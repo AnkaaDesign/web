@@ -286,6 +286,29 @@ export const FinancialBudgetCreatePage = () => {
     } : undefined,
   }), [reviewTaskCustomer]);
 
+  // Step-2 "Layout Aprovado" options come from the LIVE Step-1 layouts (artworkFiles).
+  // A new budget has no persisted task.artworks, so without this the selection shows
+  // "Nenhum layout na tarefa" even after a layout was added in Step 1 (image files only).
+  const artworks = useMemo(
+    () =>
+      artworkFiles
+        .filter((f) => (f.type || "").startsWith("image/"))
+        .map((f) => {
+          const id = (f as any).uploadedFileId || f.id;
+          return {
+            id,
+            filename: f.name,
+            originalName: f.name,
+            thumbnailUrl: f.thumbnailUrl || null,
+            preview: f.preview || null,
+            status: (f as any).status,
+            mimetype: f.type,
+            size: f.size,
+          };
+        }),
+    [artworkFiles],
+  );
+
   // Dynamic steps based on customer count
   const customerConfigs = form.watch("customerConfigs");
   const steps = useMemo(() => {
@@ -400,11 +423,16 @@ export const FinancialBudgetCreatePage = () => {
         return;
       }
 
-      // 1. Upload artwork files
+      // 1. Upload artwork files. Map each file's LOCAL id -> its real server File id so a
+      // layout selected from a Step-1 artwork (a local temp id at selection time) can be
+      // remapped to the real File id below — otherwise the temp id reaches the API and is
+      // rejected as a non-UUID.
       const uploadedArtworkIds: string[] = [...artworkFileIds];
       const remappedArtworkStatuses: Record<string, string> = {};
+      const localIdToRealFileId: Record<string, string> = {};
       for (const file of artworkFiles) {
         if (file.uploaded && file.uploadedFileId) {
+          localIdToRealFileId[file.id] = file.uploadedFileId;
           if (artworkStatuses[file.id]) {
             remappedArtworkStatuses[file.uploadedFileId] = artworkStatuses[file.id];
           }
@@ -413,6 +441,7 @@ export const FinancialBudgetCreatePage = () => {
             const response = await uploadSingleFile(file, { fileContext: 'artwork' });
             if (response.success && response.data) {
               uploadedArtworkIds.push(response.data.id);
+              localIdToRealFileId[file.id] = response.data.id;
               if (artworkStatuses[file.id]) {
                 remappedArtworkStatuses[response.data.id] = artworkStatuses[file.id];
               }
@@ -438,26 +467,48 @@ export const FinancialBudgetCreatePage = () => {
         }
       }
 
-      // 3. Upload layout files (up to 2 ordered slots). Always use FILE ids.
+      // 3. Resolve layout File ids (up to 2 ordered slots) — ALWAYS real File UUIDs. A
+      // layout chosen from a Step-1 artwork carries that artwork's LOCAL id; remap it to
+      // the real File id uploaded above. The API only accepts UUIDs.
+      const isUuid = (id: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       const resolvedLayoutIds: string[] = [];
+      let droppedStaleLayout = false;
       for (const lf of layoutFiles) {
-        if (!lf.uploaded) {
+        const existingId = (lf as any).uploadedFileId || lf.id || null;
+        const remapped = existingId ? localIdToRealFileId[existingId] : null;
+        if (remapped) {
+          resolvedLayoutIds.push(remapped);
+        } else if (!lf.uploaded) {
           try {
-            const response = await uploadSingleFile(lf, {
-              fileContext: "quote-layout",
-            });
+            const response = await uploadSingleFile(lf, { fileContext: "quote-layout" });
             if (response.success && response.data) {
               resolvedLayoutIds.push(response.data.id);
             }
           } catch (error: any) {
             toast.error(`Erro ao enviar layout: ${error.message}`);
           }
-        } else {
-          const existingId = (lf as any).uploadedFileId || lf.id || null;
-          if (existingId) resolvedLayoutIds.push(existingId);
+        } else if (existingId && isUuid(existingId)) {
+          resolvedLayoutIds.push(existingId);
+        } else if (existingId) {
+          // Marked uploaded but still a local temp id with no remap / blob — drop it
+          // rather than send a non-UUID the API would reject.
+          droppedStaleLayout = true;
         }
       }
-      const layoutFileIds = resolvedLayoutIds;
+      if (droppedStaleLayout) {
+        toast.error(
+          "Um layout selecionado não pôde ser salvo. Reenvie o arquivo de layout e tente novamente.",
+        );
+      }
+      const seenLayoutIds = new Set<string>();
+      const layoutFileIds = resolvedLayoutIds
+        .filter((id) => {
+          if (seenLayoutIds.has(id)) return false;
+          seenLayoutIds.add(id);
+          return true;
+        })
+        .slice(0, 2);
 
       // 4. Build responsible data
       const existingRepIds = responsibleRows
@@ -765,6 +816,7 @@ export const FinancialBudgetCreatePage = () => {
               disabled={isSubmitting}
               layoutFiles={layoutFiles}
               onLayoutFilesChange={setLayoutFiles}
+              artworks={artworks}
               customersCache={customersCache}
               selectedCustomers={selectedCustomers}
               setSelectedCustomers={setSelectedCustomers}
@@ -793,9 +845,6 @@ export const FinancialBudgetCreatePage = () => {
                 configIndex={configIndex}
                 customer={customer}
                 disabled={isSubmitting}
-                taskResponsibles={responsibleRows
-                  .filter(r => !r.isNew && r.id && !r.id.startsWith("temp-"))
-                  .map(r => ({ id: r.id, name: r.name, role: r.role }))}
               />
             );
           })()}

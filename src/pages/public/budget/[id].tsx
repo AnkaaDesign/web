@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { taskQuoteService } from "@/api-client/task-quote";
-import { formatCurrency, formatDate, toTitleCase } from "@/utils";
+import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "@/utils";
 import { getApiBaseUrl } from "@/utils/file";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { exportBudgetPdfFromData } from "@/utils/budget-pdf-generator";
@@ -206,12 +206,18 @@ export function PublicBudgetPage() {
   const corporateName = quote.task?.customer?.corporateName || quote.task?.customer?.fantasyName || "Cliente";
   // Find the relevant customer config (filtered by URL param, or first available)
   const activeConfig = quote.customerConfigs?.find(c => c.customerId === selectedCustomerId) || quote.customerConfigs?.[0];
-  // Prefer the explicitly selected budget responsible; then the OWNER-role task responsible; then the first
-  const ownerResponsible = quote.task?.responsibles?.find(r => r.role === 'OWNER');
-  const contactName = activeConfig?.responsible?.name
-    || ownerResponsible?.name
-    || quote.task?.responsibles?.[0]?.name
-    || "";
+  // The budget's contact is ALWAYS the task's first responsible — the quote no longer
+  // carries its own (which went stale after duplicating a task + changing its responsible).
+  const contactName = quote.task?.responsibles?.[0]?.name || "";
+  // Invoice-to customer (woven into the intro): corporate/fantasy name + CNPJ or CPF
+  // when present. Prefer the active config's customer, fall back to the task's.
+  const billCustomer: any = activeConfig?.customer || quote.task?.customer;
+  const invoiceName: string = billCustomer?.corporateName || billCustomer?.fantasyName || "";
+  const invoiceDoc: string = billCustomer?.cnpj
+    ? `CNPJ ${formatCNPJ(billCustomer.cnpj)}`
+    : billCustomer?.cpf
+      ? `CPF ${billCustomer.cpf}`
+      : "";
   // Format budget number with leading zeros (e.g., "0042")
   const budgetNumber = quote.budgetNumber
     ? String(quote.budgetNumber).padStart(4, '0')
@@ -392,8 +398,14 @@ export function PublicBudgetPage() {
                 {contactName ? `À ${contactName}` : ''}
               </p>
               <p className="text-gray-700">
-                Conforme solicitado, apresentamos nossa proposta de preço para execução dos
-                serviços abaixo descriminados
+                Conforme solicitado, apresentamos nossa proposta de preço
+                {invoiceName ? (
+                  <>
+                    {" "}para a <strong>{invoiceName}</strong>
+                    {invoiceDoc ? <> ({invoiceDoc})</> : null},
+                  </>
+                ) : null}
+                {" "}para execução dos serviços abaixo descriminados
                 {(() => {
                   const truckCategoryLabel = quote.task?.truck?.category
                     ? (TRUCK_CATEGORY_LABELS[quote.task.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || quote.task.truck.category)
