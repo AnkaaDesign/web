@@ -314,6 +314,13 @@ export const TaskCreateForm = () => {
     }
   }, [plates, serialNumbers]);
 
+  // Unsaved changes guard (declared before handleSubmit so the submit handler
+  // can call allowNavigation() right before its post-save redirect)
+  const { showDialog, confirmNavigation, cancelNavigation, guardedNavigate, allowNavigation } = useUnsavedChangesGuard({
+    isDirty: form.formState.isDirty,
+    isSubmitting,
+  });
+
   // Handle form submission
   const handleSubmit = useCallback(
     async (data: TaskCreateFormSchemaType) => {
@@ -547,11 +554,13 @@ export const TaskCreateForm = () => {
               ? "Tarefa criada com sucesso!"
               : `${successCount} tarefas criadas com sucesso!`
           );
+          allowNavigation();
           window.location.href = "/producao/agenda";
         } else if (successCount > 0 && errorCount > 0) {
           toast.warning(
             `${successCount} tarefas criadas, mas ${errorCount} falharam. Verifique os detalhes.`
           );
+          allowNavigation();
           window.location.href = "/producao/agenda";
         } else {
           toast.error("Erro ao criar tarefas");
@@ -563,18 +572,12 @@ export const TaskCreateForm = () => {
         isSubmittingRef.current = false;
       }
     },
-    [createAsync, responsibleRows, customerIdValue, uploadedFileIds, baseFileIds, uploadedFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, artworkStatuses],
+    [createAsync, responsibleRows, customerIdValue, uploadedFileIds, baseFileIds, uploadedFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, artworkStatuses, allowNavigation],
   );
 
   // Get form state
   const { formState } = form;
   const hasErrors = Object.keys(formState.errors).length > 0;
-
-  // Unsaved changes guard
-  const { showDialog, confirmNavigation, cancelNavigation, guardedNavigate } = useUnsavedChangesGuard({
-    isDirty: formState.isDirty,
-    isSubmitting,
-  });
 
   const handleCancel = useCallback(() => {
     guardedNavigate("/producao/agenda");

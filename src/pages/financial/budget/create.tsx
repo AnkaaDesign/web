@@ -33,6 +33,8 @@ import { uploadSingleFile } from "@/api-client/file";
 import { getCustomers } from "@/api-client";
 import { customerService } from "@/api-client/customer";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
+import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import type { FileWithPreview } from "@/components/common/file";
 import type { TaskCreateFormData } from "@/schemas";
 import type { ResponsibleRowData } from "@/types/responsible";
@@ -207,6 +209,12 @@ export const FinancialBudgetCreatePage = () => {
         },
       ] as any[],
     },
+  });
+
+  // Unsaved changes guard — prevents losing wizard data on back/cancel/breadcrumb/refresh
+  const { showDialog, confirmNavigation, cancelNavigation, guardedNavigate, allowNavigation } = useUnsavedChangesGuard({
+    isDirty: form.formState.isDirty,
+    isSubmitting,
   });
 
   // Auto-populate billing customer from task customer
@@ -706,6 +714,7 @@ export const FinancialBudgetCreatePage = () => {
 
       if (successCount > 0) {
         queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+        allowNavigation();
         navigate(firstCreatedTaskId
           ? routes.production.preparation.details(firstCreatedTaskId)
           : routes.financial.budget.root
@@ -730,6 +739,7 @@ export const FinancialBudgetCreatePage = () => {
     createTaskAsync,
     createQuoteMutation,
     navigate,
+    allowNavigation,
   ]);
 
   const isLastStep = currentStep === totalSteps;
@@ -764,12 +774,12 @@ export const FinancialBudgetCreatePage = () => {
           { label: "Orçamento", href: routes.financial.budget.root },
           { label: "Cadastrar" },
         ]}
-        onBreadcrumbNavigate={(path) => navigate(path)}
+        onBreadcrumbNavigate={(path) => guardedNavigate(path)}
         actions={[
           {
             key: "cancel",
             label: "Cancelar",
-            onClick: () => navigate(-1),
+            onClick: () => guardedNavigate(routes.financial.budget.root),
             variant: "outline" as const,
           },
           ...(currentStep > 1
@@ -879,6 +889,8 @@ export const FinancialBudgetCreatePage = () => {
           )}
         </FormProvider>
       </div>
+
+      <UnsavedChangesDialog open={showDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
     </div>
   );
 };
