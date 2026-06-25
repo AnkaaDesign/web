@@ -12,20 +12,33 @@ import {
   IconUserOff,
   IconLink,
   IconActivity,
+  IconChevronRight,
+  type TablerIcon,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Combobox } from "@/components/ui/combobox";
 import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { usePrivileges } from "@/hooks/common/use-privileges";
 import { DiagnosticoCard } from "@/components/integrations/secullum/diagnostics/diagnostico-card";
 import { routes, SECTOR_PRIVILEGES } from "@/constants";
+import { cn } from "@/lib/utils";
 
 import {
   useSecullumDepartamentos,
@@ -81,7 +94,7 @@ export default function SecullumMappingPage() {
           ]}
           className="flex-shrink-0"
         />
-        <Tabs defaultValue="departamentos" className="flex flex-1 min-h-0 flex-col gap-4">
+        <Tabs defaultValue="departamentos" className="flex flex-1 min-h-0 flex-col gap-3">
           <TabsList className="flex-shrink-0 self-start">
             <TabsTrigger value="departamentos" className="gap-2">
               <IconBuildingStore className="h-4 w-4" /> Departamentos ↔ Setores
@@ -128,6 +141,106 @@ export default function SecullumMappingPage() {
         </Tabs>
       </div>
     </PrivilegeRoute>
+  );
+}
+
+// ============================================================================
+// Shared dense building blocks
+// ============================================================================
+
+function MappingToolbar({
+  icon: Icon,
+  title,
+  stats,
+  onRefresh,
+  isRefreshing,
+}: {
+  icon: TablerIcon;
+  title: string;
+  stats: string;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-0.5">
+      <div className="flex min-w-0 items-center gap-2">
+        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <h2 className="shrink-0 text-sm font-semibold">{title}</h2>
+        <span className="truncate text-xs text-muted-foreground">{stats}</span>
+      </div>
+      {onRefresh && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          className="h-8 shrink-0 gap-1.5"
+        >
+          <IconRefresh className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+          Atualizar
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// One-line collapsed status indicator (dot + count, or muted "empty" label).
+function LinkCountTag({ count, emptyLabel }: { count: number; emptyLabel: string }) {
+  if (count > 0) {
+    return (
+      <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-green-700 dark:text-green-500">
+        <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
+        {count} vinculado(s)
+      </span>
+    );
+  }
+  return <span className="shrink-0 text-xs text-muted-foreground">{emptyLabel}</span>;
+}
+
+function UnmappedSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="px-0.5">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+        {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+      </div>
+      <Card className="overflow-hidden">
+        <ul className="divide-y divide-border">{children}</ul>
+      </Card>
+    </div>
+  );
+}
+
+function UnmappedRow({
+  label,
+  disabled,
+  onCreate,
+}: {
+  label: string;
+  disabled: boolean;
+  onCreate: () => void;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-3 px-3 py-1.5 text-sm">
+      <span className="min-w-0 truncate font-medium">{label}</span>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={disabled}
+        onClick={onCreate}
+        className="h-7 shrink-0 gap-1 px-2 text-xs"
+      >
+        <IconPlus className="h-3.5 w-3.5" /> Criar no Secullum
+      </Button>
+    </li>
   );
 }
 
@@ -184,90 +297,92 @@ function DepartamentoMappingCard() {
   // Secullum catalog read failure: surface it instead of rendering an empty
   // mapping section that looks like "no departamentos exist".
   const isError = departamentosQ.isError;
+  const isFetching = departamentosQ.isFetching || sectorsQ.isFetching;
   const linkedCount = groups.reduce((acc, g) => acc + g.linked.length, 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">Departamentos do Secullum</h2>
-          <p className="text-sm text-muted-foreground">
-            {isLoading
-              ? "Carregando…"
-              : `${departamentos.length} departamento(s) • ${linkedCount} setor(es) Ankaa vinculado(s)`}
-          </p>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            departamentosQ.refetch();
-            sectorsQ.refetch();
-          }}
-          disabled={departamentosQ.isFetching || sectorsQ.isFetching}
-        >
-          <IconRefresh
-            className={`h-4 w-4 ${departamentosQ.isFetching ? "animate-spin" : ""}`}
-          />
-        </Button>
-      </div>
-      <div className="space-y-4">
-        {isLoading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-        ) : isError ? (
-          <ErrorState
-            title="Erro ao carregar departamentos do Secullum"
-            description="Não foi possível ler o catálogo de departamentos do ponto (Secullum). Verifique a integração e tente novamente."
-            onRetry={() => departamentosQ.refetch()}
-          />
-        ) : (
-          <div className="space-y-3">
-            {groups.map((g) => (
-              <DepartamentoGroup
-                key={g.departamento.Id}
-                departamento={g.departamento}
-                linkedSectors={g.linked}
-                availableSectors={unmappedSectors}
-                horarios={horarios}
-                isPendingLink={linkSector.isPending}
-                isPendingHorario={setSectorHorario.isPending}
-                onLink={(sectorId) =>
-                  // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
-                  linkSector.mutate({ sectorId, departamentoId: g.departamento.Id })
-                }
-                onUnlink={(sectorId) =>
-                  // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
-                  linkSector.mutate({ sectorId, departamentoId: null })
-                }
-                onSetHorario={(sectorId, horarioId) =>
-                  // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
-                  setSectorHorario.mutate({ sectorId, horarioId })
-                }
-              />
+    <div className="flex flex-col gap-3">
+      <MappingToolbar
+        icon={IconBuildingStore}
+        title="Departamentos do Secullum"
+        stats={
+          isLoading
+            ? "Carregando…"
+            : `${departamentos.length} departamento(s) · ${linkedCount} setor(es) vinculado(s)`
+        }
+        onRefresh={() => {
+          departamentosQ.refetch();
+          sectorsQ.refetch();
+        }}
+        isRefreshing={isFetching}
+      />
+
+      {isLoading ? (
+        <Card className="overflow-hidden">
+          <div className="divide-y divide-border">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="px-3 py-2.5">
+                <Skeleton className="h-5 w-full" />
+              </div>
             ))}
           </div>
-        )}
+        </Card>
+      ) : isError ? (
+        <ErrorState
+          title="Erro ao carregar departamentos do Secullum"
+          description="Não foi possível ler o catálogo de departamentos do ponto (Secullum). Verifique a integração e tente novamente."
+          onRetry={() => departamentosQ.refetch()}
+        />
+      ) : (
+        <>
+          <Card className="overflow-hidden">
+            {groups.length === 0 ? (
+              <EmptyState
+                icon={<IconBuildingStore className="h-9 w-9" />}
+                title="Nenhum departamento no Secullum"
+                description="Crie departamentos no Secullum ou use o painel abaixo para criá-los a partir dos setores Ankaa."
+                className="py-8"
+              />
+            ) : (
+              <div className="divide-y divide-border">
+                {groups.map((g) => (
+                  <DepartamentoRow
+                    key={g.departamento.Id}
+                    departamento={g.departamento}
+                    linkedSectors={g.linked}
+                    availableSectors={unmappedSectors}
+                    horarios={horarios}
+                    isPendingLink={linkSector.isPending}
+                    isPendingHorario={setSectorHorario.isPending}
+                    onLink={(sectorId) =>
+                      // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+                      linkSector.mutate({ sectorId, departamentoId: g.departamento.Id })
+                    }
+                    onUnlink={(sectorId) =>
+                      // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+                      linkSector.mutate({ sectorId, departamentoId: null })
+                    }
+                    onSetHorario={(sectorId, horarioId) =>
+                      // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+                      setSectorHorario.mutate({ sectorId, horarioId })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </Card>
 
-        {!isLoading && !isError && unmappedSectors.length > 0 && (
-          <UnmappedPanel
-            title="Setores Ankaa sem departamento Secullum"
-            description="Crie um departamento equivalente no Secullum, ou vincule a um existente acima."
-          >
-            {unmappedSectors.map((s) => (
-              <li
-                key={s.id}
-                className="flex items-center justify-between gap-3 rounded-md bg-card px-3 py-2 text-sm"
-              >
-                <span className="font-medium">{s.name}</span>
-                <Button
-                  size="sm"
-                  variant="default"
+          {unmappedSectors.length > 0 && (
+            <UnmappedSection
+              title={`Setores Ankaa sem departamento (${unmappedSectors.length})`}
+              description="Crie um departamento equivalente no Secullum, ou vincule a um existente acima."
+            >
+              {unmappedSectors.map((s) => (
+                <UnmappedRow
+                  key={s.id}
+                  label={s.name}
                   disabled={upsert.isPending}
-                  onClick={async () => {
+                  onCreate={async () => {
                     try {
                       await upsert.mutateAsync({ Descricao: s.name });
                       // Success/error toasts emitted by the axios interceptor (POST /integrations/secullum/departamentos).
@@ -275,19 +390,17 @@ function DepartamentoMappingCard() {
                       // Error toast emitted by the axios error interceptor.
                     }
                   }}
-                >
-                  <IconPlus className="mr-1 h-4 w-4" /> Criar no Secullum
-                </Button>
-              </li>
-            ))}
-          </UnmappedPanel>
-        )}
-      </div>
+                />
+              ))}
+            </UnmappedSection>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
-function DepartamentoGroup({
+function DepartamentoRow({
   departamento,
   linkedSectors,
   availableSectors,
@@ -312,61 +425,63 @@ function DepartamentoGroup({
     () => availableSectors.find((s) => norm(s.name) === norm(departamento.Descricao)),
     [availableSectors, departamento.Descricao],
   );
+  const hasSuggestion = !!candidateName && !linkedSectors.some((s) => s.id === candidateName.id);
 
-  const sectorOptions = availableSectors.map((s) => ({
-    value: s.id,
-    label: s.name,
-  }));
+  // Auto-open rows that have an actionable name suggestion so the operator
+  // sees something to do without hunting through collapsed rows.
+  const [open, setOpen] = useState(hasSuggestion);
+
+  const sectorOptions = availableSectors.map((s) => ({ value: s.id, label: s.name }));
 
   return (
-    <div className="rounded-lg border border-border/60 bg-card">
-      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="font-mono">
-            #{departamento.Id}
-          </Badge>
-          <span className="font-semibold">{departamento.Descricao}</span>
-          {departamento.Nfolha ? (
-            <span className="text-xs text-muted-foreground">N. folha: {departamento.Nfolha}</span>
-          ) : null}
-        </div>
-        {linkedSectors.length > 0 ? (
-          <Badge className="gap-1 bg-emerald-100 text-emerald-900 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300">
-            <IconCheck className="h-3 w-3" /> {linkedSectors.length} vinculado(s)
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="text-muted-foreground">
-            Sem setores
-          </Badge>
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted/40"
+      >
+        <IconChevronRight
+          className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
+        />
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">#{departamento.Id}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{departamento.Descricao}</span>
+        {departamento.Nfolha ? (
+          <span className="hidden shrink-0 text-xs text-muted-foreground md:inline">
+            N. folha {departamento.Nfolha}
+          </span>
+        ) : null}
+        {hasSuggestion && !open && (
+          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[0.688rem] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+            sugestão
+          </span>
         )}
-      </div>
+        <LinkCountTag count={linkedSectors.length} emptyLabel="Sem setores" />
+      </button>
 
-      <div className="divide-y divide-border/40">
-        {linkedSectors.length === 0 && !candidateName && (
-          <p className="px-4 py-3 text-sm text-muted-foreground">
-            Nenhum setor Ankaa vinculado ainda.
-          </p>
-        )}
+      {open && (
+        <div className="space-y-1 bg-muted/20 pb-2.5 pl-9 pr-3 pt-0.5">
+          {linkedSectors.length === 0 && !hasSuggestion && (
+            <p className="py-1.5 text-xs text-muted-foreground">Nenhum setor Ankaa vinculado ainda.</p>
+          )}
 
-        {linkedSectors.map((s) => {
-          const horarioOptions = horarios
-            .filter((h) => !h.Desativar)
-            .map((h) => {
-              // Defensive: Secullum rows may omit Descricao. Combobox requires
-              // `label: string`, never undefined.
-              const descricao = h.Descricao ?? "(sem descrição)";
-              return {
-                value: String(h.Id),
-                label: h.Numero ? `#${h.Numero} — ${descricao}` : descricao,
-              };
-            });
-          return (
-            <div
-              key={s.id}
-              className="grid grid-cols-[1fr_240px_auto] items-center gap-3 px-4 py-2.5"
-            >
-              <span className="min-w-0 truncate text-sm font-medium">{s.name}</span>
-              <div className="w-full">
+          {linkedSectors.map((s) => {
+            const horarioOptions = horarios
+              .filter((h) => !h.Desativar)
+              .map((h) => {
+                // Defensive: Secullum rows may omit Descricao. Combobox requires
+                // `label: string`, never undefined.
+                const descricao = h.Descricao ?? "(sem descrição)";
+                return {
+                  value: String(h.Id),
+                  label: h.Numero ? `#${h.Numero} — ${descricao}` : descricao,
+                };
+              });
+            return (
+              <div
+                key={s.id}
+                className="grid grid-cols-[1fr_minmax(0,220px)_auto] items-center gap-2"
+              >
+                <span className="min-w-0 truncate text-sm">{s.name}</span>
                 <Combobox
                   mode="single"
                   options={horarioOptions}
@@ -379,57 +494,56 @@ function DepartamentoGroup({
                   emptyText="Nenhum horário"
                   disabled={isPendingHorario}
                   clearable
-                  triggerClassName="h-8 text-xs"
+                  triggerClassName="h-7 text-xs"
                 />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  disabled={isPendingLink}
+                  onClick={() => onUnlink(s.id)}
+                  aria-label={`Desvincular ${s.name}`}
+                >
+                  <IconX className="h-3.5 w-3.5" />
+                </Button>
               </div>
+            );
+          })}
+
+          {hasSuggestion && (
+            <div className="flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 dark:border-amber-950/50 dark:bg-amber-950/20">
+              <span className="min-w-0 truncate text-sm">
+                <span className="text-muted-foreground">Sugestão: </span>
+                <span className="font-medium">{candidateName!.name}</span>
+              </span>
               <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                size="sm"
+                variant="default"
+                className="h-7 shrink-0 gap-1 px-2 text-xs"
                 disabled={isPendingLink}
-                onClick={() => onUnlink(s.id)}
-                aria-label={`Desvincular ${s.name}`}
+                onClick={() => onLink(candidateName!.id)}
               >
-                <IconX className="h-4 w-4" />
+                <IconLink className="h-3.5 w-3.5" /> Vincular
               </Button>
             </div>
-          );
-        })}
+          )}
 
-        {candidateName && !linkedSectors.some((s) => s.id === candidateName.id) && (
-          <div className="grid grid-cols-[1fr_auto] items-center gap-3 bg-muted/15 px-4 py-2.5">
-            <span className="text-sm">
-              <span className="text-muted-foreground">Sugestão: </span>
-              <span className="font-medium">{candidateName.name}</span>
-            </span>
-            <Button
-              size="sm"
-              variant="default"
+          {sectorOptions.length > 0 && (
+            <Combobox
+              mode="single"
+              options={sectorOptions}
+              value=""
+              onValueChange={(v) => {
+                if (typeof v === "string" && v) onLink(v);
+              }}
+              placeholder="+ Vincular outro setor…"
+              searchPlaceholder="Buscar setor…"
+              emptyText="Nenhum setor disponível"
               disabled={isPendingLink}
-              onClick={() => onLink(candidateName.id)}
-            >
-              <IconLink className="mr-1 h-4 w-4" /> Vincular
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {sectorOptions.length > 0 && (
-        <div className="border-t border-border/40 p-2">
-          <Combobox
-            mode="single"
-            options={sectorOptions}
-            value=""
-            onValueChange={(v) => {
-              if (typeof v === "string" && v) onLink(v);
-            }}
-            placeholder="+ Vincular outro setor…"
-            searchPlaceholder="Buscar setor…"
-            emptyText="Nenhum setor disponível"
-            disabled={isPendingLink}
-            triggerClassName="h-8 text-xs justify-start text-muted-foreground border-dashed"
-            clearable={false}
-          />
+              triggerClassName="h-7 justify-start border-dashed text-xs text-muted-foreground"
+              clearable={false}
+            />
+          )}
         </div>
       )}
     </div>
@@ -480,81 +594,86 @@ function FuncaoMappingCard() {
   const isLoading = funcoesQ.isLoading || positionsQ.isLoading;
   // Secullum catalog read failure: surface it instead of an empty mapping.
   const isError = funcoesQ.isError;
+  const isFetching = funcoesQ.isFetching || positionsQ.isFetching;
   const linkedCount = groups.reduce((acc, g) => acc + g.linked.length, 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">Funções do Secullum</h2>
-          <p className="text-sm text-muted-foreground">
-            {isLoading
-              ? "Carregando…"
-              : `${funcoes.length} função(ões) • ${linkedCount} cargo(s) Ankaa vinculado(s)`}
-          </p>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            funcoesQ.refetch();
-            positionsQ.refetch();
-          }}
-          disabled={funcoesQ.isFetching || positionsQ.isFetching}
-        >
-          <IconRefresh className={`h-4 w-4 ${funcoesQ.isFetching ? "animate-spin" : ""}`} />
-        </Button>
-      </div>
-      <div className="space-y-4">
-        {isLoading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
-          </div>
-        ) : isError ? (
-          <ErrorState
-            title="Erro ao carregar funções do Secullum"
-            description="Não foi possível ler o catálogo de funções do ponto (Secullum). Verifique a integração e tente novamente."
-            onRetry={() => funcoesQ.refetch()}
-          />
-        ) : (
-          <div className="space-y-3">
-            {groups.map((g) => (
-              <FuncaoGroup
-                key={g.funcao.Id}
-                funcao={g.funcao}
-                linkedPositions={g.linked}
-                availablePositions={unmappedPositions}
-                isPendingLink={linkPosition.isPending}
-                onLink={(positionId) =>
-                  // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
-                  linkPosition.mutate({ positionId, funcaoId: g.funcao.Id })
-                }
-                onUnlink={(positionId) =>
-                  // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
-                  linkPosition.mutate({ positionId, funcaoId: null })
-                }
-              />
+    <div className="flex flex-col gap-3">
+      <MappingToolbar
+        icon={IconBriefcase}
+        title="Funções do Secullum"
+        stats={
+          isLoading
+            ? "Carregando…"
+            : `${funcoes.length} função(ões) · ${linkedCount} cargo(s) vinculado(s)`
+        }
+        onRefresh={() => {
+          funcoesQ.refetch();
+          positionsQ.refetch();
+        }}
+        isRefreshing={isFetching}
+      />
+
+      {isLoading ? (
+        <Card className="overflow-hidden">
+          <div className="divide-y divide-border">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="px-3 py-2.5">
+                <Skeleton className="h-5 w-full" />
+              </div>
             ))}
           </div>
-        )}
+        </Card>
+      ) : isError ? (
+        <ErrorState
+          title="Erro ao carregar funções do Secullum"
+          description="Não foi possível ler o catálogo de funções do ponto (Secullum). Verifique a integração e tente novamente."
+          onRetry={() => funcoesQ.refetch()}
+        />
+      ) : (
+        <>
+          <Card className="overflow-hidden">
+            {groups.length === 0 ? (
+              <EmptyState
+                icon={<IconBriefcase className="h-9 w-9" />}
+                title="Nenhuma função no Secullum"
+                description="Crie funções no Secullum ou use o painel abaixo para criá-las a partir dos cargos Ankaa."
+                className="py-8"
+              />
+            ) : (
+              <div className="divide-y divide-border">
+                {groups.map((g) => (
+                  <FuncaoRow
+                    key={g.funcao.Id}
+                    funcao={g.funcao}
+                    linkedPositions={g.linked}
+                    availablePositions={unmappedPositions}
+                    isPendingLink={linkPosition.isPending}
+                    onLink={(positionId) =>
+                      // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+                      linkPosition.mutate({ positionId, funcaoId: g.funcao.Id })
+                    }
+                    onUnlink={(positionId) =>
+                      // Success/error toasts emitted by the axios interceptor (POST mapping endpoint).
+                      linkPosition.mutate({ positionId, funcaoId: null })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </Card>
 
-        {!isLoading && !isError && unmappedPositions.length > 0 && (
-          <UnmappedPanel
-            title="Cargos Ankaa sem função Secullum"
-            description="Crie uma função equivalente no Secullum, ou vincule a uma existente acima."
-          >
-            {unmappedPositions.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-center justify-between gap-3 rounded-md bg-card px-3 py-2 text-sm"
-              >
-                <span className="font-medium">{p.name}</span>
-                <Button
-                  size="sm"
-                  variant="default"
+          {unmappedPositions.length > 0 && (
+            <UnmappedSection
+              title={`Cargos Ankaa sem função (${unmappedPositions.length})`}
+              description="Crie uma função equivalente no Secullum, ou vincule a uma existente acima."
+            >
+              {unmappedPositions.map((p) => (
+                <UnmappedRow
+                  key={p.id}
+                  label={p.name}
                   disabled={upsert.isPending}
-                  onClick={async () => {
+                  onCreate={async () => {
                     try {
                       await upsert.mutateAsync({ Descricao: p.name });
                       // Success/error toasts emitted by the axios interceptor (POST /integrations/secullum/funcoes).
@@ -562,19 +681,17 @@ function FuncaoMappingCard() {
                       // Error toast emitted by the axios error interceptor.
                     }
                   }}
-                >
-                  <IconPlus className="mr-1 h-4 w-4" /> Criar no Secullum
-                </Button>
-              </li>
-            ))}
-          </UnmappedPanel>
-        )}
-      </div>
+                />
+              ))}
+            </UnmappedSection>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
-function FuncaoGroup({
+function FuncaoRow({
   funcao,
   linkedPositions,
   availablePositions,
@@ -593,89 +710,88 @@ function FuncaoGroup({
     () => availablePositions.find((p) => norm(p.name) === norm(funcao.Descricao)),
     [availablePositions, funcao.Descricao],
   );
+  const hasSuggestion = !!candidate && !linkedPositions.some((p) => p.id === candidate.id);
+
+  const [open, setOpen] = useState(hasSuggestion);
 
   const positionOptions = availablePositions.map((p) => ({ value: p.id, label: p.name }));
 
   return (
-    <div className="rounded-lg border border-border/60 bg-card">
-      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="font-mono">
-            #{funcao.Id}
-          </Badge>
-          <span className="font-semibold">{funcao.Descricao}</span>
-        </div>
-        {linkedPositions.length > 0 ? (
-          <Badge className="gap-1 bg-emerald-100 text-emerald-900 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300">
-            <IconCheck className="h-3 w-3" /> {linkedPositions.length} vinculado(s)
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="text-muted-foreground">
-            Sem cargos
-          </Badge>
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted/40"
+      >
+        <IconChevronRight
+          className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
+        />
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">#{funcao.Id}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{funcao.Descricao}</span>
+        {hasSuggestion && !open && (
+          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[0.688rem] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+            sugestão
+          </span>
         )}
-      </div>
+        <LinkCountTag count={linkedPositions.length} emptyLabel="Sem cargos" />
+      </button>
 
-      <div className="divide-y divide-border/40">
-        {linkedPositions.length === 0 && !candidate && (
-          <p className="px-4 py-3 text-sm text-muted-foreground">
-            Nenhum cargo Ankaa vinculado ainda.
-          </p>
-        )}
+      {open && (
+        <div className="space-y-1 bg-muted/20 pb-2.5 pl-9 pr-3 pt-0.5">
+          {linkedPositions.length === 0 && !hasSuggestion && (
+            <p className="py-1.5 text-xs text-muted-foreground">Nenhum cargo Ankaa vinculado ainda.</p>
+          )}
 
-        {linkedPositions.map((p) => (
-          <div
-            key={p.id}
-            className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5"
-          >
-            <span className="min-w-0 truncate text-sm font-medium">{p.name}</span>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          {linkedPositions.map((p) => (
+            <div key={p.id} className="grid grid-cols-[1fr_auto] items-center gap-2">
+              <span className="min-w-0 truncate text-sm">{p.name}</span>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                disabled={isPendingLink}
+                onClick={() => onUnlink(p.id)}
+                aria-label={`Desvincular ${p.name}`}
+              >
+                <IconX className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+
+          {hasSuggestion && (
+            <div className="flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 dark:border-amber-950/50 dark:bg-amber-950/20">
+              <span className="min-w-0 truncate text-sm">
+                <span className="text-muted-foreground">Sugestão: </span>
+                <span className="font-medium">{candidate!.name}</span>
+              </span>
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7 shrink-0 gap-1 px-2 text-xs"
+                disabled={isPendingLink}
+                onClick={() => onLink(candidate!.id)}
+              >
+                <IconLink className="h-3.5 w-3.5" /> Vincular
+              </Button>
+            </div>
+          )}
+
+          {positionOptions.length > 0 && (
+            <Combobox
+              mode="single"
+              options={positionOptions}
+              value=""
+              onValueChange={(v) => {
+                if (typeof v === "string" && v) onLink(v);
+              }}
+              placeholder="+ Vincular outro cargo…"
+              searchPlaceholder="Buscar cargo…"
+              emptyText="Nenhum cargo disponível"
               disabled={isPendingLink}
-              onClick={() => onUnlink(p.id)}
-              aria-label={`Desvincular ${p.name}`}
-            >
-              <IconX className="h-4 w-4" />
-            </Button>
-          </div>
-        ))}
-
-        {candidate && !linkedPositions.some((p) => p.id === candidate.id) && (
-          <div className="grid grid-cols-[1fr_auto] items-center gap-3 bg-muted/15 px-4 py-2.5">
-            <span className="text-sm">
-              <span className="text-muted-foreground">Sugestão: </span>
-              <span className="font-medium">{candidate.name}</span>
-            </span>
-            <Button
-              size="sm"
-              variant="default"
-              disabled={isPendingLink}
-              onClick={() => onLink(candidate.id)}
-            >
-              <IconLink className="mr-1 h-4 w-4" /> Vincular
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {positionOptions.length > 0 && (
-        <div className="border-t border-border/40 p-2">
-          <Combobox
-            mode="single"
-            options={positionOptions}
-            value=""
-            onValueChange={(v) => {
-              if (typeof v === "string" && v) onLink(v);
-            }}
-            placeholder="+ Vincular outro cargo…"
-            searchPlaceholder="Buscar cargo…"
-            emptyText="Nenhum cargo disponível"
-            disabled={isPendingLink}
-            triggerClassName="h-8 text-xs justify-start text-muted-foreground border-dashed"
-            clearable={false}
-          />
+              triggerClassName="h-7 justify-start border-dashed text-xs text-muted-foreground"
+              clearable={false}
+            />
+          )}
         </div>
       )}
     </div>
@@ -773,40 +889,27 @@ function FuncionariosCard() {
   // a "no funcionários" empty state when the read actually failed.
   const ativosError = ativosQ.isError;
   const demitidosError = demitidosQ.isError;
+  const isFetching = ativosQ.isFetching || demitidosQ.isFetching || usersQ.isFetching;
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="flex items-center gap-2 text-base font-semibold">
-              <IconUserCheck className="h-5 w-5 text-emerald-600" />
-              Funcionários ativos
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {isLoading
-                ? "Carregando…"
-                : `${ativos.length} ativo(s) no Secullum • ${ativosLinked} vinculado(s)` +
-                  (ativosPending > 0
-                    ? ` • ${ativosPending} aguardando vínculo`
-                    : "")}
-            </p>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              ativosQ.refetch();
-              demitidosQ.refetch();
-              usersQ.refetch();
-            }}
-            disabled={ativosQ.isFetching || demitidosQ.isFetching || usersQ.isFetching}
-          >
-            <IconRefresh
-              className={`h-4 w-4 ${ativosQ.isFetching ? "animate-spin" : ""}`}
-            />
-          </Button>
-        </div>
+    <div className="flex flex-col gap-5">
+      <section className="flex flex-col gap-2">
+        <MappingToolbar
+          icon={IconUserCheck}
+          title="Funcionários ativos"
+          stats={
+            isLoading
+              ? "Carregando…"
+              : `${ativos.length} ativo(s) · ${ativosLinked} vinculado(s)` +
+                (ativosPending > 0 ? ` · ${ativosPending} aguardando` : "")
+          }
+          onRefresh={() => {
+            ativosQ.refetch();
+            demitidosQ.refetch();
+            usersQ.refetch();
+          }}
+          isRefreshing={isFetching}
+        />
 
         <div className="relative">
           <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -814,16 +917,20 @@ function FuncionariosCard() {
             placeholder="Buscar por nome, folha ou usuário Ankaa…"
             value={search}
             onChange={(value) => setSearch(typeof value === "string" ? value : "")}
-            className="pl-9"
+            className="h-9 pl-9"
           />
         </div>
 
         {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
+          <Card className="overflow-hidden">
+            <div className="divide-y divide-border">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="px-3 py-2.5">
+                  <Skeleton className="h-6 w-full" />
+                </div>
+              ))}
+            </div>
+          </Card>
         ) : ativosError ? (
           <ErrorState
             title="Erro ao carregar funcionários ativos do Secullum"
@@ -831,25 +938,27 @@ function FuncionariosCard() {
             onRetry={() => ativosQ.refetch()}
           />
         ) : (
-          <FuncionariosTable rows={ativosFiltered} matchUser={matchUser} variant="ativo" />
+          <Card className="overflow-hidden">
+            <FuncionariosTable rows={ativosFiltered} matchUser={matchUser} variant="ativo" />
+          </Card>
         )}
       </section>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <IconUserOff className="h-5 w-5 text-muted-foreground" />
-            Funcionários demitidos
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {isLoading
-              ? "Carregando…"
-              : `${demitidos.length} desligado(s) — somente leitura`}
-          </p>
+      <section className="flex flex-col gap-2">
+        <div className="flex items-center gap-2 px-0.5">
+          <IconUserOff className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <h2 className="shrink-0 text-sm font-semibold">Funcionários demitidos</h2>
+          <span className="truncate text-xs text-muted-foreground">
+            {isLoading ? "Carregando…" : `${demitidos.length} desligado(s) · somente leitura`}
+          </span>
         </div>
 
         {isLoading ? (
-          <Skeleton className="h-32 w-full" />
+          <Card className="overflow-hidden">
+            <div className="px-3 py-2.5">
+              <Skeleton className="h-20 w-full" />
+            </div>
+          </Card>
         ) : demitidosError ? (
           <ErrorState
             title="Erro ao carregar funcionários demitidos do Secullum"
@@ -857,7 +966,9 @@ function FuncionariosCard() {
             onRetry={() => demitidosQ.refetch()}
           />
         ) : (
-          <FuncionariosTable rows={demitidosFiltered} matchUser={matchUser} variant="demitido" />
+          <Card className="overflow-hidden">
+            <FuncionariosTable rows={demitidosFiltered} matchUser={matchUser} variant="demitido" />
+          </Card>
         )}
       </section>
     </div>
@@ -904,79 +1015,76 @@ function FuncionariosTable({
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-md border border-dashed bg-muted/20 px-3 py-6 text-center text-sm text-muted-foreground">
-        Nenhum funcionário encontrado.
-      </div>
+      <EmptyState
+        icon={<IconUsers className="h-9 w-9" />}
+        title="Nenhum funcionário encontrado"
+        description="Ajuste a busca ou verifique se há funcionários cadastrados no Secullum."
+        className="py-8"
+      />
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-border/60">
-      <table className="w-full text-sm">
-        <thead className="border-b border-border/60 bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2 font-medium" colSpan={3}>
-              Secullum
-            </th>
-            <th className="border-l border-border/60 px-3 py-2 font-medium" colSpan={3}>
-              Ankaa
-            </th>
-            <th className="border-l border-border/60 px-3 py-2 font-medium">Status</th>
-          </tr>
-          <tr className="border-t border-border/60 text-[11px] normal-case">
-            <th className="px-3 py-1.5 font-medium">Folha</th>
-            <th className="px-3 py-1.5 font-medium">Nome</th>
-            <th className="px-3 py-1.5 font-medium">Departamento</th>
-            <th className="border-l border-border/60 px-3 py-1.5 font-medium">Folha</th>
-            <th className="px-3 py-1.5 font-medium">Nome</th>
-            <th className="px-3 py-1.5 font-medium">Setor</th>
-            <th className="border-l border-border/60 px-3 py-1.5 font-medium"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((f) => {
-            const m = matchUser(f);
-            const u = m?.user ?? null;
-            const isBusy = pendingId === f.Id;
-            return (
-              <tr
-                key={f.Id}
-                className="border-b border-border/40 last:border-0 hover:bg-muted/20"
-              >
-                <td className="px-3 py-2 font-mono text-xs">{f.NumeroFolha || "—"}</td>
-                <td className="px-3 py-2 font-medium">{f.Nome}</td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  {f.DepartamentoDescricao || "—"}
-                </td>
-                <td className="border-l border-border/40 px-3 py-2 font-mono text-xs">
-                  {u?.payrollNumber ?? "—"}
-                </td>
-                <td className="px-3 py-2">
-                  {u ? <span className="font-medium">{u.name}</span> : <span className="text-muted-foreground">—</span>}
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  {u?.sector?.name ?? "—"}
-                </td>
-                <td className="border-l border-border/40 px-3 py-2">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="h-9 w-[88px]">Folha</TableHead>
+          <TableHead className="h-9">Funcionário (Secullum)</TableHead>
+          <TableHead className="h-9">Usuário Ankaa</TableHead>
+          <TableHead className="h-9 w-[160px] text-right">Status</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((f) => {
+          const m = matchUser(f);
+          const u = m?.user ?? null;
+          const isBusy = pendingId === f.Id;
+          return (
+            <TableRow key={f.Id}>
+              <TableCell className="py-1.5 font-mono text-xs text-muted-foreground">
+                {f.NumeroFolha || "—"}
+              </TableCell>
+              <TableCell className="py-1.5">
+                <div className="text-sm font-medium leading-tight">{f.Nome}</div>
+                {f.DepartamentoDescricao ? (
+                  <div className="text-xs text-muted-foreground">{f.DepartamentoDescricao}</div>
+                ) : null}
+              </TableCell>
+              <TableCell className="py-1.5">
+                {u ? (
+                  <div>
+                    <div className="text-sm font-medium leading-tight">{u.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {u.sector?.name ??
+                        (m?.via === "payroll"
+                          ? `sugestão · folha ${u.payrollNumber ?? "—"}`
+                          : "—")}
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </TableCell>
+              <TableCell className="py-1.5">
+                <div className="flex items-center justify-end gap-1.5">
                   {variant === "demitido" ? (
-                    <Badge variant="outline" className="text-muted-foreground">
-                      Desligado
-                    </Badge>
+                    <Badge variant="muted">Desligado</Badge>
                   ) : m?.via === "fk" ? (
-                    <div className="flex items-center gap-2">
-                      <Badge className="gap-1 bg-emerald-100 text-emerald-900 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    <>
+                      <Badge variant="active" className="gap-1">
                         <IconCheck className="h-3 w-3" /> Vinculado
                       </Badge>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="ghost"
-                        className="h-7 px-2 text-xs text-muted-foreground"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
                         disabled={isBusy}
                         onClick={() => handleUnlink(f.Id, u!.id)}
+                        aria-label={`Desvincular ${f.Nome}`}
                       >
-                        <IconX className="h-3.5 w-3.5" /> Desvincular
+                        <IconX className="h-3.5 w-3.5" />
                       </Button>
-                    </div>
+                    </>
                   ) : m?.via === "payroll" ? (
                     <Button
                       size="sm"
@@ -989,42 +1097,14 @@ function FuncionariosTable({
                       {isBusy ? "Vinculando…" : "Vincular"}
                     </Button>
                   ) : (
-                    <Badge variant="outline" className="text-muted-foreground">
-                      Sem usuário
-                    </Badge>
+                    <Badge variant="outline">Sem usuário</Badge>
                   )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function UnmappedPanel({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-md border border-border bg-muted/30 p-3">
-      <div className="mb-2">
-        <div className="text-sm font-medium">{title}</div>
-        {description ? (
-          <p className="text-xs text-muted-foreground">{description}</p>
-        ) : null}
-      </div>
-      <ul className="space-y-1.5">{children}</ul>
-    </div>
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }
