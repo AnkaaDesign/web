@@ -81,6 +81,7 @@ export function canFinishTask(user: PermissionUser | null): boolean {
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
     SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    SECTOR_PRIVILEGES.LOGISTIC,
   ]);
 }
 

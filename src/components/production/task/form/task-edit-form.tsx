@@ -36,6 +36,7 @@ import { ResponsibleRole } from "@/types/responsible";
 import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, BONIFICATION_STATUS, BONIFICATION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
+import { areAllProductionServiceOrdersComplete } from "@/utils/serviceOrder";
 import { useAuth } from "../../../../contexts/auth-context";
 import { useTaskPermissions } from '@/hooks/common/use-task-permissions';
 import { useAccordionScroll } from "@/lib/scroll-utils";
@@ -3665,8 +3666,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           </AccordionItem>
                 )}
 
-                {/* Check-out Files Card - grouped by service order, shows checkin reference above */}
-                {canViewCheckinCheckout && task.status === TASK_STATUS.COMPLETED && task.serviceOrders && task.serviceOrders.filter(so => so.id && so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.status !== SERVICE_ORDER_STATUS.CANCELLED).length > 0 && (
+                {/* Check-out Files Card - grouped by service order, shows checkin reference above.
+                    Available once ALL production SOs are complete (not when the task is finished) —
+                    doing the checkout then auto-completes "Checklist Saída", enabling Finalizar. */}
+                {canViewCheckinCheckout && areAllProductionServiceOrdersComplete(task.serviceOrders) && task.serviceOrders && task.serviceOrders.filter(so => so.id && so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.status !== SERVICE_ORDER_STATUS.CANCELLED).length > 0 && (
           <AccordionItem
             value="checkout-files"
             id="accordion-item-checkout-files"

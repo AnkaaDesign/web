@@ -1,7 +1,29 @@
 import { SERVICE_ORDER_STATUS_LABELS } from "../constants";
-import { SERVICE_ORDER_STATUS } from "../constants";
+import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../constants";
 import type { ServiceOrder } from "../types";
 import { type BadgeVariant } from "../constants/badge-colors";
+
+/**
+ * Checkout/finish gating helpers. Photos live on the PRODUCTION SOs and the
+ * LOGISTIC checklist SOs are auto-completed from them (API-side), so these
+ * derived predicates drive when the checkout field appears and when the
+ * "Finalizar" action becomes available.
+ */
+export const areAllProductionServiceOrdersComplete = (
+  serviceOrders?: Pick<ServiceOrder, "type" | "status">[] | null,
+): boolean => {
+  const active = (serviceOrders ?? []).filter(
+    (so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.status !== SERVICE_ORDER_STATUS.CANCELLED,
+  );
+  return active.length > 0 && active.every((so) => so.status === SERVICE_ORDER_STATUS.COMPLETED);
+};
+
+export const areAllServiceOrdersComplete = (
+  serviceOrders?: Pick<ServiceOrder, "status">[] | null,
+): boolean => {
+  const active = (serviceOrders ?? []).filter((so) => so.status !== SERVICE_ORDER_STATUS.CANCELLED);
+  return active.length > 0 && active.every((so) => so.status === SERVICE_ORDER_STATUS.COMPLETED);
+};
 
 export const isServiceOrderStarted = (serviceOrder: Pick<ServiceOrder, "startedAt">): boolean => {
   return serviceOrder.startedAt !== null;

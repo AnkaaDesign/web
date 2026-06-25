@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { canEditTasks, canDeleteTasks, canLeaderManageTask, canFinishTask } from "@/utils/permissions/entity-permissions";
 import { canViewQuote } from "@/utils/permissions/quote-permissions";
 import { isTeamLeader } from "@/utils/user";
+import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
 import { IconReceipt } from "@tabler/icons-react";
 
 interface TaskTableContextMenuProps {
@@ -30,6 +31,12 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
   const { tasks } = contextMenu;
   const isMultiSelection = tasks.length > 1;
   const hasInProgressTasks = tasks.some((t) => t.status === TASK_STATUS.IN_PRODUCTION);
+  // Finalizar is only offered once a task is in production AND every (non-cancelled)
+  // service order is complete — including the checkout-driven "Checklist Saída".
+  // This makes "ready to finish" explicit instead of letting the API reject it.
+  const hasFinishableTasks = tasks.some(
+    (t) => t.status === TASK_STATUS.IN_PRODUCTION && areAllServiceOrdersComplete(t.serviceOrders),
+  );
   const hasWaitingProductionTasks = tasks.some((t) => t.status === TASK_STATUS.WAITING_PRODUCTION);
   const hasPreparationTasks = tasks.some((t) => t.status === TASK_STATUS.PREPARATION);
 
@@ -75,7 +82,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           </DropdownMenuItem>
         )}
 
-        {canFinish && hasInProgressTasks && (
+        {canFinish && hasFinishableTasks && (
           <DropdownMenuItem onClick={() => handleAction("finish")} className="text-green-700 hover:text-white">
             <IconCheck className="mr-2 h-4 w-4" />
             Finalizar
@@ -83,7 +90,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         )}
 
         {/* Separator if we have status actions */}
-        {((canManageStatus && (hasWaitingProductionTasks || hasPreparationTasks)) || (canFinish && hasInProgressTasks)) && <DropdownMenuSeparator />}
+        {((canManageStatus && (hasWaitingProductionTasks || hasPreparationTasks)) || (canFinish && hasFinishableTasks)) && <DropdownMenuSeparator />}
 
         {/* Edit action - ADMIN, DESIGNER, FINANCIAL, LOGISTIC */}
         {canEdit && (
