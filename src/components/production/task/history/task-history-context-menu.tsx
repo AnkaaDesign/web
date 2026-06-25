@@ -15,6 +15,7 @@ import { SetQuoteLayoutModal } from "../schedule/set-quote-layout-modal";
 import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { useAuth } from "@/contexts/auth-context";
 import { canDeleteTasks, canFinishTask } from "@/utils/permissions/entity-permissions";
+import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
 import { canViewQuote } from "@/utils/permissions/quote-permissions";
 import { isTeamLeader } from "@/utils/user";
 import { canLeaderManageTask } from "@/utils/permissions/entity-permissions";
@@ -73,7 +74,11 @@ export function TaskHistoryContextMenu({
   const task = tasks[0];
 
   // Check task statuses for status actions
-  const hasInProgressTasks = tasks.some((t) => t.status === TASK_STATUS.IN_PRODUCTION);
+  // Finalizar is only offered once a task is in production AND every (non-cancelled)
+  // service order is complete — including the checkout-driven "Checklist Saída".
+  const hasFinishableTasks = tasks.some(
+    (t) => t.status === TASK_STATUS.IN_PRODUCTION && areAllServiceOrdersComplete(t.serviceOrders),
+  );
   const hasPreparationTasks = tasks.some((t) => t.status === TASK_STATUS.PREPARATION);
   const hasWaitingProductionTasks = tasks.some((t) => t.status === TASK_STATUS.WAITING_PRODUCTION);
   const hasCompletedTasks = tasks.some((t) => t.status === TASK_STATUS.COMPLETED);
@@ -632,7 +637,7 @@ export function TaskHistoryContextMenu({
             </DropdownMenuItem>
           )}
 
-          {canFinish && hasInProgressTasks && (
+          {canFinish && hasFinishableTasks && (
             <DropdownMenuItem onClick={handleFinish} className="text-green-700 hover:text-white">
               <IconCheck className="mr-2 h-4 w-4" />
               <span className="truncate">Finalizar</span>
@@ -640,7 +645,7 @@ export function TaskHistoryContextMenu({
           )}
 
           {/* Separator if we have status actions */}
-          {(hasPreparationTasks || (canManageStatus && (hasPreparationTasks || hasWaitingProductionTasks)) || (canFinish && hasInProgressTasks)) && <DropdownMenuSeparator />}
+          {(hasPreparationTasks || (canManageStatus && (hasPreparationTasks || hasWaitingProductionTasks)) || (canFinish && hasFinishableTasks)) && <DropdownMenuSeparator />}
 
           {/* View action - single selection only */}
           {!isBulk && task && (
