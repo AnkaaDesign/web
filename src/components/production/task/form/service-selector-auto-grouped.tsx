@@ -574,13 +574,6 @@ function ServiceRow({
     defaultValue: SERVICE_ORDER_STATUS.PENDING,
   });
 
-  // Watch the description — needed to suppress manual "Concluir" on auto-completing tasks like "Em Negociação"
-  const selectedDescription = useWatch({
-    control,
-    name: `serviceOrders.${index}.description`,
-    defaultValue: "",
-  });
-
   // Watch if this is an existing service order (has id)
   const serviceOrderId = useWatch({
     control,
@@ -639,29 +632,47 @@ function ServiceRow({
     const isProductionSectorLeader = userPrivilege === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader;
     // Production manager: full set including pause and cancel for PRODUCTION/LOGISTIC SOs
     const isProductionManager = userPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
-    // "Em Negociação" (Commercial) auto-completes when the task quote is approved — hide manual Concluir.
-    const isAutoCompletingTask = selectedType === SERVICE_ORDER_TYPE.COMMERCIAL && selectedDescription === 'Em Negociação';
 
     // State-machine transitions keyed on the current status
     const buildStatuses = (): SERVICE_ORDER_STATUS[] => {
     switch (currentStatus) {
 
       // ── PENDING ──────────────────────────────────────────────────────────
-      // Can only be started (→ IN_PROGRESS). Admin/PM can also cancel.
+      // Can be started (→ IN_PROGRESS) or completed directly (→ COMPLETED) —
+      // work is often already done by the time the SO is touched (esp. in batch
+      // "finish all" flows). Admin/PM can also cancel; artwork goes via approval.
       case SERVICE_ORDER_STATUS.PENDING:
-        if (isAdmin) return [
+        if (isAdmin) {
+          return isArtworkType ? [
+            SERVICE_ORDER_STATUS.PENDING,
+            SERVICE_ORDER_STATUS.IN_PROGRESS,
+            SERVICE_ORDER_STATUS.WAITING_APPROVE,
+            SERVICE_ORDER_STATUS.COMPLETED,
+            SERVICE_ORDER_STATUS.CANCELLED,
+          ] : [
+            SERVICE_ORDER_STATUS.PENDING,
+            SERVICE_ORDER_STATUS.IN_PROGRESS,
+            SERVICE_ORDER_STATUS.COMPLETED,
+            SERVICE_ORDER_STATUS.CANCELLED,
+          ];
+        }
+        // Artwork designers submit for approval rather than completing directly.
+        if (isArtworkType && isDesigner) return [
           SERVICE_ORDER_STATUS.PENDING,
           SERVICE_ORDER_STATUS.IN_PROGRESS,
-          SERVICE_ORDER_STATUS.CANCELLED,
+          SERVICE_ORDER_STATUS.WAITING_APPROVE,
         ];
         if (isProductionManager) return [
           SERVICE_ORDER_STATUS.PENDING,
           SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.COMPLETED,
           SERVICE_ORDER_STATUS.CANCELLED,
         ];
+        // Sector team leaders and regular sector users: start or complete.
         return [
           SERVICE_ORDER_STATUS.PENDING,
           SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.COMPLETED,
         ];
 
       // ── IN_PROGRESS ───────────────────────────────────────────────────────
@@ -834,11 +845,8 @@ function ServiceRow({
     }
     };
 
-    const statuses = buildStatuses();
-    return isAutoCompletingTask
-      ? statuses.filter((s) => s !== SERVICE_ORDER_STATUS.COMPLETED)
-      : statuses;
-  }, [serviceOrderId, userPrivilege, isTeamLeader, selectedType, selectedDescription, currentStatus]);
+    return buildStatuses();
+  }, [serviceOrderId, userPrivilege, isTeamLeader, selectedType, currentStatus]);
 
   // Determine if status field should be shown as combobox (editable) or badge (read-only)
   // For PRODUCTION sector users who are NOT team leaders: show as badge (read-only)
