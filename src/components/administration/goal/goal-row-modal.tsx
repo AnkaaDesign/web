@@ -47,7 +47,7 @@ const METRIC_GROUPS: Array<{ label: string; metrics: GOAL_METRIC[] }> = [
     ],
   },
   {
-    label: "Recursos Humanos",
+    label: "Departamento Pessoal",
     metrics: [
       GOAL_METRIC.COLLABORATORS_PER_SECTOR,
       GOAL_METRIC.HR_HIRES_PER_MONTH,

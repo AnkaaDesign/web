@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { WarningTable } from "@/components/human-resources/warning/list/warning-table";
+import { WarningTable } from "@/components/personnel-department/warning/list/warning-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { FAVORITE_PAGES, routes } from "../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -13,7 +13,7 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
-import { WarningFilters } from "@/components/human-resources/warning/list/warning-filters";
+import { WarningFilters } from "@/components/personnel-department/warning/list/warning-filters";
 
 /**
  * My Warnings Page (Minhas Advertências)

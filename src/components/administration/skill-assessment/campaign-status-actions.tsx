@@ -44,7 +44,7 @@ export function CampaignStatusActions({ assessment }: CampaignStatusActionsProps
   const status = assessment.status as ASSESSMENT_STATUS;
   const canOpen = status === ASSESSMENT_STATUS.DRAFT;
   const canClose = status === ASSESSMENT_STATUS.OPEN;
-  const canCancel = status === ASSESSMENT_STATUS.DRAFT || status === ASSESSMENT_STATUS.OPEN;
+  const canCancel = status !== ASSESSMENT_STATUS.CANCELLED;
 
   const confirm = async () => {
     try {

@@ -34,7 +34,7 @@ export type WidgetCategory =
 // Order here = order shown in the gallery tabs.
 export const WIDGET_CATEGORY_LABELS: Record<WidgetCategory, string> = {
   inventory: "Estoque",
-  hr: "Recursos Humanos",
+  hr: "Departamento Pessoal",
   production: "Produção",
   financial: "Financeiro",
   other: "Outros",

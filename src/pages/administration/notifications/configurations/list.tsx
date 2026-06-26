@@ -69,7 +69,7 @@ import { Switch } from "@/components/ui/switch";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { GenericColumnVisibilityManager } from "@/components/ui/generic-column-visibility-manager";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
-import { routes, SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS, NOTIFICATION_IMPORTANCE, NOTIFICATION_CHANNEL } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS, NOTIFICATION_IMPORTANCE, NOTIFICATION_CHANNEL, FAVORITE_PAGES } from "@/constants";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -682,6 +682,7 @@ export function NotificationConfigurationListPage() {
         <PageHeader
           variant="list"
           title="Configurações de Notificação"
+          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_NOTIFICACOES_CONFIGURACOES_LISTAR}
           breadcrumbs={[
             { label: "Início", href: "/" },
             { label: "Administração", href: "/administracao" },

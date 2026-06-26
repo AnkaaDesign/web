@@ -21,7 +21,7 @@ export function NameInput({ control, disabled, required }: NameInputProps) {
             <FormControl>
               <Input
                 {...field}
-                placeholder="Ex: Recursos Humanos, Produção, Financeiro"
+                placeholder="Ex: Departamento Pessoal, Produção, Financeiro"
                 disabled={disabled}
                 transparent={true}
                 maxLength={100}

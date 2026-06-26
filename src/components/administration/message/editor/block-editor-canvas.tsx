@@ -8,6 +8,8 @@ import { IconPlus, IconLayoutGrid } from "@tabler/icons-react";
 import { BlockEditor } from "./block-editor";
 import { BlockTypeSelector } from "./block-type-selector";
 import { MessageTemplates } from "./message-templates";
+import { SimplePasteDialog } from "./simple-paste-dialog";
+import { buildSimpleDocument } from "@/utils/message-rich-paste";
 import type { ContentBlock, BlockType, DecoratorVariant } from "./types";
 
 interface BlockEditorCanvasProps {
@@ -19,6 +21,7 @@ export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasP
   const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [insertIndex, setInsertIndex] = useState<number | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showSimplePaste, setShowSimplePaste] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -63,6 +66,17 @@ export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasP
 
   const handleDeleteBlock = (id: string) => {
     onBlocksChange(blocks.filter((block) => block.id !== id));
+  };
+
+  // "Simples": insert pasted, already-formatted content and ensure the document
+  // has a logo header at the top and a wave footer at the bottom.
+  const handleSimpleInsert = (contentBlocks: ContentBlock[]) => {
+    const next = [...blocks];
+    const at = insertIndex !== null ? insertIndex + 1 : next.length;
+    next.splice(at, 0, ...contentBlocks);
+    onBlocksChange(buildSimpleDocument(next, next));
+    setShowSimplePaste(false);
+    setInsertIndex(null);
   };
 
   return (
@@ -127,6 +141,19 @@ export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasP
             setInsertIndex(null);
           }}
           onSelect={handleAddBlock}
+          onSimple={() => {
+            setShowTypeSelector(false);
+            setShowSimplePaste(true);
+          }}
+        />
+
+        <SimplePasteDialog
+          open={showSimplePaste}
+          onClose={() => {
+            setShowSimplePaste(false);
+            setInsertIndex(null);
+          }}
+          onInsert={handleSimpleInsert}
         />
 
         <MessageTemplates

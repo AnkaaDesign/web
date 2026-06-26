@@ -23,7 +23,7 @@ import {
 } from "../../../../constants";
 import { getUsers } from "../../../../api-client";
 import { formatDate } from "../../../../utils";
-import { useUser } from "../../../../hooks/human-resources/use-user";
+import { useUser } from "../../../../hooks/personnel-department/use-user";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";

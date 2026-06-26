@@ -548,7 +548,7 @@ function DayGroup({
           if (c.key === "credit") {
             return (
               <TableCell key={c.key} className="p-0 !border-r-0 text-right">
-                {!isEmpty && summary.credits > 0 ? (
+                {!isOpen && !isEmpty && summary.credits > 0 ? (
                   <div className="px-4 py-2.5 text-right leading-tight">
                     <span className="text-sm font-semibold tabular-nums text-emerald-700 whitespace-nowrap">
                       {formatCurrency(summary.credits)}
@@ -561,7 +561,7 @@ function DayGroup({
           if (c.key === "debit") {
             return (
               <TableCell key={c.key} className="p-0 !border-r-0 text-right">
-                {!isEmpty && summary.debits > 0 ? (
+                {!isOpen && !isEmpty && summary.debits > 0 ? (
                   <div className="px-4 py-2.5 text-right leading-tight">
                     <span className="text-sm font-semibold tabular-nums text-red-700 whitespace-nowrap">
                       {formatCurrency(summary.debits)}

@@ -18,7 +18,7 @@ import {
   useOpenQuestionnaire,
   useQuestionnaireQuestions,
 } from "@/hooks/questionnaire/use-questionnaire";
-import { useUsers } from "@/hooks/human-resources/use-user";
+import { useUsers } from "@/hooks/personnel-department/use-user";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";

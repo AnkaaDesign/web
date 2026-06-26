@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconId, IconCertificate, IconFileText } from "@tabler/icons-react";
+import { IconId, IconCertificate, IconFileText, IconBuilding } from "@tabler/icons-react";
 import type { User } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { maskCPF } from "../../../../utils";
+import { maskCPF, maskCNPJ } from "../../../../utils";
 
 interface DocumentsCardProps {
   user: User;
@@ -10,7 +10,10 @@ interface DocumentsCardProps {
 }
 
 export function DocumentsCard({ user, className }: DocumentsCardProps) {
-  const hasDocuments = user.cpf || user.pis;
+  // CNPJ de prestador (terceirizado/PJ) vive no vínculo atual, não no User.
+  const providerCnpj = user.currentContract?.providerCnpj;
+  const providerName = user.currentContract?.providerName;
+  const hasDocuments = user.cpf || user.pis || providerCnpj;
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
@@ -43,6 +46,21 @@ export function DocumentsCard({ user, className }: DocumentsCardProps) {
                       PIS
                     </span>
                     <span className="text-sm font-semibold text-foreground">{user.pis}</span>
+                  </div>
+                )}
+
+                {providerCnpj && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconBuilding className="h-4 w-4" />
+                      CNPJ
+                    </span>
+                    <span className="text-sm font-semibold text-foreground text-right">
+                      {maskCNPJ(providerCnpj)}
+                      {providerName && (
+                        <span className="block text-xs font-normal text-muted-foreground">{providerName}</span>
+                      )}
+                    </span>
                   </div>
                 )}
               </div>

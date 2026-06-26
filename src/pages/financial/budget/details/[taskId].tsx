@@ -808,7 +808,11 @@ export const FinancialBudgetDetailPage = () => {
       if (dirtyFields.customerId)
         taskUpdateData.customerId = data.customerId || undefined;
       if (dirtyFields.details)
-        taskUpdateData.details = data.details || undefined;
+        // Send null (not undefined) when cleared so the API actually clears it.
+        // `details` is an optional description: the API schema transforms "" → undefined
+        // and the repository skips undefined, so "" or undefined would silently persist
+        // the old value. Only an explicit null clears the column.
+        taskUpdateData.details = data.details?.trim() ? data.details : null;
       if (dirtyFields.forecastDate)
         taskUpdateData.forecastDate = data.forecastDate || undefined;
       if (dirtyFields.term) taskUpdateData.term = data.term || undefined;

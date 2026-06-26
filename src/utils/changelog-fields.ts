@@ -1873,7 +1873,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       INTERMEDIATE: "Intermediário",
       SENIOR: "Sênior",
       LEAD: "Líder",
-      HUMAN_RESOURCES: "Recursos Humanos",
+      HUMAN_RESOURCES: "Departamento Pessoal",
       ADMIN: "Administrador",
       PRODUCTION: "Produção",
       COMMERCIAL: "Comercial",

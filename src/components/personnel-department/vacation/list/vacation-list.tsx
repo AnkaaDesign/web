@@ -1,13 +1,13 @@
 import { useState, useCallback, useMemo } from "react";
 import { useVacationMutations } from "../../../../hooks/personnel-department/use-vacations";
-import { useUsers } from "../../../../hooks/human-resources/use-user";
+import { useUsers } from "../../../../hooks/personnel-department/use-user";
 import type { Vacation } from "../../../../types/vacation";
 import type { VacationGetManyFormData } from "../../../../schemas/vacation";
 import { VACATION_STATUS } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { PeriodControl } from "@/components/human-resources/time-clock-entry/period-control";
+import { PeriodControl } from "@/components/personnel-department/time-clock-entry/period-control";
 import { VacationTable } from "./vacation-table";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { GenericColumnVisibilityManager } from "@/components/ui/generic-column-visibility-manager";

@@ -161,7 +161,7 @@ const VALID_ROUTES = [
   routes.painting.paintTypes.edit(":id"),
   routes.painting.paintTypes.details(":id"),
 
-  // Human Resources routes
+  // Personnel Department routes
   routes.personnelDepartment.root,
   routes.personnelDepartment.requisicoes.root,
   routes.personnelDepartment.requisicoes.list,
@@ -232,13 +232,13 @@ const VALID_ROUTES = [
   // Financial - Accounts Payable (Contas a Pagar) route
   routes.financial.accountsPayable.root,
 
-  // Human Resources - Payroll (Folha de Pagamento) routes
+  // Personnel Department - Payroll (Folha de Pagamento) routes
   routes.personnelDepartment.payroll.root,
   routes.personnelDepartment.payroll.create,
   routes.personnelDepartment.payroll.detail(":id"),
   routes.personnelDepartment.payroll.edit(":id"),
 
-  // Human Resources - Loans (Empréstimos) route
+  // Personnel Department - Loans (Empréstimos) route
   routes.personnelDepartment.loans.root,
 
   // Personnel Department (Departamento Pessoal) routes
@@ -332,7 +332,7 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/administracao/setores/listar": "/administracao/setores",
   "/administracao/notificacoes/listar": "/administracao/notificacoes",
 
-  // Human Resources route mappings
+  // Personnel Department route mappings
   "/departamento-pessoal/cargos/listar": "/departamento-pessoal/cargos",
   "/departamento-pessoal/ausencias/listar": "/departamento-pessoal/ferias",
   "/departamento-pessoal/ausencias": "/departamento-pessoal/ferias",

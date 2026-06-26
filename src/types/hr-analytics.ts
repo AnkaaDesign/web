@@ -177,7 +177,7 @@ export interface HeadcountFilters {
 }
 
 // ---------------------------------------------------------------------------
-// Custo de Folha / Salário (Part F) — POST /human-resources/analytics/salary-cost
+// Custo de Folha / Salário (Part F) — POST /personnel-department/analytics/salary-cost
 // Reuses HeadcountFilters as the request body.
 // ---------------------------------------------------------------------------
 

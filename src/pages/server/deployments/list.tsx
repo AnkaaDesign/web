@@ -1,4 +1,4 @@
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -17,6 +17,7 @@ export const DeploymentListPage = () => {
         <div className="flex-shrink-0">
           <PageHeader
             title="Implantações"
+            favoritePage={FAVORITE_PAGES.SERVIDOR_IMPLANTACOES_LISTAR}
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "Servidor", href: routes.server.root },

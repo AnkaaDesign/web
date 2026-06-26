@@ -1,7 +1,7 @@
 import { IconPlus } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -32,6 +32,7 @@ export const WorkAccidentListPage = () => {
         <PageHeader
           variant="list"
           title="CAT — Acidentes de Trabalho"
+          favoritePage={FAVORITE_PAGES.MEDICINA_DO_TRABALHO_CAT_LISTAR}
           breadcrumbs={[{ label: "Início", href: "/" }, { label: "Medicina do Trabalho", href: routes.occupationalHealth.root }, { label: "CAT" }]}
           actions={actions}
           className="flex-shrink-0"

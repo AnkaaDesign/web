@@ -228,7 +228,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // Registro de Ponto - All authenticated users can access
   "/registro-de-ponto": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING"],
 
-  // Recursos Humanos - HR with admin requirements for sensitive operations
+  // Departamento Pessoal - HR with admin requirements for sensitive operations
   // ACCOUNTING (Departamento Pessoal) shares the HR routes granted by the accounting-area contract.
   "/departamento-pessoal": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN"],
   // Colaboradores (employee directory) — canonical home under Departamento Pessoal.
@@ -286,10 +286,10 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // Medicina do Trabalho - Occupational Health (ACCOUNTING area)
   "/medicina-do-trabalho/*": ["ACCOUNTING", "HUMAN_RESOURCES", "ADMIN"],
 
-  // Human Resources - HR with admin requirements for sensitive operations (new English routes)
-  "/human-resources": "HUMAN_RESOURCES",
-  "/human-resources/employees": "HUMAN_RESOURCES",
-  "/human-resources/employees/create": "ADMIN", // Employee creation requires admin
+  // Personnel Department - HR with admin requirements for sensitive operations (new English routes)
+  "/personnel-department": "HUMAN_RESOURCES",
+  "/personnel-department/employees": "HUMAN_RESOURCES",
+  "/personnel-department/employees/create": "ADMIN", // Employee creation requires admin
 
   // Catalog routes (view-only for designers, commercial, logistic, team leaders - NOTE: uses same details path as painting.catalog, so privileges defined on line 87)
   // Team leaders check at component level via isTeamLeader()
@@ -329,7 +329,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   [`${routes.inventory.root}/*`]: "WAREHOUSE",
   "/pintura/*": ["WAREHOUSE", "DESIGNER", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "TEAM_LEADER", "ADMIN"], // PRODUCTION excluded from paint routes
   [`${routes.production.root}/*`]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL"], // DESIGNER, FINANCIAL, LOGISTIC, PRODUCTION_MANAGER, PLOTTING have read access to production routes
-  "/human-resources/*": "HUMAN_RESOURCES",
+  "/personnel-department/*": "HUMAN_RESOURCES",
   "/meu-pessoal/*": "TEAM_LEADER", // Team leader routes - uses virtual privilege
   "/manutencao/*": ["MAINTENANCE", "WAREHOUSE", "ADMIN"],
 };

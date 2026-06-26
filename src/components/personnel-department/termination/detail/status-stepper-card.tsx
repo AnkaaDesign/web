@@ -26,7 +26,7 @@ export const TERMINATION_STATUS_CHAIN: TERMINATION_STATUS[] = [
 
 /**
  * Per-termination applicable chain (mirrors the server in
- * api/src/modules/human-resources/termination/termination.service.ts):
+ * api/src/modules/personnel-department/termination/termination.service.ts):
  * - NOTICE_PERIOD only when the notice is actually WORKED;
  * - MEDICAL_EXAM never applies to DEATH (no exame demissional is possible).
  */

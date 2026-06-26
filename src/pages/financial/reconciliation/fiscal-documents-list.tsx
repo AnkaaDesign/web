@@ -251,12 +251,14 @@ export const FiscalDocumentsListContent = () => {
           variant="list"
           title={periodTitle}
           icon={IconReceipt}
-          favoritePage={FAVORITE_PAGES.FINANCEIRO_CONCILIACAO_NOTAS}
+          favoritePage={FAVORITE_PAGES.FINANCEIRO_NOTAS_FISCAIS_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Financeiro", href: routes.financial.root },
-            { label: "Conciliação Bancária", href: routes.financial.reconciliation.root },
-            { label: "Notas Fiscais" },
+            // This "Recebidas" content is hosted by the unified Notas Fiscais
+            // surface (/financeiro/notas-fiscais), which sits directly under
+            // Financeiro — not under Conciliação Bancária.
+            { label: "Notas Fiscais", href: routes.financial.nfse.root },
           ]}
           actions={[
             {

@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { SECTOR_PRIVILEGES } from "../../constants";
 import { formatCurrency } from "../../utils";
 import type { Discount } from "../../types";
-import { EmployeeLoanDialog } from "../human-resources/payroll/employee-loan-dialog";
+import { EmployeeLoanDialog } from "../personnel-department/payroll/employee-loan-dialog";
 
 interface CollaboratorLoansCardProps {
   userId: string;

@@ -1,6 +1,6 @@
 import { IconClipboardList } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -15,6 +15,7 @@ export const SkillListPage = () => {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Competências"
+          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_COMPETENCIAS_LISTAR}
           icon={IconClipboardList}
           breadcrumbs={[
             { label: "Início", href: routes.home },

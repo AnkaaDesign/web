@@ -57,7 +57,7 @@ import {
   useRecurrentPayableMutations,
 } from "@/hooks/financial/use-recurrent-payable";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { SECTOR_PRIVILEGES, routes, SCHEDULE_FREQUENCY_LABELS, SCHEDULE_FREQUENCY } from "@/constants";
+import { SECTOR_PRIVILEGES, routes, SCHEDULE_FREQUENCY_LABELS, SCHEDULE_FREQUENCY, FAVORITE_PAGES } from "@/constants";
 import { formatCurrency } from "@/utils";
 import type {
   RecurrentPayable,
@@ -294,6 +294,7 @@ export const RecurrentPayablesListPage = () => {
         <PageHeader
           variant="list"
           title="Recorrentes — Pagamentos do mês"
+          favoritePage={FAVORITE_PAGES.FINANCEIRO_CONTAS_RECORRENTES_LISTAR}
           icon={IconRepeat}
           breadcrumbs={[
             { label: "Início", href: routes.home },

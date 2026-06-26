@@ -1,5 +1,5 @@
 // Shared helpers for the Admission (Admissões) module.
-// Mirrors the server status machine at api/src/modules/human-resources/admission/admission.service.ts
+// Mirrors the server status machine at api/src/modules/personnel-department/admission/admission.service.ts
 
 import { ADMISSION_STATUS, ADMISSION_DOCUMENT_STATUS, ADMISSION_DOCUMENT_TYPE } from "../../../constants";
 import type { Admission, AdmissionDocument } from "../../../types/admission";

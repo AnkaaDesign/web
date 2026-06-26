@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   routes,
+  FAVORITE_PAGES,
   SHIRT_SIZE_LABELS,
   PANTS_SIZE_LABELS,
   BOOT_SIZE_LABELS,
@@ -270,6 +271,7 @@ export function ProfilePage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Meu Perfil"
+          favoritePage={FAVORITE_PAGES.PERFIL}
           icon={IconUser}
           breadcrumbs={[
             { label: "Início", href: routes.home },

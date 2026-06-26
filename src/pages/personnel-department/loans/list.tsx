@@ -6,10 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { routes, SECTOR_PRIVILEGES } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "@/constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useLoanMasters } from "@/hooks";
-import { EmployeeLoanDialog } from "@/components/human-resources/payroll/employee-loan-dialog";
+import { EmployeeLoanDialog } from "@/components/personnel-department/payroll/employee-loan-dialog";
 import { cn } from "@/lib/utils";
 import { createLoanColumns } from "./loan-table-columns";
 
@@ -30,6 +30,7 @@ function LoanListContent() {
         <PageHeader
           variant="list"
           title="Empréstimos"
+          favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_EMPRESTIMOS_LISTAR}
           breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal", href: routes.personnelDepartment.root }, { label: "Empréstimos" }]}
           actions={[
             {

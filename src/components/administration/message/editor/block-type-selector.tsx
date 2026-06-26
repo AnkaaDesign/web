@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import {
   IconH1,
   IconH2,
-  IconH3,
   IconTextSize,
   IconPhoto,
   IconClick,
@@ -21,6 +20,7 @@ import {
   IconArrowBarToDown,
   IconArrowBarToUp,
   IconBuildingStore,
+  IconClipboardText,
 } from "@tabler/icons-react";
 import type { BlockType } from "./types";
 import type { DecoratorVariant } from "./types";
@@ -29,6 +29,8 @@ interface BlockTypeSelectorProps {
   open: boolean;
   onClose: () => void;
   onSelect: (type: BlockType, initialDecoratorVariant?: DecoratorVariant) => void;
+  /** "Simples" flow — paste already-formatted text with auto logo + footer. Omit to hide (e.g. inside rows). */
+  onSimple?: () => void;
 }
 
 const blockTypes: Array<{
@@ -48,12 +50,6 @@ const blockTypes: Array<{
     label: 'Título 2',
     icon: IconH2,
     description: 'Subtítulo',
-  },
-  {
-    type: 'heading3',
-    label: 'Título 3',
-    icon: IconH3,
-    description: 'Título menor',
   },
   {
     type: 'paragraph',
@@ -138,7 +134,7 @@ const decoratorEntries: Array<{
   },
 ];
 
-export const BlockTypeSelector = ({ open, onClose, onSelect }: BlockTypeSelectorProps) => {
+export const BlockTypeSelector = ({ open, onClose, onSelect, onSimple }: BlockTypeSelectorProps) => {
   const handleSelect = (type: BlockType, initialDecoratorVariant?: DecoratorVariant) => {
     onSelect(type, initialDecoratorVariant);
     onClose();
@@ -151,6 +147,31 @@ export const BlockTypeSelector = ({ open, onClose, onSelect }: BlockTypeSelector
           <DialogTitle>Selecione o tipo de bloco</DialogTitle>
         </DialogHeader>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
+          {/* Simples — paste already-formatted text with auto logo + footer */}
+          {onSimple && (
+            <>
+              <Button
+                variant="outline"
+                className="h-auto flex-col gap-2 p-4 border-primary/60 bg-primary/5 hover:bg-primary/10 col-span-2 sm:col-span-3"
+                onClick={() => {
+                  onSimple();
+                  onClose();
+                }}
+              >
+                <IconClipboardText className="h-6 w-6 text-primary" />
+                <div className="text-center">
+                  <div className="font-medium text-sm">Simples</div>
+                  <div className="text-xs text-muted-foreground">
+                    Colar texto formatado — logo e rodapé automáticos
+                  </div>
+                </div>
+              </Button>
+
+              {/* Separator — blocos individuais */}
+              <div className="col-span-full border-t border-border/50 my-1" />
+            </>
+          )}
+
           {blockTypes.map((blockType) => {
             const Icon = blockType.icon;
             return (

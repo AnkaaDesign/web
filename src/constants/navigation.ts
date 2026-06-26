@@ -39,7 +39,7 @@ export const TABLER_ICONS = {
   paintBrush: "IconBrush", // More appropriate for paint brush functionality
   paint: "IconPaint",
 
-  // Human Resources
+  // Personnel Department
   users: "IconUsers",
   hr: "IconBriefcase", // More appropriate for HR department management
 
@@ -696,6 +696,16 @@ export const NAVIGATION_MENU: MenuItem[] = [
           SECTOR_PRIVILEGES.COMMERCIAL,
           SECTOR_PRIVILEGES.ACCOUNTING,
         ],
+        children: [
+          // Document detail opens from two surfaces — the Notas Fiscais list
+          // (/notas-fiscais/:id) and a reconciled transaction
+          // (/conciliacao/notas/:id). Register both as dynamic children so the
+          // active-nav resolver maps them onto "Notas Fiscais" instead of falling
+          // back to the top-level "Financeiro" prefix match (which left the detail
+          // page with no highlighted nav item).
+          { id: "notas-fiscais-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/notas-fiscais/:id", isDynamic: true },
+          { id: "notas-fiscais-conciliacao-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/conciliacao/notas/:id", isDynamic: true },
+        ],
       },
       {
         id: "orcamento",
@@ -821,8 +831,8 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       {
-        id: "stats-recursos-humanos",
-        title: "Recursos Humanos",
+        id: "stats-departamento-pessoal",
+        title: "Departamento Pessoal",
         icon: "users",
         path: "/estatisticas/departamento-pessoal",
         children: [
@@ -1809,7 +1819,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Departamento Pessoal",
     icon: "team",
     path: "/departamento-pessoal/colaboradores",
-    // Single consolidated personnel area. The legacy "Recursos Humanos" section was
+    // Single consolidated personnel area. The legacy "Departamento Pessoal" section was
     // retired and merged here, so this is now the one home shared by HR, ACCOUNTING
     // and ADMIN. (Production Manager reaches a curated subset via its own grouped menu.)
     requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN],
@@ -1916,7 +1926,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
       },
       {
         // Feriados — Secullum-synced holiday list. HR/ADMIN only (matches the prior
-        // Recursos Humanos placement; ACCOUNTING was intentionally excluded).
+        // Departamento Pessoal placement; ACCOUNTING was intentionally excluded).
         id: "dp-feriados",
         title: "Feriados",
         icon: "holiday",
@@ -2034,7 +2044,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
     icon: "safety",
     path: "/medicina-do-trabalho/epi/entregas",
     // ACCOUNTING-only: new accounting-sector section. HR/ADMIN keep their original
-    // "Recursos Humanos" menu and must NOT see this. (Route privileges unchanged.)
+    // "Departamento Pessoal" menu and must NOT see this. (Route privileges unchanged.)
     requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
     children: [
       {
@@ -2154,7 +2164,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
       },
       {
         // Calendário now lives under Ferramentas for the whole personnel audience
-        // (the old Recursos Humanos placement was retired). PRODUCTION_MANAGER gets
+        // (the old Departamento Pessoal placement was retired). PRODUCTION_MANAGER gets
         // it via its own Ferramentas group below. Explicit gate so the other
         // Ferramentas-section roles (WAREHOUSE/EXTERNAL) do NOT see it.
         id: "ferramentas-calendario",

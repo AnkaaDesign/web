@@ -27,7 +27,7 @@ import { getPositions } from "../../../../api-client";
 import { formatCurrency } from "../../../../utils";
 import { SALARY_ADJUSTMENT_TYPE, SALARY_ADJUSTMENT_TYPE_LABELS } from "../../../../constants";
 import { useSalaryAdjustmentMutations } from "../../../../hooks/personnel-department/use-salary-adjustment";
-import { useApplyPeriodAdjustment } from "../../../../hooks/human-resources/use-bonus";
+import { useApplyPeriodAdjustment } from "../../../../hooks/personnel-department/use-bonus";
 import { toast } from "@/components/ui/sonner";
 import type { SalaryAdjustmentApplyFormData } from "../../../../schemas/salary-adjustment";
 import type { Position } from "../../../../types";

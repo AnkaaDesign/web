@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconClipboardList, IconListDetails, IconPlus } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "@/constants";
 import { useQuestionnaires } from "@/hooks/questionnaire/use-questionnaire";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -67,6 +67,7 @@ export const QuestionnaireListPage = () => {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Questionários"
+          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_QUESTIONARIOS_LISTAR}
           icon={IconClipboardList}
           breadcrumbs={[
             { label: "Início", href: routes.home },

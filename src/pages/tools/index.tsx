@@ -17,7 +17,7 @@ import type { Icon as TablerIcon } from "@tabler/icons-react";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { routes, SECTOR_PRIVILEGES } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
 import { hasAnyPrivilege } from "@/utils";
 import { getRequiredPrivilegeForRoute } from "@/utils/route-privileges";
@@ -148,6 +148,7 @@ export function ToolsHubPage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Ferramentas"
+          favoritePage={FAVORITE_PAGES.FERRAMENTAS}
           icon={IconTools}
           breadcrumbs={[
             { label: "Início", href: routes.home },

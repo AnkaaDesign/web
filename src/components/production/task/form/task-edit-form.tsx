@@ -1393,8 +1393,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
             // For nullable fields, always include them (treat undefined as null for clearing)
             if (nullableFields.has(key)) {
-              // Convert undefined to null for nullable fields (clearing the field)
-              dataForFormData[key] = value ?? null;
+              // Convert undefined AND "" to null for nullable fields (clearing the field).
+              // Optional description fields (e.g. `details`) transform "" → undefined on the
+              // API and the repository skips undefined, so a cleared "" would silently persist
+              // the old value. Sending explicit null is the only thing that clears the column.
+              dataForFormData[key] = (value === undefined || value === '') ? null : value;
               fieldCount++;
             } else if (value !== undefined && value !== null) {
               // For non-nullable fields, only include if has actual value
@@ -1772,9 +1775,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             'observation',
           ]);
 
-          // Convert undefined to null for nullable fields that are in changedData
+          // Convert undefined AND "" to null for nullable fields that are in changedData.
+          // Optional description fields (e.g. `details`) transform "" → undefined on the API
+          // and the repository skips undefined, so a cleared "" would silently persist the old
+          // value. Sending explicit null is the only thing that clears the column.
           for (const field of nullableFields) {
-            if (field in submitData && (submitData as any)[field] === undefined) {
+            if (field in submitData && ((submitData as any)[field] === undefined || (submitData as any)[field] === '')) {
               (submitData as any)[field] = null;
             }
           }

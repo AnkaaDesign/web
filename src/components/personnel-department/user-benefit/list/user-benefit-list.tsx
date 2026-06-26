@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { useUserBenefitMutations } from "../../../../hooks/personnel-department/use-user-benefits";
 import { useBenefits } from "../../../../hooks/personnel-department/use-benefits";
-import { useUsers } from "../../../../hooks/human-resources/use-user";
+import { useUsers } from "../../../../hooks/personnel-department/use-user";
 import type { UserBenefit } from "../../../../types/benefit";
 import type { UserBenefitGetManyFormData } from "../../../../schemas/benefit";
 import { BENEFIT_ENROLLMENT_STATUS_LABELS, BENEFIT_KIND_LABELS, type BENEFIT_ENROLLMENT_STATUS, type BENEFIT_KIND } from "../../../../constants";

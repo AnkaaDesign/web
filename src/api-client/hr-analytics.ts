@@ -31,7 +31,7 @@ export class HrAnalyticsService {
 
   async getHeadcount(filters: HeadcountFilters): Promise<HeadcountResponse> {
     const response = await apiClient.post<HeadcountResponse>(
-      '/human-resources/analytics/headcount',
+      '/personnel-department/analytics/headcount',
       filters,
     );
     return response.data;
@@ -39,7 +39,7 @@ export class HrAnalyticsService {
 
   async getTurnover(filters: TurnoverFilters): Promise<TurnoverResponse> {
     const response = await apiClient.post<TurnoverResponse>(
-      '/human-resources/analytics/turnover',
+      '/personnel-department/analytics/turnover',
       filters,
     );
     return response.data;
@@ -47,7 +47,7 @@ export class HrAnalyticsService {
 
   async getAbsenteeism(filters: AbsenteeismFilters): Promise<AbsenteeismResponse> {
     const response = await apiClient.post<AbsenteeismResponse>(
-      '/human-resources/analytics/absenteeism',
+      '/personnel-department/analytics/absenteeism',
       filters,
     );
     return response.data;
@@ -55,7 +55,7 @@ export class HrAnalyticsService {
 
   async getSalaryCost(filters: HeadcountFilters): Promise<SalaryCostResponse> {
     const response = await apiClient.post<SalaryCostResponse>(
-      '/human-resources/analytics/salary-cost',
+      '/personnel-department/analytics/salary-cost',
       filters,
     );
     return response.data;

@@ -54,8 +54,8 @@ import {
   useLinkUserFuncionario,
 } from "@/hooks/integrations/use-secullum-mapping";
 import { useSectors } from "@/hooks/administration/use-sector";
-import { usePositions } from "@/hooks/human-resources/use-position";
-import { useUsers } from "@/hooks/human-resources/use-user";
+import { usePositions } from "@/hooks/personnel-department/use-position";
+import { useUsers } from "@/hooks/personnel-department/use-user";
 
 const norm = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();

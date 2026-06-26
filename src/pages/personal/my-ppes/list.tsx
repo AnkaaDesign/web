@@ -4,7 +4,7 @@ import { getMyPpeDeliveries } from "@/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/common/use-debounce";
 import type { PpeDeliveryGetManyFormData } from "@/schemas";
-import { PPE_DELIVERY_STATUS, PPE_DELIVERY_STATUS_LABELS, routes } from "@/constants";
+import { PPE_DELIVERY_STATUS, PPE_DELIVERY_STATUS_LABELS, routes, FAVORITE_PAGES } from "@/constants";
 import { formatDateTime } from "@/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -260,6 +260,7 @@ export const MyPpesPage = () => {
         <PageHeader
           variant="default"
           title="Meus EPIs"
+          favoritePage={FAVORITE_PAGES.PESSOAL_MEUS_EPIS_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Pessoal", href: routes.personal.root },

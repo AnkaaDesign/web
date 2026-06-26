@@ -90,24 +90,24 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/administracao/notificacoes/cadastrar/enviar": FAVORITE_PAGES.ADMINISTRACAO_NOTIFICACOES_CADASTRAR,
   "/administracao/mensagens/criar": FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_CRIAR,
 
-  // Human Resources - List Pages
-  "/departamento-pessoal/cargos": FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR,
-  "/departamento-pessoal/ferias": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_LISTAR,
-  "/departamento-pessoal/calendario": FAVORITE_PAGES.RECURSOS_HUMANOS_CALENDARIO,
-  "/departamento-pessoal/feriados": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_LISTAR,
-  "/departamento-pessoal/avisos": FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_LISTAR,
-  "/medicina-do-trabalho/epi/entregas": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR,
-  "/medicina-do-trabalho/epi/agendamentos": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR,
-  "/departamento-pessoal/setores": FAVORITE_PAGES.RECURSOS_HUMANOS_SETORES_LISTAR,
+  // Personnel Department - List Pages
+  "/departamento-pessoal/cargos": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CARGOS_LISTAR,
+  "/departamento-pessoal/ferias": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_FERIAS_LISTAR,
+  "/departamento-pessoal/calendario": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CALENDARIO,
+  "/departamento-pessoal/feriados": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_FERIADOS_LISTAR,
+  "/departamento-pessoal/avisos": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_AVISOS_LISTAR,
+  "/medicina-do-trabalho/epi/entregas": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_EPI_ENTREGAS_LISTAR,
+  "/medicina-do-trabalho/epi/agendamentos": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_EPI_AGENDAMENTOS_LISTAR,
+  "/departamento-pessoal/setores": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_SETORES_LISTAR,
 
-  // Human Resources - Create Pages
-  "/departamento-pessoal/cargos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_CADASTRAR,
-  "/departamento-pessoal/ferias/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_CADASTRAR,
-  "/departamento-pessoal/feriados/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_CADASTRAR,
-  "/departamento-pessoal/avisos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_CADASTRAR,
-  "/medicina-do-trabalho/epi/entregas/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR,
-  "/medicina-do-trabalho/epi/agendamentos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR,
-  "/departamento-pessoal/setores/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_SETORES_CADASTRAR,
+  // Personnel Department - Create Pages
+  "/departamento-pessoal/cargos/cadastrar": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CARGOS_CADASTRAR,
+  "/departamento-pessoal/ferias/cadastrar": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_FERIAS_CADASTRAR,
+  "/departamento-pessoal/feriados/cadastrar": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_FERIADOS_CADASTRAR,
+  "/departamento-pessoal/avisos/cadastrar": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_AVISOS_CADASTRAR,
+  "/medicina-do-trabalho/epi/entregas/cadastrar": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_EPI_ENTREGAS_CADASTRAR,
+  "/medicina-do-trabalho/epi/agendamentos/cadastrar": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_EPI_AGENDAMENTOS_CADASTRAR,
+  "/departamento-pessoal/setores/cadastrar": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_SETORES_CADASTRAR,
 
   // Personal - List Pages
   "/pessoal/feriados": FAVORITE_PAGES.PESSOAL_FERIADOS_LISTAR,
@@ -117,6 +117,29 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
 
   // Catalog Basic - List Pages
   "/pintura/catalogo-basico": FAVORITE_PAGES.CATALOGO_BASICO_LISTAR,
+
+  // Favorites coverage — list/index pages wired for the favorites button
+  "/administracao/notificacoes/configuracoes": FAVORITE_PAGES.ADMINISTRACAO_NOTIFICACOES_CONFIGURACOES_LISTAR,
+  "/administracao/questionarios": FAVORITE_PAGES.ADMINISTRACAO_QUESTIONARIOS_LISTAR,
+  "/administracao/questionarios-perguntas": FAVORITE_PAGES.ADMINISTRACAO_QUESTIONARIOS_PERGUNTAS_LISTAR,
+  "/administracao/questionarios-temas": FAVORITE_PAGES.ADMINISTRACAO_QUESTIONARIOS_TEMAS_LISTAR,
+  "/administracao/avaliacao-competencias": FAVORITE_PAGES.ADMINISTRACAO_AVALIACAO_COMPETENCIAS_LISTAR,
+  "/administracao/competencias": FAVORITE_PAGES.ADMINISTRACAO_COMPETENCIAS_LISTAR,
+  "/administracao/topicos": FAVORITE_PAGES.ADMINISTRACAO_TOPICOS_LISTAR,
+  "/financeiro/notas-fiscais": FAVORITE_PAGES.FINANCEIRO_NOTAS_FISCAIS_LISTAR,
+  "/financeiro/conciliacao/entradas": FAVORITE_PAGES.FINANCEIRO_CONTAS_A_RECEBER_LISTAR,
+  "/financeiro/contas-recorrentes": FAVORITE_PAGES.FINANCEIRO_CONTAS_RECORRENTES_LISTAR,
+  "/departamento-pessoal/controle-ponto/requisicoes": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_REQUISICOES_LISTAR,
+  "/departamento-pessoal/horarios": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_HORARIOS_LISTAR,
+  "/departamento-pessoal/emprestimos": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_EMPRESTIMOS_LISTAR,
+  "/estoque/localizacoes": FAVORITE_PAGES.ESTOQUE_LOCALIZACOES_LISTAR,
+  "/meu-pessoal": FAVORITE_PAGES.MINHA_EQUIPE,
+  "/meu-pessoal/avaliacoes-competencias": FAVORITE_PAGES.PRODUCAO_AVALIACAO_COMPETENCIAS_LISTAR,
+  "/medicina-do-trabalho/cat": FAVORITE_PAGES.MEDICINA_DO_TRABALHO_CAT_LISTAR,
+  "/perfil": FAVORITE_PAGES.PERFIL,
+  "/servidor/implantacoes": FAVORITE_PAGES.SERVIDOR_IMPLANTACOES_LISTAR,
+  "/ferramentas/paleta": FAVORITE_PAGES.FERRAMENTAS_PALETA,
+  "/ferramentas": FAVORITE_PAGES.FERRAMENTAS,
 };
 
 /**
@@ -194,7 +217,7 @@ export function getEntityDisplayName(entity: string): string {
     setores: "Setor",
     notificacoes: "Notificação",
 
-    // Human Resources
+    // Personnel Department
     cargos: "Cargo",
     ferias: "Férias",
     feriados: "Feriado",
@@ -279,7 +302,7 @@ export function groupFavoritePages(favoritePages: FAVORITE_PAGES[]): Record<stri
     Estoque: [],
     Pintura: [],
     Administração: [],
-    "Recursos Humanos": [],
+    "Departamento Pessoal": [],
     Pessoal: [],
     Catálogo: [],
   };
@@ -293,8 +316,8 @@ export function groupFavoritePages(favoritePages: FAVORITE_PAGES[]): Record<stri
       groups["Pintura"].push(page);
     } else if (page.startsWith("ADMINISTRACAO_")) {
       groups["Administração"].push(page);
-    } else if (page.startsWith("RECURSOS_HUMANOS_")) {
-      groups["Recursos Humanos"].push(page);
+    } else if (page.startsWith("DEPARTAMENTO_PESSOAL_")) {
+      groups["Departamento Pessoal"].push(page);
     } else if (page.startsWith("PESSOAL_")) {
       groups["Pessoal"].push(page);
     } else if (page.startsWith("CATALOGO_")) {
@@ -342,7 +365,7 @@ export function getAllFavoritePages(): Record<string, { page: FAVORITE_PAGES; pa
     Estoque: [],
     Pintura: [],
     Administração: [],
-    "Recursos Humanos": [],
+    "Departamento Pessoal": [],
     Pessoal: [],
     Catálogo: [],
   };
@@ -359,8 +382,8 @@ export function getAllFavoritePages(): Record<string, { page: FAVORITE_PAGES; pa
       pages["Pintura"].push(entry);
     } else if (page.startsWith("ADMINISTRACAO_")) {
       pages["Administração"].push(entry);
-    } else if (page.startsWith("RECURSOS_HUMANOS_")) {
-      pages["Recursos Humanos"].push(entry);
+    } else if (page.startsWith("DEPARTAMENTO_PESSOAL_")) {
+      pages["Departamento Pessoal"].push(entry);
     } else if (page.startsWith("PESSOAL_")) {
       pages["Pessoal"].push(entry);
     } else if (page.startsWith("CATALOGO_")) {
@@ -411,7 +434,7 @@ export function getFavoritePageIcon(favoritePage: FAVORITE_PAGES): string {
   if (favoritePage.includes("ARQUIVOS")) return "📁";
   if (favoritePage.includes("NOTIFICACOES")) return "🔔";
 
-  // Human Resources icons
+  // Personnel Department icons
   if (favoritePage.includes("CARGOS")) return "💼";
   if (favoritePage.includes("FERIAS")) return "🏖️";
   if (favoritePage.includes("FERIADOS")) return "📅";

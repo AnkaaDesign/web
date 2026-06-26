@@ -8,7 +8,7 @@ import { CalculationTable } from "./calculation-table";
 import { CalculationExport } from "./calculation-export";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createCalculationColumns } from "./calculation-table-columns";
-import { PeriodControl } from "@/components/human-resources/time-clock-entry/period-control";
+import { PeriodControl } from "@/components/personnel-department/time-clock-entry/period-control";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";

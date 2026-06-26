@@ -69,7 +69,7 @@ describe("winner resolution with recorded nav context", () => {
       const expanded = computeExpandedFromActive(menu, active);
       expect(expandedTopLevel(menu, expanded)).toEqual(["departamento-pessoal"]);
       // ADMIN also has RH > Bônus at this exact path — it must NOT yank open
-      expect(expanded["recursos-humanos"] ?? false).toBe(false);
+      expect(expanded["departamento-pessoal"] ?? false).toBe(false);
     }
   });
 
@@ -277,11 +277,11 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     expect(calendario.path).toBe("/departamento-pessoal/calendario");
   });
 
-  it("HR/ADMIN: legacy Recursos Humanos section is gone; Calendário lives under Ferramentas; Feriados/EPI under Departamento Pessoal", () => {
+  it("HR/ADMIN: legacy Departamento Pessoal section is gone; Calendário lives under Ferramentas; Feriados/EPI under Departamento Pessoal", () => {
     for (const privilege of [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]) {
       const menu = menuFor(privilege);
-      // The duplicate "Recursos Humanos" section was retired entirely.
-      expect(byId(menu, "recursos-humanos")).toBeUndefined();
+      // The duplicate "Departamento Pessoal" section was retired entirely.
+      expect(byId(menu, "departamento-pessoal")).toBeUndefined();
       // Calendário now lives under Ferramentas for HR/ADMIN (same as ACCOUNTING).
       const tools = byId(menu, "ferramentas")!;
       expect((tools.children || []).some((c) => c.id === "ferramentas-calendario")).toBe(true);

@@ -35,7 +35,7 @@ import { useAssessmentEntries } from "@/hooks/skill/use-assessment-entry";
 import { useAssessments } from "@/hooks/skill/use-assessment";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
-import { ASSESSMENT_ENTRY_STATUS, routes } from "@/constants";
+import { ASSESSMENT_ENTRY_STATUS, routes, FAVORITE_PAGES } from "@/constants";
 import type { Assessment, AssessmentEntry } from "@/types";
 import { AssessmentStatusBadge } from "@/components/production/skill-assessment/assessment-status-badge";
 import { cn } from "@/lib/utils";
@@ -254,6 +254,7 @@ export const SkillAssessmentLeaderPage = () => {
         <PageHeader
           variant="list"
           title="Avaliações de Competências"
+          favoritePage={FAVORITE_PAGES.PRODUCAO_AVALIACAO_COMPETENCIAS_LISTAR}
           icon={IconClipboardList}
           breadcrumbs={[
             { label: "Início", href: routes.home },

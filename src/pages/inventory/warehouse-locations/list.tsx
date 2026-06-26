@@ -3,7 +3,7 @@ import { IconPencil, IconCheck, IconX } from "@tabler/icons-react";
 import { WarehouseMap, type WarehouseMapHandle } from "@/components/inventory/warehouse-location/map";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { SECTOR_PRIVILEGES, routes } from "../../../constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditWarehouseLocations } from "@/utils/permissions/entity-permissions";
@@ -34,6 +34,7 @@ export const WarehouseLocationListPage = () => {
         <PageHeader
           variant="list"
           title="Localizações"
+          favoritePage={FAVORITE_PAGES.ESTOQUE_LOCALIZACOES_LISTAR}
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque", href: routes.inventory.root }, { label: "Localizações" }]}
           actions={actions}
           className="flex-shrink-0"

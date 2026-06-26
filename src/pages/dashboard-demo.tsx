@@ -1056,7 +1056,7 @@ function FauxSidebar({
     { icon: IconCurrencyDollar, label: "Financeiro", hasChildren: true },
     { icon: IconBrush, label: "Pintura", hasChildren: true },
     { icon: IconClipboardList, label: "Produção", hasChildren: true },
-    { icon: IconUsers, label: "Recursos Humanos", hasChildren: true },
+    { icon: IconUsers, label: "Departamento Pessoal", hasChildren: true },
     { icon: IconFileInvoice, label: "Servidor", hasChildren: true },
   ];
   return (
@@ -1665,7 +1665,7 @@ function AddModal({
   const tabs: { key: "all" | MockWidget["category"]; label: string }[] = [
     { key: "all", label: "Todos" },
     { key: "Estoque", label: "Estoque" },
-    { key: "RH", label: "Recursos Humanos" },
+    { key: "RH", label: "Departamento Pessoal" },
     { key: "Produção", label: "Produção" },
     { key: "Financeiro", label: "Financeiro" },
     { key: "Outros", label: "Outros" },

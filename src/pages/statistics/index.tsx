@@ -130,7 +130,7 @@ const modules: StatModule[] = [
     ],
   },
   {
-    title: "Recursos Humanos",
+    title: "Departamento Pessoal",
     description: "Folha, equipe e faltas",
     icon: IconUsers,
     hubRoute: routes.statistics.personnelDepartment.root,

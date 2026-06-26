@@ -36,8 +36,8 @@ import {
   usePpeDeliveries,
   useBatchApprovePpeDeliveries,
   useBatchRejectPpeDeliveries,
-} from "../../hooks/human-resources/use-ppe";
-import { useUsers } from "../../hooks/human-resources/use-user";
+} from "../../hooks/personnel-department/use-ppe";
+import { useUsers } from "../../hooks/personnel-department/use-user";
 import { useItems } from "../../hooks/inventory/use-item";
 import { usePrivileges } from "../../hooks/common/use-privileges";
 import { routes } from "../../constants/routes";

@@ -2,7 +2,7 @@ import { routes, TEAM_LEADER } from "../../constants";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
-import { WarningList } from "@/components/human-resources/warning/list";
+import { WarningList } from "@/components/personnel-department/warning/list";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export default function MyTeamWarningsPage() {

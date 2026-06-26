@@ -89,7 +89,7 @@ import {
 
 const ALL_USERS = "__ALL__";
 
-// Same palette as components/human-resources/absence/calendar/absences-calendar.tsx —
+// Same palette as components/personnel-department/absence/calendar/absences-calendar.tsx —
 // the dashboard tile and the full HR page must read identically at a glance.
 // Solid backgrounds + white text per the centralized BADGE_COLORS workflow:
 //   purple = ausência, amber = falta just., red = falta n.j., cyan = feriado.

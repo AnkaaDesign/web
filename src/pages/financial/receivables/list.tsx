@@ -1,7 +1,7 @@
 import { ReceivablesList } from "@/components/financial/receivables/receivables-list";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { SECTOR_PRIVILEGES, routes } from "../../../constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const ReceivablesListPage = () => {
@@ -17,7 +17,8 @@ export const ReceivablesListPage = () => {
         <PageHeader
           variant="list"
           title="Contas a Receber"
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Financeiro", href: routes.financial.root }, { label: "Contas a Receber" }]}
+          favoritePage={FAVORITE_PAGES.FINANCEIRO_CONTAS_A_RECEBER_LISTAR}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Financeiro", href: routes.financial.root }, { label: "Conciliação Bancária", href: routes.financial.reconciliation.root }, { label: "Contas a Receber" }]}
           className="flex-shrink-0"
         />
 

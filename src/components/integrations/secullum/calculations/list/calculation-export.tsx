@@ -7,7 +7,7 @@ import {
   buildControlePontoHtml,
   parseSecullumCalculations,
   fetchHorarioForUser,
-} from "@/components/human-resources/time-clock-entry/time-clock-entry-edit-export";
+} from "@/components/personnel-department/time-clock-entry/time-clock-entry-edit-export";
 
 interface CalculationRow {
   id: string;

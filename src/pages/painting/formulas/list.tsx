@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { IconFlask, IconChevronDown, IconChevronRight, IconCurrencyReal, IconDroplet, IconFilter } from "@tabler/icons-react";
 
 import { usePaintFormulas, useCanViewPrices } from "../../../hooks";
-import { routes } from "../../../constants";
+import { routes, FAVORITE_PAGES } from "../../../constants";
 import { formatCurrency, formatNumberWithDecimals } from "../../../utils";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -222,6 +222,7 @@ export default function FormulasList() {
       <PageHeader
         variant="default"
         title="Fórmulas de Tinta"
+        favoritePage={FAVORITE_PAGES.PINTURA_FORMULAS_LISTAR}
         breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura", href: routes.painting.root }, { label: "Fórmulas" }]}
         actions={[
           {

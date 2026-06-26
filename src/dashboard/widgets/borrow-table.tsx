@@ -22,7 +22,7 @@ import { useBorrows, useBorrowMutations } from "../../hooks/inventory/use-borrow
 import { useItemBrands } from "../../hooks/inventory/use-item-brand";
 import { useItemCategories } from "../../hooks/inventory/use-item-category";
 import { useItems } from "../../hooks/inventory/use-item";
-import { useUsers } from "../../hooks/human-resources/use-user";
+import { useUsers } from "../../hooks/personnel-department/use-user";
 import { routes } from "../../constants/routes";
 
 import { Input } from "../../components/ui/input";

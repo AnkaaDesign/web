@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES, routes } from "@/constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "@/constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -753,6 +753,7 @@ export default function TrueColorSystemPage() {
         {/* Page Header */}
         <PageHeader
           title="Paleta"
+          favoritePage={FAVORITE_PAGES.FERRAMENTAS_PALETA}
           breadcrumbs={[
             { label: "Inicio", href: routes.home },
             { label: "Ferramentas", href: routes.tools.root },

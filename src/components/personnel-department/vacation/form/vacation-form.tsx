@@ -33,7 +33,7 @@ export interface VacationCreateSubmit {
 import { EMPLOYEE_TYPE } from "../../../../constants";
 import type { User } from "../../../../types";
 import { getUsers } from "../../../../api-client";
-import { useUser } from "../../../../hooks/human-resources/use-user";
+import { useUser } from "../../../../hooks/personnel-department/use-user";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";

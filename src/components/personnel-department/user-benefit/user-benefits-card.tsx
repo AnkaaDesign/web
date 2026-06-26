@@ -6,7 +6,7 @@ import { formatCurrency } from "../../../utils";
 import { calculateBenefitSplit } from "../../../utils/benefit-discount";
 import { getPositionMonthlySalary } from "../../../utils/overtime-cost";
 import { useUserBenefits } from "../../../hooks/personnel-department/use-user-benefits";
-import { useDependents } from "../../../hooks/human-resources/use-dependents";
+import { useDependents } from "../../../hooks/personnel-department/use-dependents";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

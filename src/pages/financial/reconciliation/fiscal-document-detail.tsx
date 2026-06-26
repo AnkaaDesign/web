@@ -246,12 +246,11 @@ export function ReconciliationFiscalDocumentDetailPage() {
           { label: "Início", href: routes.home },
           { label: "Financeiro", href: routes.financial.root },
           {
-            label: "Conciliação Bancária",
-            href: routes.financial.reconciliation.root,
-          },
-          {
+            // The unified "Notas Fiscais" surface lives directly under Financeiro
+            // (it replaced the old "Conciliação › Notas Fiscais" entry), so the
+            // trail must match the menu hierarchy — no Conciliação Bancária level.
             label: "Notas Fiscais",
-            href: routes.financial.reconciliation.fiscalDocuments,
+            href: routes.financial.nfse.root,
           },
           { label: title },
         ]}

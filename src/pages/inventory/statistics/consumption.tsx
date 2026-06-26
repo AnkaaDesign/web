@@ -29,7 +29,7 @@ import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
 import { GoalMetaPopover } from '@/components/statistics/goal-meta-popover';
 import { useConsumptionAnalytics, consumptionAnalyticsKeys } from '@/hooks/inventory/use-consumption-analytics';
 import { useSectors } from '@/hooks/administration/use-sector';
-import { useUsers } from '@/hooks/human-resources/use-user';
+import { useUsers } from '@/hooks/personnel-department/use-user';
 import { getConsumptionComparison } from '@/api-client';
 import { useQueries } from '@tanstack/react-query';
 import type { ConsumptionAnalyticsResponse } from '@/types/consumption-analytics';

@@ -1,0 +1,33 @@
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { routes, SECTOR_PRIVILEGES } from "../../constants";
+import { PrivilegeRoute } from "@/components/navigation/privilege-route";
+import { PageHeader } from "@/components/ui/page-header";
+import { IconCalculator } from "@tabler/icons-react";
+import { BonusSimulationInteractiveTable } from "@/components/personnel-department/bonus-simulation/bonus-simulation-interactive-table";
+
+export default function BonusSimulationPage() {
+  // Track page access
+  usePageTracker({
+    title: "Simulação de Bônus",
+    icon: "calculator",
+  });
+
+  return (
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
+        <PageHeader
+          className="flex-shrink-0"
+          title="Simulação de Bônus"
+          icon={IconCalculator}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Administração", href: routes.administration.root },
+            { label: "Simulação de Bônus" }
+          ]}
+          actions={[]}
+        />
+        <BonusSimulationInteractiveTable className="flex-1 min-h-0" />
+      </div>
+    </PrivilegeRoute>
+  );
+}

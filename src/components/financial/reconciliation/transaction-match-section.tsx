@@ -124,6 +124,22 @@ export function TransactionMatchSection({
     [transaction],
   );
   const hasExistingMatch = existingMatches.length > 0;
+  // When this one payment settles several NFs of a single purchase order, the
+  // matched NFs share a "#Ped:" order code. Surface that as a header so the
+  // linked notes read as "one order, one payment" rather than loose NFs.
+  const sharedOrderCodes = useMemo(() => {
+    const docsByCode = new Map<string, Set<string>>();
+    for (const m of existingMatches) {
+      for (const oc of m.fiscalDocument?.orderCodes ?? []) {
+        const set = docsByCode.get(oc.code) ?? new Set<string>();
+        if (m.fiscalDocumentId) set.add(m.fiscalDocumentId);
+        docsByCode.set(oc.code, set);
+      }
+    }
+    return [...docsByCode.entries()]
+      .filter(([, docs]) => docs.size > 1)
+      .map(([code, docs]) => ({ code, count: docs.size }));
+  }, [existingMatches]);
   const existingAllocated = useMemo(
     () => existingMatches.reduce((sum, m) => sum + (m.allocatedAmount || 0), 0),
     [existingMatches],
@@ -320,6 +336,23 @@ export function TransactionMatchSection({
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4">
+            {sharedOrderCodes.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2">
+                <IconStack2 className="h-4 w-4 text-primary shrink-0" />
+                {sharedOrderCodes.map((g) => (
+                  <span
+                    key={g.code}
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-primary"
+                  >
+                    Pedido <span className="font-mono">{g.code}</span>
+                  </span>
+                ))}
+                <span className="text-xs text-muted-foreground">
+                  {sharedOrderCodes.reduce((s, g) => Math.max(s, g.count), 0)}{" "}
+                  notas somadas em um único pagamento
+                </span>
+              </div>
+            )}
             {existingMatches.map((m) => {
               const doc = m.fiscalDocument;
               const slip = m.bankSlip;
@@ -349,6 +382,17 @@ export function TransactionMatchSection({
                       Nº {doc.nfNumber}
                     </Badge>
                   )}
+                  {(doc?.orderCodes ?? []).map((oc) => (
+                    <Badge
+                      key={oc.code}
+                      variant="secondary"
+                      className="whitespace-nowrap font-mono gap-1"
+                      title="Pedido (#Ped) da nota"
+                    >
+                      <IconStack2 className="h-3 w-3" />
+                      {oc.code}
+                    </Badge>
+                  ))}
                   <span className="font-medium truncate flex-1 min-w-0">
                     {title}
                   </span>

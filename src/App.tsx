@@ -107,11 +107,11 @@ const AdministrationCollaboratorsDetails = lazy(() => import("@/pages/administra
 const AdministrationCollaboratorsBatchEdit = lazy(() => import("@/pages/administration/collaborators/batch-edit").then((module) => ({ default: module.default })));
 
 
-const HumanResourcesPayrollList = lazy(() => import("@/pages/human-resources/payroll/list").then((module) => ({ default: module.default })));
-const HumanResourcesPayrollDetail = lazy(() => import("@/pages/human-resources/payroll/detail").then((module) => ({ default: module.default })));
-const HumanResourcesBonusList = lazy(() => import("@/pages/human-resources/bonus/list").then((module) => ({ default: module.default })));
-const HumanResourcesBonusDetail = lazy(() => import("@/pages/human-resources/bonus/detail").then((module) => ({ default: module.default })));
-const HumanResourcesBonusSimulation = lazy(() => import("@/pages/human-resources/simulacao-bonus").then((module) => ({ default: module.default })));
+const PersonnelDepartmentPayrollList = lazy(() => import("@/pages/personnel-department/payroll/list").then((module) => ({ default: module.default })));
+const PersonnelDepartmentPayrollDetail = lazy(() => import("@/pages/personnel-department/payroll/detail").then((module) => ({ default: module.default })));
+const PersonnelDepartmentBonusList = lazy(() => import("@/pages/personnel-department/bonus/list").then((module) => ({ default: module.default })));
+const PersonnelDepartmentBonusDetail = lazy(() => import("@/pages/personnel-department/bonus/detail").then((module) => ({ default: module.default })));
+const PersonnelDepartmentBonusSimulation = lazy(() => import("@/pages/personnel-department/simulacao-bonus").then((module) => ({ default: module.default })));
 
 // Personnel Department - Salários e Cargos (W3A)
 const PersonnelDepartmentLoansList = lazy(() => import("@/pages/personnel-department/loans/list").then((module) => ({ default: module.LoanListPage })));
@@ -308,17 +308,17 @@ const FinancialOverviewStatistics = lazy(() => import("@/pages/financial/statist
 const FinancialNfseStatistics = lazy(() => import("@/pages/financial/statistics/nfse").then((module) => ({ default: module.default })));
 
 // HR Statistics
-const HRPayrollStatistics = lazy(() => import("@/pages/human-resources/statistics/payroll").then((module) => ({ default: module.default })));
-const HRTeamPerformanceStatistics = lazy(() => import("@/pages/human-resources/statistics/team-performance").then((module) => ({ default: module.default })));
-const HRFaltasStatistics = lazy(() => import("@/pages/human-resources/statistics/faltas").then((module) => ({ default: module.default })));
-const HRSalaryCostStatistics = lazy(() => import("@/pages/human-resources/statistics/salary-cost").then((module) => ({ default: module.default })));
-const HRSkillAssessmentStatistics = lazy(() => import("@/pages/human-resources/statistics/skill-assessment").then((module) => ({ default: module.default })));
+const HRPayrollStatistics = lazy(() => import("@/pages/personnel-department/statistics/payroll").then((module) => ({ default: module.default })));
+const HRTeamPerformanceStatistics = lazy(() => import("@/pages/personnel-department/statistics/team-performance").then((module) => ({ default: module.default })));
+const HRFaltasStatistics = lazy(() => import("@/pages/personnel-department/statistics/faltas").then((module) => ({ default: module.default })));
+const HRSalaryCostStatistics = lazy(() => import("@/pages/personnel-department/statistics/salary-cost").then((module) => ({ default: module.default })));
+const HRSkillAssessmentStatistics = lazy(() => import("@/pages/personnel-department/statistics/skill-assessment").then((module) => ({ default: module.default })));
 
 // Statistics Hub Pages
 const StatisticsHub = lazy(() => import("@/pages/statistics/index").then((module) => ({ default: module.default })));
 const ProductionStatisticsHub = lazy(() => import("@/pages/production/statistics/index").then((module) => ({ default: module.default })));
 const FinancialStatisticsHub = lazy(() => import("@/pages/financial/statistics/index").then((module) => ({ default: module.default })));
-const HRStatisticsHub = lazy(() => import("@/pages/human-resources/statistics/index").then((module) => ({ default: module.default })));
+const HRStatisticsHub = lazy(() => import("@/pages/personnel-department/statistics/index").then((module) => ({ default: module.default })));
 
 // Skill Assessment - Admin (Phase-4 rewrite)
 const SkillListAdminPage = lazy(() => import("@/pages/administration/skill/list").then((m) => ({ default: m.SkillListPage })));
@@ -428,54 +428,54 @@ const ProductionTasksDetails = lazy(() => import("@/pages/production/schedule/de
 const ProductionPreparation = lazy(() => import("@/pages/production/preparation").then((module) => ({ default: module.PreparationPage })));
 const ProductionGarages = lazy(() => import("@/pages/production/barracoes").then((module) => ({ default: module.GaragesPage })));
 
-// Human Resources
-const HumanResources = lazy(() => import("@/pages/human-resources/root").then((module) => ({ default: module.HumanResourcesRootPage })));
-const HumanResourcesWarningsList = lazy(() => import("@/pages/human-resources/warnings/list").then((module) => ({ default: module.WarningListPage })));
-const HumanResourcesWarningsCreate = lazy(() => import("@/pages/human-resources/warnings/create").then((module) => ({ default: module.WarningCreatePage })));
-const HumanResourcesWarningsEdit = lazy(() => import("@/pages/human-resources/warnings/edit/[id]").then((module) => ({ default: module.WarningEditPage })));
-const HumanResourcesWarningsDetails = lazy(() => import("@/pages/human-resources/warnings/details/[id]").then((module) => ({ default: module.WarningDetailPage })));
-const HumanResourcesPositions = lazy(() => import("@/pages/human-resources/positions/list").then((module) => ({ default: module.PositionListPage })));
-const HumanResourcesPositionsCreate = lazy(() => import("@/pages/human-resources/positions/create").then((module) => ({ default: module.PositionCreatePage })));
-const HumanResourcesPositionsEdit = lazy(() => import("@/pages/human-resources/positions/edit/[id]").then((module) => ({ default: module.PositionEditPage })));
-const HumanResourcesPositionsDetails = lazy(() => import("@/pages/human-resources/positions/details/[id]").then((module) => ({ default: module.PositionDetailPage })));
-const HumanResourcesPositionsHierarchy = lazy(() => import("@/pages/human-resources/positions/hierarchy").then((module) => ({ default: module.PositionHierarchyPage })));
-const HumanResourcesPositionsBatchEdit = lazy(() => import("@/pages/human-resources/positions/batch-edit").then((module) => ({ default: module.PositionBatchEditPage })));
+// Personnel Department
+const PersonnelDepartment = lazy(() => import("@/pages/personnel-department/root").then((module) => ({ default: module.PersonnelDepartmentRootPage })));
+const PersonnelDepartmentWarningsList = lazy(() => import("@/pages/personnel-department/warnings/list").then((module) => ({ default: module.WarningListPage })));
+const PersonnelDepartmentWarningsCreate = lazy(() => import("@/pages/personnel-department/warnings/create").then((module) => ({ default: module.WarningCreatePage })));
+const PersonnelDepartmentWarningsEdit = lazy(() => import("@/pages/personnel-department/warnings/edit/[id]").then((module) => ({ default: module.WarningEditPage })));
+const PersonnelDepartmentWarningsDetails = lazy(() => import("@/pages/personnel-department/warnings/details/[id]").then((module) => ({ default: module.WarningDetailPage })));
+const PersonnelDepartmentPositions = lazy(() => import("@/pages/personnel-department/positions/list").then((module) => ({ default: module.PositionListPage })));
+const PersonnelDepartmentPositionsCreate = lazy(() => import("@/pages/personnel-department/positions/create").then((module) => ({ default: module.PositionCreatePage })));
+const PersonnelDepartmentPositionsEdit = lazy(() => import("@/pages/personnel-department/positions/edit/[id]").then((module) => ({ default: module.PositionEditPage })));
+const PersonnelDepartmentPositionsDetails = lazy(() => import("@/pages/personnel-department/positions/details/[id]").then((module) => ({ default: module.PositionDetailPage })));
+const PersonnelDepartmentPositionsHierarchy = lazy(() => import("@/pages/personnel-department/positions/hierarchy").then((module) => ({ default: module.PositionHierarchyPage })));
+const PersonnelDepartmentPositionsBatchEdit = lazy(() => import("@/pages/personnel-department/positions/batch-edit").then((module) => ({ default: module.PositionBatchEditPage })));
 // Secullum integration mapping page (admin)
 const SecullumMappingPage = lazy(() => import("@/pages/integrations/secullum/mapping").then((module) => ({ default: module.default })));
-// Note: Employees pages are managed under Administration section, not Human Resources
+// Note: Employees pages are managed under Administration section, not Personnel Department
 // EPI delivery & schedule pages now live under Medicina do Trabalho (Occupational Health).
 // The DP EPI item catalog and "Tamanhos" pages were removed entirely.
-const HumanResourcesPpeDeliveries = lazy(() => import("@/pages/human-resources/ppe/deliveries/list").then((module) => ({ default: module.PpeDeliveryListPage })));
-const HumanResourcesPpeDeliveriesCreate = lazy(() => import("@/pages/human-resources/ppe/deliveries/create").then((module) => ({ default: module.EPIDeliveryCreate })));
-const HumanResourcesPpeDeliveriesEdit = lazy(() => import("@/pages/human-resources/ppe/deliveries/edit/[id]").then((module) => ({ default: module.EPIDeliveryEdit })));
-const HumanResourcesPpeDeliveriesDetails = lazy(() => import("@/pages/human-resources/ppe/deliveries/details/[id]").then((module) => ({ default: module.EPIDeliveryDetails })));
-const HumanResourcesPpeSchedules = lazy(() => import("@/pages/human-resources/ppe/schedules/list").then((module) => ({ default: module.PPESchedulesListPage })));
-const HumanResourcesPpeSchedulesCreate = lazy(() => import("@/pages/human-resources/ppe/schedules/create").then((module) => ({ default: module.PPEScheduleCreatePage })));
-const HumanResourcesPpeSchedulesEdit = lazy(() => import("@/pages/human-resources/ppe/schedules/edit/[id]").then((module) => ({ default: module.PPEScheduleEditPage })));
-const HumanResourcesPpeSchedulesDetails = lazy(() => import("@/pages/human-resources/ppe/schedules/details/[id]").then((module) => ({ default: module.PPEScheduleDetailsPage })));
-const HumanResourcesRequisitions = lazy(() => import("@/pages/human-resources/requisitions/list").then((module) => ({ default: module.default })));
-const HumanResourcesHolidays = lazy(() => import("@/pages/human-resources/holidays/list").then((module) => ({ default: module.HolidayListPage })));
-const HumanResourcesHolidaysCalendar = lazy(() => import("@/pages/human-resources/holidays/calendar").then((module) => ({ default: module.HolidayCalendarPage })));
-const HumanResourcesHolidaysCreate = lazy(() => import("@/pages/human-resources/holidays/cadastrar").then((module) => ({ default: module.HolidayCreatePage })));
-const HumanResourcesSchedules = lazy(() => import("@/pages/human-resources/schedules/list").then((module) => ({ default: module.SchedulesListPage })));
-const HumanResourcesHRCalendar = lazy(() => import("@/pages/human-resources/calendar").then((module) => ({ default: module.HRCalendarPage })));
-const HumanResourcesTimeClock = lazy(() => import("@/pages/human-resources/time-clock/list"));
-const HumanResourcesTimeClockColaborador = lazy(
-  () => import("@/pages/human-resources/time-clock/colaborador"),
+const PersonnelDepartmentPpeDeliveries = lazy(() => import("@/pages/personnel-department/ppe/deliveries/list").then((module) => ({ default: module.PpeDeliveryListPage })));
+const PersonnelDepartmentPpeDeliveriesCreate = lazy(() => import("@/pages/personnel-department/ppe/deliveries/create").then((module) => ({ default: module.EPIDeliveryCreate })));
+const PersonnelDepartmentPpeDeliveriesEdit = lazy(() => import("@/pages/personnel-department/ppe/deliveries/edit/[id]").then((module) => ({ default: module.EPIDeliveryEdit })));
+const PersonnelDepartmentPpeDeliveriesDetails = lazy(() => import("@/pages/personnel-department/ppe/deliveries/details/[id]").then((module) => ({ default: module.EPIDeliveryDetails })));
+const PersonnelDepartmentPpeSchedules = lazy(() => import("@/pages/personnel-department/ppe/schedules/list").then((module) => ({ default: module.PPESchedulesListPage })));
+const PersonnelDepartmentPpeSchedulesCreate = lazy(() => import("@/pages/personnel-department/ppe/schedules/create").then((module) => ({ default: module.PPEScheduleCreatePage })));
+const PersonnelDepartmentPpeSchedulesEdit = lazy(() => import("@/pages/personnel-department/ppe/schedules/edit/[id]").then((module) => ({ default: module.PPEScheduleEditPage })));
+const PersonnelDepartmentPpeSchedulesDetails = lazy(() => import("@/pages/personnel-department/ppe/schedules/details/[id]").then((module) => ({ default: module.PPEScheduleDetailsPage })));
+const PersonnelDepartmentRequisitions = lazy(() => import("@/pages/personnel-department/requisitions/list").then((module) => ({ default: module.default })));
+const PersonnelDepartmentHolidays = lazy(() => import("@/pages/personnel-department/holidays/list").then((module) => ({ default: module.HolidayListPage })));
+const PersonnelDepartmentHolidaysCalendar = lazy(() => import("@/pages/personnel-department/holidays/calendar").then((module) => ({ default: module.HolidayCalendarPage })));
+const PersonnelDepartmentHolidaysCreate = lazy(() => import("@/pages/personnel-department/holidays/cadastrar").then((module) => ({ default: module.HolidayCreatePage })));
+const PersonnelDepartmentSchedules = lazy(() => import("@/pages/personnel-department/schedules/list").then((module) => ({ default: module.SchedulesListPage })));
+const PersonnelDepartmentHRCalendar = lazy(() => import("@/pages/personnel-department/calendar").then((module) => ({ default: module.HRCalendarPage })));
+const PersonnelDepartmentTimeClock = lazy(() => import("@/pages/personnel-department/time-clock/list"));
+const PersonnelDepartmentTimeClockColaborador = lazy(
+  () => import("@/pages/personnel-department/time-clock/colaborador"),
 );
-const HumanResourcesTimeClockDia = lazy(() => import("@/pages/human-resources/time-clock/dia"));
-const HumanResourcesTimeClockEdicao = lazy(() => import("@/pages/human-resources/time-clock/edicao"));
-const HumanResourcesTimeClockAusencias = lazy(
-  () => import("@/pages/human-resources/time-clock/ausencias"),
+const PersonnelDepartmentTimeClockDia = lazy(() => import("@/pages/personnel-department/time-clock/dia"));
+const PersonnelDepartmentTimeClockEdicao = lazy(() => import("@/pages/personnel-department/time-clock/edicao"));
+const PersonnelDepartmentTimeClockAusencias = lazy(
+  () => import("@/pages/personnel-department/time-clock/ausencias"),
 );
 // "Fechamento" (page files still live under the assinatura-digital folder).
-const HumanResourcesFechamentoList = lazy(
-  () => import("@/pages/human-resources/time-clock/assinatura-digital/list"),
+const PersonnelDepartmentFechamentoList = lazy(
+  () => import("@/pages/personnel-department/time-clock/assinatura-digital/list"),
 );
-const HumanResourcesFechamentoDetails = lazy(
-  () => import("@/pages/human-resources/time-clock/assinatura-digital/details"),
+const PersonnelDepartmentFechamentoDetails = lazy(
+  () => import("@/pages/personnel-department/time-clock/assinatura-digital/details"),
 );
-const HumanResourcesPerformanceLevels = lazy(() => import("@/pages/human-resources/performance-levels/list").then((module) => ({ default: module.default })));
+const PersonnelDepartmentPerformanceLevels = lazy(() => import("@/pages/personnel-department/performance-levels/list").then((module) => ({ default: module.default })));
 
 // Catalog
 const CatalogList = lazy(() => import("@/pages/catalog/list").then((module) => ({ default: module.default })));
@@ -1226,7 +1226,7 @@ function App() {
                   path={routes.personnelDepartment.payroll.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPayrollList />
+                      <PersonnelDepartmentPayrollList />
                     </Suspense>
                   }
                 />
@@ -1235,7 +1235,7 @@ function App() {
                   path="/departamento-pessoal/folha-de-pagamento/detalhe/:payrollId"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPayrollDetail />
+                      <PersonnelDepartmentPayrollDetail />
                     </Suspense>
                   }
                 />
@@ -1244,7 +1244,7 @@ function App() {
                   path={routes.personnelDepartment.bonus.list}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesBonusList />
+                      <PersonnelDepartmentBonusList />
                     </Suspense>
                   }
                 />
@@ -1252,7 +1252,7 @@ function App() {
                   path={routes.personnelDepartment.bonus.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesBonusDetail />
+                      <PersonnelDepartmentBonusDetail />
                     </Suspense>
                   }
                 />
@@ -1261,7 +1261,7 @@ function App() {
                   path={routes.personnelDepartment.bonus.simulation}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesBonusSimulation />
+                      <PersonnelDepartmentBonusSimulation />
                     </Suspense>
                   }
                 />
@@ -2620,12 +2620,12 @@ function App() {
                   element={<Navigate to={routes.tools.colorPalette.root} replace />}
                 />
 
-                {/* Human Resources routes */}
+                {/* Personnel Department routes */}
                 <Route
                   path={routes.personnelDepartment.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResources />
+                      <PersonnelDepartment />
                     </Suspense>
                   }
                 />
@@ -2633,7 +2633,7 @@ function App() {
                   path={routes.personnelDepartment.warnings.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesWarningsList />
+                      <PersonnelDepartmentWarningsList />
                     </Suspense>
                   }
                 />
@@ -2641,7 +2641,7 @@ function App() {
                   path={routes.personnelDepartment.warnings.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesWarningsCreate />
+                      <PersonnelDepartmentWarningsCreate />
                     </Suspense>
                   }
                 />
@@ -2649,7 +2649,7 @@ function App() {
                   path={routes.personnelDepartment.warnings.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesWarningsEdit />
+                      <PersonnelDepartmentWarningsEdit />
                     </Suspense>
                   }
                 />
@@ -2657,7 +2657,7 @@ function App() {
                   path={routes.personnelDepartment.warnings.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesWarningsDetails />
+                      <PersonnelDepartmentWarningsDetails />
                     </Suspense>
                   }
                 />
@@ -2665,7 +2665,7 @@ function App() {
                   path={routes.personnelDepartment.positions.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPositions />
+                      <PersonnelDepartmentPositions />
                     </Suspense>
                   }
                 />
@@ -2673,7 +2673,7 @@ function App() {
                   path={routes.personnelDepartment.positions.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPositionsCreate />
+                      <PersonnelDepartmentPositionsCreate />
                     </Suspense>
                   }
                 />
@@ -2681,7 +2681,7 @@ function App() {
                   path={routes.personnelDepartment.positions.hierarchy}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPositionsHierarchy />
+                      <PersonnelDepartmentPositionsHierarchy />
                     </Suspense>
                   }
                 />
@@ -2689,7 +2689,7 @@ function App() {
                   path={routes.personnelDepartment.positions.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPositionsEdit />
+                      <PersonnelDepartmentPositionsEdit />
                     </Suspense>
                   }
                 />
@@ -2697,7 +2697,7 @@ function App() {
                   path={routes.personnelDepartment.positions.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPositionsDetails />
+                      <PersonnelDepartmentPositionsDetails />
                     </Suspense>
                   }
                 />
@@ -2705,7 +2705,7 @@ function App() {
                   path={routes.personnelDepartment.positions.batchEdit}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPositionsBatchEdit />
+                      <PersonnelDepartmentPositionsBatchEdit />
                     </Suspense>
                   }
                 />
@@ -2718,13 +2718,13 @@ function App() {
                     </Suspense>
                   }
                 />
-                {/* Note: employees routes are under administration.employees, not humanResources */}
+                {/* Note: employees routes are under administration.employees, not personnelDepartment */}
                 {/* EPI delivery & schedule pages — now under Medicina do Trabalho. */}
                 <Route
                   path={routes.occupationalHealth.ppe.deliveries.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeDeliveries />
+                      <PersonnelDepartmentPpeDeliveries />
                     </Suspense>
                   }
                 />
@@ -2732,7 +2732,7 @@ function App() {
                   path={routes.occupationalHealth.ppe.deliveries.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeDeliveriesCreate />
+                      <PersonnelDepartmentPpeDeliveriesCreate />
                     </Suspense>
                   }
                 />
@@ -2740,7 +2740,7 @@ function App() {
                   path={routes.occupationalHealth.ppe.deliveries.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeDeliveriesEdit />
+                      <PersonnelDepartmentPpeDeliveriesEdit />
                     </Suspense>
                   }
                 />
@@ -2748,7 +2748,7 @@ function App() {
                   path={routes.occupationalHealth.ppe.deliveries.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeDeliveriesDetails />
+                      <PersonnelDepartmentPpeDeliveriesDetails />
                     </Suspense>
                   }
                 />
@@ -2756,7 +2756,7 @@ function App() {
                   path={routes.occupationalHealth.ppe.schedules.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeSchedules />
+                      <PersonnelDepartmentPpeSchedules />
                     </Suspense>
                   }
                 />
@@ -2764,7 +2764,7 @@ function App() {
                   path={routes.occupationalHealth.ppe.schedules.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeSchedulesCreate />
+                      <PersonnelDepartmentPpeSchedulesCreate />
                     </Suspense>
                   }
                 />
@@ -2772,7 +2772,7 @@ function App() {
                   path={routes.occupationalHealth.ppe.schedules.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeSchedulesEdit />
+                      <PersonnelDepartmentPpeSchedulesEdit />
                     </Suspense>
                   }
                 />
@@ -2780,7 +2780,7 @@ function App() {
                   path={routes.occupationalHealth.ppe.schedules.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeSchedulesDetails />
+                      <PersonnelDepartmentPpeSchedulesDetails />
                     </Suspense>
                   }
                 />
@@ -2797,7 +2797,7 @@ function App() {
                   path={routes.personnelDepartment.requisicoes.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesRequisitions />
+                      <PersonnelDepartmentRequisitions />
                     </Suspense>
                   }
                 />
@@ -2805,7 +2805,7 @@ function App() {
                   path={routes.personnelDepartment.holidays.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesHolidays />
+                      <PersonnelDepartmentHolidays />
                     </Suspense>
                   }
                 />
@@ -2813,7 +2813,7 @@ function App() {
                   path={routes.personnelDepartment.holidays.calendar}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesHolidaysCalendar />
+                      <PersonnelDepartmentHolidaysCalendar />
                     </Suspense>
                   }
                 />
@@ -2821,7 +2821,7 @@ function App() {
                   path={routes.personnelDepartment.holidays.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesHolidaysCreate />
+                      <PersonnelDepartmentHolidaysCreate />
                     </Suspense>
                   }
                 />
@@ -2829,7 +2829,7 @@ function App() {
                   path={routes.personnelDepartment.horarios.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesSchedules />
+                      <PersonnelDepartmentSchedules />
                     </Suspense>
                   }
                 />
@@ -2837,7 +2837,7 @@ function App() {
                   path={routes.personnelDepartment.calendar.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesHRCalendar />
+                      <PersonnelDepartmentHRCalendar />
                     </Suspense>
                   }
                 />
@@ -2845,7 +2845,7 @@ function App() {
                   path={routes.personnelDepartment.timeClock.list}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesTimeClock />
+                      <PersonnelDepartmentTimeClock />
                     </Suspense>
                   }
                 />
@@ -2853,7 +2853,7 @@ function App() {
                   path={routes.personnelDepartment.timeClock.colaborador}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesTimeClockColaborador />
+                      <PersonnelDepartmentTimeClockColaborador />
                     </Suspense>
                   }
                 />
@@ -2861,7 +2861,7 @@ function App() {
                   path={routes.personnelDepartment.timeClock.dia}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesTimeClockDia />
+                      <PersonnelDepartmentTimeClockDia />
                     </Suspense>
                   }
                 />
@@ -2869,7 +2869,7 @@ function App() {
                   path={routes.personnelDepartment.timeClock.edicao}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesTimeClockEdicao />
+                      <PersonnelDepartmentTimeClockEdicao />
                     </Suspense>
                   }
                 />
@@ -2877,7 +2877,7 @@ function App() {
                   path={routes.personnelDepartment.timeClock.ausencias}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesTimeClockAusencias />
+                      <PersonnelDepartmentTimeClockAusencias />
                     </Suspense>
                   }
                 />
@@ -2885,7 +2885,7 @@ function App() {
                   path={routes.personnelDepartment.timeClock.fechamento.list}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesFechamentoList />
+                      <PersonnelDepartmentFechamentoList />
                     </Suspense>
                   }
                 />
@@ -2893,7 +2893,7 @@ function App() {
                   path={routes.personnelDepartment.timeClock.fechamento.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesFechamentoDetails />
+                      <PersonnelDepartmentFechamentoDetails />
                     </Suspense>
                   }
                 />
@@ -2901,7 +2901,7 @@ function App() {
                   path={routes.personnelDepartment.bonus.performanceLevels.list}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPerformanceLevels />
+                      <PersonnelDepartmentPerformanceLevels />
                     </Suspense>
                   }
                 />

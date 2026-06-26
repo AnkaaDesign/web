@@ -8,11 +8,11 @@ import { useAuth } from "@/contexts/auth-context";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { BasicInfoCard, AddressCard, ProfessionalInfoCard, LoginInfoCard, RelatedActivitiesCard, PpeSizesCard, EmploymentHistoryCard } from "@/components/administration/user/detail";
+import { BasicInfoCard, AddressCard, ProfessionalInfoCard, LoginInfoCard, RelatedActivitiesCard, PpeSizesCard, EmploymentHistoryCard, DocumentsCard } from "@/components/administration/user/detail";
 import { UserDocumentationCard } from "@/components/personnel-department/admission/user-documentation-card";
 import { UserPositionHistoryCard } from "@/components/personnel-department/user-position-history/detail/user-position-history-card";
 import { UserBenefitsCard } from "@/components/personnel-department/user-benefit/user-benefits-card";
-import { DependentsCard } from "@/components/human-resources/dependent/dependents-card";
+import { DependentsCard } from "@/components/personnel-department/dependent/dependents-card";
 import { CollaboratorLoansCard } from "@/components/personnel-department/collaborator-loans-card";
 import { CollaboratorThirteenthCard } from "@/components/personnel-department/collaborator-thirteenth-card";
 import { UserDetailSkeleton } from "@/components/administration/user/detail/user-detail-skeleton";
@@ -175,9 +175,14 @@ const CollaboratorDetailsPage = () => {
               <LoginInfoCard user={user} />
             </div>
 
-            {/* Documentação (Admissão) + Tamanho de EPI */}
+            {/* Documentos (CPF/PIS/CNPJ) + Documentação (Admissão) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <DocumentsCard user={user} />
               <UserDocumentationCard userId={user.id} />
+            </div>
+
+            {/* Tamanho de EPI */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <PpeSizesCard user={user} />
             </div>
 

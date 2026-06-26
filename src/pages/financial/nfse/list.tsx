@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES, routes } from "../../../constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useNfseList } from "@/hooks/financial/use-nfse";
 import { useCancelNfse } from "@/hooks/production/use-invoice";
@@ -559,6 +559,7 @@ export function NfseListContent() {
         <PageHeader
           variant="list"
           title="Notas Fiscais"
+          favoritePage={FAVORITE_PAGES.FINANCEIRO_NOTAS_FISCAIS_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Financeiro", href: routes.financial.root },

@@ -430,7 +430,10 @@ export const BillingDetailPage = () => {
       const taskUpdateData: any = {
         name: formData.name || undefined,
         customerId: formData.customerId || undefined,
-        details: formData.details || undefined,
+        // Send null (not undefined/"") when cleared so the API actually clears it:
+        // the optional-description schema turns "" → undefined and the repo skips
+        // undefined, so anything but explicit null silently persists the old value.
+        details: formData.details?.trim() ? formData.details : null,
         serialNumber: formData.serialNumber || null,
         truck: {
           plate: formData.plate || undefined,

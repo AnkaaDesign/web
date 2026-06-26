@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import { SECTOR_PRIVILEGES } from "@/constants";
-import { useUsers } from "@/hooks/human-resources/use-user";
+import { useUsers } from "@/hooks/personnel-department/use-user";
 
 /**
  * Returns the live count of active (`status != DISMISSED`) users whose sector

@@ -689,7 +689,9 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
             const isDraft = singleStatus === ASSESSMENT_STATUS.DRAFT;
             const isOpen = singleStatus === ASSESSMENT_STATUS.OPEN;
             const isCancelled = singleStatus === ASSESSMENT_STATUS.CANCELLED;
-            const canStatusCancel = isDraft || isOpen;
+            // Any non-cancelled campaign can be cancelled (incl. CLOSED), so it
+            // can then be excluded — deletion requires CANCELLED status.
+            const canStatusCancel = !isCancelled;
             // Excluir only applies to CANCELLED rows. For bulk, we let the
             // delete dialog filter on submit (or just allow the attempt).
             const showDelete = !contextMenu?.isBulk

@@ -711,7 +711,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
               {(ctxRow.settleVia === "THIRTEENTH" || ctxRow.settleVia === "VACATION") && (
                 <DropdownMenuItem disabled>
                   <IconGift className="mr-2 h-4 w-4" />
-                  Pague em Recursos Humanos
+                  Pague em Departamento Pessoal
                 </DropdownMenuItem>
               )}
             </>

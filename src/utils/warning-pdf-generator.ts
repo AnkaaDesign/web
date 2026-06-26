@@ -353,7 +353,7 @@ export function buildWarningPdfHtml(data: WarningPdfData): string {
         <div class="sign-rh">
           <div class="sign-block">
             <div class="sign-line"></div>
-            <div class="sign-label">Recursos Humanos</div>
+            <div class="sign-label">Departamento Pessoal</div>
           </div>
         </div>
       </div>

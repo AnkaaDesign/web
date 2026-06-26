@@ -5,7 +5,7 @@ import { IconStethoscope, IconCheck } from "@tabler/icons-react";
 import { MEDICAL_EXAM_TYPE, routes, SECTOR_PRIVILEGES } from "../../../constants";
 import type { MedicalExamCreateFormData } from "@/schemas/medical-exam";
 import { useMedicalExamMutations } from "@/hooks/occupational-health/use-medical-exams";
-import { useUser } from "@/hooks/human-resources/use-user";
+import { useUser } from "@/hooks/personnel-department/use-user";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { MedicalExamForm } from "@/components/occupational-health/medical-exam/form";

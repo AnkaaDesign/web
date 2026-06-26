@@ -1,6 +1,6 @@
 import { routes } from "../../constants";
 import { PageHeader } from "@/components/ui/page-header";
-import { WarningList } from "@/components/human-resources/warning/list";
+import { WarningList } from "@/components/personnel-department/warning/list";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const PmWarningsPage = () => {

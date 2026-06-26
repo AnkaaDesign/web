@@ -7,7 +7,7 @@ import type { PpeDelivery } from "../../../../../types";
 import { PPE_DELIVERY_STATUS_LABELS, getBadgeVariant, PPE_DELIVERY_STATUS } from "../../../../../constants";
 import { formatDateTime } from "../../../../../utils";
 import { cn } from "@/lib/utils";
-import { useVerifyPpeSignature } from "@/hooks/human-resources/use-ppe";
+import { useVerifyPpeSignature } from "@/hooks/personnel-department/use-ppe";
 import { toast } from "@/components/ui/sonner";
 
 const BIOMETRIC_LABELS: Record<string, string> = {

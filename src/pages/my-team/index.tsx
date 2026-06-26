@@ -5,7 +5,7 @@ import { QuickAccessCard } from "@/components/dashboard";
 import { useNavigate } from "react-router-dom";
 import { useTeamStaffUsers, useTeamStaffBorrows, useTeamStaffWarnings } from "../../hooks";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { routes, TEAM_LEADER, BORROW_STATUS } from "../../constants";
+import { routes, TEAM_LEADER, BORROW_STATUS, FAVORITE_PAGES } from "../../constants";
 import { IconUsersGroup } from "@tabler/icons-react";
 import { Users, Wrench, AlertTriangle, ShieldCheck, Activity, Fingerprint } from "lucide-react";
 
@@ -31,6 +31,7 @@ export default function MyTeamPage() {
       <div className="h-full flex flex-col bg-background px-4 pt-4 pb-4">
         <PageHeader
           title="Minha Equipe"
+          favoritePage={FAVORITE_PAGES.MINHA_EQUIPE}
           icon={IconUsersGroup}
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Minha Equipe" }]}
           className="flex-shrink-0"
