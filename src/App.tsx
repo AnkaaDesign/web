@@ -15,6 +15,7 @@ import { FileViewerProvider } from "@/components/common/file/file-viewer";
 import { MessageModalProvider } from "@/components/common/message-modal";
 import { AutoPrivilegeRoute } from "@/components/navigation/auto-privilege-route";
 import { DeepLinkRedirect } from "@/components/navigation/deep-link-redirect";
+import { MobileUsageGuard } from "@/components/navigation/mobile-usage-guard";
 import { MainLayout } from "@/layouts/main-layout";
 import { AuthLayout } from "@/layouts/auth-layout";
 import { Toaster } from "@/components/ui/sonner";
@@ -198,6 +199,9 @@ const UnderConstruction = lazy(() => import("@/pages/under-construction"));
 
 // Public Pages (no authentication required)
 const PublicBudgetPage = lazy(() => import("@/pages/public/budget/[id]").then((module) => ({ default: module.PublicBudgetPage })));
+
+// Public app-install landing page (no auth, no providers)
+const InstallPage = lazy(() => import("@/pages/install").then((module) => ({ default: module.InstallPage })));
 const PublicServiceReportPage = lazy(() => import("@/pages/public/service-report/[id]").then((module) => ({ default: module.PublicServiceReportPage })));
 const PublicWasteCertificatePage = lazy(() => import("@/pages/public/waste-certificate/[id]").then((module) => ({ default: module.PublicWasteCertificatePage })));
 const PrivacyPolicyPage = lazy(() => import("@/pages/public/privacy-policy").then((module) => ({ default: module.PrivacyPolicyPage })));
@@ -517,6 +521,10 @@ function App() {
 
   return (
     <Router>
+      {/* Mobile browsers are steered to the public /install page (see guard).
+          Mounted at the router root so it covers every route; it exempts /install,
+          auth callbacks and public share links, and never affects desktop. */}
+      <MobileUsageGuard />
       <ThemeProvider defaultTheme="light" storageKey="ankaa-ui-theme">
         <TooltipProvider skipDelayDuration={0}>
           <ErrorBoundary>
@@ -554,6 +562,22 @@ function App() {
                 </Suspense>
               }
             />
+
+            {/* Public app-install landing page — no auth, no providers, and excluded
+                from the mobile-redirect guard (it is the guard's destination). */}
+            <Route
+              path={routes.install}
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <InstallPage />
+                </Suspense>
+              }
+            />
+
+            {/* NOTE: /.well-known/* (apple-app-site-association, assetlinks.json) is
+                served as static files by nginx and MUST NOT be handled by this SPA
+                router. It is intentionally absent here; the catch-all "*" below only
+                applies to client-side app routes, never to /.well-known. */}
 
             {/* Hidden screen-recording demo — fully public, no auth, no providers. Delete when done. */}
             <Route

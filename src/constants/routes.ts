@@ -839,6 +839,10 @@ export const routes = {
 
   // Public legal pages (no authentication required)
   privacyPolicy: "/politica-de-privacidade",
+
+  // Public app-install landing page (no authentication required).
+  // Mobile browsers hitting the web app are redirected here (see MobileUsageGuard).
+  install: "/install",
 } as const;
 
 // Export types for type safety
