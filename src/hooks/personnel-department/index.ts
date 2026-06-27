@@ -9,7 +9,7 @@ export * from "./use-user-benefits";
 export * from "./use-vacations";
 export * from "./use-thirteenths";
 
-// Merged from former hooks/human-resources barrel
+// User, position, warning, holiday & PPE hooks
 export * from "./use-user";
 // NOTE: use-user-filters excluded from barrel - import directly to avoid
 // convertToApiFilters/convertFromApiFilters name conflicts across domains

@@ -1037,6 +1037,11 @@ export const ACCOUNTING_TYPE_COLORS: Record<
     text: "text-emerald-700 dark:text-emerald-400",
     hover: "hover:bg-emerald-200 dark:hover:bg-emerald-900/30",
   },
+  [ACCOUNTING_TYPE.EXTRAORDINARIO]: {
+    bg: "bg-orange-100 dark:bg-orange-900/20",
+    text: "text-orange-700 dark:text-orange-400",
+    hover: "hover:bg-orange-200 dark:hover:bg-orange-900/30",
+  },
 };
 
 /**

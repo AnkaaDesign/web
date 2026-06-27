@@ -11,7 +11,7 @@ import { IconDeviceDesktop, IconDeviceMobile, IconFileDownload } from "@tabler/i
 import * as TablerIcons from "@tabler/icons-react";
 import type { MessageFormData, DecoratorVariant } from "./types";
 import { useState } from "react";
-import { parseMarkdownToInlineFormat } from "@/utils/markdown-parser";
+import { parseMarkdownToInlineFormat, sanitizeUrl } from "@/utils/markdown-parser";
 import { getApiBaseUrl } from "@/config/api";
 import { exportMessageToPdf } from "@/utils/message-pdf-export";
 
@@ -117,11 +117,15 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
           return <strong key={key} className="font-semibold">{renderTextWithLineBreaks(format.content)}</strong>;
         case 'italic':
           return <em key={key} className="italic">{renderTextWithLineBreaks(format.content)}</em>;
-        case 'link':
+        case 'link': {
+          const safeUrl = sanitizeUrl(format.url || '');
+          if (!safeUrl) {
+            return <span key={key}>{renderTextWithLineBreaks(format.content)}</span>;
+          }
           return (
             <a
               key={key}
-              href={format.url}
+              href={safeUrl}
               className="text-primary hover:underline underline-offset-2"
               target="_blank"
               rel="noopener noreferrer"
@@ -129,6 +133,7 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
               {renderTextWithLineBreaks(format.content)}
             </a>
           );
+        }
         case 'underline':
           return <u key={key}>{renderTextWithLineBreaks(format.content)}</u>;
         case 'color':

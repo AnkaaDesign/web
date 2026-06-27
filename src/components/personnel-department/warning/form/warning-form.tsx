@@ -441,12 +441,18 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FollowUpDatePicker control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
-              <AutoResolveSwitch
-                control={form.control}
-                disabled={isSubmitting}
-                graveMeasure={form.watch("severity") === "SUSPENSION" || form.watch("severity") === "FINAL_WARNING"}
-              />
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                <div className="lg:flex-1">
+                  <FollowUpDatePicker control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
+                </div>
+                <div className="lg:flex-1">
+                  <AutoResolveSwitch
+                    control={form.control}
+                    disabled={isSubmitting}
+                    graveMeasure={form.watch("severity") === "SUSPENSION" || form.watch("severity") === "FINAL_WARNING"}
+                  />
+                </div>
+              </div>
               {props.mode === "update" && <ActiveSwitch control={form.control} disabled={isSubmitting} />}
 
               <TerminationSelect disabled={isSubmitting} collaboratorId={form.watch("collaboratorId") || undefined} />

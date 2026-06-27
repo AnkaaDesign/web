@@ -17,6 +17,7 @@
  */
 
 import type { ContentBlock, DecoratorVariant } from '@/components/administration/message/editor/types';
+import { sanitizeUrl } from '@/utils/markdown-parser';
 
 // ─── id generation ────────────────────────────────────────────────────────────
 let seq = 0;
@@ -107,7 +108,9 @@ function serializeInline(node: Node, active: ActiveFormats = {}): string {
   if (!inner.trim()) return inner; // preserve whitespace-only runs verbatim
 
   if (tag === 'a') {
-    const href = el.getAttribute('href') || '';
+    // Drop unsafe schemes (javascript:, data:, …) at paste time so they never
+    // enter the stored markdown; keep the link only for safe URLs.
+    const href = sanitizeUrl(el.getAttribute('href') || '');
     if (href) inner = `[${inner}](${href})`;
   }
   // Only wrap a format that an ancestor hasn't already applied.

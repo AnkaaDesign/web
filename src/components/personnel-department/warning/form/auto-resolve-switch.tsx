@@ -15,7 +15,7 @@ export function AutoResolveSwitch({ control, disabled, graveMeasure }: AutoResol
       control={control}
       name="autoResolve"
       render={({ field }) => (
-        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-4">
+        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border border-border/40 bg-muted/30 p-4">
           <FormControl>
             <Switch
               checked={graveMeasure ? false : !!field.value}

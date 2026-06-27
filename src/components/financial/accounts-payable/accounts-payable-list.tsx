@@ -34,6 +34,8 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparato
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { FinancialKpiCard } from "../common/financial-kpi-card";
 import { PaymentAmountDialog } from "./payment-amount-dialog";
+import { MarkPaidDialog } from "./mark-paid-dialog";
+import { createOrderFormData } from "@/utils/form-data-helper";
 import { useRecurrentPayableMutations } from "@/hooks/financial/use-recurrent-payable";
 
 // --- Per-row payment-state badge. EXPECTED (previstos/recorrentes) is a forecast,
@@ -286,6 +288,10 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // VARIABLE recurrent bill awaiting its real paid amount (opens PaymentAmountDialog).
   const [payAmountRow, setPayAmountRow] = useState<PayableRow | null>(null);
 
+  // Order payable awaiting confirmation + optional comprovante (opens MarkPaidDialog).
+  const [markPaidRow, setMarkPaidRow] = useState<PayableRow | null>(null);
+  const [markPaidPending, setMarkPaidPending] = useState(false);
+
   useEffect(() => {
     const handle = setTimeout(() => {
       setDebouncedSearch(searchText);
@@ -392,7 +398,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // Payment mutations. Order transitions auto-invalidate the payables query
   // (keyed under orderKeys.all); airbrushing settles via its own update, so we
   // refetch the list manually afterward.
-  const { markAwaitingPaymentAsync, markPaidAsync, markInstallmentPaidAsync } = useOrderMutations();
+  const { markAwaitingPaymentAsync, markPaidAsync, markInstallmentPaidAsync, updateAsync: updateOrderAsync } = useOrderMutations();
   const { updateAsync: updateAirbrushingAsync } = useAirbrushingMutations();
   const settlePayrollMonth = useSettlePayrollMonth();
   const triggerSchedule = useTriggerOrderSchedule();
@@ -488,6 +494,38 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       return;
     }
     runAction(() => payRecurrentAsync({ occurrenceId: row.id, body: {} }));
+  };
+
+  // Order payables settle through a dialog that collects an optional comprovante.
+  const openMarkPaid = (row: PayableRow) => {
+    setContextMenu(null);
+    setMarkPaidRow(row);
+  };
+
+  // Confirm an order payable as paid. When a receipt was attached, append it via the
+  // order update endpoint (no receiptIds → existing files are kept, new ones connected
+  // on top) before flipping the status. Categorization is left for the Conciliação flow.
+  const confirmMarkPaid = async (receipts: File[]) => {
+    const row = markPaidRow;
+    if (!row) return;
+    setMarkPaidPending(true);
+    try {
+      if (receipts.length > 0) {
+        const formData = createOrderFormData({}, { receipts });
+        await updateOrderAsync({ id: row.id, data: formData as any });
+      }
+      if (row.installmentId) {
+        await markInstallmentPaidAsync(row.installmentId);
+      } else {
+        await markPaidAsync(row.id);
+      }
+      setMarkPaidRow(null);
+      refetch();
+    } catch {
+      // Errors are toasted by the API client.
+    } finally {
+      setMarkPaidPending(false);
+    }
   };
 
   const parseCompetence = (c?: string | null): { year: number; month: number } | null => {
@@ -651,18 +689,11 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
               )}
 
               {ctxRow.source === "ORDER" && ctxRow.paymentState !== "PAID" && (
-                ctxRow.installmentId ? (
-                  // Boleto parcela — settle this single installment (or reconcile, below).
-                  <DropdownMenuItem onClick={() => runAction(() => markInstallmentPaidAsync(ctxRow.installmentId!))}>
-                    <IconCash className="mr-2 h-4 w-4" />
-                    Marcar parcela como paga
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onClick={() => runAction(() => markPaidAsync(ctxRow.id))}>
-                    <IconCash className="mr-2 h-4 w-4" />
-                    Marcar como pago
-                  </DropdownMenuItem>
-                )
+                // Opens a dialog to optionally attach the comprovante before settling.
+                <DropdownMenuItem onClick={() => openMarkPaid(ctxRow)}>
+                  <IconCash className="mr-2 h-4 w-4" />
+                  {ctxRow.installmentId ? "Marcar parcela como paga" : "Marcar como pago"}
+                </DropdownMenuItem>
               )}
 
               {ctxRow.source === "AIRBRUSHING" && ctxRow.paymentState !== "PAID" && (
@@ -701,7 +732,10 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
                 </DropdownMenuItem>
               )}
 
-              {ctxRow.settleVia === "RECONCILIATION" && (
+              {/* Order rows settle directly via "Marcar como pago" (with optional receipt);
+                  categorization is deferred to the dedicated Conciliação flow. Other
+                  reconciliation-only sources keep this option so they aren't stranded. */}
+              {ctxRow.settleVia === "RECONCILIATION" && ctxRow.source !== "ORDER" && (
                 <DropdownMenuItem onClick={() => handleSettle(ctxRow)}>
                   <IconArrowRight className="mr-2 h-4 w-4" />
                   Conciliar / categorizar
@@ -731,6 +765,16 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
           if (!row) return;
           runAction(() => payRecurrentAsync({ occurrenceId: row.id, body: { paidAmount } }).then(() => setPayAmountRow(null)));
         }}
+      />
+
+      {/* Order payable — confirm payment and optionally attach the comprovante. */}
+      <MarkPaidDialog
+        open={!!markPaidRow}
+        onOpenChange={(open) => !open && setMarkPaidRow(null)}
+        payeeName={markPaidRow?.payeeName}
+        amount={markPaidRow?.amount}
+        isPending={markPaidPending}
+        onConfirm={confirmMarkPaid}
       />
     </div>
   );

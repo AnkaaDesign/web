@@ -750,8 +750,12 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const currentDiscount = Number(form.getValues("discount")) || 0;
       const currentStatus = form.getValues("status");
 
-      // Resolve the selected supplier so PIX/boleto defaults shown in the form get persisted.
-      const currentSupplier = supplierId ? suppliers.find((s) => s.id === supplierId) : undefined;
+      // The Pix key is the only thing that configures a PIX payment. If the user clears it,
+      // the payment is no longer defined — drop the method too so the order reads "A Definir"
+      // (that label is derived from an order with no payment method) instead of staying on a
+      // PIX method that can never be paid. Other methods (boleto/cartão) are self-defining.
+      const pixCleared = currentPaymentMethod === "PIX" && !(currentPaymentPix || "").trim();
+      const resolvedPaymentMethod = pixCleared ? null : currentPaymentMethod || undefined;
 
       const data = {
         description: description!.trim(),
@@ -764,9 +768,12 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         freight: currentFreight,
         discount: currentDiscount,
         items,
-        paymentMethod: currentPaymentMethod || undefined,
-        // Persist what was displayed: fall back to the supplier's default pix when the user left it empty.
-        paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || currentSupplier?.pix || undefined : undefined,
+        paymentMethod: resolvedPaymentMethod,
+        // Persist exactly what the user entered. An empty/whitespace field clears the key
+        // (send null, not undefined — undefined would be skipped on the API and keep the old
+        // value). The supplier's default pix is only a placeholder hint, never silently
+        // re-applied, so clearing the Chave Pix actually sticks. Non-PIX methods clear it.
+        paymentPix: currentPaymentMethod === "PIX" ? (currentPaymentPix || "").trim() || null : null,
         // Persist the default interval (30 days) shown for 2x+ boletos when none was explicitly chosen.
         paymentDueDays:
           currentPaymentMethod === "BANK_SLIP"
@@ -1335,7 +1342,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   if (stringValue) setSelectedPaymentStatus(stringValue);
                                 }}
                                 options={[
-                                  { value: ORDER_PAYMENT_STATUS.AWAITING_PAYMENT, label: ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.AWAITING_PAYMENT] },
+                                  // With no payment method configured the obligation isn't defined yet,
+                                  // so surface the derived "A Definir" label (matches OrderPaymentStatusBadge).
+                                  { value: ORDER_PAYMENT_STATUS.AWAITING_PAYMENT, label: watchedPaymentMethod ? ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.AWAITING_PAYMENT] : "A Definir" },
                                   { value: ORDER_PAYMENT_STATUS.PAID, label: ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.PAID] },
                                   // Current PARTIALLY_PAID is installment-derived: shown so the value
                                   // renders, but the user only moves to Aguardando/Pago.
@@ -1432,7 +1441,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                       ? `Padrão: ${suppliers.find(s => s.id === supplierId)?.pix}`
                                       : "CPF, CNPJ, E-mail, Telefone..."
                                   }
-                                  value={form.watch("paymentPix") || suppliers.find(s => s.id === supplierId)?.pix || ""}
+                                  value={form.watch("paymentPix") ?? ""}
                                   onChange={(value) => {
                                     form.setValue("paymentPix", (value as string) || null, { shouldDirty: true });
                                   }}

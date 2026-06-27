@@ -337,9 +337,6 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/departamento-pessoal/ausencias/listar": "/departamento-pessoal/ferias",
   "/departamento-pessoal/ausencias": "/departamento-pessoal/ferias",
   "/departamento-pessoal/ausencias/cadastrar": "/departamento-pessoal/ferias/cadastrar",
-  // Férias migrated to Departamento Pessoal — fix RH-namespace links.
-  "/departamento-pessoal/ferias": "/departamento-pessoal/ferias",
-  "/departamento-pessoal/ferias/cadastrar": "/departamento-pessoal/ferias/cadastrar",
   "/departamento-pessoal/faltas/listar": "/departamento-pessoal",
   "/departamento-pessoal/faltas": "/departamento-pessoal",
   "/departamento-pessoal/faltas/cadastrar": "/departamento-pessoal",
@@ -399,14 +396,6 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/personal/time-tracking": "/pessoal",
   "/personal/time-tracking/details/:id": "/pessoal",
   "/registro-de-ponto": "/pessoal",
-  "/human-resources": "/departamento-pessoal",
-  "/human-resources/employees": "/departamento-pessoal/colaboradores",
-  "/human-resources/employees/create": "/departamento-pessoal/colaboradores/cadastrar",
-  "/human-resources/employees/list": "/departamento-pessoal/colaboradores",
-  "/human-resources/employees/details": "/departamento-pessoal/colaboradores",
-  "/human-resources/employees/edit": "/departamento-pessoal/colaboradores",
-  "/human-resources/absences": "/departamento-pessoal/ferias",
-  "/human-resources/vacations": "/departamento-pessoal/ferias",
   "/producao/cronograma/aguardando": "/producao/agenda",
   "/producao/em-espera": "/producao/agenda",
   "/pintura/formulas/cadastrar": "/pintura/catalogo/cadastrar",
@@ -419,7 +408,6 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/departamento-pessoal/advertencias/cadastrar": "/departamento-pessoal/avisos/cadastrar",
   "/statistics": "/estatisticas",
   "/statistics/production": "/estatisticas/producao",
-  "/statistics/human-resources": "/estatisticas/departamento-pessoal",
   "/statistics/inventory": "/estatisticas/estoque",
 };
 
@@ -503,13 +491,6 @@ export function fixNavigationPath(path: string): string {
   // Check for legacy English routes
   if (path.startsWith("/statistics")) {
     const portuguesePath = path.replace("/statistics", "/estatisticas");
-    if (isValidRoute(portuguesePath)) {
-      return portuguesePath;
-    }
-  }
-
-  if (path.startsWith("/human-resources")) {
-    const portuguesePath = path.replace("/human-resources", "/departamento-pessoal");
     if (isValidRoute(portuguesePath)) {
       return portuguesePath;
     }

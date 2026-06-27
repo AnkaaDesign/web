@@ -33,6 +33,45 @@ export function isMobile(): boolean {
 }
 
 /**
+ * True only for genuine mobile Safari on iOS — the one browser where the
+ * `itms-services://` over-the-air install actually works. Every iOS browser is
+ * WebKit under the hood, so we identify real Safari by the presence of the
+ * `Version/` token while excluding the known third-party browsers (Chrome =
+ * CriOS, Firefox = FxiOS, Edge = EdgiOS, Opera = OPiOS, Google app = GSA) and
+ * the common in-app webviews (Instagram, Facebook, WhatsApp, etc.).
+ */
+export function isIOSSafari(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if (detectPlatform() !== "ios") return false;
+
+  const ua = navigator.userAgent || "";
+  const isOtherBrowser = /(CriOS|FxiOS|EdgiOS|OPiOS|GSA|DuckDuckGo|YaBrowser)/i.test(ua);
+  const isInAppWebView = /(FBAN|FBAV|FBIOS|Instagram|Line|Twitter|WhatsApp|LinkedIn|Snapchat|MicroMessenger|Pinterest|TikTok)/i.test(ua);
+  const looksLikeSafari = /Safari/.test(ua) && /Version\//.test(ua);
+
+  return looksLikeSafari && !isOtherBrowser && !isInAppWebView;
+}
+
+/** On iOS but NOT in Safari — the OTA install would fail here. */
+export function isIOSNonSafari(): boolean {
+  return detectPlatform() === "ios" && !isIOSSafari();
+}
+
+/**
+ * Best-effort hand-off to Safari using the well-known `x-safari-` URL-scheme
+ * escape. This reliably opens Safari from in-app webviews (Instagram, WhatsApp,
+ * Gmail, etc.), which is by far the most common place install links land.
+ *
+ * Apple exposes no API to switch out of a full third-party browser like Chrome
+ * or Firefox, so there it does nothing — callers must always also offer a
+ * copy-link fallback with manual "open in Safari" instructions.
+ */
+export function openInSafari(url: string): void {
+  if (typeof window === "undefined") return;
+  window.location.href = `x-safari-${url}`;
+}
+
+/**
  * Attempt to open the native app at a given in-app path using the custom URL
  * scheme (signing-independent, e.g. `ankaadesign://producao/123`).
  *

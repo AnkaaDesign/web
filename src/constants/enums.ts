@@ -2354,6 +2354,7 @@ export enum ACCOUNTING_TYPE {
   ESTORNO = "ESTORNO",
   LUCRO_DISTRIBUIDO = "LUCRO_DISTRIBUIDO",
   RECEITA_SERVICOS = "RECEITA_SERVICOS",
+  EXTRAORDINARIO = "EXTRAORDINARIO",
 }
 
 // Category hierarchy depth: 1 = top-level category, 2 = subcategory.

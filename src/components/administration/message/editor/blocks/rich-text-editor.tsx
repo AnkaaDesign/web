@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useLayoutEffect, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { parseMarkdownToInlineFormat } from "@/utils/markdown-parser";
+import { parseMarkdownToInlineFormat, sanitizeUrl } from "@/utils/markdown-parser";
 import type { InlineFormat } from "@/components/messaging/types";
 
 export interface RichTextEditorHandle {
@@ -76,7 +76,10 @@ function segToHtml(seg: InlineFormat): string {
     case 'bold':      return `<b>${c}</b>`;
     case 'italic':    return `<i>${c}</i>`;
     case 'underline': return `<u>${c}</u>`;
-    case 'link':      return `<a href="${escAttr((seg as any).url || '')}">${c}</a>`;
+    case 'link': {
+      const safe = sanitizeUrl((seg as any).url || '');
+      return safe ? `<a href="${escAttr(safe)}">${c}</a>` : c;
+    }
     case 'color':     return `<span style="color:${(seg as any).color}">${c}</span>`;
     default:          return c;
   }

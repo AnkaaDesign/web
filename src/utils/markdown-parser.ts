@@ -8,6 +8,28 @@
 import type { InlineFormat } from '@/components/messaging/types';
 
 /**
+ * Returns the URL when it is safe to render in an href, otherwise ''.
+ *
+ * Blocks scheme-based XSS vectors (javascript:, data:, vbscript:, file:, …) —
+ * including obfuscated forms like "java\tscript:" or "  javascript:" — while
+ * allowing http/https/mailto/tel and relative/fragment/protocol-relative URLs.
+ * Callers should drop the link (render plain text) when this returns ''.
+ */
+export function sanitizeUrl(url: string): string {
+  const trimmed = (url || '').trim();
+  if (!trimmed) return '';
+  // Strip control chars / whitespace that can be smuggled inside a scheme.
+  const normalized = trimmed.replace(/[\x00-\x20\x7f-\xa0]+/g, "");
+  if (/^(?:https?|mailto|tel):/i.test(normalized)) return trimmed;
+  // Relative, fragment, query, or protocol-relative URLs carry no scheme.
+  if (/^(?:\/\/|\/|#|\?|\.)/.test(normalized)) return trimmed;
+  // No colon at all → bare/relative path, safe.
+  if (!normalized.includes(':')) return trimmed;
+  // Any other explicit scheme is unsafe.
+  return '';
+}
+
+/**
  * Parses text with markdown-style formatting into InlineFormat array
  *
  * Supported formats:
@@ -69,13 +91,20 @@ export function parseMarkdownToInlineFormat(text: string): InlineFormat[] {
     } else if (match[4]) {
       // Link: [text](url)
       const linkText = match[5].trim();
-      const linkUrl = match[6].trim();
-      // Only add link if both text and URL are non-empty
+      const linkUrl = sanitizeUrl(match[6].trim());
+      // Only add link if both text and a SAFE URL are non-empty
       if (linkText && linkUrl) {
         result.push({
           type: 'link',
           content: linkText,
           url: linkUrl,
+        });
+      } else if (linkText) {
+        // Unsafe scheme (javascript:, data:, …) or empty URL — keep the
+        // readable text but drop the dangerous link.
+        result.push({
+          type: 'text',
+          content: linkText,
         });
       } else {
         // Invalid link format - treat as plain text
