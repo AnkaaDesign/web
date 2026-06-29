@@ -478,6 +478,13 @@ interface TaskWithServiceOrdersChangelogProps {
   className?: string;
   maxHeight?: string;
   limit?: number;
+  /**
+   * When true the component renders BARE — no own Card / CardHeader / "Histórico de Alterações"
+   * title / entity-name — just the summary stats + the timeline body. Used when the host already
+   * supplies a card + title (e.g. the task detail-page "Histórico de Alterações" section). Default
+   * false keeps the standalone card look for every other caller.
+   */
+  embedded?: boolean;
 }
 
 // Map actions to icons and colors (matching ChangelogHistory)
@@ -3008,6 +3015,7 @@ export function TaskWithServiceOrdersChangelog({
   className,
   maxHeight,
   limit = 100,
+  embedded = false,
 }: TaskWithServiceOrdersChangelogProps) {
   // Get current user for permission checks
   const { data: currentUser } = useCurrentUser();
@@ -3548,45 +3556,31 @@ export function TaskWithServiceOrdersChangelog({
     taskLoading || serviceOrdersLoading || truckLoading || layoutsLoading || quoteLoading || quoteItemLoading;
   const error = taskError || serviceOrdersError || truckError || layoutsError || quoteError || quoteItemError;
 
+  // Error state — bare (embedded) or carded.
   if (error) {
-    return (
+    const errorInner = (
+      <div className="text-center">
+        <IconAlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+        <p className="text-destructive">Erro ao carregar histórico de alterações</p>
+      </div>
+    );
+    return embedded ? (
+      <div className={cn("flex items-center justify-center py-12", className)}>{errorInner}</div>
+    ) : (
       <Card className={className}>
-        <CardContent className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <IconAlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <p className="text-destructive">
-              Erro ao carregar histórico de alterações
-            </p>
-          </div>
-        </CardContent>
+        <CardContent className="flex items-center justify-center py-12">{errorInner}</CardContent>
       </Card>
     );
   }
 
-  // Don't show the card if there are no changelogs
+  // Don't show anything if there are no changelogs
   if (!isLoading && combinedChangelogs.length === 0) {
     return null;
   }
 
-  return (
-    <Card
-      className={cn("shadow-sm border border-border flex flex-col", className)}
-      style={maxHeight ? { maxHeight } : undefined}
-    >
-      <CardHeader className="pb-4 flex-shrink-0">
-        <CardTitle className="flex items-center gap-2">
-          <IconHistory className="h-5 w-5 text-muted-foreground" />
-          Histórico de Alterações
-          {taskName && (
-            <span className="text-base font-normal text-muted-foreground">
-              - {taskName}
-            </span>
-          )}
-        </CardTitle>
-
-        {/* Summary stats */}
-        {changeStats.totalChanges > 0 && (
-          <div className="grid grid-cols-3 gap-3 mt-4">
+  // Summary stats grid — shared by the carded and embedded layouts.
+  const statsGrid = changeStats.totalChanges > 0 ? (
+    <div className="grid grid-cols-3 gap-3 mt-4">
             <div className="bg-card-nested rounded-lg p-4 border border-border">
               <div className="flex flex-col justify-between h-full">
                 <div className="flex items-center gap-2 mb-2">
@@ -3631,10 +3625,11 @@ export function TaskWithServiceOrdersChangelog({
               </div>
             </div>
           </div>
-        )}
-      </CardHeader>
+  ) : null;
 
-      <CardContent className="pt-0 flex-1 min-h-0 overflow-y-auto">
+  // Timeline body — shared by the carded and embedded layouts.
+  const timeline = (
+    <>
         {isLoading ? (
           <ChangelogSkeleton />
         ) : combinedChangelogs.length === 0 ? (
@@ -3715,7 +3710,38 @@ export function TaskWithServiceOrdersChangelog({
             </div>
           </div>
         )}
-      </CardContent>
+    </>
+  );
+
+  // Embedded: bare body (host supplies the Card + title) — stats + scrolling timeline only.
+  if (embedded) {
+    return (
+      <div className={cn("flex min-h-0 flex-col", className)}>
+        {statsGrid ? <div className="flex-shrink-0">{statsGrid}</div> : null}
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">{timeline}</div>
+      </div>
+    );
+  }
+
+  return (
+    <Card
+      className={cn("shadow-sm border border-border flex flex-col", className)}
+      style={maxHeight ? { maxHeight } : undefined}
+    >
+      <CardHeader className="pb-4 flex-shrink-0">
+        <CardTitle className="flex items-center gap-2">
+          <IconHistory className="h-5 w-5 text-muted-foreground" />
+          Histórico de Alterações
+          {taskName && (
+            <span className="text-base font-normal text-muted-foreground">
+              - {taskName}
+            </span>
+          )}
+        </CardTitle>
+        {statsGrid}
+      </CardHeader>
+
+      <CardContent className="pt-0 flex-1 min-h-0 overflow-y-auto">{timeline}</CardContent>
     </Card>
   );
 }

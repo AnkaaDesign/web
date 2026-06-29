@@ -11,12 +11,15 @@ interface OrderTotalCalculatorProps {
   orderItems?: OrderItemType[]; // Pass actual OrderItem objects from the order
   discount?: number; // Percentage discount applied to the goods subtotal
   freight?: number; // Shipping cost added to the grand total
+  // Manual override of the grand total. When a number, it replaces the computed
+  // (items − discount + freight) as the displayed grand total. Null/undefined = computed.
+  totalOverride?: number | null;
   className?: string;
   showItemBreakdown?: boolean;
   showTaxBreakdown?: boolean;
 }
 
-const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ orderItems = [], discount = 0, freight = 0, className, showItemBreakdown = false, showTaxBreakdown = false }) => {
+const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ orderItems = [], discount = 0, freight = 0, totalOverride = null, className, showItemBreakdown = false, showTaxBreakdown = false }) => {
   const canViewPrices = useCanViewPrices();
   // Calculate individual item totals, taxes, and grand total
   const itemCalculations = React.useMemo(() => {
@@ -59,6 +62,10 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
     return { ...base, discountAmount, grandTotal: base.grandTotal - discountAmount + freight };
   }, [itemCalculations, discount, freight]);
 
+  // Effective grand total: a manual override (when set) takes precedence over the computed total.
+  const isOverridden = typeof totalOverride === "number";
+  const effectiveTotal = isOverridden ? (totalOverride as number) : totals.grandTotal;
+
   const totalItems = orderItems.length;
   const totalQuantity = React.useMemo(() => {
     return orderItems.reduce((total, orderItem) => {
@@ -88,7 +95,7 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
             <div className="text-xs text-muted-foreground">Quantidade Total</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(totals.grandTotal)}</div>
+            <div className="text-2xl font-bold text-green-600">{formatCurrency(effectiveTotal)}</div>
             <div className="text-xs text-muted-foreground">Total Geral</div>
           </div>
         </div>
@@ -163,7 +170,7 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
         <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-green-800 dark:text-green-200">Total do Pedido:</span>
-            <span className="text-xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totals.grandTotal)}</span>
+            <span className="text-xl font-bold text-green-600 dark:text-green-400">{formatCurrency(effectiveTotal)}</span>
           </div>
         </div>
 
@@ -188,9 +195,11 @@ const OrderTotalBadgeComponent: React.FC<{
   orderItems?: OrderItemType[];
   discount?: number;
   freight?: number;
-}> = ({ orderItems = [], discount = 0, freight = 0 }) => {
+  // Manual override of the grand total. When a number, it is displayed instead of the computed total.
+  totalOverride?: number | null;
+}> = ({ orderItems = [], discount = 0, freight = 0, totalOverride = null }) => {
   const canViewPrices = useCanViewPrices();
-  const grandTotal = React.useMemo(() => {
+  const computedTotal = React.useMemo(() => {
     let goodsSubtotal = 0;
     const total = orderItems.reduce((acc, orderItem) => {
       const quantity = orderItem.orderedQuantity;
@@ -205,6 +214,8 @@ const OrderTotalBadgeComponent: React.FC<{
     const discountAmount = discount > 0 ? goodsSubtotal * (discount / 100) : 0;
     return total - discountAmount + freight;
   }, [orderItems, discount, freight]);
+
+  const grandTotal = typeof totalOverride === "number" ? totalOverride : computedTotal;
 
   if (!canViewPrices) return null;
 

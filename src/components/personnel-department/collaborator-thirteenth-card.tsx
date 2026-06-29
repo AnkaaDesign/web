@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,19 @@ interface CollaboratorThirteenthCardProps {
   /** Colaborador name, used to label the fixed-user form. */
   userName?: string;
   className?: string;
+  /**
+   * When true, render ONLY the inner body + dialogs (no outer `<Card>`,
+   * `<CardHeader>`, `<CardTitle>` or the "Lançar 13º" header action), and hide
+   * the whole section when there are no records — even for managers (the
+   * detail-page auto-hides empty sections). Default false → unchanged.
+   */
+  embedded?: boolean;
+  /**
+   * Reports how many 13º records this collaborator has so the parent can hide the
+   * whole section when there are none. `null` while loading, `0` when empty.
+   * Fires in BOTH embedded and standalone mode.
+   */
+  onCount?: (count: number | null) => void;
 }
 
 const statusVariant = (status: THIRTEENTH_STATUS): "delivered" | "pending" | "secondary" | "outline" => {
@@ -79,7 +92,7 @@ type PayTarget = { record: Thirteenth; installment: "first" | "second" };
  * HR/ADMIN/Contabilidade lançar, editar, pagar parcelas e excluir. The engine
  * and the Contas a Pagar forecast still consume the same Thirteenth records.
  */
-export function CollaboratorThirteenthCard({ userId, userName, className }: CollaboratorThirteenthCardProps) {
+export function CollaboratorThirteenthCard({ userId, userName, className, embedded = false, onCount }: CollaboratorThirteenthCardProps) {
   const { user: currentUser } = useAuth();
   const privileges = currentUser?.sector?.privileges;
   const canManage =
@@ -100,10 +113,17 @@ export function CollaboratorThirteenthCard({ userId, userName, className }: Coll
   const [payDate, setPayDate] = useState<Date>(new Date());
   const [deleteRecord, setDeleteRecord] = useState<Thirteenth | null>(null);
 
+  // Surface the record count so the parent can hide the section when empty.
+  useEffect(() => {
+    onCount?.(isLoading ? null : records.length);
+  }, [isLoading, records.length, onCount]);
+
   // Keep the section hidden for viewers without records (preserves prior UX).
-  // Managers always see it so they can lançar a new 13º.
+  // Managers always see it so they can lançar a new 13º — EXCEPT in embedded
+  // mode, where the detail page auto-hides sections that have no info.
   if (isLoading) return null;
   if (records.length === 0 && !canManage) return null;
+  if (embedded && records.length === 0) return null;
 
   const handleCreate = async (formData: any) => {
     await createAsync({ data: formData });
@@ -133,21 +153,8 @@ export function CollaboratorThirteenthCard({ userId, userName, className }: Coll
   const canPayFirst = (t: Thirteenth) => t.status !== THIRTEENTH_STATUS.CANCELLED && !t.firstInstallmentDate;
   const canPaySecond = (t: Thirteenth) => t.status !== THIRTEENTH_STATUS.CANCELLED && !!t.firstInstallmentDate && !t.secondInstallmentDate;
 
-  return (
-    <Card className={className}>
-      <CardHeader className="pb-4 flex-row items-center justify-between space-y-0">
-        <CardTitle className="flex items-center gap-2">
-          <IconGift className="h-5 w-5 text-muted-foreground" />
-          13º Salário
-        </CardTitle>
-        {canManage && (
-          <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
-            <IconPlus className="h-4 w-4 mr-1.5" />
-            Lançar 13º
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent className="pt-0">
+  const body = (
+    <>
         {records.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">
             Nenhum registro de 13º para este colaborador. Use "Lançar 13º" para criar manualmente ou a rotina anual na listagem de colaboradores.
@@ -226,8 +233,11 @@ export function CollaboratorThirteenthCard({ userId, userName, className }: Coll
             })}
           </div>
         )}
-      </CardContent>
+    </>
+  );
 
+  const dialogs = (
+    <>
       {/* Lançar 13º */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-2xl">
@@ -323,6 +333,37 @@ export function CollaboratorThirteenthCard({ userId, userName, className }: Coll
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </>
+  );
+
+  // Embedded: render only the inner body + dialogs — the detail-page section
+  // provides the single card chrome + "13º Salário" title (and the "Lançar 13º"
+  // action is dropped).
+  if (embedded) {
+    return (
+      <div className={className}>
+        {body}
+        {dialogs}
+      </div>
+    );
+  }
+
+  return (
+    <Card className={className}>
+      <CardHeader className="pb-4 flex-row items-center justify-between space-y-0">
+        <CardTitle className="flex items-center gap-2">
+          <IconGift className="h-5 w-5 text-muted-foreground" />
+          13º Salário
+        </CardTitle>
+        {canManage && (
+          <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+            <IconPlus className="h-4 w-4 mr-1.5" />
+            Lançar 13º
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="pt-0">{body}</CardContent>
+      {dialogs}
     </Card>
   );
 }

@@ -141,6 +141,9 @@ export interface Order extends BaseEntity {
   notes: string | null;
   freight: number;
   discount: number;
+  // Manual override of the order grand total. Null = use the computed total
+  // (items − discount + freight); a number = the manually set grand total.
+  totalOverride: number | null;
   paymentMethod: PAYMENT_METHOD | null;
   paymentPix: string | null;
   paymentDueDays: number | null; // boleto: intervalo (dias) entre parcelas

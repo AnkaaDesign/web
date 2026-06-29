@@ -21,6 +21,12 @@ interface EmploymentHistoryCardProps {
    * placeholder). `null` while loading, then the contract count.
    */
   onCount?: (count: number | null) => void;
+  /**
+   * When true, render ONLY the inner timeline body (no outer `<Card>`,
+   * `<CardHeader>` or `<CardTitle>`). The surrounding detail-page section
+   * supplies the single card chrome + title. Default false → unchanged.
+   */
+  embedded?: boolean;
 }
 
 const NO_DATE = "Sem data";
@@ -35,7 +41,7 @@ const NO_DATE = "Sem data";
  * right-aligned relative timestamp in its header. The phase sub-timeline reuses
  * the same rail idiom at a smaller scale so it reads as a nested mini-rail.
  */
-export function EmploymentHistoryCard({ userId, className, maxHeight = "500px", onCount }: EmploymentHistoryCardProps) {
+export function EmploymentHistoryCard({ userId, className, maxHeight = "500px", onCount, embedded = false }: EmploymentHistoryCardProps) {
   const {
     data: response,
     isLoading,
@@ -80,15 +86,8 @@ export function EmploymentHistoryCard({ userId, className, maxHeight = "500px", 
     });
   }, [contracts]);
 
-  return (
-    <Card className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)} style={maxHeight ? { maxHeight, height: maxHeight } : undefined}>
-      <CardHeader className="pb-4 flex-shrink-0">
-        <CardTitle className="flex items-center gap-2">
-          <IconBriefcase className="h-5 w-5 text-muted-foreground" />
-          Histórico de Vínculos
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 flex-grow flex flex-col min-h-0 overflow-hidden">
+  const body = (
+    <>
         {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 2 }).map((_, i) => (
@@ -252,7 +251,24 @@ export function EmploymentHistoryCard({ userId, className, maxHeight = "500px", 
             </div>
           </ScrollArea>
         )}
-      </CardContent>
+    </>
+  );
+
+  // Embedded: render only the inner body — the detail-page section provides the
+  // single card chrome + "Histórico de Vínculos" title.
+  if (embedded) {
+    return <div className={cn("flex flex-col min-h-0 h-full overflow-hidden", className)}>{body}</div>;
+  }
+
+  return (
+    <Card className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)} style={maxHeight ? { maxHeight, height: maxHeight } : undefined}>
+      <CardHeader className="pb-4 flex-shrink-0">
+        <CardTitle className="flex items-center gap-2">
+          <IconBriefcase className="h-5 w-5 text-muted-foreground" />
+          Histórico de Vínculos
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0 flex-grow flex flex-col min-h-0 overflow-hidden">{body}</CardContent>
     </Card>
   );
 }

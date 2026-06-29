@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getApiBaseUrl } from "@/config/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -84,6 +84,15 @@ interface ChangelogHistoryProps {
   // the height (e.g. an items-stretch grid, or an absolute-inset wrapper).
   fillParent?: boolean;
   limit?: number;
+  // Render only the inner body (stats row + timeline) with NO outer Card,
+  // CardHeader/CardTitle or entity-name header. Used when the component lives
+  // inside a detail-page card section whose own header supplies the single
+  // title. Defaults to false → existing self-titled call sites are unchanged.
+  embedded?: boolean;
+  // Reports the number of changelog entries (0 when empty, null while loading)
+  // so a parent page can hide an empty changelog section. Optional/backward-
+  // compatible — existing call sites that don't pass it are unaffected.
+  onCount?: (count: number | null) => void;
 }
 
 // Logo component for changelog display
@@ -797,8 +806,47 @@ const ChangelogTimelineItem = ({
       }
     }
 
-    // Use parsedValue to ensure arrays/objects are properly formatted
-    const result = formatFieldValue(parsedValue, field, entityType, metadata);
+    // Coerce raw decimal strings to numbers before formatting. The backend
+    // stores numbers JSON-encoded with a "." decimal; the shared formatter only
+    // parses a hardcoded field allowlist, so decimal fields it doesn't know
+    // (e.g. monthlyConsumption) otherwise render as raw floats like
+    // "0.9285296965578034". We coerce only strings with a fractional part — pure
+    // integer/identifier strings (codes, uniCode, barcodes) are left untouched
+    // so they're never mangled into thousand-grouped numbers.
+    let numericValue: number | null = null;
+    if (typeof parsedValue === "number" && Number.isFinite(parsedValue)) {
+      numericValue = parsedValue;
+    } else if (typeof parsedValue === "string" && /^-?\d+\.\d+$/.test(parsedValue.trim())) {
+      const n = Number(parsedValue.trim());
+      if (Number.isFinite(n)) numericValue = n;
+    }
+
+    // Use parsedValue (or the coerced number) so the shared formatter applies
+    // currency/percentage/unit formatting for the fields it recognises.
+    let result = formatFieldValue(
+      numericValue !== null ? numericValue : parsedValue,
+      field,
+      entityType,
+      metadata,
+    );
+
+    // If the formatter returned a BARE number (no R$, %, unit or other label —
+    // i.e. only digits and pt-BR separators), normalise the precision so long
+    // decimals read cleanly: integers as-is, decimals rounded to 2 places.
+    // Fields the formatter already decorates (with currency/percent/units) carry
+    // letters and are left exactly as the shared formatter produced them.
+    if (
+      numericValue !== null &&
+      typeof result === "string" &&
+      /^-?[\d.,]+$/.test(result)
+    ) {
+      result = Number.isInteger(numericValue)
+        ? numericValue.toLocaleString("pt-BR")
+        : numericValue.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+    }
 
     // Render arrays as stacked lines (e.g., responsibles)
     if (Array.isArray(result)) {
@@ -2597,6 +2645,8 @@ export function ChangelogHistory({
   maxHeight,
   fillParent = false,
   limit = 50,
+  embedded = false,
+  onCount,
 }: ChangelogHistoryProps) {
   // Rollback loading state
   const [rollbackLoading, setRollbackLoading] = useState<string | null>(null);
@@ -2843,6 +2893,12 @@ export function ChangelogHistory({
     user,
   ]);
 
+  // Report the changelog entry count to a parent that wants to hide an empty
+  // section (null while loading, otherwise the number of entries).
+  useEffect(() => {
+    onCount?.(isLoading ? null : changelogs.length);
+  }, [onCount, isLoading, changelogs.length]);
+
   // Extract all entity IDs that need to be fetched
   const entityIds = useMemo(() => {
     const categoryIds = new Set<string>();
@@ -3076,16 +3132,24 @@ export function ChangelogHistory({
   }, [changelogs, entityType]);
 
   if (error) {
+    const errorBody = (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <IconAlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <p className="text-destructive">
+            Erro ao carregar histórico de alterações
+          </p>
+        </div>
+      </div>
+    );
+
+    if (embedded) {
+      return <div className={className}>{errorBody}</div>;
+    }
+
     return (
       <Card className={className}>
-        <CardContent className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <IconAlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <p className="text-destructive">
-              Erro ao carregar histórico de alterações
-            </p>
-          </div>
-        </CardContent>
+        <CardContent>{errorBody}</CardContent>
       </Card>
     );
   }
@@ -3095,29 +3159,10 @@ export function ChangelogHistory({
     return null;
   }
 
-  return (
-    <Card
-      className={cn(
-        "shadow-sm border border-border flex flex-col overflow-hidden",
-        fillParent && "h-full",
-        className,
-      )}
-      style={!fillParent && maxHeight ? { maxHeight, height: maxHeight } : undefined}
-    >
-      <CardHeader className="pb-4 flex-shrink-0">
-        <CardTitle className="flex items-center gap-2">
-          <IconHistory className="h-5 w-5 text-muted-foreground" />
-          Histórico de Alterações
-          {entityName && (
-            <span className="text-base font-normal text-muted-foreground">
-              - {entityName}
-            </span>
-          )}
-        </CardTitle>
-
-        {/* Summary stats */}
-        {changeStats.totalChanges > 0 && (
-          <div className="grid grid-cols-3 gap-3 mt-4">
+  // Summary stats row — shared by the standalone Card and the embedded body.
+  const statsGrid =
+    changeStats.totalChanges > 0 ? (
+      <div className="grid grid-cols-3 gap-3">
             <div className="bg-card-nested rounded-lg p-4 border border-border">
               <div className="flex flex-col justify-between h-full">
                 <div className="flex items-center gap-2 mb-2">
@@ -3162,16 +3207,11 @@ export function ChangelogHistory({
               </div>
             </div>
           </div>
-        )}
-      </CardHeader>
+    ) : null;
 
-      <CardContent className="pt-0 flex-1 flex flex-col min-h-0 overflow-hidden">
-        {isLoading ? (
-          <ChangelogSkeleton />
-        ) : changelogs.length === 0 ? (
-          <EmptyState entityType={entityType} />
-        ) : (
-          <ScrollArea className="pr-4 h-full">
+  // Timeline content — shared by both the ScrollArea (standalone Card) and the
+  // natural-height embedded body.
+  const timeline = (
             <div className="space-y-6">
               {groupedChangelogs.map(
                 ([date, dayChangelogGroups], groupIndex) => {
@@ -3233,8 +3273,63 @@ export function ChangelogHistory({
                 },
               )}
             </div>
-          </ScrollArea>
-        )}
+  );
+
+  // Standalone Card body: scrolls inside the fixed-height Card via its own
+  // ScrollArea (h-full against the Card's CardContent flex column).
+  const body = isLoading ? (
+          <ChangelogSkeleton />
+        ) : changelogs.length === 0 ? (
+          <EmptyState entityType={entityType} />
+        ) : (
+          <ScrollArea className="pr-4 h-full">{timeline}</ScrollArea>
+        );
+
+  // Embedded: render only the inner body (stats + timeline), no Card/header/title.
+  // The parent detail-page card section supplies the single title AND the scroll
+  // box (overflow-y-auto + maxHeight). So here we size naturally to content — no
+  // forced h-full / flex-1 / internal ScrollArea — letting a short changelog be a
+  // short card and a long one scroll inside the parent's bounded box.
+  if (embedded) {
+    const embeddedBody = isLoading ? (
+      <ChangelogSkeleton />
+    ) : changelogs.length === 0 ? (
+      <EmptyState entityType={entityType} />
+    ) : (
+      timeline
+    );
+    return (
+      <div className={cn("flex flex-col", className)}>
+        {statsGrid && <div className="mb-4">{statsGrid}</div>}
+        {embeddedBody}
+      </div>
+    );
+  }
+
+  return (
+    <Card
+      className={cn(
+        "shadow-sm border border-border flex flex-col overflow-hidden",
+        fillParent && "h-full",
+        className,
+      )}
+      style={!fillParent && maxHeight ? { maxHeight, height: maxHeight } : undefined}
+    >
+      <CardHeader className="pb-4 flex-shrink-0">
+        <CardTitle className="flex items-center gap-2">
+          <IconHistory className="h-5 w-5 text-muted-foreground" />
+          Histórico de Alterações
+          {entityName && (
+            <span className="text-base font-normal text-muted-foreground">
+              - {entityName}
+            </span>
+          )}
+        </CardTitle>
+        {statsGrid && <div className="mt-4">{statsGrid}</div>}
+      </CardHeader>
+
+      <CardContent className="pt-0 flex-1 flex flex-col min-h-0 overflow-hidden">
+        {body}
       </CardContent>
     </Card>
   );

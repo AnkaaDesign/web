@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconHeartHandshake, IconArrowRight, IconAlertTriangle } from "@tabler/icons-react";
 
@@ -18,6 +19,19 @@ import { cn } from "@/lib/utils";
 interface UserBenefitsCardProps {
   userId: string;
   className?: string;
+  /**
+   * When true, render ONLY the inner body (no outer `<Card>`, `<CardHeader>`,
+   * `<CardTitle>` or the "Ver adesões" header action). The surrounding
+   * detail-page section supplies the single card chrome + title. Default false
+   * → unchanged.
+   */
+  embedded?: boolean;
+  /**
+   * Reports how many ACTIVE benefit enrollments this collaborator has so the
+   * parent can hide the whole section when there are none. `null` while loading,
+   * `0` when empty. Fires in BOTH embedded and standalone mode.
+   */
+  onCount?: (count: number | null) => void;
 }
 
 /**
@@ -29,7 +43,7 @@ interface UserBenefitsCardProps {
  * Self-contained: busca os próprios dados a partir do userId — pode ser
  * inserido em qualquer página de detalhe de colaborador.
  */
-export function UserBenefitsCard({ userId, className }: UserBenefitsCardProps) {
+export function UserBenefitsCard({ userId, className, embedded = false, onCount }: UserBenefitsCardProps) {
   const navigate = useNavigate();
 
   const { data: response, isLoading } = useUserBenefits(
@@ -90,22 +104,16 @@ export function UserBenefitsCard({ userId, className }: UserBenefitsCardProps) {
 
   const enrollmentsListUrl = `${routes.personnelDepartment.benefits.enrollments.root}?users=${userId}`;
 
+  // Surface the active-enrollment count so the parent can hide the section when empty.
+  useEffect(() => {
+    onCount?.(isLoading ? null : rows.length);
+  }, [isLoading, rows.length, onCount]);
+
   // Só exibe a seção quando há benefícios ativos — oculta enquanto carrega e quando vazia.
   if (isLoading || rows.length === 0) return null;
 
-  return (
-    <Card className={cn("shadow-sm border border-border", className)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="flex items-center gap-2">
-          <IconHeartHandshake className="h-5 w-5 text-muted-foreground" />
-          Benefícios Ativos {rows.length > 0 ? `(${rows.length})` : ""}
-        </CardTitle>
-        <Button variant="outline" size="sm" onClick={() => navigate(enrollmentsListUrl)}>
-          Ver adesões
-          <IconArrowRight className="h-4 w-4 ml-2" />
-        </Button>
-      </CardHeader>
-      <CardContent>
+  const body = (
+    <>
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -188,7 +196,28 @@ export function UserBenefitsCard({ userId, className }: UserBenefitsCardProps) {
             </p>
           </div>
         )}
-      </CardContent>
+    </>
+  );
+
+  // Embedded: render only the inner body — the detail-page section provides the
+  // single card chrome + title (and the "Ver adesões" action is dropped).
+  if (embedded) {
+    return <div className={className}>{body}</div>;
+  }
+
+  return (
+    <Card className={cn("shadow-sm border border-border", className)}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="flex items-center gap-2">
+          <IconHeartHandshake className="h-5 w-5 text-muted-foreground" />
+          Benefícios Ativos {rows.length > 0 ? `(${rows.length})` : ""}
+        </CardTitle>
+        <Button variant="outline" size="sm" onClick={() => navigate(enrollmentsListUrl)}>
+          Ver adesões
+          <IconArrowRight className="h-4 w-4 ml-2" />
+        </Button>
+      </CardHeader>
+      <CardContent>{body}</CardContent>
     </Card>
   );
 }

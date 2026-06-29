@@ -25,6 +25,14 @@ export type FieldDataType =
   | "decimal"
   | "money"
   | "percentage"
+  // Brazilian masked document/contact types — the editor renders the matching masked
+  // `<Input type=...>` (formats while typing) and read-mode display formats the raw value.
+  // The value persisted/read is ALWAYS the raw digits (the masked Input emits cleaned digits).
+  | "cpf"
+  | "cnpj"
+  | "phone"
+  | "pis"
+  | "cep"
   | "date"
   | "datetime"
   | "time"
@@ -135,6 +143,12 @@ export interface DetailSectionDef<TData = any> {
   render?: (row: TData) => ReactNode;
   /** Make the section TITLE clickable (e.g. open the quote). Renders the title as a hover-underlined button. */
   onTitleClick?: (row: TData) => void;
+  /**
+   * Content rendered on the RIGHT of the section's title row (justify-between with the title) — e.g. an
+   * item count, a "Baixar Todos"/"PDF"/"Visualizar" button. Use for embedded sections (files, layouts,
+   * dossiê, billing) that need a count + actions aligned with the card title instead of inside the body.
+   */
+  headerActions?: (row: TData) => ReactNode;
   /** Visible by default (the user can still hide it). Defaults to true. */
   defaultVisible?: boolean;
   /** Cannot be hidden by the user. */
@@ -151,10 +165,16 @@ export interface DetailSectionDef<TData = any> {
    * DataTable) to avoid a card-in-a-card.
    */
   variant?: "card" | "plain";
-  /** Allow the user to drag-resize this section's content height (for embedded tables/galleries). */
-  resizableHeight?: boolean;
-  /** Initial content height (px) when `resizableHeight` is on. */
-  defaultHeight?: number;
+  /**
+   * How the section's rendered content is sized:
+   * - `false` (default) → render at NATURAL/full height: the card grows to show EVERYTHING
+   *   (use for data you must see fully — items tables, metrics, calculations).
+   * - `true` → the content is height-bounded and scrolls INTERNALLY (use for logs/history you
+   *   skim — changelog, activity lists). It fills the equal-height band, capped at `scrollHeight`.
+   */
+  scroll?: boolean;
+  /** Max content height (px) when `scroll` is on. Defaults to ~440. */
+  scrollHeight?: number;
   /** Privilege gate (VIEW) — see DetailFieldDef.requiredPrivilege. */
   requiredPrivilege?: PrivilegeGate;
   /** Privilege gate (EDIT) — applies to every editable field in the section. */
@@ -175,6 +195,4 @@ export interface PersistedDetailConfig {
   widths?: Record<string, 1 | 2>;
   /** Per-section explicit column for half-width sections (1 = left, 2 = right); absent = auto-balance. */
   columns?: Record<string, 1 | 2>;
-  /** Per-section content height (px) for resizable sections. */
-  heights?: Record<string, number>;
 }

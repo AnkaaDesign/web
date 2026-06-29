@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconUsers, IconPlus, IconEdit, IconTrash, IconLoader2, IconId, IconCake, IconReceiptTax, IconCoin, IconHeartHandshake } from "@tabler/icons-react";
@@ -37,9 +37,22 @@ import { Textarea } from "@/components/ui/textarea";
 interface DependentsCardProps {
   userId: string;
   className?: string;
+  /**
+   * When true, render ONLY the inner body + dialogs (no outer `<Card>`,
+   * `<CardHeader>`, `<CardTitle>` or the "Adicionar" header action). The
+   * surrounding detail-page section supplies the single card chrome + title.
+   * Default false → unchanged.
+   */
+  embedded?: boolean;
+  /**
+   * Reports how many dependents this collaborator has so the parent can hide the
+   * whole section when there are none. `null` while loading, `0` when empty.
+   * Fires in BOTH embedded and standalone mode.
+   */
+  onCount?: (count: number | null) => void;
 }
 
-export function DependentsCard({ userId, className }: DependentsCardProps) {
+export function DependentsCard({ userId, className, embedded = false, onCount }: DependentsCardProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDependent, setEditingDependent] = useState<Dependent | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Dependent | null>(null);
@@ -177,22 +190,16 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
     setDeleteTarget(null);
   };
 
+  // Surface the dependent count so the parent can hide the section when empty.
+  useEffect(() => {
+    onCount?.(isLoading ? null : dependents.length);
+  }, [isLoading, dependents.length, onCount]);
+
   // Só exibe a seção quando há dependentes — oculta enquanto carrega e quando vazia.
   if (isLoading || dependents.length === 0) return null;
 
-  return (
-    <Card className={cn("flex flex-col", className)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="flex items-center gap-2">
-          <IconUsers className="h-5 w-5 text-muted-foreground" />
-          Dependentes
-        </CardTitle>
-        <Button variant="outline" size="sm" onClick={openCreateDialog}>
-          <IconPlus className="h-4 w-4 mr-1" />
-          Adicionar
-        </Button>
-      </CardHeader>
-      <CardContent className="flex-1">
+  const listBody = (
+    <>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <IconLoader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -257,8 +264,11 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
             ))}
           </div>
         )}
-      </CardContent>
+    </>
+  );
 
+  const dialogs = (
+    <>
       {/* Create/Edit Dialog */}
       <Dialog
         open={isFormOpen}
@@ -387,6 +397,35 @@ export function DependentsCard({ userId, className }: DependentsCardProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </>
+  );
+
+  // Embedded: render only the inner list + dialogs — the detail-page section
+  // provides the single card chrome + "Dependentes" title (the "Adicionar"
+  // header action is dropped).
+  if (embedded) {
+    return (
+      <div className={cn("flex flex-col", className)}>
+        {listBody}
+        {dialogs}
+      </div>
+    );
+  }
+
+  return (
+    <Card className={cn("flex flex-col", className)}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="flex items-center gap-2">
+          <IconUsers className="h-5 w-5 text-muted-foreground" />
+          Dependentes
+        </CardTitle>
+        <Button variant="outline" size="sm" onClick={openCreateDialog}>
+          <IconPlus className="h-4 w-4 mr-1" />
+          Adicionar
+        </Button>
+      </CardHeader>
+      <CardContent className="flex-1">{listBody}</CardContent>
+      {dialogs}
     </Card>
   );
 }

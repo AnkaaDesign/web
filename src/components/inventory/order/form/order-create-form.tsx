@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconReceipt, IconFileText, IconTruck, IconNotes, IconClipboardList, IconCreditCard, IconPercentage } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconReceipt, IconFileText, IconTruck, IconNotes, IconClipboardList, IconCreditCard, IconPercentage, IconCurrencyReal } from "@tabler/icons-react";
 import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useSuppliers, useCanViewPrices, useNextOrderNumber } from "../../../../hooks";
@@ -127,6 +127,7 @@ export const OrderCreateForm = () => {
       notes: notes || "",
       freight: freight ?? 0,
       discount: discount ?? 0,
+      totalOverride: null,
       items: [],
       paymentMethod: null,
       paymentPix: null,
@@ -533,6 +534,7 @@ export const OrderCreateForm = () => {
       const currentNotes = form.getValues("notes");
       const currentFreight = form.getValues("freight");
       const currentDiscount = form.getValues("discount");
+      const currentTotalOverride = form.getValues("totalOverride");
       const currentPaymentMethod = form.getValues("paymentMethod");
       const currentPaymentPix = form.getValues("paymentPix");
       const currentPaymentDueDays = form.getValues("paymentDueDays");
@@ -552,6 +554,8 @@ export const OrderCreateForm = () => {
         notes: currentNotes?.trim() || undefined,
         freight: Number(currentFreight) || 0,
         discount: Number(currentDiscount) || 0,
+        // Manual grand-total override (null/omitted = use the automatic computed total).
+        totalOverride: currentTotalOverride != null && Number.isFinite(Number(currentTotalOverride)) ? Number(currentTotalOverride) : null,
         items: itemsData,
         paymentMethod: currentPaymentMethod || undefined,
         // Persist what was displayed: fall back to the supplier's default pix when the user left it empty.
@@ -1336,6 +1340,29 @@ export const OrderCreateForm = () => {
                                   updateDiscount(sanitized);
                                 }}
                                 placeholder="0%"
+                                className="h-8 w-full border-neutral-500"
+                              />
+                            </div>
+                          </div>
+                          )}
+
+                          {/* Manual total override — leave blank to use the automatic total computed from items. */}
+                          {canViewPrices && (
+                          <div className="flex justify-between items-start bg-muted/50 rounded-lg px-4 py-[6px]">
+                            <span className="text-sm text-muted-foreground whitespace-nowrap mr-4 flex items-center gap-2 pt-1">
+                              <IconCurrencyReal className="h-4 w-4" />
+                              Valor Total (manual)
+                            </span>
+                            <div className="flex-1 max-w-[55%]">
+                              <Input
+                                type="currency"
+                                value={form.watch("totalOverride") ?? null}
+                                onChange={(value) => {
+                                  const n = typeof value === "number" ? value : value == null || value === "" ? null : parseFloat(value as string);
+                                  const next = n != null && Number.isFinite(n) && n >= 0 ? n : null;
+                                  form.setValue("totalOverride", next, { shouldDirty: true, shouldTouch: true });
+                                }}
+                                placeholder="Total automático"
                                 className="h-8 w-full border-neutral-500"
                               />
                             </div>

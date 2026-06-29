@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,19 @@ import { EmployeeLoanDialog } from "../personnel-department/payroll/employee-loa
 interface CollaboratorLoansCardProps {
   userId: string;
   className?: string;
+  /**
+   * When true, render ONLY the inner body (no outer `<Card>`, `<CardHeader>`,
+   * `<CardTitle>` or the "Registrar Empréstimo" header action). The
+   * surrounding detail-page section supplies the single card chrome + title.
+   * Default false → unchanged.
+   */
+  embedded?: boolean;
+  /**
+   * Reports how many empréstimos/adiantamentos this collaborator has so the
+   * parent can hide the whole section when there are none. `null` while loading,
+   * `0` when empty. Fires in BOTH embedded and standalone mode.
+   */
+  onCount?: (count: number | null) => void;
 }
 
 const toNumber = (value: number | string | { toNumber(): number } | null | undefined): number => {
@@ -40,7 +53,7 @@ const formatCompetence = (competence?: string | null): string => {
  * API auto-applies to every future folha (POST /discount/loan). Lists the
  * colaborador's loans and lets HR/ADMIN/Contabilidade register new ones.
  */
-export function CollaboratorLoansCard({ userId, className }: CollaboratorLoansCardProps) {
+export function CollaboratorLoansCard({ userId, className, embedded = false, onCount }: CollaboratorLoansCardProps) {
   const { user: currentUser } = useAuth();
   const privileges = currentUser?.sector?.privileges;
   const canRegister =
@@ -55,24 +68,16 @@ export function CollaboratorLoansCard({ userId, className }: CollaboratorLoansCa
     (d) => d.discountType === "LOAN" || d.discountType === "ADVANCE",
   );
 
+  // Surface the loan count so the parent can hide the section when empty.
+  useEffect(() => {
+    onCount?.(isLoading ? null : loanRows.length);
+  }, [isLoading, loanRows.length, onCount]);
+
   // Só exibe a seção quando há empréstimos/adiantamentos — oculta enquanto carrega e quando vazia.
   if (isLoading || loanRows.length === 0) return null;
 
-  return (
-    <Card className={className}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <CardTitle className="flex items-center gap-2">
-          <IconCreditCard className="h-5 w-5 text-muted-foreground" />
-          Empréstimos / Adiantamentos
-        </CardTitle>
-        {canRegister && (
-          <Button size="sm" onClick={() => setDialogOpen(true)}>
-            <IconPlus className="h-4 w-4 mr-2" />
-            Registrar Empréstimo
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent className="pt-0">
+  const body = (
+    <>
         {isLoading ? (
           <p className="text-sm text-muted-foreground py-4">Carregando...</p>
         ) : loanRows.length === 0 ? (
@@ -116,16 +121,45 @@ export function CollaboratorLoansCard({ userId, className }: CollaboratorLoansCa
             })}
           </div>
         )}
-      </CardContent>
+    </>
+  );
 
-      {canRegister && (
-        <EmployeeLoanDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          userId={userId}
-          onSaved={() => refetch()}
-        />
-      )}
+  const dialog = canRegister && (
+    <EmployeeLoanDialog
+      open={dialogOpen}
+      onOpenChange={setDialogOpen}
+      userId={userId}
+      onSaved={() => refetch()}
+    />
+  );
+
+  // Embedded: render only the inner body — the detail-page section provides the
+  // single card chrome + title (and the "Registrar Empréstimo" action is dropped).
+  if (embedded) {
+    return (
+      <div className={className}>
+        {body}
+        {dialog}
+      </div>
+    );
+  }
+
+  return (
+    <Card className={className}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardTitle className="flex items-center gap-2">
+          <IconCreditCard className="h-5 w-5 text-muted-foreground" />
+          Empréstimos / Adiantamentos
+        </CardTitle>
+        {canRegister && (
+          <Button size="sm" onClick={() => setDialogOpen(true)}>
+            <IconPlus className="h-4 w-4 mr-2" />
+            Registrar Empréstimo
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="pt-0">{body}</CardContent>
+      {dialog}
     </Card>
   );
 }

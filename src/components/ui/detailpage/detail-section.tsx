@@ -1,5 +1,4 @@
-import { memo, useRef } from "react";
-import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { InlineEditField } from "./inline-edit-field";
@@ -10,8 +9,6 @@ import type { DetailFieldDef } from "./detail-page-types";
 interface DetailSectionProps<TData> {
   section: ResolvedSection<TData>;
   row: TData;
-  /** Persist a user-dragged content height (for resizable sections). */
-  onSetHeight?: (id: string, px: number) => void;
   /** Hide a field entirely when it has no value (rather than showing a "—" row). */
   hideEmptyFields?: boolean;
 }
@@ -23,58 +20,41 @@ function fieldIsEmpty<TData>(f: DetailFieldDef<TData>, row: TData): boolean {
   return v == null || v === "" || (Array.isArray(v) && v.length === 0);
 }
 
-const MIN_SECTION_HEIGHT = 140;
+/** Default cap (px) for a `scroll: true` section's internal scroll area. */
+const DEFAULT_SCROLL_HEIGHT = 440;
 
-/** A fixed-height content box with a drag handle so the user can resize embedded content (tables). */
-function ResizableContent({ id, height, onSetHeight, children }: { id: string; height: number; onSetHeight?: (id: string, px: number) => void; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const start = useRef<{ y: number; h: number } | null>(null);
-
-  const onPointerDown = (e: ReactPointerEvent) => {
-    if (!ref.current) return;
-    start.current = { y: e.clientY, h: ref.current.offsetHeight };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-  const onPointerMove = (e: ReactPointerEvent) => {
-    // Mutate the DOM directly during the drag so the embedded table doesn't re-render each frame.
-    if (!start.current || !ref.current) return;
-    ref.current.style.height = `${Math.max(MIN_SECTION_HEIGHT, start.current.h + (e.clientY - start.current.y))}px`;
-  };
-  const onPointerUp = () => {
-    if (!start.current || !ref.current) return;
-    start.current = null;
-    onSetHeight?.(id, ref.current.offsetHeight);
-  };
-
-  return (
-    <div>
-      <div ref={ref} style={{ height }} className="min-h-0 overflow-hidden">
-        {children}
-      </div>
-      <div
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        title="Arraste para redimensionar"
-        className="mt-1 flex h-3 cursor-ns-resize items-center justify-center"
-      >
-        <span className="h-1 w-10 rounded-full bg-border transition-colors hover:bg-muted-foreground/40" />
-      </div>
-    </div>
-  );
-}
-
-function DetailSectionInner<TData>({ section, row, onSetHeight, hideEmptyFields }: DetailSectionProps<TData>) {
-  const { def, height } = section;
+function DetailSectionInner<TData>({ section, row, hideEmptyFields }: DetailSectionProps<TData>) {
+  const { def } = section;
   const fields = hideEmptyFields ? section.fields.filter((f) => !fieldIsEmpty(f, row)) : section.fields;
   const { canEdit, isAllowed } = useFieldGate();
   const sectionEditable = isAllowed(def.editablePrivilege);
   const Icon = def.icon;
 
   const rendered = def.render ? def.render(row) : null;
+
+  // "Only show a section if it has info": when a render-only section's component returns null/false
+  // (the embedded cards self-hide when empty — benefits, dependents, loans, position history, etc.)
+  // AND there are no visible fields, render NOTHING (no floating title, no empty card). Required
+  // sections always render.
+  if (!def.required && fields.length === 0 && (rendered == null || rendered === false)) {
+    return null;
+  }
+
+  // `scroll: true` → the content sizes to itself up to a cap: `overflow-y-auto` + `maxHeight` means
+  // short content → short box (NO empty space, the card does NOT inflate to a taller neighbour), while
+  // long content caps at `scrollHeight` and scrolls internally. NO `flex-1`/`min-h-0`/`minHeight` — the
+  // scroll section is NATURAL bounded height (the card also drops `grow`/`flex-1`, see below).
+  // `scroll: false` (default) → natural height; the card grows to show everything and stretches in its band.
   const renderBlock = rendered
-    ? def.resizableHeight
-      ? <ResizableContent id={def.id} height={height ?? def.defaultHeight ?? 320} onSetHeight={onSetHeight}>{rendered}</ResizableContent>
+    ? def.scroll
+      ? (
+        <div
+          className={cn("overflow-y-auto", fields.length ? "mt-3" : "")}
+          style={{ maxHeight: def.scrollHeight ?? DEFAULT_SCROLL_HEIGHT }}
+        >
+          {rendered}
+        </div>
+      )
       : <div className={cn(fields.length ? "mt-3" : "")}>{rendered}</div>
     : null;
 
@@ -94,7 +74,7 @@ function DetailSectionInner<TData>({ section, row, onSetHeight, hideEmptyFields 
   // "plain": no card chrome — content brings its own container (e.g. an embedded table).
   if (def.variant === "plain") {
     return (
-      <section className="flex min-w-0 grow flex-col gap-3 animate-in fade-in-50">
+      <section className="flex min-w-0 flex-col gap-3 animate-in fade-in-50">
         <div className="flex min-w-0 items-center gap-2 px-1">
           {Icon ? <Icon className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}
           <h3 className="truncate text-base font-medium leading-tight tracking-tight text-foreground">
@@ -107,28 +87,41 @@ function DetailSectionInner<TData>({ section, row, onSetHeight, hideEmptyFields 
             )}
           </h3>
         </div>
-        <div className="min-h-0 flex-1">{body}</div>
+        <div className="flex min-h-0 flex-col">{body}</div>
       </section>
     );
   }
 
-  // `grow` makes the card fill its band cell (it's a flex child of the column) → both cells of a
-  // band reach equal height. No-op outside a flex parent (full-width band / mobile) → natural there.
+  // Non-scroll cards STRETCH to equal height in their band: `grow` makes the card fill its column and
+  // `CardContent flex-1` lets it span the matched height (the band row is `items-stretch`). Content stays
+  // TOP-aligned (the body is normal block flow inside CardContent — no `justify-between`), so a short
+  // card shows its content at the top with any extra space as plain bottom padding (a clean grid look),
+  // never a button pinned to the bottom with a mid-card gap. Outside a flex band (full-width / mobile)
+  // `grow`/`flex-1` are no-ops → natural height.
+  //
+  // SCROLL cards do the OPPOSITE: NO `grow`, NO `CardContent flex-1` → the card is NATURAL bounded height
+  // and never inflates to match a taller neighbour. Short content → short card (no empty bottom space);
+  // long content caps + scrolls inside the bounded `renderBlock` box above.
+  const isScroll = !!def.scroll;
   return (
-    <Card className="flex min-w-0 grow flex-col animate-in fade-in-50">
+    <Card className={cn("flex min-w-0 flex-col animate-in fade-in-50", !isScroll && "grow")}>
       <CardHeader>
-        <CardTitle className="flex min-w-0 items-center gap-2">
-          {Icon ? <Icon className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}
-          {def.onTitleClick ? (
-            <button type="button" onClick={() => def.onTitleClick!(row)} className="truncate text-left hover:underline">
-              {def.label}
-            </button>
-          ) : (
-            <span className="truncate">{def.label}</span>
-          )}
-        </CardTitle>
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <CardTitle className="flex min-w-0 items-center gap-2">
+            {Icon ? <Icon className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}
+            {def.onTitleClick ? (
+              <button type="button" onClick={() => def.onTitleClick!(row)} className="truncate text-left hover:underline">
+                {def.label}
+              </button>
+            ) : (
+              <span className="truncate">{def.label}</span>
+            )}
+          </CardTitle>
+          {/* Section header actions (counts / download-all / open buttons) — aligned right of the title. */}
+          {def.headerActions ? <div className="flex shrink-0 items-center gap-1.5">{def.headerActions(row)}</div> : null}
+        </div>
       </CardHeader>
-      <CardContent className="flex-1 pt-0">{body}</CardContent>
+      <CardContent className={cn("flex flex-col pt-0", !isScroll && "flex-1")}>{body}</CardContent>
     </Card>
   );
 }

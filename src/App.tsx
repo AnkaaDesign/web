@@ -426,8 +426,9 @@ const ProductionTasksHistory = lazy(() => import("@/pages/production/history").t
 const ProductionTasksBatchEdit = lazy(() => import("@/pages/production/schedule/batch-edit"));
 const ProductionTasksCreate = lazy(() => import("@/pages/production/schedule/create"));
 const ProductionTasksEdit = lazy(() => import("@/pages/production/schedule/edit/[id]").then((module) => ({ default: module.TaskEditPage })));
-const ProductionTasksDetails = lazy(() => import("@/pages/production/schedule/details/[id]").then((module) => ({ default: module.TaskDetailsPage })));
-const ProductionPreparationDetails = lazy(() => import("@/components/production/task/detail-v2/task-detail-page").then((module) => ({ default: module.TaskDetailPage })));
+// Unified task-detail page — serves the Agenda, Cronograma and Histórico detail routes (it derives the
+// section from the URL for source-aware breadcrumb / edit / prev-next).
+const ProductionTaskDetail = lazy(() => import("@/components/production/task/detail/task-detail-page").then((module) => ({ default: module.TaskDetailPage })));
 // ProductionTaskQuote removed - migrated to FinancialBudgetDetail
 const ProductionPreparation = lazy(() => import("@/pages/production/preparation").then((module) => ({ default: module.PreparationPage })));
 const ProductionGarages = lazy(() => import("@/pages/production/barracoes").then((module) => ({ default: module.GaragesPage })));
@@ -767,7 +768,7 @@ function App() {
                   path={routes.production.schedule.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <ProductionTasksDetails />
+                      <ProductionTaskDetail />
                     </Suspense>
                   }
                 />
@@ -785,7 +786,7 @@ function App() {
                   path={routes.production.preparation.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <ProductionPreparationDetails />
+                      <ProductionTaskDetail />
                     </Suspense>
                   }
                 />
@@ -802,7 +803,7 @@ function App() {
                   path={routes.production.history.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <ProductionTasksDetails />
+                      <ProductionTaskDetail />
                     </Suspense>
                   }
                 />

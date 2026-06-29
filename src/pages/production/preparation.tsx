@@ -1,12 +1,12 @@
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES } from "@/constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { TaskPreparationPage } from "@/components/production/task/preparation-v2/task-prep-page";
+import { TaskPreparationPage } from "@/components/production/task/preparation/task-prep-page";
 
 /**
  * Task preparation ("Agenda") — reimplemented on the generic DataTable base: two stacked tables
  * (Em Produção / Em Preparação), name-cluster expand/collapse, a single trimmed query, and the
- * top-table-flows / bottom-table-body-scrolls layout. See `preparation-v2/`.
+ * top-table-flows / bottom-table-body-scrolls layout. See `components/production/task/preparation/`.
  */
 export const PreparationPage = () => {
   usePageTracker({ title: "Agenda de Tarefas", icon: "clipboard-list" });

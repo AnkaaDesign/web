@@ -14,6 +14,12 @@ interface RelatedActivitiesCardProps {
   user: User;
   className?: string;
   maxHeight?: string;
+  /**
+   * When true, render ONLY the inner stats + activity timeline body (no outer
+   * `<Card>`, `<CardHeader>` or `<CardTitle>`). The surrounding detail-page
+   * section supplies the single card chrome + title. Default false → unchanged.
+   */
+  embedded?: boolean;
 }
 
 const ACTIVITY_TYPE_COLORS: Record<string, { bg: string; icon: string; text: string }> = {
@@ -32,7 +38,7 @@ const ACTIVITY_TYPE_COLORS: Record<string, { bg: string; icon: string; text: str
   [ACTIVITY_REASON.OTHER]: { bg: "bg-muted/50", icon: "text-muted-foreground", text: "text-foreground" },
 };
 
-export function RelatedActivitiesCard({ user, className, maxHeight = "500px" }: RelatedActivitiesCardProps) {
+export function RelatedActivitiesCard({ user, className, maxHeight = "500px", embedded = false }: RelatedActivitiesCardProps) {
   const activities = user.activities || [];
 
   // Sort activities by date (newest first) and filter to current month
@@ -88,16 +94,8 @@ export function RelatedActivitiesCard({ user, className, maxHeight = "500px" }: 
     return null;
   }
 
-  return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
-      <CardHeader className="pb-4 flex-shrink-0">
-        <CardTitle className="flex items-center gap-2">
-          <IconClock className="h-5 w-5 text-muted-foreground" />
-          Histórico de Atividades - {format(startOfMonth(new Date()), "MMMM 'de' yyyy", { locale: ptBR })}
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent className="pt-0 flex-grow flex flex-col min-h-0">
+  const body = (
+    <>
         {statistics.totalMovements > 0 && (
           <div className="grid grid-cols-3 gap-3 mb-6">
             <div className="bg-card-nested rounded-lg p-4 border border-border">
@@ -227,7 +225,25 @@ export function RelatedActivitiesCard({ user, className, maxHeight = "500px" }: 
             </div>
           </ScrollArea>
         )}
-      </CardContent>
+    </>
+  );
+
+  // Embedded: render only the inner stats + timeline body — the detail-page
+  // section provides the single card chrome + "Histórico de Atividades" title.
+  if (embedded) {
+    return <div className={cn("flex flex-col min-h-0 h-full", className)}>{body}</div>;
+  }
+
+  return (
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
+      <CardHeader className="pb-4 flex-shrink-0">
+        <CardTitle className="flex items-center gap-2">
+          <IconClock className="h-5 w-5 text-muted-foreground" />
+          Histórico de Atividades - {format(startOfMonth(new Date()), "MMMM 'de' yyyy", { locale: ptBR })}
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent className="pt-0 flex-grow flex flex-col min-h-0">{body}</CardContent>
     </Card>
   );
 }

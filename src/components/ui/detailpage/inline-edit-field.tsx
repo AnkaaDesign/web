@@ -15,15 +15,23 @@ import { enumOptions, enumTriggerClass, renderFieldValue } from "./inline-widget
 // Helpers
 // ---------------------------------------------------------------------------
 
-const TEXT_INPUT_TYPE: Partial<Record<FieldDataType, "text" | "number" | "integer" | "decimal" | "currency" | "percentage">> = {
+// dataType → the `<Input type=...>` the inline TextEditor renders. The Brazilian document/contact
+// types (cpf/cnpj/phone/pis/cep) map 1:1 onto the Input's own masked types — the Input formats while
+// typing and emits the RAW digits via onChange, so the committed value stays the unmasked digits.
+const TEXT_INPUT_TYPE: Partial<Record<FieldDataType, "text" | "number" | "integer" | "decimal" | "currency" | "percentage" | "cpf" | "cnpj" | "phone" | "pis" | "cep">> = {
   text: "text",
   number: "number",
   integer: "integer",
   decimal: "decimal",
   money: "currency",
   percentage: "percentage",
+  cpf: "cpf",
+  cnpj: "cnpj",
+  phone: "phone",
+  pis: "pis",
+  cep: "cep",
 };
-const TEXT_LIKE = new Set<FieldDataType>(["text", "number", "integer", "decimal", "money", "percentage"]);
+const TEXT_LIKE = new Set<FieldDataType>(["text", "number", "integer", "decimal", "money", "percentage", "cpf", "cnpj", "phone", "pis", "cep"]);
 
 // A click counts as "outside the editor" only when it is neither inside the editor container
 // NOR inside a popover/calendar portal opened by it (combobox list, date picker). Capture-phase

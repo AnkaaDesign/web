@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconCalendar, IconReceipt, IconFileText, IconNotes, IconClipboardList, IconCreditCard, IconPercentage } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconCalendar, IconReceipt, IconFileText, IconNotes, IconClipboardList, IconCreditCard, IconPercentage, IconCurrencyReal } from "@tabler/icons-react";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import type { OrderTemporaryItem } from "@/hooks/inventory/use-order-form-url-state";
@@ -303,6 +303,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     notes: notes || order.notes || "",
     freight: freight ?? order.freight ?? 0,
     discount: discount ?? order.discount ?? 0,
+    // Manual grand-total override (null = use the automatic computed total).
+    totalOverride: order.totalOverride ?? null,
     // Items list is computed from URL state at submit time.
     items: [],
     // Payment fields
@@ -547,6 +549,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   const itemCount = selectionCount + (temporaryItems || []).filter(t => t.temporaryItemDescription.trim() !== "").length;
   const watchedFreight = Number(form.watch("freight")) || 0;
   const watchedDiscount = Number(form.watch("discount")) || 0;
+  const watchedTotalOverride = form.watch("totalOverride");
   const discountAmount = watchedDiscount > 0 ? goodsSubtotal * (watchedDiscount / 100) : 0;
   const grandTotal = totalPrice + watchedFreight - discountAmount;
 
@@ -594,6 +597,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     const notesChanged = (localNotes?.trim() || "") !== (order.notes?.trim() || "");
     const freightChanged = Number(watchedFreight || 0) !== Number(order.freight || 0);
     const discountChanged = Number(watchedDiscount || 0) !== Number(order.discount || 0);
+    // Normalize both sides: a finite ≥0 number or null. So "" (cleared) vs null is no change.
+    const normOverride = (x: unknown) => (x != null && Number.isFinite(Number(x)) && Number(x) >= 0 ? Number(x) : null);
+    const totalOverrideChanged = normOverride(watchedTotalOverride) !== normOverride(order.totalOverride);
 
     // Payment fields
     const paymentMethodChanged = (watchedPaymentMethod || null) !== (order.paymentMethod || null);
@@ -643,11 +649,11 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     });
 
     return (
-      descriptionChanged || statusChanged || paymentStatusChanged || supplierChanged || forecastChanged || notesChanged || freightChanged || discountChanged ||
+      descriptionChanged || statusChanged || paymentStatusChanged || supplierChanged || forecastChanged || notesChanged || freightChanged || discountChanged || totalOverrideChanged ||
       inventoryItemsChanged || inventoryDetailsChanged || tempCountChanged || tempContentChanged ||
       hasFileChanges || paymentMethodChanged || paymentPixChanged || paymentDueDaysChanged || paymentFirstDueDateChanged || installmentCountChanged || paymentResponsibleChanged
     );
-  }, [description, watchedStatus, selectedPaymentStatus, supplierId, forecast, localNotes, watchedFreight, watchedDiscount, selectedItems, quantities, prices, icmses, ipis, temporaryItems, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedPaymentFirstDueDate, watchedInstallmentCount, watchedPaymentResponsibleId]);
+  }, [description, watchedStatus, selectedPaymentStatus, supplierId, forecast, localNotes, watchedFreight, watchedDiscount, watchedTotalOverride, selectedItems, quantities, prices, icmses, ipis, temporaryItems, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedPaymentFirstDueDate, watchedInstallmentCount, watchedPaymentResponsibleId]);
 
   // Stage validation
   const validateCurrentStep = useCallback((): boolean => {
@@ -748,6 +754,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const currentPaymentResponsibleId = form.getValues("paymentResponsibleId");
       const currentFreight = Number(form.getValues("freight")) || 0;
       const currentDiscount = Number(form.getValues("discount")) || 0;
+      const rawTotalOverride = form.getValues("totalOverride");
+      // Manual grand-total override: a finite ≥0 number, or null to clear (revert to the computed total).
+      const currentTotalOverride =
+        rawTotalOverride != null && Number.isFinite(Number(rawTotalOverride)) && Number(rawTotalOverride) >= 0 ? Number(rawTotalOverride) : null;
       const currentStatus = form.getValues("status");
 
       // The Pix key is the only thing that configures a PIX payment. If the user clears it,
@@ -771,6 +781,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         notes: notes?.trim() || undefined,
         freight: currentFreight,
         discount: currentDiscount,
+        // null clears any override (back to the automatic computed total); a number sets it.
+        totalOverride: currentTotalOverride,
         items,
         paymentMethod: resolvedPaymentMethod,
         // Persist exactly what the user entered. An empty/whitespace field clears the key
@@ -1511,6 +1523,29 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                     updateDiscount(sanitized);
                                   }}
                                   placeholder="0%"
+                                  className="h-8 w-full border-neutral-500"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Manual total override — leave blank to use the automatic total computed from items. */}
+                          {canViewPrices && (
+                            <div className="flex justify-between items-start bg-muted/50 rounded-lg px-4 py-[6px]">
+                              <span className="text-sm text-muted-foreground whitespace-nowrap mr-4 flex items-center gap-2 pt-1">
+                                <IconCurrencyReal className="h-4 w-4" />
+                                Valor Total (manual)
+                              </span>
+                              <div className="flex-1 max-w-[55%]">
+                                <Input
+                                  type="currency"
+                                  value={form.watch("totalOverride") ?? null}
+                                  onChange={(value) => {
+                                    const n = typeof value === "number" ? value : value == null || value === "" ? null : parseFloat(value as string);
+                                    const next = n != null && Number.isFinite(n) && n >= 0 ? n : null;
+                                    form.setValue("totalOverride", next, { shouldDirty: true, shouldTouch: true });
+                                  }}
+                                  placeholder="Total automático"
                                   className="h-8 w-full border-neutral-500"
                                 />
                               </div>

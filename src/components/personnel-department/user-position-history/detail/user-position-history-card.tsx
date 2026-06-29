@@ -13,6 +13,8 @@ import { getReasonBadgeVariant, PositionChangeSummary } from "../list/user-posit
 import type { UserPositionHistory } from "../../../../types/user-position-history";
 
 interface UserPositionHistoryCardProps {
+  /** Render only the inner body (no Card/header/title) — for embedding inside a detail-page card. */
+  embedded?: boolean;
   userId: string;
   className?: string;
   /** Maximum height of the scrollable timeline area. */
@@ -53,7 +55,7 @@ function reasonIconNode(reason: string) {
  * timeline where each promotion/adjustment is a nested card with a reason-coloured
  * icon node on the left rail. The open row (endedAt = null) is the current cargo.
  */
-export function UserPositionHistoryCard({ userId, className, maxHeight = "500px", onCount }: UserPositionHistoryCardProps) {
+export function UserPositionHistoryCard({ userId, className, maxHeight = "500px", onCount, embedded = false }: UserPositionHistoryCardProps) {
   const {
     data: response,
     isLoading,
@@ -97,19 +99,9 @@ export function UserPositionHistoryCard({ userId, className, maxHeight = "500px"
     });
   }, [records]);
 
-  return (
-    <Card
-      className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)}
-      style={maxHeight ? { maxHeight, height: maxHeight } : undefined}
-    >
-      <CardHeader className="pb-4 flex-shrink-0">
-        <CardTitle className="flex items-center gap-2">
-          <IconTimeline className="h-5 w-5 text-muted-foreground" />
-          Histórico de Cargos
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 flex-1 flex flex-col min-h-0 overflow-hidden">
-        {isLoading ? (
+  const body = (
+    <>
+      {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-16 w-full rounded-xl" />
@@ -208,8 +200,26 @@ export function UserPositionHistoryCard({ userId, className, maxHeight = "500px"
               })}
             </div>
           </ScrollArea>
-        )}
-      </CardContent>
+      )}
+    </>
+  );
+
+  if (embedded) {
+    return <div className={cn("flex flex-col min-h-0 h-full overflow-hidden", className)}>{body}</div>;
+  }
+
+  return (
+    <Card
+      className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)}
+      style={maxHeight ? { maxHeight, height: maxHeight } : undefined}
+    >
+      <CardHeader className="pb-4 flex-shrink-0">
+        <CardTitle className="flex items-center gap-2">
+          <IconTimeline className="h-5 w-5 text-muted-foreground" />
+          Histórico de Cargos
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0 flex-1 flex flex-col min-h-0 overflow-hidden">{body}</CardContent>
     </Card>
   );
 }

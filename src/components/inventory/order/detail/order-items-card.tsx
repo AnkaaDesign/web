@@ -51,6 +51,11 @@ interface OrderItemsCardProps {
   className?: string;
   onOrderUpdate?: () => void;
   orderActions?: OrderActionButton[];
+  // When true the component renders ONLY its inner body (stat boxes + toolbar + items
+  // table) with NO outer <Card> and NO "Itens do Pedido" <CardHeader>/title. Used when
+  // the card is embedded inside a detail-page section that already supplies the single
+  // card chrome + title. Default false keeps every other call site unchanged.
+  embedded?: boolean;
 }
 
 interface ItemChanges {
@@ -64,7 +69,7 @@ interface SelectedItems {
   [itemId: string]: boolean;
 }
 
-export function OrderItemsCard({ order, className, onOrderUpdate, orderActions = [] }: OrderItemsCardProps) {
+export function OrderItemsCard({ order, className, onOrderUpdate, orderActions = [], embedded = false }: OrderItemsCardProps) {
   const canViewPrices = useCanViewPrices();
   const { isWarehouse } = usePrivileges();
   const { batchUpdate } = useOrderItemBatchMutations({
@@ -366,31 +371,26 @@ export function OrderItemsCard({ order, className, onOrderUpdate, orderActions =
 
 
   if (!order.items || order.items.length === 0) {
+    const emptyBody = (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <IconPackage className="h-12 w-12 text-muted-foreground/50 mb-4" />
+        <p className="text-muted-foreground">Nenhum item encontrado</p>
+      </div>
+    );
+
+    if (embedded) {
+      return emptyBody;
+    }
+
     return (
       <Card className={cn("shadow-sm", className)}>
-        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-          <IconPackage className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground">Nenhum item encontrado</p>
-        </CardContent>
+        <CardContent className="p-0">{emptyBody}</CardContent>
       </Card>
     );
   }
 
-  return (
-    <Card className={cn("shadow-sm flex flex-col", className)}>
-      <CardHeader className="pb-6">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-          <IconPackage className="h-5 w-5 text-muted-foreground" />
-          Itens do Pedido
-        </CardTitle>
-          <Badge variant="secondary" className="text-sm">
-            {summary.itemCount} {summary.itemCount === 1 ? "item" : "itens"}
-          </Badge>
-        </div>
-      </CardHeader>
-
-      <CardContent className="pt-0 flex-1 space-y-6 pb-24">
+  const bodyContent = (
+    <>
         {/* Summary Statistics */}
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <div className="bg-muted/50 rounded-lg px-4 py-3">
@@ -688,7 +688,30 @@ export function OrderItemsCard({ order, className, onOrderUpdate, orderActions =
             </div>
           </div>
         )}
-      </CardContent>
+    </>
+  );
+
+  // Embedded: render the bare body only — the detail-page section card supplies the
+  // single <Card> + "Itens do Pedido" title, so we must NOT render our own.
+  if (embedded) {
+    return <div className={cn("space-y-6", className)}>{bodyContent}</div>;
+  }
+
+  return (
+    <Card className={cn("shadow-sm flex flex-col", className)}>
+      <CardHeader className="pb-6">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <IconPackage className="h-5 w-5 text-muted-foreground" />
+            Itens do Pedido
+          </CardTitle>
+          <Badge variant="secondary" className="text-sm">
+            {summary.itemCount} {summary.itemCount === 1 ? "item" : "itens"}
+          </Badge>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pt-0 flex-1 space-y-6 pb-24">{bodyContent}</CardContent>
     </Card>
   );
 }

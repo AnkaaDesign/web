@@ -270,15 +270,16 @@ export function calculateUserStats(users: User[]) {
  * Check if user is a team leader (leads a sector)
  * Note: This checks the ledSector relation (Sector.leaderId points to this user)
  */
-export function isTeamLeader(user: PrivilegeCheckUser): boolean {
-  return Boolean(user.ledSector?.id);
+export function isTeamLeader(user: PrivilegeCheckUser | null | undefined): boolean {
+  // Null-safe: callers frequently pass a still-loading (undefined) current user.
+  return Boolean(user?.ledSector?.id);
 }
 
 /**
  * Get the sector ID that the user leads (if any)
  */
-export function getLedSectorId(user: User): string | null {
-  return user.ledSector?.id || null;
+export function getLedSectorId(user: User | null | undefined): string | null {
+  return user?.ledSector?.id || null;
 }
 
 /**

@@ -77,8 +77,6 @@ export interface ResolvedSection<TData> {
   span: 1 | 2;
   /** Explicit column for a half-width section (1 = left, 2 = right). Undefined = auto-balance. */
   column?: 1 | 2;
-  /** Resolved content height (px) for a resizable section. */
-  height?: number;
 }
 
 export interface ManagerSection {
@@ -118,8 +116,6 @@ export interface UseDetailLayoutResult<TData> {
   setSectionWidth: (id: string, width: 1 | 2) => void;
   /** Pin a half-width section to a column (1 | 2), or null to auto-balance. */
   setSectionColumn: (id: string, column: 1 | 2 | null) => void;
-  /** Persist a user-dragged content height (px) for a resizable section. */
-  setSectionHeight: (id: string, px: number) => void;
   setSectionFieldOrder: (sectionId: string, order: string[]) => void;
   /** Show/hide every (non-required) section at once. */
   setAllSections: (visible: boolean) => void;
@@ -188,7 +184,6 @@ export function useDetailLayout<TData>(params: UseDetailLayoutParams<TData>): Us
   );
   const [widths, setWidths] = useState<Record<string, 1 | 2>>(() => ({ ...(localConfig?.widths ?? sectorDefault?.widths ?? {}) }));
   const [columnsMap, setColumnsMap] = useState<Record<string, 1 | 2>>(() => ({ ...(localConfig?.columns ?? sectorDefault?.columns ?? {}) }));
-  const [heightsMap, setHeightsMap] = useState<Record<string, number>>(() => ({ ...(localConfig?.heights ?? sectorDefault?.heights ?? {}) }));
   const [fieldOrder, setFieldOrder] = useState<Record<string, string[]>>(() =>
     mergeFieldOrder(localConfig?.fieldOrder ?? sectorDefault?.fieldOrder, available),
   );
@@ -230,7 +225,6 @@ export function useDetailLayout<TData>(params: UseDetailLayoutParams<TData>): Us
       setFieldVisibility(mergeVisibility(fieldIds, defaultFieldVis, cfg.fieldVisibility));
       setWidths({ ...(cfg.widths ?? {}) });
       setColumnsMap({ ...(cfg.columns ?? {}) });
-      setHeightsMap({ ...(cfg.heights ?? {}) });
       setFieldOrder(mergeFieldOrder(cfg.fieldOrder, available));
     }
     setReady(true);
@@ -251,17 +245,16 @@ export function useDetailLayout<TData>(params: UseDetailLayoutParams<TData>): Us
     if (sectorDefault.fieldOrder) setFieldOrder(mergeFieldOrder(sectorDefault.fieldOrder, available));
     if (sectorDefault.widths) setWidths({ ...sectorDefault.widths });
     if (sectorDefault.columns) setColumnsMap({ ...sectorDefault.columns });
-    if (sectorDefault.heights) setHeightsMap({ ...sectorDefault.heights });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, ready, sectorDefault, localConfig, localDirty, available, sectionIds, fieldIds, defaultSectionVis, defaultFieldVis]);
 
   // 5) Persist (debounced inside the hook) once the server baseline is known.
   useEffect(() => {
     if (!persist || !ready) return;
-    prefs.save({ sectionOrder, sectionVisibility, fieldVisibility, fieldOrder, widths, columns: columnsMap, heights: heightsMap });
+    prefs.save({ sectionOrder, sectionVisibility, fieldVisibility, fieldOrder, widths, columns: columnsMap });
     // prefs.save is stable; intentionally excluded to avoid resave loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [persist, ready, sectionOrder, sectionVisibility, fieldVisibility, fieldOrder, widths, columnsMap, heightsMap]);
+  }, [persist, ready, sectionOrder, sectionVisibility, fieldVisibility, fieldOrder, widths, columnsMap]);
 
   // --- Mutators (every one marks userInteracted so server load won't clobber) ---
   const toggleSection = useCallback(
@@ -297,10 +290,6 @@ export function useDetailLayout<TData>(params: UseDetailLayoutParams<TData>): Us
       return next;
     });
   }, []);
-  const setSectionHeight = useCallback((id: string, px: number) => {
-    userInteracted.current = true;
-    setHeightsMap((h) => ({ ...h, [id]: px }));
-  }, []);
   const setSectionFieldOrder = useCallback((sectionId: string, order: string[]) => {
     userInteracted.current = true;
     setFieldOrder((prev) => ({ ...prev, [sectionId]: order }));
@@ -326,7 +315,6 @@ export function useDetailLayout<TData>(params: UseDetailLayoutParams<TData>): Us
     setFieldVisibility(sectorDefault?.fieldVisibility ? mergeVisibility(fieldIds, defaultFieldVis, sectorDefault.fieldVisibility) : defaultFieldVis);
     setWidths({ ...(sectorDefault?.widths ?? {}) });
     setColumnsMap({ ...(sectorDefault?.columns ?? {}) });
-    setHeightsMap({ ...(sectorDefault?.heights ?? {}) });
     setFieldOrder(sectorDefault?.fieldOrder ? mergeFieldOrder(sectorDefault.fieldOrder, available) : defaultFieldOrder);
     prefs.clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -348,9 +336,8 @@ export function useDetailLayout<TData>(params: UseDetailLayoutParams<TData>): Us
           fields: orderFields(s.id, s.fields.filter((f) => fieldVisibility[f.id] !== false)),
           span: effectiveSpan(s.id),
           column: columnsMap[s.id],
-          height: heightsMap[s.id] ?? s.defaultHeight,
         })),
-    [available, sectionOrder, sectionVisibility, fieldVisibility, effectiveSpan, orderFields, columnsMap, heightsMap],
+    [available, sectionOrder, sectionVisibility, fieldVisibility, effectiveSpan, orderFields, columnsMap],
   );
 
   const managerSections = useMemo<ManagerSection[]>(
@@ -384,7 +371,6 @@ export function useDetailLayout<TData>(params: UseDetailLayoutParams<TData>): Us
     toggleField,
     setSectionWidth,
     setSectionColumn,
-    setSectionHeight,
     setSectionFieldOrder,
     setAllSections,
     resetLayout,

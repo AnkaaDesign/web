@@ -10,7 +10,7 @@
 // Autogateado: renderiza somente para ACCOUNTING / HUMAN_RESOURCES / ADMIN
 // (mesmo @Roles dos endpoints de admissão).
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconFileText, IconLoader2, IconUpload } from "@tabler/icons-react";
 
 import { cn } from "@/lib/utils";
@@ -51,6 +51,19 @@ const STATUS_OPTIONS = Object.entries(ADMISSION_DOCUMENT_STATUS_LABELS).map(([va
 interface UserDocumentationCardProps {
   userId: string;
   className?: string;
+  /**
+   * When true, render ONLY the inner body (no outer `<Card>`, `<CardHeader>`
+   * or `<CardTitle>`). The surrounding detail-page section supplies the single
+   * card chrome + "Documentação" title. Default false → unchanged.
+   */
+  embedded?: boolean;
+  /**
+   * Reports how many admission documents this collaborator has so the parent can
+   * hide the whole section when there are none. `null` while loading (or before
+   * access is resolved), `0` when empty / not viewable. Fires in BOTH embedded
+   * and standalone mode.
+   */
+  onCount?: (count: number | null) => void;
 }
 
 interface DocumentationRowProps {
@@ -143,7 +156,7 @@ function DocumentationRow({ userId, document, canEdit }: DocumentationRowProps) 
   );
 }
 
-export function UserDocumentationCard({ userId, className }: UserDocumentationCardProps) {
+export function UserDocumentationCard({ userId, className, embedded = false, onCount }: UserDocumentationCardProps) {
   const { hasAnyPrivilegeAccess } = usePrivileges();
   const canView = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]);
 
@@ -153,16 +166,49 @@ export function UserDocumentationCard({ userId, className }: UserDocumentationCa
     { enabled: canView },
   );
 
-  // Same gate as the admission endpoints (@Roles ACCOUNTING/HR/ADMIN)
-  if (!canView) return null;
-
   const admission = (data?.data ?? null) as Admission | null;
   const documents = admission?.documents || [];
+
+  // Surface the document count so the parent can hide the section when empty.
+  useEffect(() => {
+    if (!canView) {
+      onCount?.(0);
+      return;
+    }
+    onCount?.(isLoading ? null : documents.length);
+  }, [canView, isLoading, documents.length, onCount]);
+
+  // Same gate as the admission endpoints (@Roles ACCOUNTING/HR/ADMIN)
+  if (!canView) return null;
 
   // Documentos seguem a pessoa: o card só aparece quando o colaborador realmente
   // possui documentos. Prestadores (terceirizado/PJ) e cadastros sem documentação
   // simplesmente não exibem o card.
   if (!isLoading && documents.length === 0) return null;
+
+  const body = (
+    <>
+      {isLoading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      ) : (
+        documents.map((document) => (
+          // Documents stay editable even after the admission completes —
+          // expiring copies (e.g. CNH) can be replaced at any time.
+          <DocumentationRow key={document.id} userId={userId} document={document} canEdit />
+        ))
+      )}
+    </>
+  );
+
+  // Embedded: render only the inner body — the detail-page section provides the
+  // single card chrome + "Documentação" title.
+  if (embedded) {
+    return <div className={cn("flex-1 space-y-3", className)}>{body}</div>;
+  }
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
@@ -179,21 +225,7 @@ export function UserDocumentationCard({ userId, className }: UserDocumentationCa
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 space-y-3">
-        {isLoading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </div>
-        ) : (
-          documents.map((document) => (
-            // Documents stay editable even after the admission completes —
-            // expiring copies (e.g. CNH) can be replaced at any time.
-            <DocumentationRow key={document.id} userId={userId} document={document} canEdit />
-          ))
-        )}
-      </CardContent>
+      <CardContent className="flex-1 space-y-3">{body}</CardContent>
     </Card>
   );
 }

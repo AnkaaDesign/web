@@ -287,7 +287,7 @@ export function DetailPage<TData>({
     content = (
       <div className="space-y-4">
         {layout.orderedSections.map((s) => (
-          <DetailSection key={s.def.id} section={s} row={row} onSetHeight={layout.setSectionHeight} hideEmptyFields={hideEmptyFields} />
+          <DetailSection key={s.def.id} section={s} row={row} hideEmptyFields={hideEmptyFields} />
         ))}
       </div>
     );
@@ -309,32 +309,19 @@ export function DetailPage<TData>({
     content = (
       <div className="space-y-4">
         {blocks.map((b, i) => {
-          if (b.kind === "full") return <DetailSection key={b.section.def.id} section={b.section} row={row} onSetHeight={layout.setSectionHeight} hideEmptyFields={hideEmptyFields} />;
+          if (b.kind === "full") return <DetailSection key={b.section.def.id} section={b.section} row={row} hideEmptyFields={hideEmptyFields} />;
           const { left, right } = balanceColumns(b.sections);
-          // A lone card (or every card pinned to one side) renders full-width — never a half card
-          // beside a dead empty column.
-          if (!left.length || !right.length) {
-            const col = left.length ? left : right;
-            return (
-              <div key={`rows-${i}`} className="space-y-4">
-                {col.map((s) => (
-                  <DetailSection key={s.def.id} section={s} row={row} onSetHeight={layout.setSectionHeight} hideEmptyFields={hideEmptyFields} />
-                ))}
-              </div>
-            );
-          }
-          // Default `items-start`: columns keep their natural height (no stretching) → no wasted
-          // empty space. EXCEPTION: when a band contains a deliberately resizable section (e.g. the
-          // changelog the user drags taller), stretch the columns to equal height so the neighbor
-          // column matches it instead of leaving a lopsided gap. The `grow` on each section card then
-          // lets the shorter column fill the matched height.
-          const stretch = b.sections.some((s) => s.def.resizableHeight);
+          // A half-width section ALWAYS renders at half width — honoring the user's explicit ½←/½→
+          // choice — even when it's alone in its band (the opposite column simply stays empty). Sibling
+          // cards in a band are EQUAL height: the row is `items-stretch` so the two columns match the
+          // taller one, and each card (`grow` + `CardContent flex-1`, see detail-section.tsx) fills its
+          // cell with content top-aligned (extra space becomes plain bottom padding — a clean grid look).
           return (
-            <div key={`rows-${i}`} className={cn("flex gap-4", stretch ? "items-stretch" : "items-start")}>
+            <div key={`rows-${i}`} className="flex items-stretch gap-4">
               {[left, right].map((col, ci) => (
                 <div key={ci} className="flex min-w-0 flex-1 flex-col gap-4">
                   {col.map((s) => (
-                    <DetailSection key={s.def.id} section={s} row={row} onSetHeight={layout.setSectionHeight} hideEmptyFields={hideEmptyFields} />
+                    <DetailSection key={s.def.id} section={s} row={row} hideEmptyFields={hideEmptyFields} />
                   ))}
                 </div>
               ))}

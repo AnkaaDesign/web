@@ -27,5 +27,6 @@ export type {
   DataTableFilterOption,
   DataTableFilterValues,
   PersistedTableConfig,
+  SectorDefaults,
   ExportCellValue,
 } from "./data-table-types";

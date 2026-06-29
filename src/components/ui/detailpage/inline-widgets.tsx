@@ -5,6 +5,7 @@ import { getBadgeColors } from "@/constants";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/number";
 import { formatDate, formatDateTime } from "@/utils/date";
+import { formatCPF, formatCNPJ, formatPIS, formatCEP, formatBrazilianPhone } from "@/utils";
 import type { EnumEditConfig, FieldDataType, InlineEditDef } from "./detail-page-types";
 
 // Display helpers accept the enum config structurally (just the bits they read) so they
@@ -89,6 +90,17 @@ export function renderFieldValue<TData>(dataType: FieldDataType, value: unknown,
       return empty ? undefined : String(value);
     case "percentage":
       return empty ? undefined : `${value}%`;
+    // Brazilian masked types: the stored value is raw digits — format for display.
+    case "cpf":
+      return empty ? undefined : formatCPF(String(value));
+    case "cnpj":
+      return empty ? undefined : formatCNPJ(String(value));
+    case "phone":
+      return empty ? undefined : formatBrazilianPhone(String(value));
+    case "pis":
+      return empty ? undefined : formatPIS(String(value));
+    case "cep":
+      return empty ? undefined : formatCEP(String(value));
     case "date":
       return empty ? undefined : formatDate(new Date(value as string | number | Date));
     case "datetime":
