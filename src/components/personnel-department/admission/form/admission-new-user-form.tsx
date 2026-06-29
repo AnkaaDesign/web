@@ -41,7 +41,6 @@ import { SecullumSyncSwitch } from "@/components/administration/user/form/secull
 import { HorarioSelector } from "@/components/administration/user/form/horario-selector";
 import { EmployeeTypeSelector, ContractTypeSelector, ProviderFields } from "@/components/administration/user/form/status-selector";
 import { StatusDatesSection } from "@/components/administration/user/form/status-dates-section";
-import { ActiveSwitch } from "@/components/administration/user/form/active-switch";
 import { VerifiedSwitch } from "@/components/administration/user/form/verified-switch";
 import { PpeSizesSection } from "@/components/administration/user/form/ppe-sizes-section";
 
@@ -89,7 +88,6 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
       cpf: null as any,
       pis: null,
       verified: false,
-      isActive: true,
       positionId: null as any,
       performanceLevel: 0,
       sectorId: null as any,
@@ -587,7 +585,6 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
               <CardDescription>Configurações de acesso e verificação do usuário</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ActiveSwitch disabled={submitting} />
               <VerifiedSwitch disabled={submitting} />
             </CardContent>
           </Card>

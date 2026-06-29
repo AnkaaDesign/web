@@ -38,7 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { useApplyPeriodAdjustment, usePeriodAdjustment } from "@/hooks/personnel-department/use-bonus";
-import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES, EMPLOYEE_TYPE } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES, EMPLOYEE_TYPE, CONTRACT_STATUS } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { BonusFilters } from "@/components/personnel-department/bonus/list/bonus-filters";
@@ -446,7 +446,7 @@ export default function BonusListPage() {
     orderBy: { name: "asc" },
     include: { position: true, sector: true },
     where: {
-      isActive: true,
+      currentContractStatus: CONTRACT_STATUS.ACTIVE,
       currentEmployeeType: EMPLOYEE_TYPE.CLT, // Bonus is folha-only → CLT (exclude terceirizado/PJ/autônomo)
       payrollNumber: { not: null },
       secullumEmployeeId: { not: null },

@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { IconCalendarOff, IconCheck } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -41,6 +41,7 @@ export const LeaveCreatePage = () => {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <div className="container mx-auto max-w-4xl flex-shrink-0">
           <PageHeader
+            favoritePage={FAVORITE_PAGES.MEDICINA_DO_TRABALHO_AFASTAMENTOS_CADASTRAR}
             title="Novo Afastamento"
             icon={IconCalendarOff}
             breadcrumbs={[

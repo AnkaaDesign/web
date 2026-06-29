@@ -65,6 +65,17 @@ export function useMyPreferences() {
         throw new Error("Preferências do usuário ainda não estão disponíveis.");
       }
       const res = await updateMutation.mutateAsync({ id: existing.id, data });
+      // Optimistically reflect the write in the cache BEFORE the refetch lands. Several independent
+      // hooks (the two Agenda tables, the detail layout, the dashboard) each do a read-modify-write
+      // on the SAME Preferences row; without this, a second writer reading the as-yet-unrefetched
+      // value would clobber this write. Updating the cache now makes the next read-modify-write see it.
+      queryClient.setQueriesData<{ data?: Array<Record<string, unknown>> } | undefined>(
+        { queryKey: preferencesKeys.all },
+        (old) =>
+          old?.data
+            ? { ...old, data: old.data.map((p) => (p.id === existing.id ? { ...p, ...data } : p)) }
+            : old,
+      );
       queryClient.invalidateQueries({ queryKey: preferencesKeys.all });
       return res;
     };

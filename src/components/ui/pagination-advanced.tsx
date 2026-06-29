@@ -4,6 +4,7 @@ import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
+import { Input } from "@/components/ui/input";
 
 // Export a simple pagination component for basic use cases
 interface SimplePaginationProps {
@@ -154,21 +155,22 @@ export function SimplePaginationAdvanced({
         {showGoToPage && totalPages > 5 && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground whitespace-nowrap">Ir para:</span>
-            <input
-              type="number"
-              min="1"
-              max={totalPages}
-              value={pageInput}
-              onChange={(e) => setPageInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleGoToPage();
-                }
-              }}
-              className="h-9 w-16 px-3 py-2 text-sm bg-transparent"
-              placeholder="..."
-            />
+            <div className="w-16">
+              <Input
+                type="natural"
+                max={totalPages}
+                value={pageInput}
+                onChange={(value) => setPageInput(value === null ? "" : String(value))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleGoToPage();
+                  }
+                }}
+                className="h-9 text-center"
+                placeholder="..."
+              />
+            </div>
           </div>
         )}
       </div>

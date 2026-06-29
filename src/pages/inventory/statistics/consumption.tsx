@@ -22,7 +22,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
   DropdownMenuRadioGroup, DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
-import { GOAL_METRIC, GOAL_METRIC_UNIT, routes, FAVORITE_PAGES, ACTIVITY_OPERATION } from '@/constants';
+import { GOAL_METRIC, GOAL_METRIC_UNIT, routes, FAVORITE_PAGES, ACTIVITY_OPERATION, CONTRACT_STATUS } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useCanViewPrices } from '@/hooks';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
@@ -342,7 +342,7 @@ function ConsumptionFiltersSheet({
   }, []);
 
   const fetchUsers = useCallback(async (search: string, page = 1) => {
-    const res = await getUsers({ where: { isActive: true }, search: search || undefined, page, limit: COMBOBOX_PAGE_SIZE });
+    const res = await getUsers({ where: { currentContractStatus: CONTRACT_STATUS.ACTIVE }, search: search || undefined, page, limit: COMBOBOX_PAGE_SIZE });
     const seen = new Set<string>();
     const unique = (res.data || []).filter(u => { if (seen.has(u.id)) return false; seen.add(u.id); return true; });
     return { data: unique.map(u => ({ value: u.id, label: u.name })), hasMore: res.meta?.hasNextPage ?? false };
@@ -1475,7 +1475,7 @@ const ConsumptionPage = () => {
         <PageHeader
           title="Análise de Consumo"
           icon={IconChartBar}
-          favoritePage={FAVORITE_PAGES.ESTOQUE_ESTATISTICAS}
+          favoritePage={FAVORITE_PAGES.STATISTICS_CONSUMPTION}
           breadcrumbs={[
             { label: 'Início',       href: routes.home },
             { label: 'Estatísticas', href: routes.statistics.root },

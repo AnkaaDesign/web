@@ -20,7 +20,6 @@ import { SecullumSyncSwitch } from "./secullum-sync-switch";
 import { HorarioSelector } from "./horario-selector";
 import { EmployeeTypeSelector, ContractTypeSelector, ContractStatusDisplay, ProviderFields } from "./status-selector";
 import { VerifiedSwitch } from "./verified-switch";
-import { ActiveSwitch } from "./active-switch";
 import { StatusDatesSection } from "./status-dates-section";
 import { FormAddressInput } from "@/components/ui/form-address-input";
 import { FormAddressNumberInput } from "@/components/ui/form-address-number-input";
@@ -72,7 +71,6 @@ export function UserForm(props: UserFormProps) {
     cpf: null as any,
     pis: null,
     verified: false,
-    isActive: true,
     positionId: null as any, // required in schema; empty until the user selects
     performanceLevel: 0,
     sectorId: null as any, // required in schema; empty until the user selects
@@ -573,7 +571,6 @@ export function UserForm(props: UserFormProps) {
               <CardDescription>Configurações de acesso e verificação do usuário</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ActiveSwitch disabled={isSubmitting} />
               <VerifiedSwitch disabled={isSubmitting} />
               {mode === "update" && (
                 <FormSwitch<UserUpdateFormData>

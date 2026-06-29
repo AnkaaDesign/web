@@ -33,7 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { GOAL_METRIC, routes, SECTOR_PRIVILEGES } from '@/constants';
+import { GOAL_METRIC, routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
 import { useActiveProductionUserCount } from '@/hooks/administration/use-active-production-user-count';
@@ -1038,6 +1038,7 @@ export default function ProductionBonusValuePage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Relação Bônus / Produção"
+          favoritePage={FAVORITE_PAGES.ESTATISTICAS_PRODUCAO_VALOR_BONUS}
           icon={IconCoins}
           breadcrumbs={[
             { label: 'Início', href: routes.home },

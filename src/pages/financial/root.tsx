@@ -120,7 +120,7 @@ export const FinancialRootPage = () => {
       <PageHeader
         title="Financeiro"
         icon={IconCurrencyDollar}
-        favoritePage={FAVORITE_PAGES.FINANCEIRO_FATURAMENTO}
+        favoritePage={FAVORITE_PAGES.FINANCEIRO_DASHBOARD}
         breadcrumbs={[{ label: "Inicio", href: routes.home }, { label: "Financeiro" }]}
         actions={[
           {

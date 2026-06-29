@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { routes, TEAM_LEADER } from "../../constants";
+import { routes, TEAM_LEADER, FAVORITE_PAGES } from "../../constants";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
@@ -20,6 +20,7 @@ export default function MyTeamCalculationsPage() {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
         <PageHeader
           className="flex-shrink-0"
+          favoritePage={FAVORITE_PAGES.MINHA_EQUIPE_CONTROLE_PONTO_LISTAR}
           title="Cálculos de Ponto da Equipe"
           breadcrumbs={[
             { label: "Início", href: routes.home },

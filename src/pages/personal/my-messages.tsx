@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/page-header";
+import { FAVORITE_PAGES } from "@/constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -173,7 +174,7 @@ export const MyMessagesPage = () => {
   if (!user) {
     return (
       <div className="container mx-auto py-6">
-        <PageHeader title="Minhas Mensagens" subtitle="Mensagens e comunicados do sistema" />
+        <PageHeader title="Minhas Mensagens" subtitle="Mensagens e comunicados do sistema" favoritePage={FAVORITE_PAGES.PESSOAL_MENSAGENS_LISTAR} />
         <Card className="mt-6">
           <CardContent className="py-8">
             <p className="text-muted-foreground text-center">Faça login para ver suas mensagens</p>
@@ -186,6 +187,7 @@ export const MyMessagesPage = () => {
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
+        favoritePage={FAVORITE_PAGES.PESSOAL_MENSAGENS_LISTAR}
         title="Minhas Mensagens"
         subtitle="Mensagens e comunicados do sistema"
         className="flex-shrink-0"

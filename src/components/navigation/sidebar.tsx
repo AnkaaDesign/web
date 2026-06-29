@@ -6,9 +6,9 @@ import { useTheme } from "@/contexts/theme-context";
 import { useFavorites } from "@/contexts/favorites-context";
 import { MENU_ITEMS, routes } from "../../constants";
 import type { MenuItem } from "../../constants";
-import { getFilteredMenuForUser, getTablerIcon } from "../../utils";
+import { getFilteredMenuForUser, getTablerIcon, getIconInfoByPath } from "../../utils";
 import { useMyPendingQuestionnaireEntries } from "@/hooks/questionnaire/use-questionnaire-entry";
-import { maskPhone, getPageIconName, isPageCadastrar } from "../../utils";
+import { maskPhone, isPageCadastrar } from "../../utils";
 import { fixNavigationPath } from "@/utils/route-validation";
 import { useAuth } from "@/contexts/auth-context";
 import { IconLogout, IconUser, IconSettings, IconChevronRight, IconExternalLink } from "@tabler/icons-react";
@@ -255,14 +255,13 @@ const getIconComponent = (iconName: string, size = 20) => {
   return <IconComponent size={size} stroke={1.5} />;
 };
 
-// Function to render favorite icon with plus overlay for cadastrar pages
+// Function to render favorite icon with plus overlay for cadastrar pages.
+// Resolves the real icon component directly from the path-prefix registry — the single
+// source of truth shared with the dashboard widget + favorites page (no fragile string round-trip).
 const renderFavoriteIcon = (fav: any, size: number = 20) => {
-  // Try to get icon name from the path itself
-  const iconName = getPageIconName(fav.path);
+  const { icon: IconComponent } = getIconInfoByPath(fav.path);
   const isCadastrar = isPageCadastrar(fav.path);
-  const mainIcon = getIconComponent(iconName, size);
-
-  if (!mainIcon) return null;
+  const mainIcon = <IconComponent size={size} stroke={1.5} />;
 
   if (isCadastrar) {
     return (

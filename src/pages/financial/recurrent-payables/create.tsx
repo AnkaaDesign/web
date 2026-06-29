@@ -10,7 +10,7 @@ import {
 } from "@/components/financial/recurrent-payables/recurrent-payable-form";
 import { useRecurrentPayableMutations } from "@/hooks/financial/use-recurrent-payable";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { SECTOR_PRIVILEGES, routes } from "@/constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "@/constants";
 
 export const CreateRecurrentPayablePage = () => {
   usePageTracker({ title: "Nova conta recorrente", icon: "repeat" });
@@ -47,6 +47,7 @@ export const CreateRecurrentPayablePage = () => {
             variant="form"
             title="Nova conta recorrente"
             icon={IconRepeat}
+            favoritePage={FAVORITE_PAGES.FINANCEIRO_CONTAS_RECORRENTES_CADASTRAR}
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "Financeiro", href: routes.financial.root },

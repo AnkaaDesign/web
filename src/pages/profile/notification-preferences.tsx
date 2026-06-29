@@ -32,7 +32,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { routes } from "@/constants";
+import { FAVORITE_PAGES, routes } from "@/constants";
 import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 import { cn } from "@/lib/utils";
 
@@ -463,6 +463,7 @@ export function NotificationPreferencesPage() {
         <div className="flex-shrink-0">
           <PageHeader
             title="Preferências de Notificação"
+            favoritePage={FAVORITE_PAGES.PERFIL_NOTIFICACOES}
             icon={Bell as any}
             breadcrumbs={[
               { label: "Início", href: routes.home },
@@ -488,6 +489,7 @@ export function NotificationPreferencesPage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Preferências de Notificação"
+          favoritePage={FAVORITE_PAGES.PERFIL_NOTIFICACOES}
           icon={Bell as any}
           breadcrumbs={[
             { label: "Início", href: routes.home },

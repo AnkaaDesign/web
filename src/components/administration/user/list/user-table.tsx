@@ -614,7 +614,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
               )}
 
               {/* Show dismiss option if any user is still connected (active bond) */}
-              {contextMenu?.users.some((user) => user.isActive) && (
+              {contextMenu?.users.some((user) => user.currentContractStatus === CONTRACT_STATUS.ACTIVE) && (
                 <DropdownMenuItem onClick={handleMarkAsDismissed}>
                   <IconUserX className="mr-2 h-4 w-4" />
                   {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Demitir selecionados" : "Demitir"}

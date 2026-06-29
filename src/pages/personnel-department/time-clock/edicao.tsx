@@ -8,7 +8,7 @@ import {
   TimeClockEntryEditList,
   type TimeClockEntryEditActions,
 } from "@/components/personnel-department/time-clock-entry/time-clock-edit-list";
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { TimeClockTabs } from "./time-clock-tabs";
 
@@ -23,6 +23,7 @@ export default function TimeClockEdicaoPage() {
         <PageHeader
           className="flex-shrink-0"
           title="Edição"
+          favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CONTROLE_PONTO_EDICAO_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Departamento Pessoal", href: routes.personnelDepartment.root },

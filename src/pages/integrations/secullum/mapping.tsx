@@ -37,7 +37,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { usePrivileges } from "@/hooks/common/use-privileges";
 import { DiagnosticoCard } from "@/components/integrations/secullum/diagnostics/diagnostico-card";
-import { routes, SECTOR_PRIVILEGES } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "@/constants";
 import { cn } from "@/lib/utils";
 
 import {
@@ -87,6 +87,7 @@ export default function SecullumMappingPage() {
         <PageHeader
           title="Integração Secullum"
           icon={IconUsers}
+          favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_INTEGRACAO_SECULLUM}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Departamento Pessoal", href: routes.administration.collaborators.root },

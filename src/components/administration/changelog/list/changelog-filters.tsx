@@ -4,7 +4,7 @@ import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ENTITY_TYPE_LABELS, CHANGE_LOG_ACTION, CHANGE_LOG_ACTION_LABELS } from "../../../../constants";
+import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ENTITY_TYPE_LABELS, CHANGE_LOG_ACTION, CHANGE_LOG_ACTION_LABELS, CONTRACT_STATUS } from "../../../../constants";
 import { useUsers } from "../../../../hooks";
 
 // Define props interface directly to avoid import issues
@@ -20,7 +20,7 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
   const [localFilters, setLocalFilters] = useState(filters);
   const { data: usersData } = useUsers({
     limit: 100,
-    isActive: true,
+    statuses: [CONTRACT_STATUS.ACTIVE],
   });
 
   useEffect(() => {

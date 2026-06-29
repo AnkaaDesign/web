@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { Checkbox } from "@/components/ui/checkbox";
-import { routes } from "@/constants";
+import { routes, FAVORITE_PAGES } from "@/constants";
 import { cn } from "@/lib/utils";
 
 import {
@@ -213,6 +213,7 @@ export function QrCodeToolPage() {
     <div className="h-full flex flex-col px-4 pt-4">
       <div className="flex-shrink-0">
         <PageHeader
+          favoritePage={FAVORITE_PAGES.FERRAMENTAS_QR_CODE}
           title="Gerador de QR Code"
           icon={IconQrcode}
           breadcrumbs={[

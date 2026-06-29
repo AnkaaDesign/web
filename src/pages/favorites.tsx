@@ -4,12 +4,10 @@ import { PageHeader } from "@/components/page-header";
 import { useFavorites } from "@/contexts/favorites-context";
 import type { FavoriteItem } from "@/contexts/favorites-context";
 import { FAVORITE_PAGES_LABELS } from "../constants";
-import { getPageIconInfo, isPageCadastrar, getPageIconName } from "../utils";
-import { getTablerIcon } from "../utils";
+import { getIconInfoByPath, isPageCadastrar } from "../utils";
 import { ThemedBackground } from "@/components/ui";
-import { IconStar, IconStarOff, IconPlus, IconFile } from "@tabler/icons-react";
+import { IconStar, IconStarOff, IconPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import * as TablerIcons from "@tabler/icons-react";
 
 export function FavoritesPage() {
   const navigate = useNavigate();
@@ -19,24 +17,12 @@ export function FavoritesPage() {
     navigate(path);
   };
 
-  // Function to render favorite icon with plus overlay for cadastrar pages (same as sidebar)
+  // Function to render favorite icon with plus overlay for cadastrar pages (same as sidebar).
+  // Resolves the real icon component directly from the path-prefix registry — the single
+  // source of truth shared with the dashboard widget + sidebar (no fragile string round-trip).
   const renderFavoriteIcon = (fav: FavoriteItem, size: number = 24) => {
-    // Try to get icon name from the path itself
-    const iconName = getPageIconName(fav.path);
+    const { icon: IconComponent } = getIconInfoByPath(fav.path);
     const isCadastrar = isPageCadastrar(fav.path);
-
-    if (!iconName) {
-      return <IconFile size={size} stroke={1.5} />;
-    }
-
-    // Convert kebab-case to camelCase for TABLER_ICONS lookup
-    const camelCaseName = iconName.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-    const tablerName = getTablerIcon(camelCaseName);
-    const IconComponent = TablerIcons[tablerName as keyof typeof TablerIcons] as React.ComponentType<{ size?: number; stroke?: number; className?: string }>;
-
-    if (!IconComponent) {
-      return <IconFile size={size} stroke={1.5} />;
-    }
 
     const mainIcon = <IconComponent size={size} stroke={1.5} />;
 
@@ -79,7 +65,7 @@ export function FavoritesPage() {
         <ThemedBackground className="p-4 rounded-lg">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
             {favorites.map((favorite) => {
-              const iconInfo = getPageIconInfo(favorite.path);
+              const iconInfo = getIconInfoByPath(favorite.path);
               const label = FAVORITE_PAGES_LABELS[favorite.path as keyof typeof FAVORITE_PAGES_LABELS] || favorite.title;
 
               return (

@@ -1,7 +1,7 @@
 import { useRef, useMemo, useState, useCallback } from "react";
 import { usePositions, useSectors } from "../../../../hooks";
 import type { UserGetManyFormData } from "../../../../schemas";
-import { CONTRACT_TYPE } from "../../../../constants";
+import { CONTRACT_TYPE, CONTRACT_STATUS } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -148,13 +148,10 @@ export function PpeSizesList({ className }: PpeSizesListProps) {
       searchingFor: searchingFor || undefined,
     };
 
-    // Only show users where the actual isActive DB field is true,
-    // regardless of status (dismissed users with isActive=true should appear).
-    // Do NOT use the convenience `isActive` filter — it translates to
-    // `status: { not: DISMISSED }` which would hide dismissed-but-active users.
+    // Only show users with an active employment contract (currentContractStatus ACTIVE).
     result.where = {
       ...result.where,
-      isActive: true,
+      currentContractStatus: CONTRACT_STATUS.ACTIVE,
     };
 
     // Convert contract kind array to API format. The API only accepts

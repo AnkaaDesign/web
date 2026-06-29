@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FilterDrawer } from '@/components/common/filters/ui/FilterDrawer';
 import { Combobox } from '@/components/ui/combobox';
-import { GOAL_METRIC, routes, SECTOR_PRIVILEGES, BONIFICATION_STATUS } from '@/constants';
+import { GOAL_METRIC, routes, SECTOR_PRIVILEGES, BONIFICATION_STATUS, FAVORITE_PAGES, CONTRACT_STATUS } from '@/constants';
 import { BONIFICATION_STATUS_LABELS } from '@/constants/enum-labels';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useTaskProductionStats } from '@/hooks/production/use-production-analytics';
@@ -334,7 +334,7 @@ function TaskProductionFiltersSheet({
   }, []);
 
   const fetchUsers = useCallback(async (search: string, page = 1) => {
-    const res = await getUsers({ where: { isActive: true }, search: search || undefined, page, limit: COMBOBOX_PAGE_SIZE });
+    const res = await getUsers({ where: { currentContractStatus: CONTRACT_STATUS.ACTIVE }, search: search || undefined, page, limit: COMBOBOX_PAGE_SIZE });
     return {
       data: (res.data || []).map((u: any) => ({ value: u.id, label: u.name })),
       hasMore: res.meta?.hasNextPage || false,
@@ -1596,6 +1596,7 @@ const TaskProductionPage = () => {
       <div className="flex-shrink-0">
         <PageHeader
           title="Produção de Tarefas"
+          favoritePage={FAVORITE_PAGES.ESTATISTICAS_PRODUCAO_PRODUTIVIDADE}
           icon={IconChartBar}
           breadcrumbs={[
             { label: 'Início', href: routes.home },

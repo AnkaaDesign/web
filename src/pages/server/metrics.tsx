@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/auth-context";
-import { SECTOR_PRIVILEGES, routes } from "../../constants";
+import { FAVORITE_PAGES, SECTOR_PRIVILEGES, routes } from "../../constants";
 import { hasPrivilege } from "../../utils";
 import {
   IconChartLine,
@@ -410,6 +410,7 @@ export function ServerMetricsPage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Métricas do Sistema"
+          favoritePage={FAVORITE_PAGES.SERVIDOR_METRICAS}
           icon={IconChartLine}
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Servidor", href: routes.server.root }, { label: "Métricas do Sistema" }]}
           actions={[

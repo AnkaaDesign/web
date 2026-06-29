@@ -60,6 +60,7 @@ import {
   routes,
   ACCOUNTING_TYPE,
   ACCOUNTING_TYPE_LABELS,
+  FAVORITE_PAGES,
 } from "@/constants";
 import type {
   CreateTransactionCategoryPayload,
@@ -327,6 +328,7 @@ export const ReconciliationCategoriesListPage = () => {
           variant="list"
           title="Categorias de Conciliação"
           icon={IconCategory}
+          favoritePage={FAVORITE_PAGES.FINANCEIRO_CONCILIACAO_CATEGORIAS}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Financeiro", href: routes.financial.root },

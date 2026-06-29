@@ -40,6 +40,9 @@ export const routes = {
     goals: {
       root: "/administracao/metas",
     },
+    appDistribution: {
+      root: "/administracao/aplicativos",
+    },
     users: {
       batchEdit: "/departamento-pessoal/colaboradores/editar-em-lote",
       create: "/departamento-pessoal/colaboradores/cadastrar",

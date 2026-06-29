@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconBeach, IconCheck, IconLoader2 } from "@tabler/icons-react";
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { VacationForm, type VacationCreateSubmit } from "@/components/personnel-department/vacation/form";
@@ -70,6 +70,7 @@ export const VacationCreatePage = () => {
             variant="form"
             title="Novas Férias"
             icon={IconBeach}
+            favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_FERIAS_CADASTRAR}
             breadcrumbs={[
               { label: "Início", href: "/" },
               { label: "Departamento Pessoal", href: routes.personnelDepartment.root },

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
+import { CONTRACT_STATUS } from "@/constants";
 import {
   IconAlertTriangle,
   IconCheck,
@@ -69,7 +70,7 @@ export function SectorAssessmentConfigCard({
   // backend Zod schema also caps `take` at 100.
   const usersQ = useUsers({
     sectorIds: [sectorId],
-    isActive: true,
+    statuses: [CONTRACT_STATUS.ACTIVE],
     orderBy: { name: "asc" },
     take: 100,
   } as any);

@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { TimeClockDayView } from "@/components/personnel-department/time-clock-entry/time-clock-day-view";
-import { routes } from "../../../constants";
+import { routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { TimeClockTabs } from "./time-clock-tabs";
 
@@ -12,6 +12,7 @@ export default function TimeClockDiaPage() {
       <PageHeader
         className="flex-shrink-0"
         title="Resumo do Dia"
+        favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CONTROLE_PONTO_DIA_LISTAR}
         breadcrumbs={[
           { label: "Início", href: routes.home },
           { label: "Departamento Pessoal", href: routes.personnelDepartment.root },

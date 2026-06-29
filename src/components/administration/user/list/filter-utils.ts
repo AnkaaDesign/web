@@ -61,14 +61,14 @@ export function extractActiveFilters(
     });
   }
 
-  // Exibir tri-state (only show a badge when explicitly Ativos/Demitidos; Todos = omitted)
-  if (typeof filters.isActive === "boolean") {
+  // Exibir tri-state (only show a badge when explicitly Ativos/Desligados; Todos = omitted)
+  if (filters.statuses?.length === 1) {
     activeFilters.push({
-      key: "isActive",
+      key: "statuses",
       label: "Exibir",
-      value: filters.isActive ? "Ativos" : "Desligados",
+      value: filters.statuses[0] === CONTRACT_STATUS.ACTIVE ? "Ativos" : "Desligados",
       iconType: "eye",
-      onRemove: () => onRemoveFilter("isActive"),
+      onRemove: () => onRemoveFilter("statuses"),
     });
   }
 
@@ -417,8 +417,8 @@ export function createFilterRemover(currentFilters: Partial<UserGetManyFormData>
           delete newFilters.contractTypes;
         }
         break;
-      case "isActive":
-        delete newFilters.isActive;
+      case "statuses":
+        delete newFilters.statuses;
         break;
       case "contractStatuses":
         if (itemId && Array.isArray(newFilters.contractStatuses)) {

@@ -29,6 +29,7 @@ import {
 } from "@tabler/icons-react";
 
 import {
+  CONTRACT_STATUS,
   LEAVE_STATUS,
   LEAVE_TYPE_LABELS,
   VACATION_JUSTIFICATIVA_ID,
@@ -241,10 +242,10 @@ export function AbsencesCalendar() {
   );
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" }, take: 100 } as any);
   const { data: usersData, isLoading: usersLoading } = useUsers({
-    // `isActive: true` = currentContractStatus não-TERMINATED — todos os
-    // colaboradores ainda empregados (inclui experiência / aviso / afastado),
-    // só exclui desligados. Mesma convenção dos aniversários acima.
-    isActive: true,
+    // statuses: [CONTRACT_STATUS.ACTIVE] = currentContractStatus ACTIVE —
+    // colaboradores com contrato ativo, exclui desligados. Mesma convenção
+    // dos aniversários acima.
+    statuses: [CONTRACT_STATUS.ACTIVE],
     where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,
@@ -253,15 +254,11 @@ export function AbsencesCalendar() {
   // ---- Unified-calendar overlays --------------------------------------
   // Aniversários: every ACTIVE collaborator (no Secullum link required) —
   // birthdays recur yearly, so the list is range-independent.
-  // `isActive: true` is the app's canonical "ainda empregado" filter — maps
-  // server-side to currentContractStatus: { not: TERMINATED } (ver
-  // schemas/user.ts), so colaboradores desligados NÃO aparecem nos
-  // aniversários, mas quem está em experiência / aviso prévio / afastado
-  // (ainda vínculados) continua aparecendo. Usar statuses:[ACTIVE] aqui
-  // excluía erroneamente esses estados — e deixava entrar desligados quando
-  // o cache de status não batia.
+  // statuses: [CONTRACT_STATUS.ACTIVE] filtra por currentContractStatus ACTIVE
+  // (ver schemas/user.ts), so colaboradores desligados NÃO aparecem nos
+  // aniversários.
   const { data: birthdayUsersData } = useUsers({
-    isActive: true,
+    statuses: [CONTRACT_STATUS.ACTIVE],
     orderBy: { name: "asc" },
     // 100 é o teto do paginationSchema da API — limit: 200 era REJEITADO
     // pelo zod (400) e os aniversários nunca carregavam.

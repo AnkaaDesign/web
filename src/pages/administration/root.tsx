@@ -155,7 +155,7 @@ export const AdministrationRootPage = () => {
             <PageHeader
               title="Administração"
               icon={IconSettings}
-              favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
+              favoritePage={FAVORITE_PAGES.ADMINISTRACAO_DASHBOARD}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
               actions={[
                 {
@@ -190,7 +190,7 @@ export const AdministrationRootPage = () => {
             <PageHeader
               title="Administração"
               icon={IconSettings}
-              favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
+              favoritePage={FAVORITE_PAGES.ADMINISTRACAO_DASHBOARD}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
               actions={[
                 {
@@ -226,7 +226,7 @@ export const AdministrationRootPage = () => {
           <PageHeader
             title="Administração"
             icon={IconSettings}
-            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
+            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_DASHBOARD}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
             actions={[
               {

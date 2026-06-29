@@ -11,7 +11,7 @@ import {
   IconAlertCircle,
   IconUsers,
 } from "@tabler/icons-react";
-import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES, CONTRACT_STATUS } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { PayrollFilters } from "@/components/personnel-department/payroll/list/payroll-filters";
@@ -506,7 +506,7 @@ export default function PayrollListPage() {
     orderBy: { name: "asc" },
     include: { position: true, sector: true },
     where: {
-      isActive: true,
+      currentContractStatus: CONTRACT_STATUS.ACTIVE,
       payrollNumber: { not: null },
       secullumEmployeeId: { not: null },
     },

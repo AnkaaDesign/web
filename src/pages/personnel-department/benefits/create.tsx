@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { IconGift, IconCheck } from "@tabler/icons-react";
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { BenefitForm } from "@/components/personnel-department/benefit/form";
@@ -38,6 +38,7 @@ export const BenefitCreatePage = () => {
             variant="form"
             title="Novo Benefício"
             icon={IconGift}
+            favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_BENEFICIOS_CADASTRAR}
             breadcrumbs={[
               { label: "Início", href: "/" },
               { label: "Departamento Pessoal", href: routes.personnelDepartment.root },

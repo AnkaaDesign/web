@@ -12,6 +12,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
 
   // Administração - Admin access (messages also accessible to production manager)
   "/administracao": "ADMIN",
+  "/administracao/aplicativos": "ADMIN",
   "/administracao/mensagens": ["ADMIN", "PRODUCTION_MANAGER", "ACCOUNTING"],
   "/administracao/mensagens/criar": ["ADMIN", "PRODUCTION_MANAGER", "ACCOUNTING"],
   "/administracao/mensagens/*": ["ADMIN", "PRODUCTION_MANAGER", "ACCOUNTING"],

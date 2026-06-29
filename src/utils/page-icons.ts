@@ -43,6 +43,17 @@ import {
   IconFingerprint,
   IconUserCircle,
   IconRocket,
+  IconUser,
+  IconEdit,
+  IconSignature,
+  IconReportMoney,
+  IconCalculator,
+  IconTrendingUp,
+  IconCurrencyDollar,
+  IconCash,
+  IconArrowsExchange2,
+  IconStethoscope,
+  IconServer,
 } from "@tabler/icons-react";
 import type { Icon } from "@tabler/icons-react";
 import { FAVORITE_PAGES } from '@constants';
@@ -279,6 +290,50 @@ const PATH_PREFIX_ICON_MAP: Array<{ prefix: string; icon: Icon; color: string }>
   { prefix: "/ferramentas/paleta", icon: IconPalette, color: "bg-pink-500" },
   { prefix: "/ferramentas", icon: IconTools, color: "bg-slate-500" },
   { prefix: "/perfil", icon: IconUserCircle, color: "bg-slate-500" },
+
+  // Favorites coverage batch 2 — Departamento Pessoal / Controle de Ponto
+  // (more-specific prefixes win, so the per-subview entries beat the base)
+  { prefix: "/departamento-pessoal/controle-ponto/colaborador", icon: IconUser, color: "bg-purple-500" },
+  { prefix: "/departamento-pessoal/controle-ponto/dia", icon: IconCalendar, color: "bg-purple-500" },
+  { prefix: "/departamento-pessoal/controle-ponto/edicao", icon: IconEdit, color: "bg-purple-500" },
+  { prefix: "/departamento-pessoal/controle-ponto/ausencias", icon: IconList, color: "bg-purple-500" },
+  { prefix: "/departamento-pessoal/controle-ponto/fechamento", icon: IconSignature, color: "bg-purple-500" },
+  { prefix: "/departamento-pessoal/controle-ponto", icon: IconFingerprint, color: "bg-purple-500" },
+  { prefix: "/departamento-pessoal/folha-de-pagamento", icon: IconReportMoney, color: "bg-purple-600" },
+  { prefix: "/departamento-pessoal/calculos", icon: IconCalculator, color: "bg-purple-600" },
+  { prefix: "/departamento-pessoal/bonus/nivel-de-performance", icon: IconTrendingUp, color: "bg-purple-500" },
+  { prefix: "/departamento-pessoal/bonus/simulacao-de-bonus", icon: IconCalculator, color: "bg-purple-600" },
+  { prefix: "/departamento-pessoal/bonus", icon: IconCoins, color: "bg-purple-600" },
+  { prefix: "/departamento-pessoal/admissoes", icon: IconUser, color: "bg-green-600" },
+  { prefix: "/departamento-pessoal/rescisoes", icon: IconUser, color: "bg-red-600" },
+  { prefix: "/departamento-pessoal/beneficios", icon: IconCoins, color: "bg-pink-500" },
+  { prefix: "/departamento-pessoal/integracoes", icon: IconArrowsExchange2, color: "bg-slate-500" },
+
+  // Favorites coverage batch 2 — Financeiro (had no base prefix → fell to IconHome)
+  { prefix: "/financeiro/contas-a-pagar", icon: IconCash, color: "bg-rose-600" },
+  { prefix: "/financeiro/conciliacao", icon: IconArrowsExchange2, color: "bg-emerald-600" },
+  { prefix: "/financeiro", icon: IconCurrencyDollar, color: "bg-amber-600" },
+
+  // Favorites coverage batch 2 — Medicina do Trabalho / Servidor base prefixes
+  { prefix: "/medicina-do-trabalho", icon: IconStethoscope, color: "bg-red-500" },
+  { prefix: "/servidor/implantacoes", icon: IconRocket, color: "bg-indigo-500" },
+  { prefix: "/servidor", icon: IconServer, color: "bg-indigo-500" },
+
+  // Favorites coverage batch 2 — Minha Equipe / Pessoal leaf paths
+  { prefix: "/meu-pessoal/calculos", icon: IconFingerprint, color: "bg-blue-600" },
+  { prefix: "/meu-pessoal/epis", icon: IconShield, color: "bg-blue-600" },
+  { prefix: "/meu-pessoal/emprestimos", icon: IconCoins, color: "bg-blue-600" },
+  { prefix: "/meu-pessoal/movimentacoes", icon: IconArchive, color: "bg-blue-600" },
+  { prefix: "/meu-pessoal/advertencias", icon: IconAlertTriangle, color: "bg-blue-600" },
+  { prefix: "/meu-pessoal/usuarios", icon: IconUsers, color: "bg-blue-600" },
+  { prefix: "/pessoal/meus-pontos", icon: IconFingerprint, color: "bg-blue-500" },
+  { prefix: "/pessoal/minhas-movimentacoes", icon: IconActivity, color: "bg-green-500" },
+  { prefix: "/pessoal/mensagens", icon: IconMessageCircle, color: "bg-blue-500" },
+  { prefix: "/pessoal/advertencias", icon: IconAlertTriangle, color: "bg-red-500" },
+  { prefix: "/pessoal/minhas-advertencias", icon: IconAlertTriangle, color: "bg-red-500" },
+
+  // Favorites coverage batch 2 — Produção calendar
+  { prefix: "/producao/calendario", icon: IconCalendarEvent, color: "bg-blue-500" },
 
   // Favoritos
   { prefix: "/favoritos", icon: IconStar, color: "bg-yellow-500" },

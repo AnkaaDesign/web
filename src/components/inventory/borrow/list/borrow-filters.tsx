@@ -6,7 +6,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { IconFilter, IconPackage, IconUser, IconCategory, IconTag, IconCircleCheck, IconCalendarEvent, IconCalendarCheck } from "@tabler/icons-react";
 import { getItems, getUsers, getItemBrands, getItemCategories } from "../../../../api-client";
 import type { BorrowGetManyFormData } from "../../../../schemas";
-import { BORROW_STATUS, BORROW_STATUS_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
+import { BORROW_STATUS, BORROW_STATUS_LABELS, ITEM_CATEGORY_TYPE, CONTRACT_STATUS } from "../../../../constants";
 
 interface BorrowFiltersProps {
   open: boolean;
@@ -99,7 +99,7 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
         page: page,
         take: 50,
         where: {
-          isActive: true,
+          currentContractStatus: CONTRACT_STATUS.ACTIVE,
           ...(searchTerm
             ? {
                 OR: [

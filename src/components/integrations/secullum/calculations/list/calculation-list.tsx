@@ -15,6 +15,7 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { addMonths, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { CONTRACT_STATUS } from "@/constants";
 
 type CalculationListMode = 'hr' | 'personal';
 
@@ -127,7 +128,7 @@ export function CalculationList({ className, mode = 'hr', teamScope = false, onE
   const userFilters = isPersonalMode
     ? undefined
     : {
-        isActive: true,
+        statuses: [CONTRACT_STATUS.ACTIVE],
         where: { secullumEmployeeId: { not: null } },
         orderBy: { name: "asc" } as const,
         take: 100,

@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { IconHeartHandshake, IconCheck } from "@tabler/icons-react";
-import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { UserBenefitForm } from "@/components/personnel-department/user-benefit/form";
@@ -38,6 +38,7 @@ export const UserBenefitCreatePage = () => {
             variant="form"
             title="Nova Adesão"
             icon={IconHeartHandshake}
+            favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_BENEFICIOS_ADESOES_CADASTRAR}
             breadcrumbs={[
               { label: "Início", href: "/" },
               { label: "Departamento Pessoal", href: routes.personnelDepartment.root },

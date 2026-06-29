@@ -1,6 +1,6 @@
 import { IconCalendarStats } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES } from "../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { AbsencesCalendar } from "@/components/personnel-department/absence";
@@ -15,6 +15,7 @@ export const HRCalendarPage = () => {
         <PageHeader
           title="Calendário"
           icon={IconCalendarStats}
+          favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CALENDARIO}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Ferramentas", href: routes.tools.root },

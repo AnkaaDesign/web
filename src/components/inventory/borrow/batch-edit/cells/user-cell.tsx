@@ -3,6 +3,7 @@ import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/f
 import { Combobox } from "@/components/ui/combobox";
 import { useUsers } from "../../../../../hooks";
 import debounce from "lodash/debounce";
+import { CONTRACT_STATUS } from "@/constants";
 
 interface UserCellProps {
   control: any;
@@ -22,7 +23,7 @@ export function UserCell({ control, index }: UserCellProps) {
   }, [searchTerm]);
 
   const { data: usersResponse, isLoading } = useUsers({
-    isActive: true,
+    statuses: [CONTRACT_STATUS.ACTIVE],
     ...(debouncedSearchTerm && {
       searchingFor: debouncedSearchTerm,
     }),

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { ObservationForm } from "@/components/production/observation/form";
 import { PageHeader } from "@/components/ui/page-header";
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import type { Observation } from "../../../types";
 import { IconNotebook } from "@tabler/icons-react";
@@ -105,6 +105,7 @@ export const ObservationCreate = () => {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Cadastrar Observação"
+          favoritePage={FAVORITE_PAGES.PRODUCAO_OBSERVACOES_CADASTRAR}
           icon={IconNotebook}
           breadcrumbs={[
             { label: "Produção", href: routes.production.root },

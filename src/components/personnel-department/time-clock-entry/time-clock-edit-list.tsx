@@ -21,6 +21,7 @@ import { PeriodControl } from "./period-control";
 import { TimeClockEntryEditExport } from "./time-clock-entry-edit-export";
 import type { EditExportRow } from "./time-clock-entry-edit-export";
 import type { User } from "@/types";
+import { CONTRACT_STATUS } from "@/constants";
 
 const TIME_CLOCK_COLUMNS: ColumnDef[] = [
   { key: "entry1", header: "Entrada 1" },
@@ -242,7 +243,7 @@ export function TimeClockEntryEditList({
     isLoading: usersLoading,
     error: usersError,
   } = useUsers({
-    isActive: true,
+    statuses: [CONTRACT_STATUS.ACTIVE],
     where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,

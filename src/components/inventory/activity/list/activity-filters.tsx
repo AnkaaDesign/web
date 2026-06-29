@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import type { ActivityGetManyFormData } from "../../../../schemas";
-import { ACTIVITY_OPERATION, ACTIVITY_REASON, ACTIVITY_REASON_LABELS } from "../../../../constants";
+import { ACTIVITY_OPERATION, ACTIVITY_REASON, ACTIVITY_REASON_LABELS, CONTRACT_STATUS } from "../../../../constants";
 import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -68,7 +68,7 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
         page: page,
         take: 50,
         where: {
-          isActive: true,
+          currentContractStatus: CONTRACT_STATUS.ACTIVE,
           ...(searchTerm
             ? {
                 OR: [

@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
-import { routes } from "@/constants";
+import { routes, FAVORITE_PAGES } from "@/constants";
 import { formatCurrency } from "@/utils";
 
 import { usePaintTypes } from "@/hooks";
@@ -509,6 +509,7 @@ export function PaintMixCalculatorPage() {
     <div className="h-full flex flex-col px-4 pt-4">
       <div className="flex-shrink-0">
         <PageHeader
+          favoritePage={FAVORITE_PAGES.FERRAMENTAS_CALCULADORA_MISTURA}
           title="Calculadora de Mistura"
           icon={IconFlask}
           breadcrumbs={[

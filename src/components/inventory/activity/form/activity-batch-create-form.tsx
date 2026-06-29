@@ -2,7 +2,7 @@ import { useCallback, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconLoader2, IconCheck, IconPackage } from "@tabler/icons-react";
 import type { ActivityCreateFormData, ItemGetManyFormData } from "../../../../schemas";
-import { ACTIVITY_OPERATION, ACTIVITY_REASON, ACTIVITY_REASON_LABELS } from "../../../../constants";
+import { ACTIVITY_OPERATION, ACTIVITY_REASON, ACTIVITY_REASON_LABELS, CONTRACT_STATUS } from "../../../../constants";
 import { useActivityBatchMutations, useUsers } from "../../../../hooks";
 import { routes, FAVORITE_PAGES } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
@@ -63,7 +63,7 @@ export const ActivityBatchCreateForm = () => {
   // Mutations and data
   const { batchCreateAsync, isLoading: isSubmitting } = useActivityBatchMutations();
   const { data: usersResponse } = useUsers({
-    where: { isActive: true },
+    where: { currentContractStatus: CONTRACT_STATUS.ACTIVE },
     orderBy: { name: "asc" },
     take: 100,
     include: { sector: true },

@@ -6,6 +6,7 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { IconFilter } from "@tabler/icons-react";
 import type { MessageGetManyFormData } from "@/schemas/message";
 import { getUsers } from "@/api-client/user";
+import { CONTRACT_STATUS } from "@/constants";
 import { getSectors } from "@/api-client/sector";
 
 const STATUS_OPTIONS = [
@@ -43,8 +44,8 @@ export function MessageFilters({
         orderBy: { name: "asc" },
         page,
         take: 50,
-        // Employed users only (not terminated) — includes experience/notice/on-leave.
-        isActive: true,
+        // Employed users only (active employment contract).
+        statuses: [CONTRACT_STATUS.ACTIVE],
       };
       if (search && search.trim()) {
         params.searchingFor = search.trim();

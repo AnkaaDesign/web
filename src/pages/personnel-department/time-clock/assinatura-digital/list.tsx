@@ -26,7 +26,7 @@ export default function AssinaturaDigitalListPage() {
             { label: "Controle de Ponto", href: routes.personnelDepartment.timeClock.list },
             { label: "Fechamento" },
           ]}
-          favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CONTROLE_PONTO_ASSINATURA_DIGITAL_LISTAR}
+          favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CONTROLE_PONTO_FECHAMENTO_LISTAR}
           headerExtra={<TimeClockTabs />}
           className="flex-shrink-0"
         />

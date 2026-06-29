@@ -294,7 +294,9 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
     if (!deleteDialog) return;
     try {
       if (deleteDialog.isBulk) {
-        await Promise.all(deleteDialog.items.map((a) => deleteAssessmentMutation.mutateAsync(a.id)));
+        // OPEN campaigns cannot be deleted — skip them so the rest still go through.
+        const deletable = deleteDialog.items.filter((a) => a.status !== ASSESSMENT_STATUS.OPEN);
+        await Promise.all(deletable.map((a) => deleteAssessmentMutation.mutateAsync(a.id)));
         resetSelection();
       } else {
         await deleteAssessmentMutation.mutateAsync(deleteDialog.items[0].id);
@@ -680,8 +682,9 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
 
           {(() => {
             // Single-row context menu drives the lifecycle actions.
-            // Bulk only exposes Excluir (CANCELLED ones only) — open/close/cancel
-            // in bulk would need confirmations per-status, which is out of scope.
+            // Bulk only exposes Excluir (OPEN rows are skipped on submit) —
+            // open/close/cancel in bulk would need confirmations per-status,
+            // which is out of scope.
             const single = !contextMenu?.isBulk
               ? contextMenu?.assessments[0]
               : undefined;
@@ -689,13 +692,13 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
             const isDraft = singleStatus === ASSESSMENT_STATUS.DRAFT;
             const isOpen = singleStatus === ASSESSMENT_STATUS.OPEN;
             const isCancelled = singleStatus === ASSESSMENT_STATUS.CANCELLED;
-            // Any non-cancelled campaign can be cancelled (incl. CLOSED), so it
-            // can then be excluded — deletion requires CANCELLED status.
+            // Any non-cancelled campaign can be cancelled (incl. CLOSED).
             const canStatusCancel = !isCancelled;
-            // Excluir only applies to CANCELLED rows. For bulk, we let the
-            // delete dialog filter on submit (or just allow the attempt).
+            // Excluir applies to any campaign that is not actively OPEN
+            // (DRAFT/CLOSED/CANCELLED). OPEN campaigns must be closed or
+            // cancelled first. For bulk, OPEN rows are filtered out on submit.
             const showDelete = !contextMenu?.isBulk
-              ? isCancelled && canDelete
+              ? !isOpen && canDelete
               : canDelete;
 
             return (

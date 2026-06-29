@@ -9,7 +9,7 @@ import { FormCombobox } from "@/components/ui/form-combobox";
 import { Textarea } from "@/components/ui/textarea";
 import { IconUser, IconBriefcase, IconTag, IconNotes, IconLoader2 } from "@tabler/icons-react";
 import { getUsers, getPositions } from "../../../../api-client";
-import { POSITION_CHANGE_REASON, POSITION_CHANGE_REASON_LABELS } from "../../../../constants";
+import { POSITION_CHANGE_REASON, POSITION_CHANGE_REASON_LABELS, CONTRACT_STATUS } from "../../../../constants";
 import { useUserPositionHistoryMutations } from "../../../../hooks/personnel-department/use-user-position-history";
 import type { UserPositionHistoryPromoteFormData } from "../../../../schemas/user-position-history";
 
@@ -68,7 +68,7 @@ export function PromoteDialog({ open, onOpenChange }: PromoteDialogProps) {
   const queryUsers = useCallback(async (searchTerm: string) => {
     try {
       const queryParams: any = {
-        where: { isActive: true },
+        where: { currentContractStatus: CONTRACT_STATUS.ACTIVE },
         orderBy: { name: "asc" },
         take: 50,
         include: { position: true },

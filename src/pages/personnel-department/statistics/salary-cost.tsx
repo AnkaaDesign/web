@@ -13,7 +13,7 @@ import {
   IconReportMoney,
 } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "@/constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +90,7 @@ const SalaryCostStatisticsContent = () => {
         <PageHeader
           title="Custo de Folha ao Longo do Tempo"
           icon={IconReportMoney}
+          favoritePage={FAVORITE_PAGES.ESTATISTICAS_DP_CUSTO_FOLHA}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Estatísticas", href: routes.statistics.root },

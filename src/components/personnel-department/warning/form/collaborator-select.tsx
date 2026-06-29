@@ -6,6 +6,7 @@ import { userService } from "../../../../api-client";
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
+import { CONTRACT_STATUS } from "@/constants";
 
 interface CollaboratorSelectProps {
   control: any;
@@ -25,7 +26,7 @@ export function CollaboratorSelect({ control, disabled, required, initialCollabo
   const queryFn = useCallback(async (search: string) => {
     const queryParams: any = {
       take: 50,
-      where: { isActive: true },
+      where: { currentContractStatus: CONTRACT_STATUS.ACTIVE },
     };
     if (search && search.trim()) {
       queryParams.searchingFor = search.trim();

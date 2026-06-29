@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { CalculationList } from "@/components/integrations/secullum/calculations/list";
-import { routes } from "../../../constants";
+import { routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { TimeClockTabs } from "./time-clock-tabs";
 
@@ -12,6 +12,7 @@ export default function TimeClockColaboradorPage() {
       <PageHeader
         className="flex-shrink-0"
         title="Espelho de Ponto"
+        favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CONTROLE_PONTO_COLABORADOR_LISTAR}
         breadcrumbs={[
           { label: "Início", href: routes.home },
           { label: "Departamento Pessoal", href: routes.personnelDepartment.root },

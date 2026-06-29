@@ -7,7 +7,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { IconFilter, IconUser, IconPackage, IconCalendarEvent, IconClock, IconToggleLeft } from "@tabler/icons-react";
 import { getUsers, getItems } from "../../../../api-client";
 import type { PpeDeliveryScheduleGetManyFormData } from "../../../../schemas";
-import { SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS } from "../../../../constants";
+import { SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, CONTRACT_STATUS } from "../../../../constants";
 
 interface PpeScheduleFiltersProps {
   open: boolean;
@@ -100,7 +100,7 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
     try {
       const queryParams: any = {
-        where: { isActive: true },
+        where: { currentContractStatus: CONTRACT_STATUS.ACTIVE },
         orderBy: { name: "asc" },
         page: page,
         take: 50,

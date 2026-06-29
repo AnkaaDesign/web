@@ -10,7 +10,7 @@ function ChangeLogsList() {
         <PageHeader
           variant="list"
           title="Histórico de Alterações"
-          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_REGISTROS_ALTERACOES_LISTAR}
+          favoritePage={FAVORITE_PAGES.SERVIDOR_REGISTROS_ALTERACOES_LISTAR}
           breadcrumbs={[{ label: "Início", href: "/" }, { label: "Servidor", href: "/servidor" }, { label: "Registros de Alterações" }]}
         />
         <ChangelogList className="flex-1 min-h-0 mt-4" />

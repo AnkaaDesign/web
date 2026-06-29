@@ -8,7 +8,7 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import { useBorrows, usePpeDeliveries, useActivities } from "../../hooks";
 import { useNavigate } from "react-router-dom";
-import { routes, PPE_DELIVERY_STATUS, BORROW_STATUS, CONTRACT_TYPE_LABELS } from "../../constants";
+import { routes, PPE_DELIVERY_STATUS, BORROW_STATUS, CONTRACT_STATUS, CONTRACT_TYPE_LABELS, FAVORITE_PAGES } from "../../constants";
 import { formatDate, getFileUrl } from "../../utils";
 import {
   CalendarDays,
@@ -213,6 +213,7 @@ export function Personal() {
         <div className="flex-shrink-0 bg-background border-b border-border">
           <div className="px-4 py-4">
             <PageHeader
+              favoritePage={FAVORITE_PAGES.PESSOAL_INICIO}
               title="Área Pessoal"
               icon={IconUser}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
@@ -241,6 +242,7 @@ export function Personal() {
         <div className="flex-shrink-0 bg-background border-b border-border">
           <div className="px-4 py-4">
             <PageHeader
+              favoritePage={FAVORITE_PAGES.PESSOAL_INICIO}
               title="Área Pessoal"
               icon={IconUser}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
@@ -268,6 +270,7 @@ export function Personal() {
       <div className="flex-shrink-0 bg-background border-b border-border">
         <div className="px-4 py-4">
           <PageHeader
+            favoritePage={FAVORITE_PAGES.PESSOAL_INICIO}
             title="Área Pessoal"
             icon={IconUser}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
@@ -307,7 +310,7 @@ export function Personal() {
                     <h2 className="text-xl font-bold text-foreground">{user?.name}</h2>
                     <p className="text-sm text-muted-foreground">{user?.position?.name || "Sem cargo"}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant={user?.isActive ? "default" : "destructive"}>
+                      <Badge variant={user?.currentContractStatus === CONTRACT_STATUS.ACTIVE ? "default" : "destructive"}>
                         {user?.currentContractType ? CONTRACT_TYPE_LABELS[user.currentContractType] : "Desconhecido"}
                       </Badge>
                     </div>

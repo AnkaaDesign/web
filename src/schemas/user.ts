@@ -508,16 +508,6 @@ export const userWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      isActive: z
-        .union([
-          z.boolean(),
-          z.object({
-            equals: z.boolean().optional(),
-            not: z.boolean().optional(),
-          }),
-        ])
-        .optional(),
-
       birth: z
         .union([
           z.date(),
@@ -680,7 +670,6 @@ const userFilters = {
   contractStatuses: z.array(z.nativeEnum(CONTRACT_STATUS)).optional(),
   statuses: z.array(z.nativeEnum(CONTRACT_STATUS)).optional(),
   employeeTypes: z.array(z.nativeEnum(EMPLOYEE_TYPE)).optional(),
-  isActive: z.boolean().optional(),
   isVerified: z.boolean().optional(),
   hasPosition: z.boolean().optional(),
   hasSector: z.boolean().optional(),
@@ -787,14 +776,6 @@ const userTransform = (data: any) => {
   if (data.employeeTypes && Array.isArray(data.employeeTypes) && data.employeeTypes.length > 0) {
     andConditions.push({ currentEmployeeType: { in: data.employeeTypes } });
     delete data.employeeTypes;
-  }
-
-  // Handle isActive filter — driven by the null-safe User.isActive column.
-  // Dismissed (isActive:false) = all contracts terminated OR no contract, so
-  // zero-contract users are reachable (unlike currentContractStatus { not }).
-  if (typeof data.isActive === "boolean") {
-    andConditions.push({ isActive: data.isActive });
-    delete data.isActive;
   }
 
   // Handle isVerified filter
@@ -1058,7 +1039,6 @@ export const userCreateSchema = z
       .transform(cleanCPF)
       .refine(isValidCPF, { message: "CPF inválido" }),
     verified: z.boolean().default(false),
-    isActive: z.boolean().default(true),
     performanceLevel: z.number().int().min(0).max(5).default(0),
     // Setor (sector) — required at create time. Drives the Secullum departamento
     // mapping and sector-scoped permissions/reports. userUpdateSchema keeps it
@@ -1206,7 +1186,6 @@ export const userUpdateSchema = z
     pis: pisSchema.nullable().optional(),
     cpf: cpfSchema.nullable().optional(),
     verified: z.boolean().optional(),
-    isActive: z.boolean().optional(),
     performanceLevel: z.number().int().min(0).max(5).optional(),
     sectorId: z.string().uuid("Setor inválido").nullable().optional(),
     password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres").nullable().optional(),
@@ -1526,7 +1505,6 @@ export const mapUserToFormData = createMapToFormDataHelper<User, UserUpdateFormD
   pis: user.pis || undefined,
   cpf: user.cpf || undefined,
   verified: user.verified,
-  isActive: user.isActive,
   performanceLevel: user.performanceLevel,
   sectorId: user.sectorId || undefined,
   password: undefined, // Never map password from existing user

@@ -3,7 +3,7 @@ import { IconCalendarStats } from "@tabler/icons-react";
 import { TaskScheduleCalendar } from "@/components/production/task/schedule/task-schedule-calendar";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const TaskScheduleCalendarPage = () => {
@@ -29,6 +29,7 @@ export const TaskScheduleCalendarPage = () => {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Calendário"
+          favoritePage={FAVORITE_PAGES.PRODUCAO_CALENDARIO}
           icon={IconCalendarStats}
           breadcrumbs={[
             { label: "Início", href: routes.home },

@@ -28,7 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { routes } from "@/constants";
+import { routes, FAVORITE_PAGES, CONTRACT_STATUS } from "@/constants";
 import { formatCurrency } from "@/utils";
 import { getUsers } from "@/api-client";
 import {
@@ -202,7 +202,7 @@ export function OvertimeCostCalculatorPage() {
           take: pageSize,
           skip: (page - 1) * pageSize,
           where: {
-            isActive: true,
+            currentContractStatus: CONTRACT_STATUS.ACTIVE,
             ...(searchTerm
               ? {
                   OR: [
@@ -324,6 +324,7 @@ export function OvertimeCostCalculatorPage() {
       <div className="h-full flex flex-col px-4 pt-4">
         <div className="flex-shrink-0">
           <PageHeader
+            favoritePage={FAVORITE_PAGES.FERRAMENTAS_CUSTO_HORAS_EXTRAS}
             title="Custo de Horas Extras"
             icon={IconCalendarDollar}
             breadcrumbs={[

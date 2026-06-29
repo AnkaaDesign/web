@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Combobox } from '@/components/ui/combobox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { GOAL_METRIC, routes, PAYROLL_EMPLOYEE_TYPES, CONTRACT_STATUS } from '@/constants';
+import { GOAL_METRIC, routes, PAYROLL_EMPLOYEE_TYPES, CONTRACT_STATUS, FAVORITE_PAGES } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
 import { usePayrollTrends, getHrComparisonType } from '@/hooks/personnel-department/use-hr-analytics';
@@ -996,6 +996,7 @@ const PayrollStatisticsPage = () => {
         <PageHeader
           title="Folha de Pagamento"
           icon={IconCash}
+          favoritePage={FAVORITE_PAGES.ESTATISTICAS_DP_FOLHA}
           breadcrumbs={[
             { label: 'Início', href: routes.home },
             { label: 'Estatísticas', href: routes.statistics.root },

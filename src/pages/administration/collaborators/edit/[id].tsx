@@ -155,7 +155,6 @@ const EditCollaboratorPage = () => {
       providerName: user.currentContract?.providerName ?? undefined,
       providerCnpj: user.currentContract?.providerCnpj ?? undefined,
       verified: user.verified,
-      isActive: user.isActive,
       address: user.address ?? null,
       addressNumber: user.addressNumber ?? null,
       addressComplement: user.addressComplement ?? null,

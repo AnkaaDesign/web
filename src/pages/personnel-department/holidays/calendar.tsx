@@ -4,6 +4,7 @@ import { ptBR } from "date-fns/locale";
 import { IconCalendar, IconChevronLeft, IconChevronRight, IconRefresh } from "@tabler/icons-react";
 import { useSecullumHolidays } from "../../../hooks";
 import { PageHeader } from "@/components/ui/page-header";
+import { FAVORITE_PAGES } from "@/constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading";
@@ -64,6 +65,7 @@ export default function HolidayCalendarPage() {
     <div className="container mx-auto py-6 space-y-6">
       <PageHeader
         title="Calendário de Feriados"
+        favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_FERIADOS_CALENDARIO}
         subtitle="Visualização em calendário dos feriados cadastrados no Secullum"
         actions={[
           {

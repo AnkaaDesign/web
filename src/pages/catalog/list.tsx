@@ -29,7 +29,7 @@ export default function CatalogListPage() {
         <div className="flex-shrink-0">
           <PageHeader
             title="Catálogo de Tintas"
-            favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
+            favoritePage={FAVORITE_PAGES.CATALOGO_BASICO_LISTAR}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Catálogo" }]}
             actions={actions}
           />

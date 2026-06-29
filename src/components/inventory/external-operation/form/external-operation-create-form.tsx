@@ -6,7 +6,7 @@ import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconUser, IconPa
 import type { ExternalOperationCreateFormData, ItemGetManyFormData } from "../../../../schemas";
 import { externalOperationCreateSchema } from "../../../../schemas";
 import { useExternalOperationMutations, useItems, useCanViewPrices, useCustomers } from "../../../../hooks";
-import { routes, EXTERNAL_OPERATION_TYPE, EXTERNAL_OPERATION_TYPE_LABELS } from "../../../../constants";
+import { routes, EXTERNAL_OPERATION_TYPE, EXTERNAL_OPERATION_TYPE_LABELS, FAVORITE_PAGES } from "../../../../constants";
 import { ExternalOperationBillingSection, type BillingServiceRow } from "./external-operation-billing-section";
 import type { PaymentConfig } from "@/schemas/task-quote";
 import { toast } from "@/components/ui/sonner";
@@ -1112,6 +1112,7 @@ export const ExternalOperationCreateForm = () => {
         className="flex-shrink-0"
         title="Cadastrar Operação Externa"
         icon={IconPackageExport}
+        favoritePage={FAVORITE_PAGES.ESTOQUE_RETIRADAS_EXTERNAS_CADASTRAR}
         breadcrumbs={[
           { label: "Início", href: "/" },
           { label: "Estoque", href: "/estoque" },

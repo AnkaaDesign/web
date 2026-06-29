@@ -8,6 +8,7 @@ import {
 
 import type { SecullumAbsenceDayRow } from "@/types";
 import {
+  CONTRACT_STATUS,
   SECULLUM_JUSTIFICATIVAS,
   getJustificativaCategory,
   getJustificativaMeta,
@@ -377,7 +378,7 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
     useSecullumAbsenceDays(fetchParams);
 
   const { data: usersData } = useUsers({
-    isActive: true,
+    statuses: [CONTRACT_STATUS.ACTIVE],
     where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,

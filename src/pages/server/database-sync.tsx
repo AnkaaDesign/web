@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { routes } from "../../constants";
+import { FAVORITE_PAGES, routes } from "../../constants";
 import {
   IconDatabase,
   IconRefresh,
@@ -103,6 +103,7 @@ export function DatabaseSyncPage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Sincronização de Banco de Dados"
+          favoritePage={FAVORITE_PAGES.SERVIDOR_SINCRONIZACAO_BD}
           icon={IconDatabase}
           breadcrumbs={[
             { label: "Início", href: routes.home },

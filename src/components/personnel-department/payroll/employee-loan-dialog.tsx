@@ -17,7 +17,7 @@ import { IconInfoCircle, IconLoader2 } from "@tabler/icons-react";
 import { useRegisterLoan } from "../../../hooks";
 import { getUsers } from "../../../api-client";
 import { formatCurrency } from "../../../utils";
-import { EMPLOYEE_TYPE } from "../../../constants";
+import { EMPLOYEE_TYPE, CONTRACT_STATUS } from "../../../constants";
 
 type LoanKind = "COMPANY" | "PAYROLL_CONSIGNED";
 
@@ -93,7 +93,7 @@ export function EmployeeLoanDialog({ open, onOpenChange, userId, onSaved }: Empl
         take: pageSize,
         skip: (page - 1) * pageSize,
         where: {
-          isActive: true,
+          currentContractStatus: CONTRACT_STATUS.ACTIVE,
           currentEmployeeType: EMPLOYEE_TYPE.CLT, // Loans/folha discounts are CLT-only
           ...(searchTerm
             ? {

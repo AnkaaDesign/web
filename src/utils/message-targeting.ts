@@ -5,6 +5,7 @@
  */
 
 import { getUsers } from "@/api-client";
+import { CONTRACT_STATUS } from "@/constants";
 
 export interface TargetingSelection {
   type: 'all' | 'specific' | 'sector' | 'position';
@@ -42,7 +43,7 @@ export async function resolveTargetingToUserIds(targeting: TargetingSelection): 
     const users = await getUsers({
       where: {
         sectorId: { in: targeting.sectorIds },
-        isActive: true,
+        currentContractStatus: CONTRACT_STATUS.ACTIVE,
       },
       select: { id: true },
     });
@@ -57,7 +58,7 @@ export async function resolveTargetingToUserIds(targeting: TargetingSelection): 
     const users = await getUsers({
       where: {
         positionId: { in: targeting.positionIds },
-        isActive: true,
+        currentContractStatus: CONTRACT_STATUS.ACTIVE,
       },
       select: { id: true },
     });

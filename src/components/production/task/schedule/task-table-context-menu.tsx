@@ -30,7 +30,6 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
 
   const { tasks } = contextMenu;
   const isMultiSelection = tasks.length > 1;
-  const hasInProgressTasks = tasks.some((t) => t.status === TASK_STATUS.IN_PRODUCTION);
   // Finalizar is only offered once a task is in production AND every (non-cancelled)
   // service order is complete — including the checkout-driven "Checklist Saída".
   // This makes "ready to finish" explicit instead of letting the API reject it.

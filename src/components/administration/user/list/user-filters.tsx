@@ -3,7 +3,7 @@ import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { getPositions, getSectors } from "../../../../api-client";
-import { CONTRACT_TYPE_LABELS, CONTRACT_STATUS_LABELS, EMPLOYEE_TYPE_LABELS } from "../../../../constants";
+import { CONTRACT_STATUS, CONTRACT_TYPE_LABELS, CONTRACT_STATUS_LABELS, EMPLOYEE_TYPE_LABELS } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
 import { IconFilter, IconUser, IconBriefcase, IconBuilding, IconCalendar, IconEye, IconActivity, IconId } from "@tabler/icons-react";
 import type { UserGetManyFormData } from "../../../../schemas";
@@ -37,8 +37,14 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
   const selectedPositions = localFilters.positionId || [];
   const selectedSectors = localFilters.sectorId || [];
 
-  // "Exibir" tri-state derived from isActive: true → Ativos, false → Demitidos, undefined → Todos.
-  const exibirValue = localFilters.isActive === true ? "active" : localFilters.isActive === false ? "dismissed" : "all";
+  // "Exibir" tri-state derived from the `statuses` filter (→ currentContractStatus):
+  // [ACTIVE] → Ativos, [TERMINATED] → Desligados, undefined → Todos.
+  const exibirValue =
+    localFilters.statuses?.length === 1 && localFilters.statuses[0] === CONTRACT_STATUS.ACTIVE
+      ? "active"
+      : localFilters.statuses?.length === 1 && localFilters.statuses[0] === CONTRACT_STATUS.TERMINATED
+        ? "dismissed"
+        : "all";
 
   const handleApplyFilters = () => {
     // Apply all filters at once using the external callback
@@ -66,11 +72,11 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
   };
 
   const handleExibirChange = (value: string) => {
-    // active → isActive:true; dismissed → isActive:false; all → omit isActive.
-    if (value === "active") setLocalFilters({ ...localFilters, isActive: true });
-    else if (value === "dismissed") setLocalFilters({ ...localFilters, isActive: false });
+    // active → statuses:[ACTIVE]; dismissed → statuses:[TERMINATED]; all → omit statuses.
+    if (value === "active") setLocalFilters({ ...localFilters, statuses: [CONTRACT_STATUS.ACTIVE] });
+    else if (value === "dismissed") setLocalFilters({ ...localFilters, statuses: [CONTRACT_STATUS.TERMINATED] });
     else {
-      const { isActive: _removed, ...rest } = localFilters;
+      const { statuses: _removed, ...rest } = localFilters;
       setLocalFilters(rest);
     }
   };

@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/auth-context";
-import { SECTOR_PRIVILEGES, routes } from "../../constants";
+import { FAVORITE_PAGES, SECTOR_PRIVILEGES, routes } from "../../constants";
 import { hasPrivilege } from "../../utils";
 import { IconFileText, IconRefresh, IconDownload, IconFilter, IconSearch, IconX, IconAlertTriangle, IconInfoCircle, IconCircleCheck, IconFile } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
@@ -160,6 +160,7 @@ export function ServerLogsPage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Logs do Sistema"
+          favoritePage={FAVORITE_PAGES.SERVIDOR_LOGS}
           icon={IconFileText}
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Servidor", href: routes.server.root }, { label: "Logs do Sistema" }]}
         />

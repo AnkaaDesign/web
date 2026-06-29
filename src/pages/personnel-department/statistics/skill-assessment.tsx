@@ -496,12 +496,10 @@ function SkillStatsFilterSheet({
   const fetchUsers = useCallback(async (search: string, page = 1) => {
     const res = await getUsers({
       where: {
-        // `isActive` is the account-enabled flag, NOT employment status — a
-        // dismissed user can still be isActive. Exclude TERMINATED explicitly so
-        // demitidos never appear in HR stats filters (same rule as every other
-        // HR-derived screen).
-        isActive: true,
-        currentContractStatus: { not: CONTRACT_STATUS.TERMINATED },
+        // Filter to ACTIVE employment contracts only — demitidos (TERMINATED)
+        // and any other non-active status never appear in HR stats filters
+        // (same rule as every other HR-derived screen).
+        currentContractStatus: CONTRACT_STATUS.ACTIVE,
         ...(narrowSectorIds ? { sectorId: { in: narrowSectorIds } } : {}),
         ...(narrowPositionIds ? { positionId: { in: narrowPositionIds } } : {}),
         ...(narrowAssessmentIds
@@ -567,7 +565,7 @@ function SkillStatsFilterSheet({
     );
     if (!unknown.length) return;
     let cancelled = false;
-    getUsers({ where: { id: { in: unknown }, isActive: true }, limit: unknown.length } as any)
+    getUsers({ where: { id: { in: unknown }, currentContractStatus: CONTRACT_STATUS.ACTIVE }, limit: unknown.length } as any)
       .then(res => {
         if (cancelled) return;
         (res.data ?? []).forEach((u: any) => {
@@ -2282,7 +2280,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
         <PageHeader
           title="Estatísticas de Competências"
           icon={IconRadar}
-          favoritePage={FAVORITE_PAGES.ESTATISTICAS_DEPARTAMENTO_PESSOAL}
+          favoritePage={FAVORITE_PAGES.ESTATISTICAS_DP_COMPETENCIAS}
           breadcrumbs={[
             { label: 'Início', href: routes.home },
             { label: 'Estatísticas', href: routes.statistics.root },

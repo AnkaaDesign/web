@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconStethoscope, IconCheck } from "@tabler/icons-react";
 
-import { MEDICAL_EXAM_TYPE, routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { MEDICAL_EXAM_TYPE, routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import type { MedicalExamCreateFormData } from "@/schemas/medical-exam";
 import { useMedicalExamMutations } from "@/hooks/occupational-health/use-medical-exams";
 import { useUser } from "@/hooks/personnel-department/use-user";
@@ -87,6 +87,7 @@ export const MedicalExamCreatePage = () => {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <div className="container mx-auto max-w-4xl flex-shrink-0">
           <PageHeader
+            favoritePage={FAVORITE_PAGES.MEDICINA_DO_TRABALHO_ASO_CADASTRAR}
             title="Novo Exame (ASO)"
             icon={IconStethoscope}
             breadcrumbs={[

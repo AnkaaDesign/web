@@ -6,6 +6,7 @@ import { userService } from "../../../../api-client";
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
+import { CONTRACT_STATUS } from "@/constants";
 
 // Sentinel id used to represent the "collective vacations" choice. Anything
 // upstream that consumes the selected value should test for this constant
@@ -57,7 +58,7 @@ export function EmployeeSelect({
       const queryParams: any = {
         page,
         take: 50,
-        where: { isActive: true, secullumEmployeeId: { not: null } },
+        where: { currentContractStatus: CONTRACT_STATUS.ACTIVE, secullumEmployeeId: { not: null } },
         orderBy: { name: "asc" },
         select: {
           id: true,

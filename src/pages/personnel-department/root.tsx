@@ -192,7 +192,7 @@ export const PersonnelDepartmentRootPage = () => {
             <PageHeader
               title="Departamento Pessoal"
               icon={TablerIconUsers}
-              favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CARGOS_LISTAR}
+              favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_RAIZ}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Departamento Pessoal" }]}
               actions={[
                 {
@@ -227,7 +227,7 @@ export const PersonnelDepartmentRootPage = () => {
             <PageHeader
               title="Departamento Pessoal"
               icon={TablerIconUsers}
-              favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CARGOS_LISTAR}
+              favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_RAIZ}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Departamento Pessoal" }]}
               actions={[
                 {
@@ -263,7 +263,7 @@ export const PersonnelDepartmentRootPage = () => {
           <PageHeader
             title="Departamento Pessoal"
             icon={TablerIconUsers}
-            favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CARGOS_LISTAR}
+            favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_RAIZ}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Departamento Pessoal" }]}
             actions={[
               {

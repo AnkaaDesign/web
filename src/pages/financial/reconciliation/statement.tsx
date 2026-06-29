@@ -48,7 +48,7 @@ import { useUrlDialog } from "@/hooks/common/use-url-dialog";
 import { useDebouncedValue } from "@/hooks/common/use-debounced-value";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useToast } from "@/hooks/common/use-toast";
-import { SECTOR_PRIVILEGES, routes } from "@/constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "@/constants";
 import { formatAccountNumber, formatCurrency } from "@/utils";
 import type { BankTransaction, TransactionType } from "@/types/reconciliation";
 
@@ -299,6 +299,7 @@ export const ReconciliationStatementPage = () => {
           variant="list"
           title="Extrato Bancário"
           icon={IconBuildingBank}
+          favoritePage={FAVORITE_PAGES.FINANCEIRO_CONCILIACAO_EXTRATO}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Financeiro", href: routes.financial.root },

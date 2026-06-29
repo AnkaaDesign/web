@@ -3,7 +3,7 @@ import { IconUserShield } from "@tabler/icons-react";
 
 import type { User } from "../../../../types";
 import { userService } from "../../../../api-client";
-import { SECTOR_PRIVILEGES } from "../../../../constants";
+import { SECTOR_PRIVILEGES, CONTRACT_STATUS } from "../../../../constants";
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
@@ -23,13 +23,13 @@ export function SupervisorSelect({ control, disabled, required, initialSuperviso
   const getOptionLabel = useCallback((user: User) => user.name, []);
   const getOptionValue = useCallback((user: User) => user.id, []);
 
-  // Memoize queryFn - filter by isActive: true and sector privileges for supervisors
+  // Memoize queryFn - filter by active contract status and sector privileges for supervisors
   const queryFn = useCallback(async (search: string, page: number = 1) => {
     const queryParams: any = {
       page,
       take: 50,
       where: {
-        isActive: true,
+        currentContractStatus: CONTRACT_STATUS.ACTIVE,
         sector: {
           privileges: {
             in: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES],

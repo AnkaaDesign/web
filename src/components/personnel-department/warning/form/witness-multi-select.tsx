@@ -6,6 +6,7 @@ import { userService } from "../../../../api-client";
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
+import { CONTRACT_STATUS } from "@/constants";
 
 type WitnessOption = { value: string; label: string; position?: string };
 
@@ -35,10 +36,10 @@ export function WitnessMultiSelect({ control, disabled, excludeIds = [], initial
     });
   }, [initialWitnesses?.map(w => w.id).join(',')]);
 
-  // Memoize queryFn - filter by isActive: true for warning witnesses
+  // Memoize queryFn - filter by active contract status for warning witnesses
   const queryFn = useCallback(async (search: string, page: number = 1) => {
     const validExcludeIds = excludeIds.filter((id) => id && id.trim() !== "");
-    const whereClause: any = { isActive: true };
+    const whereClause: any = { currentContractStatus: CONTRACT_STATUS.ACTIVE };
 
     if (validExcludeIds.length > 0) {
       whereClause.id = { notIn: validExcludeIds };

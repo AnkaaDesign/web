@@ -196,7 +196,7 @@ export function Painting() {
             <PageHeader
               title="Pintura"
               icon={IconPalette}
-              favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
+              favoritePage={FAVORITE_PAGES.PINTURA_DASHBOARD}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura" }]}
               actions={[
                 {
@@ -231,7 +231,7 @@ export function Painting() {
             <PageHeader
               title="Pintura"
               icon={IconPalette}
-              favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
+              favoritePage={FAVORITE_PAGES.PINTURA_DASHBOARD}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura" }]}
               actions={[
                 {
@@ -267,7 +267,7 @@ export function Painting() {
           <PageHeader
             title="Pintura"
             icon={IconPalette}
-            favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
+            favoritePage={FAVORITE_PAGES.PINTURA_DASHBOARD}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura" }]}
             actions={[
               {

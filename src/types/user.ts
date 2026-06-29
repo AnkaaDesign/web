@@ -31,7 +31,6 @@ export interface User extends BaseEntity {
   currentContractType: CONTRACT_TYPE | null;
   currentContractStatus: CONTRACT_STATUS | null;
   currentEmployeeType: EMPLOYEE_TYPE | null;
-  isActive: boolean;
   phone: string | null;
   password?: string | null;
   positionId: string | null;
@@ -234,7 +233,6 @@ export interface UserOrderBy {
   currentContractType?: ORDER_BY_DIRECTION;
   currentContractStatus?: ORDER_BY_DIRECTION;
   currentEmployeeType?: ORDER_BY_DIRECTION;
-  isActive?: ORDER_BY_DIRECTION;
   phone?: ORDER_BY_DIRECTION;
   password?: ORDER_BY_DIRECTION;
   pis?: ORDER_BY_DIRECTION;

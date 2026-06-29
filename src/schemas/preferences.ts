@@ -204,6 +204,8 @@ export const preferencesCreateSchema = z
       .optional(),
     dashboardLayoutWeb: jsonValueSchema.nullable().optional(),
     dashboardLayoutMobile: jsonValueSchema.nullable().optional(),
+    tableConfigsWeb: jsonValueSchema.nullable().optional(),
+    detailConfigsWeb: jsonValueSchema.nullable().optional(),
   })
   .transform(toFormData);
 
@@ -224,6 +226,8 @@ export const preferencesUpdateSchema = z
       .optional(),
     dashboardLayoutWeb: jsonValueSchema.nullable().optional(),
     dashboardLayoutMobile: jsonValueSchema.nullable().optional(),
+    tableConfigsWeb: jsonValueSchema.nullable().optional(),
+    detailConfigsWeb: jsonValueSchema.nullable().optional(),
   })
   .transform(toFormData);
 

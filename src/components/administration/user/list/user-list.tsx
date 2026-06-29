@@ -105,10 +105,10 @@ export function UserList({ className, teamScope }: UserListProps) {
       filters.employeeTypes = employeeTypes.split(",") as any;
     }
 
-    // Exibir (tri-state): isActive=true → Ativos, false → Demitidos, omit → Todos.
-    const isActive = params.get("isActive");
-    if (isActive !== null) {
-      filters.isActive = isActive === "true";
+    // Exibir (tri-state): statuses=[ACTIVE] → Ativos, [TERMINATED] → Desligados, omit → Todos.
+    const statuses = params.get("statuses");
+    if (statuses) {
+      filters.statuses = statuses.split(",") as any;
     }
 
     // Parse entity filters (support both single and multiple selections)
@@ -230,8 +230,8 @@ export function UserList({ className, teamScope }: UserListProps) {
     if (filters.contractStatuses?.length) params.contractStatuses = filters.contractStatuses.join(",");
     if (filters.employeeTypes?.length) params.employeeTypes = filters.employeeTypes.join(",");
 
-    // Exibir tri-state (only serialize when explicitly Ativos/Demitidos; Todos omits).
-    if (typeof filters.isActive === "boolean") params.isActive = String(filters.isActive);
+    // Exibir tri-state (only serialize when explicitly Ativos/Desligados; Todos omits).
+    if (filters.statuses?.length) params.statuses = filters.statuses.join(",");
 
     // Entity filters
     if (filters.positionId?.length) params.positions = filters.positionId.join(",");
@@ -291,8 +291,8 @@ export function UserList({ className, teamScope }: UserListProps) {
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
       // Exibir defaults to "Ativos" so the landing list shows active collaborators;
-      // the user can switch to Demitidos (isActive:false) or Todos (omit) in the filter sheet.
-      isActive: true,
+      // the user can switch to Desligados ([TERMINATED]) or Todos (omit) in the filter sheet.
+      statuses: [CONTRACT_STATUS.ACTIVE],
     },
     searchDebounceMs: 500,
     searchParamName: "search", // Use "search" for URL compatibility
@@ -368,9 +368,9 @@ export function UserList({ className, teamScope }: UserListProps) {
     }
 
     // Filtering by dismissal date implies dismissed vínculos: force Exibir to
-    // Demitidos (isActive:false) so the active default does not hide the matches.
+    // Desligados (statuses:[TERMINATED]) so the active default does not hide the matches.
     if (hasDismissedAtFilter) {
-      result.isActive = false;
+      result.statuses = [CONTRACT_STATUS.TERMINATED];
     }
 
     if (teamScope) {

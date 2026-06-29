@@ -1,7 +1,7 @@
 import { ActivityList } from "@/components/inventory/activity/list/activity-list";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { TEAM_LEADER, routes } from "../../constants";
+import { TEAM_LEADER, routes, FAVORITE_PAGES } from "../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const TeamMovementsPage = () => {
@@ -16,6 +16,7 @@ export const TeamMovementsPage = () => {
         <PageHeader
           className="flex-shrink-0"
           variant="list"
+          favoritePage={FAVORITE_PAGES.MINHA_EQUIPE_MOVIMENTACOES_LISTAR}
           title="Movimentações da Equipe"
           breadcrumbs={[
             { label: "Início", href: routes.home },

@@ -6,7 +6,7 @@ import type { UserGetManyFormData } from "../../../../schemas";
 import { useUsers, useSectors, usePositions } from "../../../../hooks";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { getCurrentPayrollPeriod } from "../../../../utils";
-import { EMPLOYEE_TYPE } from "../../../../constants";
+import { CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../../constants";
 
 // Extended filters with UI-only fields for payroll
 interface PayrollFiltersData extends Partial<UserGetManyFormData> {
@@ -34,7 +34,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
     include: { position: true, sector: true },
     where: {
       // Only active CLT users with payroll number registered in Secullum (folha is CLT-only)
-      isActive: true,
+      currentContractStatus: CONTRACT_STATUS.ACTIVE,
       currentEmployeeType: EMPLOYEE_TYPE.CLT,
       payrollNumber: { not: null },
       secullumEmployeeId: { not: null },

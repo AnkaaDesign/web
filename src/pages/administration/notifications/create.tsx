@@ -24,7 +24,7 @@ import {
   IconBellRinging,
   IconX,
 } from "@tabler/icons-react";
-import { FAVORITE_PAGES } from "../../../constants";
+import { FAVORITE_PAGES, CONTRACT_STATUS } from "../../../constants";
 import { apiClient } from "@/api-client/axiosClient";
 
 // =====================
@@ -73,7 +73,7 @@ export const CreateNotificationPage = () => {
     const response = await apiClient.get("/users", {
       params: {
         searchingFor: searchTerm || undefined,
-        where: { isActive: true },
+        where: { currentContractStatus: CONTRACT_STATUS.ACTIVE },
         select: JSON.stringify({
           id: true,
           name: true,

@@ -6,7 +6,7 @@ import { z } from "zod";
 import { IconLoader2, IconCheck, IconPackage } from "@tabler/icons-react";
 import type { BorrowCreateFormData, ItemGetManyFormData } from "../../../../schemas";
 import { useBorrowBatchMutations, useUsers } from "../../../../hooks";
-import { routes, FAVORITE_PAGES } from "../../../../constants";
+import { routes, FAVORITE_PAGES, CONTRACT_STATUS } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
@@ -98,7 +98,7 @@ export const BorrowBatchCreateForm = () => {
 
   // Only fetch users for the dropdown selector
   const { data: usersResponse } = useUsers({
-    isActive: true,
+    statuses: [CONTRACT_STATUS.ACTIVE],
     orderBy: { name: "asc" },
     take: 100,
     include: { sector: true },

@@ -37,6 +37,12 @@ export interface DetailRowProps {
   className?: string;
   /** Slot rendered to the right of the value (e.g. inline actions/icons). */
   trailing?: React.ReactNode;
+  /** Interactive props — let the whole row act as a click/keyboard target (inline edit). */
+  onDoubleClick?: React.MouseEventHandler<HTMLDivElement>;
+  onKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
+  role?: string;
+  tabIndex?: number;
+  title?: string;
 }
 
 const TONE_CLASSES: Record<NonNullable<DetailRowProps["tone"]>, string> = {
@@ -53,6 +59,11 @@ export function DetailRow({
   tone = "muted",
   trailing,
   className,
+  onDoubleClick,
+  onKeyDown,
+  role,
+  tabIndex,
+  title,
 }: DetailRowProps) {
   const containerCls = cn(
     "rounded-lg px-4",
@@ -64,7 +75,7 @@ export function DetailRow({
   );
 
   return (
-    <div className={containerCls}>
+    <div className={containerCls} onDoubleClick={onDoubleClick} onKeyDown={onKeyDown} role={role} tabIndex={tabIndex} title={title}>
       <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
         {Icon ? <Icon className="h-4 w-4" /> : null}
         <span>{label}</span>
@@ -74,10 +85,12 @@ export function DetailRow({
           "flex items-center gap-2",
           block
             ? "text-sm text-foreground"
-            : "text-sm font-semibold text-foreground text-right",
+            : // inline: right-aligned, capped at ~half the row so long values wrap instead of
+              // crowding the label.
+              "min-w-0 max-w-[55%] justify-end text-right text-sm font-semibold text-foreground",
         )}
       >
-        <div className={cn(block && "w-full whitespace-pre-wrap leading-relaxed")}>
+        <div className={cn("min-w-0", block ? "w-full whitespace-pre-wrap leading-relaxed" : "whitespace-pre-wrap break-words")}>
           {value ?? <span className="text-muted-foreground italic">—</span>}
         </div>
         {trailing}

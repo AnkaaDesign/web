@@ -18,6 +18,7 @@ import {
   WEEK_DAY_LABELS,
   MONTH,
   MONTH_LABELS,
+  CONTRACT_STATUS,
 } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
@@ -104,7 +105,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
         orderBy: { name: "asc" },
         page: page,
         take: 50,
-        where: { isActive: true },
+        where: { currentContractStatus: CONTRACT_STATUS.ACTIVE },
       };
 
       // Only add searchingFor if there's a search term

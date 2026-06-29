@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/auth-context";
-import { SECTOR_PRIVILEGES, routes } from "../../constants";
+import { FAVORITE_PAGES, SECTOR_PRIVILEGES, routes } from "../../constants";
 import { hasAnyPrivilege } from "../../utils";
 import {
   IconFolderShare,
@@ -631,6 +631,7 @@ export function ServerFileManagerPage() {
           <div className="flex-shrink-0">
             <PageHeader
               title={currentSubPath ? currentSubPath.split("/").pop() || selectedFolder : selectedFolder}
+              favoritePage={FAVORITE_PAGES.SERVIDOR_GERENCIADOR_ARQUIVOS}
               icon={IconFolder}
               breadcrumbs={getBreadcrumbs()}
               actions={[
@@ -675,6 +676,7 @@ export function ServerFileManagerPage() {
         <div className="flex-shrink-0">
           <PageHeader
             title="Gerenciador de Arquivos"
+            favoritePage={FAVORITE_PAGES.SERVIDOR_GERENCIADOR_ARQUIVOS}
             icon={IconFolderShare}
             breadcrumbs={getBreadcrumbs()}
             actions={[

@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { BorrowGetManyFormData } from "../../../../schemas";
 import { useUsers, useItems } from "../../../../hooks";
+import { CONTRACT_STATUS } from "../../../../constants";
 
 function renderFilterIcon(iconType?: string) {
   if (!iconType) return null;
@@ -52,7 +53,7 @@ export function FilterIndicators({ filters, onFilterChange, className }: FilterI
   const { data: users } = useUsers({
     limit: 100,
     orderBy: { name: "asc" },
-    where: { status: "ACTIVE" },
+    where: { currentContractStatus: CONTRACT_STATUS.ACTIVE },
   });
 
   const { data: items } = useItems({

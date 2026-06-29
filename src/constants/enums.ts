@@ -2418,7 +2418,7 @@ export enum FAVORITE_PAGES {
   ESTOQUE_ESTATISTICAS_MOVIMENTACAO = "/estatisticas/estoque/movimentacao",
   STATISTICS_CONSUMPTION = "/estatisticas/estoque/consumo",
   ESTATISTICAS_PRODUCAO = "/estatisticas/producao",
-  ESTATISTICAS_PEDIDOS = "/estatisticas/pedidos",
+  ESTATISTICAS_PEDIDOS = "/estatisticas/estoque/pedidos",
   ESTATISTICAS_DEPARTAMENTO_PESSOAL = "/estatisticas/departamento-pessoal",
   ESTATISTICAS_FINANCEIRO = "/estatisticas/financeiro",
   ESTATISTICAS_FINANCEIRO_COBRANCAS = "/estatisticas/financeiro/cobrancas",
@@ -2535,13 +2535,13 @@ export enum FAVORITE_PAGES {
   DEPARTAMENTO_PESSOAL_EPI_AGENDAMENTOS_CADASTRAR = "/medicina-do-trabalho/epi/agendamentos/cadastrar",
   DEPARTAMENTO_PESSOAL_SETORES_CADASTRAR = "/departamento-pessoal/setores/cadastrar",
   DEPARTAMENTO_PESSOAL_BONUS_LISTAR = "/departamento-pessoal/bonus",
-  DEPARTAMENTO_PESSOAL_NIVEIS_DESEMPENHO_LISTAR = "/departamento-pessoal/niveis-de-desempenho",
+  DEPARTAMENTO_PESSOAL_NIVEIS_DESEMPENHO_LISTAR = "/departamento-pessoal/bonus/nivel-de-performance",
 
   // Personal - List Pages
   PESSOAL_FERIADOS_LISTAR = "/pessoal/feriados",
   PESSOAL_MEUS_EPIS_LISTAR = "/pessoal/meus-epis",
   PESSOAL_MEUS_EMPRESTIMOS_LISTAR = "/pessoal/meus-emprestimos",
-  PESSOAL_MINHAS_ATIVIDADES_LISTAR = "/pessoal/minhas-atividades",
+  PESSOAL_MINHAS_ATIVIDADES_LISTAR = "/pessoal/minhas-movimentacoes",
   PESSOAL_MINHAS_ADVERTENCIAS_LISTAR = "/pessoal/minhas-advertencias",
   PESSOAL_MEUS_PONTOS = "/pessoal/meus-pontos",
 
@@ -2640,6 +2640,88 @@ export enum FAVORITE_PAGES {
   SERVIDOR_IMPLANTACOES_LISTAR = "/servidor/implantacoes",
   FERRAMENTAS_PALETA = "/ferramentas/paleta",
   FERRAMENTAS = "/ferramentas",
+
+  // ===== Favorites coverage batch 2 — navigable pages previously missing the star =====
+
+  // Departamento Pessoal — Controle de Ponto subviews
+  DEPARTAMENTO_PESSOAL_CONTROLE_PONTO_COLABORADOR_LISTAR = "/departamento-pessoal/controle-ponto/colaborador",
+  DEPARTAMENTO_PESSOAL_CONTROLE_PONTO_DIA_LISTAR = "/departamento-pessoal/controle-ponto/dia",
+  DEPARTAMENTO_PESSOAL_CONTROLE_PONTO_EDICAO_LISTAR = "/departamento-pessoal/controle-ponto/edicao",
+  DEPARTAMENTO_PESSOAL_CONTROLE_PONTO_AUSENCIAS_LISTAR = "/departamento-pessoal/controle-ponto/ausencias",
+  DEPARTAMENTO_PESSOAL_CONTROLE_PONTO_FECHAMENTO_LISTAR = "/departamento-pessoal/controle-ponto/fechamento",
+
+  // Domain root/dashboard pages
+  ESTOQUE_RAIZ = "/estoque",
+  ADMINISTRACAO_DASHBOARD = "/administracao",
+  PINTURA_DASHBOARD = "/pintura",
+  DEPARTAMENTO_PESSOAL_RAIZ = "/departamento-pessoal",
+  PESSOAL_INICIO = "/pessoal",
+  SERVIDOR_INICIO = "/servidor",
+
+  // Produção
+  PRODUCAO_CALENDARIO = "/producao/calendario",
+  ESTATISTICAS_PRODUCAO_PRODUTIVIDADE = "/estatisticas/producao/produtividade",
+  ESTATISTICAS_PRODUCAO_DESEMPENHO = "/estatisticas/producao/desempenho",
+  ESTATISTICAS_PRODUCAO_GARGALOS = "/estatisticas/producao/gargalos",
+  ESTATISTICAS_PRODUCAO_VALOR_BONUS = "/estatisticas/producao/valor-bonus",
+
+  // Departamento Pessoal — bonus/cargos/integrações/cadastros + estatísticas
+  DEPARTAMENTO_PESSOAL_BONUS_SIMULACAO = "/departamento-pessoal/bonus/simulacao-de-bonus",
+  DEPARTAMENTO_PESSOAL_CARGOS_HIERARQUIA = "/departamento-pessoal/cargos/hierarquia",
+  DEPARTAMENTO_PESSOAL_INTEGRACAO_SECULLUM = "/departamento-pessoal/integracoes/secullum",
+  DEPARTAMENTO_PESSOAL_RESCISOES_CADASTRAR = "/departamento-pessoal/rescisoes/cadastrar",
+  DEPARTAMENTO_PESSOAL_BENEFICIOS_CADASTRAR = "/departamento-pessoal/beneficios/cadastrar",
+  DEPARTAMENTO_PESSOAL_BENEFICIOS_ADESOES_CADASTRAR = "/departamento-pessoal/beneficios/adesoes/cadastrar",
+  ESTATISTICAS_DP_FOLHA = "/estatisticas/departamento-pessoal/folha",
+  ESTATISTICAS_DP_CUSTO_FOLHA = "/estatisticas/departamento-pessoal/custo-folha",
+  ESTATISTICAS_DP_EQUIPE = "/estatisticas/departamento-pessoal/equipe",
+  ESTATISTICAS_DP_FALTAS = "/estatisticas/departamento-pessoal/faltas",
+  ESTATISTICAS_DP_COMPETENCIAS = "/estatisticas/departamento-pessoal/competencias",
+
+  // Financeiro
+  FINANCEIRO_CONCILIACAO_EXTRATO = "/financeiro/conciliacao/extrato",
+  FINANCEIRO_CONCILIACAO_CATEGORIAS = "/financeiro/conciliacao/categorias",
+  FINANCEIRO_CONTAS_RECORRENTES_CADASTRAR = "/financeiro/contas-recorrentes/cadastrar",
+
+  // Medicina do Trabalho — cadastros
+  MEDICINA_DO_TRABALHO_ASO_CADASTRAR = "/medicina-do-trabalho/aso/cadastrar",
+  MEDICINA_DO_TRABALHO_AFASTAMENTOS_CADASTRAR = "/medicina-do-trabalho/afastamentos/cadastrar",
+  MEDICINA_DO_TRABALHO_FISPQ_CADASTRAR = "/medicina-do-trabalho/fispq/cadastrar",
+  MEDICINA_DO_TRABALHO_CAT_CADASTRAR = "/medicina-do-trabalho/cat/cadastrar",
+
+  // Pessoal
+  PESSOAL_MENSAGENS_LISTAR = "/pessoal/mensagens",
+  PESSOAL_ADVERTENCIAS_LISTAR = "/pessoal/advertencias",
+
+  // Minha Equipe
+  MINHA_EQUIPE_MEMBROS_LISTAR = "/meu-pessoal/usuarios",
+  MINHA_EQUIPE_EMPRESTIMOS_LISTAR = "/meu-pessoal/emprestimos",
+  MINHA_EQUIPE_ADVERTENCIAS_LISTAR = "/meu-pessoal/advertencias",
+  MINHA_EQUIPE_EPIS_LISTAR = "/meu-pessoal/epis",
+  MINHA_EQUIPE_MOVIMENTACOES_LISTAR = "/meu-pessoal/movimentacoes",
+  MINHA_EQUIPE_CONTROLE_PONTO_LISTAR = "/meu-pessoal/calculos",
+
+  // Ferramentas
+  FERRAMENTAS_QR_CODE = "/ferramentas/qr-code",
+  FERRAMENTAS_CALCULADORA_MISTURA = "/ferramentas/calculadora-de-mistura",
+  FERRAMENTAS_CALCULADORA_HORAS = "/ferramentas/calculadora-de-horas",
+  FERRAMENTAS_CUSTO_HORAS_EXTRAS = "/ferramentas/custo-horas-extras",
+  FERRAMENTAS_CERTIFICADO_RESIDUOS = "/ferramentas/certificado-residuos",
+
+  // Servidor
+  SERVIDOR_BACKUP = "/servidor/backup",
+  SERVIDOR_SINCRONIZACAO_BD = "/servidor/sincronizacao-bd",
+  SERVIDOR_GERENCIADOR_ARQUIVOS = "/servidor/gerenciador-de-arquivos",
+  SERVIDOR_LOGS = "/servidor/logs",
+  SERVIDOR_METRICAS = "/servidor/metricas",
+  SERVIDOR_SERVICOS = "/servidor/servicos",
+  SERVIDOR_REGISTROS_ALTERACOES_LISTAR = "/servidor/registros-de-alteracoes",
+
+  // Perfil
+  PERFIL_NOTIFICACOES = "/perfil/notificacoes",
+
+  // Administração
+  ADMINISTRACAO_APLICATIVOS_LISTAR = "/administracao/aplicativos",
 }
 
 export enum LAYOUT_SIDE {

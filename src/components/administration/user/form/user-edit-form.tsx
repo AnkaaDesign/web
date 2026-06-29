@@ -48,7 +48,6 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
       providerName: user.currentContract?.providerName ?? undefined,
       providerCnpj: user.currentContract?.providerCnpj ?? undefined,
       verified: user.verified,
-      isActive: user.isActive, // Fix: Include isActive from user data
       birth: toDate(user.birth),
       positionId: user.positionId,
       performanceLevel: user.performanceLevel,

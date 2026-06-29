@@ -6,6 +6,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { IconCalendar, IconFileText, IconUsers, IconAlertTriangle } from "@tabler/icons-react";
 import { getUsers, getSectors, getPositions } from "@/api-client";
+import { CONTRACT_STATUS } from "@/constants";
 
 interface MessageMetadata {
   title: string;
@@ -127,7 +128,7 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
                     take: pageSize,
                     skip: (page - 1) * pageSize,
                     where: {
-                      isActive: true,
+                      currentContractStatus: CONTRACT_STATUS.ACTIVE,
                       ...(searchTerm ? {
                         OR: [
                           { name: { contains: searchTerm, mode: 'insensitive' as const } },

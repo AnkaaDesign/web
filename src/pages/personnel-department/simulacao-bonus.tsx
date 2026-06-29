@@ -1,5 +1,5 @@
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { routes, SECTOR_PRIVILEGES } from "../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconCalculator } from "@tabler/icons-react";
@@ -19,6 +19,7 @@ export default function BonusSimulationPage() {
           className="flex-shrink-0"
           title="Simulação de Bônus"
           icon={IconCalculator}
+          favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_BONUS_SIMULACAO}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Administração", href: routes.administration.root },

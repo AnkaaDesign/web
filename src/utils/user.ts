@@ -6,26 +6,6 @@ import { dateUtils } from "./date";
 type PrivilegeCheckUser = User | AuthUser;
 
 /**
- * Get user status color
- */
-export function getUserStatusColor(status: CONTRACT_TYPE | CONTRACT_STATUS): string {
-  const colors: Record<string, string> = {
-    // Lifecycle status (situação) of the current vínculo.
-    [CONTRACT_STATUS.ACTIVE]: "green",
-    [CONTRACT_STATUS.TERMINATED]: "gray",
-    // Contract modality (experiência now reads from contractType).
-    [CONTRACT_TYPE.EXPERIENCE_PERIOD_1]: "blue",
-    [CONTRACT_TYPE.EXPERIENCE_PERIOD_2]: "orange",
-    [CONTRACT_TYPE.INDETERMINATE]: "green",
-    [CONTRACT_TYPE.FIXED_TERM]: "blue",
-    [CONTRACT_TYPE.APPRENTICE]: "blue",
-    [CONTRACT_TYPE.INTERMITTENT]: "purple",
-    [CONTRACT_TYPE.TEMPORARY]: "purple",
-  };
-  return colors[status] || "default";
-}
-
-/**
  * Check if user is active (current vínculo not terminated)
  */
 export function isUserActive(user: User): boolean {
@@ -703,7 +683,8 @@ export interface CollaboratorStatusOptions {
 /**
  * Single source of truth for a collaborator's display SITUAÇÃO: derives the
  * label + semantic badge variant from the user's cache fields. Precedence is
- * first-match-wins; `isActive` is THE employed signal. "Efetivado" is produced
+ * first-match-wins; `currentContractStatus` is THE employed signal (TERMINATED →
+ * desligado, null → sem vínculo). "Efetivado" is produced
  * ONLY by the INDETERMINATE+ACTIVE rule, never from any other modality.
  * Experiência is derived from the contract TYPE (EXPERIENCE_PERIOD_1 vs _2),
  * not from a status. Afastado / aviso prévio are optional overlays.
@@ -714,7 +695,7 @@ export function getCollaboratorStatus(user: User, opts?: CollaboratorStatusOptio
   const employeeType = user.currentEmployeeType;
 
   // 1. Dismissed with an explicitly terminated bond.
-  if (user.isActive === false && status === CONTRACT_STATUS.TERMINATED) {
+  if (status === CONTRACT_STATUS.TERMINATED) {
     let label = "Desligado";
     const timeSince = formatTimeSinceStatusChangeCompact(user);
     if (timeSince) {
@@ -723,8 +704,8 @@ export function getCollaboratorStatus(user: User, opts?: CollaboratorStatusOptio
     return { key: "TERMINATED", label, variant: "red" };
   }
 
-  // 2. Inactive without a (terminated) contract → no employment bond.
-  if (user.isActive === false) {
+  // 2. No current contract (vínculo) → no employment bond.
+  if (status == null) {
     return { key: "NO_CONTRACT", label: "Sem vínculo", variant: "gray" };
   }
 

@@ -1,4 +1,4 @@
-import { routes } from "../../constants";
+import { FAVORITE_PAGES, routes } from "../../constants";
 import { IconServer, IconSettings, IconUserCog, IconFolders, IconChartLine, IconFileText, IconRefresh, IconActivity, IconDatabaseImport, IconDatabase } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
@@ -37,6 +37,7 @@ export function ServerRootPage() {
       <div className="flex-shrink-0 bg-background px-4 pt-4">
         <PageHeader
             title="Gerenciamento do Servidor"
+            favoritePage={FAVORITE_PAGES.SERVIDOR_INICIO}
             icon={IconServer}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Servidor" }]}
             actions={[

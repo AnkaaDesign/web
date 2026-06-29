@@ -562,6 +562,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
         requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
       },
       {
+        id: "aplicativos-moveis",
+        title: "Aplicativos Móveis",
+        icon: "deployment",
+        path: "/administracao/aplicativos",
+        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
+      },
+      {
         id: "avaliacao-competencias-admin",
         title: "Aval. de Competências",
         icon: "clipboardList",

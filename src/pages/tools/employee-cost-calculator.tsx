@@ -11,7 +11,7 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES, BENEFIT_KIND, BENEFIT_ENROLLMENT_STATUS } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES, BENEFIT_KIND, BENEFIT_ENROLLMENT_STATUS, CONTRACT_STATUS } from "@/constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { formatCurrency } from "@/utils";
 import { getUsers, getUserBenefits } from "@/api-client";
@@ -70,7 +70,7 @@ function EmployeeCostCalculatorContent() {
         take: pageSize,
         skip: (page - 1) * pageSize,
         where: {
-          isActive: true,
+          currentContractStatus: CONTRACT_STATUS.ACTIVE,
           ...(searchTerm
             ? {
                 OR: [

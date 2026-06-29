@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Combobox } from '@/components/ui/combobox';
-import { routes, SECTOR_PRIVILEGES } from '@/constants';
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useProductionBottlenecks } from '@/hooks/production/use-production-analytics';
 import type { ProductionAnalyticsFilters } from '@/types/production-analytics';
@@ -500,6 +500,7 @@ const BottlenecksPage = () => {
       <div className="flex-shrink-0">
         <PageHeader
           title="Análise de Gargalos"
+          favoritePage={FAVORITE_PAGES.ESTATISTICAS_PRODUCAO_GARGALOS}
           icon={IconAlertTriangle}
           breadcrumbs={[
             { label: 'Início', href: routes.home },

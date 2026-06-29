@@ -10,7 +10,7 @@ import type { OrderUpdateFormData } from "../../../../schemas";
 import type { Order, OrderItem } from "../../../../types";
 import { orderUpdateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useCanViewPrices } from "../../../../hooks";
-import { routes, ORDER_STATUS, ORDER_PAYMENT_STATUS, ORDER_PAYMENT_STATUS_LABELS } from "../../../../constants";
+import { routes, ORDER_STATUS, ORDER_PAYMENT_STATUS, ORDER_PAYMENT_STATUS_LABELS, CONTRACT_STATUS } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -755,7 +755,11 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       // (that label is derived from an order with no payment method) instead of staying on a
       // PIX method that can never be paid. Other methods (boleto/cartão) are self-defining.
       const pixCleared = currentPaymentMethod === "PIX" && !(currentPaymentPix || "").trim();
-      const resolvedPaymentMethod = pixCleared ? null : currentPaymentMethod || undefined;
+      // Send null (not undefined) when there is no method so the API actually CLEARS the
+      // column. undefined is skipped on the API (field left untouched), which would keep the
+      // old method on the order — so removing the payment method would never stick and the
+      // status badge would stay "Aguardando Pagamento" instead of deriving "A Definir".
+      const resolvedPaymentMethod = pixCleared ? null : currentPaymentMethod || null;
 
       const data = {
         description: description!.trim(),
@@ -1369,7 +1373,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 queryFn={async (searchTerm: string, page = 1) => {
                                   const { getUsers } = await import("../../../../api-client");
                                   const response = await getUsers({
-                                    where: { isActive: true },
+                                    where: { currentContractStatus: CONTRACT_STATUS.ACTIVE },
                                     orderBy: { name: "asc" },
                                     page,
                                     take: 50,

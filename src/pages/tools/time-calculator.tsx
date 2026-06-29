@@ -4,7 +4,7 @@ import { IconClock, IconArrowBackUp } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { routes } from "@/constants";
+import { routes, FAVORITE_PAGES } from "@/constants";
 import { cn } from "@/lib/utils";
 
 import {
@@ -370,6 +370,7 @@ export function TimeCalculatorPage() {
     <div className="h-full flex flex-col px-4 pt-4">
       <div className="flex-shrink-0">
         <PageHeader
+          favoritePage={FAVORITE_PAGES.FERRAMENTAS_CALCULADORA_HORAS}
           title="Calculadora de Horas"
           icon={IconClock}
           breadcrumbs={[

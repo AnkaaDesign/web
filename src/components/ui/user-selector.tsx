@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { getUsers } from "@/api-client";
+import { CONTRACT_STATUS } from "@/constants";
 
 interface UserSelectorProps {
   value?: string;
@@ -63,7 +64,7 @@ export function UserSelector({
         take: pageSize,
         skip: (page - 1) * pageSize,
         where: {
-          isActive: true,
+          currentContractStatus: CONTRACT_STATUS.ACTIVE,
           ...additionalWhere,
           ...(searchTerm ? {
             OR: [

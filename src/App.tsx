@@ -9,7 +9,7 @@ import { routes } from "./constants";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthProvider } from "@/contexts/auth-context";
 import { SidebarProvider } from "@/contexts/sidebar-context";
-import { PricingProvider } from "@/contexts/pricing-context";
+import { PricingProvider, PricingVisibilityBoundary } from "@/contexts/pricing-context";
 import { FavoritesProvider } from "@/contexts/favorites-context";
 import { FileViewerProvider } from "@/components/common/file/file-viewer";
 import { MessageModalProvider } from "@/components/common/message-modal";
@@ -53,6 +53,8 @@ const HomePage = lazy(() => import("@/pages/home").then((module) => ({ default: 
 
 // Hidden auto-running tutorial — public, no auth, for screen-recording demos. Delete file when done.
 const DashboardDemoPage = lazy(() => import("@/pages/dashboard-demo").then((module) => ({ default: module.DashboardDemoPage })));
+const DataTableDemoPage = lazy(() => import("@/pages/data-table-demo").then((module) => ({ default: module.DataTableDemoPage })));
+const DetailPageDemoPage = lazy(() => import("@/pages/detail-page-demo/[id]").then((module) => ({ default: module.DetailPageDemoPage })));
 
 // Favorites
 const FavoritesPage = lazy(() => import("@/pages/favorites").then((module) => ({ default: module.FavoritesPage })));
@@ -173,6 +175,7 @@ const AdministrationSectorsEdit = lazy(() => import("@/pages/administration/sect
 const AdministrationSectorsDetails = lazy(() => import("@/pages/administration/sectors/details/[id]").then((module) => ({ default: module.SectorDetailPage })));
 const AdministrationSectorsBatchEdit = lazy(() => import("@/pages/administration/sectors/batch-edit").then((module) => ({ default: module.SectorBatchEditPage })));
 const AdministrationGoalsList = lazy(() => import("@/pages/administration/goals").then((module) => ({ default: module.GoalListPage })));
+const AppDistributionPage = lazy(() => import("@/pages/administration/app-distribution").then((module) => ({ default: module.AppDistributionPage })));
 
 const AdministrationNotifications = lazy(() => import("@/pages/administration/notifications/list").then((module) => ({ default: module.NotificationListPage })));
 const AdministrationNotificationsEdit = lazy(() => import("@/pages/administration/notifications/edit/[id]").then((module) => ({ default: module.EditNotificationPage })));
@@ -424,6 +427,7 @@ const ProductionTasksBatchEdit = lazy(() => import("@/pages/production/schedule/
 const ProductionTasksCreate = lazy(() => import("@/pages/production/schedule/create"));
 const ProductionTasksEdit = lazy(() => import("@/pages/production/schedule/edit/[id]").then((module) => ({ default: module.TaskEditPage })));
 const ProductionTasksDetails = lazy(() => import("@/pages/production/schedule/details/[id]").then((module) => ({ default: module.TaskDetailsPage })));
+const ProductionPreparationDetails = lazy(() => import("@/components/production/task/detail-v2/task-detail-page").then((module) => ({ default: module.TaskDetailPage })));
 // ProductionTaskQuote removed - migrated to FinancialBudgetDetail
 const ProductionPreparation = lazy(() => import("@/pages/production/preparation").then((module) => ({ default: module.PreparationPage })));
 const ProductionGarages = lazy(() => import("@/pages/production/barracoes").then((module) => ({ default: module.GaragesPage })));
@@ -604,6 +608,7 @@ function App() {
                         <MessageModalProvider>
                           <Toaster />
                           <PushNotificationSetup />
+                          <PricingVisibilityBoundary>
                           <Routes>
                             {/* Auth routes */}
                             <Route element={<AuthLayout />}>
@@ -638,6 +643,27 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <FavoritesPage />
+                    </Suspense>
+                  }
+                />
+
+                {/* DataTable base-components demo */}
+                <Route
+                  path="/data-table-demo"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <DataTableDemoPage />
+                    </Suspense>
+                  }
+                />
+
+                {/* Detail-page base-components demo (open a row from the DataTable demo) */}
+                <Route path="/detail-page-demo" element={<Navigate to="/detail-page-demo/order-1" replace />} />
+                <Route
+                  path="/detail-page-demo/:id"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <DetailPageDemoPage />
                     </Suspense>
                   }
                 />
@@ -759,7 +785,7 @@ function App() {
                   path={routes.production.preparation.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <ProductionTasksDetails />
+                      <ProductionPreparationDetails />
                     </Suspense>
                   }
                 />
@@ -1315,6 +1341,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <AdministrationGoalsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.appDistribution.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AppDistributionPage />
                     </Suspense>
                   }
                 />
@@ -3571,6 +3605,7 @@ function App() {
                             {/* 404 Not Found route */}
                             <Route path="*" element={<NotFound />} />
                           </Routes>
+                          </PricingVisibilityBoundary>
                         </MessageModalProvider>
                       </FileViewerProvider>
                     </FavoritesProvider>

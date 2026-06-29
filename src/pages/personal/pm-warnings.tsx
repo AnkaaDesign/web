@@ -1,4 +1,4 @@
-import { routes } from "../../constants";
+import { routes, FAVORITE_PAGES } from "../../constants";
 import { PageHeader } from "@/components/ui/page-header";
 import { WarningList } from "@/components/personnel-department/warning/list";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -9,6 +9,7 @@ export const PmWarningsPage = () => {
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
+        favoritePage={FAVORITE_PAGES.PESSOAL_ADVERTENCIAS_LISTAR}
         variant="list"
         title="Advertências"
         breadcrumbs={[

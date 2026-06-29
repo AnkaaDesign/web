@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { TimeClockAbsenceOverview } from "@/components/personnel-department/time-clock-entry/time-clock-absence-overview";
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { TimeClockTabs } from "./time-clock-tabs";
 
@@ -22,6 +22,7 @@ export default function TimeClockAusenciasPage() {
         <PageHeader
           className="flex-shrink-0"
           title="Ausências"
+          favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CONTROLE_PONTO_AUSENCIAS_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Departamento Pessoal", href: routes.personnelDepartment.root },

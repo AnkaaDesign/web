@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/auth-context";
-import { SECTOR_PRIVILEGES, routes } from "../../constants";
+import { FAVORITE_PAGES, SECTOR_PRIVILEGES, routes } from "../../constants";
 import { hasPrivilege } from "../../utils";
 import { IconSettings, IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconRefresh, IconEye, IconAlertCircle, IconCheck, IconX } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
@@ -131,6 +131,7 @@ export function ServerServicesPage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Serviços do Sistema"
+          favoritePage={FAVORITE_PAGES.SERVIDOR_SERVICOS}
           icon={IconSettings}
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Servidor", href: routes.server.root }, { label: "Serviços do Sistema" }]}
           actions={[

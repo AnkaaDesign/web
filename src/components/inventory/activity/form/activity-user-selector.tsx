@@ -45,15 +45,14 @@ export const ActivityUserSelector = ({
   }, [initialUser?.id]);
 
   // Async query function for Combobox with pagination
-  // Filter: isActive: true includes all active users regardless of status
-  // (includes dismissed third-party workers who still have isActive: true)
+  // Filter: currentContractStatus ACTIVE = active vínculo
   const queryFn = useCallback(async (searchTerm: string, page: number = 1) => {
     const pageSize = 50;
     const response = await getUsers({
       take: pageSize,
       skip: (page - 1) * pageSize,
       where: {
-        isActive: true,
+        currentContractStatus: CONTRACT_STATUS.ACTIVE,
         ...(searchTerm ? {
           OR: [
             { name: { contains: searchTerm, mode: "insensitive" } },

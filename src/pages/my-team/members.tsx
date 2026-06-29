@@ -1,4 +1,4 @@
-import { routes, TEAM_LEADER } from "../../constants";
+import { routes, TEAM_LEADER, FAVORITE_PAGES } from "../../constants";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
@@ -13,6 +13,7 @@ export default function MyTeamMembersPage() {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"
+          favoritePage={FAVORITE_PAGES.MINHA_EQUIPE_MEMBROS_LISTAR}
           title="Membros da Equipe"
           breadcrumbs={[
             { label: "Início", href: routes.home },

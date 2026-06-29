@@ -12,7 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { IconCheck, IconClipboardList } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES, QUESTIONNAIRE_STATUS, QUESTIONNAIRE_STATUS_LABELS } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, QUESTIONNAIRE_STATUS, QUESTIONNAIRE_STATUS_LABELS, CONTRACT_STATUS } from "@/constants";
 import {
   useCreateQuestionnaire,
   useOpenQuestionnaire,
@@ -68,7 +68,7 @@ export const QuestionnaireCreatePage = () => {
     isActive: true,
     limit: 1000,
   });
-  const { data: usersResp } = useUsers({ orderBy: { name: "asc" }, where: { isActive: true }, limit: 500 } as any);
+  const { data: usersResp } = useUsers({ orderBy: { name: "asc" }, where: { currentContractStatus: CONTRACT_STATUS.ACTIVE }, limit: 500 } as any);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as any,

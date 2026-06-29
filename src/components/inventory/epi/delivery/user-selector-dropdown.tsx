@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { getUsers } from "../../../../api-client";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import type { User } from "../../../../types";
+import { CONTRACT_STATUS } from "@/constants";
 
 interface UserSelectorDropdownProps {
   value?: string;
@@ -12,7 +13,7 @@ interface UserSelectorDropdownProps {
 
 export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione um funcionário", disabled = false }: UserSelectorDropdownProps) {
   // Async query function for the combobox
-  // Filter by isActive: true to only show active users for EPI delivery
+  // Filter by active contract status to only show active users for EPI delivery
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
     try {
       const queryParams: any = {
@@ -20,7 +21,7 @@ export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione
         page: page,
         take: 50,
         where: {
-          isActive: true
+          currentContractStatus: CONTRACT_STATUS.ACTIVE
         },
         select: {
           id: true,

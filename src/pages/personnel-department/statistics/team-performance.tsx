@@ -13,7 +13,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { GOAL_METRIC, routes } from '@/constants';
+import { GOAL_METRIC, routes, FAVORITE_PAGES } from '@/constants';
 import { CONTRACT_TYPE, CONTRACT_STATUS } from '@/constants/enums';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
@@ -1466,6 +1466,7 @@ const EquipePage = () => {
           <PageHeader
             title="Equipe"
             icon={IconUsers}
+            favoritePage={FAVORITE_PAGES.ESTATISTICAS_DP_EQUIPE}
             breadcrumbs={[
               { label: 'Início', href: routes.home },
               { label: 'Estatísticas', href: routes.statistics.root },

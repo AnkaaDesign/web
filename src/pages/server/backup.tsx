@@ -1088,7 +1088,7 @@ const BackupManagementPage = () => {
           <PageHeader
             title="Gerenciamento de Backups"
             icon={IconDatabase}
-            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_LISTAR} // Reusing existing favorite
+            favoritePage={FAVORITE_PAGES.SERVIDOR_BACKUP}
             breadcrumbs={[{ label: "Início", href: "/" }, { label: "Administração", href: "/administracao" }, { label: "Backups" }]}
             actions={actions}
           />

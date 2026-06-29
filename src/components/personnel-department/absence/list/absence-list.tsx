@@ -6,6 +6,7 @@ import { IconCalendar, IconChevronLeft, IconChevronRight } from "@tabler/icons-r
 
 import type { SecullumAggregatedAbsence } from "../../../../types";
 import {
+  CONTRACT_STATUS,
   VACATION_JUSTIFICATIVA_ID,
 } from "../../../../constants";
 import {
@@ -80,7 +81,7 @@ export function AbsenceList({ className }: AbsenceListProps) {
   const [editing, setEditing] = useState<SecullumAggregatedAbsence | null>(null);
 
   const { data: usersData, isLoading: usersLoading } = useUsers({
-    isActive: true,
+    statuses: [CONTRACT_STATUS.ACTIVE],
     where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,

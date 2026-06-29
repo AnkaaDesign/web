@@ -11,7 +11,7 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { toast } from "@/components/ui/sonner";
-import { routes } from "@/constants";
+import { routes, FAVORITE_PAGES } from "@/constants";
 import { getApiBaseUrl } from "@/utils/file";
 import { CertificatePdfPreview } from "@/components/common/file/certificate-pdf-preview";
 import {
@@ -252,6 +252,7 @@ export function WasteCertificateToolPage() {
     <div className="h-full flex flex-col px-4 pt-4 pb-4 overflow-hidden">
       <div className="flex-shrink-0">
         <PageHeader
+          favoritePage={FAVORITE_PAGES.FERRAMENTAS_CERTIFICADO_RESIDUOS}
           title="Certificado de Resíduos"
           icon={IconRecycle}
           breadcrumbs={[

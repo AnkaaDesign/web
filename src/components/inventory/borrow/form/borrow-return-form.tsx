@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconPackage, IconUser, IconCalendar, IconArrowLeft, IconCheck, IconExclamationCircle } from "@tabler/icons-react";
 import { type Borrow } from "../../../../types";
-import { BORROW_STATUS, routes } from "../../../../constants";
+import { BORROW_STATUS, CONTRACT_STATUS, routes } from "../../../../constants";
 import { formatDateTime, formatRelativeTime } from "../../../../utils";
 import { toast } from "@/components/ui/sonner";
 import { useBorrowMutations } from "../../../../hooks";
@@ -24,7 +24,7 @@ import {
 interface BorrowReturnFormProps {
   borrow: Borrow & {
     item?: { name: string; uniCode?: string; quantity?: number; measureUnit?: string; itemCategory?: { name: string; type: string } };
-    user?: { name: string; email?: string; status?: string; isActive?: boolean; position?: { name: string } };
+    user?: { name: string; email?: string; status?: string; currentContractStatus?: CONTRACT_STATUS | null; position?: { name: string } };
   };
   onCancel: () => void;
 }
@@ -65,10 +65,10 @@ export function BorrowReturnForm({ borrow, onCancel }: BorrowReturnFormProps) {
         errors.push("Informações do usuário não encontradas");
       }
 
-      // Validate the borrower's ACCOUNT is still active (warning only). Uses
-      // isActive, not the vínculo lifecycle, so a third-party/experiência/afastado
-      // borrower isn't wrongly flagged as "inativo".
-      if (borrow.user && borrow.user.isActive === false) {
+      // Validate the borrower's current vínculo is still active (warning only).
+      // Only flag when we know the contract status and it is NOT active (a
+      // dismissed borrower with no active employment contract).
+      if (borrow.user && borrow.user.currentContractStatus != null && borrow.user.currentContractStatus !== CONTRACT_STATUS.ACTIVE) {
         toast.warning("Aviso: Usuário do empréstimo está inativo");
       }
 
@@ -222,9 +222,9 @@ export function BorrowReturnForm({ borrow, onCancel }: BorrowReturnFormProps) {
                   <label className="text-sm text-muted-foreground">Nome</label>
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium">{borrow.user?.name || "-"}</p>
-                    {borrow.user?.isActive !== undefined && (
-                      <Badge variant={borrow.user.isActive ? "default" : "destructive"} className="text-xs">
-                        {borrow.user.isActive ? "Ativo" : "Inativo"}
+                    {borrow.user?.currentContractStatus != null && (
+                      <Badge variant={borrow.user.currentContractStatus === CONTRACT_STATUS.ACTIVE ? "default" : "destructive"} className="text-xs">
+                        {borrow.user.currentContractStatus === CONTRACT_STATUS.ACTIVE ? "Ativo" : "Inativo"}
                       </Badge>
                     )}
                   </div>

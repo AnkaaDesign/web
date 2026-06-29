@@ -6,7 +6,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { IconFilter, IconTruck, IconUser, IconPackage, IconCalendarEvent, IconCalendarPlus } from "@tabler/icons-react";
 import { getUsers, getItems } from "../../../../api-client";
 import type { PpeDeliveryGetManyFormData } from "../../../../schemas";
-import { PPE_DELIVERY_STATUS, PPE_DELIVERY_STATUS_LABELS } from "../../../../constants";
+import { PPE_DELIVERY_STATUS, PPE_DELIVERY_STATUS_LABELS, CONTRACT_STATUS } from "../../../../constants";
 
 interface PpeDeliveryFiltersProps {
   open: boolean;
@@ -97,7 +97,7 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
     try {
       const queryParams: any = {
-        where: { isActive: true },
+        where: { currentContractStatus: CONTRACT_STATUS.ACTIVE },
         orderBy: { name: "asc" },
         page: page,
         take: 50,

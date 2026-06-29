@@ -763,10 +763,13 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         const isNotificationEndpoint = config.url?.includes("/notifications") || config.url?.includes("/seen-notifications");
         // Skip notifications for copy-from operations - they're handled by the calling component
         const isCopyFromOperation = config.url?.includes("/copy-from");
+        // Skip notifications for preferences - these are background auto-saves (dashboard
+        // layout, DataTable column/sort/filter layout) that would spam a toast on every tweak.
+        const isPreferences = config.url?.includes("/preferences");
         // Only show success if the response indicates success
         const isSuccess = (response.data?.success as boolean | undefined) !== false; // Show success unless explicitly false
 
-        if (!isBatchOperation && !isMarkViewed && !isNotificationEndpoint && !isCopyFromOperation && isSuccess && !metadata?.suppressToast) {
+        if (!isBatchOperation && !isMarkViewed && !isNotificationEndpoint && !isCopyFromOperation && !isPreferences && isSuccess && !metadata?.suppressToast) {
           const message = response.data?.message || getSuccessMessage(config.method);
           notify.success("Sucesso", message);
         }
@@ -887,11 +890,14 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         const isFileUpload = config?.url?.includes("/files/upload");
         // Skip notifications for notification-related endpoints - these are background operations
         const isNotificationEndpoint = config?.url?.includes("/notifications") || config?.url?.includes("/seen-notifications");
+        // Preferences are background auto-saves; their failures are retried silently by
+        // useTablePreferences, so don't spam an error toast on a transient outage.
+        const isPreferences = config?.url?.includes("/preferences");
 
         // Check if we should show this toast (deduplication check)
         const shouldShow = retryTracker.shouldShowToast(metadata.url, metadata.method, errorInfo.message);
 
-        if (!isBatchOperation && !isFileUpload && !isNotificationEndpoint && shouldShow) {
+        if (!isBatchOperation && !isFileUpload && !isNotificationEndpoint && !isPreferences && shouldShow) {
           // For rate limit errors, show specialized message
           if (errorInfo.category === ErrorCategory.RATE_LIMIT) {
             notify.error("Limite de Requisições", errorInfo.message, {

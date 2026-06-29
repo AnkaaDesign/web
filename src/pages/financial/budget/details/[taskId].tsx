@@ -1006,8 +1006,20 @@ export const FinancialBudgetDetailPage = () => {
         const layoutChanged =
           resolvedLayoutIds.length !== persistedLayoutIds.length ||
           resolvedLayoutIds.some((id, i) => id !== persistedLayoutIds[i]);
+        // Detect service reordering via ordered comparison of service ids vs the
+        // persisted ones. A pure drag-reorder does not flip dirty.services (RHF
+        // carries each item's dirty state along when it moves), so the dirty-flag
+        // check alone would miss it — mirror the layoutChanged approach.
+        const persistedServiceIds = (existingQuote.services || []).map(
+          (s: any) => s.id,
+        ) as string[];
+        const currentServiceIds = validServices.map((s: any) => s.id);
+        const servicesReordered =
+          currentServiceIds.length !== persistedServiceIds.length ||
+          currentServiceIds.some((id: any, i: number) => id !== persistedServiceIds[i]);
         const quoteFieldDirty =
           layoutChanged ||
+          servicesReordered ||
           Boolean(
             dirty.expiresAt ||
               dirty.subtotal ||

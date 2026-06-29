@@ -30,7 +30,7 @@ export interface VacationCreateSubmit {
   soldThird?: boolean;
   notes?: string | null;
 }
-import { EMPLOYEE_TYPE } from "../../../../constants";
+import { EMPLOYEE_TYPE, CONTRACT_STATUS } from "../../../../constants";
 import type { User } from "../../../../types";
 import { getUsers } from "../../../../api-client";
 import { useUser } from "../../../../hooks/personnel-department/use-user";
@@ -66,7 +66,7 @@ type VacationFormProps = (CreateModeProps | UpdateModeProps) & {
 
 // Eligibility query: active (não-desligado) colaboradores CLT (folha de
 // pagamento) — espelha o gate CLT do servidor (isPayrollEmployeeType).
-const ELIGIBLE_VACATION_WHERE = { isActive: true, where: { currentEmployeeType: EMPLOYEE_TYPE.CLT } } as const;
+const ELIGIBLE_VACATION_WHERE = { statuses: [CONTRACT_STATUS.ACTIVE], where: { currentEmployeeType: EMPLOYEE_TYPE.CLT } } as const;
 
 export function VacationForm(props: VacationFormProps) {
   const vacation = props.mode === "update" ? props.vacation : undefined;

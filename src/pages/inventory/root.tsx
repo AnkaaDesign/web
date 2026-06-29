@@ -375,7 +375,7 @@ export const InventoryRootPage = () => {
             <PageHeader
               title="Estoque"
               icon={IconPackage}
-              favoritePage={FAVORITE_PAGES.ESTATISTICAS_ESTOQUE}
+              favoritePage={FAVORITE_PAGES.ESTOQUE_RAIZ}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
               actions={[
                 {
@@ -410,7 +410,7 @@ export const InventoryRootPage = () => {
             <PageHeader
               title="Estoque"
               icon={IconPackage}
-              favoritePage={FAVORITE_PAGES.ESTATISTICAS_ESTOQUE}
+              favoritePage={FAVORITE_PAGES.ESTOQUE_RAIZ}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
               actions={[
                 {
@@ -446,7 +446,7 @@ export const InventoryRootPage = () => {
           <PageHeader
             title="Estoque"
             icon={IconPackage}
-            favoritePage={FAVORITE_PAGES.ESTATISTICAS_ESTOQUE}
+            favoritePage={FAVORITE_PAGES.ESTOQUE_RAIZ}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
             actions={[
               {

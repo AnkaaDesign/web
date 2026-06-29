@@ -3,7 +3,7 @@ import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { getBenefits } from "../../../../api-client/benefit";
 import { userService } from "../../../../api-client";
-import { BENEFIT_ENROLLMENT_STATUS_LABELS, BENEFIT_KIND_LABELS } from "../../../../constants";
+import { BENEFIT_ENROLLMENT_STATUS_LABELS, BENEFIT_KIND_LABELS, CONTRACT_STATUS } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
 import { IconCategory, IconFilter, IconGift, IconProgressCheck, IconUser } from "@tabler/icons-react";
 import type { UserBenefitGetManyFormData } from "../../../../schemas/benefit";
@@ -124,7 +124,7 @@ export function UserBenefitFilters({ open, onOpenChange, filters, onFilterChange
         orderBy: { name: "asc" },
         page: page,
         take: 50,
-        isActive: true, // enrollments only apply to active collaborators
+        statuses: [CONTRACT_STATUS.ACTIVE], // enrollments only apply to active collaborators
       };
 
       if (searchTerm && searchTerm.trim()) {

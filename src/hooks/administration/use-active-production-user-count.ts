@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { SECTOR_PRIVILEGES } from "@/constants";
+import { SECTOR_PRIVILEGES, CONTRACT_STATUS } from "@/constants";
 import { useUsers } from "@/hooks/personnel-department/use-user";
 
 /**
@@ -21,7 +21,7 @@ export function useActiveProductionUserCount(options?: {
   const { data, isLoading } = useUsers(
     enabled
       ? {
-          isActive: true,
+          statuses: [CONTRACT_STATUS.ACTIVE],
           includeSectorPrivileges: [SECTOR_PRIVILEGES.PRODUCTION],
           ...(sectorIds && sectorIds.length > 0
             ? { sectorIds }

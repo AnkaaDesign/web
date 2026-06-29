@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { getUsers, getUserById } from "../../../../api-client";
-import { EMPLOYEE_TYPE, CONTRACT_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
+import { EMPLOYEE_TYPE, CONTRACT_TYPE, CONTRACT_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useUserMutations } from "../../../../hooks";
 import type { User } from "../../../../types";
 
@@ -67,11 +67,11 @@ export function AdminUserSelector<_T extends FieldValues = FieldValues>({
   }, [initialUser, selectedUserData?.id]);
 
   // Async query function for the combobox
-  // Filter by isActive: true and specific statuses for admin user selection
+  // Filter active users (currentContractStatus ACTIVE) plus specific sector privileges for admin user selection
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
     try {
       const queryParams: any = {
-        where: { isActive: true },
+        where: { currentContractStatus: CONTRACT_STATUS.ACTIVE },
         orderBy: { name: "asc" },
         page: page,
         take: 50,
@@ -132,7 +132,6 @@ export function AdminUserSelector<_T extends FieldValues = FieldValues>({
         },
         verified: false,
         performanceLevel: 0,
-        isActive: true,
         isSectorLeader: false, // Required field
         email: null,
         phone: null,

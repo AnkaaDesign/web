@@ -24,7 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Combobox } from '@/components/ui/combobox';
-import { GOAL_METRIC, routes, SECTOR_PRIVILEGES } from '@/constants';
+import { GOAL_METRIC, routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useTaskPerformanceStats } from '@/hooks/production/use-production-analytics';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
@@ -1321,6 +1321,7 @@ const TaskPerformancePage = () => {
       <div className="flex-shrink-0">
         <PageHeader
           title="Desempenho"
+          favoritePage={FAVORITE_PAGES.ESTATISTICAS_PRODUCAO_DESEMPENHO}
           icon={IconActivity}
           breadcrumbs={[
             { label: 'Início', href: routes.home },

@@ -21,7 +21,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -173,6 +173,7 @@ export const PositionHierarchyPage = () => {
           <PageHeader
             title="Hierarquia de Cargos"
             icon={IconBriefcase}
+            favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_CARGOS_HIERARQUIA}
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "Departamento Pessoal", href: routes.personnelDepartment.root },

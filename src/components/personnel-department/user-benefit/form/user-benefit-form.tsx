@@ -9,7 +9,7 @@ import type { User } from "../../../../types";
 import type { Benefit, UserBenefit } from "../../../../types/benefit";
 import type { UserBenefitCreateFormData, UserBenefitUpdateFormData } from "../../../../schemas/benefit";
 import { userBenefitCreateSchema } from "../../../../schemas/benefit";
-import { routes, BENEFIT_KIND, BENEFIT_KIND_LABELS, BENEFIT_ENROLLMENT_STATUS } from "../../../../constants";
+import { routes, BENEFIT_KIND, BENEFIT_KIND_LABELS, BENEFIT_ENROLLMENT_STATUS, CONTRACT_STATUS } from "../../../../constants";
 import { userService } from "../../../../api-client";
 import { getBenefits } from "../../../../api-client/benefit";
 import { useUserBenefitMutations } from "../../../../hooks/personnel-department/use-user-benefits";
@@ -161,7 +161,7 @@ export function UserBenefitForm(props: UserBenefitFormProps) {
     const queryParams: any = {
       page,
       take: 50,
-      where: { isActive: true },
+      where: { currentContractStatus: CONTRACT_STATUS.ACTIVE },
       orderBy: { name: "asc" },
       // remunerations = salário-base do cargo, usado no preview Empresa × Colaborador
       include: { position: { include: { remunerations: true } }, sector: true },
