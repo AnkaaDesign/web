@@ -16,8 +16,9 @@ import {
   getBadgeVariant,
 } from "@/constants";
 import { canViewServiceOrderType } from "@/utils/permissions/service-order-permissions";
+import { IconCalendarEvent } from "@tabler/icons-react";
 import { formatCurrency } from "@/utils/number";
-import { formatDateTime, getDurationBetweenDates } from "@/utils/date";
+import { formatDate, formatDateTime, getDurationBetweenDates } from "@/utils/date";
 import { formatChassis } from "@/utils/formatters";
 import { calculateTaskMeasures, formatTaskMeasures } from "@/utils/task-measures";
 import type { Task } from "@/types";
@@ -71,16 +72,58 @@ function isToday(date: Date): boolean {
 
 /**
  * Forecast date with the Agenda status indicators: green = vehicle already entered, blue = released
- * ("Liberado"), red = overdue, yellow = due today. (The legacy violet "rescheduled" flag is omitted
- * here because it required loading the full forecast history — a perf cost we deliberately trimmed.)
+ * ("Liberado"), red = overdue, yellow = due today. The violet top-right corner flag (hover popup)
+ * marks a forecast that was MANUALLY rescheduled — `task-prep-page` fetches just the latest MANUAL
+ * forecastHistory row (take:1) so this is restored without reloading the full history.
  */
 function ForecastDateCell({ task }: { task: Task }) {
   const date = task.forecastDate ? new Date(task.forecastDate) : null;
-  if (!date) return <span className="text-muted-foreground">-</span>;
 
-  const text = formatDateTime(date);
-  const entered = !!task.entryDate && task.status !== TASK_STATUS.COMPLETED;
+  // Latest manual reschedule (the include already filters to source MANUAL + previousDate, newest
+  // first, take:1 — but keep the guard so it's correct even if a fuller history is ever passed).
   const cleared = !!task.cleared;
+  const lastManualReschedule = task.forecastHistory
+    ?.filter((h) => h.source === "MANUAL" && h.previousDate)
+    ?.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())?.[0];
+  const rescheduled = !!lastManualReschedule && !cleared;
+
+  // Top-right corner flag (same purple as the "aguardando arte" SO badge, bg-purple-600). The cell is
+  // a relative, full-width container so the flag pins to the column's top-right corner.
+  const flag = rescheduled && lastManualReschedule ? (
+    <Tooltip delayDuration={300}>
+      <TooltipTrigger asChild>
+        <div className="absolute top-0 right-0 z-[5] h-0 w-0 border-t-[22px] border-l-[22px] border-l-transparent border-t-purple-600 pointer-events-auto cursor-help">
+          <IconCalendarEvent className="absolute -top-[20px] right-[1px] h-2.5 w-2.5 text-white" style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.35))" }} />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="left" className="max-w-md p-4">
+        <div className="space-y-2 text-[15px]">
+          <div className="text-base font-semibold text-purple-600">Previsão reagendada</div>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <span>{formatDate(lastManualReschedule.previousDate)}</span>
+            <span className="text-purple-600">→</span>
+            <span className="font-medium text-foreground">{formatDate(lastManualReschedule.newDate)}</span>
+          </div>
+          {lastManualReschedule.reason && (
+            <div className="border-t border-border/60 pt-2 italic leading-relaxed text-muted-foreground">
+              {lastManualReschedule.reason}
+            </div>
+          )}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  ) : null;
+
+  if (!date) {
+    return (
+      <div className="forecast-date relative">
+        <span className="text-muted-foreground">-</span>
+        {flag}
+      </div>
+    );
+  }
+
+  const entered = !!task.entryDate && task.status !== TASK_STATUS.COMPLETED;
 
   let className = "";
   let title = "";
@@ -98,16 +141,34 @@ function ForecastDateCell({ task }: { task: Task }) {
     title = "Previsão para hoje";
   }
 
-  if (!title) return <span className="tabular-nums">{text}</span>;
+  // Responsive "dd/mm[/yy] - hh:mm": the 2-digit year is wrapped in `.forecast-year`, which the
+  // `.forecast-date` container query hides when the column is narrow. The 4-digit year is never shown.
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yy = String(date.getFullYear()).slice(-2);
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mi = String(date.getMinutes()).padStart(2, "0");
+  const dateText = (extra: string) => (
+    <span className={`tabular-nums whitespace-nowrap ${extra}`}>
+      {dd}/{mm}
+      <span className="forecast-year">/{yy}</span> - {hh}:{mi}
+    </span>
+  );
+
   return (
-    <Tooltip delayDuration={500}>
-      <TooltipTrigger asChild>
-        <span className={`tabular-nums cursor-help ${className}`}>{text}</span>
-      </TooltipTrigger>
-      <TooltipContent side="top">
-        <span className={className.split(" ")[0]}>{title}</span>
-      </TooltipContent>
-    </Tooltip>
+    <div className="forecast-date relative">
+      {!title ? (
+        dateText("")
+      ) : (
+        <Tooltip delayDuration={500}>
+          <TooltipTrigger asChild>{dateText(`cursor-help ${className}`)}</TooltipTrigger>
+          <TooltipContent side="top">
+            <span className={className.split(" ")[0]}>{title}</span>
+          </TooltipContent>
+        </Tooltip>
+      )}
+      {flag}
+    </div>
   );
 }
 

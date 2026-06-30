@@ -72,12 +72,21 @@ import type { Task } from "@/types";
 import { clusterTasks, type ClusteredTask } from "./cluster-tasks";
 import { createTaskPreparationColumns, TASK_PREP_SECTOR_DEFAULTS } from "./task-prep-columns";
 
-// Trimmed include — only what the columns render (vs. the legacy 3-7 MB payload). No forecastHistory,
-// no truck layouts. The only nested billing data is the quote's customerConfigs customer names (the
-// FINANCIAL "Faturar Para" column). `assignedToId` is the one extra scalar we keep so the progress
-// cell can flag "pending assigned to you".
+// Trimmed include — only what the columns render (vs. the legacy 3-7 MB payload). No truck layouts
+// beyond the minimal Medidas fields. The only nested billing data is the quote's customerConfigs
+// customer names (the FINANCIAL "Faturar Para" column). `assignedToId` is the one extra scalar we keep
+// so the progress cell can flag "pending assigned to you".
 const LIST_INCLUDE = {
   serviceOrders: { select: { id: true, type: true, status: true, assignedToId: true, description: true, observation: true } },
+  // Forecast "reagendada" flag on the date cell: fetch ONLY the latest MANUAL reschedule (not the full
+  // history that the legacy view loaded). where+orderBy+take:1 keeps this a single tiny row per task,
+  // so the violet hover indicator is restored without the payload cost the migration trimmed.
+  forecastHistory: {
+    select: { source: true, previousDate: true, newDate: true, reason: true, createdAt: true },
+    where: { source: "MANUAL", previousDate: { not: null } },
+    orderBy: { createdAt: "desc" },
+    take: 1,
+  },
   customer: { select: { id: true, fantasyName: true, corporateName: true } },
   truck: {
     select: {

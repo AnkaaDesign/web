@@ -812,6 +812,27 @@ input[type="time"]::-moz-calendar-picker-indicator {
   transition: filter 0.2s ease;
 }
 
+/*
+ * Responsive forecast date (Agenda "Previsão" column). The cell is a size
+ * container; the 2-digit year only renders when the column is wide enough,
+ * otherwise it collapses to "dd/mm - hh:mm". The 4-digit year is never shown.
+ */
+.forecast-date {
+  container-type: inline-size;
+  /* Needs an explicit width: as a flex item, inline-size containment would otherwise
+     collapse this box to 0 (contents ignored for sizing) and the corner flag would jump
+     to the left edge. width:100% gives the container query the real column width. */
+  width: 100%;
+}
+.forecast-date .forecast-year {
+  display: none;
+}
+@container (min-width: 110px) {
+  .forecast-date .forecast-year {
+    display: inline;
+  }
+}
+
 /* Price value element masking */
 .price-value {
   transition: filter 0.15s ease;
