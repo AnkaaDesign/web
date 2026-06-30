@@ -1,6 +1,9 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { toast } from "sonner";
+// The app mounts the custom Toaster (@/components/ui/sonner) which strips background/padding from
+// raw sonner toasts — use the wrapper so the validation-error toast renders styled.
+import { toast } from "@/components/ui/sonner";
+import { IconArrowBackUp } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +35,9 @@ const TEXT_INPUT_TYPE: Partial<Record<FieldDataType, "text" | "number" | "intege
   cep: "cep",
 };
 const TEXT_LIKE = new Set<FieldDataType>(["text", "number", "integer", "decimal", "money", "percentage", "cpf", "cnpj", "phone", "pis", "cep"]);
+
+// How long the inline "Desfazer" affordance stays on the field after a successful edit.
+const UNDO_SECONDS = 5;
 
 // A click counts as "outside the editor" only when it is neither inside the editor container
 // NOR inside a popover/calendar portal opened by it (combobox list, date picker). Capture-phase
@@ -204,6 +210,10 @@ function RelationEditor<TData>({ field, edit, row, onCommit, onCancel }: EditorP
   useOutsideDismiss(ref, onCancel, true);
   const current = (edit.get(row) as string | null) ?? undefined;
   const useAsync = !!edit.loadOptions;
+  // Seed the combobox with the current selection (resolved from the row) + any static options, so the
+  // trigger shows the LABEL immediately on open instead of the raw id while loadOptions resolves.
+  const seed = [...(edit.currentOptions?.(row) ?? []), ...(edit.options ?? [])];
+  const seedOpts = seed.length ? seed : undefined;
   return (
     <div ref={ref} onKeyDown={(e) => e.key === "Escape" && onCancel()}>
       <Combobox
@@ -213,8 +223,8 @@ function RelationEditor<TData>({ field, edit, row, onCommit, onCancel }: EditorP
         async={useAsync}
         queryKey={useAsync ? [field.id, "relation-options"] : undefined}
         queryFn={useAsync ? (s, p) => edit.loadOptions!(s, p) : undefined}
-        options={useAsync ? undefined : edit.options}
-        initialOptions={edit.options}
+        options={useAsync ? undefined : seedOpts}
+        initialOptions={seedOpts}
         minSearchLength={0}
         clearable
         searchable
@@ -231,6 +241,10 @@ function MultiselectEditor<TData>({ field, edit, row, onCommit, onCancel }: Edit
   useOutsideDismiss(ref, onCancel, true);
   const current = Array.isArray(edit.get(row)) ? (edit.get(row) as string[]) : [];
   const useAsync = !!edit.loadOptions;
+  // Seed with the current selections (resolved from the row) + static options so the chips render
+  // labels immediately instead of raw ids before loadOptions resolves.
+  const seed = [...(edit.currentOptions?.(row) ?? []), ...(edit.options ?? [])];
+  const seedOpts = seed.length ? seed : undefined;
   return (
     <div ref={ref} onKeyDown={(e) => e.key === "Escape" && onCancel()}>
       <Combobox
@@ -242,8 +256,8 @@ function MultiselectEditor<TData>({ field, edit, row, onCommit, onCancel }: Edit
         async={useAsync}
         queryKey={useAsync ? [field.id, "multiselect-options"] : undefined}
         queryFn={useAsync ? (s, p) => edit.loadOptions!(s, p) : undefined}
-        options={useAsync ? undefined : edit.options}
-        initialOptions={edit.options}
+        options={useAsync ? undefined : seedOpts}
+        initialOptions={seedOpts}
         minSearchLength={0}
         clearable
         searchable
@@ -290,10 +304,86 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
   // Inline rows keep a constant height whether showing text or an h-8 editor (no jump on edit).
   const inlineRowCls = field.block ? undefined : "min-h-[2.5rem] py-1";
 
+  // Inline "Desfazer" affordance: after a successful edit we park the previous value and a live
+  // countdown right ON the field (not a corner toast), so the undo sits next to what changed and
+  // disappears after UNDO_SECONDS.
+  const [undo, setUndo] = useState<{ previousValue: unknown } | null>(null);
+  const [remaining, setRemaining] = useState(0);
+  const undoTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Pause the countdown without losing the parked value/time (used on hover/focus of the button).
+  const pauseUndo = useCallback(() => {
+    if (undoTimer.current) {
+      clearInterval(undoTimer.current);
+      undoTimer.current = null;
+    }
+  }, []);
+
+  const clearUndo = useCallback(() => {
+    pauseUndo();
+    setUndo(null);
+    setRemaining(0);
+  }, [pauseUndo]);
+
+  // (Re)start the per-second tick from whatever `remaining` currently is — drives both the initial
+  // countdown and resume-after-hover.
+  const runCountdown = useCallback(() => {
+    pauseUndo();
+    undoTimer.current = setInterval(() => {
+      setRemaining((r) => {
+        if (r <= 1) {
+          pauseUndo();
+          setUndo(null);
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+  }, [pauseUndo]);
+
+  const startUndo = useCallback((previousValue: unknown) => {
+    setUndo({ previousValue });
+    setRemaining(UNDO_SECONDS);
+    runCountdown();
+  }, [runCountdown]);
+
+  // Resume the tick when the pointer leaves the button — only if an undo is still parked with time left.
+  const resumeUndo = useCallback(() => {
+    if (undo && remaining > 0 && !undoTimer.current) runCountdown();
+  }, [undo, remaining, runCountdown]);
+
+  // Stop the countdown if the field unmounts mid-window.
+  useEffect(() => () => clearUndo(), [clearUndo]);
+
   const begin = useCallback(() => {
-    if (canEdit && !pending) setEditing(true);
-  }, [canEdit, pending]);
+    if (canEdit && !pending) {
+      clearUndo(); // a fresh edit supersedes any pending undo
+      setEditing(true);
+    }
+  }, [canEdit, pending, clearUndo]);
   const cancel = useCallback(() => setEditing(false), []);
+
+  // Roll back to a previous value (the inline "Desfazer" button). Goes STRAIGHT to onCommit —
+  // deliberately bypassing the no-op check, the `beforeCommit` gate (which would re-prompt / read
+  // stale reason refs) and the undo affordance itself (so undo can't re-arm). A rejected revert (e.g.
+  // an illegal backward enum transition) is swallowed — the axios interceptor already surfaced it.
+  const revert = useCallback(
+    async (previousValue: unknown) => {
+      clearUndo(); // dismiss the affordance immediately on click
+      if (!edit || inFlight.current) return;
+      setPending(true);
+      inFlight.current = true;
+      try {
+        await Promise.resolve(edit.onCommit(previousValue, row));
+      } catch {
+        // interceptor already toasted; keep the current value
+      } finally {
+        setPending(false);
+        inFlight.current = false;
+      }
+    },
+    [edit, row, clearUndo],
+  );
 
   const commit = useCallback(
     async (value: unknown, keepOpen = false) => {
@@ -314,6 +404,9 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
         if (!keepOpen) setEditing(false);
         return;
       }
+      // Snapshot the pre-mutation value (shape-symmetric with onCommit) for the undo action. Read
+      // from the closure `row`, which stays the pre-commit record even after a refetch swaps the prop.
+      const previousValue = edit.get(row);
       setPending(true);
       inFlight.current = true;
       try {
@@ -327,6 +420,12 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
         }
         await Promise.resolve(edit.onCommit(value, row));
         if (!keepOpen) setEditing(false);
+        // Arm the inline undo on real, edit-closing commits. Skip multiselect's keepOpen toggles and
+        // gated fields (beforeCommit) — those changes are intentional/audited and an undo would bypass
+        // their confirm/reason capture and leave a reasonless reversal.
+        if (!keepOpen && !edit.beforeCommit) {
+          startUndo(previousValue);
+        }
       } catch {
         // Mutation/axios interceptor already surfaces the error; keep the old value.
       } finally {
@@ -334,7 +433,7 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
         inFlight.current = false;
       }
     },
-    [edit, row],
+    [edit, row, startUndo],
   );
 
   if (editing && edit) {
@@ -349,16 +448,65 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
     );
   }
 
-  const display = field.render ? field.render(row) : renderFieldValue(dataType, field.accessor ? field.accessor(row) : edit?.get(row), edit);
+  const display = field.render ? field.render(row) : renderFieldValue(dataType, field.accessor ? field.accessor(row) : edit?.get(row), edit, row);
   const node = display ?? <span className="italic text-muted-foreground">—</span>;
 
   if (canEdit) {
+    // Inline undo button — sits next to the value that just changed, with a live Ns countdown. Its
+    // click reverts and is stopped from bubbling so it doesn't double-click the row into edit mode.
+    const undoButton = undo ? (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          void revert(undo.previousValue);
+        }}
+        onDoubleClick={(e) => e.stopPropagation()}
+        // Pause the countdown while the user is hovering/focusing — gives them time to actually click.
+        onMouseEnter={pauseUndo}
+        onMouseLeave={resumeUndo}
+        onFocus={pauseUndo}
+        onBlur={resumeUndo}
+        title="Desfazer alteração"
+        className={cn(
+          "group/undo inline-flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-3 pr-1.5 text-xs font-semibold shadow-sm outline-none",
+          "bg-destructive text-destructive-foreground",
+          "transition-all duration-150 hover:brightness-110 hover:shadow-md active:scale-[0.97]",
+          "focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+          "animate-in fade-in-50 zoom-in-95",
+        )}
+      >
+        <IconArrowBackUp className="h-4 w-4 transition-transform duration-150 group-hover/undo:-translate-x-0.5" />
+        <span>Desfazer</span>
+        <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive-foreground/20 px-1.5 text-[11px] font-bold leading-none tabular-nums">
+          {remaining}
+        </span>
+      </button>
+    ) : null;
+
+    // Inline fields: chip to the right of the value. Block fields: chip beneath the stacked value.
+    const valueNode = undoButton
+      ? field.block
+        ? (
+          <div className="flex flex-col gap-1.5">
+            {node}
+            <div className="flex justify-start">{undoButton}</div>
+          </div>
+        )
+        : (
+          <div className="flex w-full items-center justify-end gap-2">
+            <span className="min-w-0 truncate">{node}</span>
+            {undoButton}
+          </div>
+        )
+      : node;
+
     // The WHOLE row is the double-click target (big, easy hit area) with a neutral hover.
     return (
       <DetailRow
         icon={field.icon}
         label={field.label}
-        value={node}
+        value={valueNode}
         block={field.block}
         role="button"
         tabIndex={0}

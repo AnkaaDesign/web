@@ -820,6 +820,11 @@ function TaskDetailContent() {
                 },
                 {
                   id: "invoiceToCustomers",
+                  // relation: without this the editor fell through to a TEXT input pre-filled with the
+                  // raw customer UUID (the "Faturar Para shows the id on double-click" bug). `relation`
+                  // routes it to the customer combobox; `currentOptions` resolves the current id → name
+                  // so the trigger shows the customer name immediately, before loadCustomers resolves.
+                  dataType: "relation" as const,
                   label: "Faturar Para",
                   requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL],
                   accessor: (t: Task) =>
@@ -834,6 +839,10 @@ function TaskDetailContent() {
                     canEdit && (task?.quote?.customerConfigs?.length ?? 0) <= 1
                       ? {
                           get: (t: Task) => t.quote?.customerConfigs?.[0]?.customerId ?? null,
+                          currentOptions: (t: Task) => {
+                            const c = t.quote?.customerConfigs?.[0]?.customer;
+                            return c ? [{ value: c.id, label: c.corporateName || c.fantasyName || "" }] : [];
+                          },
                           loadOptions: loadCustomers,
                           placeholder: "Buscar cliente...",
                           onCommit: async (v, t) => {

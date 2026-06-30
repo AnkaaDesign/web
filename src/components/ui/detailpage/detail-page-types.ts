@@ -85,6 +85,15 @@ export interface InlineEditDef<TData = any, TValue = any> {
   options?: ComboboxOption[];
   /** relation / multiselect: an async option loader (the Combobox `queryFn`). */
   loadOptions?: (search: string, page?: number) => Promise<{ data: ComboboxOption[]; hasMore?: boolean }>;
+  /**
+   * relation / multiselect: resolve the CURRENTLY-selected value(s) into their `{value,label}`
+   * option(s) DIRECTLY from the loaded row relation (e.g. `row.customer → [{value: row.customer.id,
+   * label: row.customer.fantasyName}]`). This feeds BOTH the read-mode label (so display never leaks
+   * the raw FK id when options are async/unseeded) AND seeds the editor combobox so the label shows
+   * immediately on open — before `loadOptions` resolves and even when the selection isn't on page 1.
+   * Return `[]` when nothing is selected. Prefer this over hand-seeding `options` for async relations.
+   */
+  currentOptions?: (row: TData) => ComboboxOption[];
   /** number / money bounds. */
   min?: number;
   max?: number;

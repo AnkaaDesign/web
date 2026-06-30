@@ -14,6 +14,23 @@ type EnumLabelConfig = { labels?: Record<string, string> };
 type EnumColorConfig = { badgeEntity?: string; variants?: Record<string, string> };
 type EnumBadgeConfig = EnumLabelConfig & EnumColorConfig;
 
+/**
+ * Coerce a possibly-non-number value to a finite number for display formatting.
+ * Handles: plain numbers, numeric strings ("1234.5"), and Prisma/Decimal-like objects
+ * exposing `.toNumber()` (the web `DecimalValue` shape) — which would otherwise stringify to
+ * "[object Object]". Returns null for null/empty/NaN so callers can show an em-dash instead.
+ */
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (value == null || value === "") return null;
+  if (typeof value === "object" && typeof (value as { toNumber?: () => number }).toNumber === "function") {
+    const n = (value as { toNumber: () => number }).toNumber();
+    return Number.isFinite(n) ? n : null;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** value → human label for an enum field. */
 export function enumLabel(value: string, cfg?: EnumLabelConfig): string {
   if (!value) return "";
@@ -79,17 +96,29 @@ export function enumOptions<T>(cfg: EnumEditConfig<T>, current?: string | null, 
  * empty value so the host `DetailRow` shows its em-dash. `enum`/`boolean` always
  * render a Badge; `multiselect` renders chips.
  */
-export function renderFieldValue<TData>(dataType: FieldDataType, value: unknown, edit?: InlineEditDef<TData>): ReactNode {
+export function renderFieldValue<TData>(dataType: FieldDataType, value: unknown, edit?: InlineEditDef<TData>, row?: TData): ReactNode {
   const empty = value == null || value === "";
   switch (dataType) {
-    case "money":
-      return typeof value === "number" ? formatCurrency(value) : empty ? undefined : String(value);
+    case "money": {
+      const n = toFiniteNumber(value);
+      return n != null ? formatCurrency(n) : empty ? undefined : String(value);
+    }
+    case "integer": {
+      // NO thousands grouping: `integer` covers identifier-like values too (payroll number, codes),
+      // which must not become "12.345". Coerce Decimal/string so it never prints "[object Object]".
+      const n = toFiniteNumber(value);
+      return n != null ? String(n) : empty ? undefined : String(value);
+    }
     case "number":
-    case "integer":
-    case "decimal":
-      return empty ? undefined : String(value);
-    case "percentage":
-      return empty ? undefined : `${value}%`;
+    case "decimal": {
+      // Fractional value types → pt-BR grouping + comma decimal (quantities, measures).
+      const n = toFiniteNumber(value);
+      return n != null ? n.toLocaleString("pt-BR", { maximumFractionDigits: 4 }) : empty ? undefined : String(value);
+    }
+    case "percentage": {
+      const n = toFiniteNumber(value);
+      return n != null ? `${n.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%` : empty ? undefined : `${value}%`;
+    }
     // Brazilian masked types: the stored value is raw digits — format for display.
     case "cpf":
       return empty ? undefined : formatCPF(String(value));
@@ -113,7 +142,10 @@ export function renderFieldValue<TData>(dataType: FieldDataType, value: unknown,
     case "multiselect": {
       const arr = Array.isArray(value) ? (value as unknown[]) : [];
       if (!arr.length) return undefined;
-      const opts = edit?.options ?? [];
+      // Source labels from the row's loaded relations first (currentOptions), then any static
+      // options, so async multiselects never render raw ids.
+      const seeded = row !== undefined ? edit?.currentOptions?.(row) ?? [] : [];
+      const opts = [...seeded, ...(edit?.options ?? [])];
       const labelFor = (v: string) => opts.find((o) => o.value === v)?.label ?? v;
       return (
         <div className="flex flex-wrap justify-end gap-1">
@@ -126,8 +158,12 @@ export function renderFieldValue<TData>(dataType: FieldDataType, value: unknown,
       );
     }
     case "relation": {
-      const opts = edit?.options ?? [];
-      const found = opts.find((o) => o.value === value);
+      // Resolve the current id → label from the row's loaded relation (currentOptions) first, then
+      // static options. Only if neither has it do we fall back to String(value) (the raw id) — which
+      // is what produced the "invoice-to shows the id" bug for async relations.
+      const seeded = row !== undefined ? edit?.currentOptions?.(row) ?? [] : [];
+      const pool = [...seeded, ...(edit?.options ?? [])];
+      const found = pool.find((o) => o.value === value);
       return found ? found.label : empty ? undefined : String(value);
     }
     case "textarea":

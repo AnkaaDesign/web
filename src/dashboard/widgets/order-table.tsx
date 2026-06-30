@@ -58,6 +58,7 @@ import {
 } from "../../constants/enums";
 import {
   ORDER_STATUS_LABELS,
+  ORDER_PAYMENT_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
 } from "../../constants/enum-labels";
 import { routes } from "../../constants/routes";
@@ -171,6 +172,32 @@ const ORDER_STATUS_SEQUENCE: ORDER_STATUS[] = [
   ORDER_STATUS.CANCELLED,
 ];
 
+// Payment-status filter keys. "A Definir" is not a stored status — it's the
+// derived state of an order that is AWAITING_PAYMENT with no payment method
+// (mirrors OrderPaymentStatusBadge). It gets its own filter key so it can be
+// selected distinctly from "Aguardando Pagamento" (awaiting WITH a method).
+const ORDER_PAYMENT_UNDEFINED_KEY = "UNDEFINED" as const;
+type PaymentFilterKey = ORDER_PAYMENT_STATUS | typeof ORDER_PAYMENT_UNDEFINED_KEY;
+
+const ORDER_PAYMENT_FILTER_SEQUENCE: PaymentFilterKey[] = [
+  ORDER_PAYMENT_UNDEFINED_KEY,
+  ORDER_PAYMENT_STATUS.AWAITING_PAYMENT,
+  ORDER_PAYMENT_STATUS.PARTIALLY_PAID,
+  ORDER_PAYMENT_STATUS.PAID,
+];
+
+const ORDER_PAYMENT_FILTER_LABELS: Record<PaymentFilterKey, string> = {
+  [ORDER_PAYMENT_UNDEFINED_KEY]: "A Definir",
+  ...ORDER_PAYMENT_STATUS_LABELS,
+};
+
+function paymentFilterKey(r: FlatOrder): PaymentFilterKey {
+  if (r.paymentStatus === ORDER_PAYMENT_STATUS.AWAITING_PAYMENT && !r.paymentMethod) {
+    return ORDER_PAYMENT_UNDEFINED_KEY;
+  }
+  return r.paymentStatus;
+}
+
 const COLUMN_KEYS = [
   "orderNumber",
   "description",
@@ -239,6 +266,14 @@ const orderTableConfigSchemaInner = z.object({
     .object({
       defaultBucket: z.enum(FORECAST_BUCKETS).default("all"),
       statuses: z.array(z.nativeEnum(ORDER_STATUS)).default([]),
+      paymentStatuses: z
+        .array(
+          z.union([
+            z.nativeEnum(ORDER_PAYMENT_STATUS),
+            z.literal(ORDER_PAYMENT_UNDEFINED_KEY),
+          ]),
+        )
+        .default([]),
       supplierIds: z.array(z.string()).default([]),
       isFromSchedule: z.enum(["any", "yes", "no"]).default("any"),
       hasItems: z.enum(["any", "yes", "no"]).default("any"),
@@ -250,6 +285,7 @@ const orderTableConfigSchemaInner = z.object({
     .default({
       defaultBucket: "all",
       statuses: [],
+      paymentStatuses: [],
       supplierIds: [],
       isFromSchedule: "any",
       hasItems: "any",
@@ -436,6 +472,9 @@ function applyFilters(
 
     if (f.hideReceived && r.status === ORDER_STATUS.RECEIVED) return false;
     if (f.hideCancelled && r.status === ORDER_STATUS.CANCELLED) return false;
+
+    if (f.paymentStatuses.length > 0 && !f.paymentStatuses.includes(paymentFilterKey(r)))
+      return false;
 
     if (term) {
       const hay =
@@ -1396,6 +1435,23 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<OrderTableConfig>) {
             />
           </div>
           <div className="space-y-1.5">
+            <Label className="text-xs">Status de pagamento (vazio = todos)</Label>
+            <Combobox
+              mode="multiple"
+              value={config.filters.paymentStatuses}
+              onValueChange={(v) =>
+                setFilter(
+                  "paymentStatuses",
+                  (Array.isArray(v) ? v : []) as PaymentFilterKey[],
+                )
+              }
+              options={ORDER_PAYMENT_FILTER_SEQUENCE.map((s) => ({
+                value: s,
+                label: ORDER_PAYMENT_FILTER_LABELS[s],
+              }))}
+            />
+          </div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Fornecedores (vazio = todos)</Label>
             <Combobox
               mode="multiple"
@@ -1541,6 +1597,7 @@ export const orderTableWidget: WidgetDefinition<OrderTableConfig> = {
     filters: {
       defaultBucket: "all",
       statuses: [],
+      paymentStatuses: [],
       supplierIds: [],
       isFromSchedule: "any",
       hasItems: "any",
