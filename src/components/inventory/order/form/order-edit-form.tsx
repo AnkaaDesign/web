@@ -416,7 +416,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   }, [discount]);
 
   // Mutations - use update instead of create
-  const { updateAsync, markPaidAsync, markAwaitingPaymentAsync, isLoading: isSubmitting } = useOrderMutations();
+  const { updateAsync, isLoading: isSubmitting } = useOrderMutations();
 
   // Payment status is settled through dedicated endpoints (installment cascade + paidAt
   // stamping), not a raw field write — so we track the selection separately and fire the
@@ -802,6 +802,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         paymentFirstDueDate: currentPaymentMethod === "BANK_SLIP" ? currentPaymentFirstDueDate || null : null,
         installmentCount: currentPaymentMethod === "BANK_SLIP" ? currentInstallmentCount || 1 : 1,
         paymentResponsibleId: currentPaymentResponsibleId || null,
+        // Settle payment status atomically with the field update — the API routes this
+        // through the installment/paidAt cascade (mark paid / reabrir). Only send when the
+        // user actually changed it, so an unrelated edit doesn't trigger a no-op transition.
+        ...(selectedPaymentStatus !== order.paymentStatus ? { paymentStatus: selectedPaymentStatus } : {}),
       };
 
       // Check if there are new files to upload (files without uploadedFileId)
@@ -851,16 +855,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         });
       }
 
-      // Settle payment status through its dedicated endpoint (after the field update) so
-      // the installment cascade / paidAt logic runs. Only the two user-settable targets.
-      if (selectedPaymentStatus !== order.paymentStatus) {
-        if (selectedPaymentStatus === ORDER_PAYMENT_STATUS.PAID) {
-          await markPaidAsync(order.id);
-        } else if (selectedPaymentStatus === ORDER_PAYMENT_STATUS.AWAITING_PAYMENT) {
-          await markAwaitingPaymentAsync(order.id);
-        }
-      }
-
       // Success toast is handled automatically by API client
       navigate(routes.inventory.orders?.list || "/inventory/orders");
     } catch (error: any) {
@@ -875,7 +869,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       }
       // Error is handled by the mutation hook
     }
-  }, [validateCurrentStep, selectedItems, quantities, prices, icmses, ipis, temporaryItems, description, supplierId, forecast, notes, receiptFiles, updateAsync, order, navigate, form]);
+  }, [validateCurrentStep, selectedItems, quantities, prices, icmses, ipis, temporaryItems, description, supplierId, forecast, notes, receiptFiles, updateAsync, order, navigate, form, selectedPaymentStatus]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === steps.length;

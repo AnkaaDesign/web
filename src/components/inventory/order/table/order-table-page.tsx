@@ -103,7 +103,7 @@ function buildOrderQuery(filters: DataTableFilterValues, search: string): Record
 export function OrderTablePage() {
   const navigate = useNavigate();
   const { updateAsync, deleteAsync, markAwaitingPaymentAsync, markPaidAsync } = useOrderMutations();
-  const { batchDeleteAsync, batchMarkAwaitingPaymentAsync, batchMarkPaidAsync } = useOrderBatchMutations();
+  const { batchUpdateAsync, batchDeleteAsync, batchMarkAwaitingPaymentAsync, batchMarkPaidAsync } = useOrderBatchMutations();
 
   // --- server mode: search + filters via onParamsChange; page/pageSize/sort from the URL ---
   const [searchParams] = useSearchParams();
@@ -206,6 +206,24 @@ export function OrderTablePage() {
     [updateAsync],
   );
 
+  // Apply a single status transition to N selected orders: one call when several are
+  // eligible (PUT /orders/batch), the single-order endpoint when only one is.
+  const runStatusUpdate = useCallback(
+    async (orders: Order[], status: ORDER_STATUS) => {
+      if (orders.length === 0) return;
+      try {
+        if (orders.length > 1) {
+          await batchUpdateAsync({ orders: orders.map((o) => ({ id: o.id, data: { status } })) as never });
+        } else {
+          await updateAsync({ id: orders[0].id, data: { status } as never });
+        }
+      } catch {
+        // The api client already surfaced the error notification.
+      }
+    },
+    [batchUpdateAsync, updateAsync],
+  );
+
   const confirmDelete = useCallback(async () => {
     const items = deleteDialog;
     if (!items?.length) return;
@@ -247,17 +265,27 @@ export function OrderTablePage() {
         label: "Marcar como feito",
         icon: <IconCheck className="h-4 w-4" />,
         requiredPrivilege: SECTOR_PRIVILEGES.WAREHOUSE,
-        hidden: (rows) => rows.length !== 1 || rows[0].status !== ORDER_STATUS.CREATED,
-        onClick: (rows) => rows[0] && void runUpdate(rows[0].id, { status: ORDER_STATUS.FULFILLED }),
+        // Shown whenever at least one selected order can still be fulfilled (CREATED).
+        hidden: (rows) => !rows.some((o) => o.status === ORDER_STATUS.CREATED),
+        onClick: (rows) =>
+          void runStatusUpdate(
+            rows.filter((o) => o.status === ORDER_STATUS.CREATED),
+            ORDER_STATUS.FULFILLED,
+          ),
       },
       {
         key: "mark-received",
         label: "Marcar como recebido",
         icon: <IconChecks className="h-4 w-4" />,
         requiredPrivilege: SECTOR_PRIVILEGES.WAREHOUSE,
+        // Shown whenever at least one selected order is not already received/cancelled.
         hidden: (rows) =>
-          rows.length !== 1 || rows[0].status === ORDER_STATUS.RECEIVED || rows[0].status === ORDER_STATUS.CANCELLED,
-        onClick: (rows) => rows[0] && void runUpdate(rows[0].id, { status: ORDER_STATUS.RECEIVED }),
+          !rows.some((o) => o.status !== ORDER_STATUS.RECEIVED && o.status !== ORDER_STATUS.CANCELLED),
+        onClick: (rows) =>
+          void runStatusUpdate(
+            rows.filter((o) => o.status !== ORDER_STATUS.RECEIVED && o.status !== ORDER_STATUS.CANCELLED),
+            ORDER_STATUS.RECEIVED,
+          ),
       },
       {
         key: "cancel",
@@ -316,7 +344,7 @@ export function OrderTablePage() {
         onClick: (rows) => setDeleteDialog(rows),
       },
     ],
-    [navigate, runUpdate, batchMarkPaidAsync, markPaidAsync, batchMarkAwaitingPaymentAsync, markAwaitingPaymentAsync],
+    [navigate, runUpdate, runStatusUpdate, batchMarkPaidAsync, markPaidAsync, batchMarkAwaitingPaymentAsync, markAwaitingPaymentAsync],
   );
 
   // --- declarative filters (server mode: values are mapped by buildOrderQuery) ---
