@@ -79,7 +79,20 @@ import { createTaskPreparationColumns, TASK_PREP_SECTOR_DEFAULTS } from "./task-
 const LIST_INCLUDE = {
   serviceOrders: { select: { id: true, type: true, status: true, assignedToId: true, description: true, observation: true } },
   customer: { select: { id: true, fantasyName: true, corporateName: true } },
-  truck: { select: { id: true, plate: true, category: true, chassisNumber: true, implementType: true } },
+  truck: {
+    select: {
+      id: true,
+      plate: true,
+      category: true,
+      chassisNumber: true,
+      implementType: true,
+      // Layouts power the (default-hidden) "Medidas" column — formatTaskMeasures reads
+      // height + the layoutSections' widths off the left/right side. Keep the nested select
+      // minimal (just those fields) so the payload stays lean.
+      leftSideLayout: { select: { id: true, height: true, layoutSections: { select: { id: true, width: true } } } },
+      rightSideLayout: { select: { id: true, height: true, layoutSections: { select: { id: true, width: true } } } },
+    },
+  },
   quote: {
     select: {
       id: true,
