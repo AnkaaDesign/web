@@ -52,6 +52,7 @@ import { useSuppliers } from "../../hooks/inventory/use-supplier";
 import { useAuth } from "../../hooks/common/use-auth";
 import {
   ORDER_STATUS,
+  ORDER_PAYMENT_STATUS,
   PAYMENT_METHOD,
   SECTOR_PRIVILEGES,
 } from "../../constants/enums";
@@ -84,6 +85,7 @@ import {
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
 import { OrderStatusBadge } from "../../components/inventory/order/common/order-status-badge";
+import { OrderPaymentStatusBadge } from "../../components/inventory/order/common/order-payment-status-badge";
 
 import { WidgetCard } from "../components/widget-card";
 import { ColumnPicker, type ColumnSort } from "../components/column-picker";
@@ -178,6 +180,7 @@ const COLUMN_KEYS = [
   "total",
   "forecast",
   "countdown",
+  "paymentStatus",
   "paymentMethod",
   "createdAt",
 ] as const;
@@ -191,6 +194,7 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   total: "Valor total",
   forecast: "Previsão",
   countdown: "Restante",
+  paymentStatus: "Pagamento",
   paymentMethod: "Forma de pagamento",
   createdAt: "Criado em",
 };
@@ -311,6 +315,8 @@ interface FlatOrder {
   total: number;
   forecast: Date | null;
   createdAt: Date;
+  paymentStatus: ORDER_PAYMENT_STATUS;
+  paymentStatusOrder: number;
   paymentMethod: PAYMENT_METHOD | null;
   paymentResponsibleId: string | null;
 
@@ -392,6 +398,8 @@ function flattenOrders(orders: Order[] | undefined): FlatOrder[] {
       total: calculateOrderTotal(o),
       forecast,
       createdAt: o.createdAt ? new Date(o.createdAt) : today,
+      paymentStatus: o.paymentStatus ?? ORDER_PAYMENT_STATUS.AWAITING_PAYMENT,
+      paymentStatusOrder: o.paymentStatusOrder ?? 0,
       paymentMethod: o.paymentMethod ?? null,
       paymentResponsibleId: o.paymentResponsibleId ?? null,
       daysUntilForecast: days,
@@ -448,6 +456,8 @@ function compareRows(a: FlatOrder, b: FlatOrder, key: string): number {
       return a.supplierName.localeCompare(b.supplierName);
     case "status":
       return a.statusOrder - b.statusOrder;
+    case "paymentStatus":
+      return a.paymentStatusOrder - b.paymentStatusOrder;
     case "itemCount":
       return a.itemCount - b.itemCount;
     case "total":
@@ -699,6 +709,18 @@ function makeColumns(): Record<ColumnKey, ColumnDef> {
                 : `${days}d`;
         return <span className={`tabular-nums ${cls}`}>{label}</span>;
       },
+    },
+    paymentStatus: {
+      key: "paymentStatus",
+      label: COLUMN_LABELS.paymentStatus,
+      width: "minmax(0, 1fr)",
+      render: (r) => (
+        <OrderPaymentStatusBadge
+          status={r.paymentStatus}
+          paymentMethod={r.paymentMethod}
+          size="sm"
+        />
+      ),
     },
     paymentMethod: {
       key: "paymentMethod",
