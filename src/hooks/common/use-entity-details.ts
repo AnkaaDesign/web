@@ -1,17 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import {
-  getItemCategoryById,
-  getItemBrandById,
-  getSupplierById,
-  getUserById,
-  getCustomerById,
-  getSectorById,
-  getPaintById,
-  getPaintFormulaById,
-  getItemById,
-  getFileById,
-  getObservationById,
-  getServiceOrderById,
+  getItemCategories,
+  getItemBrands,
+  getSuppliers,
+  getUsers,
+  getCustomers,
+  getSectors,
+  getPaints,
+  getPaintFormulas,
+  getItems,
+  getFiles,
+  getObservations,
+  getServiceOrders,
 } from "../../api-client";
 
 interface EntityDetails {
@@ -27,6 +27,29 @@ interface EntityDetails {
   files: Map<string, string>;
   observations: Map<string, string>;
   serviceOrders: Map<string, any>; // Store full service order objects with description, type, status, etc.
+}
+
+// The list endpoints cap `limit` (100 for most entities); chunk id batches to stay within bounds.
+const ID_BATCH_SIZE = 100;
+
+// Resolve records by id through the list endpoint (`where: { id: { in } }`) in batches, instead of
+// one getById call per id. Two wins: a single request per ~100 ids (no N+1 storm), and deleted ids
+// simply don't come back — no per-id 404 logged on the API for stale references in old changelogs.
+async function fetchByIds(listFn: (params: any) => Promise<{ data?: any[] }>, ids: string[], include?: Record<string, unknown>): Promise<any[]> {
+  if (ids.length === 0) return [];
+  const out: any[] = [];
+  for (let i = 0; i < ids.length; i += ID_BATCH_SIZE) {
+    const chunk = ids.slice(i, i + ID_BATCH_SIZE);
+    try {
+      const res = await listFn({ where: { id: { in: chunk } }, limit: chunk.length, ...(include ? { include } : {}) });
+      if (res?.data?.length) out.push(...res.data);
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Failed to batch-fetch entity details:", error);
+      }
+    }
+  }
+  return out;
 }
 
 export function useEntityDetails(entityIds: {
@@ -88,204 +111,33 @@ export function useEntityDetails(entityIds: {
         serviceOrders: new Map(),
       };
 
-      // Fetch all categories
-      const categoryPromises = uniqueCategoryIds.map(async (id) => {
-        try {
-          const response = await getItemCategoryById(id, {});
-          if (response?.success && response.data) {
-            details.categories.set(id, response.data.name || "");
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch category ${id}:`, error);
-          }
-        }
-      });
-
-      // Fetch all brands
-      const brandPromises = uniqueBrandIds.map(async (id) => {
-        try {
-          const response = await getItemBrandById(id, {});
-          if (response?.success && response.data) {
-            details.brands.set(id, response.data.name || "");
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch brand ${id}:`, error);
-          }
-        }
-      });
-
-      // Fetch all suppliers
-      const supplierPromises = uniqueSupplierIds.map(async (id) => {
-        try {
-          const response = await getSupplierById(id, {});
-          if (response?.success && response.data) {
-            details.suppliers.set(id, response.data.fantasyName || "");
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch supplier ${id}:`, error);
-          }
-        }
-      });
-
-      // Fetch all users
-      const userPromises = uniqueUserIds.map(async (id) => {
-        try {
-          const response = await getUserById(id, {});
-          if (response?.success && response.data) {
-            const userData = response.data as any;
-            details.users.set(id, {
-              name: userData.name || `Usuário ${id.slice(0, 8)}`,
-              email: userData.email,
-            });
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch user ${id}:`, error);
-          }
-        }
-      });
-
-      // Fetch all customers
-      const customerPromises = uniqueCustomerIds.map(async (id) => {
-        try {
-          const response = await getCustomerById(id, {});
-          if (response?.success && response.data) {
-            details.customers.set(id, (response.data as any).fantasyName || (response.data as any).name || `Cliente ${id.slice(0, 8)}`);
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch customer ${id}:`, error);
-          }
-        }
-      });
-
-      // Fetch all sectors
-      const sectorPromises = uniqueSectorIds.map(async (id) => {
-        try {
-          const response = await getSectorById(id, {});
-          if (response?.success && response.data) {
-            details.sectors.set(id, response.data.name || "");
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch sector ${id}:`, error);
-          }
-        }
-      });
-
-      // Fetch all paints with full details (hex, finish, brand, manufacturer, etc.)
-      const paintPromises = uniquePaintIds.map(async (id) => {
-        try {
-          const response = await getPaintById(id, {
-            include: {
-              paintBrand: true,
-              paintType: true,
-            },
-          });
-          if (response?.success && response.data) {
-            // Store the full paint object with all properties needed for display
-            details.paints.set(id, response.data);
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch paint ${id}:`, error);
-          }
-        }
-      });
-
-      // Fetch all formulas
-      const formulaPromises = uniqueFormulaIds.map(async (id) => {
-        try {
-          const response = await getPaintFormulaById(id, {});
-          if (response?.success && response.data) {
-            details.formulas.set(id, (response.data as any).description || (response.data as any).code || `Fórmula ${id.slice(0, 8)}`);
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch formula ${id}:`, error);
-          }
-        }
-      });
-
-      // Fetch all items
-      const itemPromises = uniqueItemIds.map(async (id) => {
-        try {
-          const response = await getItemById(id, {});
-          if (response?.success && response.data) {
-            details.items.set(id, response.data.name || "");
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch item ${id}:`, error);
-          }
-        }
-      });
-
-      // Fetch all files
-      const filePromises = uniqueFileIds.map(async (id) => {
-        try {
-          const response = await getFileById(id, {});
-          if (response?.success && response.data) {
-            details.files.set(id, response.data.filename || "");
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch file ${id}:`, error);
-          }
-        }
-      });
-
-      // Fetch all observations
-      const observationPromises = uniqueObservationIds.map(async (id) => {
-        try {
-          const response = await getObservationById(id, {});
-          if (response?.success && response.data) {
-            details.observations.set(id, (response.data as any).content || (response.data as any).description || `Observação ${id.slice(0, 8)}`);
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch observation ${id}:`, error);
-          }
-        }
-      });
-
-      // Fetch all service orders with full details
-      const serviceOrderPromises = uniqueServiceOrderIds.map(async (id) => {
-        try {
-          const response = await getServiceOrderById({
-            id,
-            include: {
-              assignedTo: true,
-            },
-          });
-          if (response?.success && response.data) {
-            // Store the full service order object
-            details.serviceOrders.set(id, response.data);
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch service order ${id}:`, error);
-          }
-        }
-      });
-
-      await Promise.all([
-        ...categoryPromises,
-        ...brandPromises,
-        ...supplierPromises,
-        ...userPromises,
-        ...customerPromises,
-        ...sectorPromises,
-        ...paintPromises,
-        ...formulaPromises,
-        ...itemPromises,
-        ...filePromises,
-        ...observationPromises,
-        ...serviceOrderPromises,
+      const [categories, brands, suppliers, users, customers, sectors, paints, formulas, items, files, observations, serviceOrders] = await Promise.all([
+        fetchByIds(getItemCategories, uniqueCategoryIds),
+        fetchByIds(getItemBrands, uniqueBrandIds),
+        fetchByIds(getSuppliers, uniqueSupplierIds),
+        fetchByIds(getUsers, uniqueUserIds),
+        fetchByIds(getCustomers, uniqueCustomerIds),
+        fetchByIds(getSectors, uniqueSectorIds),
+        fetchByIds(getPaints, uniquePaintIds, { paintBrand: true, paintType: true }),
+        fetchByIds(getPaintFormulas, uniqueFormulaIds),
+        fetchByIds(getItems, uniqueItemIds),
+        fetchByIds(getFiles, uniqueFileIds),
+        fetchByIds(getObservations, uniqueObservationIds),
+        fetchByIds(getServiceOrders, uniqueServiceOrderIds, { assignedTo: true }),
       ]);
+
+      for (const c of categories) details.categories.set(c.id, c.name || "");
+      for (const b of brands) details.brands.set(b.id, b.name || "");
+      for (const s of suppliers) details.suppliers.set(s.id, s.fantasyName || "");
+      for (const u of users) details.users.set(u.id, { name: u.name || `Usuário ${String(u.id).slice(0, 8)}`, email: u.email });
+      for (const c of customers) details.customers.set(c.id, c.fantasyName || c.name || `Cliente ${String(c.id).slice(0, 8)}`);
+      for (const s of sectors) details.sectors.set(s.id, s.name || "");
+      for (const p of paints) details.paints.set(p.id, p);
+      for (const f of formulas) details.formulas.set(f.id, f.description || f.code || `Fórmula ${String(f.id).slice(0, 8)}`);
+      for (const it of items) details.items.set(it.id, it.name || "");
+      for (const f of files) details.files.set(f.id, f.filename || "");
+      for (const o of observations) details.observations.set(o.id, o.content || o.description || `Observação ${String(o.id).slice(0, 8)}`);
+      for (const so of serviceOrders) details.serviceOrders.set(so.id, so);
 
       return details;
     },

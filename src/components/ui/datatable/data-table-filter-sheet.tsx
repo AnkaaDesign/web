@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { IconFilter } from "@tabler/icons-react";
 import { Label } from "@/components/ui/label";
 import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
@@ -13,6 +13,8 @@ interface DataTableFilterSheetProps<TData> {
   values: DataTableFilterValues;
   onApply: (values: DataTableFilterValues) => void;
   onReset: () => void;
+  /** Extra content rendered above the declarative fields (e.g. a fetch-scope control). */
+  filterContent?: ReactNode;
 }
 
 /**
@@ -27,6 +29,7 @@ export function DataTableFilterSheet<TData>({
   values,
   onApply,
   onReset,
+  filterContent,
 }: DataTableFilterSheetProps<TData>) {
   const [draft, setDraft] = useState<DataTableFilterValues>(values);
 
@@ -54,6 +57,7 @@ export function DataTableFilterSheet<TData>({
         onOpenChange(false);
       }}
     >
+      {filterContent}
       {defs.map((def) => (
         <div key={def.key} className="space-y-2">
           <Label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">

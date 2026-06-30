@@ -96,6 +96,8 @@ export interface DataTableProps<TData> {
   titleCount?: number;
   /** Extra controls rendered in the toolbar (left of the column manager). */
   toolbarActions?: ReactNode;
+  /** Extra content rendered at the TOP of the Filtros drawer, above the declarative filter fields. */
+  filterContent?: ReactNode;
   enableSelection?: boolean;
   enableColumnReorder?: boolean;
   enableColumnResizing?: boolean;
@@ -170,6 +172,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     title,
     titleCount,
     toolbarActions,
+    filterContent,
     enableSelection = true,
     enableColumnReorder = true,
     enableColumnResizing = true,
@@ -608,7 +611,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
             columnAlignment={columnAlignment}
             onColumnAlignmentChange={setColumnAlignment}
             onResetLayout={dt.resetLayout}
-            hasFilters={filterDefs.length > 0}
+            hasFilters={filterDefs.length > 0 || !!filterContent}
             filterCount={countActiveFilters(filters)}
             onOpenFilters={openFilters}
             shareEnabled={enableShare}
@@ -738,7 +741,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
         </div>
       </div>
 
-      {filterDefs.length > 0 && (
+      {(filterDefs.length > 0 || filterContent) && (
         <DataTableFilterSheet
           open={filterOpen}
           onOpenChange={setFilterOpen}
@@ -746,6 +749,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
           values={filters}
           onApply={applyFilters}
           onReset={() => applyFilters({})}
+          filterContent={filterContent}
         />
       )}
 

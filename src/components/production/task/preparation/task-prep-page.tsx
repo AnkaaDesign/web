@@ -144,6 +144,10 @@ function useTasksBucket(statuses: TASK_STATUS[] | undefined, enabled: boolean, s
     enabled,
     // No refetch-on-every-focus storm (the legacy forced "always"); revalidates on demand instead.
     refetchOnWindowFocus: false,
+    // `useTasks` is otherwise staleTime:0 — which would refetch both 1000-row buckets on every remount
+    // (e.g. navigating away and back). Keep them fresh for 30s; explicit post-mutation invalidations
+    // still refetch immediately, so on-page edits stay live.
+    staleTime: 30_000,
   } as never);
   const tasks = (data as { data?: Task[] } | undefined)?.data ?? [];
   return { tasks, isLoading, error };
@@ -211,12 +215,19 @@ const CLOSED_MODAL: ModalState = { open: false, taskIds: [] };
 // don't lift the DataTable selection, so a stable empty Set + no-op clear keep its props satisfied.
 const EMPTY_TASK_IDS = new Set<string>();
 const noop = () => {};
+// Stable identities so the closed modals (the common case) and the DataTable props don't churn:
+// rowsFor returns this when no modal is open (avoids filtering ~2000 rows 4× per render), and the
+// DataTable getRowId/getSubRows/empty-rowActions are hoisted out of the per-render tableProps factory.
+const EMPTY_TASKS: Task[] = [];
+const EMPTY_ROW_ACTIONS: DataTableRowAction<ClusteredTask>[] = [];
+const getRowId = (t: ClusteredTask) => t.id;
+const getSubRows = (t: ClusteredTask) => t.__children;
 
 export function TaskPreparationPage() {
   const navigate = useNavigate();
   const { data: user } = useCurrentUser();
   const priv = (user as { sector?: { privileges?: SECTOR_PRIVILEGES } } | undefined)?.sector?.privileges;
-  const { updateAsync, deleteAsync } = useTaskMutations();
+  const { deleteAsync } = useTaskMutations();
   const { batchDeleteAsync } = useTaskBatchMutations();
   const { tables, tasks, isLoading, error } = useSplitClusters(true, priv);
   // Legacy gave WAREHOUSE no context menu and no export/share button (read-only view).
@@ -349,21 +360,27 @@ export function TaskPreparationPage() {
     priv === SECTOR_PRIVILEGES.COMMERCIAL;
 
   // Direct field mutations. The api client surfaces success/error notifications itself — we never
-  // toast here, that would double up.
+  // toast here, that would double up. We call the raw client (not useTaskMutations.updateAsync) so we
+  // can invalidate ONCE after the whole loop: the mutation hook invalidates ~8 query trees per success,
+  // so an N-row bulk action would otherwise trigger N refetches of BOTH 1000-row buckets mid-loop.
+  // This mirrors confirmCopyFrom's batched single refresh.
   const set = useCallback(
     async (rows: Task[], patch: (t: Task) => Record<string, unknown> | null) => {
+      let mutated = false;
       for (const t of rows) {
         const data = patch(t);
         if (!data) continue;
         try {
-          await updateAsync({ id: t.id, data: data as never });
+          await taskService.updateTask(t.id, data as never);
+          mutated = true;
         } catch {
           // The api client already surfaced the error notification. Keep going so one failing row
           // doesn't silently abort the remaining rows of a bulk operation.
         }
       }
+      if (mutated) await queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
-    [updateAsync],
+    [queryClient],
   );
 
   const inPrepOrWaiting = (t: Task) => t.status === TASK_STATUS.PREPARATION || t.status === TASK_STATUS.WAITING_PRODUCTION;
@@ -381,7 +398,14 @@ export function TaskPreparationPage() {
 
   // Resolve live Task objects for a set of ids: the schedule modals need `tasks` for their count and
   // initial-value computation, and TaskDuplicateModal needs the single source task.
-  const rowsFor = useCallback((ids: string[]) => tasks.filter((t) => ids.includes(t.id)), [tasks]);
+  const rowsFor = useCallback(
+    (ids: string[]) => {
+      if (!ids.length) return EMPTY_TASKS; // closed modals: skip filtering the whole ~2000-row set
+      const idSet = new Set(ids);
+      return tasks.filter((t) => idSet.has(t.id));
+    },
+    [tasks],
+  );
 
   const handleSectorConfirm = useCallback(
     (sectorId: string | null) => void set(rowsFor(sectorModal.taskIds), () => ({ sectorId })),
@@ -723,16 +747,16 @@ export function TaskPreparationPage() {
     data,
     columns,
     filterDefs,
-    rowActions: isWarehouse ? [] : rowActions,
+    rowActions: isWarehouse ? EMPTY_ROW_ACTIONS : rowActions,
     enableShare: !isWarehouse,
-    getRowId: (t: ClusteredTask) => t.id,
+    getRowId,
     onRowClick,
     isLoading,
     syncUrl: false,
     enablePagination: false,
     enableExpansion: true,
     persistExpansion: true,
-    getSubRows: (t: ClusteredTask) => t.__children,
+    getSubRows,
     estimateRowHeight: 44,
     autoHeight,
     // Per-sector starting column layout (applied only when the user has no saved config).

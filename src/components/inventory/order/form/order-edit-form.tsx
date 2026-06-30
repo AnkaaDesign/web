@@ -760,11 +760,14 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         rawTotalOverride != null && Number.isFinite(Number(rawTotalOverride)) && Number(rawTotalOverride) >= 0 ? Number(rawTotalOverride) : null;
       const currentStatus = form.getValues("status");
 
-      // The Pix key is the only thing that configures a PIX payment. If the user clears it,
-      // the payment is no longer defined — drop the method too so the order reads "A Definir"
-      // (that label is derived from an order with no payment method) instead of staying on a
-      // PIX method that can never be paid. Other methods (boleto/cartão) are self-defining.
-      const pixCleared = currentPaymentMethod === "PIX" && !(currentPaymentPix || "").trim();
+      // Effective Pix = what the user typed, else the supplier's default (shown in the field as a
+      // real value). The Pix key is the only thing that configures a PIX payment: if neither a typed
+      // key nor a supplier default exists, the payment is no longer defined — drop the method too so
+      // the order reads "A Definir" (derived from an order with no payment method) instead of staying
+      // on a PIX method that can never be paid. Other methods (boleto/cartão) are self-defining.
+      const supplierPix = suppliers.find((s) => s.id === supplierId)?.pix || "";
+      const effectivePix = ((currentPaymentPix || supplierPix) ?? "").trim();
+      const pixCleared = currentPaymentMethod === "PIX" && !effectivePix;
       // Send null (not undefined) when there is no method so the API actually CLEARS the
       // column. undefined is skipped on the API (field left untouched), which would keep the
       // old method on the order — so removing the payment method would never stick and the
@@ -785,11 +788,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         totalOverride: currentTotalOverride,
         items,
         paymentMethod: resolvedPaymentMethod,
-        // Persist exactly what the user entered. An empty/whitespace field clears the key
-        // (send null, not undefined — undefined would be skipped on the API and keep the old
-        // value). The supplier's default pix is only a placeholder hint, never silently
-        // re-applied, so clearing the Chave Pix actually sticks. Non-PIX methods clear it.
-        paymentPix: currentPaymentMethod === "PIX" ? (currentPaymentPix || "").trim() || null : null,
+        // Persist the effective Pix (typed key, else supplier default). Send null (not undefined —
+        // undefined is skipped on the API and keeps the old value) when there's no key at all, so an
+        // order with no Pix actually clears. Non-PIX methods clear it.
+        paymentPix: currentPaymentMethod === "PIX" ? effectivePix || null : null,
         // Persist the default interval (30 days) shown for 2x+ boletos when none was explicitly chosen.
         paymentDueDays:
           currentPaymentMethod === "BANK_SLIP"
@@ -1452,12 +1454,11 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Chave Pix</span>
                               <div className="flex-1 max-w-[55%]">
                                 <Input
-                                  placeholder={
-                                    suppliers.find(s => s.id === supplierId)?.pix
-                                      ? `Padrão: ${suppliers.find(s => s.id === supplierId)?.pix}`
-                                      : "CPF, CNPJ, E-mail, Telefone..."
-                                  }
-                                  value={form.watch("paymentPix") ?? ""}
+                                  placeholder="CPF, CNPJ, E-mail, Telefone..."
+                                  // Show the supplier's default pix as the actual field value (not just a
+                                  // placeholder hint) so it reads as a real, editable, persisted key — matching
+                                  // the create form. `?? ""` keeps the input controlled when there's no default.
+                                  value={form.watch("paymentPix") || (suppliers.find((s) => s.id === supplierId)?.pix ?? "")}
                                   onChange={(value) => {
                                     form.setValue("paymentPix", (value as string) || null, { shouldDirty: true });
                                   }}
@@ -1515,6 +1516,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               <div className="flex-1 max-w-[55%]">
                                 <Input
                                   type="percentage"
+                                  blankZero
                                   value={form.watch("discount") ?? 0}
                                   onChange={(value) => {
                                     const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
@@ -1522,7 +1524,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                     form.setValue("discount", sanitized, { shouldDirty: true, shouldTouch: true });
                                     updateDiscount(sanitized);
                                   }}
-                                  placeholder="0%"
+                                  placeholder="0,00%"
                                   className="h-8 w-full border-neutral-500"
                                 />
                               </div>

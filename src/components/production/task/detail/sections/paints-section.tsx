@@ -28,7 +28,17 @@ function PaintSwatch({ paint, size }: { paint: PaintLike; size: number }) {
       style={{ width: size, height: size, background: paint.hex || "#888" }}
     >
       {paint.colorPreview ? (
-        <img src={paint.colorPreview} alt={paint.name ?? ""} className="h-full w-full object-cover" loading="lazy" />
+        <img
+          src={paint.colorPreview}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={(e) => {
+            // Broken preview URL: hide the img so the hex background shows
+            // (otherwise the browser renders the alt text in its place).
+            e.currentTarget.style.display = "none";
+          }}
+        />
       ) : null}
     </div>
   );

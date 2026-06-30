@@ -42,6 +42,10 @@ import { layoutSectionQueryKeys } from "../administration/use-layout-section";
 interface UseTasksParams extends Partial<TaskGetManyFormData> {
   enabled?: boolean;
   refetchOnWindowFocus?: boolean | 'always';
+  // Override how long the list is considered fresh. Defaults to 0 (always stale) to preserve the
+  // historical behavior for callers that rely on refetch-on-mount; heavy list views (e.g. the Agenda
+  // buckets at limit:1000) should pass a real value so a remount/focus doesn't refetch every time.
+  staleTime?: number;
 }
 
 interface UseTaskDetailParams {
@@ -91,7 +95,7 @@ export const useTasksInfinite = (params?: Partial<TaskGetManyFormData>) => {
 // -------------------------------------
 export function useTasks(params?: UseTasksParams) {
   const queryClient = useQueryClient();
-  const { enabled = true, refetchOnWindowFocus, ...restParams } = params ?? {};
+  const { enabled = true, refetchOnWindowFocus, staleTime, ...restParams } = params ?? {};
 
   // Include pagination in query key for proper pagination support
   // Each page should be a separate cached query
@@ -106,7 +110,7 @@ export function useTasks(params?: UseTasksParams) {
     queryKey, // Include pagination in query key
     queryFn: () => getTasks(restParams), // Pass all params to the API
     enabled,
-    staleTime: 0,
+    staleTime: staleTime ?? 0,
     retry: 2,
     refetchOnWindowFocus,
   });

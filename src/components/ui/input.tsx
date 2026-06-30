@@ -47,6 +47,10 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   value?: string | number | null;
   onChange?: (value: string | number | null) => void;
   decimals?: number;
+  // When true, a `percentage` input renders its placeholder (blank) instead of "0,00%" when the
+  // value is 0 — matching the `currency` convention, which always blanks 0. Opt-in so existing
+  // percentage fields (e.g. ICMS/IPI table cells) keep showing an explicit "0%".
+  blankZero?: boolean;
   documentType?: "cpf" | "cnpj";
   onCepLookup?: (data: CepData) => void;
   showCepLoading?: boolean;
@@ -75,6 +79,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       value,
       onChange,
       decimals = 2,
+      blankZero = false,
       documentType,
       onCepLookup,
       showCepLoading = false,
@@ -334,6 +339,25 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             }
           }
         }
+      } else if (type === "percentage" && blankZero) {
+        // Mirror the currency branch: when not focused, blank a 0 value so the placeholder shows
+        // (instead of "0,00%"); while focused, leave the display to handleChange so typing is
+        // never reformatted mid-keystroke.
+        if (!isFocused) {
+          const pct = value !== null ? Number(value) : 0;
+          if (!Number.isFinite(pct) || pct === 0) {
+            setInternalValue("");
+            if (!naturalTyping || disabled) {
+              setDisplayValue("");
+            }
+          } else {
+            const formatted = formatValue(value, type, documentType);
+            setInternalValue(formatted);
+            if (!naturalTyping || disabled) {
+              setDisplayValue(formatted);
+            }
+          }
+        }
       } else if (isFocused && (type === "decimal" || type === "number")) {
         // For decimal/number, don't overwrite while focused - let handleChange control the display
         // This prevents min/max constraints from reformatting the value mid-typing
@@ -345,7 +369,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           setDisplayValue(formatted);
         }
       }
-    }, [value, type, documentType, formatValue, naturalTyping, disabled]);
+    }, [value, type, documentType, formatValue, naturalTyping, disabled, blankZero]);
 
     // Handle CEP lookup
     React.useEffect(() => {

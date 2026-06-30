@@ -28,35 +28,49 @@ function formatRelativeTime(date: Date | string): string {
   const diffDays = Math.floor(diffMs / 86400000);
 
   if (diffMins < 1) return "agora";
-  if (diffMins < 60) return `${diffMins}min atras`;
-  if (diffHours < 24) return `${diffHours}h atras`;
-  if (diffDays < 7) return `${diffDays}d atras`;
+  if (diffMins < 60) return `${diffMins}min atrás`;
+  if (diffHours < 24) return `${diffHours}h atrás`;
+  if (diffDays < 7) return `${diffDays}d atrás`;
   return formatDate(date);
 }
 
-function HistoryEntry({ entry }: { entry: TaskForecastHistory }) {
+function HistoryEntry({ entry, isLast }: { entry: TaskForecastHistory; isLast: boolean }) {
   return (
-    <div className="flex flex-col gap-1 border-l-2 border-muted pl-3 pb-3 last:pb-0">
+    <div className="relative pl-6 pb-4 last:pb-0">
+      {/* Timeline rail */}
+      {!isLast && (
+        <span className="absolute left-[5px] top-3 bottom-0 w-px bg-border" aria-hidden />
+      )}
+      {/* Timeline dot */}
+      <span className="absolute left-0 top-1.5 h-[11px] w-[11px] rounded-full border-2 border-primary bg-background" aria-hidden />
+
+      {/* Header: who + when */}
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">
+        <span className="text-sm font-medium leading-tight">
           {entry.changedBy?.name || "Sistema"}
         </span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground shrink-0">
           {formatRelativeTime(entry.createdAt)}
         </span>
       </div>
 
-      <div className="flex items-center gap-1.5 text-sm flex-wrap">
-        <span className="text-muted-foreground">{formatDate(entry.previousDate)}</span>
+      {/* Date change */}
+      <div className="mt-1.5 flex items-center gap-2 text-xs">
+        <span className="rounded-md bg-muted px-2 py-0.5 text-muted-foreground line-through decoration-muted-foreground/50">
+          {formatDate(entry.previousDate)}
+        </span>
         <IconArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <span className="font-medium">{formatDate(entry.newDate)}</span>
-        {entry.reason && (
-          <>
-            <span className="text-muted-foreground">—</span>
-            <span className="text-sm italic">{entry.reason}</span>
-          </>
-        )}
+        <span className="rounded-md bg-primary/10 px-2 py-0.5 font-medium text-foreground">
+          {formatDate(entry.newDate)}
+        </span>
       </div>
+
+      {/* Reason */}
+      {entry.reason && (
+        <p className="mt-1.5 text-sm text-muted-foreground leading-snug">
+          {entry.reason}
+        </p>
+      )}
     </div>
   );
 }
@@ -67,7 +81,7 @@ export function ForecastHistoryTimeline({ taskId }: ForecastHistoryTimelineProps
   if (isLoading) {
     return (
       <div className="text-sm text-muted-foreground py-2">
-        Carregando historico...
+        Carregando histórico...
       </div>
     );
   }
@@ -85,15 +99,22 @@ export function ForecastHistoryTimeline({ taskId }: ForecastHistoryTimelineProps
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3 rounded-lg border border-border dark:border-border/30 bg-card/50 p-3">
       <div className="flex items-center gap-2 text-sm font-medium">
-        <IconHistory className="h-4 w-4" />
-        Historico de Reagendamentos ({entries.length})
+        <IconHistory className="h-4 w-4 text-muted-foreground" />
+        Histórico de Reagendamentos
+        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">
+          {entries.length}
+        </span>
       </div>
       <ScrollArea className="max-h-[300px]">
-        <div className="space-y-0 pr-2">
-          {entries.map((entry) => (
-            <HistoryEntry key={entry.id} entry={entry} />
+        <div className="pr-2">
+          {entries.map((entry, index) => (
+            <HistoryEntry
+              key={entry.id}
+              entry={entry}
+              isLast={index === entries.length - 1}
+            />
           ))}
         </div>
       </ScrollArea>

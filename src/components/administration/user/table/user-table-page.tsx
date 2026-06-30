@@ -15,6 +15,7 @@ import {
 import { DataTablePage } from "@/components/ui/datatable";
 import type { DataTableRowAction, DataTableRowClickMeta, DataTableFilterValues } from "@/components/ui/datatable";
 import { Combobox } from "@/components/ui/combobox";
+import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import {
   AlertDialog,
@@ -324,8 +325,14 @@ export function UserTablePage() {
     [canGenerateThirteenth, isAdmin, navigate],
   );
 
+  // "Exibir" scope lives inside the Filtros drawer (not the toolbar). It drives the server fetch
+  // scope; it updates immediately (refetching) rather than staging behind "Aplicar".
   const exibirControl = (
-    <div className="w-44">
+    <div className="space-y-2">
+      <Label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <IconEye className="h-4 w-4" />
+        Exibir
+      </Label>
       <Combobox
         mode="single"
         options={EXIBIR_OPTIONS}
@@ -359,7 +366,7 @@ export function UserTablePage() {
           enableSelection: showInteractive,
           sectorDefaults: USER_TABLE_SECTOR_DEFAULTS,
           defaultSorting: [{ id: "name", desc: false }],
-          toolbarActions: exibirControl,
+          filterContent: exibirControl,
           searchPlaceholder: "Buscar: nome, email, CPF ou nº folha...",
           exportTitle: "Colaboradores",
           exportFilename: "colaboradores",

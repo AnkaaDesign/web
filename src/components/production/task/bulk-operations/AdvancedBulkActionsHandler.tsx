@@ -199,12 +199,26 @@ export const AdvancedBulkActionsHandler = forwardRef<
           for (let i = 0; i < taskIds.length; i += CHUNK_SIZE) {
             chunks.push(taskIds.slice(i, i + CHUNK_SIZE));
           }
+          // Paints are selected down to display fields only — `true` would pull every Paint scalar
+          // incl. the base64 data-URL `colorPreview` and the `previewConfig` JSON for every paint of
+          // every selected task. The selectors render id/name/hex/finish (+ paintType name + formula
+          // count badge) and fall back to a hex/finish canvas preview, so the heavy columns aren't needed.
+          const PAINT_DISPLAY_SELECT = {
+            select: {
+              id: true,
+              name: true,
+              hex: true,
+              finish: true,
+              paintType: { select: { id: true, name: true } },
+              _count: { select: { formulas: true } },
+            },
+          };
           const include = {
             artworks: { include: { file: true } },
             baseFiles: true,
             cuts: { include: { file: true } },
-            logoPaints: true,
-            generalPainting: true,
+            logoPaints: PAINT_DISPLAY_SELECT,
+            generalPainting: PAINT_DISPLAY_SELECT,
             truck: {
               include: {
                 leftSideLayout: { include: { layoutSections: true } },

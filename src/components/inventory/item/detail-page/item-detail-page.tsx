@@ -1,9 +1,9 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { IconEdit, IconInfoCircle, IconChartBar, IconCalculator, IconShieldCheck, IconClock, IconHistory, IconLink, IconPackage, IconRuler, IconCertificate, IconPackages, IconUser, IconTag, IconCategory, IconBuildingStore, IconBox, IconCurrencyReal } from "@tabler/icons-react";
+import { IconEdit, IconInfoCircle, IconChartBar, IconCalculator, IconShieldCheck, IconClock, IconHistory, IconLink, IconPackage, IconRuler, IconCertificate, IconPackages, IconUser, IconTag, IconCategory, IconBuildingStore, IconBox, IconCurrencyReal, IconWorld, IconBarcode, IconTruckDelivery, IconWeight, IconFlask, IconRulerMeasure, IconArrowAutofitWidth, IconLayersIntersect, IconDimensions, IconNumbers, IconCircle, IconSpiral, IconBolt } from "@tabler/icons-react";
 
 import { useItem, useItemMutations, useOrderSchedules, useOrderScheduleProjection, useCanViewPrices } from "../../../../hooks";
-import { routes, CHANGE_LOG_ENTITY_TYPE, SECTOR_PRIVILEGES, MEASURE_TYPE_LABELS, MEASURE_TYPE_ORDER, MEASURE_UNIT_LABELS, PPE_TYPE, PPE_SIZE, PPE_DELIVERY_MODE, PPE_TYPE_LABELS, PPE_SIZE_LABELS, PPE_DELIVERY_MODE_LABELS } from "../../../../constants";
+import { routes, CHANGE_LOG_ENTITY_TYPE, SECTOR_PRIVILEGES, MEASURE_TYPE, MEASURE_TYPE_LABELS, MEASURE_TYPE_ORDER, MEASURE_UNIT_LABELS, PPE_TYPE, PPE_SIZE, PPE_DELIVERY_MODE, PPE_TYPE_LABELS, PPE_SIZE_LABELS, PPE_DELIVERY_MODE_LABELS } from "../../../../constants";
 import type { Item, Measure } from "../../../../types";
 import { measureUtils, formatItemLocation } from "../../../../utils";
 import { getItemBrands } from "@/api-client/item-brand";
@@ -25,6 +25,21 @@ import { ActivitySection, hasActivitiesThisPeriod } from "./sections/activity-se
 import { RelatedItemsSection, relatedItemsCount } from "./sections/related-items-section";
 
 const NotDefined = () => <span className="text-muted-foreground italic font-normal">Não definida</span>;
+
+// Per-measure-type leading icon, so each measure row matches the rest of the spec rows.
+const MEASURE_TYPE_ICONS: Record<MEASURE_TYPE, typeof IconRuler> = {
+  [MEASURE_TYPE.WEIGHT]: IconWeight,
+  [MEASURE_TYPE.VOLUME]: IconFlask,
+  [MEASURE_TYPE.LENGTH]: IconRulerMeasure,
+  [MEASURE_TYPE.WIDTH]: IconArrowAutofitWidth,
+  [MEASURE_TYPE.THICKNESS]: IconLayersIntersect,
+  [MEASURE_TYPE.AREA]: IconDimensions,
+  [MEASURE_TYPE.COUNT]: IconNumbers,
+  [MEASURE_TYPE.DIAMETER]: IconCircle,
+  [MEASURE_TYPE.THREAD]: IconSpiral,
+  [MEASURE_TYPE.ELECTRICAL]: IconBolt,
+  [MEASURE_TYPE.SIZE]: IconRuler,
+};
 
 // Format a single measure into a "value unit" string (e.g. "900 ml"), with graceful fallbacks.
 function formatMeasureValue(measure: Measure): string {
@@ -232,17 +247,19 @@ function ItemDetailContent() {
     specFields.push({
       id: "uniCode",
       label: "Código Universal",
+      icon: IconWorld,
       accessor: (i) => i.uniCode,
       render: (i) => (i.uniCode ? <span className="font-mono">{i.uniCode}</span> : <span className="text-muted-foreground">—</span>),
       edit: canEdit ? { get: (i) => i.uniCode ?? "", onCommit: (v) => setField({ uniCode: (v as string) || null }) } : undefined,
     });
     if (item?.ppeCA) {
-      specFields.push({ id: "ppeCA", label: "Certificado de Aprovação (CA)", accessor: (i) => i.ppeCA, render: (i) => <span className="font-mono">{i.ppeCA}</span> });
+      specFields.push({ id: "ppeCA", label: "Certificado de Aprovação (CA)", icon: IconCertificate, accessor: (i) => i.ppeCA, render: (i) => <span className="font-mono">{i.ppeCA}</span> });
     }
     if (item?.barcodes && item.barcodes.length > 0) {
       specFields.push({
         id: "barcodes",
         label: "Códigos de Barras",
+        icon: IconBarcode,
         block: true,
         accessor: (i) => i.barcodes,
         render: (i) => (
@@ -256,27 +273,19 @@ function ItemDetailContent() {
         ),
       });
     }
-    // Medidas — one stacked row per measure (sorted by canonical type order).
-    specFields.push({
-      id: "measures",
-      label: "Medidas",
-      block: true,
-      accessor: (i) => (i.measures || []).map((m) => formatMeasureValue(m)).join(", ") || null,
-      render: (i) => {
-        const measures = [...(i.measures || [])].sort((a, b) => (MEASURE_TYPE_ORDER[a.measureType] ?? 999) - (MEASURE_TYPE_ORDER[b.measureType] ?? 999));
-        if (!measures.length) return <NotDefined />;
-        return (
-          <div className="mt-1 space-y-2">
-            {measures.map((m) => (
-              <div key={m.id} className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-3 py-2">
-                <span className="text-sm text-muted-foreground">{MEASURE_TYPE_LABELS[m.measureType] ?? m.measureType}</span>
-                <span className="text-sm font-semibold text-foreground">{formatMeasureValue(m)}</span>
-              </div>
-            ))}
-          </div>
-        );
-      },
-    });
+    // Medidas — each measure becomes its own spec row (label = type, icon = type icon),
+    // sorted by canonical type order, inline with the rest of the specifications.
+    const sortedMeasures = [...(item?.measures || [])].sort((a, b) => (MEASURE_TYPE_ORDER[a.measureType] ?? 999) - (MEASURE_TYPE_ORDER[b.measureType] ?? 999));
+    for (const m of sortedMeasures) {
+      const value = formatMeasureValue(m);
+      specFields.push({
+        id: `measure-${m.id}`,
+        label: MEASURE_TYPE_LABELS[m.measureType] ?? m.measureType,
+        icon: MEASURE_TYPE_ICONS[m.measureType] ?? IconRuler,
+        accessor: () => value,
+        render: () => <span>{value}</span>,
+      });
+    }
     // Embalagem e Logística
     specFields.push({
       id: "boxQuantity",
@@ -289,6 +298,7 @@ function ItemDetailContent() {
     specFields.push({
       id: "estimatedLeadTime",
       label: "Prazo de Entrega Estimado",
+      icon: IconTruckDelivery,
       dataType: "integer",
       accessor: (i) => i.estimatedLeadTime,
       render: (i) => <span>{i.estimatedLeadTime != null ? `${i.estimatedLeadTime} dias` : "—"}</span>,
