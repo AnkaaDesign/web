@@ -200,7 +200,9 @@ export function createOrderColumns(): DataTableColumnDef<Order>[] {
       enableSorting: true,
       size: 120,
       minSize: 100,
-      meta: { defaultVisible: false, headerLabel: "Pago em", exportValue: (row) => (row.paidAt ? formatDate(row.paidAt) : "") },
+      // Payment date is financial info → gated from WAREHOUSE, same as `total`/`paymentStatus` (and
+      // the detail's payment section). Without this a warehouse user could re-enable "Pago em".
+      meta: { defaultVisible: false, requiredPrivilege: ORDER_PRICE_VIEWERS, headerLabel: "Pago em", exportValue: (row) => (row.paidAt ? formatDate(row.paidAt) : "") },
       cell: ({ row }) => muted(row.original.paidAt ? formatDate(row.original.paidAt) : "-"),
     },
     {

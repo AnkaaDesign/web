@@ -5,6 +5,7 @@ import { secullumService } from "@/api-client";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { formatCPF, formatPIS } from "@/utils/formatters";
 import { formatDate } from "@/utils";
+import { createEspelhoRenderer } from "@/utils/espelho-ponto-pdf-generator";
 import type { User } from "@/types";
 
 export interface EditExportRow {
@@ -118,21 +119,21 @@ interface CalculationDayRow {
   saida2: string;
   entrada3: string;
   saida3: string;
-  carga: string;
   normais: string;
   faltas: string;
   ex50: string;
   ex100: string;
   ex150: string;
+  dsr: string;
 }
 
 interface CalculationTotals {
-  carga: string;
   normais: string;
   faltas: string;
   ex50: string;
   ex100: string;
   ex150: string;
+  dsr: string;
 }
 
 interface HorarioInfo {
@@ -220,23 +221,23 @@ function parseSecullumCalculations(payload: any): { rows: CalculationDayRow[]; t
       saida2,
       entrada3,
       saida3,
-      carga: shortTime(get(row, "Carga")),
       normais: shortTime(get(row, "Normais")),
       faltas: shortTime(get(row, "Faltas")),
       ex50: shortTime(get(row, "Ex50%")),
       ex100: shortTime(get(row, "Ex100%")),
       ex150: shortTime(get(row, "Ex150%")),
+      dsr: shortTime(get(row, "DSR")),
     };
   });
 
   const totals: CalculationTotals | null = Totais.length
     ? {
-        carga: shortTime(Totais[idx.get("Carga") ?? -1]),
         normais: shortTime(Totais[idx.get("Normais") ?? -1]),
         faltas: shortTime(Totais[idx.get("Faltas") ?? -1]),
         ex50: shortTime(Totais[idx.get("Ex50%") ?? -1]),
         ex100: shortTime(Totais[idx.get("Ex100%") ?? -1]),
         ex150: shortTime(Totais[idx.get("Ex150%") ?? -1]),
+        dsr: shortTime(Totais[idx.get("DSR") ?? -1]),
       }
     : null;
 
@@ -251,8 +252,14 @@ async function fetchHorarioForUser(user: User | null | undefined): Promise<Horar
     const employee = empList.find((e: any) => String(e?.Id) === String(user.secullumEmployeeId));
     const horarioId = employee?.HorarioId;
     if (!horarioId) return null;
-    const horarioResp = await secullumService.getHorarioById(horarioId);
-    const h: any = (horarioResp?.data as any)?.data ?? null;
+
+    // Use the list endpoint: it returns the backend's *flattened* horário DTO
+    // (top-level Entrada1..Saida3, CargaHorariaSemanal, Codigo). The single-record
+    // endpoint (getHorarioById) returns the raw Secullum payload where the times are
+    // nested in a Dias[] array, so reading h.Entrada1 there yields undefined.
+    const horariosResp = await secullumService.getHorarios({ incluirDesativados: true });
+    const list: any[] = (horariosResp?.data as any)?.data ?? [];
+    const h: any = list.find((item: any) => String(item?.Id) === String(horarioId)) ?? null;
     if (!h) return null;
     return {
       entrada1: shortTime(h.Entrada1),
@@ -309,7 +316,7 @@ export function TimeClockEntryEditExport({
       return;
     }
 
-    const loadingId = toast.loading("Gerando PDF do controle de ponto…");
+    const loadingId = toast.loading("Gerando PDF do espelho de ponto…");
     try {
       const startStr = format(startDate, "yyyy-MM-dd");
       const endStr = format(endDate, "yyyy-MM-dd");
@@ -327,42 +334,37 @@ export function TimeClockEntryEditExport({
         return;
       }
 
-      const html = buildControlePontoHtml({
-        user: user ?? null,
-        startDate,
-        endDate,
-        rows,
-        totals,
-        horario,
-      });
+      // Vector PDF (real, selectable text) — the SAME generator used by the
+      // Espelho de Ponto and Fechamento exports, so every espelho is identical.
+      const renderer = await createEspelhoRenderer();
+      const doc = renderer.newDoc();
+      renderer.drawPage(doc, { user: user ?? null, startDate, endDate, rows, totals, horario });
 
-      const win = window.open("", "_blank");
-      if (!win) {
-        toast.dismiss(loadingId);
-        toast.error("Bloqueador de pop-up impediu a exportação");
-        return;
-      }
-      win.document.write(html);
-      win.document.close();
-      win.onload = () => {
-        win.focus();
-        win.print();
-        win.onafterprint = () => {
-          try {
-            win.close();
-          } catch {
-            // Ignore
-          }
-        };
-      };
+      const safeName =
+        (user?.name ?? "colaborador")
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .replace(/[\\/:*?"<>|]+/g, "")
+          .replace(/\s+/g, " ")
+          .trim() || "colaborador";
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Espelho de Ponto - ${safeName} - ${startStr}_a_${endStr}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
       toast.dismiss(loadingId);
-      toast.success("PDF gerado — janela de impressão aberta");
+      toast.success("Espelho de ponto gerado");
     } catch (err) {
       toast.dismiss(loadingId);
       const message =
         (err as any)?.response?.data?.message ||
         (err as any)?.message ||
-        "Erro ao gerar PDF do controle de ponto";
+        "Erro ao gerar PDF do espelho de ponto";
       toast.error(message);
     }
   };
@@ -416,8 +418,8 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
   const bodyFontPt = dense ? 8 : 8.5;
   const tableFontPt = dense ? 6.6 : 7.2;
   const tableHeadPt = dense ? 5.8 : 6.2;
-  const rowPadY = dense ? 0.8 : 1.0; // mm
-  const headPadY = dense ? 1.1 : 1.3; // mm
+  const rowPadY = dense ? 0.55 : 1.0; // mm
+  const headPadY = dense ? 0.9 : 1.3; // mm
 
   // Build main table rows
   const tableRowsHtml = rows
@@ -458,12 +460,12 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
         <tr class="${rowClasses.join(" ")}">
           <td class="cell-date">${dateLabel}</td>
           ${cells}
-          <td class="cell-totals">${escapeHtml(r.carga) || "—"}</td>
           <td class="cell-totals">${escapeHtml(r.normais) || "—"}</td>
           <td class="cell-totals ${r.faltas ? "cell-absence" : ""}">${escapeHtml(r.faltas) || "—"}</td>
           <td class="cell-totals">${escapeHtml(r.ex50) || "—"}</td>
           <td class="cell-totals">${escapeHtml(r.ex100) || "—"}</td>
           <td class="cell-totals">${escapeHtml(r.ex150) || "—"}</td>
+          <td class="cell-totals">${escapeHtml(r.dsr) || "—"}</td>
         </tr>
       `;
     })
@@ -474,12 +476,12 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
       <tr class="row-totals">
         <td class="cell-date">TOTAIS</td>
         <td colspan="6" class="cell-totals-spacer"></td>
-        <td class="cell-totals">${escapeHtml(totals.carga) || "—"}</td>
         <td class="cell-totals">${escapeHtml(totals.normais) || "—"}</td>
         <td class="cell-totals ${totals.faltas ? "cell-absence" : ""}">${escapeHtml(totals.faltas) || "—"}</td>
         <td class="cell-totals">${escapeHtml(totals.ex50) || "—"}</td>
         <td class="cell-totals">${escapeHtml(totals.ex100) || "—"}</td>
         <td class="cell-totals">${escapeHtml(totals.ex150) || "—"}</td>
+        <td class="cell-totals">${escapeHtml(totals.dsr) || "—"}</td>
       </tr>
     `
     : "";
@@ -492,12 +494,12 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
           <span class="ident-label">Colaborador</span>
           <span class="ident-value strong">${escapeHtml(userName)}</span>
         </div>
+      </div>
+      <div class="ident-row ident-row-secondary">
         <div class="ident-item">
           <span class="ident-label">Matrícula</span>
           <span class="ident-value mono strong">${escapeHtml(payrollNumber)}</span>
         </div>
-      </div>
-      <div class="ident-row ident-row-secondary">
         <div class="ident-item">
           <span class="ident-label">CPF</span>
           <span class="ident-value mono">${escapeHtml(cpf)}</span>
@@ -529,7 +531,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Controle de Ponto — ${escapeHtml(userName)}</title>
+  <title>Espelho de Ponto — ${escapeHtml(userName)}</title>
   <style>
     @page {
       size: A4;
@@ -562,7 +564,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 2mm;
+      margin-bottom: 3mm;
       gap: 8mm;
     }
 
@@ -599,7 +601,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
     .header-line {
       height: 1px;
       background: linear-gradient(to right, #888 0%, ${BRAND_COLORS.primaryGreen} 35%);
-      margin-bottom: 3mm;
+      margin-bottom: 6mm;
     }
 
     /* ===== Identification strip ===== */
@@ -609,7 +611,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
       border-radius: 2pt;
       padding: 2.4mm 3mm;
       background: #fafcfa;
-      margin-bottom: 3mm;
+      margin-bottom: 5mm;
     }
 
     .ident-row {
@@ -658,7 +660,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
 
     /* ===== Horario block (optional) ===== */
     .horario {
-      margin-bottom: 3mm;
+      margin-bottom: 5mm;
     }
     .horario-title {
       font-size: 7.6pt;
@@ -675,9 +677,13 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
       font-variant-numeric: tabular-nums;
     }
     .horario-table th, .horario-table td {
-      padding: 0.8mm 1.6mm;
+      padding: 0.7mm 0.8mm;
       text-align: center;
       border: 1px solid #e6e6e6;
+      white-space: nowrap;
+    }
+    .horario-table td {
+      font-size: ${Math.max(5.4, tableFontPt - 1)}pt;
     }
     .horario-table th {
       background: #f3f5f4;
@@ -744,8 +750,9 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
       border: 1px solid #e6e6e6;
       color: ${BRAND_COLORS.textDark};
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      /* overflow stays visible: values are short and columns are fixed-width, and
+         clipping here makes html2canvas shear off the bottom of the glyphs. */
+      overflow: visible;
     }
 
     /* Column widths — sum to 100% */
@@ -824,7 +831,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
 
     /* ===== Signatures ===== */
     .signatures {
-      margin-top: 14mm;
+      margin-top: 6mm;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 14mm;
@@ -834,7 +841,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
 
     /* Empty area where the user signs by hand; border-bottom is the visible line. */
     .signature-area {
-      height: 14mm;
+      height: 10mm;
       border-bottom: 0.5mm solid ${BRAND_COLORS.textDark};
       margin-bottom: 1.4mm;
     }
@@ -853,7 +860,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
 
     /* ===== Footer (matches dossie pdf) ===== */
     .footer {
-      margin-top: 14mm;
+      margin-top: 9mm;
       padding-top: 0;
     }
     .footer-line {
@@ -900,7 +907,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
     <header class="header">
       <img src="/logo.png" alt="Ankaa Design" class="logo" />
       <div class="header-right">
-        <div class="document-title">Controle de Ponto</div>
+        <div class="document-title">Espelho de Ponto</div>
         <div class="header-meta">
           <span class="label">Período:</span> ${escapeHtml(periodLabel)}
           &nbsp;·&nbsp; <span class="label">Emissão:</span> ${escapeHtml(emissionDate)}
@@ -942,12 +949,12 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
             <th class="col-clock">Saída 2</th>
             <th class="col-clock">Entrada 3</th>
             <th class="col-clock">Saída 3</th>
-            <th class="col-totals">Carga</th>
             <th class="col-totals">Normais</th>
             <th class="col-totals">Faltas</th>
             <th class="col-totals">Ex 50%</th>
             <th class="col-totals">Ex 100%</th>
             <th class="col-totals">Ex 150%</th>
+            <th class="col-totals">DSR</th>
           </tr>
         </thead>
         <tbody>

@@ -249,6 +249,9 @@ export function createItemTableColumns(): DataTableColumnDef<Item>[] {
       size: 120,
       minSize: 90,
       meta: {
+        // Hidden by default — the legacy default column set showed `price` but never `totalPrice`
+        // (see the default-set doc-comment above). Only the absence of this flag made it show up.
+        defaultVisible: false,
         headerLabel: "Valor Total",
         exportHeader: "Valor Total",
         requiredPrivilege: PRICE_VIEWERS,
@@ -352,7 +355,7 @@ export function createItemTableColumns(): DataTableColumnDef<Item>[] {
       accessorKey: "icms",
       enableSorting: true,
       size: 90,
-      meta: { defaultVisible: false, headerLabel: "ICMS", exportHeader: "ICMS", exportValue: (i) => (i.icms ? `${i.icms}%` : "") },
+      meta: { defaultVisible: false, requiredPrivilege: PRICE_VIEWERS, headerLabel: "ICMS", exportHeader: "ICMS", exportValue: (i) => (i.icms ? `${i.icms}%` : "") },
       cell: ({ row }) => <div className="text-muted-foreground truncate">{fmtPercent(row.original.icms)}</div>,
     },
     {
@@ -361,7 +364,7 @@ export function createItemTableColumns(): DataTableColumnDef<Item>[] {
       accessorKey: "ipi",
       enableSorting: true,
       size: 90,
-      meta: { defaultVisible: false, headerLabel: "IPI", exportHeader: "IPI", exportValue: (i) => (i.ipi ? `${i.ipi}%` : "") },
+      meta: { defaultVisible: false, requiredPrivilege: PRICE_VIEWERS, headerLabel: "IPI", exportHeader: "IPI", exportValue: (i) => (i.ipi ? `${i.ipi}%` : "") },
       cell: ({ row }) => <div className="text-muted-foreground truncate">{fmtPercent(row.original.ipi)}</div>,
     },
     {

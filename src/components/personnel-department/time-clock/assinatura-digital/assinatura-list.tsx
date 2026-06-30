@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { IconPlus } from "@tabler/icons-react";
+import { IconPlus, IconFileTypePdf } from "@tabler/icons-react";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AssinaturaTable, type SecullumAssinatura } from "./assinatura-table";
@@ -15,11 +15,12 @@ import { AssinaturaEmpty } from "./assinatura-empty";
 interface AssinaturaListProps {
   className?: string;
   onNewApuracao?: () => void;
+  onExportEspelho?: () => void;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
 
-export function AssinaturaList({ className, onNewApuracao }: AssinaturaListProps) {
+export function AssinaturaList({ className, onNewApuracao, onExportEspelho }: AssinaturaListProps) {
   const [displaySearchText, setDisplaySearchText] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -58,14 +59,13 @@ export function AssinaturaList({ className, onNewApuracao }: AssinaturaListProps
       );
     }
 
-    // Newest apuração first by DataInicio. Within the same period, the bulk
-    // monthly apuração is created before the per-employee retry rows, so its
-    // Id is lower — sort by Id asc as a tiebreaker so the main batch appears
-    // above its follow-ups (matches the Secullum UI order).
+    // Newest apuração first by DataInicio. Within the same period, sort by Id
+    // desc so the most recently created apuração (highest Id — the latest bulk
+    // run or per-employee follow-up) appears at the top of its period group.
     arr = [...arr].sort((a, b) => {
       const diff = new Date(b.DataInicio).getTime() - new Date(a.DataInicio).getTime();
       if (diff !== 0) return diff;
-      return a.Id - b.Id;
+      return b.Id - a.Id;
     });
 
     return arr;
@@ -111,6 +111,12 @@ export function AssinaturaList({ className, onNewApuracao }: AssinaturaListProps
             isPending={displaySearchText !== searchText}
             className="flex-1"
           />
+          {onExportEspelho && (
+            <Button type="button" variant="outline" onClick={onExportEspelho} className="shrink-0">
+              <IconFileTypePdf className="h-4 w-4 mr-2" />
+              Exportar Espelho
+            </Button>
+          )}
           {onNewApuracao && (
             <Button type="button" onClick={onNewApuracao} className="shrink-0">
               <IconPlus className="h-4 w-4 mr-2" />

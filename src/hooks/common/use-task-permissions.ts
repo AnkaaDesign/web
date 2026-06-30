@@ -48,7 +48,14 @@ export function useTaskPermissions() {
 
   // -- Status management --------------------------------------------------
   const canManageStatus = isAdmin || isTeamLeader;
-  const canFinish = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]);
+  // Keep in lockstep with `canFinishTask` (entity-permissions): LOGISTIC was granted finish in the
+  // 2026-06-25 logistics-finish change. (This flag had drifted stale here; the task detail/prep/
+  // context-menus all use `canFinishTask` directly, which already includes LOGISTIC.)
+  const canFinish = hasAnyPrivilegeAccess([
+    SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    SECTOR_PRIVILEGES.LOGISTIC,
+  ]);
   const canCancel = hasAnyPrivilegeAccess([
     SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL,
     SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER,

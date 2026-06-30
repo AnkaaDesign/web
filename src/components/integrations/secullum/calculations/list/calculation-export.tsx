@@ -4,10 +4,10 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { secullumService } from "@/api-client";
 import {
-  buildControlePontoHtml,
   parseSecullumCalculations,
   fetchHorarioForUser,
 } from "@/components/personnel-department/time-clock-entry/time-clock-entry-edit-export";
+import { createEspelhoRenderer } from "@/utils/espelho-ponto-pdf-generator";
 
 interface CalculationRow {
   id: string;
@@ -180,7 +180,7 @@ export function CalculationExport({
       return;
     }
 
-    const loadingId = toast.loading("Gerando PDF do controle de ponto…");
+    const loadingId = toast.loading("Gerando espelho de ponto…");
     try {
       const startStr = format(startDate, "yyyy-MM-dd");
       const endStr = format(endDate, "yyyy-MM-dd");
@@ -198,29 +198,37 @@ export function CalculationExport({
         return;
       }
 
-      const html = buildControlePontoHtml({ user, startDate, endDate, rows, totals, horario });
+      // Vector PDF (real, selectable text) — the SAME generator the Fechamento
+      // "Exportar Espelho" uses, so both pages produce an identical document.
+      const renderer = await createEspelhoRenderer();
+      const doc = renderer.newDoc();
+      renderer.drawPage(doc, { user, startDate, endDate, rows, totals, horario });
 
-      const win = window.open("", "_blank");
-      if (!win) {
-        toast.dismiss(loadingId);
-        toast.error("Bloqueador de pop-up impediu a exportação");
-        return;
-      }
-      win.document.write(html);
-      win.document.close();
-      win.onload = () => {
-        win.focus();
-        win.print();
-        win.onafterprint = () => { try { win.close(); } catch { /* ignore */ } };
-      };
+      const safeName =
+        (user?.name ?? "colaborador")
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .replace(/[\\/:*?"<>|]+/g, "")
+          .replace(/\s+/g, " ")
+          .trim() || "colaborador";
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Espelho de Ponto - ${safeName} - ${startStr}_a_${endStr}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
       toast.dismiss(loadingId);
-      toast.success("PDF gerado — janela de impressão aberta");
+      toast.success("Espelho de ponto gerado");
     } catch (err) {
       toast.dismiss(loadingId);
       const message =
         (err as any)?.response?.data?.message ||
         (err as any)?.message ||
-        "Erro ao gerar PDF do controle de ponto";
+        "Erro ao gerar o espelho de ponto";
       toast.error(message);
     }
   };

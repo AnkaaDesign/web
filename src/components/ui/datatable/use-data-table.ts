@@ -195,10 +195,14 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     const pageSizeRaw = syncUrl ? searchParams.get("pageSize") : null;
     const selRaw = syncUrl ? searchParams.get("sel") : null;
     const selIds = selRaw ? selRaw.split(",").filter(Boolean) : undefined;
+    // Guard against a hand-edited / malformed URL (`?page=abc`): Number("abc") is NaN, which would
+    // poison pageIndex/pageSize. Fall back to undefined (→ the saved/default value) on non-finite input.
+    const pageNum = pageRaw ? Number(pageRaw) : NaN;
+    const pageSizeNum = pageSizeRaw ? Number(pageSizeRaw) : NaN;
     urlSeed.current = {
       sort,
-      page: pageRaw ? Math.max(0, Number(pageRaw) - 1) : undefined,
-      pageSize: pageSizeRaw ? Number(pageSizeRaw) : undefined,
+      page: Number.isFinite(pageNum) ? Math.max(0, pageNum - 1) : undefined,
+      pageSize: Number.isFinite(pageSizeNum) && pageSizeNum > 0 ? pageSizeNum : undefined,
       selection: selIds ? Object.fromEntries(selIds.map((id) => [id, true])) : undefined,
     };
   }
@@ -253,6 +257,13 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
   // --- Server precedence: apply the user's saved server layout once it loads,
   //     unless the user already interacted, and never overriding URL-provided view. ---
   const userInteracted = useRef(false);
+  // What we PERSIST for sort/pageSize — seeded from the saved layout (NOT the URL). The `sorting`/
+  // `pagination` STATE may hold a share-link's URL-seeded values so the link renders correctly, but
+  // these refs hold the user's own choice, updated only on a genuine sort/page-size gesture or a
+  // server/sector restore. Without this, opening a colleague's sorted link and then (say) resizing a
+  // column would save the link's sort as your personal default.
+  const persistSortRef = useRef<SortingState>(localConfig?.sorting ?? sectorDefault?.sorting ?? defaultSorting);
+  const persistPageSizeRef = useRef<number>(localConfig?.pageSize ?? sectorDefault?.pageSize ?? defaultPageSize);
   const serverApplied = useRef(false);
   // Captures whether the server actually returned a saved config — gates the sector-default effect
   // so a sector default can NEVER apply over a user's saved (server) layout.
@@ -273,12 +284,26 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
       setColumnAlignment(cfg.columnAlignment ?? {});
       setRowPinning({ top: cfg.rowPinning?.top ?? [], bottom: [] });
       if (persistExpansion && cfg.expanded) setExpanded(cfg.expanded);
-      if (seed.sort === undefined && cfg.sorting) setSorting(cfg.sorting);
+      // Track the saved sort/pageSize as the persist baseline even when a URL seed overrides the
+      // DISPLAY below — so a later unrelated interaction re-persists the saved value, not the link's.
+      if (cfg.sorting) persistSortRef.current = cfg.sorting;
+      if (cfg.pageSize) persistPageSizeRef.current = cfg.pageSize;
+      if (seed.sort === undefined && cfg.sorting) {
+        setSorting(cfg.sorting);
+        // Server-mode pages build their query from the URL, so the restored sort must also reach the
+        // URL or the fetch silently runs the default order. Guarded by `seed.sort === undefined`, so
+        // this can never fight a share-link's explicit sort.
+        if (syncUrl && cfg.sorting.length) writeUrl((p) => p.set("sort", JSON.stringify(cfg.sorting)));
+      }
       if (seed.pageSize === undefined && cfg.pageSize) {
         setPagination((p) => ({ ...p, pageSize: cfg.pageSize as number }));
+        if (syncUrl && cfg.pageSize !== defaultPageSize) writeUrl((p) => p.set("pageSize", String(cfg.pageSize)));
       }
     }
     setReady(true);
+    // writeUrl is referenced in the body only (runs post-mount, after its declaration); this effect
+    // is one-shot (serverApplied) so the extra deps can't cause a re-run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isServerLoaded, serverConfig, localDirty, dataColumnIds, columns, seed.sort, seed.pageSize]);
 
   // --- Sector default (one-shot): `currentPrivilege` (and thus `sectorDefault`) can resolve AFTER
@@ -297,25 +322,62 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     if (serverHadConfig.current || localConfig || userInteracted.current || localDirty || !sectorDefault) return;
     if (sectorDefault.columnOrder) setColumnOrder(reconcileOrder(sectorDefault.columnOrder, dataColumnIds));
     if (sectorDefault.columnVisibility) setColumnVisibility(mergeVisibility(columns, sectorDefault.columnVisibility));
-    if (seed.sort === undefined && sectorDefault.sorting) setSorting(sectorDefault.sorting);
+    if (sectorDefault.sorting) persistSortRef.current = sectorDefault.sorting;
+    if (sectorDefault.pageSize) persistPageSizeRef.current = sectorDefault.pageSize;
+    if (seed.sort === undefined && sectorDefault.sorting) {
+      setSorting(sectorDefault.sorting);
+      // Same as the server restore: a server-mode page reads sort from the URL, so the sector default
+      // must reach the URL too (no URL seed here, so it can't override a share-link).
+      if (syncUrl && sectorDefault.sorting.length) writeUrl((p) => p.set("sort", JSON.stringify(sectorDefault.sorting)));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectorReady, ready, sectorDefault, localConfig, localDirty, dataColumnIds, columns, seed.sort]);
+
+  // --- Mirror the resolved INITIAL sort/pageSize from localStorage into the URL at mount (server-mode
+  //     pages read the fetch params from the URL). The server/sector restore effects above cover the
+  //     server-config & fresh-user cases; this covers a localStorage layout — notably an unsynced
+  //     (dirty) one, where the server-restore block is intentionally skipped. Guarded by "no URL seed"
+  //     so a share-link's explicit view always wins, and one-shot so it never loops. ---
+  const urlMirrorDone = useRef(false);
+  useEffect(() => {
+    if (urlMirrorDone.current || !syncUrl) return;
+    urlMirrorDone.current = true;
+    if (seed.sort === undefined && localConfig?.sorting?.length) {
+      writeUrl((p) => p.set("sort", JSON.stringify(localConfig.sorting)));
+    }
+    if (seed.pageSize === undefined && localConfig?.pageSize && localConfig.pageSize !== defaultPageSize) {
+      writeUrl((p) => p.set("pageSize", String(localConfig.pageSize)));
+    }
+    // one-shot, mount-only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // --- Persist layout (debounced inside the hook) once the server baseline is known. ---
   useEffect(() => {
     if (!persist || !ready) return;
+    // Persist ONLY after a genuine user customization. Before any interaction the in-memory layout is
+    // just the resolved default (or a share-link's URL-seeded view), and writing it back would
+    //   (a) freeze the current default into every user's prefs on first visit — so a later default
+    //       improvement would never reach them — and
+    //   (b) save a colleague's shared-link sort/pageSize as this user's own layout.
+    // Unsynced (dirty) local changes from a prior session are re-pushed by useTablePreferences itself
+    // (its `reSynced` effect), so they don't need this effect to fire.
+    if (!userInteracted.current) return;
     prefs.save({
       columnOrder,
       columnSizing,
       columnVisibility: columnVisibility as Record<string, boolean>,
       columnAlignment,
       rowPinning: { top: rowPinning.top ?? [] },
-      pageSize: pagination.pageSize,
-      sorting: sorting.map((s) => ({ id: s.id, desc: s.desc })),
+      // sort/pageSize come from the persist-baseline refs (the user's own choice), never the live
+      // state, which may hold a share-link's URL-seeded view.
+      pageSize: persistPageSizeRef.current,
+      sorting: persistSortRef.current.map((s) => ({ id: s.id, desc: s.desc })),
       // Only persist a finite map (never `true`/all-expanded, which can't be reconciled by id).
       expanded: persistExpansion && expanded && typeof expanded === "object" ? expanded : undefined,
     });
-    // prefs.save is stable; intentionally excluded to avoid resave loops.
+    // prefs.save is stable; intentionally excluded to avoid resave loops. `sorting`/`pagination.pageSize`
+    // stay in deps so a user sort/page-size change re-runs this (the refs are updated in their handlers).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persist, ready, columnOrder, columnSizing, columnVisibility, columnAlignment, rowPinning, pagination.pageSize, sorting, expanded]);
 
@@ -340,6 +402,7 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
       userInteracted.current = true;
       setSorting((prev) => {
         const next = applyUpdater(updater, prev);
+        persistSortRef.current = next; // user's own sort → this is what we persist
         writeUrl((p) => (next.length ? p.set("sort", JSON.stringify(next)) : p.delete("sort")));
         return next;
       });
@@ -358,7 +421,10 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
           next.pageIndex ? p.set("page", String(next.pageIndex + 1)) : p.delete("page");
           next.pageSize !== defaultPageSize ? p.set("pageSize", String(next.pageSize)) : p.delete("pageSize");
         });
-        if (next.pageSize !== prev.pageSize) userInteracted.current = true;
+        if (next.pageSize !== prev.pageSize) {
+          userInteracted.current = true;
+          persistPageSizeRef.current = next.pageSize; // user's own page-size → persist this
+        }
         return next;
       });
     },
@@ -508,17 +574,23 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
   });
 
   const resetLayout = useCallback(() => {
-    userInteracted.current = true;
     // "Restaurar padrão" resets to the SECTOR default when present (so existing users can adopt it),
-    // falling back to the hardcoded defaults per field. Persistence is cleared either way.
+    // falling back to the hardcoded defaults per field. Persistence is CLEARED and left cleared:
+    // flipping userInteracted off makes the trailing persist effect no-op, so we don't immediately
+    // re-save the snapshot (which would re-pin the user to today's default and block future default
+    // improvements). A later genuine change re-enables persistence.
+    userInteracted.current = false;
     setColumnOrder(reconcileOrder(sectorDefault?.columnOrder, dataColumnIds));
     setColumnSizing(sectorDefault?.columnSizing ?? {});
     setColumnVisibility(sectorDefault?.columnVisibility ? mergeVisibility(columns, sectorDefault.columnVisibility) : defaultVisibility);
     setColumnAlignment(sectorDefault?.columnAlignment ?? {});
     setRowPinning({ top: sectorDefault?.rowPinning?.top ?? [], bottom: [] });
-    if (sectorDefault?.sorting) setSorting(sectorDefault.sorting);
-    else setSorting(defaultSorting);
-    setPagination((p) => ({ ...p, pageSize: sectorDefault?.pageSize ?? defaultPageSize }));
+    const resetSort = sectorDefault?.sorting ?? defaultSorting;
+    setSorting(resetSort);
+    persistSortRef.current = resetSort;
+    const resetPageSize = sectorDefault?.pageSize ?? defaultPageSize;
+    setPagination((p) => ({ ...p, pageSize: resetPageSize }));
+    persistPageSizeRef.current = resetPageSize;
     prefs.clear();
   }, [dataColumnIds, defaultVisibility, prefs, sectorDefault, columns, defaultSorting, defaultPageSize]);
 

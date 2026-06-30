@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/sonner";
 import { useItems, useItemMutations, useItemBatchMutations, useItemMerge, useItemBrands, useItemCategories, useSuppliers } from "@/hooks";
+import { getItems } from "@/api-client";
 import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "@/constants";
 import type { Item } from "@/types";
 import { PriceAdjustmentModal } from "../modals/price-adjustment-modal";
@@ -47,8 +48,10 @@ export function ItemTablePage() {
     setParams(next);
   }, []);
 
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
-  const pageSize = Number(searchParams.get("pageSize") ?? String(ITEM_DEFAULT_PAGE_SIZE));
+  const pageRaw = Number(searchParams.get("page") ?? "1");
+  const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
+  const pageSizeRaw = Number(searchParams.get("pageSize") ?? String(ITEM_DEFAULT_PAGE_SIZE));
+  const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? pageSizeRaw : ITEM_DEFAULT_PAGE_SIZE;
   const sortParam = searchParams.get("sort");
   const sorting = useMemo<{ id: string; desc: boolean }[]>(() => {
     if (!sortParam) return [];
@@ -74,6 +77,20 @@ export function ItemTablePage() {
   const { data: response, isLoading } = useItems(query as never);
   const items = (response?.data ?? []) as Item[];
   const totalRecords = response?.meta?.totalRecords ?? 0;
+
+  // Export "all": refetch every item matching the current search/filters/sort in one request (the
+  // table only holds the current page). Gating still applies — the share dialog only exports columns
+  // the user can see (price/totalPrice are dropped for WAREHOUSE before the dialog).
+  const fetchAllForExport = useCallback(async (): Promise<Item[]> => {
+    const res = await getItems({
+      ...buildItemQuery(params.filters, params.search),
+      page: 1,
+      limit: Math.max(totalRecords, 1),
+      orderBy: buildItemOrderBy(sorting),
+      include: ITEM_LIST_INCLUDE,
+    } as never);
+    return (res?.data ?? []) as Item[];
+  }, [params, sorting, totalRecords]);
 
   // --- filter option sources (loaded once; API caps limit at 100) ---
   const { data: categoriesData } = useItemCategories({ orderBy: { name: "asc" }, limit: 100 } as never);
@@ -256,6 +273,7 @@ export function ItemTablePage() {
           onRowClick,
           isLoading,
           onParamsChange,
+          onExportFetchAll: fetchAllForExport,
           defaultPageSize: ITEM_DEFAULT_PAGE_SIZE,
           searchPlaceholder: "Buscar por nome, código, código de barras...",
           exportTitle: "Produtos",

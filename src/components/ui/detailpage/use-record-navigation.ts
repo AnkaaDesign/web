@@ -91,7 +91,10 @@ export function useRecordNavigation(params: UseRecordNavigationParams): RecordNa
 
   return {
     index: nav.index,
-    total: nav.list.length,
+    // Report a navigable total only when the current record is actually in the list. A stale deep-link
+    // (currentId not found, index = -1) otherwise rendered the widget as "0 / N" with both arrows dead;
+    // treating it as no-context (total 0) hides the widget cleanly, like the no-ids case.
+    total: nav.index >= 0 ? nav.list.length : 0,
     position: nav.index >= 0 ? nav.index + 1 : 0,
     prevId: nav.prevId,
     nextId: nav.nextId,

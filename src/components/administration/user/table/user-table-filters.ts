@@ -146,5 +146,12 @@ export function buildUserFilterDefs(rows: User[]): DataTableFilterDef<User>[] {
       icon: createElement(IconCalendar, { className: "h-4 w-4" }),
       accessor: (u) => u.createdAt ?? null,
     },
+    {
+      key: "updatedAt",
+      label: "Data de Atualização",
+      type: "date-range",
+      icon: createElement(IconCalendar, { className: "h-4 w-4" }),
+      accessor: (u) => u.updatedAt ?? null,
+    },
   ];
 }

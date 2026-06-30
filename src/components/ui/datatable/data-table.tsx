@@ -68,6 +68,14 @@ export interface DataTableProps<TData> {
   mode?: DataTableMode;
   /** Server mode: total row count across all pages. */
   rowCount?: number;
+  /**
+   * Server mode: fetch EVERY row matching the current search/filters (across all pages) for an
+   * "export all" — the engine only holds the current page, so the page owner supplies this (it calls
+   * the same list endpoint with a large limit + the active query). Omit in client mode, where the
+   * engine already has the full filtered set. When provided, the share dialog offers a "Todos os
+   * registros" scope.
+   */
+  onExportFetchAll?: () => Promise<TData[]>;
   filterDefs?: DataTableFilterDef<TData>[];
   /** Right-click context-menu actions (in addition to the built-in pin/unpin). */
   rowActions?: DataTableRowAction<TData>[];
@@ -154,6 +162,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     getRowId,
     mode = "client",
     rowCount,
+    onExportFetchAll,
     filterDefs: rawFilterDefs = EMPTY_FILTER_DEFS,
     rowActions = EMPTY_ROW_ACTIONS,
     onRowClick,
@@ -261,9 +270,26 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     [setSearchParams, syncUrl],
   );
 
+  // Returns the table to page 1. Wired to `dt.table` once the engine is built (below). Narrowing the
+  // result set must reset the page or you land on a now-empty out-of-range page — server mode reads
+  // `page` from the URL and would refetch page N of a shorter set; client mode would strand you on an
+  // empty page. `setPageIndex(0)` covers both (it clears the URL `page` AND resets internal state).
+  const resetToFirstPage = useRef<() => void>(() => {});
+
   useEffect(() => {
     writeParam("q", debouncedSearch || null);
   }, [debouncedSearch, writeParam]);
+
+  // Reset to page 1 when the (debounced) search changes — skipping the initial mount so a deep-linked
+  // `?q=…&page=N` still opens on page N.
+  const searchPageResetMounted = useRef(false);
+  useEffect(() => {
+    if (!searchPageResetMounted.current) {
+      searchPageResetMounted.current = true;
+      return;
+    }
+    resetToFirstPage.current();
+  }, [debouncedSearch]);
 
   useEffect(() => {
     onParamsChange?.({ search: debouncedSearch, filters });
@@ -273,6 +299,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     (next: DataTableFilterValues) => {
       setFilters(next);
       writeParam("filters", countActiveFilters(next) > 0 ? JSON.stringify(next) : null);
+      resetToFirstPage.current(); // any filter change → back to page 1
     },
     [writeParam],
   );
@@ -316,6 +343,8 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   });
 
   const { table, columnSizeVars, rowVirtualizer, rows, columnAlignment, setColumnAlignment } = dt;
+  // Wire the page-1 reset now that the engine exists (used by the search + filter effects above).
+  resetToFirstPage.current = () => table.setPageIndex(0);
 
   // Hand the table's CURRENT filtered+sorted order to onRowClick so a detail page can page
   // prev/next through exactly the list the user sees (across pages, not just the page).
@@ -356,9 +385,17 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     setMirroredSelection((prev) => (prev.size === ids.length && ids.every((id) => prev.has(id)) ? prev : new Set(ids)));
   }, [selectedRows]);
   const totalItems = mode === "client" ? filtered.length : rowCount ?? filtered.length;
-  // Export = selected rows, else just the CURRENT PAGE (not every page).
-  const exportRows =
-    selectedCount > 0 ? selectedRows.map((r) => r.original) : table.getRowModel().rows.map((r) => r.original);
+  // Export row sources — the share dialog lets the user pick the scope (selected / current page /
+  // ALL filtered rows). "All" is resolved lazily on export: client mode reads the in-memory
+  // pre-pagination model; server mode calls the page's fetch-all hook (one request, current query).
+  const exportSelectedRows = selectedRows.map((r) => r.original);
+  const exportPageRows = table.getRowModel().rows.map((r) => r.original);
+  const canExportAll = mode === "client" || !!onExportFetchAll;
+  const resolveAllRows = useCallback(async (): Promise<TData[]> => {
+    if (mode === "client") return table.getPrePaginationRowModel().rows.map((r) => r.original);
+    if (onExportFetchAll) return onExportFetchAll();
+    return table.getRowModel().rows.map((r) => r.original);
+  }, [mode, table, onExportFetchAll]);
 
   useEffect(() => {
     if (selectedCount === 0 && viewSelectedOnly) setViewSelectedOnly(false);
@@ -576,9 +613,11 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
             onOpenFilters={openFilters}
             shareEnabled={enableShare}
             onShare={handleShare}
+            canShareLink={syncUrl}
             selectedCount={selectedCount}
             showSelectedOnly={viewSelectedOnly}
             onToggleSelectedOnly={setViewSelectedOnly}
+            canViewSelectedOnly={mode === "client"}
             enableExpansion={enableExpansion}
             allExpanded={allRowsExpanded}
             onToggleExpandAll={handleToggleExpandAll}
@@ -717,8 +756,10 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
           format={shareFormat}
           columns={orderedColumns}
           visibleColumnIds={visibleColumnIds}
-          exportRows={exportRows}
-          selectedCount={selectedCount}
+          pageRows={exportPageRows}
+          selectedRows={exportSelectedRows}
+          totalCount={totalItems}
+          resolveAllRows={canExportAll ? resolveAllRows : undefined}
           title={exportTitle}
           filename={exportFilename}
         />

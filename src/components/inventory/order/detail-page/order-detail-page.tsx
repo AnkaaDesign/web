@@ -56,7 +56,7 @@ import {
 } from "../../../../constants";
 import { getSuppliers } from "@/api-client/supplier";
 import { getUsers } from "@/api-client/user";
-import { formatDateTime, formatCurrency, formatPixKey } from "../../../../utils";
+import { formatDateTime, formatCurrency, formatPixKey, formatCNPJ } from "../../../../utils";
 import { formatOrderNumber } from "@/utils/order-code";
 import type { Order } from "../../../../types";
 import { OrderStatusBadge } from "../common/order-status-badge";
@@ -290,11 +290,27 @@ export function OrderDetailPage() {
             : undefined,
         },
         {
+          id: "supplierCnpj",
+          label: "CNPJ",
+          icon: IconId,
+          accessor: (o) => o.supplier?.cnpj ?? null,
+          render: (o) => (o.supplier?.cnpj ? <span className="tabular-nums">{formatCNPJ(o.supplier.cnpj)}</span> : muted(null)),
+        },
+        {
           id: "orderNumber",
           label: "Número do Pedido",
           icon: IconId,
           accessor: (o) => (o.orderNumber != null ? formatOrderNumber(o.orderNumber) : null),
-          render: (o) => <span className="tabular-nums">{o.orderNumber != null ? formatOrderNumber(o.orderNumber) : "—"}</span>,
+          render: (o) => (
+            <span className="flex items-center gap-2">
+              <span className="tabular-nums">{o.orderNumber != null ? formatOrderNumber(o.orderNumber) : "—"}</span>
+              {o.items?.some((it) => it.temporaryItemDescription) && (
+                <Badge variant="outline" className="text-xs">
+                  Temporário
+                </Badge>
+              )}
+            </span>
+          ),
         },
         {
           id: "description",
@@ -538,9 +554,11 @@ export function OrderDetailPage() {
     // --- Histórico ---
     list.push({
       id: "changelog",
+      // Full-width: the changelog is a wide timeline and is the last section, so a half-width span
+      // would leave an empty right column. (Matches the user/task detail changelog, also full-width.)
+      span: 2,
       label: "Histórico",
       icon: IconHistory,
-      span: 1,
       scroll: true,
       render: (o) => (
         <ChangelogHistory embedded entityType={CHANGE_LOG_ENTITY_TYPE.ORDER} entityId={o.id} entityName={o.description} entityCreatedAt={o.createdAt} className="w-full" />

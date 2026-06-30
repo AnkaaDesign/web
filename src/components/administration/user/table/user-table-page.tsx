@@ -13,7 +13,7 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 import { DataTablePage } from "@/components/ui/datatable";
-import type { DataTableRowAction, DataTableRowClickMeta } from "@/components/ui/datatable";
+import type { DataTableRowAction, DataTableRowClickMeta, DataTableFilterValues } from "@/components/ui/datatable";
 import { Combobox } from "@/components/ui/combobox";
 import { toast } from "@/components/ui/sonner";
 import {
@@ -87,9 +87,26 @@ export function UserTablePage() {
 
   // --- data: load the selected "Exibir" subset (client-mode table over the loaded rows) ---
   const [exibir, setExibir] = useState<ExibirScope>("active");
+  // The table runs client-side, but it still reports its active filters via onParamsChange. We watch
+  // them so the SERVER fetch scope can widen when a filter targets rows the current "Exibir" subset
+  // never loaded (otherwise the filter matches nothing).
+  const [activeFilters, setActiveFilters] = useState<DataTableFilterValues>({});
+  const onParamsChange = useCallback(
+    (next: { search: string; filters: DataTableFilterValues }) => setActiveFilters(next.filters),
+    [],
+  );
+  // A "Data de Demissão" range, or an explicit TERMINATED status filter, targets dismissed
+  // collaborators — not loaded under Exibir=Ativos. Widen the fetch to include them (the legacy list
+  // auto-switched the scope to "Desligados" in this case).
+  const needsTerminated =
+    activeFilters.dismissedAt != null ||
+    (Array.isArray(activeFilters.currentContractStatus) &&
+      (activeFilters.currentContractStatus as string[]).includes(CONTRACT_STATUS.TERMINATED));
   const statuses =
     exibir === "active"
-      ? [CONTRACT_STATUS.ACTIVE]
+      ? needsTerminated
+        ? undefined // load every status so the dismissed-targeting filter has rows to match
+        : [CONTRACT_STATUS.ACTIVE]
       : exibir === "dismissed"
         ? [CONTRACT_STATUS.TERMINATED]
         : undefined;
@@ -337,6 +354,7 @@ export function UserTablePage() {
           rowActions,
           getRowId: (u) => u.id,
           onRowClick,
+          onParamsChange,
           isLoading: loading,
           enableSelection: showInteractive,
           sectorDefaults: USER_TABLE_SECTOR_DEFAULTS,

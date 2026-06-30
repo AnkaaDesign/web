@@ -306,9 +306,18 @@ export function DetailPage<TData>({
         else blocks.push({ kind: "rows", sections: [s] });
       }
     }
+    // A half-width section left ALONE in its band — e.g. a sector that only sees one of a default
+    // half-width pair (warehouse on the order detail sees `info` but not `payment`) — renders
+    // full-width instead of a lopsided card with an empty column beside it. An EXPLICIT ½← / ½→ pin
+    // (`column` set) is still honored, so this only cleans up the auto-balanced default.
+    const normalized = blocks.map((b) =>
+      b.kind === "rows" && b.sections.length === 1 && !b.sections[0].column
+        ? ({ kind: "full" as const, section: b.sections[0] })
+        : b,
+    );
     content = (
       <div className="space-y-4">
-        {blocks.map((b, i) => {
+        {normalized.map((b, i) => {
           if (b.kind === "full") return <DetailSection key={b.section.def.id} section={b.section} row={row} hideEmptyFields={hideEmptyFields} />;
           const { left, right } = balanceColumns(b.sections);
           // A half-width section ALWAYS renders at half width — honoring the user's explicit ½←/½→

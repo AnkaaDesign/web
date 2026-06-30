@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useOrders, useOrderMutations, useOrderBatchMutations, useSuppliers } from "../../../../hooks";
+import { getOrders } from "@/api-client";
 import type { DataTableFilterValues } from "@/components/ui/datatable";
 import type { Order } from "../../../../types";
 import {
@@ -92,7 +93,9 @@ function buildOrderQuery(filters: DataTableFilterValues, search: string): Record
   const forecast = dateRange(filters.forecast);
   if (forecast) q.forecastRange = forecast;
   const updated = dateRange(filters.updatedAt);
-  if (updated) q.updatedAtRange = updated;
+  // API exposes a root `updatedAt` range filter (mirrors `createdAt`); there is NO `updatedAtRange`
+  // key, so the old name was silently stripped by zod → the filter returned the full unfiltered set.
+  if (updated) q.updatedAt = updated;
   if (search) q.searchingFor = search;
   return q;
 }
@@ -113,8 +116,10 @@ export function OrderTablePage() {
     setParams(next);
   }, []);
 
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
-  const pageSize = Number(searchParams.get("pageSize") ?? String(ORDER_DEFAULT_PAGE_SIZE));
+  const pageRaw = Number(searchParams.get("page") ?? "1");
+  const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
+  const pageSizeRaw = Number(searchParams.get("pageSize") ?? String(ORDER_DEFAULT_PAGE_SIZE));
+  const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? pageSizeRaw : ORDER_DEFAULT_PAGE_SIZE;
   const sortParam = searchParams.get("sort");
   const sorting = useMemo<{ id: string; desc: boolean }[]>(() => {
     if (!sortParam) return [];
@@ -140,6 +145,19 @@ export function OrderTablePage() {
   const { data: response, isLoading, error } = useOrders(query as never);
   const orders = useMemo(() => (response as { data?: Order[] } | undefined)?.data ?? [], [response]);
   const totalRecords = (response as { meta?: { totalRecords?: number } } | undefined)?.meta?.totalRecords ?? 0;
+
+  // Export "all": refetch every order matching the current search/filters/sort in one request (the
+  // table only holds the current page). Mirrors the legacy OrderExport's fetch-all.
+  const fetchAllForExport = useCallback(async (): Promise<Order[]> => {
+    const res = await getOrders({
+      ...buildOrderQuery(params.filters, params.search),
+      page: 1,
+      limit: Math.max(totalRecords, 1),
+      orderBy: buildOrderOrderBy(sorting),
+      include: LIST_INCLUDE,
+    } as never);
+    return (res as { data?: Order[] } | undefined)?.data ?? [];
+  }, [params, sorting, totalRecords]);
 
   // Supplier filter options (loaded once; API caps limit at 100).
   const { data: suppliersData } = useSuppliers({ orderBy: { fantasyName: "asc" }, limit: 100 } as never);
@@ -356,6 +374,7 @@ export function OrderTablePage() {
           mode: "server",
           rowCount: totalRecords,
           onParamsChange,
+          onExportFetchAll: fetchAllForExport,
           defaultSorting: [
             { id: "status", desc: false },
             { id: "createdAt", desc: true },

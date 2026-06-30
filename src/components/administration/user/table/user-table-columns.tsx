@@ -54,7 +54,9 @@ export function createUserColumns(): DataTableColumnDef<User>[] {
       enableSorting: true,
       size: 120,
       minSize: 90,
-      meta: { headerLabel: "Nº Folha", exportValue: (u) => u.payrollNumber ?? "" },
+      // Payroll number is HR/folha data → gated to match the DETAIL (which gates it to HR_ACC_ADMIN).
+      // Without this the table would show "Nº Folha" to PRODUCTION_MANAGER while the detail hides it.
+      meta: { requiredPrivilege: HR_VIEWERS, headerLabel: "Nº Folha", exportValue: (u) => u.payrollNumber ?? "" },
       cell: ({ row }) => muted(row.original.payrollNumber != null ? String(row.original.payrollNumber) : null),
     },
     {
@@ -658,10 +660,15 @@ function sectorConfig(visible: string[]): Partial<PersistedTableConfig> {
   };
 }
 
+// Default-visible column ids (mirrors the legacy `user-list-visible-columns-v4` defaults). Used as the
+// ADMIN starting layout below.
+export const USER_TABLE_DEFAULT_VISIBLE = ["payrollNumber", "name", "position", "sector", "currentContractStatus", "documents"];
+
 /**
  * Per-sector STARTING column layout — applied only when the user has no saved config. HR / Accounting
- * see the folha-oriented columns; the production-management sectors get the operational set. ADMIN has
- * no entry and falls back to the hardcoded `meta.defaultVisible` defaults.
+ * see the folha-oriented columns; the production-management sectors get the operational set. ADMIN
+ * starts from `USER_TABLE_DEFAULT_VISIBLE` — without an explicit entry it would fall back to the
+ * per-column `meta.defaultVisible`, which leaves email/phone/CPF/PIS visible (wider than intended).
  */
 export const USER_TABLE_SECTOR_DEFAULTS: Partial<Record<SECTOR_PRIVILEGES, Partial<PersistedTableConfig>>> = {
   [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: sectorConfig([
@@ -673,7 +680,5 @@ export const USER_TABLE_SECTOR_DEFAULTS: Partial<Record<SECTOR_PRIVILEGES, Parti
   [SECTOR_PRIVILEGES.PRODUCTION_MANAGER]: sectorConfig([
     "name", "position", "sector", "currentContractStatus", "currentContractType", "performanceLevel", "tasksCount",
   ]),
+  [SECTOR_PRIVILEGES.ADMIN]: sectorConfig(USER_TABLE_DEFAULT_VISIBLE),
 };
-
-// Default-visible column ids (mirrors the legacy `user-list-visible-columns-v4` defaults).
-export const USER_TABLE_DEFAULT_VISIBLE = ["payrollNumber", "name", "position", "sector", "currentContractStatus", "documents"];

@@ -20,6 +20,9 @@ import type { DataTableColumnDef } from "./data-table-types";
 
 export type ShareFormat = "pdf" | "xlsx";
 
+/** Which rows to export. */
+type ExportScope = "selected" | "page" | "all";
+
 interface DataTableShareDialogProps<TData> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -27,8 +30,17 @@ interface DataTableShareDialogProps<TData> {
   format: ShareFormat;
   columns: DataTableColumnDef<TData>[];
   visibleColumnIds: string[];
-  exportRows: TData[];
-  selectedCount: number;
+  /** Rows on the current page. */
+  pageRows: TData[];
+  /** Currently-selected rows. */
+  selectedRows: TData[];
+  /** Total rows matching the active search/filters — the label/scope for "all". */
+  totalCount: number;
+  /**
+   * Resolve EVERY filtered row across all pages (client: in-memory pre-pagination model; server: a
+   * fetch-all request). Absent ⇒ the "Todos" scope isn't offered.
+   */
+  resolveAllRows?: () => Promise<TData[]>;
   title: string;
   filename: string;
 }
@@ -45,8 +57,10 @@ export function DataTableShareDialog<TData>({
   format,
   columns,
   visibleColumnIds,
-  exportRows,
-  selectedCount,
+  pageRows,
+  selectedRows,
+  totalCount,
+  resolveAllRows,
   title,
   filename,
 }: DataTableShareDialogProps<TData>) {
@@ -54,13 +68,18 @@ export function DataTableShareDialog<TData>({
   const [selected, setSelected] = useState<Set<string>>(() => new Set(visibleColumnIds));
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const selectedCount = selectedRows.length;
+  // Scope defaults to the selection if any, else ALL filtered rows when available (restores the
+  // legacy "all data" export default), else the current page.
+  const [scope, setScope] = useState<ExportScope>("page");
 
   useEffect(() => {
     if (open) {
       setSelected(new Set(visibleColumnIds.length ? visibleColumnIds : exportable.map((c) => c.id)));
       setSearch("");
+      setScope(selectedCount > 0 ? "selected" : resolveAllRows ? "all" : "page");
     }
-  }, [open, visibleColumnIds, exportable]);
+  }, [open, visibleColumnIds, exportable, selectedCount, resolveAllRows]);
 
   const filtered = useMemo(
     () => (search ? exportable.filter((c) => columnHeaderText(c).toLowerCase().includes(search.toLowerCase())) : exportable),
@@ -79,13 +98,23 @@ export function DataTableShareDialog<TData>({
 
   const doExport = async () => {
     if (!chosenColumns.length) return notify.error("Atenção", "Selecione ao menos uma coluna.");
-    if (!exportRows.length) return notify.error("Atenção", "Nenhum registro para exportar.");
     setBusy(true);
     try {
-      const req = { rows: exportRows, columns: chosenColumns, filename, title };
+      // Resolve the rows for the chosen scope. "all" may be async (server-mode fetch-all).
+      const rows =
+        scope === "selected"
+          ? selectedRows
+          : scope === "all" && resolveAllRows
+            ? await resolveAllRows()
+            : pageRows;
+      if (!rows.length) {
+        notify.error("Atenção", "Nenhum registro para exportar.");
+        return;
+      }
+      const req = { rows, columns: chosenColumns, filename, title };
       if (isXlsx) await exportToXlsx(req);
       else await exportToPdf(req);
-      notify.success("Exportado", `${exportRows.length} registro(s) exportado(s) com sucesso.`);
+      notify.success("Exportado", `${rows.length} registro(s) exportado(s) com sucesso.`);
       onOpenChange(false);
     } catch {
       notify.error("Erro", "Falha ao gerar o arquivo.");
@@ -103,11 +132,51 @@ export function DataTableShareDialog<TData>({
             {isXlsx ? "Exportar planilha (XLSX)" : "Exportar PDF"}
           </DialogTitle>
           <DialogDescription>
-            {selectedCount > 0
+            {scope === "selected"
               ? `${selectedCount} linha(s) selecionada(s) serão exportadas.`
-              : `${exportRows.length} registro(s) da página atual serão exportados.`}
+              : scope === "all"
+                ? `Todos os ${totalCount} registro(s) que correspondem aos filtros serão exportados.`
+                : `${pageRows.length} registro(s) da página atual serão exportados.`}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Export scope — selected / current page / all filtered rows. */}
+        <div className="space-y-1.5">
+          <span className="text-sm font-medium">Registros</span>
+          <div className="flex gap-2">
+            {selectedCount > 0 && (
+              <Button
+                type="button"
+                variant={scope === "selected" ? "default" : "outline"}
+                size="sm"
+                className="h-8 flex-1 text-xs"
+                onClick={() => setScope("selected")}
+              >
+                Selecionados ({selectedCount})
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant={scope === "page" ? "default" : "outline"}
+              size="sm"
+              className="h-8 flex-1 text-xs"
+              onClick={() => setScope("page")}
+            >
+              Página atual ({pageRows.length})
+            </Button>
+            {resolveAllRows && (
+              <Button
+                type="button"
+                variant={scope === "all" ? "default" : "outline"}
+                size="sm"
+                className="h-8 flex-1 text-xs"
+                onClick={() => setScope("all")}
+              >
+                Todos ({totalCount})
+              </Button>
+            )}
+          </div>
+        </div>
 
         {/* Column picker — same layout as the column-visibility manager. */}
         <div className="space-y-2">

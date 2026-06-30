@@ -19,6 +19,7 @@ import { canViewServiceOrderType } from "@/utils/permissions/service-order-permi
 import { formatCurrency } from "@/utils/number";
 import { formatDateTime, getDurationBetweenDates } from "@/utils/date";
 import { formatChassis } from "@/utils/formatters";
+import { calculateTaskMeasures, formatTaskMeasures } from "@/utils/task-measures";
 import type { Task } from "@/types";
 import type { ClusteredTask } from "./cluster-tasks";
 import { TaskProgressCell } from "./task-progress-cell";
@@ -155,7 +156,7 @@ const ALL_TASK_PREP_COLUMN_IDS = [
   "soCommercial", "soLogistic", "soArtwork", "soProduction",
   "forecastDate", "term", "total", "invoiceToCustomers", "paymentStatus", "bonification",
   "status", "pintura", "sector", "responsibles",
-  "truckCategory", "implementType", "chassisNumber",
+  "truckCategory", "implementType", "chassisNumber", "measures",
   "entryDate", "startedAt", "finishedAt", "createdAt", "duration", "details",
 ] as const;
 
@@ -436,6 +437,20 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
         ) : (
           <span className="text-muted-foreground">-</span>
         ),
+    },
+    {
+      // Truck dimensions (width × height in cm). Default-hidden — toggleable only, as in the legacy
+      // Agenda. Sorts by total area (m²); displays + exports/searches the "L × A" string.
+      id: "measures",
+      header: "Medidas",
+      accessorFn: (row) => calculateTaskMeasures(row) ?? 0,
+      enableSorting: true,
+      size: 110,
+      meta: { defaultVisible: false, headerLabel: "Medidas", exportValue: (row) => formatTaskMeasures(row) },
+      cell: ({ row }) => {
+        const m = formatTaskMeasures(row.original);
+        return m && m !== "-" ? <span className="tabular-nums">{m}</span> : <span className="text-muted-foreground">-</span>;
+      },
     },
     {
       id: "entryDate",

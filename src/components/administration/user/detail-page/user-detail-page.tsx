@@ -569,8 +569,12 @@ function UserDetailContent() {
         ],
       },
 
-      // Vínculo + cargo (promotion) history are NOT separate sections — those changes are captured in
-      // the changelog ("Histórico de Alterações") below.
+      // Vínculo + cargo history are NOT separate sections — the changelog below already records both:
+      // cargo changes (positionId → "Cargo", id→name resolved) and vínculo changes (currentContractType
+      // / currentContractStatus, admission/termination dates), all backend-logged to the USER entity.
+      // The full structured records INCLUDING salary-per-promotion (HR-sensitive) stay on the dedicated
+      // Promoções / Admissões pages — deliberately NOT merged here, since this collaborator detail is
+      // reachable by PRODUCTION_MANAGER and the changelog has no salary gate (would leak remuneração).
 
       // ---- Benefícios / Dependentes (largos) ---------------------------------
       {
@@ -578,6 +582,10 @@ function UserDetailContent() {
         label: "Benefícios",
         icon: IconGift,
         span: 2,
+        // Folha data (benefit values, company/employee share) → HR/ACC/ADMIN only, like loans/13º.
+        // The API also 403s these for other sectors, so leaving it ungated only gave PM an empty
+        // card + repeated error toasts.
+        requiredPrivilege: HR_ACC_ADMIN,
         render: (u) => <UserBenefitsCard userId={u.id} embedded onCount={(n) => reportCount("benefits", n)} />,
       },
       {
@@ -585,6 +593,8 @@ function UserDetailContent() {
         label: "Dependentes",
         icon: IconUsers,
         span: 2,
+        // Dependent PII (name/CPF/birth) → HR/ACC/ADMIN only (the dependents endpoint 403s others).
+        requiredPrivilege: HR_ACC_ADMIN,
         render: (u) => <DependentsCard userId={u.id} embedded onCount={(n) => reportCount("dependents", n)} />,
       },
 

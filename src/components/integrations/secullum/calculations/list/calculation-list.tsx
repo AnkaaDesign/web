@@ -132,7 +132,7 @@ export function CalculationList({ className, mode = 'hr', teamScope = false, onE
         where: { secullumEmployeeId: { not: null } },
         orderBy: { name: "asc" } as const,
         take: 100,
-        include: { currentContract: true },
+        include: { currentContract: true, position: true, sector: true },
       };
   const hrUsersQuery = useUsers(userFilters, { enabled: !isPersonalMode && !teamScope });
   const teamUsersQuery = useTeamStaffUsers(userFilters, { enabled: !isPersonalMode && teamScope });

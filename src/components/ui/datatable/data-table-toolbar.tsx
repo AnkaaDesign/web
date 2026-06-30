@@ -37,10 +37,22 @@ interface DataTableToolbarProps<TData> {
   onOpenFilters?: () => void;
   shareEnabled: boolean;
   onShare?: (action: ShareAction) => void;
-  /** "View selected only" toggle — only shown when there is a selection. */
+  /**
+   * Whether "Copiar link" is offered. False when the table doesn't sync its view to the URL (e.g. two
+   * tables sharing one route), where the link would NOT reproduce the current sort/filter/selection.
+   * Defaults to true.
+   */
+  canShareLink?: boolean;
+  /** "View selected only" toggle — only shown when there is a selection AND it can actually narrow. */
   selectedCount: number;
   showSelectedOnly: boolean;
   onToggleSelectedOnly: (value: boolean) => void;
+  /**
+   * Whether the "view selected only" toggle can work. False in server mode, where narrowing happens
+   * server-side and the in-memory selection (which may span unloaded pages) can't filter the fetch —
+   * showing the toggle there would be a no-op. Defaults to true.
+   */
+  canViewSelectedOnly?: boolean;
   /** Expand/collapse-all control — only shown when row expansion is enabled. */
   enableExpansion?: boolean;
   allExpanded?: boolean;
@@ -64,9 +76,11 @@ function DataTableToolbarInner<TData>({
   onOpenFilters,
   shareEnabled,
   onShare,
+  canShareLink = true,
   selectedCount,
   showSelectedOnly,
   onToggleSelectedOnly,
+  canViewSelectedOnly = true,
   enableExpansion,
   allExpanded,
   onToggleExpandAll,
@@ -113,7 +127,7 @@ function DataTableToolbarInner<TData>({
           </Button>
         )}
 
-        {selectedCount > 0 && (
+        {selectedCount > 0 && canViewSelectedOnly && (
           <Button
             variant={showSelectedOnly ? "default" : "outline"}
             onClick={() => onToggleSelectedOnly(!showSelectedOnly)}
@@ -160,14 +174,16 @@ function DataTableToolbarInner<TData>({
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-56 p-1.5">
-              <button
-                type="button"
-                onClick={() => share("link")}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted"
-              >
-                <IconLink className="h-4 w-4 shrink-0 text-muted-foreground" />
-                Copiar link
-              </button>
+              {canShareLink && (
+                <button
+                  type="button"
+                  onClick={() => share("link")}
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted"
+                >
+                  <IconLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  Copiar link
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => share("pdf")}

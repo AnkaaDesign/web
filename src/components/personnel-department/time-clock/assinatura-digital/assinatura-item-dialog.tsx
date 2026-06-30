@@ -66,7 +66,7 @@ export function AssinaturaItemDialog({ open, apuracaoId, item, onClose }: Assina
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Assinatura Digital de Cartão Ponto</DialogTitle>
         </DialogHeader>
@@ -96,7 +96,7 @@ export function AssinaturaItemDialog({ open, apuracaoId, item, onClose }: Assina
               value={item.Resposta || ""}
               readOnly
               disabled
-              rows={3}
+              rows={6}
               placeholder={item.Resposta ? "" : "Sem justificativa registrada."}
               className="resize-none"
             />
