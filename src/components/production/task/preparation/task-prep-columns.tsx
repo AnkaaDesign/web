@@ -207,6 +207,15 @@ function mutedDate(v: Date | string | null | undefined) {
   return v ? <span className="tabular-nums">{formatDateTime(new Date(v))}</span> : <span className="text-muted-foreground">-</span>;
 }
 
+/**
+ * Sort accessor for date columns: epoch ms, or `undefined` when missing. Paired with
+ * `sortUndefined: "last"` this parks empty dates at the BOTTOM in both asc and desc — otherwise a
+ * raw null sorts as a value and bunches the empties ahead of the real dates.
+ */
+function dateSortValue(v: Date | string | null | undefined): number | undefined {
+  return v ? new Date(v).getTime() : undefined;
+}
+
 export interface TaskPreparationColumnContext {
   currentUserId?: string;
 }
@@ -309,10 +318,10 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
     {
       id: "forecastDate",
       header: "Previsão",
-      // Missing forecast → `undefined` (not null) so `sortUndefined: "last"` keeps empties at the
-      // bottom in BOTH asc and desc, instead of bunching nulls before the real dates. The cell reads
-      // row.original directly, so this accessor is sort-only and doesn't affect display.
-      accessorFn: (row) => (row.forecastDate ? new Date(row.forecastDate).getTime() : undefined),
+      // Missing forecast → `undefined` so `sortUndefined: "last"` keeps empties at the bottom in BOTH
+      // asc and desc, instead of bunching nulls before the real dates. The cell reads row.original
+      // directly, so this accessor is sort-only and doesn't affect display.
+      accessorFn: (row) => dateSortValue(row.forecastDate),
       sortUndefined: "last",
       enableSorting: true,
       size: 150,
@@ -322,11 +331,12 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
     {
       id: "term",
       header: "Prazo",
-      accessorKey: "term",
+      accessorFn: (row) => dateSortValue(row.term),
+      sortUndefined: "last",
       enableSorting: true,
       size: 140,
       meta: { defaultVisible: false, headerLabel: "Prazo" },
-      cell: ({ getValue }) => mutedDate(getValue() as Date | string | null),
+      cell: ({ row }) => mutedDate(row.original.term),
     },
     {
       id: "total",
@@ -520,43 +530,50 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
     {
       id: "entryDate",
       header: "Entrada",
-      accessorKey: "entryDate",
+      accessorFn: (row) => dateSortValue(row.entryDate),
+      sortUndefined: "last",
       enableSorting: true,
       size: 140,
       meta: { defaultVisible: false, headerLabel: "Entrada" },
-      cell: ({ getValue }) => mutedDate(getValue() as Date | string | null),
+      cell: ({ row }) => mutedDate(row.original.entryDate),
     },
     {
       id: "startedAt",
       header: "Iniciado",
-      accessorKey: "startedAt",
+      accessorFn: (row) => dateSortValue(row.startedAt),
+      sortUndefined: "last",
       enableSorting: true,
       size: 140,
       meta: { defaultVisible: false, headerLabel: "Iniciado" },
-      cell: ({ getValue }) => mutedDate(getValue() as Date | string | null),
+      cell: ({ row }) => mutedDate(row.original.startedAt),
     },
     {
       id: "finishedAt",
       header: "Finalizado",
-      accessorKey: "finishedAt",
+      accessorFn: (row) => dateSortValue(row.finishedAt),
+      sortUndefined: "last",
       enableSorting: true,
       size: 140,
       meta: { defaultVisible: false, headerLabel: "Finalizado" },
-      cell: ({ getValue }) => mutedDate(getValue() as Date | string | null),
+      cell: ({ row }) => mutedDate(row.original.finishedAt),
     },
     {
       id: "createdAt",
       header: "Criado em",
-      accessorKey: "createdAt",
+      accessorFn: (row) => dateSortValue(row.createdAt),
+      sortUndefined: "last",
       enableSorting: true,
       size: 140,
       meta: { defaultVisible: false, headerLabel: "Criado em" },
-      cell: ({ getValue }) => mutedDate(getValue() as Date | string | null),
+      cell: ({ row }) => mutedDate(row.original.createdAt),
     },
     {
       id: "duration",
       header: "Duração",
-      accessorFn: (row) => (row.startedAt && row.finishedAt ? new Date(row.finishedAt).getTime() - new Date(row.startedAt).getTime() : 0),
+      // Undefined (not 0) when the task hasn't run, so `sortUndefined: "last"` keeps unstarted/unfinished
+      // tasks at the bottom rather than sorting them as a zero duration at the top.
+      accessorFn: (row) => (row.startedAt && row.finishedAt ? new Date(row.finishedAt).getTime() - new Date(row.startedAt).getTime() : undefined),
+      sortUndefined: "last",
       enableSorting: true,
       size: 130,
       meta: { defaultVisible: false, headerLabel: "Duração" },
