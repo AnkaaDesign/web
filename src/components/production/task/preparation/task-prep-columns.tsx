@@ -309,7 +309,11 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
     {
       id: "forecastDate",
       header: "Previsão",
-      accessorKey: "forecastDate",
+      // Missing forecast → `undefined` (not null) so `sortUndefined: "last"` keeps empties at the
+      // bottom in BOTH asc and desc, instead of bunching nulls before the real dates. The cell reads
+      // row.original directly, so this accessor is sort-only and doesn't affect display.
+      accessorFn: (row) => (row.forecastDate ? new Date(row.forecastDate).getTime() : undefined),
+      sortUndefined: "last",
       enableSorting: true,
       size: 150,
       meta: { headerLabel: "Previsão", requiredPrivilege: RESTRICTED_VIEWERS },
