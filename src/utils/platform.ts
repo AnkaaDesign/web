@@ -8,22 +8,48 @@ import { APP_URI_SCHEME } from "@/config/deployment";
 export type Platform = "ios" | "android" | "desktop";
 
 /**
- * Detect the current platform from the user agent.
+ * Chromium high-entropy Client Hints. Not yet in the default TS DOM lib, so we
+ * model the small slice we use. Apple does NOT implement this API, so it is only
+ * ever present on Android/desktop Chromium — never on iOS.
+ */
+interface UADataLike {
+  readonly mobile?: boolean;
+  readonly platform?: string;
+}
+
+/**
+ * Detect the current platform.
+ *
+ * We consult Client Hints (`navigator.userAgentData`) BEFORE the UA string
+ * because Chrome's "Request desktop site" mode rewrites the UA to a Linux
+ * desktop string with no `Android`/`Mobile` token — which would otherwise make
+ * a real Android phone look like a desktop and dump it on the QR-scan view.
+ * Client Hints keep `platform: "Android"` / `mobile: true` even in that mode.
  *
  * iPadOS 13+ Safari reports a desktop ("Macintosh") user agent by default, so
  * we additionally treat a Mac-looking UA with a touch screen as iOS — that is
- * an iPad masquerading as desktop Safari, not a real Mac.
+ * an iPad masquerading as desktop Safari, not a real Mac. (Safari has no Client
+ * Hints, so that branch stays UA + touch based.)
  */
 export function detectPlatform(): Platform {
   if (typeof navigator === "undefined") return "desktop";
 
   const ua = navigator.userAgent || "";
+  const uaData = (navigator as Navigator & { userAgentData?: UADataLike }).userAgentData;
+
+  // Client Hints first — survives "Request desktop site" on Android Chrome.
+  if (uaData?.platform === "Android") return "android";
 
   // iPadOS-as-desktop-Safari fix.
   const isIPadOS = /Macintosh/.test(ua) && (navigator.maxTouchPoints ?? 0) > 1;
 
   if (/iPad|iPhone|iPod/.test(ua) || isIPadOS) return "ios";
   if (/Android/i.test(ua)) return "android";
+
+  // Desktop-site mode strips the Android token but Client Hints still flag a
+  // mobile form factor; treat that as Android (iOS never reaches here).
+  if (uaData?.mobile === true) return "android";
+
   return "desktop";
 }
 

@@ -422,7 +422,7 @@ function PpeDeliveryTableRender({
   const navigate = useNavigate();
   const display = config.display;
   const dens = densityClasses(display.density as Density);
-  const { canManageHR } = usePrivileges();
+  const { canManageHR, canAccessExact } = usePrivileges();
 
   // Live in-widget search box (when display.showSearchBox is true).
   const [searchInput, setSearchInput] = useState("");
@@ -475,7 +475,10 @@ function PpeDeliveryTableRender({
     y: number;
     delivery: any;
   } | null>(null);
-  const canAct = canManageHR;
+  // Approve/reject is open to HR/Admin and Accounting (the backend grants
+  // ACCOUNTING on batch-approve/batch-reject). Warehouse-only "mark delivered"
+  // is not exposed by this widget, so there is no forbidden action to gate.
+  const canAct = canManageHR || canAccessExact(SECTOR_PRIVILEGES.ACCOUNTING);
 
   const handleContextMenu = (e: React.MouseEvent, delivery: any) => {
     if (!canAct) return;
@@ -965,6 +968,7 @@ export const ppeDeliveryTableWidget: WidgetDefinition<PpeDeliveryTableConfig> = 
     SECTOR_PRIVILEGES.HUMAN_RESOURCES,
     SECTOR_PRIVILEGES.ADMIN,
     SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.ACCOUNTING,
   ],
   defaultSize: { cols: 4, rows: 2 },
   minSize: { cols: 2, rows: 1 },

@@ -1237,6 +1237,7 @@ export const hrRequestsTableWidget: WidgetDefinition<HrRequestsTableConfig> = {
   allowedSectors: [
     SECTOR_PRIVILEGES.HUMAN_RESOURCES,
     SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.ACCOUNTING,
   ],
   defaultSize: { cols: 4, rows: 3 },
   minSize: { cols: 2, rows: 2 },

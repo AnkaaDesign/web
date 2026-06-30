@@ -1261,6 +1261,7 @@ export const dailyPontoWidget: WidgetDefinition<DailyPontoConfig> = {
   allowedSectors: [
     SECTOR_PRIVILEGES.HUMAN_RESOURCES,
     SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    SECTOR_PRIVILEGES.ACCOUNTING,
     SECTOR_PRIVILEGES.ADMIN,
   ],
   defaultSize: { cols: 4, rows: 3 },

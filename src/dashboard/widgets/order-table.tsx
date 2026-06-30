@@ -1572,8 +1572,13 @@ export const orderTableWidget: WidgetDefinition<OrderTableConfig> = {
     "Tabela de pedidos de compra totalmente configurável. Filtros por previsão de entrega (atrasados, 7 dias, 30 dias), status e fornecedor. Suporta agrupamento, busca, densidade e colunas configuráveis.",
   icon: IconShoppingCart,
   // Mirror /estoque/pedidos page (parent /estoque is [WAREHOUSE, ADMIN]).
+  // Accounting also tracks purchase orders for reconciliation.
   category: "inventory",
-  allowedSectors: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.WAREHOUSE],
+  allowedSectors: [
+    SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.ACCOUNTING,
+  ],
   defaultSize: { cols: 3, rows: 2 },
   minSize: { cols: 2, rows: 1 },
   maxSize: { cols: 4, rows: 4 },

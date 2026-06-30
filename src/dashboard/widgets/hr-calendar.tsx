@@ -774,6 +774,7 @@ export const hrCalendarWidget: WidgetDefinition<HrCalendarConfig> = {
     SECTOR_PRIVILEGES.HUMAN_RESOURCES,
     SECTOR_PRIVILEGES.ADMIN,
     SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    SECTOR_PRIVILEGES.ACCOUNTING,
   ],
   defaultSize: { cols: 4, rows: 3 },
   minSize: { cols: 2, rows: 3 },
