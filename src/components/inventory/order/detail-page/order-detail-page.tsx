@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   IconShoppingCart,
@@ -109,6 +109,25 @@ export function OrderDetailPage() {
   const { deleteMutation, updateAsync, markPaidAsync, markAwaitingPaymentAsync } = useOrderMutations();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+
+  // Promise-based confirm for the inline "Status de Pagamento" edit. Settling / un-settling money
+  // (markPaid / markAwaitingPayment) must be confirmed first — the legacy payment card gated this
+  // behind an AlertDialog; `beforeCommit` awaits this before the status actually changes.
+  const [paymentConfirm, setPaymentConfirm] = useState<{ open: boolean; target: ORDER_PAYMENT_STATUS | null }>({ open: false, target: null });
+  const paymentConfirmResolver = useRef<((ok: boolean) => void) | null>(null);
+  const confirmPaymentChange = useCallback((target: ORDER_PAYMENT_STATUS): Promise<boolean> => {
+    // A new prompt supersedes any pending one — settle the prior promise (false) so its awaiter unblocks.
+    paymentConfirmResolver.current?.(false);
+    setPaymentConfirm({ open: true, target });
+    return new Promise<boolean>((resolve) => {
+      paymentConfirmResolver.current = resolve;
+    });
+  }, []);
+  const settlePaymentConfirm = useCallback((ok: boolean) => {
+    paymentConfirmResolver.current?.(ok);
+    paymentConfirmResolver.current = null;
+    setPaymentConfirm((s) => ({ ...s, open: false }));
+  }, []);
 
   const {
     data: response,
@@ -436,6 +455,11 @@ export function OrderDetailPage() {
                   transitions: (current) =>
                     Array.from(new Set([current, ORDER_PAYMENT_STATUS.AWAITING_PAYMENT, ORDER_PAYMENT_STATUS.PAID].filter(Boolean))),
                 },
+                // Confirm before settling/un-settling money — a no-op (same status) commits silently.
+                beforeCommit: (v, o) => {
+                  if (v === o.paymentStatus) return true;
+                  return confirmPaymentChange(v as ORDER_PAYMENT_STATUS);
+                },
                 onCommit: async (v, o) => {
                   if (v === o.paymentStatus) return;
                   if (v === ORDER_PAYMENT_STATUS.PAID) await markPaidAsync(o.id);
@@ -567,7 +591,7 @@ export function OrderDetailPage() {
 
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order?.receipts?.length, order?.supplier, order?.paymentResponsible, order?.paymentMethod, orderActions, canEdit, isCancelled, isReceivedOrCancelled, updateAsync, markPaidAsync, markAwaitingPaymentAsync, loadSuppliers, loadUsers]);
+  }, [order?.receipts?.length, order?.supplier, order?.paymentResponsible, order?.paymentMethod, orderActions, canEdit, isCancelled, isReceivedOrCancelled, updateAsync, markPaidAsync, markAwaitingPaymentAsync, confirmPaymentChange, loadSuppliers, loadUsers]);
 
   const actions = useMemo<PageAction[]>(() => {
     if (!order) return [];
@@ -677,6 +701,26 @@ export function OrderDetailPage() {
                 </>
               )}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Payment-status change confirmation — gates the inline edit that settles / un-settles money. */}
+      <AlertDialog open={paymentConfirm.open} onOpenChange={(o) => !o && settlePaymentConfirm(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {paymentConfirm.target === ORDER_PAYMENT_STATUS.PAID ? "Confirmar pagamento" : "Desfazer pagamento"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {paymentConfirm.target === ORDER_PAYMENT_STATUS.PAID
+                ? "Marcar este pedido como pago? Isso registra a liquidação do pagamento."
+                : "Desfazer o pagamento deste pedido? Ele voltará para aguardando pagamento."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => settlePaymentConfirm(false)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => settlePaymentConfirm(true)}>Confirmar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

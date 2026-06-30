@@ -278,18 +278,22 @@ export function OrderItemsCard({ order, className, onOrderUpdate, orderActions =
     const freight = order.freight ?? 0;
     totalValue += freight;
 
+    // A manual grand-total override wins over the computed figure — same precedence the header
+    // OrderTotalBadge uses (typeof totalOverride === "number") so the card and the header agree.
+    const effectiveTotalValue = typeof order.totalOverride === "number" ? order.totalOverride : totalValue;
+
     return {
       itemCount: items.length,
       totalOrdered,
       totalReceived,
-      totalValue,
+      totalValue: effectiveTotalValue,
       receivedValue,
       discountPercent,
       discountAmount,
       freight,
       percentComplete: totalOrdered > 0 ? (totalReceived / totalOrdered) * 100 : 0,
     };
-  }, [order.items, order.discount, order.freight, getItemValue]);
+  }, [order.items, order.discount, order.freight, order.totalOverride, getItemValue]);
 
   // Get row status
   const getRowStatus = useCallback(

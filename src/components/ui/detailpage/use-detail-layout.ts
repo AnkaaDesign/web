@@ -251,6 +251,10 @@ export function useDetailLayout<TData>(params: UseDetailLayoutParams<TData>): Us
   // 5) Persist (debounced inside the hook) once the server baseline is known.
   useEffect(() => {
     if (!persist || !ready) return;
+    // Persist ONLY after a genuine user customization (matches the DataTable engine). Before any
+    // interaction the in-memory layout is just the resolved default, and writing it back would freeze
+    // today's default into every user's prefs on first visit. Every mutator sets userInteracted.
+    if (!userInteracted.current) return;
     prefs.save({ sectionOrder, sectionVisibility, fieldVisibility, fieldOrder, widths, columns: columnsMap });
     // prefs.save is stable; intentionally excluded to avoid resave loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps

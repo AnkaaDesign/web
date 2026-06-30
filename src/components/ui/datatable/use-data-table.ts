@@ -330,8 +330,14 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
       // must reach the URL too (no URL seed here, so it can't override a share-link).
       if (syncUrl && sectorDefault.sorting.length) writeUrl((p) => p.set("sort", JSON.stringify(sectorDefault.sorting)));
     }
+    if (seed.pageSize === undefined && sectorDefault.pageSize) {
+      // Mirror the sorting branch: a sector pageSize default must reach live pagination AND the URL
+      // (server-mode pages read pageSize from the URL), not just the persist ref.
+      setPagination((p) => ({ ...p, pageSize: sectorDefault.pageSize as number }));
+      if (syncUrl && sectorDefault.pageSize !== defaultPageSize) writeUrl((p) => p.set("pageSize", String(sectorDefault.pageSize)));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectorReady, ready, sectorDefault, localConfig, localDirty, dataColumnIds, columns, seed.sort]);
+  }, [sectorReady, ready, sectorDefault, localConfig, localDirty, dataColumnIds, columns, seed.sort, seed.pageSize]);
 
   // --- Mirror the resolved INITIAL sort/pageSize from localStorage into the URL at mount (server-mode
   //     pages read the fetch params from the URL). The server/sector restore effects above cover the
@@ -482,7 +488,9 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
       pagination,
       expanded,
     },
-    onExpandedChange: (u) => setExpanded((p) => { userInteracted.current = true; return applyUpdater(u, p); }),
+    // Only treat expansion as a persisted customization when it IS persisted; otherwise it's a
+    // transient view action (like selection/page-index) that must not flip userInteracted.
+    onExpandedChange: (u) => setExpanded((p) => { if (persistExpansion) userInteracted.current = true; return applyUpdater(u, p); }),
     onColumnOrderChange: (u) => setColumnOrder((p) => { userInteracted.current = true; return applyUpdater(u, p); }),
     onColumnSizingChange: (u) => setColumnSizing((p) => { userInteracted.current = true; return applyUpdater(u, p); }),
     onColumnSizingInfoChange: (u) => setColumnSizingInfo((p) => applyUpdater(u, p)),

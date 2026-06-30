@@ -60,7 +60,8 @@ import {
   PAYMENT_METHOD_LABELS,
 } from "../../constants/enum-labels";
 import { routes } from "../../constants/routes";
-import type { Order, OrderItem } from "../../types";
+import type { Order } from "../../types";
+import { calculateOrderTotal } from "../../utils/order";
 
 import { Combobox } from "../../components/ui/combobox";
 import { Input } from "../../components/ui/input";
@@ -363,22 +364,6 @@ function supplierLabel(
   return supplier.fantasyName || supplier.corporateName || "—";
 }
 
-/**
- * Order total = Σ orderedQuantity × price, plus per-item ICMS/IPI percentages.
- * Mirrors the inventory orders list page's `total` column so the numbers match.
- */
-function orderTotal(items: OrderItem[] | undefined | null): number {
-  if (!items?.length) return 0;
-  return items.reduce((sum, item) => {
-    const quantity = Number(item.orderedQuantity ?? 0);
-    const price = Number(item.price ?? 0);
-    const subtotal = quantity * price;
-    const icmsAmount = subtotal * (Number(item.icms ?? 0) / 100);
-    const ipiAmount = subtotal * (Number(item.ipi ?? 0) / 100);
-    return sum + subtotal + icmsAmount + ipiAmount;
-  }, 0);
-}
-
 function bucketFor(forecast: Date | null, daysUntilForecast: number | null): ForecastBucket {
   if (!forecast || daysUntilForecast == null) return "no-forecast";
   if (daysUntilForecast < 0) return "overdue";
@@ -404,7 +389,7 @@ function flattenOrders(orders: Order[] | undefined): FlatOrder[] {
       status: o.status,
       statusOrder: o.statusOrder ?? 0,
       itemCount,
-      total: orderTotal(o.items),
+      total: calculateOrderTotal(o),
       forecast,
       createdAt: o.createdAt ? new Date(o.createdAt) : today,
       paymentMethod: o.paymentMethod ?? null,

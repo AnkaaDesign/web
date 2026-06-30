@@ -78,18 +78,31 @@ export function ItemTablePage() {
   const items = (response?.data ?? []) as Item[];
   const totalRecords = response?.meta?.totalRecords ?? 0;
 
-  // Export "all": refetch every item matching the current search/filters/sort in one request (the
-  // table only holds the current page). Gating still applies — the share dialog only exports columns
-  // the user can see (price/totalPrice are dropped for WAREHOUSE before the dialog).
+  // Export "all": refetch every item matching the current search/filters/sort (the table only holds
+  // the current page). The API caps `limit` at 500 (item schema), so page through the full set rather
+  // than requesting everything in one shot — a single oversized request would be rejected/truncated,
+  // silently dropping rows while the UI promises "Todos os N registros". Gating still applies — the
+  // share dialog only exports columns the user can see (price/totalPrice dropped for WAREHOUSE).
   const fetchAllForExport = useCallback(async (): Promise<Item[]> => {
-    const res = await getItems({
+    const PAGE_SIZE = 500;
+    const baseQuery = {
       ...buildItemQuery(params.filters, params.search),
-      page: 1,
-      limit: Math.max(totalRecords, 1),
       orderBy: buildItemOrderBy(sorting),
       include: ITEM_LIST_INCLUDE,
-    } as never);
-    return (res?.data ?? []) as Item[];
+    };
+    const all: Item[] = [];
+    for (let page = 1; ; page++) {
+      const res = (await getItems({ ...baseQuery, page, limit: PAGE_SIZE } as never)) as
+        | { data?: Item[]; meta?: { hasNextPage?: boolean } }
+        | undefined;
+      const rows = (res?.data ?? []) as Item[];
+      all.push(...rows);
+      // Stop when the API reports no further page or returns a short page; the total guard is a
+      // defensive backstop against an unbounded loop.
+      if (res?.meta?.hasNextPage === false || rows.length < PAGE_SIZE) break;
+      if (totalRecords > 0 && all.length >= totalRecords) break;
+    }
+    return all;
   }, [params, sorting, totalRecords]);
 
   // --- filter option sources (loaded once; API caps limit at 100) ---

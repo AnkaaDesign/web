@@ -7,6 +7,7 @@ import { IconShoppingCart, IconAlertCircle, IconCircleCheckFilled, IconClock, Ic
 import type { Supplier } from "../../../../types";
 import { formatCurrency, formatDate } from "../../../../utils";
 import { ORDER_STATUS, ORDER_STATUS_LABELS } from "../../../../constants";
+import { calculateOrderTotal } from "../../../../utils/order";
 import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "react-router-dom";
 import { routes } from "../../../../constants";
@@ -99,10 +100,7 @@ export function RelatedOrdersCard({ supplier, className }: RelatedOrdersCardProp
     const activeOrders = orders.filter((order) => order.status !== ORDER_STATUS.CANCELLED && order.status !== ORDER_STATUS.RECEIVED).length;
     const completedOrders = orders.filter((order) => order.status === ORDER_STATUS.RECEIVED).length;
 
-    const totalValue = orders.reduce((sum, order) => {
-      const orderTotal = order.items?.reduce((itemSum, item) => itemSum + item.orderedQuantity * item.price, 0) || 0;
-      return sum + orderTotal;
-    }, 0);
+    const totalValue = orders.reduce((sum, order) => sum + calculateOrderTotal(order), 0);
 
     const statusCounts = orders.reduce(
       (acc, order) => {
@@ -213,7 +211,7 @@ export function RelatedOrdersCard({ supplier, className }: RelatedOrdersCardProp
         <ScrollArea className="h-[320px]">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pr-4">
             {sortedOrders.map((order) => {
-              const orderTotal = order.items?.reduce((sum, item) => sum + item.orderedQuantity * item.price, 0) || 0;
+              const orderTotal = calculateOrderTotal(order);
               const itemCount = order.items?.length || 0;
               const config = ORDER_STATUS_CONFIG[order.status];
               const StatusIcon = config.icon;

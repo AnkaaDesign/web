@@ -49,6 +49,7 @@ import { isValidTaskStatusTransition, getTaskQuoteEditRoute } from "@/utils/task
 import { getAvailableQuoteStatusTransitions, canViewQuote, canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
 import { canEditTasks, canFinishTask } from "@/utils/permissions/entity-permissions";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
+import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
 import { isTeamLeader } from "@/utils/user";
 import { formatChassis, formatTruckSpot } from "@/utils";
 import { ForecastHistoryTimeline } from "@/components/production/task/form/forecast-history-timeline";
@@ -540,7 +541,9 @@ function TaskDetailContent() {
                         if (cur === TASK_STATUS.PREPARATION) add(TASK_STATUS.WAITING_PRODUCTION);
                         if (cur === TASK_STATUS.WAITING_PRODUCTION) add(TASK_STATUS.IN_PRODUCTION);
                       }
-                      if (canFinish) add(TASK_STATUS.COMPLETED);
+                      // Completing requires canFinish AND every (non-cancelled) service order done —
+                      // matches the schedule/history/preparation surfaces' Finalizar gate.
+                      if (canFinish && areAllServiceOrdersComplete(task?.serviceOrders)) add(TASK_STATUS.COMPLETED);
                       return allowed;
                     },
                   },
@@ -1126,6 +1129,9 @@ function TaskDetailContent() {
     task?.truck?.id,
     truckDimensions,
     task?.serviceOrders?.length,
+    // SO statuses gate the inline "Concluída" transition (areAllServiceOrdersComplete) — the array ref
+    // changes on refetch (e.g. after an SO is completed), so recompute the closure then.
+    task?.serviceOrders,
     task?.responsibles?.length,
     filteredArtworks.length,
     cuts.length,
@@ -1157,7 +1163,7 @@ function TaskDetailContent() {
     } else if (task.status === TASK_STATUS.WAITING_PRODUCTION) {
       list.push({ key: "iniciar", label: "Iniciar Produção", icon: IconPlayerPlay, variant: "default", onClick: () => void changeStatus(TASK_STATUS.IN_PRODUCTION, { startedAt: new Date() }) });
     }
-    if (canFinish && task.status === TASK_STATUS.IN_PRODUCTION) {
+    if (canFinish && task.status === TASK_STATUS.IN_PRODUCTION && areAllServiceOrdersComplete(task.serviceOrders)) {
       list.push({ key: "finalizar", label: "Finalizar", icon: IconCheck, variant: "default", onClick: () => void changeStatus(TASK_STATUS.COMPLETED, { finishedAt: new Date() }) });
     }
     list.push({

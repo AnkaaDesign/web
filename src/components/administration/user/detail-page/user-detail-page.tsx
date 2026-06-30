@@ -13,6 +13,7 @@ import {
   IconCertificate,
   IconBuilding,
   IconBriefcase,
+  IconTimeline,
   IconUserCog,
   IconHash,
   IconCalendarTime,
@@ -79,6 +80,8 @@ import {
 import type { User } from "@/types";
 
 import { RelatedActivitiesCard } from "@/components/administration/user/detail/related-activities-card";
+import { EmploymentHistoryCard } from "@/components/administration/user/detail/employment-history-card";
+import { UserPositionHistoryCard } from "@/components/personnel-department/user-position-history/detail/user-position-history-card";
 import { UserDocumentationCard } from "@/components/personnel-department/admission/user-documentation-card";
 import { UserBenefitsCard } from "@/components/personnel-department/user-benefit/user-benefits-card";
 import { DependentsCard } from "@/components/personnel-department/dependent/dependents-card";
@@ -569,12 +572,29 @@ function UserDetailContent() {
         ],
       },
 
-      // Vínculo + cargo history are NOT separate sections — the changelog below already records both:
-      // cargo changes (positionId → "Cargo", id→name resolved) and vínculo changes (currentContractType
-      // / currentContractStatus, admission/termination dates), all backend-logged to the USER entity.
-      // The full structured records INCLUDING salary-per-promotion (HR-sensitive) stay on the dedicated
-      // Promoções / Admissões pages — deliberately NOT merged here, since this collaborator detail is
-      // reachable by PRODUCTION_MANAGER and the changelog has no salary gate (would leak remuneração).
+      // ---- Histórico de Vínculos + Cargos (read-only) ------------------------
+      // Structured employment-contract (vínculo) + position/cargo timelines. NEITHER shows salary —
+      // remuneração stays on the dedicated Admissões / Promoções pages — so both are gated to the
+      // Departamento Pessoal audience (HR/ACC/ADMIN) like the other folha sections, NOT exposed to the
+      // Production Manager who can otherwise reach this page. Read-only; self-hide when empty.
+      {
+        id: "employment-history",
+        label: "Histórico de Vínculos",
+        icon: IconBriefcase,
+        span: 2,
+        scroll: true,
+        requiredPrivilege: HR_ACC_ADMIN,
+        render: (u) => <EmploymentHistoryCard userId={u.id} embedded maxHeight="100%" className="h-full" onCount={(n) => reportCount("employment-history", n)} />,
+      },
+      {
+        id: "position-history",
+        label: "Histórico de Cargos",
+        icon: IconTimeline,
+        span: 2,
+        scroll: true,
+        requiredPrivilege: HR_ACC_ADMIN,
+        render: (u) => <UserPositionHistoryCard userId={u.id} embedded maxHeight="100%" className="h-full" onCount={(n) => reportCount("position-history", n)} />,
+      },
 
       // ---- Benefícios / Dependentes (largos) ---------------------------------
       {

@@ -27,6 +27,7 @@ import {
 } from '@/types/statistics-common';
 import type { YAxisMode, StatisticsChartType, TrendLineType } from '@/types/statistics-common';
 import { getOrders } from '@/api-client/order';
+import { calculateOrderTotal } from '@/utils/order';
 import { getSuppliers } from '@/api-client/supplier';
 import { supplierKeys } from '@/hooks/common/query-keys';
 import {
@@ -514,11 +515,9 @@ function OrdersDrilldownModal({
   );
 
   const supplierName = (o: any) => o.supplier?.fantasyName ?? o.supplier?.name ?? '—';
-  const orderValue = (o: any): number =>
-    (o.items || []).reduce(
-      (s: number, it: any) => s + (Number(it.price) || 0) * (Number(it.orderedQuantity) || 0),
-      0,
-    );
+  // Honors the manual `totalOverride` (via the shared helper) so this list agrees with the order
+  // table/detail; falls back to items − discount when no override is set.
+  const orderValue = (o: any): number => calculateOrderTotal(o);
   const itemCount = (o: any): number => (o.items || []).length;
 
   const filtered = useMemo(() => {

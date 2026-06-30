@@ -113,6 +113,10 @@ export function calculateOrderDiscount(order: Order): number {
  * Calculate order total value (items + taxes − discount)
  */
 export function calculateOrderTotal(order: Order): number {
+  // A manual grand-total override always wins over the computed item-sum (mirrors the order
+  // detail/list which honor `totalOverride`), so every surface routed through this helper agrees.
+  if (order.totalOverride != null) return order.totalOverride;
+
   if (!order.items || order.items.length === 0) return 0;
 
   const itemsTotal = order.items.reduce((total, item) => {

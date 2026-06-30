@@ -239,22 +239,29 @@ function drawEspelhoPage(doc: any, { autoTable, logo }: Assets, item: BuildHtmlO
     "Normais", "Faltas", "Ex 50%", "Ex 100%", "Ex 150%", "DSR",
   ]];
 
-  type RowMeta = { bg: RGB | null; holiday: boolean; dayoff: boolean; hasFaltas: boolean };
+  type RowMeta = { bg: RGB | null; holiday: boolean; dayoff: boolean; hasFaltas: boolean; collapsed: boolean };
   const rowMeta: RowMeta[] = [];
 
   const body = rows.map((r) => {
+    // A holiday / day-off row only collapses to a single "Feriado"/"Folga" label cell when the
+    // employee did NOT clock in. If punches exist (a worked holiday / worked day-off) show the real
+    // entrada/saída marcações like a normal day — the day still reads as holiday/folga via its row
+    // background + date label, but the marcações must not be hidden.
+    const hasPunches = !!(r.entrada1 || r.saida1 || r.entrada2 || r.saida2 || r.entrada3 || r.saida3);
+    const collapsed = (r.isHoliday || r.isDayOff) && !hasPunches;
     const meta: RowMeta = {
       bg: r.isHoliday ? HOLIDAY_BG : r.isDayOff ? DAYOFF_BG : r.isWeekend ? WEEKEND_BG : null,
       holiday: r.isHoliday,
       dayoff: r.isDayOff,
       hasFaltas: !!r.faltas,
+      collapsed,
     };
     rowMeta.push(meta);
     const dateLabel = `${shortDate(r.date)}${r.weekday ? ` - ${r.weekday}` : ""}`;
     const tail = [
       r.normais || "—", r.faltas || "—", r.ex50 || "—", r.ex100 || "—", r.ex150 || "—", r.dsr || "—",
     ];
-    if (r.isHoliday || r.isDayOff) {
+    if (collapsed) {
       return [
         dateLabel,
         { content: r.isHoliday ? "Feriado" : "Folga", colSpan: 6 },
@@ -322,7 +329,9 @@ function drawEspelhoPage(doc: any, { autoTable, logo }: Assets, item: BuildHtmlO
       const meta = rowMeta[data.row.index];
       if (!meta) return;
       if (meta.bg) data.cell.styles.fillColor = meta.bg;
-      if ((meta.holiday || meta.dayoff) && data.column.index === 1) {
+      // Only the COLLAPSED label cell (column 1 of a no-punch holiday/day-off row) gets the italic
+      // label styling — a worked holiday/day-off renders real punches there, which must stay normal.
+      if (meta.collapsed && data.column.index === 1) {
         data.cell.styles.fontStyle = "italic";
         data.cell.styles.textColor = meta.holiday ? HOLIDAY_FG : GRAY;
       }

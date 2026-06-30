@@ -69,8 +69,14 @@ interface EditorProps<TData> {
 
 function TextEditor<TData>({ field, edit, row, onCommit, onCancel }: EditorProps<TData>) {
   const ref = useRef<HTMLInputElement>(null);
+  // Enter/Escape call setEditing(false), which unmounts this input → React fires a spurious onBlur on
+  // the unmounting node. Without this guard that blur fires a SECOND commit (Escape would save the
+  // discarded draft; Enter would double-commit). `settled` is flipped by whichever path resolves the
+  // session first; the blur handler then no-ops. Fresh per mount (each edit session remounts).
+  const settled = useRef(false);
   const [draft, setDraft] = useState<string | number | null>((edit.get(row) as string | number | null) ?? "");
   useEffect(() => {
+    settled.current = false;
     ref.current?.focus();
     ref.current?.select?.();
   }, []);
@@ -84,13 +90,19 @@ function TextEditor<TData>({ field, edit, row, onCommit, onCancel }: EditorProps
       step={edit.step}
       placeholder={edit.placeholder}
       onChange={(v) => setDraft(v)}
-      onBlur={() => onCommit(draft)}
+      onBlur={() => {
+        if (settled.current) return; // already resolved by Enter/Escape — ignore the unmount blur
+        settled.current = true;
+        onCommit(draft);
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();
+          settled.current = true;
           onCommit(draft);
         } else if (e.key === "Escape") {
           e.preventDefault();
+          settled.current = true;
           onCancel();
         }
       }}
@@ -101,8 +113,11 @@ function TextEditor<TData>({ field, edit, row, onCommit, onCancel }: EditorProps
 
 function TextareaEditor<TData>({ edit, row, onCommit, onCancel }: EditorProps<TData>) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  // See TextEditor: guards the spurious onBlur fired when Escape/Enter unmount this textarea.
+  const settled = useRef(false);
   const [draft, setDraft] = useState<string>(String(edit.get(row) ?? ""));
   useEffect(() => {
+    settled.current = false;
     ref.current?.focus();
     ref.current?.select?.();
   }, []);
@@ -112,13 +127,19 @@ function TextareaEditor<TData>({ edit, row, onCommit, onCancel }: EditorProps<TD
       value={draft}
       placeholder={edit.placeholder}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => onCommit(draft)}
+      onBlur={() => {
+        if (settled.current) return; // already resolved by Enter/Escape — ignore the unmount blur
+        settled.current = true;
+        onCommit(draft);
+      }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault();
+          settled.current = true;
           onCancel();
         } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
           e.preventDefault();
+          settled.current = true;
           onCommit(draft);
         }
       }}

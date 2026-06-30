@@ -146,17 +146,30 @@ export function OrderTablePage() {
   const orders = useMemo(() => (response as { data?: Order[] } | undefined)?.data ?? [], [response]);
   const totalRecords = (response as { meta?: { totalRecords?: number } } | undefined)?.meta?.totalRecords ?? 0;
 
-  // Export "all": refetch every order matching the current search/filters/sort in one request (the
-  // table only holds the current page). Mirrors the legacy OrderExport's fetch-all.
+  // Export "all": refetch every order matching the current search/filters/sort (the table only holds
+  // the current page). The API caps `limit` at 100 (order schema), so page through the full set rather
+  // than requesting everything in one shot — a single oversized request would be rejected/truncated,
+  // silently dropping rows while the UI promises "Todos os N registros".
   const fetchAllForExport = useCallback(async (): Promise<Order[]> => {
-    const res = await getOrders({
+    const PAGE_SIZE = 100;
+    const baseQuery = {
       ...buildOrderQuery(params.filters, params.search),
-      page: 1,
-      limit: Math.max(totalRecords, 1),
       orderBy: buildOrderOrderBy(sorting),
       include: LIST_INCLUDE,
-    } as never);
-    return (res as { data?: Order[] } | undefined)?.data ?? [];
+    };
+    const all: Order[] = [];
+    for (let page = 1; ; page++) {
+      const res = (await getOrders({ ...baseQuery, page, limit: PAGE_SIZE } as never)) as
+        | { data?: Order[]; meta?: { hasNextPage?: boolean } }
+        | undefined;
+      const rows = res?.data ?? [];
+      all.push(...rows);
+      // Stop when the API reports no further page or returns a short page; the total guard is a
+      // defensive backstop against an unbounded loop.
+      if (res?.meta?.hasNextPage === false || rows.length < PAGE_SIZE) break;
+      if (totalRecords > 0 && all.length >= totalRecords) break;
+    }
+    return all;
   }, [params, sorting, totalRecords]);
 
   // Supplier filter options (loaded once; API caps limit at 100).

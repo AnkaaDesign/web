@@ -5,6 +5,7 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useInventoryDashboard, useOrders, useBorrows, useItems, useSuppliers, useActivities, useCanViewPrices } from "../../hooks";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "../../utils";
+import { calculateOrderTotal } from "../../utils/order";
 import { useState, useMemo } from "react";
 import { IconPackage, IconPlus } from "@tabler/icons-react";
 import {
@@ -239,12 +240,9 @@ export const InventoryRootPage = () => {
     }
 
     return ordersData.data.slice(0, 10).map((order) => {
-      // Calculate total from items if not available on order
-      const totalPrice =
-        order.items?.reduce((sum, item) => {
-          const unitPrice = (item.price || 0) + (item.icms || 0) + (item.ipi || 0);
-          return sum + unitPrice * (item.orderedQuantity || 1);
-        }, 0) || 0;
+      // Effective grand total — honors a manual `totalOverride` via the shared helper so the
+      // recent-orders strip agrees with the order table/detail.
+      const totalPrice = calculateOrderTotal(order);
 
       return {
         item: order.description || "Sem descrição",

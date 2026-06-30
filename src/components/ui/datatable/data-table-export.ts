@@ -1,6 +1,6 @@
 import { formatDate } from "@/utils/date";
 import { COMPANY_INFO } from "@/config/company";
-import { rawColumnValue, valueToString } from "./data-table-utils";
+import { columnHeaderText, rawColumnValue, valueToString } from "./data-table-utils";
 import type { DataTableColumnDef } from "./data-table-types";
 
 const BRAND_GREEN: [number, number, number] = [10, 92, 30]; // #0a5c1e
@@ -60,7 +60,7 @@ export interface ExportRequest<TData> {
 
 export async function exportToXlsx<TData>({ rows, columns, filename, title }: ExportRequest<TData>): Promise<void> {
   const XLSX = await import("xlsx");
-  const headers = columns.map((c) => c.meta?.exportHeader ?? (typeof c.header === "string" ? c.header : c.id));
+  const headers = columns.map((c) => columnHeaderText(c));
   // Every cell is written as TEXT so Excel left-aligns ALL of them (community xlsx can't
   // write alignment styles, and numeric cells would otherwise right-align). Per request:
   // the spreadsheet is always left-aligned regardless of the column's on-screen alignment.
@@ -143,7 +143,7 @@ export async function exportToPdf<TData>({ rows, columns, filename, title }: Exp
   };
 
   autoTable(doc, {
-    head: [columns.map((c) => c.meta?.exportHeader ?? (typeof c.header === "string" ? c.header : c.id))],
+    head: [columns.map((c) => columnHeaderText(c))],
     body: rows.map((row) => columns.map((col) => textCell(col, row))),
     margin: { top: 74, bottom: 64, left: M, right: M },
     // One line per row (truncate with "…", never wrap) + horizontal rules ONLY — the

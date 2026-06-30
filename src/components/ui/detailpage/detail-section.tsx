@@ -25,9 +25,15 @@ const DEFAULT_SCROLL_HEIGHT = 440;
 
 function DetailSectionInner<TData>({ section, row, hideEmptyFields }: DetailSectionProps<TData>) {
   const { def } = section;
-  const fields = hideEmptyFields ? section.fields.filter((f) => !fieldIsEmpty(f, row)) : section.fields;
   const { canEdit, isAllowed } = useFieldGate();
   const sectionEditable = isAllowed(def.editablePrivilege);
+  // When hiding empty fields, KEEP an empty field the user can still inline-edit (forecast / notes /
+  // paymentMethod / pix, etc.) so it stays reachable; only hide read-only empties. The editable
+  // condition mirrors the `editable` prop passed to InlineEditField below (sectionEditable && canEdit
+  // && has an edit def).
+  const fields = hideEmptyFields
+    ? section.fields.filter((f) => !fieldIsEmpty(f, row) || (!!f.edit && sectionEditable && canEdit(f)))
+    : section.fields;
   const Icon = def.icon;
 
   const rendered = def.render ? def.render(row) : null;

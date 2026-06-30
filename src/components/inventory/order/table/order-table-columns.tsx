@@ -49,6 +49,11 @@ const ALL_ORDER_COLUMN_IDS = [
   "forecast",
   "paidAt",
   "createdAt",
+  // Export-only audit columns (hidden by default) — listed here so the ADMIN sector default explicitly
+  // keeps them hidden too.
+  "notes",
+  "updatedAt",
+  "id",
 ] as const;
 
 /** Build a full table config (visibility + order) showing exactly `visible` (in that order). */
@@ -214,6 +219,39 @@ export function createOrderColumns(): DataTableColumnDef<Order>[] {
       minSize: 100,
       meta: { defaultVisible: false, headerLabel: "Criado em", exportValue: (row) => formatDate(row.createdAt) },
       cell: ({ row }) => muted(formatDate(row.original.createdAt)),
+    },
+    // --- Export-only audit columns (hidden by default; selectable in the share dialog) ---
+    // Restore the legacy OrderExport's OBSERVAÇÕES / FINALIZADO EM / CÓDIGO fields so audit exports stay
+    // complete without cluttering the visible table.
+    {
+      id: "notes",
+      header: "Observações",
+      accessorFn: (row) => row.notes ?? "",
+      enableSorting: false,
+      size: 240,
+      minSize: 160,
+      meta: { defaultVisible: false, headerLabel: "Observações", exportHeader: "Observações", exportValue: (row) => row.notes || "" },
+      cell: ({ row }) => (row.original.notes ? <TruncatedTextWithTooltip text={row.original.notes} className="text-sm" /> : muted("-")),
+    },
+    {
+      id: "updatedAt",
+      header: "Finalizado em",
+      accessorKey: "updatedAt",
+      enableSorting: true,
+      size: 120,
+      minSize: 100,
+      meta: { defaultVisible: false, headerLabel: "Finalizado em", exportHeader: "Finalizado em", exportValue: (row) => (row.updatedAt ? formatDate(row.updatedAt) : "") },
+      cell: ({ row }) => muted(row.original.updatedAt ? formatDate(row.original.updatedAt) : "-"),
+    },
+    {
+      id: "id",
+      header: "Código",
+      accessorKey: "id",
+      enableSorting: false,
+      size: 220,
+      minSize: 140,
+      meta: { defaultVisible: false, headerLabel: "Código", exportHeader: "Código", exportValue: (row) => row.id },
+      cell: ({ row }) => <span className="text-sm font-mono tabular-nums">{row.original.id}</span>,
     },
   ];
 }
