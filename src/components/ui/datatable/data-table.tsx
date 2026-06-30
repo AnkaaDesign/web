@@ -243,8 +243,9 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   });
 
   // "View selected only": narrow to the selected rows. Sourced from the URL `sel` param
-  // (selection lives there) since `filtered` is computed before the table exists.
-  const [viewSelectedOnly, setViewSelectedOnly] = useState(false);
+  // (selection lives there) since `filtered` is computed before the table exists. The toggle itself
+  // is mirrored to the URL `selOnly` param so a shared link reproduces the filtered view.
+  const [viewSelectedOnly, _setViewSelectedOnly] = useState(() => syncUrl && searchParams.get("selOnly") === "1");
   // Mirror of the table's live selection — lets "view selected only" work even without URL sync
   // (two-table pages run syncUrl:false, so the URL `sel` param is unavailable). An effect keeps it in
   // sync once the table exists; for syncUrl tables `selectedIds` keeps reading the URL as before.
@@ -271,6 +272,16 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
       );
     },
     [setSearchParams, syncUrl],
+  );
+
+  // Mirror the "view selected only" toggle to the URL so it persists across reloads and is encoded
+  // in a shared link (copyShareLink copies window.location.href).
+  const setViewSelectedOnly = useCallback(
+    (value: boolean) => {
+      _setViewSelectedOnly(value);
+      writeParam("selOnly", value ? "1" : null);
+    },
+    [writeParam],
   );
 
   // Returns the table to page 1. Wired to `dt.table` once the engine is built (below). Narrowing the
@@ -309,7 +320,13 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
 
   // --- client-mode narrowing (search + filters + view-selected-only) ---
   const filtered = useMemo(() => {
-    if (mode !== "client") return data;
+    if (mode !== "client") {
+      // Server mode narrows search/filters/pagination server-side, but "view selected only" can
+      // still filter the currently-loaded page client-side. This only sees selections on the page
+      // in view (cross-page selections aren't loaded), which matches the toggle's count.
+      if (viewSelectedOnly && selectedIds) return data.filter((r) => selectedIds.has(getId(r)));
+      return data;
+    }
     let rows = data;
     if (debouncedSearch) rows = rows.filter((r) => rowMatchesSearch(r, columns, debouncedSearch));
     if (filterDefs.length) rows = rows.filter((r) => rowMatchesFilters(r, filterDefs, filters));
@@ -389,20 +406,36 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   }, [selectedRows]);
   const totalItems = mode === "client" ? filtered.length : rowCount ?? filtered.length;
   // Export row sources — the share dialog lets the user pick the scope (selected / current page /
-  // ALL filtered rows). "All" is resolved lazily on export: client mode reads the in-memory
-  // pre-pagination model; server mode calls the page's fetch-all hook (one request, current query).
+  // ALL filtered rows). "Selected" and "All" are resolved lazily on export: client mode reads the
+  // in-memory pre-pagination model; server mode calls the page's fetch-all hook (one request).
   const exportSelectedRows = selectedRows.map((r) => r.original);
   const exportPageRows = table.getRowModel().rows.map((r) => r.original);
+  // Full selection count across ALL pages. Selection ids persist in the URL `sel` param (or the
+  // mirror) even for rows not currently loaded, so the export's "Selecionados" scope reflects the
+  // whole selection — not just the rows materialised on the current page (server mode).
+  const selectedAllCount = selectedIds ? selectedIds.size : selectedCount;
   const canExportAll = mode === "client" || !!onExportFetchAll;
   const resolveAllRows = useCallback(async (): Promise<TData[]> => {
     if (mode === "client") return table.getPrePaginationRowModel().rows.map((r) => r.original);
     if (onExportFetchAll) return onExportFetchAll();
     return table.getRowModel().rows.map((r) => r.original);
   }, [mode, table, onExportFetchAll]);
+  // Resolve the FULL selection for export. Client mode already holds every row, so the in-memory
+  // selected model is complete. Server mode may have selected rows on unloaded pages: fetch the
+  // full filtered set and narrow it to the selected ids (kept in the URL across pages).
+  const resolveSelectedRows = useCallback(async (): Promise<TData[]> => {
+    if (mode === "client" || !selectedIds || !onExportFetchAll) return exportSelectedRows;
+    const all = await onExportFetchAll();
+    return all.filter((r) => selectedIds.has(getId(r)));
+  }, [mode, selectedIds, onExportFetchAll, exportSelectedRows, getId]);
 
+  // Auto-disable the "view selected only" filter only when the WHOLE selection is empty (keyed off
+  // the URL/mirror selection, not the loaded-page count). Using the loaded count would wrongly fire
+  // on a reload/shared link in server mode, where the page data arrives async and the selected rows
+  // aren't materialised on the first render yet — clearing the toggle before the selection loads.
   useEffect(() => {
-    if (selectedCount === 0 && viewSelectedOnly) setViewSelectedOnly(false);
-  }, [selectedCount, viewSelectedOnly]);
+    if (selectedAllCount === 0 && viewSelectedOnly) setViewSelectedOnly(false);
+  }, [selectedAllCount, viewSelectedOnly, setViewSelectedOnly]);
 
   const order = table.getState().columnOrder;
   const orderedColumns = useMemo(() => {
@@ -620,7 +653,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
             selectedCount={selectedCount}
             showSelectedOnly={viewSelectedOnly}
             onToggleSelectedOnly={setViewSelectedOnly}
-            canViewSelectedOnly={mode === "client"}
+            canViewSelectedOnly={true}
             enableExpansion={enableExpansion}
             allExpanded={allRowsExpanded}
             onToggleExpandAll={handleToggleExpandAll}
@@ -762,6 +795,8 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
           visibleColumnIds={visibleColumnIds}
           pageRows={exportPageRows}
           selectedRows={exportSelectedRows}
+          selectedCount={selectedAllCount}
+          resolveSelectedRows={resolveSelectedRows}
           totalCount={totalItems}
           resolveAllRows={canExportAll ? resolveAllRows : undefined}
           title={exportTitle}

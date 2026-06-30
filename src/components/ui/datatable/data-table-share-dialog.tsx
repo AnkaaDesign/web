@@ -32,8 +32,19 @@ interface DataTableShareDialogProps<TData> {
   visibleColumnIds: string[];
   /** Rows on the current page. */
   pageRows: TData[];
-  /** Currently-selected rows. */
+  /** Currently-loaded selected rows (current page in server mode); used as a sync fallback. */
   selectedRows: TData[];
+  /**
+   * Total selected across all pages. Defaults to `selectedRows.length`. In server mode the full
+   * selection (from the URL `sel` param) can exceed the loaded rows, so the page passes the real
+   * count here to label the "Selecionados" scope correctly.
+   */
+  selectedCount?: number;
+  /**
+   * Resolve the FULL selection across all pages (server mode fetches unloaded selected rows).
+   * Absent ⇒ the "Selecionados" scope exports `selectedRows` as-is.
+   */
+  resolveSelectedRows?: () => Promise<TData[]>;
   /** Total rows matching the active search/filters — the label/scope for "all". */
   totalCount: number;
   /**
@@ -59,6 +70,8 @@ export function DataTableShareDialog<TData>({
   visibleColumnIds,
   pageRows,
   selectedRows,
+  selectedCount: selectedCountProp,
+  resolveSelectedRows,
   totalCount,
   resolveAllRows,
   title,
@@ -68,7 +81,7 @@ export function DataTableShareDialog<TData>({
   const [selected, setSelected] = useState<Set<string>>(() => new Set(visibleColumnIds));
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
-  const selectedCount = selectedRows.length;
+  const selectedCount = selectedCountProp ?? selectedRows.length;
   // Scope defaults to the selection if any, else ALL filtered rows when available (restores the
   // legacy "all data" export default), else the current page.
   const [scope, setScope] = useState<ExportScope>("page");
@@ -100,10 +113,13 @@ export function DataTableShareDialog<TData>({
     if (!chosenColumns.length) return notify.error("Atenção", "Selecione ao menos uma coluna.");
     setBusy(true);
     try {
-      // Resolve the rows for the chosen scope. "all" may be async (server-mode fetch-all).
+      // Resolve the rows for the chosen scope. "selected" and "all" may be async (server-mode
+      // fetch of rows not loaded on the current page).
       const rows =
         scope === "selected"
-          ? selectedRows
+          ? resolveSelectedRows
+            ? await resolveSelectedRows()
+            : selectedRows
           : scope === "all" && resolveAllRows
             ? await resolveAllRows()
             : pageRows;

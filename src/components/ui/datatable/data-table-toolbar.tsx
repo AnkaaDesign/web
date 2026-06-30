@@ -48,9 +48,9 @@ interface DataTableToolbarProps<TData> {
   showSelectedOnly: boolean;
   onToggleSelectedOnly: (value: boolean) => void;
   /**
-   * Whether the "view selected only" toggle can work. False in server mode, where narrowing happens
-   * server-side and the in-memory selection (which may span unloaded pages) can't filter the fetch —
-   * showing the toggle there would be a no-op. Defaults to true.
+   * Whether the "view selected only" toggle is offered. In server mode the toggle narrows only the
+   * currently-loaded page (selections on unloaded pages aren't visible), which matches the count.
+   * Defaults to true.
    */
   canViewSelectedOnly?: boolean;
   /** Expand/collapse-all control — only shown when row expansion is enabled. */
