@@ -1196,7 +1196,7 @@ export const OrderCreateForm = () => {
                             <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
                               <Combobox
                                 async={true}
-                                queryKey={["users", "active", "paymentResponsible", SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}
+                                queryKey={["users", "active", "paymentResponsible", SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING]}
                                 queryFn={async (searchTerm: string, page = 1) => {
                                   const { getUsers } = await import("../../../../api-client");
                                   const response = await getUsers({
@@ -1206,7 +1206,7 @@ export const OrderCreateForm = () => {
                                     take: 50,
                                     select: { id: true, name: true },
                                     ...(searchTerm?.trim() ? { searchingFor: searchTerm.trim() } : {}),
-                                    includeSectorPrivileges: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+                                    includeSectorPrivileges: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING],
                                   } as any);
                                   return {
                                     data: (response.data || []).map((u: any) => ({ value: u.id, label: u.name })),
