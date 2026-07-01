@@ -3,17 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconReceipt2,
   IconRepeat,
-  IconSpray,
   IconCash,
   IconProgressCheck,
   IconCoins,
-  IconPackage,
-  IconReceiptTax,
-  IconUsers,
   IconGift,
   IconArrowRight,
   IconAlertTriangle,
-  IconCheck,
   IconClock,
   IconCopy,
 } from "@tabler/icons-react";
@@ -47,7 +42,7 @@ const PAYABLE_STATE_LABELS: Record<PayableState, string> = {
   AWAITING_PAYMENT: "Aguardando Pagamento",
   OVERDUE: "Vencido",
   PARTIALLY_PAID: "Parcialmente Pago",
-  EXPECTED: "Previsto/Recorrente",
+  EXPECTED: "Previsto",
   PAID: "Pago",
 };
 
@@ -55,7 +50,7 @@ const PAYABLE_STATE_BADGE: Record<PayableState, BadgeProps["variant"]> = {
   AWAITING_PAYMENT: "pending", // amber — open obligation awaiting payment
   OVERDUE: "destructive", // red — past due
   PARTIALLY_PAID: "orange",
-  EXPECTED: "outline", // muted — forecast/recurrent, not a real debt yet
+  EXPECTED: "gray", // gray — forecast/recurrent, not a real debt yet
   PAID: "completed", // green
 };
 
@@ -72,7 +67,7 @@ const PAYABLE_BUCKETS: Record<
   AWAITING: { label: "Aguardando Pagamento", Icon: IconProgressCheck, tone: "text-amber-600 bg-amber-500/10", states: ["AWAITING_PAYMENT"] },
   OVERDUE: { label: "Vencido", Icon: IconAlertTriangle, tone: "text-red-600 bg-red-500/10", states: ["OVERDUE"] },
   PARTIAL: { label: "Parcialmente Pago", Icon: IconCoins, tone: "text-orange-600 bg-orange-500/10", states: ["PARTIALLY_PAID"] },
-  EXPECTED: { label: "Previsto/Recorrente", Icon: IconRepeat, tone: "text-neutral-500 bg-neutral-500/10", states: ["EXPECTED"] },
+  EXPECTED: { label: "Previsto", Icon: IconRepeat, tone: "text-neutral-500 bg-neutral-500/10", states: ["EXPECTED"] },
   PAID: { label: "Pago no mês", Icon: IconCash, tone: "text-emerald-600 bg-emerald-500/10", states: ["PAID"] },
   UNCLEARED: { label: "Pago, aguardando conciliação", Icon: IconClock, tone: "text-amber-600 bg-amber-500/10", states: ["PAID"] },
 };
@@ -162,8 +157,7 @@ function PayablePaymentCell({ row }: { row: PayableRow }) {
   }
 
   return (
-    <Badge variant="completed" className="font-medium whitespace-nowrap gap-1 w-fit">
-      <IconCheck className="h-3 w-3" />
+    <Badge variant="completed" className="font-medium whitespace-nowrap w-fit">
       Pago
     </Badge>
   );
@@ -186,52 +180,42 @@ function PayableTypeBadge({ row }: { row: PayableRow }) {
   switch (row.source) {
     case "AIRBRUSHING":
       return (
-        <Badge variant="purple" className="whitespace-nowrap text-[10px]">
-          <IconSpray className="mr-1 h-3 w-3" />
+        <Badge variant="purple" className="whitespace-nowrap text-[10px] leading-4">
           Aerografia
-        </Badge>
-      );
-    case "SCHEDULED":
-      return (
-        <Badge variant="cyan" className="whitespace-nowrap text-[10px]">
-          <IconRepeat className="mr-1 h-3 w-3" />
-          Pedido programado
         </Badge>
       );
     case "TAX":
       return (
-        <Badge variant="orange" className="whitespace-nowrap text-[10px]">
-          <IconReceiptTax className="mr-1 h-3 w-3" />
+        <Badge variant="orange" className="whitespace-nowrap text-[10px] leading-4">
           Imposto
         </Badge>
       );
     case "PAYROLL":
       return (
-        <Badge variant="indigo" className="whitespace-nowrap text-[10px]">
-          <IconUsers className="mr-1 h-3 w-3" />
+        <Badge variant="indigo" className="whitespace-nowrap text-[10px] leading-4">
           Folha
         </Badge>
       );
     case "PAYROLL_SCHEDULED":
       return (
-        <Badge variant="indigo" className="whitespace-nowrap text-[10px]">
-          <IconGift className="mr-1 h-3 w-3" />
+        <Badge variant="indigo" className="whitespace-nowrap text-[10px] leading-4">
           {row.subtype || "Folha programada"}
         </Badge>
       );
     case "RECURRING":
     case "RECURRENT_PAYABLE":
       return (
-        <Badge variant="teal" className="whitespace-nowrap text-[10px]">
-          <IconRepeat className="mr-1 h-3 w-3" />
+        <Badge variant="pink" className="whitespace-nowrap text-[10px] leading-4">
           Recorrente{row.subtype ? ` · ${row.subtype}` : ""}
         </Badge>
       );
+    // "Pedido programado" (SCHEDULED) is just a not-yet-materialized order — show it
+    // under the same "Pedidos" badge as a real order (default), no separate type.
+    case "SCHEDULED":
     default:
       return (
-        <Badge variant="blue" className="whitespace-nowrap text-[10px]">
-          <IconPackage className="mr-1 h-3 w-3" />
-          Pedido
+        <Badge variant="blue" className="whitespace-nowrap text-[10px] leading-4">
+          Pedidos
         </Badge>
       );
   }
@@ -601,7 +585,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       ),
     },
     { key: "amount", header: "Valor", width: 128, align: "right", render: (row) => <span className="text-sm font-medium tabular-nums">{formatCurrency(row.amount)}</span> },
-    { key: "payment", header: "Pagamento", width: 160, render: (row) => <PayablePaymentCell row={row} /> },
+    { key: "payment", header: "Pagamento", width: 200, render: (row) => <PayablePaymentCell row={row} /> },
     {
       key: "dueDate",
       header: "Vencimento",
@@ -762,10 +746,13 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
                 </DropdownMenuItem>
               )}
 
+              {/* Scheduled orders (previstos) materialize automatically — they behave
+                  like a PENDING order, waiting for an admin to requisitar o pagamento.
+                  No manual "Gerar pedido" action. */}
               {ctxRow.settleVia === "SCHEDULE_TRIGGER" && (
-                <DropdownMenuItem onClick={() => handleSettle(ctxRow)}>
-                  <IconPackage className="mr-2 h-4 w-4" />
-                  Gerar pedido (materializar)
+                <DropdownMenuItem disabled>
+                  <IconClock className="mr-2 h-4 w-4" />
+                  Aguardando requisição de pagamento
                 </DropdownMenuItem>
               )}
 
