@@ -1332,6 +1332,7 @@ export const OrderCreateForm = () => {
                             <div className="flex-1 max-w-[55%]">
                               <Input
                                 type="percentage"
+                                blankZero
                                 value={form.watch("discount") ?? 0}
                                 onChange={(value) => {
                                   const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
@@ -1339,7 +1340,7 @@ export const OrderCreateForm = () => {
                                   form.setValue("discount", sanitized, { shouldDirty: true, shouldTouch: true });
                                   updateDiscount(sanitized);
                                 }}
-                                placeholder="0%"
+                                placeholder="0,00%"
                                 className="h-8 w-full border-neutral-500"
                               />
                             </div>
