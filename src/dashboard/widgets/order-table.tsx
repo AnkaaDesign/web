@@ -50,6 +50,7 @@ import {
 import { useOrders, useOrderMutations } from "../../hooks/inventory/use-order";
 import { useSuppliers } from "../../hooks/inventory/use-supplier";
 import { useAuth } from "../../hooks/common/use-auth";
+import { usePrivileges } from "../../hooks/common/use-privileges";
 import {
   ORDER_STATUS,
   ORDER_PAYMENT_STATUS,
@@ -172,29 +173,24 @@ const ORDER_STATUS_SEQUENCE: ORDER_STATUS[] = [
   ORDER_STATUS.CANCELLED,
 ];
 
-// Payment-status filter keys. "A Definir" is not a stored status — it's the
-// derived state of an order that is AWAITING_PAYMENT with no payment method
-// (mirrors OrderPaymentStatusBadge). It gets its own filter key so it can be
-// selected distinctly from "Aguardando Pagamento" (awaiting WITH a method).
-const ORDER_PAYMENT_UNDEFINED_KEY = "UNDEFINED" as const;
-type PaymentFilterKey = ORDER_PAYMENT_STATUS | typeof ORDER_PAYMENT_UNDEFINED_KEY;
+// Payment-status filter keys — driven directly by the stored ORDER_PAYMENT_STATUS
+// (Pendente / Aguardando Pagamento / Parcialmente Pago / Pago). The retired
+// method-derived "A Definir" state was removed; PENDING is now the real
+// not-yet-requested status.
+type PaymentFilterKey = ORDER_PAYMENT_STATUS;
 
 const ORDER_PAYMENT_FILTER_SEQUENCE: PaymentFilterKey[] = [
-  ORDER_PAYMENT_UNDEFINED_KEY,
+  ORDER_PAYMENT_STATUS.PENDING,
   ORDER_PAYMENT_STATUS.AWAITING_PAYMENT,
   ORDER_PAYMENT_STATUS.PARTIALLY_PAID,
   ORDER_PAYMENT_STATUS.PAID,
 ];
 
 const ORDER_PAYMENT_FILTER_LABELS: Record<PaymentFilterKey, string> = {
-  [ORDER_PAYMENT_UNDEFINED_KEY]: "A Definir",
   ...ORDER_PAYMENT_STATUS_LABELS,
 };
 
 function paymentFilterKey(r: FlatOrder): PaymentFilterKey {
-  if (r.paymentStatus === ORDER_PAYMENT_STATUS.AWAITING_PAYMENT && !r.paymentMethod) {
-    return ORDER_PAYMENT_UNDEFINED_KEY;
-  }
   return r.paymentStatus;
 }
 
@@ -266,14 +262,7 @@ const orderTableConfigSchemaInner = z.object({
     .object({
       defaultBucket: z.enum(FORECAST_BUCKETS).default("all"),
       statuses: z.array(z.nativeEnum(ORDER_STATUS)).default([]),
-      paymentStatuses: z
-        .array(
-          z.union([
-            z.nativeEnum(ORDER_PAYMENT_STATUS),
-            z.literal(ORDER_PAYMENT_UNDEFINED_KEY),
-          ]),
-        )
-        .default([]),
+      paymentStatuses: z.array(z.nativeEnum(ORDER_PAYMENT_STATUS)).default([]),
       supplierIds: z.array(z.string()).default([]),
       isFromSchedule: z.enum(["any", "yes", "no"]).default("any"),
       hasItems: z.enum(["any", "yes", "no"]).default("any"),
@@ -434,7 +423,7 @@ function flattenOrders(orders: Order[] | undefined): FlatOrder[] {
       total: calculateOrderTotal(o),
       forecast,
       createdAt: o.createdAt ? new Date(o.createdAt) : today,
-      paymentStatus: o.paymentStatus ?? ORDER_PAYMENT_STATUS.AWAITING_PAYMENT,
+      paymentStatus: o.paymentStatus ?? ORDER_PAYMENT_STATUS.PENDING,
       paymentStatusOrder: o.paymentStatusOrder ?? 0,
       paymentMethod: o.paymentMethod ?? null,
       paymentResponsibleId: o.paymentResponsibleId ?? null,
@@ -829,6 +818,10 @@ function Render({ config, instanceId }: WidgetRenderProps<OrderTableConfig>) {
   const navigate = useNavigate();
   const returnTo = useReturnTo();
   const { user } = useAuth();
+  const { isAdmin, canAccessExact } = usePrivileges();
+  // Accounting users (non-admin) no longer open order internals — route them to Contas a Pagar instead.
+  const isAccountingOnly =
+    !isAdmin && canAccessExact(SECTOR_PRIVILEGES.ACCOUNTING);
   const currentUserId = user?.id ?? null;
   const display = config.display;
   const dens = densityClasses(display.density);
@@ -959,9 +952,13 @@ function Render({ config, instanceId }: WidgetRenderProps<OrderTableConfig>) {
 
   const onRowClick = useCallback(
     (r: FlatOrder) => {
+      if (isAccountingOnly) {
+        navigate(routes.financial.accountsPayable.root);
+        return;
+      }
       navigate(routes.inventory.orders.details(r.id), { state: { returnTo } });
     },
-    [navigate, returnTo],
+    [navigate, returnTo, isAccountingOnly],
   );
 
   const handleContextMenu = (e: React.MouseEvent, order: FlatOrder) => {
@@ -1189,9 +1186,11 @@ function Render({ config, instanceId }: WidgetRenderProps<OrderTableConfig>) {
           <DropdownMenuItem
             onClick={() =>
               contextMenu &&
-              navigate(routes.inventory.orders.details(contextMenu.order.id), {
-                state: { returnTo },
-              })
+              (isAccountingOnly
+                ? navigate(routes.financial.accountsPayable.root)
+                : navigate(routes.inventory.orders.details(contextMenu.order.id), {
+                    state: { returnTo },
+                  }))
             }
           >
             <IconEye className="mr-2 h-4 w-4" />

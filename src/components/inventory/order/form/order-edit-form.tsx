@@ -10,7 +10,7 @@ import type { OrderUpdateFormData } from "../../../../schemas";
 import type { Order, OrderItem } from "../../../../types";
 import { orderUpdateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useCanViewPrices } from "../../../../hooks";
-import { routes, ORDER_STATUS, ORDER_PAYMENT_STATUS, ORDER_PAYMENT_STATUS_LABELS, CONTRACT_STATUS } from "../../../../constants";
+import { routes, ORDER_STATUS, ORDER_PAYMENT_STATUS, ORDER_PAYMENT_STATUS_LABELS, ORDER_INSTALLMENT_STATUS, CONTRACT_STATUS } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -424,6 +424,18 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   // is derived from installments.
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string>(order.paymentStatus);
 
+  // Once any parcela has been settled (order paid/partially-paid, or any installment in a
+  // paid state), the boleto schedule is FROZEN on the API — regenerating it from edited
+  // installmentCount/due-dates would desync Order.installmentCount from the real parcelas
+  // (the API can't rebuild a schedule with settled rows). Lock the boleto inputs so the edit
+  // is blocked at the UI rather than silently "saved but unchanged".
+  const boletoScheduleLocked =
+    order.paymentStatus === ORDER_PAYMENT_STATUS.PARTIALLY_PAID ||
+    order.paymentStatus === ORDER_PAYMENT_STATUS.PAID ||
+    (order.installments ?? []).some(
+      (inst) => inst.status === ORDER_INSTALLMENT_STATUS.PAID || inst.status === ORDER_INSTALLMENT_STATUS.PARTIALLY_PAID,
+    );
+
   // Fetch suppliers for combobox
   const { data: suppliersResponse } = useSuppliers({
     orderBy: { fantasyName: "asc" },
@@ -755,9 +767,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const currentFreight = Number(form.getValues("freight")) || 0;
       const currentDiscount = Number(form.getValues("discount")) || 0;
       const rawTotalOverride = form.getValues("totalOverride");
-      // Manual grand-total override: a finite ≥0 number, or null to clear (revert to the computed total).
+      // Manual grand-total override: a finite POSITIVE number, or null to clear
+      // (revert to the computed total). 0 counts as cleared, not a R$0 override.
       const currentTotalOverride =
-        rawTotalOverride != null && Number.isFinite(Number(rawTotalOverride)) && Number(rawTotalOverride) >= 0 ? Number(rawTotalOverride) : null;
+        rawTotalOverride != null && Number.isFinite(Number(rawTotalOverride)) && Number(rawTotalOverride) > 0 ? Number(rawTotalOverride) : null;
       const currentStatus = form.getValues("status");
 
       // Effective Pix = what the user typed, else the supplier's default (shown in the field as a
@@ -779,9 +792,13 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         // Only send status when the user actually changed it, so an unrelated edit
         // doesn't trigger a no-op (same → same) status transition on the API.
         ...(currentStatus && currentStatus !== order.status ? { status: currentStatus } : {}),
-        supplierId: supplierId || undefined,
+        // Send null (not undefined) to CLEAR a previously-set supplier — the API treats undefined
+        // as "leave unchanged" and only disconnects on null. undefined when there was never a
+        // supplier (no-op, avoids an unnecessary disconnect).
+        supplierId: supplierId || (order.supplierId ? null : undefined),
         forecast: forecast, // Keep null to allow clearing the forecast date
-        notes: notes?.trim() || undefined,
+        // Send null (not undefined) to CLEAR previously-set notes (undefined = leave unchanged).
+        notes: notes?.trim() || (order.notes ? null : undefined),
         freight: currentFreight,
         discount: currentDiscount,
         // null clears any override (back to the automatic computed total); a number sets it.
@@ -1345,6 +1362,22 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               endpoints on submit (installment cascade). Financial-only card. */}
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
                             <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Status de Pagamento</span>
+                            {order.paymentStatus === ORDER_PAYMENT_STATUS.PENDING ? (
+                              // A PENDING order is pre-payable: it becomes payable only via the
+                              // ADMIN-only "Requisitar Pagamento" action on the order detail page.
+                              // Do NOT offer the editable status combobox here — the AWAITING/PAID
+                              // options don't apply, and selecting one would route a
+                              // PENDING → AWAITING_PAYMENT change through the generic update path,
+                              // bypassing the ADMIN gate (the API also rejects this transition).
+                              <div className="flex-1 max-w-[55%] text-right">
+                                <span className="text-sm font-medium text-foreground">
+                                  {ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.PENDING]}
+                                </span>
+                                <span className="block text-xs text-muted-foreground">
+                                  Requisite o pagamento na página do pedido
+                                </span>
+                              </div>
+                            ) : (
                             <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
                               <Combobox
                                 value={selectedPaymentStatus}
@@ -1354,9 +1387,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   if (stringValue) setSelectedPaymentStatus(stringValue);
                                 }}
                                 options={[
-                                  // With no payment method configured the obligation isn't defined yet,
-                                  // so surface the derived "A Definir" label (matches OrderPaymentStatusBadge).
-                                  { value: ORDER_PAYMENT_STATUS.AWAITING_PAYMENT, label: watchedPaymentMethod ? ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.AWAITING_PAYMENT] : "A Definir" },
+                                  // Status drives the label directly — no method-derived "A Definir".
+                                  { value: ORDER_PAYMENT_STATUS.AWAITING_PAYMENT, label: ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.AWAITING_PAYMENT] },
                                   { value: ORDER_PAYMENT_STATUS.PAID, label: ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.PAID] },
                                   // Current PARTIALLY_PAID is installment-derived: shown so the value
                                   // renders, but the user only moves to Aguardando/Pago.
@@ -1369,6 +1401,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 className="h-8 w-full"
                               />
                             </div>
+                            )}
                           </div>
 
                           {/* Payment Responsible */}
@@ -1473,7 +1506,14 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               and the interval between parcelas. Changing these regenerates the
                               installment schedule on save, unless a parcela is already paid. */}
                           {form.watch("paymentMethod") === "BANK_SLIP" && (
-                            <BoletoPaymentFields form={form} markDirty />
+                            <>
+                              <BoletoPaymentFields form={form} markDirty disabled={boletoScheduleLocked} />
+                              {boletoScheduleLocked && (
+                                <p className="px-1 text-xs text-muted-foreground">
+                                  As parcelas estão bloqueadas porque já existe uma parcela paga — o cronograma de boleto não pode mais ser alterado.
+                                </p>
+                              )}
+                            </>
                           )}
 
                           {/* Freight (frete) — supplier shipping cost added to the order total. */}
@@ -1538,7 +1578,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   value={form.watch("totalOverride") ?? null}
                                   onChange={(value) => {
                                     const n = typeof value === "number" ? value : value == null || value === "" ? null : parseFloat(value as string);
-                                    const next = n != null && Number.isFinite(n) && n >= 0 ? n : null;
+                                    // The currency input emits 0 when cleared; treat 0 (or any non-positive)
+                                    // as "no override" → null so the total reverts to the computed items total.
+                                    const next = n != null && Number.isFinite(n) && n > 0 ? n : null;
                                     form.setValue("totalOverride", next, { shouldDirty: true, shouldTouch: true });
                                   }}
                                   placeholder="Total automático"

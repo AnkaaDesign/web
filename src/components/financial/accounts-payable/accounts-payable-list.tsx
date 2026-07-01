@@ -15,6 +15,7 @@ import {
   IconAlertTriangle,
   IconCheck,
   IconClock,
+  IconCopy,
 } from "@tabler/icons-react";
 
 import type { ClearanceState, PayableRow, PayableState } from "../../../types";
@@ -23,8 +24,10 @@ import { useOrderPayables, useOrderMutations, useSettlePayrollMonth, useTriggerO
 import { MonthNav, monthKey, parseMonthKey } from "@/components/financial/reconciliation/month-nav";
 import { useAirbrushingMutations } from "../../../hooks/production/use-airbrushing";
 import { usePrivileges } from "../../../hooks/common/use-privileges";
-import { formatCurrency, formatDate } from "../../../utils";
+import { useToast } from "@/hooks/common/use-toast";
+import { formatCurrency, formatDate, formatCNPJ, formatPixKey } from "../../../utils";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -74,7 +77,10 @@ const PAYABLE_BUCKETS: Record<
   UNCLEARED: { label: "Pago, aguardando conciliação", Icon: IconClock, tone: "text-amber-600 bg-amber-500/10", states: ["PAID"] },
 };
 
-const BUCKET_ORDER: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED", "PAID", "UNCLEARED"];
+// "UNCLEARED" (Pago, aguardando conciliação) is hidden for now — the payables
+// reconciliation workflow is still being decided. Restore it here to bring the
+// card back.
+const BUCKET_ORDER: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED", "PAID"];
 // Default view: every open/overdue/forecast obligation; paid-this-month and the
 // awaiting-conciliação view are opt-in (click the card).
 const DEFAULT_BUCKETS: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED"];
@@ -148,50 +154,19 @@ function clearanceOf(row: PayableRow): ClearanceState {
 //   PAID + CLEARED                       → "Pago e conciliado" (green) + clearedAt
 //   DISPUTED (any paymentState)          → "Divergência de valor" (red alert)
 function PayablePaymentCell({ row }: { row: PayableRow }) {
-  const clearance = clearanceOf(row);
-
-  // DISPUTED is an alert state regardless of the assertion axis.
-  if (clearance === "DISPUTED") {
-    return (
-      <Badge variant="red" className="font-medium whitespace-nowrap gap-1">
-        <IconAlertTriangle className="h-3 w-3" />
-        Divergência de valor
-      </Badge>
-    );
-  }
-
+  // The conciliação (clearance) axis is hidden for now — until the payables
+  // reconciliation workflow is decided, a PAID row is simply "Pago" (green),
+  // regardless of clearanceState. Non-PAID rows keep their assertion badge.
   if (row.paymentState !== "PAID") {
     return <PayableStateBadge state={row.paymentState} />;
   }
 
-  if (clearance === "CLEARED") {
-    return (
-      <div className="flex flex-col gap-0.5">
-        <Badge variant="completed" className="font-medium whitespace-nowrap gap-1 w-fit">
-          <IconCheck className="h-3 w-3" />
-          Pago e conciliado
-        </Badge>
-        {row.clearedAt && <span className="text-[10px] text-muted-foreground tabular-nums">em {formatDate(new Date(row.clearedAt))}</span>}
-      </div>
-    );
-  }
-
-  // PAID + UNCLEARED — the 3-5 day window awaiting the next OFX.
   return (
-    <Badge variant="amber" className="font-medium whitespace-nowrap gap-1">
-      <IconClock className="h-3 w-3" />
-      Pago · aguardando conciliação
+    <Badge variant="completed" className="font-medium whitespace-nowrap gap-1 w-fit">
+      <IconCheck className="h-3 w-3" />
+      Pago
     </Badge>
   );
-}
-
-// "Conciliado" column cell — mirrors the receivables list checkmark, three-valued
-// on clearanceState (CLEARED ✓ / DISPUTED ⚠ / UNCLEARED —).
-function PayableClearanceCell({ row }: { row: PayableRow }) {
-  const clearance = clearanceOf(row);
-  if (clearance === "CLEARED") return <IconCheck className="mx-auto h-4 w-4 text-emerald-600" />;
-  if (clearance === "DISPUTED") return <IconAlertTriangle className="mx-auto h-4 w-4 text-red-600" />;
-  return <span className="text-sm text-muted-foreground">-</span>;
 }
 
 // Map the raw payment-method enum (any casing) to its PT label, falling back to
@@ -202,7 +177,8 @@ function formatPaymentMethod(method: string | null): string {
 }
 
 function isOverdueRow(row: PayableRow): boolean {
-  if (row.paymentState === "EXPECTED" || !row.dueDate) return false;
+  // Already-paid rows are never "vencido" — only unpaid dues past their date are.
+  if (row.paymentState === "PAID" || row.paymentState === "EXPECTED" || !row.dueDate) return false;
   return new Date(row.dueDate) < new Date();
 }
 
@@ -269,6 +245,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { hasAnyPrivilegeAccess } = usePrivileges();
+  const { toast } = useToast();
 
   const canManagePayments = hasAnyPrivilegeAccess(PAYMENT_MANAGER_PRIVILEGES);
   const canViewAirbrushing = hasAnyPrivilegeAccess(AIRBRUSHING_VIEW_PRIVILEGES);
@@ -447,15 +424,17 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       navigate(routes.financial.reconciliation.transactionDetail(row.bankTransactionId));
       return;
     }
-    // Recurrent rows (occurrences of a recurrent bill) have no own detail page —
-    // send the operator to the Contas Recorrentes management screen.
+    // Recurrent occurrences must not leave the payables table — clicking a row
+    // stays here (settle via the row's context menu when payable), like ORDER rows.
     if (row.source === "RECURRENT_PAYABLE" || row.source === "RECURRING") {
-      navigate(routes.financial.recurrentPayables.root);
       return;
     }
     if (row.source === "ORDER") {
-      navigate(routes.inventory.orders.details(row.id));
-    } else if (row.source === "AIRBRUSHING") {
+      // Accounting must not open order internals from Contas a Pagar — ORDER rows
+      // are not clickable here (they settle via the context menu, when payable).
+      return;
+    }
+    if (row.source === "AIRBRUSHING") {
       // row.id is the airbrushing id — open its own detail page (not the task
       // cronograma, which finance/accounting users can't reach).
       if (canViewAirbrushing) navigate(routes.production.airbrushings.details(row.id));
@@ -502,27 +481,42 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     setMarkPaidRow(row);
   };
 
-  // Confirm an order payable as paid. When a receipt was attached, append it via the
-  // order update endpoint (no receiptIds → existing files are kept, new ones connected
-  // on top) before flipping the status. Categorization is left for the Conciliação flow.
+  // Confirm an order payable as paid. The two steps (flip status + attach receipt)
+  // are not a single transaction, so we flip the PAYMENT STATUS FIRST: a validation
+  // failure on mark-paid then aborts before any receipt is attached (the comprovante
+  // does not need to precede the payment, and categorization is deferred to the
+  // Conciliação flow). The receipt is appended on top of the now-paid row (empty
+  // FormData → existing files are kept, new ones connected on top). If the receipt
+  // upload fails AFTER the payment is recorded, we surface a clear warning instead of
+  // letting the generic error imply the payment didn't go through.
   const confirmMarkPaid = async (receipts: File[]) => {
     const row = markPaidRow;
     if (!row) return;
     setMarkPaidPending(true);
     try {
-      if (receipts.length > 0) {
-        const formData = createOrderFormData({}, { receipts });
-        await updateOrderAsync({ id: row.id, data: formData as any });
-      }
       if (row.installmentId) {
         await markInstallmentPaidAsync(row.installmentId);
       } else {
         await markPaidAsync(row.id);
       }
+      if (receipts.length > 0) {
+        try {
+          const formData = createOrderFormData({}, { receipts });
+          await updateOrderAsync({ id: row.id, data: formData as any });
+        } catch {
+          // Payment is already recorded — don't let the receipt failure look like a
+          // failed payment. Tell the user exactly what happened.
+          toast({
+            title: "Pagamento registrado, comprovante não anexado",
+            description: "O pagamento foi marcado como pago, mas o comprovante não pôde ser anexado. Anexe-o novamente pelo pedido.",
+            variant: "warning",
+          });
+        }
+      }
       setMarkPaidRow(null);
       refetch();
     } catch {
-      // Errors are toasted by the API client.
+      // mark-paid failed before any side effect — error toasted by the API client.
     } finally {
       setMarkPaidPending(false);
     }
@@ -555,6 +549,14 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
 
   const ctxRow = contextMenu?.row;
 
+  // Click-to-copy helper for the Tomador CNPJ / PIX-key cells (mirrors the order
+  // detail copy UX). Stops row-click propagation so copying never navigates.
+  const copyText = (text: string, label: string) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    toast({ title: label, variant: "success" });
+  };
+
   // --- Table columns (StandardizedTable — matches Conciliação / Previsão) ----
   const columns: StandardizedColumn<PayableRow>[] = [
     {
@@ -562,7 +564,11 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       header: "Descrição",
       className: "min-w-[16rem]",
       render: (row) => {
-        const isForecast = row.paymentState === "EXPECTED" || row.isEstimate;
+        // PENDING orders (paymentRequested === false) are not yet a real debt —
+        // they await an admin's "Requisitar Pagamento" and render muted/italic
+        // like the EXPECTED/estimate forecasts.
+        const isPending = row.paymentRequested === false;
+        const isForecast = row.paymentState === "EXPECTED" || row.isEstimate || isPending;
         return <TruncatedTextWithTooltip text={row.description || "-"} className={cn("text-sm", isForecast && "italic text-muted-foreground")} />;
       },
     },
@@ -579,9 +585,23 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
           <span className="text-sm text-muted-foreground">-</span>
         ),
     },
-    { key: "payee", header: "Tomador", className: "min-w-[12rem]", render: (row) => <TruncatedTextWithTooltip text={row.payeeName || "-"} className="text-sm font-medium" /> },
+    {
+      key: "payee",
+      header: "Tomador",
+      className: "min-w-[12rem]",
+      // Supplier name + CNPJ inline on a single row (CNPJ muted, no copy — copy
+      // lives only on the Chave Pix cell).
+      render: (row) => (
+        <div className="flex items-baseline gap-2 min-w-0">
+          <TruncatedTextWithTooltip text={row.payeeName || "-"} className="text-sm font-medium" />
+          {row.payeeCnpj && (
+            <span className="text-sm text-muted-foreground shrink-0">{formatCNPJ(row.payeeCnpj)}</span>
+          )}
+        </div>
+      ),
+    },
     { key: "amount", header: "Valor", width: 128, align: "right", render: (row) => <span className="text-sm font-medium tabular-nums">{formatCurrency(row.amount)}</span> },
-    { key: "payment", header: "Pagamento", width: 232, render: (row) => <PayablePaymentCell row={row} /> },
+    { key: "payment", header: "Pagamento", width: 160, render: (row) => <PayablePaymentCell row={row} /> },
     {
       key: "dueDate",
       header: "Vencimento",
@@ -601,21 +621,36 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     },
     { key: "method", header: "Forma", width: 144, render: (row) => <span className="text-sm text-muted-foreground">{formatPaymentMethod(row.method)}</span> },
     {
-      // Conciliação axis (bank truth) — mirrors the receivables list "Conciliado"
-      // column. Three-valued: CLEARED ✓ / DISPUTED ⚠ / UNCLEARED —.
-      key: "reconciled",
-      header: "Conciliado",
-      width: 110,
-      align: "center",
-      render: (row) => <PayableClearanceCell row={row} />,
+      // PIX key (orders paying via PIX) — click-to-copy.
+      key: "pixKey",
+      header: "Chave Pix",
+      width: 176,
+      render: (row) =>
+        row.pixKey ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 max-w-full text-muted-foreground hover:text-foreground"
+            onClick={copyText(row.pixKey, "Chave Pix copiada!")}
+            title="Copiar chave Pix"
+          >
+            <IconCopy className="h-3.5 w-3.5 mr-1 shrink-0" />
+            <span className="text-sm truncate">{formatPixKey(row.pixKey)}</span>
+          </Button>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
+        ),
     },
+    // NOTE: the "Conciliado" (clearance axis) column is hidden for now — the
+    // payables reconciliation workflow is still being decided. The clearanceState
+    // helpers stay defined so the column can be restored once that lands.
   ];
 
   // --- Render ---------------------------------------------------------------
   return (
     <div className={cn("flex flex-col gap-4 h-full min-h-0", className)}>
       {/* Summary cards double as filter buckets — click to show only that status. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 flex-shrink-0">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 flex-shrink-0">
         {BUCKET_ORDER.map((key) => {
           const meta = PAYABLE_BUCKETS[key];
           const b = monthBucketSummary[key];
@@ -688,11 +723,20 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
                 </>
               )}
 
-              {ctxRow.source === "ORDER" && ctxRow.paymentState !== "PAID" && (
+              {ctxRow.source === "ORDER" && ctxRow.paymentState !== "PAID" && ctxRow.paymentRequested !== false && (
                 // Opens a dialog to optionally attach the comprovante before settling.
                 <DropdownMenuItem onClick={() => openMarkPaid(ctxRow)}>
                   <IconCash className="mr-2 h-4 w-4" />
                   {ctxRow.installmentId ? "Marcar parcela como paga" : "Marcar como pago"}
+                </DropdownMenuItem>
+              )}
+
+              {/* PENDING order (not yet requested for payment) — settling is blocked
+                  until an admin requisita o pagamento. Show why, disabled. */}
+              {ctxRow.source === "ORDER" && ctxRow.paymentState !== "PAID" && ctxRow.paymentRequested === false && (
+                <DropdownMenuItem disabled>
+                  <IconClock className="mr-2 h-4 w-4" />
+                  Aguardando requisição de pagamento
                 </DropdownMenuItem>
               )}
 

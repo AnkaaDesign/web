@@ -224,7 +224,7 @@ const VALID_ROUTES = [
   routes.financial.reconciliation.fiscalDocumentDetail(":id"),
   routes.financial.reconciliation.categories,
   routes.financial.reconciliation.outflows,
-  routes.financial.reconciliation.inflows,
+  routes.financial.accountsReceivable.root,
 
   // Financial - Outflow forecast (Previsão de Saídas)
   routes.financial.outflowForecast,

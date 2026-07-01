@@ -18,7 +18,7 @@ export const AccountsPayableListPage = () => {
           variant="list"
           title="Contas a Pagar"
           favoritePage={FAVORITE_PAGES.FINANCEIRO_CONTAS_A_PAGAR_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Financeiro", href: routes.financial.root }, { label: "Conciliação Bancária", href: routes.financial.reconciliation.root }, { label: "Contas a Pagar" }]}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Financeiro", href: routes.financial.root }, { label: "Contas a Pagar" }]}
           className="flex-shrink-0"
         />
 

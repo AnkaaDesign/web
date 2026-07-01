@@ -18,7 +18,7 @@ export const ReceivablesListPage = () => {
           variant="list"
           title="Contas a Receber"
           favoritePage={FAVORITE_PAGES.FINANCEIRO_CONTAS_A_RECEBER_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Financeiro", href: routes.financial.root }, { label: "Conciliação Bancária", href: routes.financial.reconciliation.root }, { label: "Contas a Receber" }]}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Financeiro", href: routes.financial.root }, { label: "Contas a Receber" }]}
           className="flex-shrink-0"
         />
 

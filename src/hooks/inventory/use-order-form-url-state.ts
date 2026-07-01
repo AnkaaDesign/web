@@ -1004,6 +1004,12 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
         price: item.price ?? 0,
         icms: item.icms ?? 0,
         ipi: item.ipi ?? 0,
+        // Carry through the optional metadata (código/marca/categoria/medidas) so
+        // they persist and get composed into the description at submit time.
+        uniCode: item.uniCode,
+        brand: item.brand,
+        category: item.category,
+        measures: item.measures,
       };
       setFilters({ temporaryItems: [...temporaryItems, newItem] });
       return key;

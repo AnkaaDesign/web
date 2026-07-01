@@ -20,6 +20,10 @@ import {
   markOrderInstallmentPaid,
   batchMarkOrdersAwaitingPayment,
   batchMarkOrdersPaid,
+  requestOrderPayment,
+  cancelOrderPaymentRequest,
+  batchRequestOrdersPayment,
+  batchCancelOrdersPaymentRequest,
 } from "../../api-client";
 import type {
   // Order types
@@ -323,13 +327,30 @@ export const useOrderMutations = (options?: {
     },
   });
 
+  // ADMIN: PENDING → AWAITING_PAYMENT (Requisitar Pagamento) and its reverse.
+  const requestPaymentMutation = useMutation({
+    mutationFn: (id: string) => requestOrderPayment(id),
+    onSuccess: (data) => {
+      invalidateQueries(data.data?.supplierId || undefined);
+    },
+  });
+
+  const cancelPaymentRequestMutation = useMutation({
+    mutationFn: (id: string) => cancelOrderPaymentRequest(id),
+    onSuccess: (data) => {
+      invalidateQueries(data.data?.supplierId || undefined);
+    },
+  });
+
   const isLoading =
     createMutation.isPending ||
     updateMutation.isPending ||
     deleteMutation.isPending ||
     markAwaitingPaymentMutation.isPending ||
     markPaidMutation.isPending ||
-    markInstallmentPaidMutation.isPending;
+    markInstallmentPaidMutation.isPending ||
+    requestPaymentMutation.isPending ||
+    cancelPaymentRequestMutation.isPending;
 
   const error =
     createMutation.error ||
@@ -337,7 +358,9 @@ export const useOrderMutations = (options?: {
     deleteMutation.error ||
     markAwaitingPaymentMutation.error ||
     markPaidMutation.error ||
-    markInstallmentPaidMutation.error;
+    markInstallmentPaidMutation.error ||
+    requestPaymentMutation.error ||
+    cancelPaymentRequestMutation.error;
 
   return {
     create: createMutation.mutate,
@@ -352,6 +375,10 @@ export const useOrderMutations = (options?: {
     markPaidAsync: markPaidMutation.mutateAsync,
     markInstallmentPaid: markInstallmentPaidMutation.mutate,
     markInstallmentPaidAsync: markInstallmentPaidMutation.mutateAsync,
+    requestPayment: requestPaymentMutation.mutate,
+    requestPaymentAsync: requestPaymentMutation.mutateAsync,
+    cancelPaymentRequest: cancelPaymentRequestMutation.mutate,
+    cancelPaymentRequestAsync: cancelPaymentRequestMutation.mutateAsync,
     isLoading,
     error,
     refresh: () => invalidateQueries(),
@@ -362,6 +389,8 @@ export const useOrderMutations = (options?: {
     markAwaitingPaymentMutation,
     markPaidMutation,
     markInstallmentPaidMutation,
+    requestPaymentMutation,
+    cancelPaymentRequestMutation,
   };
 };
 
@@ -491,19 +520,37 @@ export const useOrderBatchMutations = (options?: {
     },
   });
 
+  const batchRequestPaymentMutation = useMutation({
+    mutationFn: (data: OrderBatchPaymentFormData) => batchRequestOrdersPayment(data),
+    onSuccess: () => {
+      invalidateQueries();
+    },
+  });
+
+  const batchCancelPaymentRequestMutation = useMutation({
+    mutationFn: (data: OrderBatchPaymentFormData) => batchCancelOrdersPaymentRequest(data),
+    onSuccess: () => {
+      invalidateQueries();
+    },
+  });
+
   const isLoading =
     batchCreateMutation.isPending ||
     batchUpdateMutation.isPending ||
     batchDeleteMutation.isPending ||
     batchMarkAwaitingPaymentMutation.isPending ||
-    batchMarkPaidMutation.isPending;
+    batchMarkPaidMutation.isPending ||
+    batchRequestPaymentMutation.isPending ||
+    batchCancelPaymentRequestMutation.isPending;
 
   const error =
     batchCreateMutation.error ||
     batchUpdateMutation.error ||
     batchDeleteMutation.error ||
     batchMarkAwaitingPaymentMutation.error ||
-    batchMarkPaidMutation.error;
+    batchMarkPaidMutation.error ||
+    batchRequestPaymentMutation.error ||
+    batchCancelPaymentRequestMutation.error;
 
   return {
     batchCreate: batchCreateMutation.mutate,
@@ -516,6 +563,10 @@ export const useOrderBatchMutations = (options?: {
     batchMarkAwaitingPaymentAsync: batchMarkAwaitingPaymentMutation.mutateAsync,
     batchMarkPaid: batchMarkPaidMutation.mutate,
     batchMarkPaidAsync: batchMarkPaidMutation.mutateAsync,
+    batchRequestPayment: batchRequestPaymentMutation.mutate,
+    batchRequestPaymentAsync: batchRequestPaymentMutation.mutateAsync,
+    batchCancelPaymentRequest: batchCancelPaymentRequestMutation.mutate,
+    batchCancelPaymentRequestAsync: batchCancelPaymentRequestMutation.mutateAsync,
     isLoading,
     error,
     refresh: invalidateQueries,
@@ -525,6 +576,8 @@ export const useOrderBatchMutations = (options?: {
     batchDeleteMutation,
     batchMarkAwaitingPaymentMutation,
     batchMarkPaidMutation,
+    batchRequestPaymentMutation,
+    batchCancelPaymentRequestMutation,
   };
 };
 

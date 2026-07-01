@@ -127,7 +127,7 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/administracao/competencias": FAVORITE_PAGES.ADMINISTRACAO_COMPETENCIAS_LISTAR,
   "/administracao/topicos": FAVORITE_PAGES.ADMINISTRACAO_TOPICOS_LISTAR,
   "/financeiro/notas-fiscais": FAVORITE_PAGES.FINANCEIRO_NOTAS_FISCAIS_LISTAR,
-  "/financeiro/conciliacao/entradas": FAVORITE_PAGES.FINANCEIRO_CONTAS_A_RECEBER_LISTAR,
+  "/financeiro/contas-a-receber": FAVORITE_PAGES.FINANCEIRO_CONTAS_A_RECEBER_LISTAR,
   "/financeiro/contas-recorrentes": FAVORITE_PAGES.FINANCEIRO_CONTAS_RECORRENTES_LISTAR,
   "/departamento-pessoal/controle-ponto/requisicoes": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_REQUISICOES_LISTAR,
   "/departamento-pessoal/horarios": FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_HORARIOS_LISTAR,

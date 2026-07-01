@@ -23,15 +23,31 @@ import { useReconciliationCategories } from "@/hooks/financial/use-reconciliatio
 import { PAYMENT_METHOD, PAYMENT_METHOD_LABELS, SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS } from "@/constants";
 import type { CreateRecurrentPayablePayload, RecurrentPayable } from "@/types/recurrent-payable";
 
-// Frequencies offered for recurrent bills (most are monthly; the rest cover
-// quarterly/semestral/annual contracts). MONTHLY is the default.
+// Frequencies offered for recurrent bills. WEEKLY/BIWEEKLY are sub-monthly (use
+// weekdays — e.g. a faxineira 2× por semana); the rest are monthly-family (use a
+// day of the month). MONTHLY is the default.
 const FREQUENCY_OPTIONS = [
+  SCHEDULE_FREQUENCY.WEEKLY,
+  SCHEDULE_FREQUENCY.BIWEEKLY,
   SCHEDULE_FREQUENCY.MONTHLY,
   SCHEDULE_FREQUENCY.BIMONTHLY,
   SCHEDULE_FREQUENCY.QUARTERLY,
   SCHEDULE_FREQUENCY.SEMI_ANNUAL,
   SCHEDULE_FREQUENCY.ANNUAL,
 ].map((value) => ({ value, label: SCHEDULE_FREQUENCY_LABELS[value] }));
+
+// Weekday picker (0=Sunday … 6=Saturday, matching the api daysOfWeek encoding).
+const WEEKDAY_OPTIONS = [
+  { value: 0, label: "Dom" },
+  { value: 1, label: "Seg" },
+  { value: 2, label: "Ter" },
+  { value: 3, label: "Qua" },
+  { value: 4, label: "Qui" },
+  { value: 5, label: "Sex" },
+  { value: 6, label: "Sáb" },
+];
+
+const WEEKLY_FREQUENCIES: string[] = [SCHEDULE_FREQUENCY.WEEKLY, SCHEDULE_FREQUENCY.BIWEEKLY];
 
 const PAYMENT_METHOD_OPTIONS = Object.values(PAYMENT_METHOD).map((value) => ({
   value,
@@ -61,12 +77,14 @@ const formSchema = z
     amountKind: z.enum(["FIXED", "VARIABLE"]),
     fixedAmount: z.coerce.number({ invalid_type_error: "valor inválido" }).optional(),
     estimatedAmount: z.coerce.number({ invalid_type_error: "valor inválido" }).optional(),
-    frequency: z.enum(["MONTHLY", "BIMONTHLY", "QUARTERLY", "TRIANNUAL", "QUADRIMESTRAL", "SEMI_ANNUAL", "ANNUAL"]),
+    frequency: z.enum(["WEEKLY", "BIWEEKLY", "MONTHLY", "BIMONTHLY", "QUARTERLY", "TRIANNUAL", "QUADRIMESTRAL", "SEMI_ANNUAL", "ANNUAL"]),
     dueDayOfMonth: z.coerce
       .number({ invalid_type_error: "dia inválido" })
       .int()
       .min(1, { message: "Entre 1 e 31" })
-      .max(31, { message: "Entre 1 e 31" }),
+      .max(31, { message: "Entre 1 e 31" })
+      .optional(),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).default([]),
     paymentMethod: z.enum([PAYMENT_METHOD.PIX, PAYMENT_METHOD.BANK_SLIP, PAYMENT_METHOD.CREDIT_CARD]).optional(),
     expectsNf: z.boolean(),
     isActive: z.boolean(),
@@ -74,6 +92,14 @@ const formSchema = z
   .refine((d) => d.amountKind !== "FIXED" || (typeof d.fixedAmount === "number" && d.fixedAmount > 0), {
     message: "Informe o valor fixo (maior que zero)",
     path: ["fixedAmount"],
+  })
+  .refine((d) => !WEEKLY_FREQUENCIES.includes(d.frequency) || d.daysOfWeek.length > 0, {
+    message: "Selecione ao menos um dia da semana",
+    path: ["daysOfWeek"],
+  })
+  .refine((d) => WEEKLY_FREQUENCIES.includes(d.frequency) || typeof d.dueDayOfMonth === "number", {
+    message: "Informe o dia do vencimento (1-31)",
+    path: ["dueDayOfMonth"],
   });
 
 type FormData = z.infer<typeof formSchema>;
@@ -88,7 +114,8 @@ const EMPTY_DEFAULTS: FormData = {
   fixedAmount: undefined,
   estimatedAmount: undefined,
   frequency: SCHEDULE_FREQUENCY.MONTHLY,
-  dueDayOfMonth: undefined as unknown as number,
+  dueDayOfMonth: undefined,
+  daysOfWeek: [],
   paymentMethod: undefined,
   expectsNf: false,
   isActive: true,
@@ -134,7 +161,8 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
         fixedAmount: payable.fixedAmount != null ? Number(payable.fixedAmount) : undefined,
         estimatedAmount: payable.estimatedAmount != null ? Number(payable.estimatedAmount) : undefined,
         frequency: payable.frequency || SCHEDULE_FREQUENCY.MONTHLY,
-        dueDayOfMonth: payable.dueDayOfMonth,
+        dueDayOfMonth: payable.dueDayOfMonth ?? undefined,
+        daysOfWeek: payable.daysOfWeek ?? [],
         paymentMethod: (payable.paymentMethod as PAYMENT_METHOD | null) ?? undefined,
         expectsNf: payable.expectsNf,
         isActive: payable.isActive,
@@ -149,9 +177,12 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
   }, [isValid, isDirty, onFormStateChange]);
 
   const amountKind = useWatch({ control: form.control, name: "amountKind" });
+  const frequency = useWatch({ control: form.control, name: "frequency" });
+  const isWeekly = WEEKLY_FREQUENCIES.includes(frequency);
 
   const handleSubmit = (data: FormData) => {
     const cnpjDigits = (data.payeeCnpj ?? "").replace(/\D/g, "");
+    const weekly = WEEKLY_FREQUENCIES.includes(data.frequency);
     const payload: CreateRecurrentPayablePayload = {
       name: data.name.trim(),
       description: data.description?.trim() ? data.description.trim() : null,
@@ -165,7 +196,9 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
       fixedAmount: data.amountKind === "FIXED" ? data.fixedAmount ?? null : null,
       estimatedAmount: data.amountKind === "VARIABLE" ? data.estimatedAmount ?? null : null,
       frequency: data.frequency,
-      dueDayOfMonth: data.dueDayOfMonth,
+      // Weekly bills carry weekdays (no day-of-month); monthly bills the reverse.
+      dueDayOfMonth: weekly ? null : data.dueDayOfMonth ?? null,
+      daysOfWeek: weekly ? data.daysOfWeek : [],
       paymentMethod: data.paymentMethod ?? null,
       expectsNf: data.expectsNf,
       isActive: data.isActive,
@@ -175,7 +208,7 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
 
   return (
     <FormProvider {...form}>
-      <form id="recurrent-payable-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-4xl">
+      <form id="recurrent-payable-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-2xl">
         {/* Programmatic submit target for the PageHeader action button. */}
         <button id="recurrent-payable-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
           Submit
@@ -357,10 +390,13 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
                 <IconCalendarRepeat className="h-5 w-5 text-muted-foreground" />
                 Recorrência
               </CardTitle>
-              <CardDescription>Quando e como a cobrança mensal é gerada em Contas a Pagar.</CardDescription>
+              <CardDescription>
+                Quando a cobrança é gerada em Contas a Pagar. Semanal/Quinzenal usa dias da semana (ex.: faxineira
+                2× por semana); as demais usam um dia do mês.
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
                   name="frequency"
@@ -377,30 +413,6 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
                           placeholder="Frequência"
                           clearable={false}
                           searchable={false}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="dueDayOfMonth"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Dia do vencimento <span className="text-destructive">*</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={31}
-                          value={field.value ?? ""}
-                          onChange={(value) => field.onChange(value === null || value === "" ? undefined : Number(value))}
-                          disabled={isSubmitting}
-                          placeholder="1-31"
                         />
                       </FormControl>
                       <FormMessage />
@@ -431,6 +443,83 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
                   )}
                 />
               </div>
+
+              {isWeekly ? (
+                <FormField
+                  control={form.control}
+                  name="daysOfWeek"
+                  render={({ field }) => {
+                    const selected: number[] = field.value ?? [];
+                    const toggle = (day: number) =>
+                      field.onChange(
+                        selected.includes(day)
+                          ? selected.filter((d) => d !== day)
+                          : [...selected, day].sort((a, b) => a - b),
+                      );
+                    return (
+                      <FormItem>
+                        <FormLabel>
+                          Dias da semana <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <div className="flex flex-wrap gap-2">
+                            {WEEKDAY_OPTIONS.map((opt) => {
+                              const active = selected.includes(opt.value);
+                              return (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  disabled={isSubmitting}
+                                  onClick={() => toggle(opt.value)}
+                                  aria-pressed={active}
+                                  className={`h-9 w-12 rounded-md border text-sm font-medium transition-colors ${
+                                    active
+                                      ? "border-primary bg-primary text-primary-foreground"
+                                      : "border-border bg-background text-muted-foreground hover:bg-muted"
+                                  }`}
+                                >
+                                  {opt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Gera uma cobrança em cada dia selecionado, toda semana (Quinzenal: a cada duas semanas).
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="dueDayOfMonth"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Dia do vencimento <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={31}
+                            value={field.value ?? ""}
+                            onChange={(value) => field.onChange(value === null || value === "" ? undefined : Number(value))}
+                            disabled={isSubmitting}
+                            placeholder="1-31"
+                          />
+                        </FormControl>
+                        <FormDescription>Gera uma cobrança nesse dia do mês (a cada N meses conforme a frequência).</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 

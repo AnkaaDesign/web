@@ -725,6 +725,26 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       {
+        // Outflow ledger — unified payables (orders + airbrushing + payroll +
+        // taxes + recurrents). Top-level Financeiro page (moved out of Conciliação
+        // Bancária). ACCOUNTING emphasis; FINANCIAL also manages cash.
+        id: "contas-a-pagar",
+        title: "Contas a Pagar",
+        icon: "receipt",
+        path: "/financeiro/contas-a-pagar",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+      },
+      {
+        // Inflow ledger — open/overdue/received receivable installments
+        // (task-quotes + external operations + invoices). Top-level Financeiro page
+        // (moved out of Conciliação Bancária). FINANCIAL emphasis.
+        id: "contas-a-receber",
+        title: "Contas a Receber",
+        icon: "receipt",
+        path: "/financeiro/contas-a-receber",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+      },
+      {
         id: "conciliacao-bancaria",
         title: "Conciliação Bancária",
         icon: "arrowsExchange2",
@@ -750,26 +770,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
               // "Financeiro" prefix match.
               { id: "conciliacao-transacao-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/conciliacao/transacoes/:id", isDynamic: true },
             ],
-          },
-          {
-            // Inflow ledger — open/overdue/received receivable installments
-            // (task-quotes + external operations + invoices). FINANCIAL emphasis.
-            id: "contas-a-receber",
-            title: "Contas a Receber",
-            icon: "receipt",
-            path: "/financeiro/conciliacao/entradas",
-            order: 2,
-            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
-          },
-          {
-            // Outflow ledger — unified payables (orders + airbrushing + payroll +
-            // taxes + recurrents). ACCOUNTING emphasis. FINANCIAL also manages cash.
-            id: "contas-a-pagar",
-            title: "Contas a Pagar",
-            icon: "receipt",
-            path: "/financeiro/contas-a-pagar",
-            order: 3,
-            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
           },
           {
             // Recurring monthly bills (aluguel/internet/energia/água). One page:

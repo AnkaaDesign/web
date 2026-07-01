@@ -56,8 +56,14 @@ function mergeVisibility<TData>(
 ): VisibilityState {
   const base = buildDefaultVisibility(columns);
   if (!stored) return base;
-  for (const c of columns) if (c.id in stored) base[c.id] = stored[c.id];
-  return base;
+  // Overlay ALL stored entries onto the defaults — including ones for columns not currently
+  // present. A privilege-gated column can be briefly absent during a cold load (the privilege
+  // resolves async, AFTER the saved config is applied); dropping its stored entry here would lose
+  // the user's saved visibility once the column reappears (and re-persist the damage). Stale ids
+  // are harmless: TanStack ignores columnVisibility entries that match no column, and gating is
+  // enforced upstream (gated columns are filtered out of `columns`), so a preserved `true` can
+  // never reveal a column the user isn't allowed to see. Mirrors `reconcileOrder` above.
+  return { ...base, ...stored };
 }
 
 function parseJSON<T>(raw: string | null): T | undefined {

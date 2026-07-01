@@ -4,28 +4,21 @@ import { cn } from "@/lib/utils";
 
 interface OrderPaymentStatusBadgeProps {
   status: ORDER_PAYMENT_STATUS;
-  // The order's payment method. Pass it so the badge can tell a genuinely payable
-  // order (PIX/Boleto/Cartão chosen → amber "Aguardando Pagamento") apart from one
-  // that was just created with no payment configured yet (neutral "A Definir").
-  // This is derived live — once a method is set the badge flips automatically,
-  // there is no stored "A Definir" status to keep in sync.
+  // Accepted for call-site compatibility; no longer affects the label. The old
+  // "A Definir" derivation (AWAITING + no method) was retired — the PENDING status
+  // now represents a not-yet-requested order, and a requisitioned (AWAITING) order
+  // is always payable, with or without a method chosen.
   paymentMethod?: string | null;
   className?: string;
   size?: "default" | "sm" | "lg";
 }
 
-export function OrderPaymentStatusBadge({ status, paymentMethod, className, size = "default" }: OrderPaymentStatusBadgeProps) {
-  // "Aguardando Pagamento" with no payment method means nothing was set up — the
-  // obligation isn't configured, so show a neutral "A Definir" instead of implying
-  // a payment is staged and waiting. Settled states (Parcialmente Pago / Pago) are
-  // shown as-is; PARTIALLY_PAID only comes from boleto (which always has a method).
-  const isUnconfigured = status === ORDER_PAYMENT_STATUS.AWAITING_PAYMENT && !paymentMethod;
-
-  // Use centralized badge configuration with entity context
-  const variant = isUnconfigured ? "secondary" : getBadgeVariant(status, "ORDER_PAYMENT");
-
-  // Get display text
-  const displayText = isUnconfigured ? "A Definir" : ORDER_PAYMENT_STATUS_LABELS[status] || status;
+export function OrderPaymentStatusBadge({ status, className, size = "default" }: OrderPaymentStatusBadgeProps) {
+  // The stored payment status drives the badge directly: PENDING → "Pagamento
+  // Pendente" (gray), AWAITING_PAYMENT → "Aguardando Pagamento" (amber),
+  // Parcialmente Pago / Pago as-is. No method-derived "A Definir" state.
+  const variant = getBadgeVariant(status, "ORDER_PAYMENT");
+  const displayText = ORDER_PAYMENT_STATUS_LABELS[status] || status;
 
   return (
     <Badge variant={variant} size={size} className={cn("font-medium whitespace-nowrap", className)}>

@@ -518,6 +518,16 @@ export interface PayableRow {
   /** Grouping key — supplier id, painter id, or schedule supplier id. May be null. */
   payeeId: string | null;
   payeeName: string;
+  /** Supplier CNPJ of the counterparty (the "Tomador") — may be null. */
+  payeeCnpj: string | null;
+  /**
+   * False for PENDING orders that still need an admin's "Requisitar Pagamento";
+   * true for every already-requested obligation. PENDING rows render muted and
+   * cannot be settled (mirrors the EXPECTED/forecast treatment).
+   */
+  paymentRequested: boolean;
+  /** Order PIX key — populated only when the payment method is PIX, else null. */
+  pixKey: string | null;
   description: string;
   amount: number;
   paymentState: PayableState;

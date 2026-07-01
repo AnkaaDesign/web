@@ -203,12 +203,17 @@ export const routes = {
       // Previsão de Saídas, Entradas).
       statement: "/financeiro/conciliacao/extrato",
       outflows: "/financeiro/conciliacao/saidas",
-      inflows: "/financeiro/conciliacao/entradas",
     },
     // Top-level (outside the conciliação domain) — a forward forecast page.
     outflowForecast: "/financeiro/previsao-de-saidas",
+    // Contas a Pagar / Contas a Receber are top-level Financeiro pages (NOT under
+    // Conciliação Bancária) — the bank-reconciliation views (Extrato/Categorias)
+    // stay under /conciliacao.
     accountsPayable: {
       root: "/financeiro/contas-a-pagar",
+    },
+    accountsReceivable: {
+      root: "/financeiro/contas-a-receber",
     },
     recurrentPayables: {
       root: "/financeiro/contas-recorrentes",

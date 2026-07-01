@@ -47,6 +47,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FormMoneyInput } from "@/components/ui/form-money-input";
+import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
@@ -71,6 +72,18 @@ const amountOf = (p: RecurrentPayable): number | null => {
   return raw == null ? null : Number(raw);
 };
 
+const WEEKDAY_ABBR = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const isWeekly = (p: RecurrentPayable): boolean => p.frequency === "WEEKLY" || p.frequency === "BIWEEKLY";
+
+// "Dia 10" for monthly bills; "Ter, Sex" (the weekdays) for weekly ones.
+const scheduleLabel = (p: RecurrentPayable): string => {
+  if (isWeekly(p)) {
+    const days = [...(p.daysOfWeek ?? [])].sort((a, b) => a - b).map((d) => WEEKDAY_ABBR[d] ?? "?");
+    return days.length ? days.join(", ") : "—";
+  }
+  return p.dueDayOfMonth ? `Dia ${p.dueDayOfMonth}` : "—";
+};
+
 export const RecurrentPayablesListPage = () => {
   usePageTracker({ title: "Recorrentes", icon: "repeat" });
   const navigate = useNavigate();
@@ -86,6 +99,8 @@ export const RecurrentPayablesListPage = () => {
 
   const [deleteTarget, setDeleteTarget] = useState<RecurrentPayable | null>(null);
   const [payTarget, setPayTarget] = useState<{ payable: RecurrentPayable; item: RecurrentPayableMonthlyItem } | null>(null);
+  // Multi-occurrence (weekly) bills settle per occurrence via this dialog.
+  const [occTarget, setOccTarget] = useState<RecurrentPayable | null>(null);
   const [searchText, setSearchText] = useState("");
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: RecurrentPayable } | null>(null);
 
@@ -109,7 +124,10 @@ export const RecurrentPayablesListPage = () => {
     const q = searchText.trim().toLowerCase();
     const base = [...(payables ?? [])].sort((a, b) => {
       if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
-      if (a.dueDayOfMonth !== b.dueDayOfMonth) return a.dueDayOfMonth - b.dueDayOfMonth;
+      // Weekly bills have no day-of-month; group them ahead of monthly ones.
+      const dayA = a.dueDayOfMonth ?? 0;
+      const dayB = b.dueDayOfMonth ?? 0;
+      if (dayA !== dayB) return dayA - dayB;
       return a.name.localeCompare(b.name, "pt-BR");
     });
     if (!q) return base;
@@ -153,13 +171,20 @@ export const RecurrentPayablesListPage = () => {
   }, []);
 
   // FIXED bills settle with their known amount immediately; VARIABLE bills
-  // (água/energia) require the real paid amount, so we prompt for it.
+  // (água/energia) require the real paid amount, so we prompt for it. Weekly
+  // bills have several occurrences a month, paid individually via a breakdown.
   const startPay = useCallback(
     (p: RecurrentPayable) => {
       setContextMenu(null);
       const item = monthlyById.get(p.id);
-      // Needs a materialized occurrence (current month or an already-created one).
-      if (!item || !item.occurrenceId || item.status === "PAID") return;
+      if (!item || item.pendingCount === 0) return;
+      // Multiple occurrences in the month → open the per-occurrence breakdown.
+      if (item.occurrenceCount > 1) {
+        setOccTarget(p);
+        return;
+      }
+      // Single occurrence (monthly bill).
+      if (!item.occurrenceId || item.status === "PAID") return;
       if (p.amountKind === "FIXED") {
         pay({ occurrenceId: item.occurrenceId, body: {} });
       } else {
@@ -202,14 +227,14 @@ export const RecurrentPayablesListPage = () => {
     {
       key: "dueDay",
       header: "Vencimento",
-      width: "120px",
+      width: "140px",
       align: "center",
-      render: (p) => <span className="text-sm whitespace-nowrap">Dia {p.dueDayOfMonth}</span>,
+      render: (p) => <span className="text-sm whitespace-nowrap">{scheduleLabel(p)}</span>,
     },
     {
       key: "status",
       header: "Status",
-      width: "150px",
+      width: "160px",
       align: "center",
       render: (p) => {
         if (!p.isActive)
@@ -219,11 +244,29 @@ export const RecurrentPayablesListPage = () => {
             </Badge>
           );
         const item = monthlyById.get(p.id);
-        return item?.status === "PAID" ? (
-          <Badge variant="completed" size="sm">
-            <IconCheck className="h-3 w-3 mr-1" /> Pago
-          </Badge>
-        ) : (
+        // Weekly bills: show paid/total for the month.
+        if (item && item.occurrenceCount > 1) {
+          const allPaid = item.paidCount === item.occurrenceCount;
+          return (
+            <Badge variant={allPaid ? "completed" : "pending"} size="sm">
+              {allPaid ? <IconCheck className="h-3 w-3 mr-1" /> : <IconClockHour4 className="h-3 w-3 mr-1" />}
+              {item.paidCount}/{item.occurrenceCount} pagas
+            </Badge>
+          );
+        }
+        if (item?.status === "PAID")
+          return (
+            <Badge variant="completed" size="sm">
+              <IconCheck className="h-3 w-3 mr-1" /> Pago
+            </Badge>
+          );
+        if (item?.status === "OVERDUE")
+          return (
+            <Badge variant="error" size="sm">
+              <IconClockHour4 className="h-3 w-3 mr-1" /> Vencida
+            </Badge>
+          );
+        return (
           <Badge variant="pending" size="sm">
             <IconClockHour4 className="h-3 w-3 mr-1" /> Pendente
           </Badge>
@@ -359,12 +402,13 @@ export const RecurrentPayablesListPage = () => {
           {contextMenu && (
             <>
               {contextMenu.item.isActive &&
-                monthlyById.get(contextMenu.item.id)?.status === "PENDING" &&
-                monthlyById.get(contextMenu.item.id)?.occurrenceId && (
+                (monthlyById.get(contextMenu.item.id)?.pendingCount ?? 0) > 0 && (
                 <>
                   <DropdownMenuItem onClick={() => startPay(contextMenu.item)}>
                     <IconCircleCheck className="mr-2 h-4 w-4" />
-                    Marcar como paga
+                    {(monthlyById.get(contextMenu.item.id)?.occurrenceCount ?? 1) > 1
+                      ? "Pagar ocorrências"
+                      : "Marcar como paga"}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </>
@@ -406,6 +450,16 @@ export const RecurrentPayablesListPage = () => {
             { onSuccess: () => setPayTarget(null) },
           );
         }}
+      />
+
+      <OccurrencesPayDialog
+        payable={occTarget}
+        item={occTarget ? monthlyById.get(occTarget.id) ?? null : null}
+        isPending={payMutation.isPending}
+        onClose={() => setOccTarget(null)}
+        onPay={(occurrenceId, paidAmount) =>
+          pay({ occurrenceId, body: paidAmount != null ? { paidAmount } : {} })
+        }
       />
 
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
@@ -507,6 +561,103 @@ function PayOccurrenceDialog({
             </DialogFooter>
           </form>
         </FormProvider>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Per-occurrence pay dialog (weekly bills — settle each visit individually)
+// ---------------------------------------------------------------------------
+function OccurrencesPayDialog({
+  payable,
+  item,
+  isPending,
+  onClose,
+  onPay,
+}: {
+  payable: RecurrentPayable | null;
+  item: RecurrentPayableMonthlyItem | null;
+  isPending: boolean;
+  onClose: () => void;
+  onPay: (occurrenceId: string, paidAmount: number | null) => void;
+}) {
+  // Typed amount per VARIABLE occurrence (seeded from the forecast on open).
+  const [amounts, setAmounts] = useState<Record<string, number | undefined>>({});
+  const isVariable = payable?.amountKind === "VARIABLE";
+
+  useEffect(() => {
+    if (item) {
+      const seed: Record<string, number | undefined> = {};
+      for (const o of item.occurrences) if (o.occurrenceId) seed[o.occurrenceId] = o.forecastAmount || undefined;
+      setAmounts(seed);
+    }
+  }, [item]);
+
+  return (
+    <Dialog open={payable !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Pagar ocorrências</DialogTitle>
+          <DialogDescription>
+            {payable ? `Marque cada cobrança de "${payable.name}" neste mês como paga.` : ""}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[60vh] space-y-2 overflow-auto">
+          {(item?.occurrences ?? []).map((o, idx) => {
+            const paid = o.status === "PAID";
+            const canPay = !!o.occurrenceId && !paid;
+            return (
+              <div
+                key={o.occurrenceId ?? `idx-${idx}`}
+                className="flex items-center gap-3 rounded-md border border-border p-2"
+              >
+                <div className="w-16 text-sm font-medium tabular-nums">
+                  {format(new Date(o.dueDate), "dd/MM")}
+                </div>
+                <div className="flex-1 min-w-0">
+                  {paid ? (
+                    <Badge variant="completed" size="sm">
+                      <IconCheck className="h-3 w-3 mr-1" /> Pago {o.paidAmount != null ? formatCurrency(o.paidAmount) : ""}
+                    </Badge>
+                  ) : isVariable && o.occurrenceId ? (
+                    <Input
+                      type="number"
+                      value={amounts[o.occurrenceId] ?? ""}
+                      onChange={(value) =>
+                        setAmounts((prev) => ({
+                          ...prev,
+                          [o.occurrenceId as string]: value === null || value === "" ? undefined : Number(value),
+                        }))
+                      }
+                      disabled={isPending}
+                      placeholder="Valor pago"
+                    />
+                  ) : (
+                    <span className="text-sm text-muted-foreground tabular-nums">{formatCurrency(o.forecastAmount)}</span>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!canPay || isPending || (isVariable && !(o.occurrenceId && amounts[o.occurrenceId]))}
+                  onClick={() => {
+                    if (!o.occurrenceId) return;
+                    onPay(o.occurrenceId, isVariable ? amounts[o.occurrenceId] ?? null : null);
+                  }}
+                >
+                  {paid ? "Pago" : "Pagar"}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+            Fechar
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

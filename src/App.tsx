@@ -1591,7 +1591,7 @@ function App() {
                 {/* Entradas hosts "Contas a Receber" — the inflow analog of
                     Contas a Pagar (receivable installments + boleto/conciliação). */}
                 <Route
-                  path={routes.financial.reconciliation.inflows}
+                  path={routes.financial.accountsReceivable.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ReceivablesListPage />

@@ -123,7 +123,8 @@ export function calculateOrderTotal(order: Order): number {
     return total + calculateOrderItemTotal(item);
   }, 0);
 
-  return itemsTotal - calculateOrderDiscount(order);
+  // Mirror the server's computeOrderPayableTotal: items − discount + freight.
+  return itemsTotal - calculateOrderDiscount(order) + (order.freight ?? 0);
 }
 
 /**

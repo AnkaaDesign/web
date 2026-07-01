@@ -46,7 +46,7 @@ export const EditRecurrentPayablePage = () => {
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <div className="container mx-auto max-w-2xl flex-shrink-0">
           <PageHeader
             variant="form"
             title={payable?.name ?? "Editar conta recorrente"}
@@ -63,7 +63,7 @@ export const EditRecurrentPayablePage = () => {
 
         <div className="flex-1 overflow-y-auto pb-6">
           {isLoading ? (
-            <div className="container mx-auto max-w-4xl space-y-4">
+            <div className="container mx-auto max-w-2xl space-y-4">
               <Skeleton className="h-40 w-full" />
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-32 w-full" />

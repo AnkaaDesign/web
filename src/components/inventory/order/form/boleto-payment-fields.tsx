@@ -40,9 +40,14 @@ interface BoletoPaymentFieldsProps {
   form: UseFormReturn<any>;
   /** Edit form needs setValue to mark the form dirty so the save button enables. */
   markDirty?: boolean;
+  /**
+   * Lock the schedule inputs. Used by the edit form once a parcela is settled: the API freezes
+   * the boleto schedule then, so editing parcelas/due-dates would be a no-op (or desync).
+   */
+  disabled?: boolean;
 }
 
-export function BoletoPaymentFields({ form, markDirty }: BoletoPaymentFieldsProps) {
+export function BoletoPaymentFields({ form, markDirty, disabled }: BoletoPaymentFieldsProps) {
   const opts = markDirty ? { shouldDirty: true } : undefined;
   const installmentCount = form.watch("installmentCount") || 1;
   const firstDue: Date | null = form.watch("paymentFirstDueDate") || null;
@@ -75,6 +80,7 @@ export function BoletoPaymentFields({ form, markDirty }: BoletoPaymentFieldsProp
             placeholder="Selecione as parcelas"
             emptyText="—"
             searchable={false}
+            disabled={disabled}
             className="h-8 w-full"
           />
         </div>
@@ -104,6 +110,7 @@ export function BoletoPaymentFields({ form, markDirty }: BoletoPaymentFieldsProp
             placeholder="Selecione o vencimento"
             emptyText="Nenhuma opção"
             searchable={false}
+            disabled={disabled}
             className="h-8 w-full"
           />
         </div>
@@ -131,6 +138,7 @@ export function BoletoPaymentFields({ form, markDirty }: BoletoPaymentFieldsProp
               }}
               hideLabel
               showClearButton
+              disabled={disabled}
             />
           </div>
         </div>
@@ -151,6 +159,7 @@ export function BoletoPaymentFields({ form, markDirty }: BoletoPaymentFieldsProp
               placeholder="Intervalo"
               emptyText="—"
               searchable={false}
+              disabled={disabled}
               className="h-8 w-full"
             />
           </div>

@@ -1464,11 +1464,14 @@ export const orderUpdateSchema = z
         errorMap: () => ({ message: "Status de pagamento inválido" }),
       })
       .optional(),
-    supplierId: z.string().uuid({ message: "Fornecedor inválido" }).optional(),
+    // Nullable so the client can SEND null to CLEAR the supplier (disconnect). undefined =
+    // leave unchanged on the API; null/empty = clear.
+    supplierId: z.string().uuid({ message: "Fornecedor inválido" }).nullable().optional(),
     orderScheduleId: z.string().uuid({ message: "Cronograma inválido" }).optional(),
     orderRuleId: z.string().uuid({ message: "Regra de pedido inválida" }).optional(),
     ppeScheduleId: z.string().uuid({ message: "Agendamento EPI inválido" }).optional(),
-    notes: z.string().optional(),
+    // Nullable so the client can SEND null to CLEAR the notes (undefined = leave unchanged).
+    notes: z.string().nullable().optional(),
     freight: z
       .number()
       .min(0, "Frete deve ser maior ou igual a 0")

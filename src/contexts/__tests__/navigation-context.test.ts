@@ -217,13 +217,16 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     expect(childTitles).toContain("Tamanhos");
   });
 
-  it("Financeiro (ACCOUNTING): unified Notas Fiscais at top level; Contas a Receber/Pagar/Recorrentes under Conciliação", () => {
+  it("Financeiro (ACCOUNTING): Notas Fiscais + Contas a Pagar/Receber at top level; Extrato/Recorrentes/Categorias under Conciliação", () => {
     const fin = byId(ACCOUNTING, "financeiro")!;
-    // Notas Fiscais is now a single top-level entry (Emitidas+Recebidas toggle).
-    // Contas a Receber / a Pagar / Recorrentes were regrouped under Conciliação
-    // Bancária. Top-level children are sorted alphabetically.
+    // Notas Fiscais is a single top-level entry (Emitidas+Recebidas toggle).
+    // Contas a Pagar / a Receber are top-level Financeiro pages (moved OUT of
+    // Conciliação Bancária); only Extrato/Recorrentes/Categorias stay under it.
+    // Top-level children are sorted alphabetically.
     expect((fin.children || []).map((c) => c.title)).toEqual([
       "Conciliação Bancária",
+      "Contas a Pagar",
+      "Contas a Receber",
       "Faturamento",
       "Notas Fiscais",
     ]);
@@ -232,9 +235,7 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
     // is hidden from ACCOUNTING.
     expect((conc.children || []).map((c) => ({ title: c.title, path: c.path }))).toEqual([
       { title: "Extrato", path: "/financeiro/conciliacao/extrato" },
-      { title: "Contas a Receber", path: "/financeiro/conciliacao/entradas" },
-      { title: "Contas a Pagar", path: "/financeiro/contas-a-pagar" },
-      { title: "Contas Recorrentes", path: "/financeiro/contas-recorrentes" },
+      { title: "Recorrentes", path: "/financeiro/contas-recorrentes" },
       { title: "Categorias", path: "/financeiro/conciliacao/categorias" },
     ]);
   });

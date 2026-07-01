@@ -21,6 +21,7 @@ import {
   IconCheck,
   IconLoader2,
   IconCircleDot,
+  IconCashBanknote,
 } from "@tabler/icons-react";
 import { DetailPage } from "@/components/ui/detailpage";
 import type { DetailSectionDef } from "@/components/ui/detailpage";
@@ -41,6 +42,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/auth-context";
+import { usePrivileges } from "@/hooks/common/use-privileges";
 import { canEditOrders } from "@/utils/permissions/entity-permissions";
 import { useOrder, useOrderMutations, useCanViewPrices } from "../../../../hooks";
 import {
@@ -106,7 +108,8 @@ export function OrderDetailPage() {
   const { user } = useAuth();
   const canViewPrices = useCanViewPrices();
   const canManageWarehouse = canEditOrders(user);
-  const { deleteMutation, updateAsync, markPaidAsync, markAwaitingPaymentAsync } = useOrderMutations();
+  const { isAdmin } = usePrivileges();
+  const { deleteMutation, updateAsync, markPaidAsync, markAwaitingPaymentAsync, requestPaymentAsync } = useOrderMutations();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
 
@@ -453,7 +456,11 @@ export function OrderDetailPage() {
                   labels: ORDER_PAYMENT_STATUS_LABELS,
                   badgeEntity: "ORDER_PAYMENT",
                   transitions: (current) =>
-                    Array.from(new Set([current, ORDER_PAYMENT_STATUS.AWAITING_PAYMENT, ORDER_PAYMENT_STATUS.PAID].filter(Boolean))),
+                    // A still-PENDING order leaves PENDING only via the admin "Requisitar Pagamento"
+                    // action — the inline editor offers no targets for it.
+                    current === ORDER_PAYMENT_STATUS.PENDING
+                      ? [ORDER_PAYMENT_STATUS.PENDING]
+                      : Array.from(new Set([current, ORDER_PAYMENT_STATUS.AWAITING_PAYMENT, ORDER_PAYMENT_STATUS.PAID].filter(Boolean))),
                 },
                 // Confirm before settling/un-settling money — a no-op (same status) commits silently.
                 beforeCommit: (v, o) => {
@@ -598,10 +605,26 @@ export function OrderDetailPage() {
     const canEdit = canManageWarehouse && ![ORDER_STATUS.RECEIVED, ORDER_STATUS.CANCELLED].includes(order.status);
     const list: PageAction[] = [];
     if (canEdit) list.push({ key: "edit", label: "Editar", icon: IconEdit, variant: "default", onClick: () => navigate(routes.inventory.orders.edit(order.id)) });
+    // ADMIN: move a still-PENDING order into AWAITING_PAYMENT so accounting can pay it.
+    if (isAdmin && order.paymentStatus === ORDER_PAYMENT_STATUS.PENDING) {
+      list.push({
+        key: "request-payment",
+        label: "Requisitar Pagamento",
+        icon: IconCashBanknote,
+        onClick: async () => {
+          try {
+            await requestPaymentAsync(order.id);
+            refetch();
+          } catch (e) {
+            if (process.env.NODE_ENV !== "production") console.error("Error requesting payment:", e);
+          }
+        },
+      });
+    }
     if (canManageWarehouse) list.push({ key: "delete", label: "Excluir", icon: IconTrash, onClick: () => setShowDeleteDialog(true) });
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order, canManageWarehouse, navigate]);
+  }, [order, canManageWarehouse, isAdmin, requestPaymentAsync, navigate]);
 
   return (
     <>

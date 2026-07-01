@@ -18,21 +18,26 @@ export const ORDER_PRICE_VIEWERS = (Object.values(SECTOR_PRIVILEGES) as SECTOR_P
   (p) => p !== SECTOR_PRIVILEGES.WAREHOUSE,
 );
 
-/** Order total: the manual `totalOverride` when set, else Σ items (qty × price, plus ICMS & IPI). */
+/** Order grand total: the manual `totalOverride` when set, else Σ items (qty × price + ICMS & IPI)
+ *  − discount% on the goods subtotal + freight — matching the detail-page / payable total. */
 export function computeOrderTotal(order: Order): number {
   // A manual override always wins — show it everywhere, never the computed value.
   if (typeof order.totalOverride === "number") return order.totalOverride;
   const items: OrderItem[] = order.items ?? [];
   if (items.length === 0) return 0;
-  return items.reduce((sum, item) => {
+  let goodsSubtotal = 0;
+  const itemsTotal = items.reduce((sum, item) => {
     const quantity = item.orderedQuantity || 0;
     const price = item.price || 0;
     const icms = item.icms || 0;
     const ipi = item.ipi || 0;
     const subtotal = quantity * price;
+    goodsSubtotal += subtotal;
     const itemTotal = subtotal + subtotal * (icms / 100) + subtotal * (ipi / 100);
     return sum + itemTotal;
   }, 0);
+  const discountAmount = order.discount > 0 ? goodsSubtotal * (order.discount / 100) : 0;
+  return itemsTotal - discountAmount + (order.freight || 0);
 }
 
 const muted = (text: string) => <span className="text-sm text-muted-foreground whitespace-nowrap">{text}</span>;

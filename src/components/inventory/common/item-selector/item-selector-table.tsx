@@ -3,6 +3,7 @@ import type { MouseEvent, ReactNode } from "react";
 
 import { IconFilter, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { useItems, useItemCategories, useItemBrands, useSuppliers, useCanViewPrices } from "../../../../hooks";
 import { formatCurrency } from "../../../../utils";
 import type { OrderTemporaryItem } from "@/hooks/inventory/use-order-form-url-state";
@@ -311,6 +312,12 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   const brands = brandsResponse?.data || [];
   const suppliers = suppliersResponse?.data || [];
 
+  // Temporary items carry category/brand as plain NAME strings (composed into the
+  // final description at submit). Use the real category/brand names as the combobox
+  // value so selection maps 1:1 to what composeTempItemDescription reads.
+  const tempCategoryOptions = useMemo(() => categories.map((c) => ({ value: c.name, label: c.name })), [categories]);
+  const tempBrandOptions = useMemo(() => brands.map((b) => ({ value: b.name, label: b.name })), [brands]);
+
   // Handle search change
   const handleSearchChange = useCallback(
     (value: string) => {
@@ -580,24 +587,30 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
         );
       case "brand.name":
         return (
-          <Input
+          <Combobox
+            options={tempBrandOptions}
             value={tempDraft.brand}
-            onChange={(value) => setTempDraft((prev) => ({ ...prev, brand: (value as string) ?? "" }))}
-            onKeyDown={handleTempKeyDown}
+            onValueChange={(value) => setTempDraft((prev) => ({ ...prev, brand: (value as string) ?? "" }))}
             placeholder="Marca"
-            className={tempInputBaseClass}
-            maxLength={100}
+            emptyText="Nenhuma marca encontrada"
+            searchPlaceholder="Buscar marca..."
+            clearable
+            minSearchLength={0}
+            triggerClassName={tempInputBaseClass}
           />
         );
       case "category.name":
         return (
-          <Input
+          <Combobox
+            options={tempCategoryOptions}
             value={tempDraft.category}
-            onChange={(value) => setTempDraft((prev) => ({ ...prev, category: (value as string) ?? "" }))}
-            onKeyDown={handleTempKeyDown}
+            onValueChange={(value) => setTempDraft((prev) => ({ ...prev, category: (value as string) ?? "" }))}
             placeholder="Categoria"
-            className={tempInputBaseClass}
-            maxLength={100}
+            emptyText="Nenhuma categoria encontrada"
+            searchPlaceholder="Buscar categoria..."
+            clearable
+            minSearchLength={0}
+            triggerClassName={tempInputBaseClass}
           />
         );
       case "measures":
@@ -710,22 +723,30 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
         );
       case "brand.name":
         return (
-          <Input
+          <Combobox
+            options={tempBrandOptions}
             value={temp.brand || ""}
-            onChange={(value) => onTemporaryItemUpdate?.(temp.key, { brand: ((value as string) || "").trim() || undefined })}
+            onValueChange={(value) => onTemporaryItemUpdate?.(temp.key, { brand: ((value as string) || "").trim() || undefined })}
             placeholder="Marca"
-            className={tempInputBaseClass}
-            maxLength={100}
+            emptyText="Nenhuma marca encontrada"
+            searchPlaceholder="Buscar marca..."
+            clearable
+            minSearchLength={0}
+            triggerClassName={tempInputBaseClass}
           />
         );
       case "category.name":
         return (
-          <Input
+          <Combobox
+            options={tempCategoryOptions}
             value={temp.category || ""}
-            onChange={(value) => onTemporaryItemUpdate?.(temp.key, { category: ((value as string) || "").trim() || undefined })}
+            onValueChange={(value) => onTemporaryItemUpdate?.(temp.key, { category: ((value as string) || "").trim() || undefined })}
             placeholder="Categoria"
-            className={tempInputBaseClass}
-            maxLength={100}
+            emptyText="Nenhuma categoria encontrada"
+            searchPlaceholder="Buscar categoria..."
+            clearable
+            minSearchLength={0}
+            triggerClassName={tempInputBaseClass}
           />
         );
       case "measures":

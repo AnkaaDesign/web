@@ -68,7 +68,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // access vs the "/financeiro/*" wildcard (COMMERCIAL excluded here).
   "/financeiro/conciliacao/extrato": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
   "/financeiro/conciliacao/saidas": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
-  "/financeiro/conciliacao/entradas": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
+  "/financeiro/contas-a-receber": ["ACCOUNTING", "FINANCIAL", "ADMIN"],
   // Notas Fiscais (Recebidas tab) + Categorias + first-class/legacy recorrentes —
   // explicit entries so they match the menu intent instead of the broad wildcard.
   "/financeiro/conciliacao/notas": ["ACCOUNTING", "FINANCIAL", "ADMIN"],

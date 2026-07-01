@@ -9,6 +9,8 @@ import {
   IconX,
   IconCircleCheck,
   IconHourglass,
+  IconCashBanknote,
+  IconArrowBackUp,
   IconTrash,
   IconAlertTriangle,
 } from "@tabler/icons-react";
@@ -102,8 +104,8 @@ function buildOrderQuery(filters: DataTableFilterValues, search: string): Record
 
 export function OrderTablePage() {
   const navigate = useNavigate();
-  const { updateAsync, deleteAsync, markAwaitingPaymentAsync, markPaidAsync } = useOrderMutations();
-  const { batchUpdateAsync, batchDeleteAsync, batchMarkAwaitingPaymentAsync, batchMarkPaidAsync } = useOrderBatchMutations();
+  const { updateAsync, deleteAsync, markAwaitingPaymentAsync, markPaidAsync, requestPaymentAsync, cancelPaymentRequestAsync } = useOrderMutations();
+  const { batchUpdateAsync, batchDeleteAsync, batchMarkAwaitingPaymentAsync, batchMarkPaidAsync, batchRequestPaymentAsync, batchCancelPaymentRequestAsync } = useOrderBatchMutations();
 
   // --- server mode: search + filters via onParamsChange; page/pageSize/sort from the URL ---
   const [searchParams] = useSearchParams();
@@ -299,12 +301,52 @@ export function OrderTablePage() {
       },
       // --- payment workflow (single + bulk) ---
       {
+        key: "request-payment",
+        label: "Requisitar Pagamento",
+        icon: <IconCashBanknote className="h-4 w-4" />,
+        separatorBefore: true,
+        // ADMIN gate: only an admin moves an order from PENDING → AWAITING_PAYMENT (payable).
+        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
+        // Visible only when every selected order is still PENDING (not yet requested).
+        hidden: (rows) => rows.length === 0 || rows.some((o) => o.paymentStatus !== ORDER_PAYMENT_STATUS.PENDING),
+        onClick: async (rows) => {
+          const eligible = rows.filter((o) => o.paymentStatus === ORDER_PAYMENT_STATUS.PENDING);
+          if (eligible.length === 0) return;
+          try {
+            if (eligible.length > 1) await batchRequestPaymentAsync({ orderIds: eligible.map((o) => o.id) });
+            else await requestPaymentAsync(eligible[0].id);
+          } catch {
+            // The api client already surfaced the error notification.
+          }
+        },
+      },
+      {
+        key: "cancel-payment-request",
+        label: "Cancelar requisição de pagamento",
+        icon: <IconArrowBackUp className="h-4 w-4" />,
+        // ADMIN gate: reverse AWAITING_PAYMENT → PENDING (only while unpaid).
+        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
+        hidden: (rows) => rows.length === 0 || rows.some((o) => o.paymentStatus !== ORDER_PAYMENT_STATUS.AWAITING_PAYMENT),
+        onClick: async (rows) => {
+          const eligible = rows.filter((o) => o.paymentStatus === ORDER_PAYMENT_STATUS.AWAITING_PAYMENT);
+          if (eligible.length === 0) return;
+          try {
+            if (eligible.length > 1) await batchCancelPaymentRequestAsync({ orderIds: eligible.map((o) => o.id) });
+            else await cancelPaymentRequestAsync(eligible[0].id);
+          } catch {
+            // The api client already surfaced the error notification.
+          }
+        },
+      },
+      {
         key: "mark-paid",
         label: "Marcar como Pago",
         icon: <IconCircleCheck className="h-4 w-4" />,
-        separatorBefore: true,
         requiredPrivilege: PAYMENT_MANAGERS,
-        hidden: (rows) => !rows.some((o) => o.paymentStatus !== ORDER_PAYMENT_STATUS.PAID),
+        // Hidden while any selected order is still PENDING — payment can only happen after it's requested.
+        hidden: (rows) =>
+          rows.some((o) => o.paymentStatus === ORDER_PAYMENT_STATUS.PENDING) ||
+          !rows.some((o) => o.paymentStatus !== ORDER_PAYMENT_STATUS.PAID),
         onClick: async (rows) => {
           const eligible = rows.filter((o) => o.paymentStatus !== ORDER_PAYMENT_STATUS.PAID);
           if (eligible.length === 0) return;
@@ -321,7 +363,9 @@ export function OrderTablePage() {
         label: "Desfazer pagamento",
         icon: <IconHourglass className="h-4 w-4" />,
         requiredPrivilege: PAYMENT_MANAGERS,
-        hidden: (rows) => !rows.some((o) => o.paymentStatus === ORDER_PAYMENT_STATUS.PAID),
+        hidden: (rows) =>
+          rows.some((o) => o.paymentStatus === ORDER_PAYMENT_STATUS.PENDING) ||
+          !rows.some((o) => o.paymentStatus === ORDER_PAYMENT_STATUS.PAID),
         onClick: async (rows) => {
           const eligible = rows.filter((o) => o.paymentStatus === ORDER_PAYMENT_STATUS.PAID);
           if (eligible.length === 0) return;
@@ -344,7 +388,7 @@ export function OrderTablePage() {
         onClick: (rows) => setDeleteDialog(rows),
       },
     ],
-    [navigate, runUpdate, runStatusUpdate, batchMarkPaidAsync, markPaidAsync, batchMarkAwaitingPaymentAsync, markAwaitingPaymentAsync],
+    [navigate, runUpdate, runStatusUpdate, batchMarkPaidAsync, markPaidAsync, batchMarkAwaitingPaymentAsync, markAwaitingPaymentAsync, requestPaymentAsync, batchRequestPaymentAsync, cancelPaymentRequestAsync, batchCancelPaymentRequestAsync],
   );
 
   // --- declarative filters (server mode: values are mapped by buildOrderQuery) ---

@@ -10,8 +10,23 @@ import type { TransactionCategory } from "./reconciliation";
 // estimate until the real paid amount is informed on settlement.
 export type AmountKind = "FIXED" | "VARIABLE";
 
-// Recurrence cadence accepted by the api dto.
-export type RecurrentFrequency = "MONTHLY" | "BIMONTHLY" | "QUARTERLY" | "TRIANNUAL" | "QUADRIMESTRAL" | "SEMI_ANNUAL" | "ANNUAL";
+// Recurrence cadence accepted by the api dto. WEEKLY/BIWEEKLY are sub-monthly
+// (use daysOfWeek); the rest are monthly-family (use dueDayOfMonth).
+export type RecurrentFrequency =
+  | "WEEKLY"
+  | "BIWEEKLY"
+  | "MONTHLY"
+  | "BIMONTHLY"
+  | "QUARTERLY"
+  | "TRIANNUAL"
+  | "QUADRIMESTRAL"
+  | "SEMI_ANNUAL"
+  | "ANNUAL";
+
+// Weekly-family frequencies use daysOfWeek instead of dueDayOfMonth.
+export const WEEKLY_RECURRENT_FREQUENCIES: RecurrentFrequency[] = ["WEEKLY", "BIWEEKLY"];
+export const isWeeklyRecurrentFrequency = (f: RecurrentFrequency): boolean =>
+  WEEKLY_RECURRENT_FREQUENCIES.includes(f);
 
 // Lifecycle of a single materialized monthly bill.
 export type RecurrentPayableStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
@@ -33,8 +48,10 @@ export interface RecurrentPayable {
   // Recurrence cadence — defaults to "MONTHLY" server-side.
   frequency: RecurrentFrequency;
   frequencyCount: number;
-  // Day of month the bill is due (1-31).
-  dueDayOfMonth: number;
+  // Day of month the bill is due (1-31). Null for weekly bills.
+  dueDayOfMonth: number | null;
+  // Weekdays a weekly bill is due (0=Sun … 6=Sat). Empty for monthly bills.
+  daysOfWeek: number[];
   paymentMethod: "PIX" | "BANK_SLIP" | "CREDIT_CARD" | null;
   // When true, the matching NF is synced and reconciled automatically.
   expectsNf: boolean;
@@ -88,7 +105,10 @@ export interface CreateRecurrentPayablePayload {
   estimatedAmount?: number | null;
   frequency?: RecurrentFrequency;
   frequencyCount?: number;
-  dueDayOfMonth: number;
+  // Required for monthly-family cadences; omit/null for weekly.
+  dueDayOfMonth?: number | null;
+  // Required (≥1 weekday) for weekly cadences; omit for monthly.
+  daysOfWeek?: number[];
   paymentMethod?: "PIX" | "BANK_SLIP" | "CREDIT_CARD" | null;
   expectsNf: boolean;
   isActive: boolean;
@@ -100,12 +120,26 @@ export interface RecurrentPayableListParams {
   isActive?: boolean;
 }
 
-// One row of the monthly Recorrentes dashboard — a bill plus its occurrence for
-// the selected competence (status/paid/forecast folded in).
+// One occurrence within a month's breakdown (a single charge/visit).
+export interface RecurrentPayableMonthlyOccurrence {
+  // Null for synthesized forecast entries on a non-current month (not yet materialized).
+  occurrenceId: string | null;
+  dueDate: string;
+  status: RecurrentPayableStatus;
+  forecastAmount: number;
+  paidAmount: number | null;
+  paidAt: string | null;
+  transactionCount: number;
+  nfLinked: boolean;
+}
+
+// One row of the monthly Recorrentes dashboard — a bill aggregated over ALL its
+// occurrences in the selected competence (one for a monthly bill, several for a
+// weekly one), plus a per-occurrence breakdown for individual settlement.
 export interface RecurrentPayableMonthlyItem {
   id: string;
-  // Null for past/future months with no materialized occurrence yet (read-only
-  // estimate); present for the current month and any already-materialized month.
+  // The lone occurrence id for a single-occurrence (monthly) bill, else null —
+  // multi-occurrence bills settle per occurrence via `occurrences`.
   occurrenceId: string | null;
   name: string;
   category: { id: string; name: string; color: string | null } | null;
@@ -113,14 +147,24 @@ export interface RecurrentPayableMonthlyItem {
   amountKind: AmountKind;
   isVariable: boolean;
   frequency: RecurrentFrequency;
+  daysOfWeek: number[];
+  dueDayOfMonth: number | null;
   paymentMethod: "PIX" | "BANK_SLIP" | "CREDIT_CARD" | null;
+  // Earliest unpaid due date in the month (or the first occurrence's).
   dueDate: string;
+  // Summary across the month: PAID only when every occurrence is paid.
   status: RecurrentPayableStatus;
+  occurrenceCount: number;
+  paidCount: number;
+  pendingCount: number;
+  overdueCount: number;
+  // Month aggregates. paidAmount is null when nothing was paid (renders "—").
   paidAmount: number | null;
   paidAt: string | null;
   forecastAmount: number;
   nfLinked: boolean;
   transactionCount: number;
+  occurrences: RecurrentPayableMonthlyOccurrence[];
 }
 
 export interface RecurrentPayableMonthly {
