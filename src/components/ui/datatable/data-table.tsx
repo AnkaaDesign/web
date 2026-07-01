@@ -328,11 +328,22 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
       return data;
     }
     let rows = data;
-    if (debouncedSearch) rows = rows.filter((r) => rowMatchesSearch(r, columns, debouncedSearch));
+    if (debouncedSearch) {
+      // Match DEEPLY: a grouped/clustered parent has its members in sub-rows (getSubRows). Searching
+      // must find a match anywhere in the subtree, otherwise a child that matches (e.g. a task's
+      // serial that only exists on a grouped child) is invisible because the parent's own cells
+      // don't contain it. Keep the row when it — or any descendant — matches.
+      const matchesDeep = (r: TData): boolean => {
+        if (rowMatchesSearch(r, columns, debouncedSearch)) return true;
+        const kids = getSubRows?.(r);
+        return Array.isArray(kids) && kids.some(matchesDeep);
+      };
+      rows = rows.filter(matchesDeep);
+    }
     if (filterDefs.length) rows = rows.filter((r) => rowMatchesFilters(r, filterDefs, filters));
     if (viewSelectedOnly && selectedIds) rows = rows.filter((r) => selectedIds.has(getId(r)));
     return rows;
-  }, [mode, data, columns, debouncedSearch, filterDefs, filters, viewSelectedOnly, selectedIds, getId]);
+  }, [mode, data, columns, debouncedSearch, filterDefs, filters, viewSelectedOnly, selectedIds, getId, getSubRows]);
 
   const dt = useDataTable<TData>({
     tableId,
@@ -365,6 +376,23 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   const { table, columnSizeVars, rowVirtualizer, rows, columnAlignment, setColumnAlignment } = dt;
   // Wire the page-1 reset now that the engine exists (used by the search + filter effects above).
   resetToFirstPage.current = () => table.setPageIndex(0);
+
+  // Auto-expand groups while a search is active. The deep-match above keeps a grouped parent when a
+  // descendant matches, but the matching child stays collapsed (hidden) until the group is expanded.
+  // Snapshot the pre-search expansion and restore it once the search clears so we don't clobber the
+  // user's manual/persisted expand state.
+  const preSearchExpanded = useRef<boolean | Record<string, boolean> | null>(null);
+  const searchExpandActive = !!debouncedSearch && !!getSubRows;
+  useEffect(() => {
+    if (!getSubRows) return;
+    if (searchExpandActive) {
+      if (preSearchExpanded.current === null) preSearchExpanded.current = table.getState().expanded;
+      table.toggleAllRowsExpanded(true);
+    } else if (preSearchExpanded.current !== null) {
+      table.setExpanded(preSearchExpanded.current);
+      preSearchExpanded.current = null;
+    }
+  }, [searchExpandActive, getSubRows, table]);
 
   // Hand the table's CURRENT filtered+sorted order to onRowClick so a detail page can page
   // prev/next through exactly the list the user sees (across pages, not just the page).

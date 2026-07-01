@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useTaskMutations, useTaskBatchMutations, useTaskDetail } from "../../../../hooks";
-import { TASK_STATUS, SERVICE_ORDER_STATUS } from "../../../../constants";
+import { TASK_STATUS, SERVICE_ORDER_STATUS, PAYMENT_CONDITION } from "../../../../constants";
 import { IconLoader2, IconPlus, IconTrash } from "@tabler/icons-react";
 import { Label } from "@/components/ui/label";
 import type { Task } from "../../../../types";
@@ -141,6 +141,21 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
     onOpenChange(newOpen);
   };
 
+  // Normalize a source quote's paymentCondition before copying it.
+  // The enum was historically split (CASH -> CASH_5/CASH_40) but the column is a free
+  // String, so old records still hold dead values (CASH, PIX, ...) that the create
+  // schema rejects. Map known legacy values to their modern equivalent and drop any
+  // value that isn't a current enum member so a duplicate never fails validation.
+  const LEGACY_PAYMENT_CONDITION_MAP: Record<string, PAYMENT_CONDITION> = {
+    CASH: PAYMENT_CONDITION.CASH_40,
+    PIX: PAYMENT_CONDITION.CASH_5,
+  };
+  const normalizePaymentCondition = (value: any): PAYMENT_CONDITION | null => {
+    if (!value) return null;
+    const mapped = LEGACY_PAYMENT_CONDITION_MAP[value] ?? value;
+    return (Object.values(PAYMENT_CONDITION) as string[]).includes(mapped) ? (mapped as PAYMENT_CONDITION) : null;
+  };
+
   // Build comprehensive task data for a single copy
   const buildTaskData = (copyData: { serialNumber?: string | null; plate?: string | null; chassisNumber?: string | null }) => {
     if (!sourceTask) return null;
@@ -243,7 +258,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                 discountReference: config.discountReference || null,
                 customPaymentText: config.customPaymentText || null,
                 responsibleId: config.responsibleId || null,
-                paymentCondition: config.paymentCondition || null,
+                paymentCondition: normalizePaymentCondition(config.paymentCondition),
                 paymentConfig: config.paymentConfig || null,
                 generateInvoice: config.generateInvoice ?? true,
                 generateBankSlip: config.generateBankSlip ?? true,
