@@ -734,6 +734,7 @@ export function TaskPreparationPage() {
     return [
       { key: "forecastDate", label: "Previsão", type: "date-range", accessor: (r) => r.forecastDate },
       { key: "term", label: "Prazo", type: "date-range", accessor: (r) => r.term },
+      { key: "createdAt", label: "Data de Criação", type: "date-range", accessor: (r) => r.createdAt },
       {
         key: "customerId",
         label: "Razão Social",
