@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -82,6 +82,15 @@ export interface UseDataTableParams<TData> {
   columns: DataTableColumnDef<TData>[];
   /** The scroll container the virtualizer measures (owned by the renderer). */
   scrollRef: RefObject<HTMLDivElement | null>;
+  /**
+   * Windowed (page-scroll) mode: this table has no inner scroll and virtualizes against an EXTERNAL
+   * shared scroll container (`scrollRef`) using `scrollMargin` (this list's offset within it). Used to
+   * stack several tables inside ONE page scrollbar while every table still renders only its visible
+   * rows. Requires `listRef` (the tbody) so the offset can be measured.
+   */
+  windowed?: boolean;
+  /** The list element (tbody) whose offset within the shared scroll container is the `scrollMargin`. */
+  listRef?: RefObject<HTMLElement | null>;
   getRowId?: (row: TData, index: number) => string;
   mode?: DataTableMode;
   /** Server mode: total row count (for pagination math). */
@@ -94,12 +103,6 @@ export interface UseDataTableParams<TData> {
   enableRowSelection?: boolean;
   enableRowPinning?: boolean;
   enablePagination?: boolean;
-  /**
-   * Render ALL rows at natural height with no internal scroll (the page scrolls the table). The
-   * virtualizer still measures/positions rows, but every row is rendered — used for a table that
-   * should "show everything it has" and flow in the page (e.g. the top table of a stacked pair).
-   */
-  autoHeight?: boolean;
   /** Enable native child-row expansion (TanStack sub-rows). Requires `getSubRows`. */
   enableExpansion?: boolean;
   /** Return a row's child rows (e.g. a name-cluster's hidden siblings). Children are real rows. */
@@ -135,6 +138,12 @@ export interface UseDataTableResult<TData> {
   columnSizeVars: Record<string, number>;
   isResizing: boolean;
   rowVirtualizer: ReturnType<typeof useVirtualizer<HTMLDivElement, Element>>;
+  /**
+   * In windowed mode, the offset (px) of this table's list within the shared scroll container — the
+   * value fed to the virtualizer's `scrollMargin`. Row/overlay positions are `virtualItem.start -
+   * scrollMargin`. Always 0 in the normal (inner-scroll) mode.
+   */
+  scrollMargin: number;
   /** Pinned (top) rows first, then center rows — one list, virtualized together. */
   rows: Row<TData>[];
   dataColumnIds: string[];
@@ -156,6 +165,8 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     data,
     columns,
     scrollRef,
+    windowed = false,
+    listRef,
     getRowId,
     mode = "client",
     rowCount,
@@ -167,7 +178,6 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     enableRowSelection = true,
     enableRowPinning = true,
     enablePagination = true,
-    autoHeight = false,
     enableExpansion = false,
     getSubRows,
     getRowCanExpand,
@@ -576,15 +586,48 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
   // masked by the sticky header (no "empty space at top" drift).
   const rows = enableRowPinning ? [...table.getTopRows(), ...table.getCenterRows()] : table.getRowModel().rows;
 
+  // --- Windowed (page-scroll) mode: measure this list's offset within the shared scroll container so
+  //     the virtualizer can window against the PAGE scroll while the table flows at natural height.
+  //     Recomputed whenever the container OR any sibling table above it changes size (a sibling growing
+  //     pushes this list down → its scrollMargin changes), so several stacked tables stay windowed
+  //     under a single scrollbar. In normal (inner-scroll) mode this stays 0. ---
+  const [scrollMargin, setScrollMargin] = useState(0);
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    const list = listRef?.current;
+    if (!windowed || !container || !list) {
+      setScrollMargin((prev) => (prev !== 0 ? 0 : prev));
+      return;
+    }
+    const measure = () => {
+      const offset = list.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+      setScrollMargin((prev) => (Math.abs(prev - offset) > 0.5 ? offset : prev));
+    };
+    measure();
+    // Observe the container AND each of its direct children (the stacked table wrappers): when a table
+    // above this one grows/shrinks, this list moves, so its margin must be re-measured. Re-runs on row
+    // count changes to re-observe if the set of tables changed.
+    const ro = new ResizeObserver(measure);
+    ro.observe(container);
+    for (const child of Array.from(container.children)) ro.observe(child);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [windowed, scrollRef, listRef, rows.length]);
+
   const rowVirtualizer = useVirtualizer<HTMLDivElement, Element>({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => estimateRowHeight,
     overscan: 10,
     getItemKey: (index) => rows[index]?.id ?? index,
-    // autoHeight: render EVERY row (no windowing) so the table grows to its full content height and
-    // the page — not the table — scrolls. Rows keep their measured positions, so overlays still work.
-    ...(autoHeight ? { rangeExtractor: (range) => Array.from({ length: range.count }, (_, i) => i) } : {}),
+    // Windowed mode: window against the shared page scroll using this list's offset. `virtualItem.start`
+    // then includes this margin (positions subtract it); `getTotalSize()` excludes it (tbody height
+    // stays this list's own height). 0 in normal mode → identical to the plain inner-scroll virtualizer.
+    scrollMargin: windowed ? scrollMargin : 0,
   });
 
   const resetLayout = useCallback(() => {
@@ -618,6 +661,7 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     columnSizeVars,
     isResizing,
     rowVirtualizer,
+    scrollMargin,
     rows,
     dataColumnIds,
     defaultVisibility,

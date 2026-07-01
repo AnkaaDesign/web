@@ -3,7 +3,7 @@
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
 import type { ORDER_STATUS, ORDER_PAYMENT_STATUS, ORDER_INSTALLMENT_STATUS, PAYMENT_METHOD, SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, ORDER_TRIGGER_TYPE, ORDER_BY_DIRECTION, RESCHEDULE_REASON } from '@constants';
 import type { Supplier, SupplierIncludes, SupplierOrderBy } from "./supplier";
-import type { Item, ItemIncludes, ItemOrderBy, ItemWhere } from "./item";
+import type { Item, ItemCategory, ItemIncludes, ItemOrderBy, ItemWhere } from "./item";
 import type { File, FileIncludes } from "./file";
 import type {
   PpeDeliverySchedule,
@@ -99,7 +99,14 @@ export interface OrderRule extends BaseEntity {
 export interface OrderItem extends BaseEntity {
   orderId: string;
   itemId: string | null;
+  // Temporary (itemId = null) line fields. `temporaryItemDescription` is the PURE
+  // name; código/marca/medidas/categoria are discrete fields. Legacy rows may keep
+  // an old crammed string in temporaryItemDescription with the others null.
   temporaryItemDescription: string | null;
+  temporaryItemUniCode: string | null;
+  temporaryItemBrand: string | null;
+  temporaryItemMeasures: string | null;
+  temporaryItemCategoryId: string | null;
   orderedQuantity: number;
   receivedQuantity: number;
   price: number;
@@ -111,6 +118,7 @@ export interface OrderItem extends BaseEntity {
 
   // Relations (optional, populated based on query)
   item?: Item;
+  temporaryItemCategory?: ItemCategory | null;
   order?: Order;
   activities?: Activity[];
 }
@@ -256,6 +264,7 @@ export interface OrderItemIncludes {
         where?: ItemWhere;
         orderBy?: ItemOrderBy;
       };
+  temporaryItemCategory?: boolean;
   order?:
     | boolean
     | {
@@ -510,6 +519,13 @@ export type PayableState = "AWAITING_PAYMENT" | "OVERDUE" | "PARTIALLY_PAID" | "
  */
 export type ClearanceState = "UNCLEARED" | "CLEARED" | "DISPUTED";
 
+/**
+ * {@link PayableRow.threeWayConsistency} discriminant — whether the order's
+ * matched bank outflow, linked-NF totals and installment amounts agree.
+ * Mirrors api/src/types/order.ts ThreeWayFlag.
+ */
+export type ThreeWayFlag = "OK" | "MISMATCH";
+
 /** One normalized payable row: an open order, an airbrushing painter payment, or a scheduled/expected outflow. */
 export interface PayableRow {
   source: PayableSource;
@@ -560,6 +576,21 @@ export interface PayableRow {
   clearedAt?: string | null;
   /** The bank transaction that cleared this row (for row → extrato linking). */
   bankTransactionId?: string | null;
+  /**
+   * C4 — per-order 3-way consistency (ORDER rows only): whether the matched bank
+   * outflow, the linked NF totals and the installment amounts agree within
+   * tolerance. 'OK' when bank-backed and consistent, 'MISMATCH' when bank-backed
+   * but the three sums diverge, null/undefined when the order has no bank backing
+   * yet (paid-on-paper / still open — nothing to cross-validate).
+   * Mirrors api/src/types/order.ts PayableRow.threeWayConsistency.
+   */
+  threeWayConsistency?: ThreeWayFlag | null;
+  /**
+   * The three sums behind {@link threeWayConsistency} (pedido ≟ nf ≟ transação):
+   * `tx` = Σ conciliated bank debits, `nf` = Σ linked NF totals,
+   * `installment` = Σ order installment amounts (the pedido total).
+   */
+  threeWaySums?: { tx: number; nf: number; installment: number } | null;
 }
 
 export interface PayablesSummary {

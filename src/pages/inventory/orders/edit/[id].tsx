@@ -34,6 +34,7 @@ export const EditOrderPage = () => {
               category: true,
             },
           },
+          temporaryItemCategory: true,
         },
       },
       supplier: true,

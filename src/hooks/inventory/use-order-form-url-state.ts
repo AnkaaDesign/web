@@ -21,31 +21,29 @@ export interface OrderTemporaryItem {
   price: number;
   icms: number;
   ipi: number;
-  // Optional metadata that, when filled, get composed into the final description
-  // sent to the API. Fields stay client-side only — the API only receives the
-  // composed `temporaryItemDescription` string.
+  // Discrete metadata persisted alongside the pure `temporaryItemDescription`
+  // name. These map 1:1 to the API's `temporaryItemUniCode/Brand/Measures` and
+  // the `temporaryItemCategoryId` FK (categoryName kept only for display).
   uniCode?: string;
   brand?: string;
-  category?: string;
+  categoryId?: string;
+  categoryName?: string;
   measures?: string;
 }
 
 /**
- * Compose the final temporaryItemDescription string from the visible metadata
- * fields. Used at submit time — keeps the API contract single-string while
- * letting the form capture richer info.
- *
- * Example: code="ABC", description="Parafuso", brand="Tramontina", category="Ferragens"
- *  → "[ABC] Parafuso — Tramontina / Ferragens"
+ * Map a temporary item to the discrete API payload fields. `temporaryItemDescription`
+ * stays the PURE name; código/marca/medidas/categoria are sent as their own fields
+ * (`temporaryItemUniCode/Brand/Measures` and the `temporaryItemCategoryId` FK).
  */
-export function composeTempItemDescription(t: OrderTemporaryItem): string {
-  const description = (t.temporaryItemDescription || "").trim();
-  const code = (t.uniCode || "").trim();
-  const tail = [t.brand, t.category, t.measures]
-    .map(v => (v || "").trim())
-    .filter(v => v.length > 0);
-  const head = code ? `[${code}] ${description}` : description;
-  return tail.length > 0 ? `${head} — ${tail.join(" / ")}` : head;
+export function toTempItemPayload(t: OrderTemporaryItem) {
+  return {
+    temporaryItemDescription: (t.temporaryItemDescription || "").trim(),
+    temporaryItemUniCode: (t.uniCode || "").trim() || undefined,
+    temporaryItemBrand: (t.brand || "").trim() || undefined,
+    temporaryItemMeasures: (t.measures || "").trim() || undefined,
+    temporaryItemCategoryId: t.categoryId || undefined,
+  };
 }
 
 export interface OrderFormValidationState {
@@ -131,7 +129,8 @@ const orderFormFilterConfig = {
         ipi: z.number().min(0).max(100).default(0),
         uniCode: z.string().optional(),
         brand: z.string().optional(),
-        category: z.string().optional(),
+        categoryId: z.string().optional(),
+        categoryName: z.string().optional(),
         measures: z.string().optional(),
       })
     ).default([]),
@@ -930,7 +929,7 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     const tempItems = temporaryItems
       .filter(t => t.temporaryItemDescription.trim() !== "" && t.orderedQuantity > 0)
       .map(t => ({
-        temporaryItemDescription: composeTempItemDescription(t),
+        ...toTempItemPayload(t),
         orderedQuantity: t.orderedQuantity,
         price: t.price,
         icms: t.icms,
@@ -1004,11 +1003,12 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
         price: item.price ?? 0,
         icms: item.icms ?? 0,
         ipi: item.ipi ?? 0,
-        // Carry through the optional metadata (código/marca/categoria/medidas) so
-        // they persist and get composed into the description at submit time.
+        // Carry through the discrete metadata (código/marca/categoria/medidas) so
+        // they persist and get sent as their own API fields at submit time.
         uniCode: item.uniCode,
         brand: item.brand,
-        category: item.category,
+        categoryId: item.categoryId,
+        categoryName: item.categoryName,
         measures: item.measures,
       };
       setFilters({ temporaryItems: [...temporaryItems, newItem] });

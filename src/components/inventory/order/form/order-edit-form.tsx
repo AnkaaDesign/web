@@ -24,7 +24,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { useOrderFormUrlState, composeTempItemDescription } from "@/hooks/inventory/use-order-form-url-state";
+import { useOrderFormUrlState, toTempItemPayload } from "@/hooks/inventory/use-order-form-url-state";
 import { formatCurrency, formatDate, formatPixKey, isValidStatusTransition } from "../../../../utils";
 import { exportOrderPdf } from "@/utils/order-pdf-generator";
 import { buildOrderCode } from "@/utils/order-code";
@@ -117,6 +117,12 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       price: item.price,
       icms: item.icms || 0,
       ipi: item.ipi || 0,
+      // Hydrate the discrete metadata from the loaded temp order item.
+      uniCode: item.temporaryItemUniCode || undefined,
+      brand: item.temporaryItemBrand || undefined,
+      measures: item.temporaryItemMeasures || undefined,
+      categoryId: item.temporaryItemCategoryId || undefined,
+      categoryName: item.temporaryItemCategory?.name || undefined,
     })),
     [order.items]
   );
@@ -644,15 +650,20 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     });
 
     // Temporary items: count diff or any field changed for an existing temp.
-    // Compare composed description (what gets sent to API) so adding metadata
-    // counts as a change even if the raw description text is unchanged.
+    // Compare the discrete payload fields (pure name + código/marca/medidas/categoria)
+    // so editing any metadata counts as a change.
     const originalTemps = order.items.filter(i => !i.itemId);
     const tempCountChanged = (temporaryItems || []).length !== originalTemps.length;
     const tempContentChanged = !tempCountChanged && (temporaryItems || []).some(t => {
       const orig = originalTemps.find(o => buildTempKey(o.id) === t.key);
       if (!orig) return true; // newly added
+      const payload = toTempItemPayload(t);
       return (
-        composeTempItemDescription(t) !== (orig.temporaryItemDescription || "Item temporário") ||
+        payload.temporaryItemDescription !== (orig.temporaryItemDescription || "Item temporário") ||
+        (payload.temporaryItemUniCode || undefined) !== (orig.temporaryItemUniCode || undefined) ||
+        (payload.temporaryItemBrand || undefined) !== (orig.temporaryItemBrand || undefined) ||
+        (payload.temporaryItemMeasures || undefined) !== (orig.temporaryItemMeasures || undefined) ||
+        (payload.temporaryItemCategoryId || undefined) !== (orig.temporaryItemCategoryId || undefined) ||
         t.orderedQuantity !== orig.orderedQuantity ||
         t.price !== orig.price ||
         t.icms !== (orig.icms ?? 0) ||
@@ -749,7 +760,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const tempPayload = (temporaryItems || [])
         .filter(t => t.temporaryItemDescription.trim() !== "" && t.orderedQuantity > 0)
         .map(t => ({
-          temporaryItemDescription: composeTempItemDescription(t),
+          ...toTempItemPayload(t),
           orderedQuantity: Number(t.orderedQuantity) || 1,
           price: Number(t.price) || 0,
           icms: Number(t.icms) || 0,
@@ -920,7 +931,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         .filter((t) => t.temporaryItemDescription.trim() !== "")
         .map((t) => ({
           code: t.uniCode || "-",
-          name: composeTempItemDescription(t),
+          name: t.temporaryItemDescription,
           brand: t.brand || "-",
           measures: t.measures || "-",
           quantity: Number(t.orderedQuantity) || 0,

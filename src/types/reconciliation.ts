@@ -579,14 +579,6 @@ export interface RecurringForecastItem {
   isPaymentDateForecast: boolean;
 }
 
-export interface RecurringForecast {
-  from: string;
-  to: string;
-  totalPaid: number;
-  totalForecast: number;
-  items: RecurringForecastItem[];
-}
-
 export interface ClassifyBatchResult {
   processed: number;
   reconciled: number;
@@ -618,6 +610,12 @@ export interface OutflowForecastOrderRow {
   paymentStatus: OrderPaymentStatusKey;
   forecast: string | null;
   total: number;
+  /**
+   * C3 — the order is already bank-backed (a reconciled debit settled it), so it
+   * is EXCLUDED from the open forecast total to avoid double counting cash that
+   * has already left the account. Mirrors api OutflowForecastOrderRow.bankCleared.
+   */
+  bankCleared?: boolean;
 }
 
 export interface OutflowForecastScheduleRow {

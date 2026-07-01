@@ -762,7 +762,6 @@ export function TaskPreparationPage() {
   const tableProps = (
     tableId: string,
     data: ClusteredTask[],
-    autoHeight: boolean,
     title: string,
     titleCount: number,
   ) => ({
@@ -781,7 +780,11 @@ export function TaskPreparationPage() {
     persistExpansion: true,
     getSubRows,
     estimateRowHeight: 44,
-    autoHeight,
+    // Every table flows at its natural height and windows against the ONE page scroll container below
+    // (autoHeight + a shared scrollContainerRef): a single scrollbar for the whole page, yet each table
+    // still renders only its visible rows.
+    autoHeight: true,
+    scrollContainerRef: scrollRef,
     // Per-sector starting column layout (applied only when the user has no saved config).
     sectorDefaults: TASK_PREP_SECTOR_DEFAULTS,
     title,
@@ -848,24 +851,20 @@ export function TaskPreparationPage() {
         </div>
       )}
 
-      {/* The PAGE scrolls. The top "Em Produção" table shows everything it has (autoHeight, no inner
-          scroll); the bottom "Em Preparação" table fills the viewport and scrolls inside its body. */}
-      {/* One table (FINANCIAL: "Aguardando Faturamento") or the stacked pair (everyone else: top
-          "Em Produção" auto-height, bottom "Em Preparação" fills the viewport + body-scrolls). The
-          LAST table always fills; earlier ones flow at natural height. */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        {tables.map((t, i) => {
-          const isLast = i === tables.length - 1;
-          return isLast ? (
-            <div key={t.id} className="flex h-full min-h-0 flex-1 flex-col">
-              <DataTable<ClusteredTask> {...tableProps(`task-prep-${t.id}`, t.clusters, false, t.title, t.clusters.length)} />
-            </div>
-          ) : (
-            <div key={t.id} className="mb-6">
-              <DataTable<ClusteredTask> {...tableProps(`task-prep-${t.id}`, t.clusters, true, t.title, t.clusters.length)} />
-            </div>
-          );
-        })}
+      {/* ONE scroll for the whole page. Every table (FINANCIAL: a single "Aguardando Faturamento";
+          everyone else: "Em Produção" + "Em Preparação") flows at its natural, content-sized height and
+          windows against THIS container — so there is a single scrollbar, yet each table still renders
+          only its visible rows (no all-rows dump). The page header collapses on scroll-down via
+          useScrollHideHeader watching this same container.
+
+          The cards are cleanly SEPARATED (space-y gap). This is safe because each table's toolbar AND its
+          column header are ONE sticky block that always covers that table's own rows — so as one table
+          scrolls out, only the page background shows in the gap (never a strip of peeking rows) before
+          the next table's block pins. */}
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-auto">
+        {tables.map((t) => (
+          <DataTable<ClusteredTask> key={t.id} {...tableProps(`task-prep-${t.id}`, t.clusters, t.title, t.clusters.length)} />
+        ))}
       </div>
 
       {/* Context-menu modals — hosted once at page level; each operates on its captured taskIds. */}

@@ -139,7 +139,7 @@ export function OrderDetailPage() {
     refetch,
   } = useOrder(id!, {
     include: {
-      items: { include: { item: { include: { brands: true, measures: true, category: true } } } },
+      items: { include: { item: { include: { brands: true, measures: true, category: true } }, temporaryItemCategory: true } },
       supplier: { include: { logo: true } },
       receipts: true,
       paymentResponsible: true,

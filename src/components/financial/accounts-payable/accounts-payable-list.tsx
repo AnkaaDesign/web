@@ -11,6 +11,7 @@ import {
   IconAlertTriangle,
   IconClock,
   IconCopy,
+  IconCircleCheck,
 } from "@tabler/icons-react";
 
 import type { ClearanceState, PayableRow, PayableState } from "../../../types";
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
@@ -79,6 +81,12 @@ const BUCKET_ORDER: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXP
 // Default view: every open/overdue/forecast obligation; paid-this-month and the
 // awaiting-conciliação view are opt-in (click the card).
 const DEFAULT_BUCKETS: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PARTIAL", "EXPECTED"];
+
+// Cards always kept on screen for a stable at-a-glance summary, even when the
+// month has nothing in them. Every OTHER bucket (notably PARTIAL — "Parcialmente
+// Pago", which recurrent occurrences never populate, so it is structurally always
+// R$ 0,00 · 0 — and EXPECTED) is hidden when empty so no bogus card is rendered.
+const ALWAYS_SHOWN_BUCKETS: PayableBucketKey[] = ["AWAITING", "OVERDUE", "PAID"];
 
 // paymentState → its primary bucket (the assertion axis). UNCLEARED is handled
 // separately (it cross-cuts on the conciliação axis).
@@ -143,23 +151,69 @@ function clearanceOf(row: PayableRow): ClearanceState {
   return row.clearanceState ?? "UNCLEARED";
 }
 
+// --- C4 — per-order 3-way (Pedido ≟ NF ≟ Transação) consistency indicator. ----
+// ORDER rows only. `threeWayConsistency` is null/undefined until the order is
+// bank-backed (paid-on-paper / still open → nothing to cross-validate, so we
+// render nothing). Once bank-backed it is 'OK' (green check) or 'MISMATCH'
+// (amber warning) with a tooltip breaking down the three sums.
+function OrderThreeWayBadge({ row }: { row: PayableRow }) {
+  if (row.source !== "ORDER" || row.threeWayConsistency == null) return null;
+  const ok = row.threeWayConsistency === "OK";
+  const sums = row.threeWaySums;
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            variant={ok ? "completed" : "warning"}
+            className="font-medium whitespace-nowrap w-fit gap-1 h-5 px-1.5 text-[10px] leading-4 cursor-default"
+          >
+            {ok ? <IconCircleCheck className="h-3 w-3" /> : <IconAlertTriangle className="h-3 w-3" />}
+            Pedido ≟ NF ≟ Transação
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <div className="space-y-1.5">
+            <p className="font-medium">{ok ? "Pedido, NF e transação conferem" : "Divergência entre pedido, NF e transação"}</p>
+            {sums && (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 tabular-nums">
+                <span className="text-muted-foreground">Pedido (parcelas)</span>
+                <span className="text-right">{formatCurrency(sums.installment)}</span>
+                <span className="text-muted-foreground">NF vinculada</span>
+                <span className="text-right">{formatCurrency(sums.nf)}</span>
+                <span className="text-muted-foreground">Transação conciliada</span>
+                <span className="text-right">{formatCurrency(sums.tx)}</span>
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 // Combined Pagamento × Conciliação badge per the reconciliation design:
 //   paymentState ≠ PAID                  → just the assertion badge (no clearance)
 //   PAID + UNCLEARED                     → "Pago · aguardando conciliação" (amber)
 //   PAID + CLEARED                       → "Pago e conciliado" (green) + clearedAt
 //   DISPUTED (any paymentState)          → "Divergência de valor" (red alert)
+// The 3-way (Pedido ≟ NF ≟ Transação) indicator rides below the assertion badge
+// for ORDER rows that are already bank-backed.
 function PayablePaymentCell({ row }: { row: PayableRow }) {
   // The conciliação (clearance) axis is hidden for now — until the payables
   // reconciliation workflow is decided, a PAID row is simply "Pago" (green),
   // regardless of clearanceState. Non-PAID rows keep their assertion badge.
-  if (row.paymentState !== "PAID") {
-    return <PayableStateBadge state={row.paymentState} />;
-  }
-
   return (
-    <Badge variant="completed" className="font-medium whitespace-nowrap w-fit">
-      Pago
-    </Badge>
+    <div className="flex flex-col items-start gap-1">
+      {row.paymentState !== "PAID" ? (
+        <PayableStateBadge state={row.paymentState} />
+      ) : (
+        <Badge variant="completed" className="font-medium whitespace-nowrap w-fit">
+          Pago
+        </Badge>
+      )}
+      <OrderThreeWayBadge row={row} />
+    </div>
   );
 }
 
@@ -315,7 +369,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   };
 
   // --- Unified payables endpoint (orders + airbrushing + scheduled) ---------
-  const { data: response, isLoading, error, refetch } = useOrderPayables();
+  const { data: response, isLoading, error, refetch } = useOrderPayables(monthKey(month));
   const allRows = useMemo(() => response?.data?.rows ?? [], [response?.data?.rows]);
 
   // --- Period scope: keep only the rows that belong to the selected month ----
@@ -605,12 +659,15 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     },
     { key: "method", header: "Forma", width: 144, render: (row) => <span className="text-sm text-muted-foreground">{formatPaymentMethod(row.method)}</span> },
     {
-      // PIX key (orders paying via PIX) — click-to-copy.
+      // PIX key (orders paying via PIX) — click-to-copy. Only shown once the
+      // payment has been requested (AWAITING_PAYMENT onward). A PENDING order
+      // (paymentRequested === false) isn't a payable debt yet, so its Pix key
+      // stays hidden until an admin runs "Requisitar Pagamento".
       key: "pixKey",
       header: "Chave Pix",
       width: 176,
       render: (row) =>
-        row.pixKey ? (
+        row.pixKey && row.paymentRequested !== false ? (
           <Button
             variant="ghost"
             size="sm"
@@ -638,6 +695,9 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
         {BUCKET_ORDER.map((key) => {
           const meta = PAYABLE_BUCKETS[key];
           const b = monthBucketSummary[key];
+          // Hide an empty non-core bucket (e.g. "Parcialmente Pago") so it never
+          // renders a meaningless "R$ 0,00 · 0" card. Core buckets always show.
+          if (!ALWAYS_SHOWN_BUCKETS.includes(key) && b.count === 0 && b.total === 0) return null;
           return (
             <FinancialKpiCard
               key={key}

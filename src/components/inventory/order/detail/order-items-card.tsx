@@ -569,7 +569,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate, orderActions =
                       </div>
                     </TableCell>
                     <TableCell className="py-2 max-w-[250px]">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-0.5">
                         <TruncatedTextWithTooltip
                           text={
                             item.temporaryItemDescription ||
@@ -578,6 +578,17 @@ export function OrderItemsCard({ order, className, onOrderUpdate, orderActions =
                           }
                           className="font-medium text-sm"
                         />
+                        {!item.itemId && (() => {
+                          // Temp line: show discrete código/marca/categoria/medidas as
+                          // separate labeled bits (legacy rows without them show nothing extra).
+                          const bits = [
+                            item.temporaryItemUniCode ? `Cód: ${item.temporaryItemUniCode}` : null,
+                            item.temporaryItemBrand ? `Marca: ${item.temporaryItemBrand}` : null,
+                            item.temporaryItemCategory?.name ? `Cat: ${item.temporaryItemCategory.name}` : null,
+                            item.temporaryItemMeasures ? `Medidas: ${item.temporaryItemMeasures}` : null,
+                          ].filter(Boolean) as string[];
+                          return bits.length > 0 ? <span className="text-xs text-muted-foreground">{bits.join(" · ")}</span> : null;
+                        })()}
                       </div>
                     </TableCell>
                     <TableCell className="text-center py-2">

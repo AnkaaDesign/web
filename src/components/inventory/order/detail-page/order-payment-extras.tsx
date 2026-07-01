@@ -56,28 +56,40 @@ export function OrderPaymentExtras({ order }: OrderPaymentExtrasProps) {
         </div>
       )}
 
-      {/* Installment schedule (boleto 2x/3x) — one row per parcela. */}
+      {/* Installment schedule — orders now always carry ≥1 installment. Boleto
+          orders list N parcelas; single-payment (PIX/cartão) orders show one
+          "Parcela única" row. Each row surfaces its settle status + paid date
+          (the bank-backed vs paid-on-paper clearance axis is derived only in the
+          Conciliação / Contas a Pagar views — the order GET carries no match
+          data). */}
       {installments.length > 0 && (
         <>
           <Separator className="bg-border" />
           <div className="space-y-4">
             <h3 className="text-base font-semibold mb-4 text-foreground flex items-center gap-2">
               <IconReceipt2 className="h-4 w-4 text-muted-foreground" />
-              Parcelas do Boleto
+              {isBoleto && installments.length > 1 ? "Parcelas do Boleto" : "Parcelas"}
             </h3>
             <div className="space-y-2">
               {installments.map((inst) => {
                 const variant = (INSTALLMENT_STATUS_VARIANT[inst.status] || "outline") as any;
+                const isPaid = inst.status === ORDER_INSTALLMENT_STATUS.PAID;
                 return (
                   <div key={inst.id} className="flex justify-between items-start bg-muted/50 rounded-lg px-4 py-3 gap-3">
                     <div className="flex flex-col min-w-0 gap-1.5">
                       <span className="text-sm font-medium text-foreground">
-                        {inst.number}ª parcela de {installments.length}
+                        {installments.length > 1 ? `${inst.number}ª parcela de ${installments.length}` : "Parcela única"}
                       </span>
                       {inst.dueDate && (
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
                           <IconCalendar className="h-3 w-3" />
                           Vence em {formatDate(inst.dueDate)}
+                        </span>
+                      )}
+                      {isPaid && inst.paidAt && (
+                        <span className="text-xs text-green-700 flex items-center gap-1">
+                          <IconCircleCheck className="h-3 w-3" />
+                          Pago em {formatDate(inst.paidAt)}
                         </span>
                       )}
                     </div>

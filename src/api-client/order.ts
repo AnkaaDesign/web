@@ -101,8 +101,8 @@ export class OrderService {
   }
 
   /** Unified Contas a Pagar list: orders + airbrushing + schedules + taxes + folha + 13º/férias + recorrentes, plus per-state summary. */
-  async getPayables(): Promise<PayablesResponse> {
-    const response = await apiClient.get<PayablesResponse>(`/financial/payables`);
+  async getPayables(competence?: string): Promise<PayablesResponse> {
+    const response = await apiClient.get<PayablesResponse>(`/financial/payables`, competence ? { params: { competence } } : undefined);
     return response.data;
   }
 
@@ -391,7 +391,7 @@ export const batchDeleteOrders = (data: OrderBatchDeleteFormData) => orderServic
 
 // Order payment exports (contas a pagar)
 export const getOrderPaymentSummary = () => orderService.getPaymentSummary();
-export const getOrderPayables = () => orderService.getPayables();
+export const getOrderPayables = (competence?: string) => orderService.getPayables(competence);
 export const settlePayrollMonth = (year: number, month: number, amount: number | null) => orderService.settlePayrollMonth(year, month, amount);
 export const markOrderAwaitingPayment = (id: string, query?: OrderQueryFormData) => orderService.markAwaitingPayment(id, query);
 export const markOrderPaid = (id: string, query?: OrderQueryFormData) => orderService.markPaid(id, query);

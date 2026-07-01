@@ -175,8 +175,8 @@ export interface ItemSelectorTableProps {
 /**
  * Temporary item carried directly inside the order form (no inventory itemId).
  * Rendered as pinned rows above the paginated inventory items.
- * Optional metadata fields, when filled, get composed into the final
- * description sent to the API at submit time.
+ * Discrete metadata fields map 1:1 to the API's temporary-item fields
+ * (`temporaryItemUniCode/Brand/Measures` + `temporaryItemCategoryId`).
  */
 export interface TemporaryItemRow {
   key: string;
@@ -187,7 +187,8 @@ export interface TemporaryItemRow {
   ipi: number;
   uniCode?: string;
   brand?: string;
-  category?: string;
+  categoryId?: string;
+  categoryName?: string;
   measures?: string;
 }
 

@@ -148,10 +148,12 @@ export const useOrderPaymentSummary = (options?: { enabled?: boolean }) =>
  * scheduled/expected outflows, each carrying its own payment state, plus a
  * per-state summary. Keyed under orderKeys.all so payment mutations invalidate it.
  */
-export const useOrderPayables = (options?: { enabled?: boolean }) =>
+export const useOrderPayables = (competence?: string, options?: { enabled?: boolean }) =>
   useQuery({
-    queryKey: [...orderKeys.all, "payables"] as const,
-    queryFn: getOrderPayables,
+    // Keyed by competence so navigating months in Contas a Pagar refetches the
+    // selected month server-side (past-month recurrent occurrences aren't preloaded).
+    queryKey: [...orderKeys.all, "payables", competence ?? "current"] as const,
+    queryFn: () => getOrderPayables(competence),
     staleTime: 1000 * 60, // 1 minute
     enabled: options?.enabled ?? true,
   });

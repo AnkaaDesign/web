@@ -312,11 +312,16 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   const brands = brandsResponse?.data || [];
   const suppliers = suppliersResponse?.data || [];
 
-  // Temporary items carry category/brand as plain NAME strings (composed into the
-  // final description at submit). Use the real category/brand names as the combobox
-  // value so selection maps 1:1 to what composeTempItemDescription reads.
-  const tempCategoryOptions = useMemo(() => categories.map((c) => ({ value: c.name, label: c.name })), [categories]);
+  // Temporary items store the ItemCategory id (persisted as temporaryItemCategoryId).
+  // The combobox value is the category id; the label resolves via categoryNameById.
+  // Brand stays a plain NAME string (temporaryItemBrand).
+  const tempCategoryOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
   const tempBrandOptions = useMemo(() => brands.map((b) => ({ value: b.name, label: b.name })), [brands]);
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    categories.forEach((c) => map.set(c.id, c.name));
+    return map;
+  }, [categories]);
 
   // Handle search change
   const handleSearchChange = useCallback(
@@ -511,7 +516,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
     description: "",
     uniCode: "",
     brand: "",
-    category: "",
+    categoryId: "",
     measures: "",
     quantity: 1,
     price: 0,
@@ -538,13 +543,14 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
       ipi: tempDraft.ipi,
       uniCode: tempDraft.uniCode.trim() || undefined,
       brand: tempDraft.brand.trim() || undefined,
-      category: tempDraft.category.trim() || undefined,
+      categoryId: tempDraft.categoryId || undefined,
+      categoryName: tempDraft.categoryId ? categoryNameById.get(tempDraft.categoryId) : undefined,
       measures: tempDraft.measures.trim() || undefined,
     });
     resetTempDraft();
     // Re-focus the description input so the user can keep typing more items quickly.
     setTimeout(() => tempDescriptionInputRef.current?.focus(), 0);
-  }, [tempDraft, onTemporaryItemAdd, resetTempDraft]);
+  }, [tempDraft, onTemporaryItemAdd, resetTempDraft, categoryNameById]);
 
   const handleTempKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -603,8 +609,8 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
         return (
           <Combobox
             options={tempCategoryOptions}
-            value={tempDraft.category}
-            onValueChange={(value) => setTempDraft((prev) => ({ ...prev, category: (value as string) ?? "" }))}
+            value={tempDraft.categoryId}
+            onValueChange={(value) => setTempDraft((prev) => ({ ...prev, categoryId: (value as string) ?? "" }))}
             placeholder="Categoria"
             emptyText="Nenhuma categoria encontrada"
             searchPlaceholder="Buscar categoria..."
@@ -739,8 +745,13 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
         return (
           <Combobox
             options={tempCategoryOptions}
-            value={temp.category || ""}
-            onValueChange={(value) => onTemporaryItemUpdate?.(temp.key, { category: ((value as string) || "").trim() || undefined })}
+            value={temp.categoryId || ""}
+            onValueChange={(value) =>
+              onTemporaryItemUpdate?.(temp.key, {
+                categoryId: (value as string) || undefined,
+                categoryName: value ? categoryNameById.get(value as string) : undefined,
+              })
+            }
             placeholder="Categoria"
             emptyText="Nenhuma categoria encontrada"
             searchPlaceholder="Buscar categoria..."

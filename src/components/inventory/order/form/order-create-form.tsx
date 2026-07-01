@@ -25,7 +25,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import type { ItemGetManyFormData } from "../../../../schemas";
-import { useOrderFormUrlState, composeTempItemDescription } from "@/hooks/inventory/use-order-form-url-state";
+import { useOrderFormUrlState, toTempItemPayload } from "@/hooks/inventory/use-order-form-url-state";
 import { formatCurrency, formatDate, measureUtils, formatPixKey } from "../../../../utils";
 import { exportOrderPdf } from "@/utils/order-pdf-generator";
 import { buildOrderCode } from "@/utils/order-code";
@@ -200,7 +200,7 @@ export const OrderCreateForm = () => {
     const tempItemsForForm = (temporaryItems || [])
       .filter(t => t.temporaryItemDescription.trim() !== "" && t.orderedQuantity > 0)
       .map(t => ({
-        temporaryItemDescription: composeTempItemDescription(t),
+        ...toTempItemPayload(t),
         orderedQuantity: t.orderedQuantity,
         price: t.price,
         icms: t.icms,
@@ -519,7 +519,7 @@ export const OrderCreateForm = () => {
       const tempItemsData = (temporaryItems || [])
         .filter(t => t.temporaryItemDescription.trim() !== "" && t.orderedQuantity > 0)
         .map(t => ({
-          temporaryItemDescription: composeTempItemDescription(t),
+          ...toTempItemPayload(t),
           orderedQuantity: Number(t.orderedQuantity) || 1,
           price: Number(t.price) || 0,
           icms: Number(t.icms) || 0,
@@ -752,7 +752,7 @@ export const OrderCreateForm = () => {
         .filter((t) => t.temporaryItemDescription.trim() !== "")
         .map((t) => ({
           code: t.uniCode || "-",
-          name: composeTempItemDescription(t),
+          name: t.temporaryItemDescription,
           brand: t.brand || "-",
           measures: t.measures || "-",
           quantity: Number(t.orderedQuantity) || 0,

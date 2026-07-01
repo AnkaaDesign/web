@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { flexRender, type Header, type Row, type Table } from "@tanstack/react-table";
+import { flexRender, type ExpandedState, type Header, type Row, type Table } from "@tanstack/react-table";
 import { useSearchParams } from "react-router-dom";
 import { notify } from "@/api-client";
 import { IconChevronUp, IconChevronDown, IconSelector, IconPin, IconPinnedOff, IconChevronRight } from "@tabler/icons-react";
@@ -203,7 +203,14 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const internalScrollRef = useRef<HTMLDivElement | null>(null);
-  const scrollRef = scrollContainerRef ?? internalScrollRef;
+  // Windowed mode: `autoHeight` + a shared (external) scroll container → this table has NO inner scroll
+  // and virtualizes against that page container via scrollMargin, so several tables stack under one
+  // scrollbar. Otherwise the table owns its inner scroll (`scrollContainerRef` may still alias it so a
+  // parent like DataTablePage can watch it, e.g. for scroll-hide header).
+  const windowed = autoHeight && !!scrollContainerRef;
+  const scrollRef = windowed ? scrollContainerRef : (scrollContainerRef ?? internalScrollRef);
+  // The body tbody, whose offset within the shared container is measured as the scrollMargin (windowed).
+  const listRef = useRef<HTMLTableSectionElement | null>(null);
 
   // --- Privilege gating: drop columns / filters / row-actions the user may not see BEFORE
   //     the table is built, so a gated item never reaches the render, the column-visibility
@@ -350,6 +357,8 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     data: filtered,
     columns,
     scrollRef,
+    windowed,
+    listRef,
     getRowId: getRowId ? (r) => getRowId(r) : undefined,
     mode,
     rowCount,
@@ -360,7 +369,6 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     enableRowSelection: enableSelection,
     enableRowPinning,
     enablePagination: enablePagination && !autoHeight,
-    autoHeight,
     enableExpansion,
     getSubRows,
     getRowCanExpand,
@@ -373,7 +381,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     sectorReady: !!currentPrivilege,
   });
 
-  const { table, columnSizeVars, rowVirtualizer, rows, columnAlignment, setColumnAlignment } = dt;
+  const { table, columnSizeVars, rowVirtualizer, scrollMargin, rows, columnAlignment, setColumnAlignment } = dt;
   // Wire the page-1 reset now that the engine exists (used by the search + filter effects above).
   resetToFirstPage.current = () => table.setPageIndex(0);
 
@@ -381,7 +389,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   // descendant matches, but the matching child stays collapsed (hidden) until the group is expanded.
   // Snapshot the pre-search expansion and restore it once the search clears so we don't clobber the
   // user's manual/persisted expand state.
-  const preSearchExpanded = useRef<boolean | Record<string, boolean> | null>(null);
+  const preSearchExpanded = useRef<ExpandedState | null>(null);
   const searchExpandActive = !!debouncedSearch && !!getSubRows;
   useEffect(() => {
     if (!getSubRows) return;
@@ -614,20 +622,24 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   const columnsKey = `${visibleColumnIds.join(",")}|${alignKey}`;
   const isEmpty = !isLoading && rows.length === 0;
 
+  // Row/overlay positions inside the tbody are `virtualItem.start - scrollMargin` (0 in normal mode;
+  // in windowed mode `start` includes this list's offset within the shared page scroll container).
+  const posOf = (vi: (typeof virtualItems)[number]) => vi.start - scrollMargin;
+
   // Contiguous runs of selected rows → one bordered overlay per block.
   const selectedBlocks: { top: number; height: number }[] = [];
   for (let k = 0; k < virtualItems.length; ) {
     const vi = virtualItems[k];
     if (rows[vi.index]?.getIsSelected()) {
-      const top = vi.start;
-      let bottom = vi.start + vi.size;
+      const top = posOf(vi);
+      let bottom = posOf(vi) + vi.size;
       let j = k + 1;
       while (
         j < virtualItems.length &&
         virtualItems[j].index === virtualItems[j - 1].index + 1 &&
         rows[virtualItems[j].index]?.getIsSelected()
       ) {
-        bottom = virtualItems[j].start + virtualItems[j].size;
+        bottom = posOf(virtualItems[j]) + virtualItems[j].size;
         j++;
       }
       selectedBlocks.push({ top, height: bottom - top });
@@ -642,164 +654,204 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   let pinnedBottomPx = 0;
   for (const vi of virtualItems) {
     if (rows[vi.index]?.getIsPinned() === "top") {
-      if (pinnedTopPx === null) pinnedTopPx = vi.start;
-      pinnedBottomPx = vi.start + vi.size;
+      if (pinnedTopPx === null) pinnedTopPx = posOf(vi);
+      pinnedBottomPx = posOf(vi) + vi.size;
     } else {
       break;
     }
   }
   const pinnedBar = pinnedTopPx !== null ? { top: pinnedTopPx, height: pinnedBottomPx - pinnedTopPx } : null;
 
+  // --- shared render fragments (composed into the normal single-table OR the windowed split layout) ---
+  const tableStyle = { ...columnSizeVars, width: rowWidth, minWidth: "100%" } as CSSProperties;
+
+  const headerBar = (
+    <>
+      {title != null && (
+        <h2 className="mb-3 text-sm font-semibold text-foreground">
+          {title}
+          {titleCount != null && <span className="ml-1.5 text-xs font-normal text-muted-foreground">({titleCount})</span>}
+        </h2>
+      )}
+      <DataTableToolbar
+        table={table}
+        columns={columns}
+        search={displaySearch}
+        onSearchChange={setDisplaySearch}
+        searchPlaceholder={searchPlaceholder}
+        isSearchPending={displaySearch !== debouncedSearch}
+        enableColumnReorder={enableColumnReorder}
+        columnAlignment={columnAlignment}
+        onColumnAlignmentChange={setColumnAlignment}
+        onResetLayout={dt.resetLayout}
+        hasFilters={filterDefs.length > 0 || !!filterContent}
+        filterCount={countActiveFilters(filters)}
+        onOpenFilters={openFilters}
+        shareEnabled={enableShare}
+        onShare={handleShare}
+        canShareLink={syncUrl}
+        selectedCount={selectedCount}
+        showSelectedOnly={viewSelectedOnly}
+        onToggleSelectedOnly={setViewSelectedOnly}
+        canViewSelectedOnly={true}
+        enableExpansion={enableExpansion}
+        allExpanded={allRowsExpanded}
+        onToggleExpandAll={handleToggleExpandAll}
+        customActions={toolbarActions}
+      />
+      {activeChips.length > 0 && (
+        <div className="mt-3">
+          <FilterIndicators filters={activeChips} onClearAll={() => applyFilters({})} />
+        </div>
+      )}
+    </>
+  );
+
+  const headerRowEls = headerGroups.map((hg) => (
+    <tr key={hg.id} className="flex w-full border-b border-border">
+      {enableSelection && (
+        <th
+          className="flex h-10 w-10 min-w-10 shrink-0 cursor-pointer items-center justify-center bg-muted"
+          onClick={() => table.toggleAllPageRowsSelected()}
+        >
+          <Checkbox checked={headerCheckedState} tabIndex={-1} className="pointer-events-none" aria-label="Selecionar todos" />
+        </th>
+      )}
+      {enableExpansion && (
+        <th
+          className="flex h-10 w-9 min-w-9 shrink-0 cursor-pointer items-center justify-center bg-muted text-muted-foreground"
+          onClick={table.getToggleAllRowsExpandedHandler()}
+          title={allRowsExpanded ? "Recolher todos" : "Expandir todos"}
+        >
+          <IconChevronRight className={cn("h-4 w-4 transition-transform", allRowsExpanded && "rotate-90")} />
+        </th>
+      )}
+      {hg.headers.map((header, i) => (
+        <HeaderCell
+          key={header.id}
+          header={header}
+          showSortOrder={multiSort}
+          align={alignMap[header.column.id] ?? "left"}
+          isLast={i === hg.headers.length - 1}
+        />
+      ))}
+    </tr>
+  ));
+
+  const bodyRowEls = (
+    <>
+      {virtualItems.map((vi) => {
+        const row = rows[vi.index];
+        if (!row) return null;
+        return (
+          <DataRow
+            key={row.id}
+            row={row}
+            enableSelection={enableSelection}
+            enableExpansion={enableExpansion}
+            canExpand={enableExpansion && row.getCanExpand()}
+            isExpanded={enableExpansion && row.getIsExpanded()}
+            selected={row.getIsSelected()}
+            selectedBelow={vi.index < rows.length - 1 ? (rows[vi.index + 1]?.getIsSelected() ?? false) : false}
+            isLastRow={vi.index === rows.length - 1}
+            absoluteIndex={vi.index}
+            virtualStart={vi.start - scrollMargin}
+            measureRef={rowVirtualizer.measureElement}
+            columnsKey={columnsKey}
+            alignMap={alignMap}
+            onSelectRow={handleSelectRow}
+            onToggleExpand={handleToggleExpand}
+            onContextMenu={handleRowContext}
+            onRowClick={handleRowClick}
+          />
+        );
+      })}
+      {/* selected-block wrapping borders (one per contiguous run) */}
+      {selectedBlocks.map((b, idx) => (
+        <tr
+          key={`sel-${idx}`}
+          aria-hidden
+          className="pointer-events-none absolute left-0 right-0 z-20 block rounded-md border-2 border-primary"
+          style={{ top: b.top, height: b.height }}
+        />
+      ))}
+      {/* pinned green left bar — one continuous overlay above the stripe shadow */}
+      {pinnedBar && (
+        <tr
+          aria-hidden
+          className="pointer-events-none absolute left-0 z-20 block w-[3px] bg-primary"
+          style={{ top: pinnedBar.top, height: pinnedBar.height }}
+        />
+      )}
+    </>
+  );
+
+  const stateOverlay = (
+    <>
+      {isEmpty && <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">{emptyMessage}</div>}
+      {isLoading && <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Carregando…</div>}
+    </>
+  );
+
   return (
     <div className={cn("flex flex-col", autoHeight ? "" : "h-full", className)}>
       {/* Outer card: padded toolbar + an inset, framed table whose left/right/bottom margins match the toolbar. */}
       <div className={cn("flex flex-col", autoHeight ? "" : "min-h-0 flex-1", !bare && "rounded-lg border border-border bg-card")}>
-        <div className={cn("pb-3", bare ? "pt-0" : "px-4 pt-3")}>
-          {title != null && (
-            <h2 className="mb-3 text-sm font-semibold text-foreground">
-              {title}
-              {titleCount != null && <span className="ml-1.5 text-xs font-normal text-muted-foreground">({titleCount})</span>}
-            </h2>
-          )}
-          <DataTableToolbar
-            table={table}
-            columns={columns}
-            search={displaySearch}
-            onSearchChange={setDisplaySearch}
-            searchPlaceholder={searchPlaceholder}
-            isSearchPending={displaySearch !== debouncedSearch}
-            enableColumnReorder={enableColumnReorder}
-            columnAlignment={columnAlignment}
-            onColumnAlignmentChange={setColumnAlignment}
-            onResetLayout={dt.resetLayout}
-            hasFilters={filterDefs.length > 0 || !!filterContent}
-            filterCount={countActiveFilters(filters)}
-            onOpenFilters={openFilters}
-            shareEnabled={enableShare}
-            onShare={handleShare}
-            canShareLink={syncUrl}
-            selectedCount={selectedCount}
-            showSelectedOnly={viewSelectedOnly}
-            onToggleSelectedOnly={setViewSelectedOnly}
-            canViewSelectedOnly={true}
-            enableExpansion={enableExpansion}
-            allExpanded={allRowsExpanded}
-            onToggleExpandAll={handleToggleExpandAll}
-            customActions={toolbarActions}
-          />
-          {activeChips.length > 0 && (
-            <div className="mt-3">
-              <FilterIndicators filters={activeChips} onClearAll={() => applyFilters({})} />
+        {windowed ? (
+          // WINDOWED (page-scroll) LAYOUT — the toolbar AND the column header live in ONE sticky block,
+          // so they can never separate: no measured offset, no see-through gap. The body rows sit in a
+          // sibling element below and scroll UNDER the block (page scroll). Header/body are two separate
+          // <table>s that align because both use the same columnSizeVars + rowWidth.
+          <>
+            <div className="sticky top-0 z-30 bg-card">
+              <div className="px-4 pb-3 pt-3">{headerBar}</div>
+              <div className="px-4">
+                <table className="grid border-collapse text-sm" style={tableStyle}>
+                  <thead className="m-0 grid bg-muted">{headerRowEls}</thead>
+                </table>
+              </div>
             </div>
-          )}
-        </div>
-
-        <div className={cn("flex flex-col", autoHeight ? "" : "min-h-0 flex-1", bare ? "pb-0" : "px-4 pb-4")}>
-          <div className={cn("flex flex-col rounded-lg border border-border", autoHeight ? "" : "min-h-0 flex-1 overflow-hidden")}>
-            <div ref={scrollRef} className={cn("relative", autoHeight ? "" : "min-h-0 flex-1 overflow-auto")}>
-              <table
-                className="grid border-collapse text-sm"
-                style={{ ...columnSizeVars, width: rowWidth, minWidth: "100%" } as CSSProperties}
-              >
-                <thead className={cn("z-30 m-0 grid bg-muted", autoHeight ? "" : "sticky top-0")}>
-                  {headerGroups.map((hg) => (
-                    <tr key={hg.id} className="flex w-full border-b border-border">
-                      {enableSelection && (
-                        <th
-                          className="flex h-10 w-10 min-w-10 shrink-0 cursor-pointer items-center justify-center bg-muted"
-                          onClick={() => table.toggleAllPageRowsSelected()}
-                        >
-                          <Checkbox checked={headerCheckedState} tabIndex={-1} className="pointer-events-none" aria-label="Selecionar todos" />
-                        </th>
-                      )}
-                      {enableExpansion && (
-                        <th
-                          className="flex h-10 w-9 min-w-9 shrink-0 cursor-pointer items-center justify-center bg-muted text-muted-foreground"
-                          onClick={table.getToggleAllRowsExpandedHandler()}
-                          title={allRowsExpanded ? "Recolher todos" : "Expandir todos"}
-                        >
-                          <IconChevronRight className={cn("h-4 w-4 transition-transform", allRowsExpanded && "rotate-90")} />
-                        </th>
-                      )}
-                      {hg.headers.map((header, i) => (
-                        <HeaderCell
-                          key={header.id}
-                          header={header}
-                          showSortOrder={multiSort}
-                          align={alignMap[header.column.id] ?? "left"}
-                          isLast={i === hg.headers.length - 1}
-                        />
-                      ))}
-                    </tr>
-                  ))}
-                </thead>
-
-                {/* One tbody: pinned rows (non-sticky, top) then center rows — all virtualized. */}
+            <div className="relative px-4 pb-4">
+              <table className="grid border-collapse text-sm" style={tableStyle}>
                 <tbody
-                  className="relative grid"
+                  ref={listRef}
+                  className="relative grid overflow-clip"
                   style={{ height: rowVirtualizer.getTotalSize(), width: rowWidth, minWidth: "100%" } as CSSProperties}
                 >
-                  {virtualItems.map((vi) => {
-                    const row = rows[vi.index];
-                    if (!row) return null;
-                    return (
-                      <DataRow
-                        key={row.id}
-                        row={row}
-                        enableSelection={enableSelection}
-                        enableExpansion={enableExpansion}
-                        canExpand={enableExpansion && row.getCanExpand()}
-                        isExpanded={enableExpansion && row.getIsExpanded()}
-                        selected={row.getIsSelected()}
-                        selectedBelow={vi.index < rows.length - 1 ? (rows[vi.index + 1]?.getIsSelected() ?? false) : false}
-                        isLastRow={vi.index === rows.length - 1}
-                        absoluteIndex={vi.index}
-                        virtualStart={vi.start}
-                        measureRef={rowVirtualizer.measureElement}
-                        columnsKey={columnsKey}
-                        alignMap={alignMap}
-                        onSelectRow={handleSelectRow}
-                        onToggleExpand={handleToggleExpand}
-                        onContextMenu={handleRowContext}
-                        onRowClick={handleRowClick}
-                      />
-                    );
-                  })}
-                  {/* selected-block wrapping borders (one per contiguous run) */}
-                  {selectedBlocks.map((b, idx) => (
-                    <tr
-                      key={`sel-${idx}`}
-                      aria-hidden
-                      className="pointer-events-none absolute left-0 right-0 z-20 block rounded-md border-2 border-primary"
-                      style={{ top: b.top, height: b.height }}
-                    />
-                  ))}
-                  {/* pinned green left bar — one continuous overlay above the stripe shadow */}
-                  {pinnedBar && (
-                    <tr
-                      aria-hidden
-                      className="pointer-events-none absolute left-0 z-20 block w-[3px] bg-primary"
-                      style={{ top: pinnedBar.top, height: pinnedBar.height }}
-                    />
-                  )}
+                  {bodyRowEls}
                 </tbody>
               </table>
-
-              {isEmpty && (
-                <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">{emptyMessage}</div>
-              )}
-              {isLoading && (
-                <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Carregando…</div>
-              )}
+              {stateOverlay}
             </div>
+          </>
+        ) : (
+          // NORMAL LAYOUT — single table, sticky <thead> inside the table's OWN inner scroll (unchanged).
+          <>
+            <div className={cn("pb-3", bare ? "pt-0" : "px-4 pt-3")}>{headerBar}</div>
+            <div className={cn("flex flex-col", autoHeight ? "" : "min-h-0 flex-1", bare ? "pb-0" : "px-4 pb-4")}>
+              <div className={cn("flex flex-col rounded-lg border border-border", autoHeight ? "" : "min-h-0 flex-1 overflow-hidden")}>
+                <div ref={scrollRef} className={cn("relative", autoHeight ? "" : "min-h-0 flex-1 overflow-auto")}>
+                  <table className="grid border-collapse text-sm" style={tableStyle}>
+                    <thead className={cn("z-30 m-0 grid bg-muted", !autoHeight && "sticky top-0")}>{headerRowEls}</thead>
+                    <tbody
+                      className="relative grid"
+                      style={{ height: rowVirtualizer.getTotalSize(), width: rowWidth, minWidth: "100%" } as CSSProperties}
+                    >
+                      {bodyRowEls}
+                    </tbody>
+                  </table>
+                  {stateOverlay}
+                </div>
 
-            {enablePagination && !autoHeight && (
-              <div className="border-t border-border bg-muted/40 px-4">
-                <DataTablePagination table={table} totalItems={totalItems} pageSizeOptions={dt.pageSizeOptions} />
+                {enablePagination && !autoHeight && (
+                  <div className="border-t border-border bg-muted/40 px-4">
+                    <DataTablePagination table={table} totalItems={totalItems} pageSizeOptions={dt.pageSizeOptions} />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       {(filterDefs.length > 0 || filterContent) && (
