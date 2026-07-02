@@ -550,15 +550,18 @@ input[type="time"]::-moz-calendar-picker-indicator {
     background-color: hsl(0 0% 15%) !important; /* very dark neutral */
   }
 
-  /* Select items in dark mode */
-  .dark [role="option"] {
+  /* Select items in dark mode — scoped to popper-rendered dropdowns only.
+     The previous bare `[role="option"]` selector force-grayed EVERY option on
+     the page (with !important), which made selection highlights like the
+     spotlight's bg-accent row invisible in dark mode. */
+  .dark [data-radix-popper-content-wrapper] [role="option"] {
     background-color: hsl(0 0% 15%) !important; /* darker neutral */
     color: hsl(0 0% 96%) !important;
   }
 
-  .dark [role="option"]:hover,
-  .dark [role="option"]:focus,
-  .dark [role="option"][data-highlighted] {
+  .dark [data-radix-popper-content-wrapper] [role="option"]:hover,
+  .dark [data-radix-popper-content-wrapper] [role="option"]:focus,
+  .dark [data-radix-popper-content-wrapper] [role="option"][data-highlighted] {
     background-color: hsl(0 0% 25%) !important; /* lighter on hover */
     outline: none !important;
   }

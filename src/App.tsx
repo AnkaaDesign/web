@@ -23,6 +23,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { setupWebNotifications } from "@/lib/setup-notifications";
 import { PushNotificationSetup } from "@/components/common/push-notification-setup";
 import { SocketNotificationsListener } from "@/components/common/socket-notifications-listener";
+import { SpotlightSearch } from "@/components/navigation/spotlight";
 import { SocketReconnectHandler } from "@/components/common/socket-reconnect-handler";
 import { useAppVersion } from "@/hooks/use-app-version";
 
@@ -608,6 +609,7 @@ function App() {
                       <FileViewerProvider>
                         <MessageModalProvider>
                           <Toaster />
+                          <SpotlightSearch />
                           <PushNotificationSetup />
                           <PricingVisibilityBoundary>
                           <Routes>

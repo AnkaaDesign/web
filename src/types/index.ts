@@ -44,6 +44,7 @@ export * from "./layout";
 export * from "./layoutSection";
 export * from "./user";
 export * from "./dashboard";
+export * from "./search";
 export * from "./auth";
 export * from "./bonus";
 export * from "./bonusDiscount";

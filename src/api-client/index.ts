@@ -79,6 +79,7 @@ export * from "./services/layoutSection";
 export * from "./services/team-staff";
 export * from "./user";
 export * from "./dashboard";
+export * from "./search";
 export * from "./economic-activity";
 export * from "./server";
 export * from "./services/bonus";
