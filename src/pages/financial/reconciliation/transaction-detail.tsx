@@ -219,7 +219,10 @@ export function ReconciliationTransactionDetailPage() {
               </Card>
 
               {/* Categoria — when an NF is linked the categories come from the
-                  note's items (read-only here); otherwise it's set inline. */}
+                  note's items (read-only here). With no NF linked the category is
+                  set inline, even for transactions that expect an NF: a matching
+                  note may never arrive (payment without NF), so the user must be
+                  able to categorize manually. Linking an NF later takes over. */}
               <Card className="shadow-sm border border-border">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2">
@@ -228,14 +231,22 @@ export function ReconciliationTransactionDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  {!hasNf && !tx.expectsFiscalDocument ? (
-                    <CategoryEditor
-                      transaction={tx}
-                      value={categoryIds}
-                      onChange={commitCategories}
-                      enableSplit={false}
-                      enableNotes={false}
-                    />
+                  {!hasNf ? (
+                    <div className="space-y-2">
+                      <CategoryEditor
+                        transaction={tx}
+                        value={categoryIds}
+                        onChange={commitCategories}
+                        enableSplit={false}
+                        enableNotes={false}
+                      />
+                      {tx.expectsFiscalDocument && (
+                        <p className="text-xs text-muted-foreground">
+                          Sem nota vinculada — selecione a categoria manualmente. Ao vincular uma NF, as
+                          categorias passam a vir dela.
+                        </p>
+                      )}
+                    </div>
                   ) : tx.categories && tx.categories.length > 0 ? (
                     <div className="space-y-3">
                       {tx.categories.map(t => (

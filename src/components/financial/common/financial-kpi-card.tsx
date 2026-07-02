@@ -34,8 +34,14 @@ export function FinancialKpiCard({ label, value, count, Icon, tone, hint, active
       title={hint}
       className={cn(
         "h-full",
-        onClick && "transition-all cursor-pointer hover:shadow-md",
-        onClick && (active ? "border-primary/60 shadow-sm" : "opacity-70"),
+        onClick && "transition-all cursor-pointer",
+        onClick &&
+          (active
+            ? // Selected: solid primary border + tinted fill + lift. The border
+              // is the Card's own edge, so it follows the rounded-xl corners exactly.
+              "border-primary bg-primary/5 shadow-md hover:shadow-lg"
+            : // Unselected: recessed — neutral gray border, dimmed + desaturated.
+              "border-border opacity-50 grayscale hover:opacity-100 hover:grayscale-0 hover:shadow-md"),
       )}
     >
       <CardContent className="flex items-center gap-3 p-4">
@@ -60,7 +66,15 @@ export function FinancialKpiCard({ label, value, count, Icon, tone, hint, active
   if (!onClick) return card;
 
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className="text-left w-full focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      // rounded-xl matches the Card so the keyboard focus ring hugs the same
+      // corners. focus-visible (not focus) so a mouse click to DESELECT doesn't
+      // leave a lingering green ring on the now-unselected card.
+      className="text-left w-full rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+    >
       {card}
     </button>
   );

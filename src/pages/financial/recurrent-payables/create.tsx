@@ -42,7 +42,7 @@ export const CreateRecurrentPayablePage = () => {
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <div className="container mx-auto max-w-2xl flex-shrink-0">
+        <div className="container mx-auto max-w-3xl flex-shrink-0">
           <PageHeader
             variant="form"
             title="Nova conta recorrente"

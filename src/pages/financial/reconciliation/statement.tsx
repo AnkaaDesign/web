@@ -72,6 +72,45 @@ function parseTypes(raw: string | null): TransactionType[] {
   return parsed.length ? parsed : ALL_TYPES;
 }
 
+// The card selection (Entradas/Saídas + status buckets) persists across visits
+// in localStorage so the user's chosen view sticks. A URL param still wins when
+// present (shared/deep links); otherwise we fall back to the stored value, then
+// to the defaults (everything on).
+const TYPES_STORAGE_KEY = "reconciliation-statement:types";
+const BUCKETS_STORAGE_KEY = "reconciliation-statement:buckets";
+const MONTH_STORAGE_KEY = "reconciliation-statement:month";
+
+function readStoredMonth(): Date | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return parseMonthKey(window.localStorage.getItem(MONTH_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function readStoredSelection<T extends string>(key: string, allowed: readonly T[]): T[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter((v): v is T => allowed.includes(v as T));
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSelection(key: string, value: readonly string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* quota / private-mode — non-fatal */
+  }
+}
+
 /** Stable identity of one bank account inside the statement data. */
 function accountKeyOf(t: BankTransaction): string {
   return `${t.bankCode}|${t.agency}|${t.accountNumber}`;
@@ -97,21 +136,27 @@ export const ReconciliationStatementPage = () => {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [month, setMonth] = useState<Date>(
-    () => parseMonthKey(searchParams.get("mes")) ?? new Date(),
-  );
+  const [month, setMonth] = useState<Date>(() => {
+    const raw = searchParams.get("mes");
+    if (raw) return parseMonthKey(raw) ?? new Date();
+    return readStoredMonth() ?? new Date();
+  });
   const [accountKey, setAccountKey] = useState<string>(
     () => searchParams.get("conta") || "",
   );
   const [searchText, setSearchText] = useState(
     () => searchParams.get("search") || "",
   );
-  const [types, setTypes] = useState<TransactionType[]>(() =>
-    parseTypes(searchParams.get("tipo")),
-  );
-  const [buckets, setBuckets] = useState<BucketKey[]>(() =>
-    parseBuckets(searchParams.get("status"), ALL_BUCKETS),
-  );
+  const [types, setTypes] = useState<TransactionType[]>(() => {
+    const raw = searchParams.get("tipo");
+    if (raw !== null) return parseTypes(raw);
+    return readStoredSelection(TYPES_STORAGE_KEY, ALL_TYPES) ?? ALL_TYPES;
+  });
+  const [buckets, setBuckets] = useState<BucketKey[]>(() => {
+    const raw = searchParams.get("status");
+    if (raw !== null) return parseBuckets(raw, ALL_BUCKETS);
+    return readStoredSelection(BUCKETS_STORAGE_KEY, ALL_BUCKETS) ?? ALL_BUCKETS;
+  });
   const debouncedSearch = useDebouncedValue(searchText.trim(), 300);
   const [importOpen, setImportOpen] = useState(false);
   const [scoringHelpOpen, setScoringHelpOpen] = useState(false);
@@ -135,6 +180,22 @@ export const ReconciliationStatementPage = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, accountKey, searchText, types, buckets]);
+
+  // Persist the card selection + month so the chosen view sticks across visits/reloads.
+  useEffect(() => {
+    writeStoredSelection(TYPES_STORAGE_KEY, types);
+  }, [types]);
+  useEffect(() => {
+    writeStoredSelection(BUCKETS_STORAGE_KEY, buckets);
+  }, [buckets]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(MONTH_STORAGE_KEY, monthKey(month));
+    } catch {
+      /* quota / private-mode — non-fatal */
+    }
+  }, [month]);
 
   const { from, to } = useMemo(() => monthBounds(month), [month]);
 

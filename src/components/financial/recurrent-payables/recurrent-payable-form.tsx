@@ -8,6 +8,7 @@ import {
   IconCash,
   IconCalendarRepeat,
   IconAdjustments,
+  IconQrcode,
 } from "@tabler/icons-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,10 +18,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { FormMoneyInput } from "@/components/ui/form-money-input";
-import { FormCNPJInput } from "@/components/ui/form-cnpj-input";
+import { FormDocumentInput } from "@/components/ui/form-document-input";
 
 import { useReconciliationCategories } from "@/hooks/financial/use-reconciliation";
 import { PAYMENT_METHOD, PAYMENT_METHOD_LABELS, SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS } from "@/constants";
+import { formatPixKey } from "@/utils/formatters";
 import type { CreateRecurrentPayablePayload, RecurrentPayable } from "@/types/recurrent-payable";
 
 // Frequencies offered for recurrent bills. WEEKLY/BIWEEKLY are sub-monthly (use
@@ -66,12 +68,21 @@ const formSchema = z
     name: z.string().trim().min(1, { message: "Informe o nome da conta" }).max(200),
     description: z.string().max(500).optional(),
     payeeName: z.string().max(200).optional(),
-    // Free text — formatted CNPJ; cleaned + validated (14 digits) server-side.
+    // Tomador aceita CPF OU CNPJ (o seletor mantém apenas um preenchido, zerando
+    // o outro para null). Ambos são limpos + validados (11/14 dígitos).
     payeeCnpj: z
       .string()
+      .nullable()
       .optional()
       .refine((v) => !v || v.replace(/\D/g, "").length === 0 || v.replace(/\D/g, "").length === 14, {
         message: "CNPJ deve ter 14 dígitos",
+      }),
+    payeeCpf: z
+      .string()
+      .nullable()
+      .optional()
+      .refine((v) => !v || v.replace(/\D/g, "").length === 0 || v.replace(/\D/g, "").length === 11, {
+        message: "CPF deve ter 11 dígitos",
       }),
     categoryId: z.string().uuid({ message: "Selecione a categoria" }),
     amountKind: z.enum(["FIXED", "VARIABLE"]),
@@ -86,6 +97,8 @@ const formSchema = z
       .optional(),
     daysOfWeek: z.array(z.number().int().min(0).max(6)).default([]),
     paymentMethod: z.enum([PAYMENT_METHOD.PIX, PAYMENT_METHOD.BANK_SLIP, PAYMENT_METHOD.CREDIT_CARD]).optional(),
+    // Chave Pix (qualquer formato: CPF/CNPJ/e-mail/telefone/aleatória).
+    pixKey: z.string().max(500, { message: "Chave Pix muito longa" }).optional(),
     expectsNf: z.boolean(),
     isActive: z.boolean(),
   })
@@ -109,6 +122,7 @@ const EMPTY_DEFAULTS: FormData = {
   description: "",
   payeeName: "",
   payeeCnpj: "",
+  payeeCpf: "",
   categoryId: "",
   amountKind: "FIXED",
   fixedAmount: undefined,
@@ -117,6 +131,7 @@ const EMPTY_DEFAULTS: FormData = {
   dueDayOfMonth: undefined,
   daysOfWeek: [],
   paymentMethod: undefined,
+  pixKey: "",
   expectsNf: false,
   isActive: true,
 };
@@ -137,8 +152,15 @@ interface RecurrentPayableFormProps {
 export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormStateChange }: RecurrentPayableFormProps) {
   const { data: categories } = useReconciliationCategories({ includeInactive: false });
   const categoryOptions = useMemo(
-    () => (categories ?? []).map((c) => ({ value: c.id, label: c.name })),
-    [categories],
+    () =>
+      (categories ?? [])
+        // Recorrentes são despesas de serviço/overhead (aluguel, internet, água…),
+        // nunca categorias de itens do estoque (ITEM_DERIVED espelha uma ItemCategory).
+        // Mantém a categoria já selecionada na edição, mesmo que seja de item, para
+        // não esvaziar o campo de uma conta antiga.
+        .filter((c) => c.kind !== "ITEM_DERIVED" || c.id === payable?.categoryId)
+        .map((c) => ({ value: c.id, label: c.name })),
+    [categories, payable?.categoryId],
   );
 
   const form = useForm<FormData>({
@@ -156,6 +178,7 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
         description: payable.description ?? "",
         payeeName: payable.payeeName ?? "",
         payeeCnpj: payable.payeeCnpj ?? "",
+        payeeCpf: payable.payeeCpf ?? "",
         categoryId: payable.categoryId,
         amountKind: payable.amountKind,
         fixedAmount: payable.fixedAmount != null ? Number(payable.fixedAmount) : undefined,
@@ -164,6 +187,7 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
         dueDayOfMonth: payable.dueDayOfMonth ?? undefined,
         daysOfWeek: payable.daysOfWeek ?? [],
         paymentMethod: (payable.paymentMethod as PAYMENT_METHOD | null) ?? undefined,
+        pixKey: payable.pixKey ?? "",
         expectsNf: payable.expectsNf,
         isActive: payable.isActive,
       });
@@ -178,19 +202,25 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
 
   const amountKind = useWatch({ control: form.control, name: "amountKind" });
   const frequency = useWatch({ control: form.control, name: "frequency" });
+  const paymentMethod = useWatch({ control: form.control, name: "paymentMethod" });
   const isWeekly = WEEKLY_FREQUENCIES.includes(frequency);
+  const isPix = paymentMethod === PAYMENT_METHOD.PIX;
 
   const handleSubmit = (data: FormData) => {
     const cnpjDigits = (data.payeeCnpj ?? "").replace(/\D/g, "");
+    const cpfDigits = (data.payeeCpf ?? "").replace(/\D/g, "");
     const weekly = WEEKLY_FREQUENCIES.includes(data.frequency);
+    const isPixMethod = data.paymentMethod === PAYMENT_METHOD.PIX;
+    const pix = isPixMethod && data.pixKey?.trim() ? formatPixKey(data.pixKey.trim()) : null;
     const payload: CreateRecurrentPayablePayload = {
       name: data.name.trim(),
       description: data.description?.trim() ? data.description.trim() : null,
       // Recurrent bills are not provided by inventory suppliers — payee is free
-      // text + optional CNPJ.
+      // text + optional CPF/CNPJ.
       supplierId: null,
       payeeName: data.payeeName?.trim() ? data.payeeName.trim() : null,
       payeeCnpj: cnpjDigits.length === 14 ? cnpjDigits : null,
+      payeeCpf: cpfDigits.length === 11 ? cpfDigits : null,
       categoryId: data.categoryId,
       amountKind: data.amountKind,
       fixedAmount: data.amountKind === "FIXED" ? data.fixedAmount ?? null : null,
@@ -200,6 +230,8 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
       dueDayOfMonth: weekly ? null : data.dueDayOfMonth ?? null,
       daysOfWeek: weekly ? data.daysOfWeek : [],
       paymentMethod: data.paymentMethod ?? null,
+      // Only a PIX bill carries a key; other methods drop it.
+      pixKey: pix,
       expectsNf: data.expectsNf,
       isActive: data.isActive,
     };
@@ -208,7 +240,7 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
 
   return (
     <FormProvider {...form}>
-      <form id="recurrent-payable-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-2xl">
+      <form id="recurrent-payable-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-3xl">
         {/* Programmatic submit target for the PageHeader action button. */}
         <button id="recurrent-payable-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
           Submit
@@ -325,12 +357,12 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
                   )}
                 />
 
-                <div className="space-y-1">
-                  <FormCNPJInput<FormData> name="payeeCnpj" label="CNPJ do tomador" disabled={isSubmitting} />
-                  <p className="text-xs text-muted-foreground">
-                    Informe o CNPJ para sincronizar e conciliar a NF automaticamente.
-                  </p>
-                </div>
+                <FormDocumentInput<FormData>
+                  cpfFieldName="payeeCpf"
+                  cnpjFieldName="payeeCnpj"
+                  label="CPF / CNPJ do tomador"
+                  disabled={isSubmitting}
+                />
               </div>
             </CardContent>
           </Card>
@@ -430,7 +462,13 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
                         <Combobox
                           mode="single"
                           value={field.value || undefined}
-                          onValueChange={(value) => field.onChange(value || undefined)}
+                          onValueChange={(value) => {
+                            field.onChange(value || undefined);
+                            // A chave Pix só pertence a uma conta Pix — troca de método a limpa.
+                            if (value !== PAYMENT_METHOD.PIX) {
+                              form.setValue("pixKey", "", { shouldDirty: true, shouldValidate: true });
+                            }
+                          }}
                           options={PAYMENT_METHOD_OPTIONS}
                           disabled={isSubmitting}
                           placeholder="Selecione a forma (opcional)"
@@ -443,6 +481,43 @@ export function RecurrentPayableForm({ payable, isSubmitting, onSubmit, onFormSt
                   )}
                 />
               </div>
+
+              {/* Chave Pix — só quando a forma de pagamento é Pix. Aceita qualquer
+                  formato (CPF/CNPJ/e-mail/telefone/aleatória) e normaliza no blur. */}
+              {isPix && (
+                <FormField
+                  control={form.control}
+                  name="pixKey"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <IconQrcode className="h-4 w-4 text-muted-foreground" />
+                        Chave Pix
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          value={field.value ?? ""}
+                          onChange={(value) => field.onChange(value == null ? "" : String(value))}
+                          onBlur={() => {
+                            const current = form.getValues("pixKey");
+                            if (current && current.trim()) {
+                              form.setValue("pixKey", formatPixKey(current.trim()), {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              });
+                            }
+                            field.onBlur();
+                          }}
+                          disabled={isSubmitting}
+                          placeholder="CPF, CNPJ, E-mail, Telefone ou Chave Aleatória"
+                        />
+                      </FormControl>
+                      <FormDescription>Exibida em Contas a Pagar para facilitar o pagamento.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {isWeekly ? (
                 <FormField

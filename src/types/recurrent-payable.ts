@@ -40,6 +40,8 @@ export interface RecurrentPayable {
   payeeName: string | null;
   // Optional CNPJ of the payee — enables NF auto-linking by emitter CNPJ.
   payeeCnpj: string | null;
+  // Optional CPF of the payee (individuals). Tomador is a CPF OR a CNPJ.
+  payeeCpf: string | null;
   categoryId: string;
   amountKind: AmountKind;
   // Decimal columns arrive as string|number depending on the serializer.
@@ -53,6 +55,8 @@ export interface RecurrentPayable {
   // Weekdays a weekly bill is due (0=Sun … 6=Sat). Empty for monthly bills.
   daysOfWeek: number[];
   paymentMethod: "PIX" | "BANK_SLIP" | "CREDIT_CARD" | null;
+  // PIX key to pay this bill — only set when paymentMethod = PIX.
+  pixKey: string | null;
   // When true, the matching NF is synced and reconciled automatically.
   expectsNf: boolean;
   isActive: boolean;
@@ -98,6 +102,7 @@ export interface CreateRecurrentPayablePayload {
   supplierId?: string | null;
   payeeName?: string | null;
   payeeCnpj?: string | null;
+  payeeCpf?: string | null;
   categoryId: string;
   amountKind: AmountKind;
   // Required (> 0) when amountKind is FIXED.
@@ -110,6 +115,8 @@ export interface CreateRecurrentPayablePayload {
   // Required (≥1 weekday) for weekly cadences; omit for monthly.
   daysOfWeek?: number[];
   paymentMethod?: "PIX" | "BANK_SLIP" | "CREDIT_CARD" | null;
+  // PIX key to pay this bill — only sent when paymentMethod = PIX.
+  pixKey?: string | null;
   expectsNf: boolean;
   isActive: boolean;
 }
