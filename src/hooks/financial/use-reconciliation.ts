@@ -120,14 +120,20 @@ export function useFiscalDocument(id: string | undefined) {
 export function useMatchCandidates(
   transactionId: string | undefined,
   enabled = false,
+  search?: string,
 ) {
+  const term = search?.trim() || "";
   return useQuery({
+    // Search is folded into the key as an extra segment (not into the factory) so
+    // existing prefix-based invalidations by `candidates(txId)` still match.
     queryKey: transactionId
-      ? reconciliationKeys.candidates(transactionId)
+      ? [...reconciliationKeys.candidates(transactionId), term]
       : reconciliationKeys.all,
     queryFn: () =>
       transactionId
-        ? reconciliationService.getCandidates(transactionId).then((r) => r.data)
+        ? reconciliationService
+            .getCandidates(transactionId, term || undefined)
+            .then((r) => r.data)
         : Promise.reject(),
     enabled: !!transactionId && enabled,
     staleTime: 30_000,

@@ -7,6 +7,7 @@ import {
   IconExternalLink,
   IconLinkOff,
   IconStack2,
+  IconTruckDelivery,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -68,6 +69,12 @@ export function TransactionMatchSection({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [allocations, setAllocations] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState("");
+  // Remainder resolution: how the part of the payment NOT backed by an NF (frete,
+  // seguro estendido, taxas…) is accounted. A resolving reason marks the tx
+  // RECONCILED; "DEFERRED" (or null) leaves it PARTIAL for another transaction.
+  const [remainderReason, setRemainderReason] = useState<
+    "FRETE" | "SEGURO" | "TAXAS" | "OUTROS" | "DEFERRED" | null
+  >(null);
 
   const matchMut = useMatchTransaction();
   const setItemCategory = useSetFiscalItemCategory();
@@ -94,6 +101,7 @@ export function TransactionMatchSection({
     setSelectedIds([]);
     setAllocations({});
     setNotes("");
+    setRemainderReason(null);
   }, [transaction.id]);
 
   const handleItemCategory = (
@@ -172,7 +180,20 @@ export function TransactionMatchSection({
     () => selectedIds.reduce((sum, id) => sum + (allocations[id] || 0), 0),
     [selectedIds, allocations],
   );
-  const totalAllocated = existingAllocated + newlyAllocated;
+  // Category remainder counts toward coverage only alongside a selected NF (the
+  // backend match requires ≥1 NF); ignore orphan rows when nothing is selected.
+  // NF-only allocated (before resolving the non-NF remainder).
+  const nfAllocated = existingAllocated + newlyAllocated;
+  // The part of the payment not backed by an NF — the "restante sem nota".
+  const remainder = Number((txAmount - nfAllocated).toFixed(2));
+  // A resolving reason (frete/seguro/taxas/outros — NOT "deferred") accounts for
+  // the remainder, so it counts as fully allocated for the header + validation.
+  const remainderResolved =
+    selectedIds.length > 0 &&
+    remainder > 0.05 &&
+    remainderReason != null &&
+    remainderReason !== "DEFERRED";
+  const totalAllocated = nfAllocated + (remainderResolved ? remainder : 0);
   const diff = totalAllocated - txAmount;
   // Order-group selections sum several NFs, so accumulated rounding can drift a
   // couple reais from the payment; widen the tolerance when one is selected
@@ -271,6 +292,12 @@ export function TransactionMatchSection({
     const payload: ManualMatchPayload = {
       fiscalDocumentIds: expanded.map((e) => e.fiscalDocumentId),
       allocations: expanded,
+      // A resolving reason accounts for the non-NF remainder → RECONCILED.
+      // "DEFERRED"/none is not sent → the tx stays PARTIAL for another transaction.
+      remainderReason:
+        remainderReason && remainderReason !== "DEFERRED"
+          ? remainderReason
+          : undefined,
       notes: notes || undefined,
     };
     // Mutation success invalidates reconciliationKeys.all → detail refetches.
@@ -481,7 +508,7 @@ export function TransactionMatchSection({
               <p className="py-8 text-center text-sm text-muted-foreground">
                 {isLikelyTax
                   ? "Sem candidatas — esta transação não exige conciliação fiscal."
-                  : "Nenhuma candidata encontrada. Tente importar mais XMLs ou ampliar o período."}
+                  : "Nenhuma candidata encontrada. Importe mais XMLs ou amplie o período."}
               </p>
             ) : (
               <div className="space-y-6">
@@ -491,6 +518,7 @@ export function TransactionMatchSection({
                     candidate={c}
                     checked={selectedIds.includes(c.fiscalDocumentId)}
                     allocation={allocations[c.fiscalDocumentId]}
+                    txAmount={txAmount}
                     onToggle={() => toggleSelect(c.fiscalDocumentId, c)}
                     onAllocationChange={(v) =>
                       setAllocation(c.fiscalDocumentId, v)
@@ -498,6 +526,72 @@ export function TransactionMatchSection({
                     onItemCategoryChange={handleItemCategory}
                   />
                 ))}
+              </div>
+            )}
+
+            {/* Restante sem nota — the part of the payment NOT backed by an NF
+                (frete, seguro estendido, taxas). Pick what it is to reconcile the
+                whole payment, or defer it to another transaction (stays Parcial).
+                No category is added — the transaction keeps only the NF's own. */}
+            {selectedIds.length > 0 && remainder > 0.05 && (
+              <div className="rounded-lg border border-border bg-muted/10 p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <IconTruckDelivery className="h-4 w-4 text-muted-foreground" />
+                    Restante sem nota
+                  </span>
+                  <span
+                    className={cn(
+                      "text-sm font-semibold tabular-nums",
+                      remainderResolved
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-amber-600 dark:text-amber-400",
+                    )}
+                  >
+                    {formatCurrency(remainder)}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  O pagamento excede a nota em {formatCurrency(remainder)}. O que é esse valor?
+                </p>
+
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      { key: "FRETE", label: "Frete" },
+                      { key: "SEGURO", label: "Seguro estendido" },
+                      { key: "TAXAS", label: "Taxas / tarifas" },
+                      { key: "OUTROS", label: "Outros" },
+                      { key: "DEFERRED", label: "Outra transação (depois)" },
+                    ] as const
+                  ).map((opt) => {
+                    const active = remainderReason === opt.key;
+                    return (
+                      <Button
+                        key={opt.key}
+                        type="button"
+                        variant={active ? "default" : "outline"}
+                        size="sm"
+                        onClick={() =>
+                          setRemainderReason((prev) =>
+                            prev === opt.key ? null : opt.key,
+                          )
+                        }
+                      >
+                        {active && <IconCircleCheck className="h-4 w-4 mr-1" />}
+                        {opt.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                {remainderReason === "DEFERRED" && (
+                  <p className="text-xs text-muted-foreground border-t border-border/60 pt-2">
+                    O restante ({formatCurrency(remainder)}) fica{" "}
+                    <span className="font-medium">pendente</span> — a conciliação será{" "}
+                    <span className="font-medium">Parcial</span> até outra transação cobri-lo.
+                  </p>
+                )}
               </div>
             )}
 
@@ -535,6 +629,7 @@ function CandidateRow({
   candidate: c,
   checked,
   allocation,
+  txAmount,
   onToggle,
   onAllocationChange,
   onItemCategoryChange,
@@ -542,6 +637,7 @@ function CandidateRow({
   candidate: MatchCandidate;
   checked: boolean;
   allocation: number | undefined;
+  txAmount: number;
   onToggle: () => void;
   onAllocationChange: (value: number) => void;
   onItemCategoryChange: (itemId: string, categoryId: string | null) => void;
@@ -555,6 +651,12 @@ function CandidateRow({
   // This transaction is covering only part of the NF's open balance.
   const isPartial =
     !c.isOrderGroup && allocation != null && allocation + 0.05 < openBalance;
+  // The "Valor a alocar" input is only needed when the NF must be SPLIT — an
+  // installment: the note is worth more than this single payment (or was already
+  // partly paid by another transaction). Otherwise the allocation is simply the
+  // full note value (auto), so the input is hidden to keep the flow clean.
+  const showAllocationInput =
+    !c.isOrderGroup && (alreadyPaid || openBalance > txAmount + 0.05);
   return (
     // The ENTIRE card is the toggle target — clicking anywhere selects/deselects
     // the candidate (green border = selected). The category combobox cell stops
@@ -706,33 +808,40 @@ function CandidateRow({
           linking one NF across several installment transactions: each pays a
           PARTIAL slice of the same NF. Order groups link at their full summed
           value, so no per-NF input. Stops propagation so editing doesn't toggle. */}
-      {checked && !c.isOrderGroup && (
+      {checked && showAllocationInput && (
         <div
           className={cn(
-            "flex flex-wrap items-center gap-2 px-3 py-2.5 border-t border-border bg-muted/10",
+            "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2.5 border-t border-border bg-muted/10",
             alreadyPaid && "border-t-0",
           )}
+          onClick={(e) => e.stopPropagation()}
         >
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            Valor a alocar
-          </span>
-          <Input
-            type="number"
-            step={0.01}
-            min={0}
-            max={openBalance}
-            value={allocation ?? ""}
-            onChange={(v) => {
-              const n = v === "" || v == null ? 0 : Number(v);
-              onAllocationChange(Number.isFinite(n) ? n : 0);
-            }}
-            onClick={(e) => e.stopPropagation()}
-            className="h-8 w-36 tabular-nums"
-          />
-          <span className="text-xs text-muted-foreground">
-            de {formatCurrency(openBalance)}
-            {alreadyPaid ? " em aberto" : ""}
-          </span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+              Valor a alocar
+            </span>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                R$
+              </span>
+              <Input
+                type="number"
+                step={0.01}
+                min={0}
+                max={openBalance}
+                value={allocation ?? ""}
+                onChange={(v) => {
+                  const n = v === "" || v == null ? 0 : Number(v);
+                  onAllocationChange(Number.isFinite(n) ? n : 0);
+                }}
+                className="h-8 w-32 pl-8 text-right tabular-nums"
+              />
+            </div>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              de {formatCurrency(openBalance)}
+              {alreadyPaid ? " em aberto" : ""}
+            </span>
+          </div>
           {isPartial && (
             <Badge
               variant="secondary"

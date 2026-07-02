@@ -70,9 +70,10 @@ export const reconciliationService = {
       },
     ),
 
-  getCandidates: (transactionId: string) =>
+  getCandidates: (transactionId: string, search?: string) =>
     apiClient.get<MatchCandidate[]>(
       `/financial/reconciliation/transactions/${transactionId}/candidates`,
+      { params: search ? { search } : undefined },
     ),
 
   getTransaction: (transactionId: string) =>
