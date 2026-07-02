@@ -561,6 +561,12 @@ export interface PayableRow {
   isEstimate?: boolean;
   /** Sub-label: installment ("1ª parcela"), Fixo/Variável, etc. */
   subtype?: string | null;
+  /**
+   * RECURRENT_PAYABLE rows only — occurrence IGNORED for its month (e.g. diarista
+   * faltou). Rendered muted with an "Ignorado" badge, excluded from all summary
+   * totals, and revertible via the row action.
+   */
+  ignored?: boolean;
   /** Competence the row belongs to (YYYY-MM) — payroll/tax/recurring. */
   competence?: string | null;
   /** Deep-link target for RECONCILIATION/SCHEDULE settle actions. */

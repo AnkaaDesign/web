@@ -377,6 +377,12 @@ export interface MatchCandidate {
   confidence: number;
   matchType: MatchType;
   rationale: string;
+  /** Open balance of the NF: totalValue minus what OTHER transactions already
+   *  allocated (non-reversed). Below totalValue ⇒ the NF is being paid in
+   *  installments and this is a remaining parcela. Defaults to totalValue. */
+  remainingValue?: number;
+  /** How much of the NF other transactions already settled (installments). */
+  allocatedValue?: number;
   amountDelta: number;
   daysDelta: number;
   aliasAssisted: boolean;

@@ -12,6 +12,8 @@ import {
   IconClock,
   IconCopy,
   IconCircleCheck,
+  IconBan,
+  IconArrowBackUp,
 } from "@tabler/icons-react";
 
 import type { ClearanceState, PayableRow, PayableState } from "../../../types";
@@ -205,7 +207,15 @@ function PayablePaymentCell({ row }: { row: PayableRow }) {
   // regardless of clearanceState. Non-PAID rows keep their assertion badge.
   return (
     <div className="flex flex-col items-start gap-1">
-      {row.paymentState !== "PAID" ? (
+      {row.ignored ? (
+        <Badge
+          variant="gray"
+          className="font-medium whitespace-nowrap w-fit"
+          title="Conta ignorada neste mês — não será paga e não entra nos totais."
+        >
+          Ignorado
+        </Badge>
+      ) : row.paymentState !== "PAID" ? (
         <PayableStateBadge state={row.paymentState} />
       ) : (
         <Badge variant="completed" className="font-medium whitespace-nowrap w-fit">
@@ -419,7 +429,12 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   const triggerSchedule = useTriggerOrderSchedule();
   // Recorrentes: pay one materialized occurrence (the payables query is keyed
   // under orderKeys.all, so the pay action invalidates it and the row flips).
-  const { payAsync: payRecurrentAsync, payMutation: payRecurrentMutation } = useRecurrentPayableMutations();
+  const {
+    payAsync: payRecurrentAsync,
+    payMutation: payRecurrentMutation,
+    ignoreAsync: ignoreRecurrentAsync,
+    unignoreAsync: unignoreRecurrentAsync,
+  } = useRecurrentPayableMutations();
 
   // --- Client-side filter: active buckets + search across tomador/description -
   const filteredRows = useMemo(() => {
@@ -511,6 +526,17 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       return;
     }
     runAction(() => payRecurrentAsync({ occurrenceId: row.id, body: {} }));
+  };
+
+  // Ignore a recurrent occurrence for its month (e.g. diarista faltou) — it won't
+  // be paid and drops out of the totals, but stays visible (muted) and revertible.
+  const handleRecurrentIgnore = (row: PayableRow) => {
+    setContextMenu(null);
+    runAction(() => ignoreRecurrentAsync(row.id));
+  };
+  const handleRecurrentUnignore = (row: PayableRow) => {
+    setContextMenu(null);
+    runAction(() => unignoreRecurrentAsync(row.id));
   };
 
   // Order payables settle through a dialog that collects an optional comprovante.
@@ -607,7 +633,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
         // like the EXPECTED/estimate forecasts.
         const isPending = row.paymentRequested === false;
         const isForecast = row.paymentState === "EXPECTED" || row.isEstimate || isPending;
-        return <TruncatedTextWithTooltip text={row.description || "-"} className={cn("text-sm", isForecast && "italic text-muted-foreground")} />;
+        return <TruncatedTextWithTooltip text={row.description || "-"} className={cn("text-sm", isForecast && "italic text-muted-foreground", row.ignored && "line-through text-muted-foreground")} />;
       },
     },
     { key: "type", header: "Tipo", width: 176, render: (row) => <PayableTypeBadge row={row} /> },
@@ -690,28 +716,52 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // --- Render ---------------------------------------------------------------
   return (
     <div className={cn("flex flex-col gap-4 h-full min-h-0", className)}>
-      {/* Summary cards double as filter buckets — click to show only that status. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 flex-shrink-0">
-        {BUCKET_ORDER.map((key) => {
-          const meta = PAYABLE_BUCKETS[key];
+      {/* Summary cards double as filter buckets — click to show only that status.
+          The reconciliation bucket ("Pago, aguardando conciliação") was dropped —
+          reconciliation now lives entirely in Conciliação Bancária (transaction/NF),
+          not on this page. The remaining cards span the FULL width: the column
+          count tracks how many actually render (empty non-core buckets are hidden),
+          so there is never a blank slot where the removed card used to be. */}
+      {(() => {
+        const visibleBuckets = BUCKET_ORDER.filter((key) => {
+          if (ALWAYS_SHOWN_BUCKETS.includes(key)) return true;
           const b = monthBucketSummary[key];
-          // Hide an empty non-core bucket (e.g. "Parcialmente Pago") so it never
-          // renders a meaningless "R$ 0,00 · 0" card. Core buckets always show.
-          if (!ALWAYS_SHOWN_BUCKETS.includes(key) && b.count === 0 && b.total === 0) return null;
-          return (
-            <FinancialKpiCard
-              key={key}
-              label={meta.label}
-              value={isLoading ? null : formatCurrency(b.total)}
-              count={b.count}
-              Icon={meta.Icon}
-              tone={meta.tone}
-              active={buckets.includes(key)}
-              onClick={() => toggleBucket(key)}
-            />
-          );
-        })}
-      </div>
+          return !(b.count === 0 && b.total === 0);
+        });
+        // Static Tailwind classes (no dynamic string) so the columns fill the row.
+        const lgCols: Record<number, string> = {
+          1: "lg:grid-cols-1",
+          2: "lg:grid-cols-2",
+          3: "lg:grid-cols-3",
+          4: "lg:grid-cols-4",
+          5: "lg:grid-cols-5",
+        };
+        return (
+          <div
+            className={cn(
+              "grid grid-cols-2 gap-3 sm:grid-cols-2 flex-shrink-0",
+              lgCols[visibleBuckets.length] ?? "lg:grid-cols-4",
+            )}
+          >
+            {visibleBuckets.map((key) => {
+              const meta = PAYABLE_BUCKETS[key];
+              const b = monthBucketSummary[key];
+              return (
+                <FinancialKpiCard
+                  key={key}
+                  label={meta.label}
+                  value={isLoading ? null : formatCurrency(b.total)}
+                  count={b.count}
+                  Icon={meta.Icon}
+                  tone={meta.tone}
+                  active={buckets.includes(key)}
+                  onClick={() => toggleBucket(key)}
+                />
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Search + period switcher + flat list */}
       <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
@@ -799,10 +849,25 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
                 </>
               )}
 
-              {ctxRow.source === "RECURRENT_PAYABLE" && ctxRow.paymentState !== "PAID" && (
-                <DropdownMenuItem onClick={() => handleRecurrentPay(ctxRow)}>
-                  <IconCash className="mr-2 h-4 w-4" />
-                  Marcar como pago
+              {ctxRow.source === "RECURRENT_PAYABLE" &&
+                ctxRow.paymentState !== "PAID" &&
+                !ctxRow.ignored && (
+                  <>
+                    <DropdownMenuItem onClick={() => handleRecurrentPay(ctxRow)}>
+                      <IconCash className="mr-2 h-4 w-4" />
+                      Marcar como pago
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleRecurrentIgnore(ctxRow)}>
+                      <IconBan className="mr-2 h-4 w-4" />
+                      Ignorar este mês
+                    </DropdownMenuItem>
+                  </>
+                )}
+
+              {ctxRow.source === "RECURRENT_PAYABLE" && ctxRow.ignored && (
+                <DropdownMenuItem onClick={() => handleRecurrentUnignore(ctxRow)}>
+                  <IconArrowBackUp className="mr-2 h-4 w-4" />
+                  Reverter (deixar de ignorar)
                 </DropdownMenuItem>
               )}
 

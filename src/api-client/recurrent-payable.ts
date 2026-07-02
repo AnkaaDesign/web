@@ -45,4 +45,19 @@ export const recurrentPayableService = {
       `${basePath}/occurrences/${occurrenceId}/pay`,
       body,
     ),
+
+  // Ignore a single occurrence for its month (won't be paid — e.g. diarista
+  // faltou). Kept on record so it's out of totals but revertible.
+  ignoreRecurrentOccurrence: (occurrenceId: string) =>
+    apiClient.post<PayRecurrentOccurrenceResponse>(
+      `${basePath}/occurrences/${occurrenceId}/ignore`,
+      {},
+    ),
+
+  // Revert an ignored occurrence back to an open obligation.
+  unignoreRecurrentOccurrence: (occurrenceId: string) =>
+    apiClient.post<PayRecurrentOccurrenceResponse>(
+      `${basePath}/occurrences/${occurrenceId}/unignore`,
+      {},
+    ),
 };

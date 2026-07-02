@@ -21,7 +21,7 @@ import {
 } from "@/hooks/financial/use-reconciliation";
 import { routes } from "@/constants";
 import { cn } from "@/lib/utils";
-import { formatCNPJ, formatDate } from "@/utils";
+import { formatCNPJ, formatCurrency, formatDate } from "@/utils";
 import type { BankTransaction, MatchCandidate } from "@/types/reconciliation";
 import type { ManualMatchPayload } from "@/schemas/reconciliation";
 import { getConfidenceBadgeVariant } from "./match-status-badge";
@@ -107,7 +107,28 @@ export function TransactionMatchSection({
         ? prev.filter((x) => x !== id)
         : [...prev, id];
       if (!prev.includes(id)) {
-        setAllocations((a) => ({ ...a, [id]: candidate.totalValue }));
+        // Default the allocation to what THIS transaction can still cover, capped
+        // at the NF's own total. For an installment (parcela) — one NF paid by
+        // several transactions — the NF total (e.g. R$36.530) exceeds a single
+        // payment (e.g. R$12.179), so the default becomes the remaining payment
+        // amount and the NF is linked as a PARTIAL. The other installment
+        // transactions later cover the rest of the same NF. Order groups keep
+        // their full summed value (handled in handleSave), so they aren't capped.
+        setAllocations((a) => {
+          if (candidate.isOrderGroup) {
+            return { ...a, [id]: candidate.totalValue };
+          }
+          // The NF's open balance — its full total minus what OTHER transactions
+          // already paid (installments). Never allocate more than this.
+          const openBalance = candidate.remainingValue ?? candidate.totalValue;
+          const alreadySelected = Object.entries(a)
+            .filter(([k]) => k !== id)
+            .reduce((s, [, v]) => s + (v || 0), 0);
+          const txRemaining = txAmount - existingAllocated - alreadySelected;
+          const def =
+            txRemaining > 0 ? Math.min(openBalance, txRemaining) : openBalance;
+          return { ...a, [id]: Number(def.toFixed(2)) };
+        });
       } else {
         setAllocations((a) => {
           const copy = { ...a };
@@ -118,6 +139,9 @@ export function TransactionMatchSection({
       return next;
     });
   };
+
+  const setAllocation = (id: string, value: number) =>
+    setAllocations((a) => ({ ...a, [id]: value }));
 
   const existingMatches = useMemo(
     () => (transaction.matches ?? []).filter((m) => !m.reversedAt),
@@ -466,7 +490,11 @@ export function TransactionMatchSection({
                     key={c.fiscalDocumentId}
                     candidate={c}
                     checked={selectedIds.includes(c.fiscalDocumentId)}
+                    allocation={allocations[c.fiscalDocumentId]}
                     onToggle={() => toggleSelect(c.fiscalDocumentId, c)}
+                    onAllocationChange={(v) =>
+                      setAllocation(c.fiscalDocumentId, v)
+                    }
                     onItemCategoryChange={handleItemCategory}
                   />
                 ))}
@@ -506,14 +534,27 @@ export function TransactionMatchSection({
 function CandidateRow({
   candidate: c,
   checked,
+  allocation,
   onToggle,
+  onAllocationChange,
   onItemCategoryChange,
 }: {
   candidate: MatchCandidate;
   checked: boolean;
+  allocation: number | undefined;
   onToggle: () => void;
+  onAllocationChange: (value: number) => void;
   onItemCategoryChange: (itemId: string, categoryId: string | null) => void;
 }) {
+  // A single NF paid in installments allocates only PART of its total to this
+  // transaction; the value is editable so the user can split it. Order groups
+  // sum several NFs at their full value and aren't individually editable.
+  const openBalance = c.remainingValue ?? c.totalValue;
+  // The NF was already partially paid by OTHER transactions (a prior parcela).
+  const alreadyPaid = !c.isOrderGroup && openBalance + 0.05 < c.totalValue;
+  // This transaction is covering only part of the NF's open balance.
+  const isPartial =
+    !c.isOrderGroup && allocation != null && allocation + 0.05 < openBalance;
   return (
     // The ENTIRE card is the toggle target — clicking anywhere selects/deselects
     // the candidate (green border = selected). The category combobox cell stops
@@ -632,8 +673,10 @@ function CandidateRow({
         </div>
       </div>
 
-      {/* Services / items of the NF, with per-line category combobox. The NF
-          total (table footer) IS the amount allocated when selected. */}
+      {/* Services / items of the NF, with per-line category combobox. When
+          selected, the amount allocated to THIS transaction is editable below —
+          defaulting to the NF total, or to the remaining payment when the NF is
+          worth more than the payment (installment / parcela). */}
       {c.items && c.items.length > 0 && (
         <FiscalItemsTable
           items={c.items}
@@ -644,6 +687,63 @@ function CandidateRow({
           onItemCategoryChange={onItemCategoryChange}
           className="border-0 border-t rounded-none"
         />
+      )}
+
+      {/* Installment banner — the NF was already partially settled by a prior
+          transaction; show what's still open so the user allocates correctly. */}
+      {checked && alreadyPaid && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 pt-2.5 text-xs border-t border-border bg-amber-50/50 dark:bg-amber-500/5">
+          <IconStack2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-500" />
+          <span className="text-amber-800 dark:text-amber-300">
+            Nota paga em parcelas — {formatCurrency(c.totalValue - openBalance)}{" "}
+            já pago, {formatCurrency(openBalance)} em aberto de{" "}
+            {formatCurrency(c.totalValue)}
+          </span>
+        </div>
+      )}
+
+      {/* Editable allocation — how much of this payment settles this NF. Enables
+          linking one NF across several installment transactions: each pays a
+          PARTIAL slice of the same NF. Order groups link at their full summed
+          value, so no per-NF input. Stops propagation so editing doesn't toggle. */}
+      {checked && !c.isOrderGroup && (
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-2 px-3 py-2.5 border-t border-border bg-muted/10",
+            alreadyPaid && "border-t-0",
+          )}
+        >
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            Valor a alocar
+          </span>
+          <Input
+            type="number"
+            step={0.01}
+            min={0}
+            max={openBalance}
+            value={allocation ?? ""}
+            onChange={(v) => {
+              const n = v === "" || v == null ? 0 : Number(v);
+              onAllocationChange(Number.isFinite(n) ? n : 0);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="h-8 w-36 tabular-nums"
+          />
+          <span className="text-xs text-muted-foreground">
+            de {formatCurrency(openBalance)}
+            {alreadyPaid ? " em aberto" : ""}
+          </span>
+          {isPartial && (
+            <Badge
+              variant="secondary"
+              size="sm"
+              className="whitespace-nowrap"
+              title="Esta transação paga apenas parte do saldo em aberto desta nota (parcela). O restante fica em aberto para as demais parcelas."
+            >
+              Parcial · resta {formatCurrency(openBalance - (allocation ?? 0))}
+            </Badge>
+          )}
+        </div>
       )}
     </div>
   );

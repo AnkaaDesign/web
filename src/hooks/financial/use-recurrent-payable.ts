@@ -111,6 +111,30 @@ export function useRecurrentPayableMutations() {
     },
   });
 
+  // Ignore / revert an occurrence for its month (diarista faltou, etc.). Both
+  // flip the Contas a Pagar row in place (payables live under orderKeys.all).
+  const ignoreMutation = useMutation({
+    mutationFn: (occurrenceId: string) =>
+      recurrentPayableService
+        .ignoreRecurrentOccurrence(occurrenceId)
+        .then((r) => r.data),
+    onSuccess: () => {
+      invalidate();
+      qc.invalidateQueries({ queryKey: orderKeys.all });
+    },
+  });
+
+  const unignoreMutation = useMutation({
+    mutationFn: (occurrenceId: string) =>
+      recurrentPayableService
+        .unignoreRecurrentOccurrence(occurrenceId)
+        .then((r) => r.data),
+    onSuccess: () => {
+      invalidate();
+      qc.invalidateQueries({ queryKey: orderKeys.all });
+    },
+  });
+
   return {
     create: createMutation.mutate,
     createAsync: createMutation.mutateAsync,
@@ -120,20 +144,30 @@ export function useRecurrentPayableMutations() {
     deleteAsync: deleteMutation.mutateAsync,
     pay: payMutation.mutate,
     payAsync: payMutation.mutateAsync,
+    ignore: ignoreMutation.mutate,
+    ignoreAsync: ignoreMutation.mutateAsync,
+    unignore: unignoreMutation.mutate,
+    unignoreAsync: unignoreMutation.mutateAsync,
     isLoading:
       createMutation.isPending ||
       updateMutation.isPending ||
       deleteMutation.isPending ||
-      payMutation.isPending,
+      payMutation.isPending ||
+      ignoreMutation.isPending ||
+      unignoreMutation.isPending,
     error:
       createMutation.error ||
       updateMutation.error ||
       deleteMutation.error ||
-      payMutation.error,
+      payMutation.error ||
+      ignoreMutation.error ||
+      unignoreMutation.error,
     // Individual mutation states
     createMutation,
     updateMutation,
     deleteMutation,
     payMutation,
+    ignoreMutation,
+    unignoreMutation,
   };
 }
