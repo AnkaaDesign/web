@@ -19,7 +19,6 @@ import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { CategoryChips, MatchStatusBadge, getAccountingTypeLabel } from "./match-status-badge";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { routes } from "@/constants";
 import {
@@ -101,7 +100,7 @@ function writeScroll(key: string | undefined, top: number) {
 // Width assigned to the leading column. The day banner reserves the same width
 // for the chevron + date so the date label sits *inside* the DATA column space
 // instead of bleeding into CONTA.
-const DATE_COLUMN_WIDTH = 170;
+const DATE_COLUMN_WIDTH = 138;
 
 interface ColumnSpec {
   key: string;
@@ -256,16 +255,16 @@ export function TransactionsByDateAccordion({
       { key: "account", header: "Conta", width: "240px", show: !!showAccountColumn },
       // No "Tipo" column — the green Entrada / red Saída values already encode
       // credit vs. debit.
-      { key: "subtype", header: "Forma", width: "120px", align: "center", show: true },
+      { key: "subtype", header: "Forma", width: "90px", align: "center", show: true },
       { key: "credit", header: "Entrada", width: "140px", align: "right", show: true },
       { key: "debit", header: "Saída", width: "140px", align: "right", show: true },
       { key: "counterparty", header: "Contraparte / Descrição", show: true },
       // Wider so longer emitter names ("FARBEN S/A INDUSTRIA QUIMICA") fit
       // without truncation. The freed space comes from Contraparte (flex).
-      { key: "linkedNf", header: "NF vinculada", width: "220px", show: true },
-      { key: "category", header: "Categoria", width: "240px", show: true },
-      { key: "accountingGroup", header: "Grupo Contábil", width: "200px", show: true },
-      { key: "reconciliationStatus", header: "Status", width: "180px", show: true },
+      { key: "linkedNf", header: "NF vinculada", width: "200px", show: true },
+      { key: "category", header: "Categoria", width: "200px", show: true },
+      { key: "accountingGroup", header: "Grupo Contábil", width: "150px", show: true },
+      { key: "reconciliationStatus", header: "Status", width: "160px", show: true },
     ],
     [showAccountColumn],
   );
@@ -697,7 +696,8 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
       return <CategoryChips categories={t.categories} maxVisible={2} />;
     case "accountingGroup": {
       // Distinct chart-of-accounts groups (grupo contábil) of this transaction's
-      // categories, in its own column beside Categoria.
+      // categories, in its own column beside Categoria. Compact truncating text
+      // (long labels like "Prestação de Serviço") — full name on hover.
       const labels = Array.from(
         new Set(
           (t.categories ?? [])
@@ -707,11 +707,11 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
       );
       if (labels.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
       return (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-col gap-0.5 min-w-0">
           {labels.map(l => (
-            <Badge key={l} variant="secondary" size="sm" className="whitespace-nowrap">
+            <span key={l} className="truncate text-xs text-muted-foreground" title={l}>
               {l}
-            </Badge>
+            </span>
           ))}
         </div>
       );
