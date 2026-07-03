@@ -936,30 +936,6 @@ function CandidateRow({
               {alreadyPaid ? " em aberto" : ""}
             </span>
           </div>
-          {(paidLess || paidMore) && (
-            <Badge
-              variant={
-                adjustmentReason ? "default" : paidMore ? "cancelled" : "secondary"
-              }
-              size="sm"
-              className="whitespace-nowrap"
-              title={
-                adjustmentReason
-                  ? "A diferença desta nota é lançada como ajuste — a nota fica quitada."
-                  : paidMore
-                    ? "O pagamento excede a nota. Escolha o motivo do excedente para quitar a nota."
-                    : "Esta transação paga apenas parte do saldo desta nota (parcela). O restante fica em aberto."
-              }
-            >
-              {adjustmentReason
-                ? `Quitada · ${ADJUSTMENT_REASON_LABELS[adjustmentReason]} ${formatCurrency(
-                    Math.abs(noteDiff),
-                  )}`
-                : paidMore
-                  ? `Excede a nota em ${formatCurrency(-noteDiff)}`
-                  : `Parcial · resta ${formatCurrency(noteDiff)}`}
-            </Badge>
-          )}
         </div>
       )}
 
@@ -970,25 +946,34 @@ function CandidateRow({
           note as quitada while the payment stays fully allocated. */}
       {checked && (paidLess || paidMore) && (
         <div
-          className="px-3 py-2.5 border-t border-border bg-muted/10 space-y-2"
+          className="border-t border-border bg-muted/20 px-3 py-3 space-y-2.5"
           onClick={(e) => e.stopPropagation()}
         >
-          <p className="text-xs text-muted-foreground">
-            {paidMore ? (
-              <>
-                Pagou{" "}
-                <span className="font-medium">{formatCurrency(-noteDiff)}</span> a
-                mais que a nota. O que é esse excedente?
-              </>
-            ) : (
-              <>
-                Pagou{" "}
-                <span className="font-medium">{formatCurrency(noteDiff)}</span> a
-                menos que a nota. É uma parcela ou o restante é desconto/ajuste?
-              </>
-            )}
-          </p>
-          <div className="flex flex-wrap gap-2">
+          {/* Header: the difference + its current resolution state */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-foreground">
+              {paidMore ? "Pagamento excede a nota" : "Pagamento menor que a nota"}
+              <span className="ml-1.5 font-normal tabular-nums text-muted-foreground">
+                {formatCurrency(Math.abs(noteDiff))}
+              </span>
+            </span>
+            <Badge
+              variant={
+                adjustmentReason ? "default" : paidMore ? "cancelled" : "secondary"
+              }
+              size="sm"
+              className="whitespace-nowrap shrink-0"
+            >
+              {adjustmentReason
+                ? `Quitada · ${ADJUSTMENT_REASON_LABELS[adjustmentReason]}`
+                : paidMore
+                  ? "Escolha o motivo"
+                  : "Parcela em aberto"}
+            </Badge>
+          </div>
+
+          {/* Reason choices */}
+          <div className="flex flex-wrap gap-1.5">
             {paidLess && (
               <Button
                 type="button"
@@ -999,7 +984,7 @@ function CandidateRow({
                 {adjustmentReason == null && (
                   <IconCircleCheck className="h-4 w-4 mr-1" />
                 )}
-                Parcela (fica em aberto)
+                Parcela
               </Button>
             )}
             {reasonOptions.map((r) => {
@@ -1018,18 +1003,22 @@ function CandidateRow({
               );
             })}
           </div>
+
+          {/* Result / warning */}
           {adjustmentReason ? (
             <p className="text-xs text-emerald-600 dark:text-emerald-400">
-              Nota será quitada — {formatCurrency(Math.abs(noteDiff))} lançado como{" "}
+              Nota quitada — {formatCurrency(Math.abs(noteDiff))} lançado como{" "}
               {ADJUSTMENT_REASON_LABELS[adjustmentReason]}.
             </p>
+          ) : paidMore ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Escolha um motivo para o excedente — senão não será possível salvar.
+            </p>
           ) : (
-            paidMore && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                Escolha um motivo para o excedente — senão o pagamento excederia o
-                total da nota e não poderá ser salvo.
-              </p>
-            )
+            <p className="text-xs text-muted-foreground">
+              Deixe como parcela para pagar o restante em outra transação, ou
+              escolha um motivo para quitar a nota agora.
+            </p>
           )}
         </div>
       )}
