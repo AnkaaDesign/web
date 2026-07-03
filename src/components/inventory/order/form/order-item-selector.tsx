@@ -21,6 +21,8 @@ import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-to
 import { formatCurrency } from "@/utils/number";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { useDebounce } from "@/hooks/common/use-debounce";
+import { useResizableColumns, type ResizableColumnDef } from "@/hooks/common/use-resizable-columns";
+import { ColumnResizeHandle } from "@/components/ui/column-resize-handle";
 import { extractActiveFilters } from "./filter-utils";
 import { FilterIndicators } from "./filter-indicator";
 import { useDirectFilterUpdate } from "./use-direct-filter-update";
@@ -127,6 +129,28 @@ export const OrderItemSelector = ({
   const showPriceInput = showPriceInputProp && canViewPrices;
   const showIcmsInput = showIcmsInputProp && canViewPrices;
   const showIpiInput = showIpiInputProp && canViewPrices;
+
+  // Resizable columns (drag-to-resize + per-user persistence, same store as the DataTable).
+  // Defaults mirror the legacy fixed Tailwind widths (w-24=96, w-56=224, w-32=128, w-28=112).
+  const resizableColumns = useMemo<ResizableColumnDef[]>(() => {
+    const cols: ResizableColumnDef[] = [
+      { id: "uniCode", defaultWidth: 96, minWidth: 72 },
+      { id: "name", defaultWidth: 224, minWidth: 120 },
+      { id: "brand", defaultWidth: 128, minWidth: 80 },
+      { id: "quantity", defaultWidth: 112, minWidth: 80 },
+    ];
+    if (canViewPrices) cols.push({ id: "price", defaultWidth: 96, minWidth: 72 });
+    if (showQuantityInput) cols.push({ id: "quantityInput", defaultWidth: 112, minWidth: 88 });
+    if (showPriceInput) cols.push({ id: "priceInput", defaultWidth: 128, minWidth: 96 });
+    if (showIcmsInput) cols.push({ id: "icms", defaultWidth: 96, minWidth: 80 });
+    if (showIpiInput) cols.push({ id: "ipi", defaultWidth: 96, minWidth: 80 });
+    return cols;
+  }, [canViewPrices, showQuantityInput, showPriceInput, showIcmsInput, showIpiInput]);
+
+  const { columnSizeVars, getColumnStyle, getResizeHandleProps, isResizing } = useResizableColumns({
+    tableId: "order-item-selector",
+    columns: resizableColumns,
+  });
 
   // Use direct filter update for immediate, atomic URL updates
   const { updateFilters: directUpdateFilters } = useDirectFilterUpdate();
@@ -756,7 +780,8 @@ export const OrderItemSelector = ({
       </div>
 
       {/* Items Table Section - matching the working table structure exactly */}
-      <div className={cn("rounded-lg flex flex-col overflow-hidden", "flex-1")}>
+      {/* columnSizeVars drive both the fixed-header and scrollable-body tables so they stay aligned. */}
+      <div className={cn("rounded-lg flex flex-col overflow-hidden", "flex-1")} style={columnSizeVars}>
         {/* Fixed Header Table */}
         <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
           <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
@@ -771,7 +796,7 @@ export const OrderItemSelector = ({
                     />
                   </div>
                 </TableHead>
-                <TableHead className="w-24 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                <TableHead style={getColumnStyle("uniCode")} className="relative whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                   <button
                     onClick={() => toggleSort("uniCode")}
                     className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
@@ -779,8 +804,9 @@ export const OrderItemSelector = ({
                     <TruncatedTextWithTooltip text="CÓDIGO" />
                     {renderSortIndicator("uniCode")}
                   </button>
+                  <ColumnResizeHandle {...getResizeHandleProps("uniCode")} active={isResizing("uniCode")} />
                 </TableHead>
-                <TableHead className="w-56 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                <TableHead style={getColumnStyle("name")} className="relative whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                   <button
                     onClick={() => toggleSort("name")}
                     className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
@@ -788,8 +814,9 @@ export const OrderItemSelector = ({
                     <TruncatedTextWithTooltip text="ITEM" />
                     {renderSortIndicator("name")}
                   </button>
+                  <ColumnResizeHandle {...getResizeHandleProps("name")} active={isResizing("name")} />
                 </TableHead>
-                <TableHead className="w-32 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                <TableHead style={getColumnStyle("brand")} className="relative whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                   <button
                     onClick={() => toggleSort("brand.name")}
                     className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
@@ -797,8 +824,9 @@ export const OrderItemSelector = ({
                     <TruncatedTextWithTooltip text="MARCA" />
                     {renderSortIndicator("brand.name")}
                   </button>
+                  <ColumnResizeHandle {...getResizeHandleProps("brand")} active={isResizing("brand")} />
                 </TableHead>
-                <TableHead className="w-28 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                <TableHead style={getColumnStyle("quantity")} className="relative whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                   <button
                     onClick={() => toggleSort("quantity")}
                     className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
@@ -806,9 +834,10 @@ export const OrderItemSelector = ({
                     <TruncatedTextWithTooltip text="ESTOQUE" />
                     {renderSortIndicator("quantity")}
                   </button>
+                  <ColumnResizeHandle {...getResizeHandleProps("quantity")} active={isResizing("quantity")} />
                 </TableHead>
                 {canViewPrices && (
-                  <TableHead className="w-24 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                  <TableHead style={getColumnStyle("price")} className="relative whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                     <button
                       onClick={() => toggleSort("prices.value")}
                       className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
@@ -816,34 +845,39 @@ export const OrderItemSelector = ({
                       <TruncatedTextWithTooltip text="PREÇO" />
                       {renderSortIndicator("prices.value")}
                     </button>
+                    <ColumnResizeHandle {...getResizeHandleProps("price")} active={isResizing("price")} />
                   </TableHead>
                 )}
                 {showQuantityInput && (
-                  <TableHead className="w-28 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                  <TableHead style={getColumnStyle("quantityInput")} className="relative whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
                       <TruncatedTextWithTooltip text="QTDE" />
                     </div>
+                    <ColumnResizeHandle {...getResizeHandleProps("quantityInput")} active={isResizing("quantityInput")} />
                   </TableHead>
                 )}
                 {showPriceInput && (
-                  <TableHead className="w-32 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                  <TableHead style={getColumnStyle("priceInput")} className="relative whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
                       <TruncatedTextWithTooltip text="VALOR UNIT." />
                     </div>
+                    <ColumnResizeHandle {...getResizeHandleProps("priceInput")} active={isResizing("priceInput")} />
                   </TableHead>
                 )}
                 {showIcmsInput && (
-                  <TableHead className="w-24 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                  <TableHead style={getColumnStyle("icms")} className="relative whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
                       <TruncatedTextWithTooltip text="ICMS %" />
                     </div>
+                    <ColumnResizeHandle {...getResizeHandleProps("icms")} active={isResizing("icms")} />
                   </TableHead>
                 )}
                 {showIpiInput && (
-                  <TableHead className="w-24 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                  <TableHead style={getColumnStyle("ipi")} className="relative whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
                       <TruncatedTextWithTooltip text="IPI %" />
                     </div>
+                    <ColumnResizeHandle {...getResizeHandleProps("ipi")} active={isResizing("ipi")} />
                   </TableHead>
                 )}
                 {/* Scrollbar spacer - only show if not overlay scrollbar */}
@@ -922,29 +956,29 @@ export const OrderItemSelector = ({
                         </div>
                       </TableCell>
                       {/* Código */}
-                      <TableCell className="w-24 p-0 !border-r-0">
+                      <TableCell style={getColumnStyle("uniCode")} className="p-0 !border-r-0">
                         <div className="px-4 py-1">
                           <div className="font-mono text-sm truncate">{item.uniCode || "-"}</div>
                         </div>
                       </TableCell>
                       {/* Nome do Item */}
-                      <TableCell className="w-56 p-0 !border-r-0">
+                      <TableCell style={getColumnStyle("name")} className="p-0 !border-r-0">
                         <div className="px-4 py-1">
                           <div className="font-medium truncate">{item.name}</div>
                         </div>
                       </TableCell>
-                      <TableCell className="w-32 p-0 !border-r-0">
+                      <TableCell style={getColumnStyle("brand")} className="p-0 !border-r-0">
                         <div className="px-4 py-1">
                           <div className="text-sm truncate">{item.brands?.map((b) => b.name).join(", ") || "-"}</div>
                         </div>
                       </TableCell>
-                      <TableCell className="w-28 p-0 !border-r-0">
+                      <TableCell style={getColumnStyle("quantity")} className="p-0 !border-r-0">
                         <div className="px-4 py-1">
                           <StockStatusIndicator item={item} showQuantity={true} />
                         </div>
                       </TableCell>
                       {canViewPrices && (
-                        <TableCell className="w-24 p-0 !border-r-0">
+                        <TableCell style={getColumnStyle("price")} className="p-0 !border-r-0">
                           <div className="px-4 py-1">
                             <span className="font-medium tabular-nums">
                               {item.prices?.[0]?.value ? formatCurrency(item.prices[0].value) : "-"}
@@ -953,7 +987,7 @@ export const OrderItemSelector = ({
                         </TableCell>
                       )}
                       {showQuantityInput && (
-                        <TableCell className="w-28 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
+                        <TableCell style={getColumnStyle("quantityInput")} className="p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
                           <div className="px-4 py-1">
                             {itemIsSelected ? (
                               <Input
@@ -971,7 +1005,7 @@ export const OrderItemSelector = ({
                         </TableCell>
                       )}
                       {showPriceInput && (
-                        <TableCell className="w-32 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
+                        <TableCell style={getColumnStyle("priceInput")} className="p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
                           <div className="px-4 py-1">
                             {itemIsSelected ? (
                               <Input
@@ -994,7 +1028,7 @@ export const OrderItemSelector = ({
                         </TableCell>
                       )}
                       {showIcmsInput && (
-                        <TableCell className="w-24 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
+                        <TableCell style={getColumnStyle("icms")} className="p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
                           <div className="px-4 py-1">
                             {itemIsSelected ? (
                               <Input
@@ -1014,7 +1048,7 @@ export const OrderItemSelector = ({
                         </TableCell>
                       )}
                       {showIpiInput && (
-                        <TableCell className="w-24 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
+                        <TableCell style={getColumnStyle("ipi")} className="p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
                           <div className="px-4 py-1">
                             {itemIsSelected ? (
                               <Input

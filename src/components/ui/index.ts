@@ -54,6 +54,7 @@ export { Progress } from "./progress";
 export { UploadProgress, CardProgressOverlay } from "./upload-progress";
 export * from "./radio-group";
 export * from "./resizable";
+export * from "./column-resize-handle";
 export * from "./scroll-area";
 // export * from "./select"; // Removed - replaced by combobox
 export * from "./separator";
