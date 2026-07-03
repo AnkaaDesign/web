@@ -692,7 +692,7 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
       );
     }
     case "category":
-      return <CategoryChips categories={t.categories} maxVisible={2} />;
+      return <CategoryChips categories={t.categories} maxVisible={2} showAccountingType />;
     case "reconciliationStatus": {
       return <MatchStatusBadge status={t.reconciliationStatus} topMatchScore={t.topMatchScore} />;
     }

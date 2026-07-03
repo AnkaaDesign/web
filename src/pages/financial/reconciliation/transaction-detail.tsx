@@ -29,7 +29,10 @@ import {
 } from "@/utils";
 import { cn } from "@/lib/utils";
 import { SECTOR_PRIVILEGES, routes } from "@/constants";
-import { MatchStatusBadge } from "@/components/financial/reconciliation/match-status-badge";
+import {
+  MatchStatusBadge,
+  getAccountingTypeLabel,
+} from "@/components/financial/reconciliation/match-status-badge";
 import {
   TransactionMatchSection,
   type MatchSaveState,
@@ -249,22 +252,32 @@ export function ReconciliationTransactionDetailPage() {
                     </div>
                   ) : tx.categories && tx.categories.length > 0 ? (
                     <div className="space-y-3">
-                      {tx.categories.map(t => (
-                        <div
-                          key={t.id}
-                          className="flex items-center gap-2 bg-muted/50 rounded-lg px-4 py-3"
-                        >
-                          {t.category?.color && (
-                            <span
-                              className="h-2 w-2 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: t.category.color }}
-                            />
-                          )}
-                          <span className="text-sm font-semibold text-foreground">
-                            {t.category?.name ?? "—"}
-                          </span>
-                        </div>
-                      ))}
+                      {tx.categories.map(t => {
+                        const accountingLabel = getAccountingTypeLabel(t.category);
+                        return (
+                          <div
+                            key={t.id}
+                            className="flex items-center gap-2 bg-muted/50 rounded-lg px-4 py-3"
+                          >
+                            {t.category?.color && (
+                              <span
+                                className="h-2 w-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: t.category.color }}
+                              />
+                            )}
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold text-foreground">
+                                {t.category?.name ?? "—"}
+                              </span>
+                              {accountingLabel && (
+                                <span className="text-xs text-muted-foreground">
+                                  Grupo contábil: {accountingLabel}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="bg-muted/50 rounded-lg px-4 py-3">

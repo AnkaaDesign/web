@@ -47,7 +47,7 @@ export interface BankTransactionCategoryTag {
   derivedFromFiscalItemId: string | null;
   category: Pick<
     TransactionCategory,
-    "id" | "name" | "slug" | "kind" | "color" | "isResolving" | "isRecurring"
+    "id" | "name" | "slug" | "kind" | "color" | "isResolving" | "isRecurring" | "accountingType"
   >;
 }
 
