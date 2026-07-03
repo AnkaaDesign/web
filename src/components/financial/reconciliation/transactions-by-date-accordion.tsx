@@ -18,7 +18,8 @@ import {
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { CategoryChips, MatchStatusBadge } from "./match-status-badge";
+import { CategoryChips, MatchStatusBadge, getAccountingTypeLabel } from "./match-status-badge";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { routes } from "@/constants";
 import {
@@ -263,6 +264,7 @@ export function TransactionsByDateAccordion({
       // without truncation. The freed space comes from Contraparte (flex).
       { key: "linkedNf", header: "NF vinculada", width: "220px", show: true },
       { key: "category", header: "Categoria", width: "240px", show: true },
+      { key: "accountingGroup", header: "Grupo Contábil", width: "200px", show: true },
       { key: "reconciliationStatus", header: "Status", width: "180px", show: true },
     ],
     [showAccountColumn],
@@ -692,7 +694,28 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
       );
     }
     case "category":
-      return <CategoryChips categories={t.categories} maxVisible={2} showAccountingType />;
+      return <CategoryChips categories={t.categories} maxVisible={2} />;
+    case "accountingGroup": {
+      // Distinct chart-of-accounts groups (grupo contábil) of this transaction's
+      // categories, in its own column beside Categoria.
+      const labels = Array.from(
+        new Set(
+          (t.categories ?? [])
+            .map(tag => getAccountingTypeLabel(tag.category))
+            .filter((l): l is string => !!l),
+        ),
+      );
+      if (labels.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
+      return (
+        <div className="flex flex-wrap gap-1">
+          {labels.map(l => (
+            <Badge key={l} variant="secondary" size="sm" className="whitespace-nowrap">
+              {l}
+            </Badge>
+          ))}
+        </div>
+      );
+    }
     case "reconciliationStatus": {
       return <MatchStatusBadge status={t.reconciliationStatus} topMatchScore={t.topMatchScore} />;
     }
