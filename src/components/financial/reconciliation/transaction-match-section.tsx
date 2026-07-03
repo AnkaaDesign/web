@@ -199,6 +199,23 @@ export function TransactionMatchSection({
     () => existingMatches.reduce((sum, m) => sum + (m.allocatedAmount || 0), 0),
     [existingMatches],
   );
+
+  // A single selected note takes the WHOLE payment — a transaction is one payment
+  // event, so when it settles one note the entire amount goes there (paid-less →
+  // parcela/discount, paid-more → surcharge; the resolver sorts out the diff). No
+  // splitting, so the allocation is pinned to the transaction amount and the
+  // per-note "Valor a alocar" input is hidden. The input only appears when SEVERAL
+  // notes share one payment (then the amount must be divided among them).
+  const soleSelectedId =
+    selectedIds.length === 1 &&
+    !candById.get(selectedIds[0])?.isOrderGroup
+      ? selectedIds[0]
+      : null;
+  useEffect(() => {
+    if (!soleSelectedId) return;
+    const full = Number((txAmount - existingAllocated).toFixed(2));
+    setAllocations((a) => (a[soleSelectedId] === full ? a : { [soleSelectedId]: full }));
+  }, [soleSelectedId, txAmount, existingAllocated]);
   const newlyAllocated = useMemo(
     () => selectedIds.reduce((sum, id) => sum + (allocations[id] || 0), 0),
     [selectedIds, allocations],
@@ -577,6 +594,7 @@ export function TransactionMatchSection({
                     checked={selectedIds.includes(c.fiscalDocumentId)}
                     allocation={allocations[c.fiscalDocumentId]}
                     txAmount={txAmount}
+                    multiSelect={selectedIds.length > 1}
                     onToggle={() => toggleSelect(c.fiscalDocumentId, c)}
                     onAllocationChange={(v) =>
                       setAllocation(c.fiscalDocumentId, v)
@@ -694,6 +712,7 @@ function CandidateRow({
   checked,
   allocation,
   txAmount,
+  multiSelect,
   adjustmentReason,
   onToggle,
   onAllocationChange,
@@ -704,6 +723,7 @@ function CandidateRow({
   checked: boolean;
   allocation: number | undefined;
   txAmount: number;
+  multiSelect: boolean;
   adjustmentReason: AdjustmentReason | null;
   onToggle: () => void;
   onAllocationChange: (value: number) => void;
@@ -722,12 +742,11 @@ function CandidateRow({
   const noteDiff = Number((openBalance - paid).toFixed(2));
   const paidLess = !c.isOrderGroup && noteDiff > 0.05;
   const paidMore = !c.isOrderGroup && noteDiff < -0.05;
-  // Show the "Valor a alocar" input whenever this note's value can differ from the
-  // payment: an installment (note worth more), already partly paid, or the payment
-  // exceeds the note so the surplus can be pushed onto it as a surcharge (frete).
-  const showAllocationInput =
-    !c.isOrderGroup &&
-    (alreadyPaid || openBalance > txAmount + 0.05 || txAmount > openBalance + 0.05);
+  // The "Valor a alocar" input only appears when SEVERAL notes share one payment
+  // and the amount must be divided among them. For a single note the whole
+  // transaction goes to it (pinned in the parent), so no input — the paid-less/
+  // paid-more resolver below still handles any difference from the note total.
+  const showAllocationInput = !c.isOrderGroup && multiSelect;
   // Reasons offered per direction — a discount only makes sense when paid LESS.
   const reasonOptions = paidMore
     ? ADJUSTMENT_REASON_ORDER.filter((r) => r !== "DESCONTO")
