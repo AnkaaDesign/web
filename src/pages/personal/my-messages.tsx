@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/page-header";
 import { FAVORITE_PAGES } from "@/constants";
@@ -8,8 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/auth-context";
 import { messageService } from "@/api-client/message";
 import { MessageModal } from "@/components/common/message-modal/message-modal";
-import { MessageBlockRenderer } from "@/components/messaging/MessageBlockRenderer";
-import { transformMessageContent } from "@/utils/message-transformer";
+import { MessageMiniature } from "@/components/messaging/MessageCanvas";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -18,9 +17,8 @@ import type { Message } from "@/types/message";
 
 type MessageWithViewStatus = Message & { viewedAt?: Date | null; dismissedAt?: Date | null };
 
-const HOVER_DELAY_MS = 400;
-const GRID_COLUMNS = 4;
-const GRID_ROWS = 2;
+/** Cap on the card preview height; longer messages clip with a bottom fade. */
+const CARD_PREVIEW_MAX_HEIGHT = 340;
 
 const MessagePreviewCard = ({
   message,
@@ -29,62 +27,15 @@ const MessagePreviewCard = ({
   message: MessageWithViewStatus;
   onClick: () => void;
 }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [scrollActive, setScrollActive] = useState(false);
   const isViewed = !!message.viewedAt;
-
-  const handleMouseEnter = useCallback(() => {
-    hoverTimerRef.current = setTimeout(() => {
-      if (contentRef.current) {
-        const el = contentRef.current;
-        const isScrollable = el.scrollHeight > el.clientHeight;
-        if (isScrollable) {
-          setScrollActive(true);
-        }
-      }
-    }, HOVER_DELAY_MS);
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    if (hoverTimerRef.current) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-    setScrollActive(false);
-  }, []);
-
-  const handleWheel = useCallback(
-    (e: React.WheelEvent<HTMLDivElement>) => {
-      if (!scrollActive || !contentRef.current) return;
-
-      const el = contentRef.current;
-      const { scrollTop, scrollHeight, clientHeight } = el;
-      const atTop = scrollTop === 0;
-      const atBottom = Math.abs(scrollTop + clientHeight - scrollHeight) < 1;
-
-      // If scrolling down and at bottom, or scrolling up and at top, let the page scroll
-      if ((e.deltaY > 0 && atBottom) || (e.deltaY < 0 && atTop)) {
-        return;
-      }
-
-      // Otherwise trap the scroll inside the card content
-      e.stopPropagation();
-      el.scrollTop += e.deltaY;
-    },
-    [scrollActive]
-  );
 
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:z-10 relative flex flex-col h-full overflow-hidden",
+        "cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:z-10 relative flex flex-col overflow-hidden",
         !isViewed && "outline outline-2 outline-primary/30 bg-primary/5"
       )}
       onClick={onClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onWheel={handleWheel}
     >
       {/* Header with gradient like the modal */}
       <div
@@ -124,21 +75,9 @@ const MessagePreviewCard = ({
         </div>
       </div>
 
-      {/* Content preview */}
-      <CardContent className="p-4 flex-1 min-h-0">
-        <div
-          ref={contentRef}
-          className={cn(
-            "prose prose-sm dark:prose-invert max-w-none text-sm text-muted-foreground h-full",
-            scrollActive
-              ? "overflow-y-auto overscroll-contain"
-              : "overflow-hidden"
-          )}
-        >
-          <MessageBlockRenderer
-            blocks={transformMessageContent(message.content)}
-          />
-        </div>
+      {/* Content preview — full-width scaled miniature of the whole message */}
+      <CardContent className="p-0">
+        <MessageMiniature content={message.content} mode="width" maxBodyHeight={CARD_PREVIEW_MAX_HEIGHT} className="w-full" />
       </CardContent>
     </Card>
   );
@@ -153,15 +92,6 @@ export const MyMessagesPage = () => {
     queryFn: () => messageService.getMyMessages(),
     enabled: !!user,
   });
-
-  const rows = useMemo(() => {
-    if (!messages) return [];
-    const result: MessageWithViewStatus[][] = [];
-    for (let i = 0; i < messages.length; i += GRID_COLUMNS) {
-      result.push(messages.slice(i, i + GRID_COLUMNS));
-    }
-    return result;
-  }, [messages]);
 
   const handleCardClick = (message: MessageWithViewStatus) => {
     setSelectedMessage(message);
@@ -192,27 +122,19 @@ export const MyMessagesPage = () => {
         subtitle="Mensagens e comunicados do sistema"
         className="flex-shrink-0"
       />
-      <div
-        className="flex-1 min-h-0 overflow-y-auto scroll-smooth snap-y snap-mandatory flex flex-col gap-4 pb-1"
-      >
+      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
         {isLoading ? (
-          Array.from({ length: GRID_ROWS }).map((_, i) => (
-            <div
-              key={i}
-              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 shrink-0 snap-start px-1"
-              style={{ height: `calc((100% - ${(GRID_ROWS - 1) * 16}px) / ${GRID_ROWS})` }}
-            >
-              {Array.from({ length: GRID_COLUMNS }).map((_, j) => (
-                <Card key={j} className="overflow-hidden">
-                  <div className="p-4 space-y-3">
-                    <Skeleton className="h-5 w-3/4" />
-                    <Skeleton className="h-3 w-1/4" />
-                    <Skeleton className="h-24 w-full" />
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ))
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 items-start px-1">
+            {Array.from({ length: 8 }).map((_, j) => (
+              <Card key={j} className="overflow-hidden">
+                <div className="p-4 space-y-3">
+                  <Skeleton className="h-5 w-3/4" />
+                  <Skeleton className="h-3 w-1/4" />
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              </Card>
+            ))}
+          </div>
         ) : error ? (
           <Card>
             <CardContent className="py-8">
@@ -236,21 +158,15 @@ export const MyMessagesPage = () => {
             </CardContent>
           </Card>
         ) : (
-          rows.map((row, rowIndex) => (
-            <div
-              key={rowIndex}
-              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 shrink-0 snap-start px-1"
-              style={{ height: `calc((100% - ${(GRID_ROWS - 1) * 16}px) / ${GRID_ROWS})` }}
-            >
-              {row.map((message) => (
-                <MessagePreviewCard
-                  key={message.id}
-                  message={message}
-                  onClick={() => handleCardClick(message)}
-                />
-              ))}
-            </div>
-          ))
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 items-start px-1">
+            {messages.map((message) => (
+              <MessagePreviewCard
+                key={message.id}
+                message={message}
+                onClick={() => handleCardClick(message)}
+              />
+            ))}
+          </div>
         )}
       </div>
 

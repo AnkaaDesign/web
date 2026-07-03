@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import type { DecoratorBlock, DecoratorVariant } from '../types';
+import { HEADER_LOGO_MAX_WIDTH_PX, HEADER_LOGO_WIDTH_PCT } from '@/components/messaging/render-constants';
 
 interface DecoratorBlockEditorProps {
   block: DecoratorBlock;
@@ -10,7 +11,8 @@ interface DecoratorBlockEditorProps {
 }
 
 export const DECORATOR_IMAGES: Record<DecoratorVariant, string> = {
-  'header-logo': '/header-logo.webp',
+  // Compact cropped logo (575×226) — canonical header-logo asset (spec §6)
+  'header-logo': '/header-logo-compact.webp',
   'header-logo-stripes': '/header-logo-stripes.webp',
   'footer-wave-dark': '/footer-wave-dark.webp',
   'footer-wave-logo': '/footer-wave-logo.webp',
@@ -50,7 +52,11 @@ export const DecoratorBlockEditor = ({ block, onUpdate }: DecoratorBlockEditorPr
     <>
       <div className="space-y-2">
         <div className="w-full pointer-events-none">
-          <img src={src} alt="Decoração" style={{ width: '100%', display: 'block' }} />
+          <img
+            src={src}
+            alt="Decoração"
+            style={{ width: block.variant === 'header-logo' ? `min(${HEADER_LOGO_WIDTH_PCT}%, ${HEADER_LOGO_MAX_WIDTH_PX}px)` : '100%', display: 'block' }}
+          />
         </div>
         <Button variant="outline" size="sm" className="w-full" onClick={() => setOpen(true)}>
           Alterar {groupLabel}
@@ -76,7 +82,7 @@ export const DecoratorBlockEditor = ({ block, onUpdate }: DecoratorBlockEditorPr
                   <img
                     src={DECORATOR_IMAGES[v]}
                     alt={VARIANT_LABELS[v]}
-                    style={{ width: '100%', display: 'block' }}
+                    style={{ width: v === 'header-logo' ? `min(${HEADER_LOGO_WIDTH_PCT}%, ${HEADER_LOGO_MAX_WIDTH_PX}px)` : '100%', display: 'block' }}
                   />
                   <div className="px-2 py-1.5">
                     <Label className={`text-xs cursor-pointer ${isSelected ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>

@@ -37,19 +37,11 @@ export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => 
     setHasError(true);
   }, []);
 
-  const getSizeStyle = () => {
-    // If customWidth is provided, use it directly
-    if ((block as any).customWidth) {
-      return { maxWidth: (block as any).customWidth };
-    }
-
-    // If size is provided, convert it to maxWidth
-    if (size) {
-      return { maxWidth: size };
-    }
-
-    // Default to 50% (medium)
-    return { maxWidth: '50%' };
+  // Spec §4: resolved width = customWidth ?? size ?? '50%'.
+  // '%' is a fraction of the content area; px values are clamped to it.
+  const getSizeStyle = (): React.CSSProperties => {
+    const resolved = (block as any).customWidth || size || '50%';
+    return { width: resolved, maxWidth: '100%' };
   };
 
   const getAlignmentClass = () => {
@@ -58,6 +50,7 @@ export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => 
       center: 'mx-auto',
       right: 'ml-auto',
     };
+    // Spec §4: default alignment is center
     return alignmentMap[alignment || 'center'];
   };
 
@@ -65,7 +58,7 @@ export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => 
     <figure
       id={id}
       style={getSizeStyle()}
-      className={cn("my-6 first:mt-0 last:mb-0", getAlignmentClass(), className)}
+      className={cn("m-0", getAlignmentClass(), className)}
     >
       <div className="relative overflow-hidden rounded-lg">
         {isLoading && !hasError && (
@@ -107,6 +100,8 @@ export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => 
             onLoadedData={handleLoad}
             onError={handleError}
             aria-label={alt}
+            // Spec §4: unknown aspect → 16:9 (until metadata provides the real one)
+            style={width && height ? undefined : { aspectRatio: '16 / 9' }}
             className={cn(
               "w-full h-auto object-contain transition-opacity duration-300 rounded-lg bg-black",
               isLoading ? "opacity-0" : "opacity-100"
@@ -132,7 +127,10 @@ export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => 
       </div>
 
       {caption && (
-        <figcaption className="mt-2 text-center text-sm text-muted-foreground">
+        <figcaption
+          className="text-center text-muted-foreground"
+          style={{ fontSize: 13, marginTop: 4 }}
+        >
           {caption}
         </figcaption>
       )}

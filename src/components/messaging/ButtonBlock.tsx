@@ -12,6 +12,9 @@ interface ButtonBlockProps {
  * Renders an interactive button block with support for links and click handlers.
  * Uses the design system's Button component for consistency.
  */
+// Spec §7: primary pill, 15px/600 text, 10px × 20px padding, radius 8px.
+const BUTTON_SPEC_CLASSES = "h-auto rounded-lg px-5 py-2.5 text-[15px] font-semibold";
+
 export const ButtonBlock = React.memo<ButtonBlockProps>(({ block, className }) => {
   const { text, url, onClick, variant = 'default', disabled, id } = block;
 
@@ -30,7 +33,7 @@ export const ButtonBlock = React.memo<ButtonBlockProps>(({ block, className }) =
         variant={variant}
         disabled={disabled}
         asChild
-        className={cn("my-2", className)}
+        className={cn(BUTTON_SPEC_CLASSES, className)}
       >
         <a
           href={url}
@@ -52,7 +55,7 @@ export const ButtonBlock = React.memo<ButtonBlockProps>(({ block, className }) =
       disabled={disabled}
       onClick={handleClick}
       type="button"
-      className={cn("my-2", className)}
+      className={cn(BUTTON_SPEC_CLASSES, className)}
     >
       {text}
     </Button>

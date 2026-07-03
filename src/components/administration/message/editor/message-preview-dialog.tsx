@@ -8,11 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 import { IconDeviceDesktop, IconDeviceMobile, IconFileDownload } from "@tabler/icons-react";
-import * as TablerIcons from "@tabler/icons-react";
-import type { MessageFormData, DecoratorVariant } from "./types";
-import { useState } from "react";
-import { parseMarkdownToInlineFormat, sanitizeUrl } from "@/utils/markdown-parser";
-import { getApiBaseUrl } from "@/config/api";
+import type { MessageFormData } from "./types";
+import { useMemo, useState } from "react";
+import { MessageCanvas } from "@/components/messaging/MessageCanvas";
+import { transformBlocksForDisplay } from "@/utils/message-transformer";
 import { exportMessageToPdf } from "@/utils/message-pdf-export";
 
 interface MessagePreviewDialogProps {
@@ -21,407 +20,29 @@ interface MessagePreviewDialogProps {
   data: MessageFormData;
 }
 
-const DECORATOR_IMAGES: Record<string, string> = {
-  'header-logo': '/header-logo.webp',
-  'header-logo-stripes': '/header-logo-stripes.webp',
-  'footer-wave-dark': '/footer-wave-dark.webp',
-  'footer-wave-logo': '/footer-wave-logo.webp',
-  'footer-diagonal-stripes': '/footer-diagonal-stripes.webp',
-  'footer-wave-gold': '/footer-wave-gold.webp',
-  'footer-geometric': '/footer-geometric.webp',
-};
-
-const DecoratorPreview = ({ variant, mobile }: { variant: DecoratorVariant; mobile?: boolean }) => {
-  const src = DECORATOR_IMAGES[variant] ?? DECORATOR_IMAGES['footer-wave-dark'];
-  const isHeader = variant.startsWith('header-');
-  if (isHeader) {
-    if (mobile) {
-      // Match the real mobile app: it renders the logo from a pre-cropped
-      // 575×226 banner, so the logo fills the width and reads clearly on a
-      // narrow screen instead of being a tiny mark on a wide letterhead band.
-      // We reproduce that crop by clipping the wide asset to its left logo
-      // region (575/2482 ≈ 23%) at a capped size, left-aligned edge-to-edge.
-      return (
-        <div style={{ paddingTop: '8px', paddingLeft: '18px' }}>
-          <div style={{ width: '230px', maxWidth: '66%', aspectRatio: '575 / 158', overflow: 'hidden' }}>
-            <img
-              src={src}
-              alt="Decoração"
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                objectPosition: 'left center',
-                display: 'block',
-              }}
-            />
-          </div>
-        </div>
-      );
-    }
-    // Desktop: wide letterhead band (matches the PDF export). Inset the left
-    // edge so the logo aligns with the body content padding, and crop the
-    // asset's baked-in vertical whitespace so it sits flush with the top.
-    return (
-      <div style={{ paddingTop: '24px', paddingLeft: '13px' }}>
-        <div style={{ width: '100%', aspectRatio: '15.3', overflow: 'hidden' }}>
-          <img
-            src={src}
-            alt="Decoração"
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'left center',
-              display: 'block',
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-  return <img src={src} alt="Decoração" style={{ width: '100%', display: 'block' }} />;
-};
-
 export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePreviewDialogProps) => {
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
+
+  // The dialog receives raw editor blocks — transform to renderer format once.
+  const rendererBlocks = useMemo(() => transformBlocksForDisplay(data.blocks), [data.blocks]);
 
   const handleExportPDF = () => {
     exportMessageToPdf({ title: data.title, blocks: data.blocks });
   };
 
-  // Helper to render text content with newlines converted to <br /> elements
-  const renderTextWithLineBreaks = (text: string) => {
-    if (!text.includes('\n')) {
-      return text;
-    }
-
-    const parts = text.split('\n');
-    return parts.map((part, i) => (
-      <span key={i}>
-        {part}
-        {i < parts.length - 1 && <br />}
-      </span>
-    ));
-  };
-
-  // Helper to render formatted text with markdown support
-  const renderFormattedText = (text: string) => {
-    const formatted = parseMarkdownToInlineFormat(text);
-    return formatted.map((format, index) => {
-      const key = `fmt-${index}`;
-      switch (format.type) {
-        case 'text':
-          return <span key={key}>{renderTextWithLineBreaks(format.content)}</span>;
-        case 'bold':
-          return <strong key={key} className="font-semibold">{renderTextWithLineBreaks(format.content)}</strong>;
-        case 'italic':
-          return <em key={key} className="italic">{renderTextWithLineBreaks(format.content)}</em>;
-        case 'link': {
-          const safeUrl = sanitizeUrl(format.url || '');
-          if (!safeUrl) {
-            return <span key={key}>{renderTextWithLineBreaks(format.content)}</span>;
-          }
-          return (
-            <a
-              key={key}
-              href={safeUrl}
-              className="text-primary hover:underline underline-offset-2"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {renderTextWithLineBreaks(format.content)}
-            </a>
-          );
-        }
-        case 'underline':
-          return <u key={key}>{renderTextWithLineBreaks(format.content)}</u>;
-        case 'color':
-          return (
-            <span key={key} style={{ color: format.color }}>
-              {renderTextWithLineBreaks(format.content)}
-            </span>
-          );
-        default:
-          return null;
-      }
-    });
-  };
-
-  const resolveImageUrl = (url: string) => {
-    if (!url) return url;
-    if (url.startsWith("/")) return `${getApiBaseUrl()}${url}`;
-    return url;
-  };
-
-  const renderBlock = (block: any) => {
-    // Helper to get font size class
-    const getFontSizeClass = (size?: string) => {
-      const sizes: Record<string, string> = {
-        xs: 'text-xs',
-        sm: 'text-sm',
-        base: 'text-base',
-        lg: 'text-lg',
-        xl: 'text-xl',
-        '2xl': 'text-2xl',
-        '3xl': 'text-3xl',
-      };
-      return size ? sizes[size] : '';
-    };
-
-    // Default sizes for headings when no custom size is set
-    const defaultHeadingSizes: Record<number, string> = {
-      1: 'text-4xl md:text-5xl',
-      2: 'text-3xl md:text-4xl',
-      3: 'text-2xl md:text-3xl',
-    };
-
-    // Get effective heading size: custom if provided, otherwise default
-    const getEffectiveHeadingSize = (level: number, customSize?: string) => {
-      if (!customSize) return defaultHeadingSizes[level];
-      return getFontSizeClass(customSize);
-    };
-
-    // Helper to get font weight class
-    const getFontWeightClass = (weight?: string) => {
-      const weights: Record<string, string> = {
-        normal: 'font-normal',
-        medium: 'font-medium',
-        semibold: 'font-semibold',
-        bold: 'font-bold',
-      };
-      return weight ? weights[weight] : '';
-    };
-
-    switch (block.type) {
-      case 'heading1':
-        return (
-          <h1 className={`${getEffectiveHeadingSize(1, block.fontSize)} ${getFontWeightClass(block.fontWeight) || 'font-bold'} break-words whitespace-normal`}>
-            {renderFormattedText(block.content)}
-          </h1>
-        );
-      case 'heading2':
-        return (
-          <h2 className={`${getEffectiveHeadingSize(2, block.fontSize)} ${getFontWeightClass(block.fontWeight) || 'font-semibold'} break-words whitespace-normal`}>
-            {renderFormattedText(block.content)}
-          </h2>
-        );
-      case 'heading3':
-        return (
-          <h3 className={`${getEffectiveHeadingSize(3, block.fontSize)} ${getFontWeightClass(block.fontWeight) || 'font-medium'} break-words whitespace-normal`}>
-            {renderFormattedText(block.content)}
-          </h3>
-        );
-      case 'paragraph':
-        return (
-          <p className={`${getFontSizeClass(block.fontSize) || 'text-base'} ${getFontWeightClass(block.fontWeight) || 'font-normal'} leading-relaxed break-words whitespace-normal`}>
-            {renderFormattedText(block.content)}
-          </p>
-        );
-      case 'quote':
-        return (
-          <blockquote className={`border-l-4 border-primary pl-4 italic ${getFontSizeClass(block.fontSize) || 'text-lg'} ${getFontWeightClass(block.fontWeight) || 'font-normal'} break-words whitespace-normal`}>
-            {renderFormattedText(block.content)}
-          </blockquote>
-        );
-      case 'image': {
-        const getSizeStyle = () => {
-          if (block.customWidth) return { maxWidth: block.customWidth };
-          if (block.size) return { maxWidth: block.size };
-          return { maxWidth: '50%' };
-        };
-        const resolvedSrc = resolveImageUrl(block.url);
-        const isVideo =
-          block.mediaType === 'video' ||
-          block.mimeType?.startsWith('video/') ||
-          /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(block.url || '');
-        return (
-          <div className={`flex ${block.alignment === 'center' ? 'justify-center' : block.alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
-            <div style={getSizeStyle()}>
-              {isVideo ? (
-                <video
-                  src={resolvedSrc}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  className="w-full h-auto rounded-lg bg-black"
-                >
-                  {block.mimeType && <source src={resolvedSrc} type={block.mimeType} />}
-                </video>
-              ) : (
-                <img
-                  src={resolvedSrc}
-                  alt={block.alt || ''}
-                  className="w-full h-auto rounded-lg"
-                />
-              )}
-              {block.caption && (
-                <p className="text-sm text-muted-foreground mt-2 text-center">
-                  {block.caption}
-                </p>
-              )}
-            </div>
-          </div>
-        );
-      }
-      case 'button': {
-        const buttonContent = (
-          <Button
-            variant={block.variant || 'default'}
-            className="my-2 print:hidden"
-            onClick={() => block.url && window.open(block.url, '_blank', 'noopener,noreferrer')}
-          >
-            {block.text}
-          </Button>
-        );
-
-        if (block.alignment) {
-          const buttonAlignmentClasses = {
-            left: 'justify-start',
-            center: 'justify-center',
-            right: 'justify-end',
-          };
-          return (
-            <div className={`flex my-4 first:mt-0 last:mb-0 print:hidden ${buttonAlignmentClasses[block.alignment as keyof typeof buttonAlignmentClasses]}`}>
-              {buttonContent}
-            </div>
-          );
-        }
-
-        return buttonContent;
-      }
-      case 'divider':
-        return <Separator />;
-      case 'list':
-        return block.ordered ? (
-          <ol className="list-decimal list-inside space-y-1">
-            {block.items.map((item: string, i: number) => (
-              <li key={i}>{renderFormattedText(item)}</li>
-            ))}
-          </ol>
-        ) : (
-          <ul className="list-disc list-inside space-y-1">
-            {block.items.map((item: string, i: number) => (
-              <li key={i}>{renderFormattedText(item)}</li>
-            ))}
-          </ul>
-        );
-      case 'spacer':
-        const spacerHeights = {
-          sm: 'h-2',  // 8px
-          md: 'h-4',  // 16px
-          lg: 'h-6',  // 24px
-          xl: 'h-10', // 40px
-        };
-        return <div className={spacerHeights[(block.height || 'md') as keyof typeof spacerHeights]} />;
-      case 'icon':
-        const IconComponent = block.icon ? (TablerIcons as any)[block.icon] : null;
-        if (!IconComponent) return null;
-
-        const iconSizeClasses = {
-          sm: 'h-4 w-4',
-          md: 'h-6 w-6',
-          lg: 'h-8 w-8',
-          xl: 'h-12 w-12',
-        };
-
-        const iconAlignmentClasses = {
-          left: 'justify-start',
-          center: 'justify-center',
-          right: 'justify-end',
-        };
-
-        const iconContent = (
-          <IconComponent
-            className={`flex-shrink-0 ${iconSizeClasses[(block.size || 'md') as keyof typeof iconSizeClasses]} ${block.color || 'text-foreground'}`}
-          />
-        );
-
-        // Apply alignment wrapper for standalone icons (not in rows)
-        return block.alignment ? (
-          <div className={`flex my-4 first:mt-0 last:mb-0 ${iconAlignmentClasses[block.alignment as keyof typeof iconAlignmentClasses]}`}>
-            {iconContent}
-          </div>
-        ) : iconContent;
-      case 'decorator':
-        return <DecoratorPreview variant={block.variant} mobile={viewMode === 'mobile'} />;
-      case 'company-asset': {
-        const assetUrl = block.asset === 'logo' ? '/logo.png' : '/android-chrome-192x192.png';
-        const sizeStyle = block.size ? { maxWidth: block.size } : { maxWidth: '75%' };
-        return (
-          <div className={`flex ${block.alignment === 'center' ? 'justify-center' : block.alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
-            <div style={sizeStyle}>
-              <img src={assetUrl} alt={block.asset === 'logo' ? 'Logo' : 'Ícone'} className="w-full h-auto" />
-            </div>
-          </div>
-        );
-      }
-      case 'row':
-        const rowGapClasses = {
-          none: 'gap-0',
-          sm: 'gap-2',
-          md: 'gap-4',
-          lg: 'gap-6',
-        };
-
-        const rowAlignClasses = {
-          top: 'items-start',
-          center: 'items-center',
-          bottom: 'items-end',
-        };
-
-        return (
-          <div className={`flex flex-wrap md:flex-nowrap ${rowGapClasses[(block.gap || 'md') as keyof typeof rowGapClasses]} ${rowAlignClasses[(block.verticalAlign || 'top') as keyof typeof rowAlignClasses]} my-4 first:mt-0 last:mb-0 [&>*]:m-0`}>
-            {(block.blocks || []).map((nestedBlock: any, idx: number) => {
-              // Icons should only take their natural width, other blocks should grow
-              const isIconBlock = nestedBlock.type === 'icon';
-              const flexClass = isIconBlock ? 'flex-none' : 'flex-1 min-w-0';
-              // Icons need slight top margin to align with text baseline
-              const iconAdjustment = isIconBlock ? 'mt-[0.2em]' : '';
-
-              return (
-                <div key={nestedBlock.id || `nested-${idx}`} className={`${flexClass} ${iconAdjustment} [&>*]:my-0 [&>*]:first:mt-0 [&>*]:last:mb-0`}>
-                  {renderBlock(nestedBlock)}
-                </div>
-              );
-            })}
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const PreviewContent = () => (
-    // bg-background ensures dark mode responds correctly (dark bg in dark mode)
-    // overflow-hidden + rounded-xl clips decorator SVGs to the card border-radius
-    <div
-      className="w-full overflow-hidden rounded-xl border border-border bg-background text-foreground"
-      id="message-preview-content"
-    >
+  // Shared preview surface: title + canonical MessageCanvas render.
+  // `compact` = phone-width canvas (16px padding), identical to the mobile app.
+  const previewContent = (compact: boolean) => (
+    <div className="w-full bg-background text-foreground" id="message-preview-content">
       {/* Title */}
-      <div className="px-6 pt-5 pb-4">
+      <div className={compact ? "px-4 pt-4 pb-3" : "px-6 pt-5 pb-4"}>
         <h2 className="text-2xl font-bold break-words">{data.title}</h2>
       </div>
       <Separator />
 
-      {/* Blocks — decorators are edge-to-edge (no px), company-asset gets extra py, rest get px-6 py-2 */}
+      {/* Blocks — single canonical pipeline (spec §1) */}
       {data.blocks.length > 0 ? (
-        <div>
-          {data.blocks.map((block) => {
-            const isDecorator = block.type === 'decorator';
-            const isCompanyAsset = block.type === 'company-asset';
-            return (
-              <div
-                key={block.id}
-                data-block-id={block.id}
-                className={isDecorator ? 'w-full' : isCompanyAsset ? 'px-6 py-5' : 'px-6 py-2'}
-              >
-                {renderBlock(block)}
-              </div>
-            );
-          })}
-        </div>
+        <MessageCanvas blocks={rendererBlocks} compact={compact} className="py-4" />
       ) : (
         <div className="px-6 py-8 text-center text-muted-foreground">
           Nenhum conteúdo adicionado ainda
@@ -508,9 +129,10 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
                       </div>
                     </div>
 
-                    {/* Content - Only this scrolls */}
+                    {/* Content - Only this scrolls. Exactly 375px wide canvas with
+                        compact (16px) padding — identical pipeline to the Flutter app. */}
                     <div className="bg-background flex-1 overflow-y-auto min-h-0">
-                      <PreviewContent />
+                      {previewContent(true)}
                     </div>
 
                     {/* Home indicator */}
@@ -521,9 +143,11 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
                 </div>
               </div>
             ) : (
-              // Desktop view - scrollable content
-              <div className="w-full max-w-4xl h-full overflow-y-auto">
-                <PreviewContent />
+              // Desktop view - scrollable content, canvas capped at 672px
+              <div className="w-full h-full overflow-y-auto">
+                <div className="max-w-[672px] mx-auto overflow-hidden rounded-xl border border-border bg-background text-foreground">
+                  {previewContent(false)}
+                </div>
               </div>
             )}
           </div>

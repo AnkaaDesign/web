@@ -22,17 +22,23 @@ export interface UseMessageModalReturn {
   unviewedMessages: Message[];
   isLoading: boolean;
   error: Error | null;
-  dismissForToday: (messageId: string) => void;
+  dismissForToday: (messageIds: string | string[]) => void;
   dontShowAgain: (messageId: string) => void;
+  markViewed: (messageId: string) => void;
   refetch: () => void;
 }
 
 // Storage key for daily dismissed messages
 const DAILY_DISMISSED_KEY = "message_modal_daily_dismissed";
 
-// Get today's date as YYYY-MM-DD
+// Get today's date as YYYY-MM-DD using the LOCAL calendar day
+// (toISOString would use UTC, making "reappears tomorrow" mean UTC midnight)
 function getTodayDate(): string {
-  return new Date().toISOString().split("T")[0];
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 // Get daily dismissed messages from localStorage
@@ -147,40 +153,44 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
     return messages.filter((msg) => !isDismissedToday(msg.id, dailyDismissed));
   }, [messages, dailyDismissed]);
 
-  // Automatically track views when messages are displayed
-  React.useEffect(() => {
-    if (open && unviewedMessages.length > 0) {
-      // Track view for the first message (currently displayed)
-      const currentMessage = unviewedMessages[0];
-
-      // Only track once per message per session
-      if (currentMessage && !trackedViews.current.has(currentMessage.id)) {
-        trackedViews.current.add(currentMessage.id);
-        markAsViewedMutation.mutate(currentMessage.id);
-      }
-    }
-  }, [open, unviewedMessages, markAsViewedMutation]);
-
-  // Dismiss for today only (mark as viewed in API + store locally, will show again tomorrow)
-  const dismissForToday = React.useCallback(
+  // Mark a message as viewed in the API (once per message per session).
+  // Wired to the modal's onMessageDisplayed so it fires for EVERY message the
+  // user actually sees (open + Anterior/Próxima navigation), not just the first.
+  const markViewed = React.useCallback(
     (messageId: string) => {
-      // Mark as viewed in the API so it doesn't keep appearing on refresh
-      // This is different from permanent dismissal - the message is just "viewed"
       if (!trackedViews.current.has(messageId)) {
         trackedViews.current.add(messageId);
         markAsViewedMutation.mutate(messageId);
       }
-
-      const newDismissed = {
-        ...dailyDismissed,
-        [messageId]: getTodayDate(),
-      };
-
-      setDailyDismissed(newDismissed);
-      saveDailyDismissed(newDismissed);
-      onMessageDismissedForToday?.(messageId);
     },
-    [dailyDismissed, onMessageDismissedForToday, markAsViewedMutation]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [markAsViewedMutation.mutate]
+  );
+
+  // Snooze for today only (stored locally, will show again tomorrow).
+  // Accepts a batch: closing the modal snoozes every message still in the
+  // queue. Uses a functional update so batched/successive calls never clobber
+  // each other. Mark-viewed is handled separately per displayed message.
+  const dismissForToday = React.useCallback(
+    (messageIds: string | string[]) => {
+      const ids = Array.isArray(messageIds) ? messageIds : [messageIds];
+      if (ids.length === 0) return;
+
+      const today = getTodayDate();
+      setDailyDismissed((prev) => {
+        const next = { ...prev };
+        for (const id of ids) {
+          next[id] = today;
+        }
+        saveDailyDismissed(next);
+        return next;
+      });
+
+      for (const id of ids) {
+        onMessageDismissedForToday?.(id);
+      }
+    },
+    [onMessageDismissedForToday]
   );
 
   // Don't show again (permanent - marks as dismissed in database)
@@ -224,6 +234,7 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
     error: error as Error | null,
     dismissForToday,
     dontShowAgain,
+    markViewed,
     refetch,
   };
 }

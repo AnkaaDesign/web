@@ -1,5 +1,6 @@
 // Main exports
 export { MessageBlockRenderer } from "./MessageBlockRenderer";
+export { MessageCanvas, MessageMiniature, MINIATURE_REFERENCE_WIDTH } from "./MessageCanvas";
 
 // Individual block components
 export { HeadingBlock } from "./HeadingBlock";

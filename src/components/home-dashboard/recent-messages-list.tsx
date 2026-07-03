@@ -1,17 +1,14 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { IconMessage } from "@tabler/icons-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { MessageBlockRenderer } from "@/components/messaging/MessageBlockRenderer";
+import { MessageMiniature } from "@/components/messaging/MessageCanvas";
 import { MessageModal } from "@/components/common/message-modal/message-modal";
-import { transformMessageContent } from "@/utils/message-transformer";
 import { useMarkAsViewed } from "@/hooks/administration/use-message";
 import type { HomeDashboardMessage } from "../../types";
-
-const HOVER_DELAY_MS = 400;
 
 function MessagePreviewCard({
   message,
@@ -20,49 +17,7 @@ function MessagePreviewCard({
   message: HomeDashboardMessage;
   onClick: () => void;
 }) {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [scrollActive, setScrollActive] = useState(false);
   const isViewed = !!message.viewedAt;
-
-  const handleMouseEnter = useCallback(() => {
-    hoverTimerRef.current = setTimeout(() => {
-      if (contentRef.current) {
-        const el = contentRef.current;
-        const isScrollable = el.scrollHeight > el.clientHeight;
-        if (isScrollable) {
-          setScrollActive(true);
-        }
-      }
-    }, HOVER_DELAY_MS);
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    if (hoverTimerRef.current) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-    setScrollActive(false);
-  }, []);
-
-  const handleWheel = useCallback(
-    (e: React.WheelEvent<HTMLDivElement>) => {
-      if (!scrollActive || !contentRef.current) return;
-
-      const el = contentRef.current;
-      const { scrollTop, scrollHeight, clientHeight } = el;
-      const atTop = scrollTop === 0;
-      const atBottom = Math.abs(scrollTop + clientHeight - scrollHeight) < 1;
-
-      if ((e.deltaY > 0 && atBottom) || (e.deltaY < 0 && atTop)) {
-        return;
-      }
-
-      e.stopPropagation();
-      el.scrollTop += e.deltaY;
-    },
-    [scrollActive]
-  );
 
   return (
     <Card
@@ -71,9 +26,6 @@ function MessagePreviewCard({
         !isViewed && "outline outline-2 outline-primary/30 bg-primary/5"
       )}
       onClick={onClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onWheel={handleWheel}
     >
       {/* Header with gradient like the modal */}
       <div
@@ -111,21 +63,9 @@ function MessagePreviewCard({
         </div>
       </div>
 
-      {/* Content preview */}
-      <CardContent className="p-4 flex-1 min-h-0">
-        <div
-          ref={contentRef}
-          className={cn(
-            "prose prose-sm dark:prose-invert max-w-none text-sm text-muted-foreground h-full",
-            scrollActive
-              ? "overflow-y-auto overscroll-contain"
-              : "overflow-hidden"
-          )}
-        >
-          <MessageBlockRenderer
-            blocks={transformMessageContent(message.content)}
-          />
-        </div>
+      {/* Content preview — true scaled miniature (375px reference render) */}
+      <CardContent className="p-0 flex-1 min-h-0">
+        <MessageMiniature content={message.content} className="h-full w-full" />
       </CardContent>
     </Card>
   );

@@ -21,6 +21,7 @@ export function MessageModalProvider({
     unviewedMessages,
     dismissForToday,
     dontShowAgain,
+    markViewed,
   } = useMessageModal({
     autoShow,
     showOnMount,
@@ -36,6 +37,7 @@ export function MessageModalProvider({
         messages={unviewedMessages}
         onClose={dismissForToday}
         onDontShowAgain={dontShowAgain}
+        onMessageDisplayed={markViewed}
       />
     </>
   );

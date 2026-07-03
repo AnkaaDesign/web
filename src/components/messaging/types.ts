@@ -65,6 +65,7 @@ export interface ButtonBlock {
   onClick?: () => void;
   variant?: 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive';
   disabled?: boolean;
+  alignment?: 'left' | 'center' | 'right';
   id?: string;
 }
 

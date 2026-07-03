@@ -15,11 +15,12 @@ interface RowBlockProps {
 export const RowBlock = React.memo<RowBlockProps>(({ block, className }) => {
   const { blocks, columns: _columns, gap = 'md', verticalAlign = 'top', id } = block;
 
+  // Spec §7: 12px gutter (md/default); other tokens kept for legacy content
   const gapClasses = {
     none: 'gap-0',
     sm: 'gap-2',
-    md: 'gap-4',
-    lg: 'gap-6',
+    md: 'gap-3',
+    lg: 'gap-4',
   };
 
   const alignClasses = {
@@ -32,7 +33,6 @@ export const RowBlock = React.memo<RowBlockProps>(({ block, className }) => {
     <div
       id={id}
       className={cn(
-        "my-4 first:mt-0 last:mb-0",
         "flex flex-wrap md:flex-nowrap", // Wrap on mobile, inline on desktop
         gapClasses[gap],
         alignClasses[verticalAlign],

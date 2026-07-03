@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { IconLayoutGrid } from "@tabler/icons-react";
+import { MessageMiniature } from "@/components/messaging/MessageCanvas";
+import { transformBlocksForDisplay } from "@/utils/message-transformer";
 import type { ContentBlock } from "./types";
 
 interface MessageTemplate {
@@ -42,107 +44,10 @@ const uniqueBlockBadges = (blocks: ContentBlock[]): string[] => {
   return result;
 };
 
-// ─── Skeleton block shapes — use CSS variables so they adapt to dark/light mode
-const C = {
-  strong: 'hsl(var(--muted-foreground) / 0.35)',
-  soft:   'hsl(var(--muted-foreground) / 0.18)',
-  faint:  'hsl(var(--muted-foreground) / 0.10)',
-  accent: 'hsl(var(--primary) / 0.7)',
-  btn:    'hsl(var(--foreground) / 0.55)',
-};
-
-const bar  = (w: string, h: number, bg = C.strong, extra?: React.CSSProperties) =>
-  <div style={{ width: w, height: h, borderRadius: 2, background: bg, flexShrink: 0, ...extra }} />;
-const line = (w: string) =>
-  <div style={{ width: w, height: 3, borderRadius: 1, background: C.soft }} />;
-
-const SkeletonBlock = ({ block }: { block: ContentBlock }) => {
-  switch (block.type) {
-    case 'company-asset':
-      return <div style={{ display:'flex' }}>{bar('36%', 6, C.soft)}</div>;
-
-    case 'heading1': return bar('76%', 8);
-    case 'heading2': return bar('60%', 7);
-    case 'heading3': return bar('50%', 6);
-
-    case 'paragraph':
-      return (
-        <div style={{ display:'flex', flexDirection:'column', gap: 2 }}>
-          {line('100%')}{line('88%')}{line('68%')}
-        </div>
-      );
-
-    case 'list':
-      return (
-        <div style={{ display:'flex', flexDirection:'column', gap: 2 }}>
-          {[76, 63, 70].map((w, i) => (
-            <div key={i} style={{ display:'flex', alignItems:'center', gap: 3 }}>
-              <div style={{ width: 3, height: 3, borderRadius:'50%', background: C.strong, flexShrink:0 }} />
-              {line(`${w}%`)}
-            </div>
-          ))}
-        </div>
-      );
-
-    case 'quote':
-      return (
-        <div style={{ display:'flex', gap: 3 }}>
-          <div style={{ width: 2, borderRadius: 1, background: C.accent, flexShrink: 0, alignSelf:'stretch' }} />
-          <div style={{ flex:1, display:'flex', flexDirection:'column', gap: 2 }}>
-            {line('100%')}{line('78%')}
-          </div>
-        </div>
-      );
-
-    case 'button':
-      return (
-        <div style={{ display:'flex', justifyContent:'center' }}>
-          <div style={{ width:'42%', height: 8, borderRadius: 3, background: C.btn }} />
-        </div>
-      );
-
-    case 'divider':
-      return <div style={{ width:'100%', height: 1, background: C.faint }} />;
-
-    case 'spacer':
-      return <div style={{ height: 3 }} />;
-
-    case 'image':
-      return <div style={{ width:'100%', height: "1.25rem", borderRadius: 2, background: C.faint }} />;
-
-    case 'decorator':
-      return <div style={{ width:'100%', height: 8, background:'linear-gradient(90deg,#0c884e 0%,hsl(var(--muted)) 100%)', borderRadius: 1 }} />;
-
-    default:
-      return null;
-  }
-};
-
-// ─── Skeleton preview ─────────────────────────────────────────────────────────
-const SkeletonPreview = ({ blocks }: { blocks: ContentBlock[] }) => {
-  const firstBlock = blocks[0];
-  const lastBlock = blocks[blocks.length - 1];
-  const hasHeader = firstBlock?.type === 'decorator';
-  const hasFooter = lastBlock?.type === 'decorator' && !(hasHeader && blocks.length === 1);
-  const start = hasHeader ? 1 : 0;
-  const end = hasFooter ? blocks.length - 1 : blocks.length;
-  const contentBlocks = blocks.slice(start, end);
-
-  const accentBar = (
-    <div style={{ flexShrink:0, height: 8, background:'linear-gradient(90deg,#0c884e 0%,hsl(var(--muted)) 100%)' }} />
-  );
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
-      {hasHeader && accentBar}
-      <div style={{ flex:1, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column', gap: 5, padding: '8px 10px' }}>
-        {contentBlocks.map((block, i) => (
-          <SkeletonBlock key={i} block={block} />
-        ))}
-      </div>
-      {hasFooter && accentBar}
-    </div>
-  );
+// ─── Template preview: real scaled miniature of the template's blocks ────────
+const TemplatePreview = ({ blocks }: { blocks: ContentBlock[] }) => {
+  const rendererBlocks = useMemo(() => transformBlocksForDisplay(blocks), [blocks]);
+  return <MessageMiniature blocks={rendererBlocks} mode="fit" className="h-full w-full" />;
 };
 
 // ─── Template data ────────────────────────────────────────────────────────────
@@ -369,9 +274,9 @@ export const MessageTemplates = ({ open, onOpenChange, onSelect, hasExistingBloc
                     <Badge variant="secondary" className="text-xs shrink-0">{template.category}</Badge>
                   </div>
 
-                  {/* Skeleton preview */}
-                  <div className="flex-1 min-h-0 mx-3 rounded border border-border/50 bg-muted/20 overflow-hidden">
-                    <SkeletonPreview blocks={template.blocks} />
+                  {/* Real miniature preview */}
+                  <div className="flex-1 min-h-0 mx-3 rounded border border-border/50 bg-background overflow-hidden">
+                    <TemplatePreview blocks={template.blocks} />
                   </div>
 
                   {/* Block type badges */}

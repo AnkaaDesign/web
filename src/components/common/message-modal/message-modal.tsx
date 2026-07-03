@@ -4,8 +4,7 @@ import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types/message";
-import { MessageBlockRenderer } from "@/components/messaging/MessageBlockRenderer";
-import { transformMessageContent } from "@/utils/message-transformer";
+import { MessageCanvas } from "@/components/messaging/MessageCanvas";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -14,10 +13,15 @@ export interface MessageModalProps {
   onOpenChange: (open: boolean) => void;
   messages: Message[];
   currentIndex?: number;
-  /** Called when user clicks close (X) - dismiss for today only */
-  onClose?: (messageId: string) => void;
+  /**
+   * Called once per open cycle when the modal is closed via X, Escape or
+   * outside click - receives ALL queued message ids (dismiss for today only)
+   */
+  onClose?: (messageIds: string[]) => void;
   /** Called when user clicks "Não mostrar novamente" - permanent dismiss */
   onDontShowAgain?: (messageId: string) => void;
+  /** Called whenever a message becomes the displayed one (open / navigation) */
+  onMessageDisplayed?: (messageId: string) => void;
 }
 
 export function MessageModal({
@@ -27,9 +31,14 @@ export function MessageModal({
   currentIndex: initialIndex = 0,
   onClose,
   onDontShowAgain,
+  onMessageDisplayed,
 }: MessageModalProps) {
   const [currentIndex, setCurrentIndex] = React.useState(initialIndex);
   const [isClosing, setIsClosing] = React.useState(false);
+  // Guards against double-firing of the close flow (e.g. X button click also
+  // triggering Radix onOpenChange, or Escape hitting both our keydown handler
+  // and Radix's). Reset on every open cycle.
+  const closeHandledRef = React.useRef(false);
 
   const currentMessage = messages[currentIndex];
   const hasMultipleMessages = messages.length > 1;
@@ -41,8 +50,41 @@ export function MessageModal({
     if (open) {
       setCurrentIndex(initialIndex);
       setIsClosing(false);
+      closeHandledRef.current = false;
     }
   }, [open, initialIndex]);
+
+  // Notify whenever a message is actually displayed (on open and on navigation)
+  const currentMessageId = currentMessage?.id;
+  React.useEffect(() => {
+    if (open && currentMessageId) {
+      onMessageDisplayed?.(currentMessageId);
+    }
+  }, [open, currentMessageId, onMessageDisplayed]);
+
+  // Unified close path (X button, Escape, outside click / onOpenChange(false)):
+  // snooze ALL queued messages for today. Idempotent per open cycle.
+  const handleClose = React.useCallback(() => {
+    if (!closeHandledRef.current) {
+      closeHandledRef.current = true;
+      if (messages.length > 0) {
+        onClose?.(messages.map((message) => message.id));
+      }
+    }
+    onOpenChange(false);
+  }, [messages, onClose, onOpenChange]);
+
+  // Route Radix-initiated closes (outside click, Escape) through handleClose
+  const handleDialogOpenChange = React.useCallback(
+    (nextOpen: boolean) => {
+      if (nextOpen) {
+        onOpenChange(true);
+      } else {
+        handleClose();
+      }
+    },
+    [handleClose, onOpenChange]
+  );
 
   // Keyboard navigation
   React.useEffect(() => {
@@ -70,7 +112,7 @@ export function MessageModal({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, hasMultipleMessages, isFirstMessage, isLastMessage]);
+  }, [open, hasMultipleMessages, isFirstMessage, isLastMessage, handleClose]);
 
   const handlePrevious = () => {
     if (!isFirstMessage) {
@@ -82,14 +124,6 @@ export function MessageModal({
     if (!isLastMessage) {
       setCurrentIndex((prev) => prev + 1);
     }
-  };
-
-  // Close button - dismiss for today only
-  const handleClose = () => {
-    if (currentMessage) {
-      onClose?.(currentMessage.id);
-    }
-    onOpenChange(false);
   };
 
   // Don't show again - permanent dismiss
@@ -111,8 +145,10 @@ export function MessageModal({
           setIsClosing(false);
         }, 300);
       } else {
-        // Close the modal after a short delay
+        // Close the modal after a short delay. This is a permanent dismiss of
+        // the only remaining message, so skip the snooze-on-close flow.
         setTimeout(() => {
+          closeHandledRef.current = true;
           onOpenChange(false);
         }, 300);
       }
@@ -130,7 +166,7 @@ export function MessageModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogOverlay className="bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 transition-all duration-300" />
       <DialogContent
         hideClose
@@ -187,16 +223,15 @@ export function MessageModal({
           )}
         </div>
 
-        {/* Body */}
-        <div className="px-6 pb-6 pt-2 min-h-[200px] max-h-[60vh] overflow-y-auto">
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <MessageBlockRenderer
-              blocks={transformMessageContent(currentMessage.content)}
-            />
-          </div>
+        {/* Body — shared canvas owns padding so decorators can bleed edge-to-edge;
+            flex + flex-1 stretch the canvas so a trailing footer decorator sticks
+            to the bottom even for short messages. */}
+        <div className="pt-2 min-h-[200px] max-h-[60vh] overflow-y-auto flex flex-col">
+          <MessageCanvas content={currentMessage.content} className="flex-1" />
         </div>
 
-        {/* Footer */}
+        {/* Footer — hidden when it would render empty */}
+        {(hasMultipleMessages || onDontShowAgain) && (
         <div className="border-t bg-muted/20 px-6 py-4">
           <div className="flex items-center justify-between gap-3">
             {/* Navigation buttons */}
@@ -243,6 +278,7 @@ export function MessageModal({
             </div>
           </div>
         </div>
+        )}
 
         {/* Screen reader description */}
         <div id="message-modal-description" className="sr-only">

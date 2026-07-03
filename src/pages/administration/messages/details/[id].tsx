@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { IconMessageCircle, IconEdit, IconTrash, IconRefresh, IconEye } from "@tabler/icons-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageBlockRenderer } from "@/components/messaging/MessageBlockRenderer";
+import { MessageCanvas } from "@/components/messaging/MessageCanvas";
 import { transformBlocksForDisplay } from "@/utils/message-transformer";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -342,7 +342,7 @@ export const MessageDetailsPage = () => {
 
                       // Check if we have valid blocks
                       if (blocks && Array.isArray(blocks) && blocks.length > 0) {
-                        return <MessageBlockRenderer blocks={transformBlocksForDisplay(blocks)} className="px-4 py-3" />;
+                        return <MessageCanvas blocks={transformBlocksForDisplay(blocks)} className="py-3" />;
                       }
 
                       return (

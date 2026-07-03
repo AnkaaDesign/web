@@ -2,6 +2,7 @@ import * as React from "react";
 import type { DividerBlock as DividerBlockType } from "./types";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { DIVIDER_MARGIN_Y } from "./render-constants";
 
 interface DividerBlockProps {
   block: DividerBlockType;
@@ -9,8 +10,8 @@ interface DividerBlockProps {
 }
 
 /**
- * Renders a horizontal divider to separate content sections.
- * Uses semantic separator for accessibility.
+ * Renders a horizontal divider (Message Rendering Spec §7):
+ * 1px hairline, 8px vertical margin.
  */
 export const DividerBlock = React.memo<DividerBlockProps>(({ block, className }) => {
   const { id } = block;
@@ -18,12 +19,10 @@ export const DividerBlock = React.memo<DividerBlockProps>(({ block, className })
   return (
     <div
       id={id}
-      className={cn("my-6 first:mt-0 last:mb-0", className)}
+      style={{ marginTop: DIVIDER_MARGIN_Y, marginBottom: DIVIDER_MARGIN_Y }}
+      className={cn(className)}
     >
-      <Separator
-        decorative
-        aria-hidden="true"
-      />
+      <Separator decorative aria-hidden="true" />
     </div>
   );
 });

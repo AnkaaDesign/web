@@ -54,7 +54,7 @@ export const MessageBlockRenderer = React.memo<MessageBlockRendererProps>(
         };
 
         return (
-          <div className={cn("flex my-4 first:mt-0 last:mb-0", alignmentClasses[alignment])}>
+          <div key={`align-${key}`} className={cn("flex", alignmentClasses[alignment])}>
             {content}
           </div>
         );
@@ -71,7 +71,8 @@ export const MessageBlockRenderer = React.memo<MessageBlockRendererProps>(
           return <ImageBlock key={key} block={block} />;
 
         case 'button':
-          return <ButtonBlock key={key} block={block} />;
+          // Spec §7: button alignment default left
+          return withAlignment(<ButtonBlock key={key} block={block} />, block.alignment ?? 'left');
 
         case 'divider':
           return <DividerBlock key={key} block={block} />;
@@ -105,15 +106,26 @@ export const MessageBlockRenderer = React.memo<MessageBlockRendererProps>(
       }
     };
 
+    // Spec §1: 12px vertical gap between consecutive blocks; no prose wrappers —
+    // the renderer fully owns typography.
     return (
       <article
-        className={cn(
-          "message-blocks prose prose-neutral dark:prose-invert max-w-none [&>*]:mb-4 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-          className
-        )}
+        className={cn("message-blocks flex flex-col gap-3 text-foreground", className)}
         role="article"
       >
-        {blocks.map((block, index) => renderBlock(block, index))}
+        {blocks.map((block, index) => {
+          const rendered = renderBlock(block, index);
+          // A trailing decorator (footer wave) is pushed to the bottom edge
+          // when the host stretches the canvas (mt-auto is inert otherwise).
+          if (index === blocks.length - 1 && block.type === "decorator") {
+            return (
+              <div key={`stick-${block.id || index}`} className="mt-auto">
+                {rendered}
+              </div>
+            );
+          }
+          return rendered;
+        })}
       </article>
     );
   }
