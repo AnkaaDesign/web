@@ -58,6 +58,35 @@ export type MatchType =
   | "MANUAL"
   | "BANK_SLIP_BRIDGE";
 
+/** Why a payment settled a note for LESS than its total (the unpaid slice is
+ *  written off with this reason so the note closes as fully settled). */
+export type AdjustmentReason =
+  | "DESCONTO"
+  | "FRETE"
+  | "GARANTIA_ESTENDIDA"
+  | "SEGURO"
+  | "TAXAS"
+  | "OUTROS";
+
+export const ADJUSTMENT_REASON_LABELS: Record<AdjustmentReason, string> = {
+  DESCONTO: "Desconto",
+  FRETE: "Frete",
+  GARANTIA_ESTENDIDA: "Garantia estendida",
+  SEGURO: "Seguro",
+  TAXAS: "Taxas",
+  OUTROS: "Outros",
+};
+
+/** Order used to render the shortfall reason selector. */
+export const ADJUSTMENT_REASON_ORDER: AdjustmentReason[] = [
+  "DESCONTO",
+  "FRETE",
+  "GARANTIA_ESTENDIDA",
+  "SEGURO",
+  "TAXAS",
+  "OUTROS",
+];
+
 export type TransactionType = "CREDIT" | "DEBIT";
 
 export type BankTransactionSubtype =
@@ -129,6 +158,10 @@ export interface ReconciliationMatch {
   /** Set when an inflow (entrada) is matched to a receivable installment. */
   installmentId: string | null;
   allocatedAmount: number;
+  /** Note-shortfall write-off: the unpaid slice of the note (paid < note total),
+   *  closed with a reason so the note settles below its total. */
+  adjustmentAmount?: number | null;
+  adjustmentReason?: AdjustmentReason | null;
   matchType: MatchType;
   confidenceScore: number;
   matchedByUserId: string | null;

@@ -23,7 +23,12 @@ import {
 import { routes } from "@/constants";
 import { cn } from "@/lib/utils";
 import { formatCNPJ, formatCurrency, formatDate } from "@/utils";
-import type { BankTransaction, MatchCandidate } from "@/types/reconciliation";
+import type {
+  AdjustmentReason,
+  BankTransaction,
+  MatchCandidate,
+} from "@/types/reconciliation";
+import { ADJUSTMENT_REASON_LABELS, ADJUSTMENT_REASON_ORDER } from "@/types/reconciliation";
 import type { ManualMatchPayload } from "@/schemas/reconciliation";
 import { getConfidenceBadgeVariant } from "./match-status-badge";
 import { FiscalItemsTable } from "./fiscal-items-table";
@@ -75,6 +80,13 @@ export function TransactionMatchSection({
   const [remainderReason, setRemainderReason] = useState<
     "FRETE" | "SEGURO" | "TAXAS" | "OUTROS" | "DEFERRED" | null
   >(null);
+  // Per-note shortfall write-off: when this payment settles a note for LESS than
+  // its total, the user picks a reason (Desconto, Frete…) so the note closes as
+  // settled instead of lingering open. null = leave open (a parcela another
+  // transaction pays). Keyed by fiscalDocumentId.
+  const [adjustmentByDoc, setAdjustmentByDoc] = useState<
+    Record<string, AdjustmentReason | null>
+  >({});
 
   const matchMut = useMatchTransaction();
   const setItemCategory = useSetFiscalItemCategory();
@@ -102,6 +114,7 @@ export function TransactionMatchSection({
     setAllocations({});
     setNotes("");
     setRemainderReason(null);
+    setAdjustmentByDoc({});
   }, [transaction.id]);
 
   const handleItemCategory = (
@@ -143,6 +156,13 @@ export function TransactionMatchSection({
           delete copy[id];
           return copy;
         });
+        // Drop any shortfall write-off chosen for a now-deselected note.
+        setAdjustmentByDoc((m) => {
+          if (!(id in m)) return m;
+          const copy = { ...m };
+          delete copy[id];
+          return copy;
+        });
       }
       return next;
     });
@@ -150,6 +170,9 @@ export function TransactionMatchSection({
 
   const setAllocation = (id: string, value: number) =>
     setAllocations((a) => ({ ...a, [id]: value }));
+
+  const setAdjustment = (id: string, reason: AdjustmentReason | null) =>
+    setAdjustmentByDoc((m) => ({ ...m, [id]: reason }));
 
   const existingMatches = useMemo(
     () => (transaction.matches ?? []).filter((m) => !m.reversedAt),
@@ -222,7 +245,22 @@ export function TransactionMatchSection({
   // handleSave absorbs the residual onto the largest NF so the backend receives
   // an allocation that sums exactly to the payment. isValidAllocation is kept
   // as a visual signal only (amber "Faltam" label) but no longer blocks saving.
-  const canSave = hasMatchChanges;
+  //
+  // BUT: a note allocated MORE than its open balance (paid-more) must carry a
+  // surcharge reason (frete/seguro…) — otherwise the payload would over-allocate
+  // the note and the backend rejects it. Block the save until that's resolved.
+  const hasUnresolvedSurplus = useMemo(
+    () =>
+      selectedIds.some((id) => {
+        const c = candById.get(id);
+        if (!c || c.isOrderGroup) return false;
+        const openBalance = c.remainingValue ?? c.totalValue;
+        const alloc = allocations[id] ?? 0;
+        return alloc > openBalance + 0.05 && !adjustmentByDoc[id];
+      }),
+    [selectedIds, candById, allocations, adjustmentByDoc],
+  );
+  const canSave = hasMatchChanges && !hasUnresolvedSurplus;
   const saving = matchMut.isPending;
 
   const handleSave = () => {
@@ -235,12 +273,21 @@ export function TransactionMatchSection({
     // fiscal matches alongside the new ones — otherwise they'd be dropped and the
     // payload could no longer cover the payment (the old `txAmount −
     // existingAllocated` target made partial re-matches fail validation).
-    const expanded: { fiscalDocumentId: string; amount: number }[] = [];
+    const expanded: {
+      fiscalDocumentId: string;
+      amount: number;
+      adjustmentAmount?: number;
+      adjustmentReason?: AdjustmentReason;
+    }[] = [];
     for (const m of existingMatches) {
       if (m.fiscalDocumentId) {
         expanded.push({
           fiscalDocumentId: m.fiscalDocumentId,
           amount: m.allocatedAmount || 0,
+          // Preserve any write-off already recorded on this note (re-sending the
+          // match without it would clear it on the backend).
+          adjustmentAmount: m.adjustmentAmount ?? undefined,
+          adjustmentReason: m.adjustmentReason ?? undefined,
         });
       }
     }
@@ -258,9 +305,20 @@ export function TransactionMatchSection({
           });
         }
       } else {
+        const amount = allocations[id] ?? c?.totalValue ?? 0;
+        // Signed settlement adjustment: note total − what this payment covers.
+        // >0 = paid less (discount, positive write-off); <0 = paid more (frete/
+        // seguro surcharge, negative). Sent only when the user chose a reason so
+        // the note closes; a bare shortfall with no reason stays open (parcela).
+        const reason = adjustmentByDoc[id] ?? null;
+        const openBalance = c?.remainingValue ?? c?.totalValue ?? amount;
+        const diff = Number((openBalance - amount).toFixed(2));
         expanded.push({
           fiscalDocumentId: id,
-          amount: allocations[id] ?? c?.totalValue ?? 0,
+          amount,
+          ...(reason && Math.abs(diff) > 0.005
+            ? { adjustmentAmount: diff, adjustmentReason: reason }
+            : {}),
         });
       }
     }
@@ -523,6 +581,12 @@ export function TransactionMatchSection({
                     onAllocationChange={(v) =>
                       setAllocation(c.fiscalDocumentId, v)
                     }
+                    adjustmentReason={
+                      adjustmentByDoc[c.fiscalDocumentId] ?? null
+                    }
+                    onAdjustmentChange={(r) =>
+                      setAdjustment(c.fiscalDocumentId, r)
+                    }
                     onItemCategoryChange={handleItemCategory}
                   />
                 ))}
@@ -630,16 +694,20 @@ function CandidateRow({
   checked,
   allocation,
   txAmount,
+  adjustmentReason,
   onToggle,
   onAllocationChange,
+  onAdjustmentChange,
   onItemCategoryChange,
 }: {
   candidate: MatchCandidate;
   checked: boolean;
   allocation: number | undefined;
   txAmount: number;
+  adjustmentReason: AdjustmentReason | null;
   onToggle: () => void;
   onAllocationChange: (value: number) => void;
+  onAdjustmentChange: (reason: AdjustmentReason | null) => void;
   onItemCategoryChange: (itemId: string, categoryId: string | null) => void;
 }) {
   // A single NF paid in installments allocates only PART of its total to this
@@ -648,15 +716,22 @@ function CandidateRow({
   const openBalance = c.remainingValue ?? c.totalValue;
   // The NF was already partially paid by OTHER transactions (a prior parcela).
   const alreadyPaid = !c.isOrderGroup && openBalance + 0.05 < c.totalValue;
-  // This transaction is covering only part of the NF's open balance.
-  const isPartial =
-    !c.isOrderGroup && allocation != null && allocation + 0.05 < openBalance;
-  // The "Valor a alocar" input is only needed when the NF must be SPLIT — an
-  // installment: the note is worth more than this single payment (or was already
-  // partly paid by another transaction). Otherwise the allocation is simply the
-  // full note value (auto), so the input is hidden to keep the flow clean.
+  const paid = allocation ?? 0;
+  // Signed difference between the note's open balance and what THIS payment puts
+  // toward it: >0 paid LESS (discount/installment), <0 paid MORE (surcharge).
+  const noteDiff = Number((openBalance - paid).toFixed(2));
+  const paidLess = !c.isOrderGroup && noteDiff > 0.05;
+  const paidMore = !c.isOrderGroup && noteDiff < -0.05;
+  // Show the "Valor a alocar" input whenever this note's value can differ from the
+  // payment: an installment (note worth more), already partly paid, or the payment
+  // exceeds the note so the surplus can be pushed onto it as a surcharge (frete).
   const showAllocationInput =
-    !c.isOrderGroup && (alreadyPaid || openBalance > txAmount + 0.05);
+    !c.isOrderGroup &&
+    (alreadyPaid || openBalance > txAmount + 0.05 || txAmount > openBalance + 0.05);
+  // Reasons offered per direction — a discount only makes sense when paid LESS.
+  const reasonOptions = paidMore
+    ? ADJUSTMENT_REASON_ORDER.filter((r) => r !== "DESCONTO")
+    : ADJUSTMENT_REASON_ORDER;
   return (
     // The ENTIRE card is the toggle target — clicking anywhere selects/deselects
     // the candidate (green border = selected). The category combobox cell stops
@@ -828,7 +903,7 @@ function CandidateRow({
                 type="number"
                 step={0.01}
                 min={0}
-                max={openBalance}
+                max={Math.max(openBalance, txAmount)}
                 value={allocation ?? ""}
                 onChange={(v) => {
                   const n = v === "" || v == null ? 0 : Number(v);
@@ -842,15 +917,100 @@ function CandidateRow({
               {alreadyPaid ? " em aberto" : ""}
             </span>
           </div>
-          {isPartial && (
+          {(paidLess || paidMore) && (
             <Badge
-              variant="secondary"
+              variant={
+                adjustmentReason ? "default" : paidMore ? "cancelled" : "secondary"
+              }
               size="sm"
               className="whitespace-nowrap"
-              title="Esta transação paga apenas parte do saldo em aberto desta nota (parcela). O restante fica em aberto para as demais parcelas."
+              title={
+                adjustmentReason
+                  ? "A diferença desta nota é lançada como ajuste — a nota fica quitada."
+                  : paidMore
+                    ? "O pagamento excede a nota. Escolha o motivo do excedente para quitar a nota."
+                    : "Esta transação paga apenas parte do saldo desta nota (parcela). O restante fica em aberto."
+              }
             >
-              Parcial · resta {formatCurrency(openBalance - (allocation ?? 0))}
+              {adjustmentReason
+                ? `Quitada · ${ADJUSTMENT_REASON_LABELS[adjustmentReason]} ${formatCurrency(
+                    Math.abs(noteDiff),
+                  )}`
+                : paidMore
+                  ? `Excede a nota em ${formatCurrency(-noteDiff)}`
+                  : `Parcial · resta ${formatCurrency(noteDiff)}`}
             </Badge>
+          )}
+        </div>
+      )}
+
+      {/* Settlement-difference resolver — the amount paid for this note differs
+          from its total, in EITHER direction. Paid less: leave open (a parcela) or
+          write off the shortfall with a reason (Desconto…). Paid more: attribute
+          the surplus as a note-related surcharge (Frete, Seguro…). Both close the
+          note as quitada while the payment stays fully allocated. */}
+      {checked && (paidLess || paidMore) && (
+        <div
+          className="px-3 py-2.5 border-t border-border bg-muted/10 space-y-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-xs text-muted-foreground">
+            {paidMore ? (
+              <>
+                Pagou{" "}
+                <span className="font-medium">{formatCurrency(-noteDiff)}</span> a
+                mais que a nota. O que é esse excedente?
+              </>
+            ) : (
+              <>
+                Pagou{" "}
+                <span className="font-medium">{formatCurrency(noteDiff)}</span> a
+                menos que a nota. É uma parcela ou o restante é desconto/ajuste?
+              </>
+            )}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {paidLess && (
+              <Button
+                type="button"
+                variant={adjustmentReason == null ? "default" : "outline"}
+                size="sm"
+                onClick={() => onAdjustmentChange(null)}
+              >
+                {adjustmentReason == null && (
+                  <IconCircleCheck className="h-4 w-4 mr-1" />
+                )}
+                Parcela (fica em aberto)
+              </Button>
+            )}
+            {reasonOptions.map((r) => {
+              const active = adjustmentReason === r;
+              return (
+                <Button
+                  key={r}
+                  type="button"
+                  variant={active ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => onAdjustmentChange(active ? null : r)}
+                >
+                  {active && <IconCircleCheck className="h-4 w-4 mr-1" />}
+                  {ADJUSTMENT_REASON_LABELS[r]}
+                </Button>
+              );
+            })}
+          </div>
+          {adjustmentReason ? (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              Nota será quitada — {formatCurrency(Math.abs(noteDiff))} lançado como{" "}
+              {ADJUSTMENT_REASON_LABELS[adjustmentReason]}.
+            </p>
+          ) : (
+            paidMore && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Escolha um motivo para o excedente — senão o pagamento excederia o
+                total da nota e não poderá ser salvo.
+              </p>
+            )
           )}
         </div>
       )}
