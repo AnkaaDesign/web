@@ -64,11 +64,32 @@ const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" | "large" = "
   return "";
 };
 
+// Raster image formats the browser can decode into a <canvas> and place on the
+// clipboard as image/png. Types like image/x-eps, image/eps, image/tiff and
+// image/svg+xml carry an "image/" MIME but CANNOT be rasterized by <img>, so a
+// clipboard "copy file" would silently fail and fall back to copying a URL.
+// Only offer "Copiar arquivo" when a real image copy will actually succeed.
+const COPYABLE_IMAGE_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/gif",
+  "image/webp",
+  "image/bmp",
+  "image/avif",
+]);
+
+const canCopyAsImage = (file: AnkaaFile): boolean =>
+  !!file.mimetype && COPYABLE_IMAGE_MIME_TYPES.has(file.mimetype.toLowerCase());
+
 /**
  * Hook for file context menu (right-click) with Open, Save, Copy actions.
  */
 function useFileContextMenu(file: AnkaaFile) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  // Only raster images can actually be copied to the clipboard as a file; for
+  // everything else (EPS/PDF/DXF/…) users should use "Salvar arquivo" or drag-out.
+  const canCopyFile = canCopyAsImage(file);
 
   const onContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -145,7 +166,34 @@ function useFileContextMenu(file: AnkaaFile) {
     setContextMenu(null);
   }, [file]);
 
-  return { contextMenu, onContextMenu, close, openInNewTab, saveFile, copyFile, copyLink };
+  // Native drag-out: lets the user drag the thumbnail straight from the browser
+  // onto a folder or a native app (e.g. Adobe Illustrator) so the REAL file
+  // materializes there — not a raster of the thumbnail. The browser clipboard
+  // cannot carry an arbitrary binary file (EPS/PDF/etc.), but the OS drag-and-drop
+  // "DownloadURL" format (Chromium/Electron) can. Illustrator treats the drop as a
+  // file drop and places the actual vector artwork.
+  const onDragStart = useCallback((e: React.DragEvent) => {
+    try {
+      const downloadUrl = getFileDownloadUrl(file);
+      // DownloadURL requires an absolute URL; getFileDownloadUrl already returns one,
+      // but guard against relative URLs just in case.
+      const absoluteUrl = /^https?:\/\//i.test(downloadUrl)
+        ? downloadUrl
+        : new URL(downloadUrl, window.location.origin).href;
+      const filename = file.filename || file.originalName || "arquivo";
+      const mimetype = file.mimetype || "application/octet-stream";
+      // Format: "mimetype:filename:url" — Chromium downloads the real file on drop.
+      e.dataTransfer.setData("DownloadURL", `${mimetype}:${filename}:${absoluteUrl}`);
+      // Fallbacks for drop targets that understand URLs (other browser tabs, editors, etc.).
+      e.dataTransfer.setData("text/uri-list", absoluteUrl);
+      e.dataTransfer.setData("text/plain", absoluteUrl);
+      e.dataTransfer.effectAllowed = "copy";
+    } catch (err) {
+      console.warn("[FileItem] Drag start failed:", err);
+    }
+  }, [file]);
+
+  return { contextMenu, onContextMenu, close, openInNewTab, saveFile, copyFile, copyLink, onDragStart, canCopyFile };
 }
 
 function FileContextMenu({ ctx }: { ctx: ReturnType<typeof useFileContextMenu> }) {
@@ -166,10 +214,12 @@ function FileContextMenu({ ctx }: { ctx: ReturnType<typeof useFileContextMenu> }
           Salvar arquivo
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={ctx.copyFile}>
-          <IconCopy className="mr-2 h-4 w-4" />
-          Copiar arquivo
-        </DropdownMenuItem>
+        {ctx.canCopyFile && (
+          <DropdownMenuItem onClick={ctx.copyFile}>
+            <IconCopy className="mr-2 h-4 w-4" />
+            Copiar arquivo
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={ctx.copyLink}>
           <IconClipboard className="mr-2 h-4 w-4" />
           Copiar link
@@ -226,6 +276,9 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
         onContextMenu={ctx.onContextMenu}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        draggable
+        onDragStart={ctx.onDragStart}
+        title={`${file.filename} — clique para visualizar, arraste para o Illustrator ou pasta`}
       >
         {/* Thumbnail/Icon Area */}
         <div
@@ -326,6 +379,9 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
         className={cn("group relative flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer border border-border", className)}
         onClick={handleClick}
         onContextMenu={ctx.onContextMenu}
+        draggable
+        onDragStart={ctx.onDragStart}
+        title={`${file.filename} — clique para visualizar, arraste para o Illustrator ou pasta`}
       >
         {/* Thumbnail/Icon */}
         <div className="flex items-center justify-center w-10 h-10 rounded bg-muted/30 shrink-0 relative">
