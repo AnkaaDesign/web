@@ -1,4 +1,5 @@
 import { useState, useCallback, useContext, useRef, useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { FileViewerContext } from "@/components/common/file/file-viewer";
 import { useNavigate } from "react-router-dom";
 import { useWatch } from "react-hook-form";
@@ -30,6 +31,7 @@ import {
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
 import { useTaskMutations, useCutsByTask } from "../../../../hooks";
+import { cutKeys } from "../../../../hooks/common/query-keys";
 import { cutService } from "../../../../api-client/cut";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole } from "@/types/responsible";
@@ -114,6 +116,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const navigate = useNavigate();
   const { user } = useAuth();
   const taskMutations = useTaskMutations();
+  const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResponsibleErrors, setShowResponsibleErrors] = useState(false);
   const [showForecastReason, setShowForecastReason] = useState(false);
@@ -157,6 +160,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       },
     },
   });
+
+  // Always-current snapshot of the task's persisted cuts (individual DB rows).
+  // Used at submit time to reconcile the grouped form value against reality
+  // (create / edit / remove) without relying on the submit closure being fresh.
+  const originalCutsRef = useRef<any[]>([]);
+  useEffect(() => {
+    originalCutsRef.current = cutsData?.data || [];
+  }, [cutsData]);
 
   // Initialize artwork files from existing task data
   // NOTE: task.artworks are now Artwork entities with a nested file property
@@ -745,9 +756,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         return [];
       }
 
-      const cutMap = new Map<string, { id: string; fileId: string; type: string; quantity: number; file?: any; origin: string }>();
+      const cutMap = new Map<string, { id: string; fileId: string; type: string; quantity: number; file?: any; origin: string; existingCutIds: string[] }>();
 
-      for (const cut of cuts) {
+      // Process more-progressed cuts first (COMPLETED > CUTTING > PENDING) so that,
+      // when the user reduces a group's quantity, the reconciliation keeps in-progress
+      // cuts and deletes PENDING ones first (existingCutIds is ordered accordingly).
+      const sortedCuts = [...cuts].sort((a, b) => (b.statusOrder ?? 0) - (a.statusOrder ?? 0));
+
+      for (const cut of sortedCuts) {
         const fileId = cut.file?.id || cut.fileId || "";
         const type = cut.type;
         const key = `${fileId || 'no-file'}|${type}`;
@@ -755,6 +771,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         if (cutMap.has(key)) {
           const existing = cutMap.get(key)!;
           existing.quantity += 1;
+          if (cut.id) existing.existingCutIds.push(cut.id);
         } else {
           // Convert file entity to FileWithPreview
           const convertedFile = cut.file ? (() => {
@@ -769,6 +786,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             quantity: 1,
             file: convertedFile,
             origin: cut.origin || CUT_ORIGIN.PLAN,
+            existingCutIds: cut.id ? [cut.id] : [], // real DB cut ids backing this group
           });
         }
       }
@@ -1075,6 +1093,29 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         const cuts = form.getValues('cuts') as any[] || [];
         const hasCutsToCreate = cuts.length > 0 && cuts.some((cut) => cut.file && cut.file instanceof File);
 
+        // Broader detection: cuts also "change" when existing ones are removed, their
+        // quantity changes, or their type changes. The post-update reconciliation must
+        // run for any of those, so compare the form's cut composition to the DB's.
+        const hasCutChanges = (() => {
+          if (hasCutsToCreate) return true;
+          const originalCuts = originalCutsRef.current || [];
+          const countSig = (units: string[]) =>
+            units.reduce<Record<string, number>>((m, k) => ((m[k] = (m[k] || 0) + 1), m), {});
+          const originalSig = countSig(
+            originalCuts.map((c: any) => `${c.file?.id || c.fileId || ""}|${c.type}`),
+          );
+          const desiredUnits: string[] = [];
+          for (const g of cuts) {
+            if (g.file instanceof File || !g.fileId) continue; // new-file rows covered above
+            const qty = Math.max(1, Number(g.quantity) || 1);
+            for (let i = 0; i < qty; i++) desiredUnits.push(`${g.fileId}|${g.type}`);
+          }
+          const desiredSig = countSig(desiredUnits);
+          const keys = new Set([...Object.keys(originalSig), ...Object.keys(desiredSig)]);
+          for (const k of keys) if ((originalSig[k] || 0) !== (desiredSig[k] || 0)) return true;
+          return false;
+        })();
+
         // Validate that we have changes (form, layout, file changes, artwork status changes, or cuts to create)
         console.log('[TaskEditForm] Change detection:', {
           changedDataKeys: Object.keys(changedData),
@@ -1083,8 +1124,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           hasFileChanges,
           hasArtworkStatusChanges,
           hasCutsToCreate,
+          hasCutChanges,
         });
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate && !hasNewResponsibles) {
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutChanges && !hasNewResponsibles) {
           console.log('[TaskEditForm] ❌ Early return: no changes detected');
           return;
         }
@@ -1199,14 +1241,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
         }
 
-        // If only cuts exist (no other changes), we still need to update the task to trigger cut creation
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && hasCutsToCreate) {
+        // If only cuts exist (no other changes), we still need to update the task to trigger cut reconciliation
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && hasCutChanges) {
 
           (changedData as any)._onlyCuts = true; // Marker field to prevent empty body
         }
 
         // If only new responsibles exist (no other changes), we still need to update the task
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate && hasNewResponsibles) {
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutChanges && hasNewResponsibles) {
           console.log('[TaskEditForm] Only new responsibles detected, adding marker field');
           (changedData as any)._onlyNewResponsibles = true; // Marker field to prevent empty body
         }
@@ -2060,66 +2102,104 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           console.log('[TaskEditForm] Clearing deletion tracking refs after successful save');
           deletedServiceOrderDescriptionsRef.current.clear();
 
-          // Create cuts separately via POST /cuts with FormData
+          // ============================================================
+          // Reconcile cuts (create / edit / remove) against the DB.
+          // Cuts are individual rows with their own status workflow, so we touch
+          // only what changed: reuse existing rows (preserving their status),
+          // create only genuinely-new units, and delete the ones the user removed.
+          // ============================================================
+          try {
+            const originalCuts = originalCutsRef.current || [];
+            const originalById = new Map<string, any>(originalCuts.map((c: any) => [c.id, c]));
+            const formCuts = (form.getValues('cuts') as any[]) || [];
 
-          const cuts = form.getValues('cuts') as any[] || [];
+            const keptIds = new Set<string>();
+            const cutsToUpdate: { id: string; type: any }[] = [];              // existing cut, type changed
+            const cutsToCreateFromFileId: { fileId: string; type: any }[] = []; // extra unit of an existing file
+            const cutsToCreateWithFile: { file: File; type: any; quantity: number }[] = []; // brand-new upload
 
-          if (cuts.length > 0) {
-            const cutCreationPromises = cuts.map(async (cut, index) => {
+            for (const g of formCuts) {
+              const type = g.type;
+              const desired = Math.max(1, Number(g.quantity) || 1);
+              const hasFreshFile = g.file instanceof File; // loaded cuts are FileWithPreview, not File
+              const poolIds: string[] = Array.isArray(g.existingCutIds)
+                ? g.existingCutIds.filter((id: string) => originalById.has(id) && !keptIds.has(id))
+                : [];
 
-              // Only create cuts with new files
-              if (!cut.file || !(cut.file instanceof File)) {
-                
-                return { success: false, skipped: true, index };
+              if (hasFreshFile) {
+                // New upload (or a file replacement of an existing group). Any poolIds
+                // are intentionally left un-kept, so the old cuts get deleted below.
+                cutsToCreateWithFile.push({ file: g.file, type, quantity: desired });
+                continue;
               }
+              if (!g.fileId) continue; // nothing persistable (empty/default row)
 
-              try {
-
-                // Create FormData with cut metadata + file
-                const formData = new FormData();
-                formData.append('type', cut.type);
-                formData.append('origin', CUT_ORIGIN.PLAN);
-                formData.append('taskId', task.id);
-                formData.append('quantity', String(cut.quantity || 1));
-                formData.append('file', cut.file);
-
-                // Add context for file organization
-                const context = {
-                  entityType: 'cut',
-                  entityId: task.id,
-                  customerName: task.customer?.corporateName || task.customer?.fantasyName || 'Sem-Nome',
-                  cutType: cut.type, // Send the actual enum value: 'VINYL' or 'STENCIL'
-                };
-                formData.append('_context', JSON.stringify(context));
-
-                // Log FormData contents
-                
-                for (const [_key, _value] of (formData as any).entries()) {
-
-                }
-
-                // Call the cut service directly, bypassing the mutation hooks
-                // The hooks wrap FormData in a way that loses the actual data
-                const result = await cutService.createCut(formData as any);
-
-                const createdCount = cut.quantity || 1;
-                
-                return { success: true, index, result, createdCount };
-              } catch (error: any) {
-                const failedCount = cut.quantity || 1;
-                return { success: false, index, error: error?.message, failedCount };
+              // Reuse existing rows up to the desired count (preserving their status),
+              // fixing the type in place if it changed; create any shortfall from the
+              // same file; surplus rows stay un-kept and are deleted.
+              const reuse = poolIds.slice(0, desired);
+              for (const id of reuse) {
+                keptIds.add(id);
+                const orig = originalById.get(id);
+                if (orig && orig.type !== type) cutsToUpdate.push({ id, type });
               }
-            });
+              for (let i = reuse.length; i < desired; i++) {
+                cutsToCreateFromFileId.push({ fileId: g.fileId, type });
+              }
+            }
 
-            await Promise.all(cutCreationPromises);
-            // const _totalCreated = results
-            //   .filter(r => r.success)
-            //   .reduce((sum, r) => sum + (r.createdCount || 1), 0);
-            // const _totalFailed = results
-            //   .filter(r => !r.success && !r.skipped)
-            //   .reduce((sum, r) => sum + (r.failedCount || 1), 0);
+            // Everything not explicitly kept is removed (removed groups, reduced
+            // quantities, replaced files).
+            const cutIdsToDelete = originalCuts
+              .map((c: any) => c.id)
+              .filter((id: string) => !keptIds.has(id));
 
+            // 1) Deletions
+            if (cutIdsToDelete.length > 0) {
+              await cutService.batchDeleteCuts({ cutIds: cutIdsToDelete });
+            }
+            // 2) Type edits on preserved cuts (keeps status/progress)
+            if (cutsToUpdate.length > 0) {
+              await cutService.batchUpdateCuts({
+                cuts: cutsToUpdate.map((u) => ({ id: u.id, type: u.type })),
+              });
+            }
+            // 3) Extra units of an already-uploaded file (no re-upload needed)
+            if (cutsToCreateFromFileId.length > 0) {
+              await cutService.batchCreateCuts({
+                cuts: cutsToCreateFromFileId.map((c) => ({
+                  fileId: c.fileId,
+                  type: c.type,
+                  origin: CUT_ORIGIN.PLAN,
+                  taskId: task.id,
+                })),
+              });
+            }
+            // 4) Brand-new uploads (multipart; backend fans out by quantity)
+            for (const c of cutsToCreateWithFile) {
+              const formData = new FormData();
+              formData.append('type', c.type);
+              formData.append('origin', CUT_ORIGIN.PLAN);
+              formData.append('taskId', task.id);
+              formData.append('quantity', String(c.quantity || 1));
+              formData.append('file', c.file);
+              formData.append('_context', JSON.stringify({
+                entityType: 'cut',
+                entityId: task.id,
+                customerName: task.customer?.corporateName || task.customer?.fantasyName || 'Sem-Nome',
+                cutType: c.type,
+              }));
+              await cutService.createCut(formData as any);
+            }
+          } catch (cutError: any) {
+            console.error('[TaskEditForm] Cut reconciliation failed:', cutError);
+            toast.error('Não foi possível salvar todos os recortes. Verifique e tente novamente.');
           }
+
+          // Refresh the separately-queried cut lists so the detail page reflects the
+          // reconciliation immediately (the task mutation invalidates cuts too early,
+          // before this reconciliation runs).
+          await queryClient.invalidateQueries({ queryKey: cutKeys.all });
 
           // Layout photos are uploaded WITH the task update (not separately like cuts)
           // The backend handles them in the transaction at lines 683-728 of task.service.ts
