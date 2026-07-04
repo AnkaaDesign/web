@@ -79,6 +79,19 @@ export const getFileCategoryFromExtension = (extension: string): string => {
 
 export const isImageFile = (file: File): boolean => getFileCategory(file) === "image";
 export const isDocumentFile = (file: File): boolean => getFileCategory(file) === "document";
+
+/**
+ * EPS / PostScript vector files. These are not "images" by category, but the API *does* generate
+ * raster thumbnails for them (via Ghostscript), served from `/files/thumbnail/{id}`. Detected by
+ * mimetype or `.eps`/`.ps` extension so the UI can render those thumbnails like any other.
+ */
+export const isEpsFile = (file: File | undefined | null): boolean => {
+  if (!file) return false;
+  const epsMimetypes = ["application/postscript", "application/x-eps", "application/eps", "image/eps", "image/x-eps"];
+  if (file.mimetype && epsMimetypes.includes(file.mimetype.toLowerCase())) return true;
+  const ext = getFileExtension(file.filename);
+  return ext === "eps" || ext === "ps";
+};
 export const isVideoFile = (file: File): boolean => getFileCategory(file) === "video";
 export const isAudioFile = (file: File): boolean => getFileCategory(file) === "audio";
 export const isArchiveFile = (file: File): boolean => getFileCategory(file) === "archive";

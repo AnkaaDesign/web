@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import type { File as AnkaaFile } from "../../../types";
-import { formatFileSize, getFileDisplayName, getFileDownloadUrl, getFileUrl, isImageFile, rewriteCdnUrl } from "../../../utils/file";
+import { formatFileSize, getFileDisplayName, getFileDownloadUrl, getFileUrl, isEpsFile, isImageFile, rewriteCdnUrl } from "../../../utils/file";
 import { getPDFThumbnailUrl, isPDFFile } from "../../../utils/pdf-thumbnail";
 import { formatRelativeTime } from "../../../utils";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,11 @@ const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" | "large" = "
     if (file.thumbnailUrl.startsWith("http")) {
       return rewriteCdnUrl(file.thumbnailUrl);
     }
+    return `${apiUrl}/files/thumbnail/${file.id}?size=${size}`;
+  }
+  // EPS/vector files have no `thumbnailUrl` until the backend generates one, but the thumbnail
+  // endpoint generates on-demand — hit it directly (same as the cut list) so the thumbnail shows.
+  if (isEpsFile(file) && !isRemoteFile) {
     return `${apiUrl}/files/thumbnail/${file.id}?size=${size}`;
   }
   if (isImageFile(file)) {
@@ -181,9 +186,10 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
   const [isHovered, setIsHovered] = useState(false);
   const isImage = isImageFile(file);
   const isPdf = isPDFFile(file);
+  const isEps = isEpsFile(file);
   // Check if this is a remote file without database record (can't generate PDF thumbnails)
   const isRemoteFile = file.id && file.id.startsWith("remote-");
-  const hasThumbnail = file.thumbnailUrl || isImage || (isPdf && !isRemoteFile);
+  const hasThumbnail = file.thumbnailUrl || isImage || ((isPdf || isEps) && !isRemoteFile);
 
   const fileViewer = React.useContext(FileViewerContext);
   const imgRef = React.useRef<HTMLImageElement>(null);
@@ -288,9 +294,10 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
   const [showThumbnail, setShowThumbnail] = useState(false);
   const isImage = isImageFile(file);
   const isPdf = isPDFFile(file);
+  const isEps = isEpsFile(file);
   // Check if this is a remote file without database record (can't generate PDF thumbnails)
   const isRemoteFile = file.id && file.id.startsWith("remote-");
-  const hasThumbnail = file.thumbnailUrl || isImage || (isPdf && !isRemoteFile);
+  const hasThumbnail = file.thumbnailUrl || isImage || ((isPdf || isEps) && !isRemoteFile);
 
   const fileViewer = React.useContext(FileViewerContext);
   const imgRef = React.useRef<HTMLImageElement>(null);

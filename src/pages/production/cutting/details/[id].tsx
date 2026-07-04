@@ -24,6 +24,7 @@ import {
   ENTITY_BADGE_CONFIG,
 } from "../../../../constants";
 import { formatRelativeTime } from "../../../../utils";
+import { getFileDownloadUrl } from "@/utils/file";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
   AlertDialog,
@@ -47,6 +48,7 @@ import {
   IconFile,
   IconAlertCircle,
   IconRefresh,
+  IconDownload,
   IconHome,
   IconClipboardList,
   IconHash,
@@ -132,6 +134,17 @@ export const CuttingDetailsPage = () => {
     title: cut ? `Recorte: ${cut.file?.filename || "Sem nome"}` : "Detalhes do Recorte",
     icon: "cut",
   });
+
+  // Download the cut's file via the API download endpoint.
+  const handleDownloadFile = () => {
+    if (!cut?.file) return;
+    const link = document.createElement("a");
+    link.href = getFileDownloadUrl(cut.file);
+    link.download = cut.file.filename || "recorte";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Status change handlers
   const handleStatusChange = (newStatus: CUT_STATUS) => {
@@ -259,6 +272,16 @@ export const CuttingDetailsPage = () => {
               icon: IconRefresh,
               onClick: () => refetch(),
             },
+            ...(cut.file
+              ? [
+                  {
+                    key: "download",
+                    label: "Baixar",
+                    icon: IconDownload,
+                    onClick: handleDownloadFile,
+                  },
+                ]
+              : []),
             ...(canEdit && cut.status === CUT_STATUS.PENDING
               ? [
                   {
@@ -307,6 +330,8 @@ export const CuttingDetailsPage = () => {
                   <FileItem
                     file={cut.file}
                     viewMode="grid"
+                    onDownload={handleDownloadFile}
+                    showActions
                   />
                 ) : (
                   <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-lg">

@@ -80,7 +80,7 @@ import { ResponsiblesSection } from "./sections/responsibles-section";
 import { TruckLayoutSection } from "./sections/truck-layout-section";
 import { ArtworksSection, getVisibleArtworks, downloadAllArtworks } from "./sections/artworks-section";
 import { FilesSection, getVisibleTaskFiles, downloadAllTaskFiles } from "./sections/files-section";
-import { CutsSection } from "./sections/cuts-section";
+import { CutsSection, downloadAllCuts } from "./sections/cuts-section";
 import { AirbrushingsSection } from "./sections/airbrushings-section";
 import { DossieSection, getDossieServiceOrders, countDossieFiles, downloadAllDossieFiles, exportTaskDossiePdf } from "./sections/dossie-section";
 
@@ -364,6 +364,7 @@ function TaskDetailContent() {
   // toggle can live in the section header actions (right side) while the section renders only the body.
   const [artworksView, setArtworksView] = useState<FileViewMode>("grid");
   const [filesView, setFilesView] = useState<FileViewMode>("grid");
+  const [cutsView, setCutsView] = useState<FileViewMode>("grid");
 
   // Quote-status reason (captured for a PENDING downgrade) is read by onCommit after beforeCommit.
   const quoteReasonRef = useRef<string | undefined>(undefined);
@@ -1018,10 +1019,21 @@ function TaskDetailContent() {
         ? [
             {
               id: "cuts",
-              label: "Recortes",
+              label: titleWithCount("Recortes", cuts.length),
               icon: IconScissors,
               span: 2 as const,
-              render: (t: Task) => <CutsSection cuts={cuts} taskName={t.name} />,
+              headerActions: (t: Task) => (
+                <>
+                  {cuts.length > 1 ? (
+                    <Button variant="default" size="sm" className="h-7 gap-1 text-xs" onClick={() => void downloadAllCuts(cuts, t.name)}>
+                      <IconDownload className="h-3.5 w-3.5" />
+                      Baixar Todos
+                    </Button>
+                  ) : null}
+                  <ViewToggle view={cutsView} onChange={setCutsView} />
+                </>
+              ),
+              render: () => <CutsSection cuts={cuts} view={cutsView} />,
             } as DetailSectionDef<Task>,
           ]
         : []),
@@ -1156,6 +1168,7 @@ function TaskDetailContent() {
     canViewChangelog,
     artworksView,
     filesView,
+    cutsView,
     setTaskField,
     confirm,
     askReason,
