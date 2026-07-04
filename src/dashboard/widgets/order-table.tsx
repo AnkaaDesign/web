@@ -1333,25 +1333,12 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<OrderTableConfig>) {
                 }
               />
             </Section>
-            <Section title="Densidade e linhas">
-              <div className="space-y-2">
-                <DensitySegmented
-                  value={config.display.density}
-                  onChange={(d) => setDisplay("density", d)}
-                />
-              </div>
-            </Section>
             <Section title="Cabeçalho e link">
               <div className="space-y-1">
                 <ToggleRow
                   label="Exibir cabeçalho"
                   checked={config.display.showHeader ?? true}
                   onCheckedChange={(v) => setDisplay("showHeader", v)}
-                />
-                <ToggleRow
-                  label="Cabeçalho fixo"
-                  checked={config.display.stickyHeader}
-                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
                 />
                 <ToggleRow
                   label="Exibir contagem"
@@ -1372,6 +1359,19 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<OrderTableConfig>) {
                   label='Link "Ver todos"'
                   checked={config.display.showViewAllLink}
                   onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Densidade e linhas">
+              <div className="space-y-2">
+                <DensitySegmented
+                  value={config.display.density}
+                  onChange={(d) => setDisplay("density", d)}
+                />
+                <ToggleRow
+                  label="Cabeçalho fixo"
+                  checked={config.display.stickyHeader}
+                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
                 />
               </div>
             </Section>

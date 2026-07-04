@@ -556,16 +556,18 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
                 />
               </div>
             </Section>
+            <Section title="Densidade">
+              <DensitySegmented
+                value={config.density ?? "comfortable"}
+                onChange={(d) => set("density", d)}
+              />
+            </Section>
           </SectionGroup>
         </TabsContent>
         <TabsContent value="behavior" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Grade e densidade" defaultOpen>
+            <Section title="Grade" defaultOpen>
               <div className="space-y-3">
-                <DensitySegmented
-                  value={config.density ?? "comfortable"}
-                  onChange={(d) => set("density", d)}
-                />
                 <NumberPills
                   label="Mensagens por linha (1–8)"
                   min={1}

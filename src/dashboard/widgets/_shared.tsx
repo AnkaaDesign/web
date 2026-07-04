@@ -3,7 +3,17 @@
 // dedupes the request so the call cost is one network round-trip regardless of
 // how many widgets the user has configured.
 
-import { createContext, useContext, useId, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { z } from "zod";
 import { IconChevronDown } from "@tabler/icons-react";
 import { useHomeDashboard } from "../../hooks/common/use-dashboard";
@@ -60,11 +70,17 @@ export function HomeDashboardWidgetBody<TSlice>({
 
 // Coordinates which `Section` is open inside a single config form.
 // When a SectionGroup wraps a tree of Sections, only one Section can be open
-// at a time — opening another auto-closes the previous one. Without a wrapper,
-// each Section behaves independently (backward-compatible with old configs).
+// at a time — opening another auto-closes the previous one. When no section is
+// open (initial mount, or after a tab switch unmounts the previously-open
+// section — Radix TabsContent unmounts inactive tabs), the first mounted
+// section auto-opens so the form never renders as a wall of collapsed rows.
+// Without a wrapper, each Section behaves independently (backward-compatible
+// with old configs).
 interface SectionGroupContextValue {
   openId: string | null;
   setOpenId: (id: string | null) => void;
+  /** Section mount registration; returns the matching unregister cleanup. */
+  register: (id: string) => () => void;
 }
 const SectionGroupContext = createContext<SectionGroupContextValue | null>(null);
 
@@ -76,7 +92,38 @@ export function SectionGroup({
   children: ReactNode;
 }) {
   const [openId, setOpenId] = useState<string | null>(defaultOpenId ?? null);
-  const value = useMemo(() => ({ openId, setOpenId }), [openId]);
+  // Mount-ordered ids of the Sections currently rendered inside this group.
+  // Kept in a ref (mutating it must not re-render); `registrationVersion`
+  // bumps on every register/unregister so the auto-open effect below re-runs
+  // exactly when membership changes — and only then. Deliberately NOT run when
+  // `openId` alone changes: a user closing the open section should be able to
+  // collapse everything without the group fighting them.
+  const idsRef = useRef<string[]>([]);
+  const [registrationVersion, setRegistrationVersion] = useState(0);
+
+  const register = useCallback((id: string) => {
+    idsRef.current = [...idsRef.current, id];
+    setRegistrationVersion((v) => v + 1);
+    return () => {
+      idsRef.current = idsRef.current.filter((existing) => existing !== id);
+      setRegistrationVersion((v) => v + 1);
+    };
+  }, []);
+
+  useEffect(() => {
+    const ids = idsRef.current;
+    if (ids.length === 0) return;
+    // Auto-open the first mounted section when nothing (or a section that has
+    // since unmounted, e.g. it lived in a previous tab) is open.
+    setOpenId((current) =>
+      current !== null && ids.includes(current) ? current : ids[0],
+    );
+  }, [registrationVersion]);
+
+  const value = useMemo(
+    () => ({ openId, setOpenId, register }),
+    [openId, register],
+  );
   return <SectionGroupContext.Provider value={value}>{children}</SectionGroupContext.Provider>;
 }
 
@@ -96,6 +143,15 @@ export function Section({
   const id = useId();
   const [localOpen, setLocalOpen] = useState(defaultOpen);
 
+  // Register with the surrounding group (mount order = sibling render order,
+  // since sibling effects fire in document order). `register` is stable, so
+  // this runs once per mount rather than on every open/close.
+  const register = ctx?.register;
+  useEffect(() => {
+    if (!register) return;
+    return register(id);
+  }, [register, id]);
+
   const open = ctx ? ctx.openId === id : localOpen;
   const setOpen = (next: boolean) => {
     if (ctx) {
@@ -111,14 +167,14 @@ export function Section({
       onOpenChange={setOpen}
       className="border border-border rounded-md"
     >
-      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
+      <CollapsibleTrigger className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
         <span className="flex items-center gap-2">
           {icon}
           {title}
         </span>
         <IconChevronDown className="h-4 w-4 transition-transform" />
       </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
+      <CollapsibleContent className="px-4 pb-4 pt-1 space-y-4">{children}</CollapsibleContent>
     </Collapsible>
   );
 }
@@ -173,9 +229,9 @@ export function ToggleRow({
         className={cn("shrink-0 pointer-events-none", hint && "mt-0.5")}
       />
       <span className="min-w-0">
-        <span className="block text-xs font-medium leading-tight text-foreground">{label}</span>
+        <span className="block text-sm font-medium leading-tight text-foreground">{label}</span>
         {hint && (
-          <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
             {hint}
           </span>
         )}
@@ -218,7 +274,7 @@ export function SegmentedControl<T extends string | number>({
 }) {
   return (
     <div className="space-y-1.5">
-      {label && <Label className="text-xs">{label}</Label>}
+      {label && <Label className="text-sm font-medium">{label}</Label>}
       <div className="flex gap-2 flex-wrap">
         {options.map((opt) => {
           const active = opt.value === value;
@@ -266,7 +322,7 @@ export function NumberPills({
   for (let n = min; n <= max; n += 1) nums.push(n);
   return (
     <div className="space-y-1.5">
-      {label && <Label className="text-xs">{label}</Label>}
+      {label && <Label className="text-sm font-medium">{label}</Label>}
       <div className="flex gap-2 flex-wrap">
         {nums.map((n) => {
           const active = n === value;
@@ -388,7 +444,7 @@ export function LimitInput({
 }) {
   return (
     <div className="space-y-1">
-      <Label className="text-xs">Limite de linhas</Label>
+      <Label className="text-sm font-medium">Limite de linhas</Label>
       <Input
         type="number"
         min={min}

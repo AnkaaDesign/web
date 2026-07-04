@@ -853,25 +853,12 @@ function ItemTableConfigComponent({
                 }
               />
             </Section>
-            <Section title="Densidade e linhas">
-              <div className="space-y-2">
-                <DensitySegmented
-                  value={c.display?.density ?? "comfortable"}
-                  onChange={(d) => setDisplay("density", d)}
-                />
-              </div>
-            </Section>
             <Section title="Cabeçalho e link">
               <div className="space-y-1">
                 <ToggleRow
                   label="Exibir cabeçalho"
                   checked={c.display?.showHeader ?? true}
                   onCheckedChange={(v) => setDisplay("showHeader", v)}
-                />
-                <ToggleRow
-                  label="Cabeçalho fixo"
-                  checked={c.display?.stickyHeader ?? true}
-                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
                 />
                 <ToggleRow
                   label="Exibir contagem"
@@ -882,6 +869,19 @@ function ItemTableConfigComponent({
                   label='Link "Ver todos"'
                   checked={c.display?.showViewAllLink ?? true}
                   onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Densidade e linhas">
+              <div className="space-y-2">
+                <DensitySegmented
+                  value={c.display?.density ?? "comfortable"}
+                  onChange={(d) => setDisplay("density", d)}
+                />
+                <ToggleRow
+                  label="Cabeçalho fixo"
+                  checked={c.display?.stickyHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
                 />
               </div>
             </Section>

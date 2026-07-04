@@ -177,7 +177,7 @@ function FieldRow({ field, value, onChange }: FieldRowProps) {
   if (field.kind === "enum" && field.options) {
     return (
       <div className="space-y-1.5">
-        <Label htmlFor={fieldId} className="text-xs font-medium">
+        <Label htmlFor={fieldId} className="text-sm font-medium">
           {field.label}
         </Label>
         <Select value={value == null ? "" : String(value)} onValueChange={onChange}>
@@ -200,7 +200,7 @@ function FieldRow({ field, value, onChange }: FieldRowProps) {
   if (field.kind === "number") {
     return (
       <div className="space-y-1.5">
-        <Label htmlFor={fieldId} className="text-xs font-medium">
+        <Label htmlFor={fieldId} className="text-sm font-medium">
           {field.label}
         </Label>
         <Input
@@ -226,7 +226,7 @@ function FieldRow({ field, value, onChange }: FieldRowProps) {
   if (field.kind === "string") {
     return (
       <div className="space-y-1.5">
-        <Label htmlFor={fieldId} className="text-xs font-medium">
+        <Label htmlFor={fieldId} className="text-sm font-medium">
           {field.label}
         </Label>
         <Input
@@ -277,7 +277,7 @@ function JsonField({
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs font-medium">
+      <Label htmlFor={id} className="text-sm font-medium">
         {label}
       </Label>
       <textarea

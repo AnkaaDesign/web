@@ -1089,14 +1089,6 @@ function HrRequestsTableConfigComponent({
                 }
               />
             </Section>
-            <Section title="Densidade e linhas">
-              <div className="space-y-2">
-                <DensitySegmented
-                  value={c.display.density}
-                  onChange={(d) => setDisplay("density", d)}
-                />
-              </div>
-            </Section>
             <Section title="Cabeçalho e link">
               <div className="space-y-1">
                 <ToggleRow
@@ -1118,6 +1110,14 @@ function HrRequestsTableConfigComponent({
                   label='Link "Ver todos"'
                   checked={c.display.showViewAllLink ?? true}
                   onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Densidade e linhas">
+              <div className="space-y-2">
+                <DensitySegmented
+                  value={c.display.density}
+                  onChange={(d) => setDisplay("density", d)}
                 />
               </div>
             </Section>

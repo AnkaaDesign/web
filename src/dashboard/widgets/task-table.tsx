@@ -2854,6 +2854,30 @@ function TaskTableConfigComponent({
               }
             />
           </Section>
+          <Section title="Cabeçalho e link">
+            <div className="space-y-1">
+              <ToggleRow
+                label="Exibir cabeçalho"
+                checked={c.showHeader}
+                onCheckedChange={(v) => set("showHeader", v)}
+              />
+              <ToggleRow
+                label="Exibir contagem"
+                checked={c.display.showCount}
+                onCheckedChange={(v) => setDisplay("showCount", v)}
+              />
+              <ToggleRow
+                label="Caixa de busca"
+                checked={c.display.showSearchBox}
+                onCheckedChange={(v) => setDisplay("showSearchBox", v)}
+              />
+              <ToggleRow
+                label='Exibir "Ver todos"'
+                checked={c.display.showViewAllLink}
+                onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
+              />
+            </div>
+          </Section>
           <Section title="Densidade e linhas" defaultOpen>
             <div className="space-y-3">
               <DensitySegmented
@@ -2865,6 +2889,11 @@ function TaskTableConfigComponent({
                   label="Linhas divisórias"
                   checked={c.display.gridLines}
                   onCheckedChange={(v) => setDisplay("gridLines", v)}
+                />
+                <ToggleRow
+                  label="Cabeçalho fixo"
+                  checked={c.display.stickyHeader}
+                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
                 />
               </div>
             </div>
@@ -2928,35 +2957,6 @@ function TaskTableConfigComponent({
                   clearable={false}
                 />
               </div>
-            </div>
-          </Section>
-          <Section title="Cabeçalho e link">
-            <div className="space-y-1">
-              <ToggleRow
-                label="Exibir cabeçalho"
-                checked={c.showHeader}
-                onCheckedChange={(v) => set("showHeader", v)}
-              />
-              <ToggleRow
-                label="Cabeçalho fixo"
-                checked={c.display.stickyHeader}
-                onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-              />
-              <ToggleRow
-                label="Exibir contagem"
-                checked={c.display.showCount}
-                onCheckedChange={(v) => setDisplay("showCount", v)}
-              />
-              <ToggleRow
-                label="Caixa de busca"
-                checked={c.display.showSearchBox}
-                onCheckedChange={(v) => setDisplay("showSearchBox", v)}
-              />
-              <ToggleRow
-                label='Exibir "Ver todos"'
-                checked={c.display.showViewAllLink}
-                onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
-              />
             </div>
           </Section>
         </TabsContent>

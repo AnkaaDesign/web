@@ -2,8 +2,8 @@
 //
 // Centralises the pieces that used to be copy-pasted (and to drift) across the
 // add/configure modals and every widget's ConfigComponent:
-//   - CONFIG_DIALOG_CONTENT_CLASS — the single source of truth for the fixed
-//     1080×800 dialog footprint (with viewport caps).
+//   - CONFIG_DIALOG_CONTENT_CLASS — the single source of truth for the dialog
+//     footprint (fixed 1080px width, content-hugging height with viewport caps).
 //   - WidgetConfigDialog          — the shell: fixed header / scrolling body /
 //     optional sticky footer. The shell owns scrolling, so ConfigComponents must
 //     NOT add their own `max-h-[Nvh] overflow-y-auto` wrapper.
@@ -31,14 +31,16 @@ import { cn } from "../../lib/utils";
 export const WIDGET_TITLE_MAX = 80;
 
 /**
- * Single source of truth for the big config-dialog footprint. A fixed
- * 1080×800 with viewport caps so it never jumps when inner sections expand,
- * and still fits small screens. `gap-0 p-0` because the shell manages its own
- * header/body/footer padding.
+ * Single source of truth for the big config-dialog footprint. Fixed width with
+ * a viewport cap; height hugs the content (capped at 85vh) so a dialog with two
+ * collapsed sections doesn't render a mostly-empty 800px shell. The body keeps
+ * a modest min-height (see WidgetConfigDialog) so tiny widgets don't look
+ * cramped. `gap-0 p-0` because the shell manages its own header/body/footer
+ * padding.
  */
 export const CONFIG_DIALOG_CONTENT_CLASS =
   "w-[min(1080px,calc(100vw-2rem))] max-w-[min(1080px,calc(100vw-2rem))] " +
-  "h-[min(800px,calc(100vh-2rem))] max-h-[calc(100vh-2rem)] " +
+  "h-auto max-h-[min(85vh,calc(100vh-2rem))] " +
   "flex flex-col gap-0 p-0 overflow-hidden";
 
 interface WidgetConfigDialogProps {
@@ -93,12 +95,20 @@ export function WidgetConfigDialog({
           </div>
         ) : null}
         {rawBody ? (
-          <div className={cn("flex-1 min-h-0", bodyClassName)}>{children}</div>
+          <div className={cn("flex-auto min-h-[280px]", bodyClassName)}>{children}</div>
         ) : (
           // Plain overflow container (not Radix ScrollArea) so `position: sticky`
           // works for the per-widget config tab bar. `-mx-6` on WidgetTabsBar
           // counteracts this `px-6` to span full width.
-          <div className={cn("flex-1 min-h-0 overflow-y-auto px-6 pt-5 pb-6", bodyClassName)}>
+          // `flex-auto` (basis auto) + the dialog's `h-auto max-h` make the shell
+          // hug its content; the min-h keeps tiny configs from looking cramped
+          // while still allowing the body to shrink-and-scroll under the cap.
+          <div
+            className={cn(
+              "flex-auto min-h-[280px] overflow-y-auto px-6 pt-5 pb-6",
+              bodyClassName,
+            )}
+          >
             {children}
           </div>
         )}
@@ -142,7 +152,7 @@ export function TitleField({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor="widget-title" className="text-xs font-medium">
+      <Label htmlFor="widget-title" className="text-sm font-medium">
         Título
       </Label>
       <Input

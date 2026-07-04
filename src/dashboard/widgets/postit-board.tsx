@@ -123,7 +123,7 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
                 }
               />
             </Section>
-            <Section title="Cabeçalho">
+            <Section title="Cabeçalho e link">
               <div className="space-y-1">
                 <ToggleRow
                   label="Exibir cabeçalho"

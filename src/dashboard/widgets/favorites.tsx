@@ -292,7 +292,7 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
                 }
               />
             </Section>
-            <Section title="Cabeçalho">
+            <Section title="Cabeçalho e link">
               <div className="space-y-1">
                 <ToggleRow
                   label="Exibir cabeçalho"
@@ -326,12 +326,18 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
                 />
               </div>
             </Section>
+            <Section title="Densidade">
+              <DensitySegmented
+                value={config.density ?? "comfortable"}
+                onChange={(d) => set("density", d)}
+              />
+            </Section>
           </SectionGroup>
         </TabsContent>
 
         <TabsContent value="behavior" className="space-y-3 mt-0">
           <SectionGroup defaultOpenId={null}>
-            <Section title="Grade e densidade" defaultOpen>
+            <Section title="Grade" defaultOpen>
               <div className="space-y-3">
                 <SegmentedControl
                   label="Layout do texto"
@@ -341,10 +347,6 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
                   ]}
                   value={config.layout ?? "row"}
                   onChange={(v) => set("layout", v as Config["layout"])}
-                />
-                <DensitySegmented
-                  value={config.density ?? "comfortable"}
-                  onChange={(d) => set("density", d)}
                 />
                 <NumberPills
                   label="Cartões por linha (1–10)"
