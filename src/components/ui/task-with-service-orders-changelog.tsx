@@ -205,7 +205,7 @@ const renderCutsCards = (cuts: any[]) => {
         return (
           <div
             key={index}
-            className="rounded-lg px-2.5 py-1.5 flex items-center gap-2.5 bg-muted/40 border border-border/50"
+            className="w-full max-w-md rounded-lg px-2.5 py-1.5 flex items-center gap-2.5 bg-muted/40 border border-border/50"
           >
             <div className="flex-1 min-w-0 space-y-1">
               <div className="flex items-center gap-2 min-w-0">
