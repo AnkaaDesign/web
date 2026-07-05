@@ -4,7 +4,6 @@ import {
   IconCut,
   IconScissors,
   IconClipboardList,
-  IconExternalLink,
   IconReload,
   IconChevronRight,
   IconHistory,
@@ -21,7 +20,6 @@ import { DetailPage } from "@/components/ui/detailpage";
 import type { DetailSectionDef } from "@/components/ui/detailpage";
 import type { PageAction } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -76,12 +74,8 @@ function CutRowList({ cuts, onOpen, showReason }: { cuts: Cut[]; onOpen: (id: st
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            <Badge variant={getBadgeVariant(cut.status, "CUT")} className="text-xs">
-              {CUT_STATUS_LABELS[cut.status]}
-            </Badge>
-            <Badge variant={getBadgeVariant(cut.origin, "CUT_ORIGIN")} className="text-xs">
-              {CUT_ORIGIN_LABELS[cut.origin]}
-            </Badge>
+            <Badge variant={getBadgeVariant(cut.status, "CUT")}>{CUT_STATUS_LABELS[cut.status]}</Badge>
+            <Badge variant={getBadgeVariant(cut.origin, "CUT_ORIGIN")}>{CUT_ORIGIN_LABELS[cut.origin]}</Badge>
             <IconChevronRight className="h-4 w-4 text-muted-foreground" />
           </div>
         </button>
@@ -171,19 +165,8 @@ function CuttingDetailsContent() {
         label: "Tarefa",
         icon: IconClipboardList,
         span: 1,
+        // Clicking the "Tarefa" title opens the task detail (no separate button needed).
         onTitleClick: (c) => c.task && navigate(routes.production.schedule.details(c.task.id)),
-        headerActions: (c) =>
-          c.task ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => navigate(routes.production.schedule.details(c.task!.id))}
-            >
-              <IconExternalLink className="h-3.5 w-3.5" />
-              Ver Tarefa
-            </Button>
-          ) : null,
         fields: [
           { id: "taskName", label: "Nome da Tarefa", icon: IconClipboardList, accessor: (c) => c.task?.name ?? null },
           { id: "serialNumber", label: "Número de Série", icon: IconHash, accessor: (c) => c.task?.serialNumber ?? null },
