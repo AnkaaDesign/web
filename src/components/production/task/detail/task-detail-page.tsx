@@ -1022,6 +1022,8 @@ function TaskDetailContent() {
               label: titleWithCount("Recortes", cuts.length),
               icon: IconScissors,
               span: 2 as const,
+              // Clicking the section title opens the full cuts (Recortes) page.
+              onTitleClick: () => navigate(routes.production.cutting.list),
               headerActions: (t: Task) => (
                 <>
                   {cuts.length > 1 ? (

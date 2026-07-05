@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 
 import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
 import { Badge } from "@/components/ui/badge";
-import { CUT_ORIGIN, CUT_ORIGIN_LABELS, CUT_STATUS_LABELS, getBadgeVariant } from "@/constants";
+import { CUT_ORIGIN_LABELS, CUT_STATUS_LABELS, getBadgeVariant } from "@/constants";
 import { cn } from "@/lib/utils";
 import type { Cut, File } from "@/types";
 import { getApiBaseUrl } from "@/utils/file";
@@ -83,23 +83,39 @@ export function CutsSection({ cuts, view }: { cuts: Cut[]; view: FileViewMode })
         if (!cut.file) return null;
         // A task's "Recortes" mixes PLAN cuts with REQUEST (rework) cuts. Without a marker
         // they look identical, so the count can seem to disagree with the task-edit "Plano de
-        // Corte" section (which only manages PLAN cuts). Badge each cut's status, and flag
-        // reworks explicitly so it's clear which cuts are re-cut requests.
-        const isRework = cut.origin === CUT_ORIGIN.REQUEST;
+        // Corte" section (which only manages PLAN cuts). Show each cut's status + origin
+        // (Plano = blue, Solicitação = yellow) so every cut is unambiguous.
+        const statusBadge = cut.status ? (
+          <Badge variant={getBadgeVariant(cut.status, "CUT")} className="h-5 px-1.5 text-[10px] shadow-sm">
+            {CUT_STATUS_LABELS[cut.status]}
+          </Badge>
+        ) : null;
+        const originBadge = cut.origin ? (
+          <Badge variant={getBadgeVariant(cut.origin, "CUT_ORIGIN")} className="h-5 px-1.5 text-[10px] shadow-sm">
+            {CUT_ORIGIN_LABELS[cut.origin]}
+          </Badge>
+        ) : null;
+
+        if (view === "grid") {
+          // Opposite corners so the two badges never stack on the thumbnail.
+          return (
+            <div key={cut.id} className="relative">
+              <FileItem file={cut.file} viewMode={view} onPreview={handlePreview} onDownload={handleDownload} showActions />
+              <div className="pointer-events-none absolute left-1.5 top-1.5 z-10">{statusBadge}</div>
+              <div className="pointer-events-none absolute right-1.5 top-1.5 z-10">{originBadge}</div>
+            </div>
+          );
+        }
+
+        // List view: badges inline to the right of the file row.
         return (
-          <div key={cut.id} className="relative">
-            <FileItem file={cut.file} viewMode={view} onPreview={handlePreview} onDownload={handleDownload} showActions />
-            <div className="pointer-events-none absolute left-1.5 top-1.5 z-10 flex flex-wrap gap-1">
-              {cut.status && (
-                <Badge variant={getBadgeVariant(cut.status, "CUT")} className="h-5 px-1.5 text-[10px] shadow-sm">
-                  {CUT_STATUS_LABELS[cut.status]}
-                </Badge>
-              )}
-              {isRework && (
-                <Badge variant="warning" className="h-5 px-1.5 text-[10px] shadow-sm">
-                  {CUT_ORIGIN_LABELS[cut.origin]}
-                </Badge>
-              )}
+          <div key={cut.id} className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <FileItem file={cut.file} viewMode={view} onPreview={handlePreview} onDownload={handleDownload} showActions />
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              {statusBadge}
+              {originBadge}
             </div>
           </div>
         );

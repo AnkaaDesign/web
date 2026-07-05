@@ -1,142 +1,147 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useCut, useCutMutations, useCuts, useAuth } from "../../../../hooks";
-import type { CutUpdateFormData } from "../../../../schemas";
-import { canEditCuts } from "@/utils/permissions/entity-permissions";
-import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCallback, useMemo, type ReactNode } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import {
+  IconCut,
+  IconScissors,
+  IconClipboardList,
+  IconExternalLink,
+  IconReload,
+  IconChevronRight,
+  IconHistory,
+  IconPlayerPlay,
+  IconCheck,
+  IconDownload,
+  IconHash,
+  IconUser,
+  IconBuildingFactory,
+  IconAlertCircle,
+} from "@tabler/icons-react";
+
+import { DetailPage } from "@/components/ui/detailpage";
+import type { DetailSectionDef } from "@/components/ui/detailpage";
+import type { PageAction } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/sonner";
+import { ChangelogHistory } from "@/components/ui/changelog-history";
+import { PrivilegeRoute } from "@/components/navigation/privilege-route";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { useCut, useCutMutations, useCuts, useAuth } from "@/hooks";
+import { canEditCuts } from "@/utils/permissions/entity-permissions";
+import { getFileDownloadUrl } from "@/utils/file";
+import type { Cut } from "@/types";
+import type { CutUpdateFormData } from "@/schemas";
 import {
-  SECTOR_PRIVILEGES,
   routes,
+  SECTOR_PRIVILEGES,
   CUT_STATUS,
-  CUT_TYPE,
-  CUT_ORIGIN,
-  CUT_REQUEST_REASON,
   CUT_STATUS_LABELS,
-  CUT_TYPE_LABELS,
   CUT_ORIGIN_LABELS,
   CUT_REQUEST_REASON_LABELS,
   CHANGE_LOG_ENTITY_TYPE,
-  ENTITY_BADGE_CONFIG,
-} from "../../../../constants";
-import { formatRelativeTime } from "../../../../utils";
-import { getFileDownloadUrl } from "@/utils/file";
-import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { LoadingSpinner } from "@/components/ui/loading";
-import { Separator } from "@/components/ui/separator";
-import { FileItem } from "@/components/common/file";
-import { ChangelogHistory } from "@/components/ui/changelog-history";
-import {
-  IconCut,
-  IconPlayerPlay,
-  IconCheck,
-  IconClock,
-  IconFile,
-  IconAlertCircle,
-  IconRefresh,
-  IconDownload,
-  IconHome,
-  IconClipboardList,
-  IconHash,
-  IconArrowBack,
-  IconExternalLink,
-  IconInfoCircle,
-  IconArrowRight,
-  IconUser,
-  IconBuildingFactory,
-  IconScissors,
-  IconReload,
-  IconChevronRight,
-} from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
-import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
+  getBadgeVariant,
+} from "@/constants";
+import { CutOverviewSection } from "@/components/production/cut/detail/cut-overview-section";
+import { useConfirm } from "@/components/production/task/detail/use-confirm";
 
-export const CuttingDetailsPage = () => {
+const PAGE_PRIVILEGES = [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.ADMIN];
+
+const DETAIL_INCLUDE = {
+  file: true,
+  task: { include: { customer: true, sector: true } },
+  parentCut: { include: { file: true } },
+  childCuts: { include: { file: true } },
+} as const;
+
+/** Clickable cut rows (child cuts / other cuts of the task) with status + origin colored badges. */
+function CutRowList({ cuts, onOpen, showReason }: { cuts: Cut[]; onOpen: (id: string) => void; showReason?: boolean }) {
+  return (
+    <div className="space-y-2">
+      {cuts.map((cut) => (
+        <button
+          key={cut.id}
+          type="button"
+          onClick={() => onOpen(cut.id)}
+          className="flex w-full items-center justify-between gap-2 rounded-lg bg-muted/50 px-4 py-2.5 text-left transition-colors hover:bg-muted/70"
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <IconScissors className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{cut.file?.filename || "Sem nome"}</p>
+              {showReason && cut.reason && (
+                <p className="mt-0.5 flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400">
+                  <IconAlertCircle className="h-3 w-3 shrink-0" />
+                  {CUT_REQUEST_REASON_LABELS[cut.reason]}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Badge variant={getBadgeVariant(cut.status, "CUT")} className="text-xs">
+              {CUT_STATUS_LABELS[cut.status]}
+            </Badge>
+            <Badge variant={getBadgeVariant(cut.origin, "CUT_ORIGIN")} className="text-xs">
+              {CUT_ORIGIN_LABELS[cut.origin]}
+            </Badge>
+            <IconChevronRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CuttingDetailsContent() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
-  const { update } = useCutMutations();
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
-  const [pendingStatus, setPendingStatus] = useState<CUT_STATUS | null>(null);
+  const canEdit = canEditCuts(user as never);
 
-  // Permission checks
-  const canEdit = canEditCuts(user as any);
+  const { confirm, dialog } = useConfirm();
+  const { updateAsync } = useCutMutations();
 
-  // Fetch cut details with all relations
-  const {
-    data: response,
-    isLoading,
-    error,
-    refetch,
-  } = useCut(id!, {
-    enabled: !!id,
-    include: {
-      file: true,
-      task: {
-        include: {
-          customer: true,
-          sector: true,
-        },
-      },
-      parentCut: {
-        include: {
-          file: true,
-        },
-      },
-      childCuts: {
-        include: {
-          file: true,
-        },
-      },
+  const { data: response, isLoading, error } = useCut(id!, { enabled: !!id, include: DETAIL_INCLUDE as never });
+  const cut = (response?.data ?? null) as Cut | null;
+
+  usePageTracker({ title: cut ? `Recorte: ${cut.file?.filename || "Sem nome"}` : "Detalhes do Recorte", icon: "cut" });
+
+  // Other cuts of the same task (enabled belongs in the query OPTIONS, not the params).
+  const { data: taskCutsResponse } = useCuts(
+    {
+      where: { taskId: cut?.taskId, id: { not: cut?.id } },
+      include: { file: true },
+      orderBy: { createdAt: "desc" },
+      take: 10,
     },
-  });
+    { enabled: !!cut?.taskId },
+  );
+  const otherCuts = (taskCutsResponse?.data ?? []) as Cut[];
 
-  const cut = response?.data;
-
-  // Fetch other cuts from the same task
-  const { data: taskCutsResponse } = useCuts({
-    where: {
-      taskId: cut?.taskId,
-      id: {
-        not: cut?.id,
-      },
+  // Persist a status change — mirror the lifecycle timestamps (server also auto-sets these).
+  const setStatus = useCallback(
+    async (c: Cut, next: CUT_STATUS) => {
+      const data: Partial<CutUpdateFormData> = { status: next };
+      if (next === CUT_STATUS.CUTTING && !c.startedAt) data.startedAt = new Date();
+      if (next === CUT_STATUS.COMPLETED && !c.completedAt) data.completedAt = new Date();
+      await updateAsync({ id: c.id, data: data as never });
     },
-    include: {
-      file: true,
+    [updateAsync],
+  );
+
+  const startCut = useCallback((c: Cut) => void setStatus(c, CUT_STATUS.CUTTING), [setStatus]);
+  const finishCut = useCallback(
+    async (c: Cut) => {
+      const ok = await confirm({
+        title: "Finalizar corte?",
+        description: "O horário de conclusão será registrado automaticamente.",
+      });
+      if (!ok) return;
+      await setStatus(c, CUT_STATUS.COMPLETED);
     },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 10,
-    enabled: !!cut?.taskId,
-  });
+    [confirm, setStatus],
+  );
 
-  const otherTaskCuts = taskCutsResponse?.data || [];
-
-  // Track page access
-  usePageTracker({
-    title: cut ? `Recorte: ${cut.file?.filename || "Sem nome"}` : "Detalhes do Recorte",
-    icon: "cut",
-  });
-
-  // Download the cut's file via the API download endpoint.
-  const handleDownloadFile = () => {
+  const handleDownloadFile = useCallback(() => {
     if (!cut?.file) return;
     const link = document.createElement("a");
     link.href = getFileDownloadUrl(cut.file);
@@ -144,495 +149,149 @@ export const CuttingDetailsPage = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [cut]);
 
-  // Status change handlers
-  const handleStatusChange = (newStatus: CUT_STATUS) => {
-    if (!cut) return;
+  const sections = useMemo<DetailSectionDef<Cut>[]>(() => {
+    if (!cut) return [];
+    const list: DetailSectionDef<Cut>[] = [];
 
-    // Validate transition
-    const validTransitions: Record<CUT_STATUS, CUT_STATUS[]> = {
-      [CUT_STATUS.PENDING]: [CUT_STATUS.CUTTING],
-      [CUT_STATUS.CUTTING]: [CUT_STATUS.COMPLETED],
-      [CUT_STATUS.COMPLETED]: [],
-    };
+    // 1. Informações Gerais — file preview + inline-editable status / badges / timestamps / duration.
+    list.push({
+      id: "overview",
+      label: "Informações Gerais",
+      icon: IconScissors,
+      span: 1,
+      render: (c) => <CutOverviewSection cut={c} canEdit={canEdit} onStatusCommit={setStatus} />,
+    });
 
-    if (!validTransitions[cut.status as CUT_STATUS]?.includes(newStatus)) {
-      toast.error("Transição de status inválida");
-      return;
-    }
-
-    setPendingStatus(newStatus);
-    setStatusChangeDialogOpen(true);
-  };
-
-  const confirmStatusChange = async () => {
-    if (!cut || !pendingStatus) return;
-
-    setIsUpdating(true);
-    try {
-      const updateData: Partial<CutUpdateFormData> = { status: pendingStatus };
-
-      // Add required dates based on status
-      if (pendingStatus === CUT_STATUS.CUTTING && !cut.startedAt) {
-        updateData.startedAt = new Date();
-      }
-      if (pendingStatus === CUT_STATUS.COMPLETED && !cut.completedAt) {
-        updateData.completedAt = new Date();
-      }
-
-      await update({ id: cut.id, data: updateData });
-      setStatusChangeDialogOpen(false);
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Error updating cut status:", error);
-      }
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  // Get status badge variant
-  const getStatusBadgeVariant = (status: CUT_STATUS) => {
-    return (ENTITY_BADGE_CONFIG.CUT[status] || "default") as any;
-  };
-
-  // Calculate duration
-  const getDuration = () => {
-    if (!cut?.startedAt) return null;
-    const start = new Date(cut.startedAt);
-    const end = cut.completedAt ? new Date(cut.completedAt) : new Date();
-    const diff = end.getTime() - start.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours > 0) {
-      return `${hours}h ${minutes}min`;
-    }
-    return `${minutes} minutos`;
-  };
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className={DETAIL_PAGE_SPACING.CONTAINER}>
-        <Skeleton className="h-24 w-full rounded-lg" />
-        <div className={DETAIL_PAGE_SPACING.HEADER_TO_GRID}>
-          <div className={getDetailGridClasses()}>
-            <Skeleton className="h-96 rounded-lg" />
-            <Skeleton className="h-96 rounded-lg" />
-            <Skeleton className="h-64 rounded-lg" />
-            <Skeleton className="h-64 rounded-lg" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Error or not found state
-  if (error || !cut) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in-50 duration-500">
-        <div className="text-center px-4 max-w-md mx-auto space-y-4">
-          <div className="inline-flex p-4 bg-red-100 dark:bg-red-900/20 rounded-full mb-4">
-            <IconAlertCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
-          </div>
-          <h2 className="text-2xl font-semibold">Recorte não encontrado</h2>
-          <p className="text-muted-foreground">O recorte que você está procurando não existe ou foi removido.</p>
-          <div className="flex gap-2 justify-center">
-            <Button onClick={() => navigate(routes.production.cutting.list)} variant="outline">
-              <IconCut className="h-4 w-4 mr-2" />
-              Voltar para lista
+    // 2. Tarefa — clickable related-entity card (title + "Ver Tarefa" both open the task detail).
+    if (cut.task) {
+      list.push({
+        id: "task",
+        label: "Tarefa",
+        icon: IconClipboardList,
+        span: 1,
+        onTitleClick: (c) => c.task && navigate(routes.production.schedule.details(c.task.id)),
+        headerActions: (c) =>
+          c.task ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => navigate(routes.production.schedule.details(c.task!.id))}
+            >
+              <IconExternalLink className="h-3.5 w-3.5" />
+              Ver Tarefa
             </Button>
-            <Button onClick={() => navigate(routes.production.root)}>
-              <IconHome className="h-4 w-4 mr-2" />
-              Ir para produção
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+          ) : null,
+        fields: [
+          { id: "taskName", label: "Nome da Tarefa", icon: IconClipboardList, accessor: (c) => c.task?.name ?? null },
+          { id: "serialNumber", label: "Número de Série", icon: IconHash, accessor: (c) => c.task?.serialNumber ?? null },
+          { id: "customer", label: "Cliente", icon: IconUser, accessor: (c) => c.task?.customer?.fantasyName ?? null },
+          { id: "sector", label: "Setor", icon: IconBuildingFactory, accessor: (c) => c.task?.sector?.name ?? null },
+        ],
+      });
+    }
+
+    // 3. Retrabalhos Realizados (child cuts) — full width, only when present.
+    if (cut.childCuts && cut.childCuts.length > 0) {
+      list.push({
+        id: "childCuts",
+        label: "Retrabalhos Realizados",
+        icon: IconReload,
+        span: 2,
+        scroll: true,
+        headerActions: (c) => <Badge variant="secondary">{c.childCuts?.length ?? 0}</Badge>,
+        render: (c) => <CutRowList cuts={c.childCuts ?? []} onOpen={(cid) => navigate(routes.production.cutting.details(cid))} showReason />,
+      });
+    }
+
+    // 4. Outros Recortes da Tarefa — only when there are sibling cuts.
+    if (otherCuts.length > 0) {
+      list.push({
+        id: "otherCuts",
+        label: "Outros Recortes da Tarefa",
+        icon: IconScissors,
+        span: 1,
+        scroll: true,
+        headerActions: () => <Badge variant="secondary">{otherCuts.length}</Badge>,
+        render: () => <CutRowList cuts={otherCuts} onOpen={(cid) => navigate(routes.production.cutting.details(cid))} />,
+      });
+    }
+
+    // 5. Histórico de Alterações.
+    list.push({
+      id: "changelog",
+      label: "Histórico de Alterações",
+      icon: IconHistory,
+      span: 2,
+      scroll: true,
+      render: (c) => (
+        <ChangelogHistory
+          embedded
+          entityType={CHANGE_LOG_ENTITY_TYPE.CUT}
+          entityId={c.id}
+          entityName={c.file?.filename || "Recorte"}
+          entityCreatedAt={c.createdAt}
+          className="w-full"
+        />
+      ),
+    });
+
+    return list;
+  }, [cut, canEdit, setStatus, navigate, otherCuts]);
+
+  // Header actions: lifecycle buttons (primary) + Baixar — NO "Atualizar".
+  const actions = useMemo<PageAction[]>(() => {
+    if (!cut) return [];
+    const list: PageAction[] = [];
+    if (cut.file) {
+      list.push({ key: "baixar", label: "Baixar", icon: IconDownload, variant: "outline", onClick: handleDownloadFile });
+    }
+    if (canEdit && cut.status === CUT_STATUS.PENDING) {
+      list.push({ key: "iniciar", label: "Iniciar Corte", icon: IconPlayerPlay, variant: "default", onClick: () => startCut(cut) });
+    }
+    if (canEdit && cut.status === CUT_STATUS.CUTTING) {
+      list.push({ key: "finalizar", label: "Finalizar Corte", icon: IconCheck, variant: "default", onClick: () => void finishCut(cut) });
+    }
+    return list;
+  }, [cut, canEdit, handleDownloadFile, startCut, finishCut]);
+
+  const errorNode: ReactNode = error ? "Recorte não encontrado." : undefined;
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <PageHeader
-          variant="detail"
-          title={cut.file?.filename || "Recorte"}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Produção", href: routes.production.root },
-            { label: "Recortes", href: routes.production.cutting.list },
-            { label: cut.file?.filename || "Recorte" },
-          ]}
-          actions={[
-            {
-              key: "refresh",
-              label: "Atualizar",
-              icon: IconRefresh,
-              onClick: () => refetch(),
-            },
-            ...(cut.file
-              ? [
-                  {
-                    key: "download",
-                    label: "Baixar",
-                    icon: IconDownload,
-                    onClick: handleDownloadFile,
-                  },
-                ]
-              : []),
-            ...(canEdit && cut.status === CUT_STATUS.PENDING
-              ? [
-                  {
-                    key: "start",
-                    label: "Iniciar Corte",
-                    icon: IconPlayerPlay,
-                    onClick: () => handleStatusChange(CUT_STATUS.CUTTING),
-                    variant: "default" as const,
-                  },
-                ]
-              : []),
-            ...(canEdit && cut.status === CUT_STATUS.CUTTING
-              ? [
-                  {
-                    key: "complete",
-                    label: "Finalizar Corte",
-                    icon: IconCheck,
-                    onClick: () => handleStatusChange(CUT_STATUS.COMPLETED),
-                    variant: "default" as const,
-                  },
-                ]
-              : []),
-          ]}
-          className="flex-shrink-0"
-        />
-        <div className="flex-1 overflow-y-auto pb-6">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Basic Info Card with File Preview */}
-              <Card className="border flex flex-col animate-in fade-in-50 duration-700">
-            <CardHeader className="pb-6">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <IconScissors className="h-5 w-5 text-muted-foreground" />
-                  Informações Gerais
-                </CardTitle>
-                <Badge variant={getStatusBadgeVariant(cut.status as CUT_STATUS)}>
-                  {CUT_STATUS_LABELS[cut.status as CUT_STATUS]}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 flex-1">
-              <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 items-center">
-                {/* Left: File Preview */}
-                {cut.file ? (
-                  <FileItem
-                    file={cut.file}
-                    viewMode="grid"
-                    onDownload={handleDownloadFile}
-                    showActions
-                  />
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-lg">
-                    <IconFile className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>Nenhum arquivo associado</p>
-                  </div>
-                )}
-
-                {/* Right: Field-Value Rows */}
-                <div className="space-y-4">
-                  {/* Origin */}
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconArrowBack className="h-4 w-4" />
-                      Origem
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">{CUT_ORIGIN_LABELS[cut.origin as CUT_ORIGIN]}</span>
-                  </div>
-
-                  {/* Type */}
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconHash className="h-4 w-4" />
-                      Tipo
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">{CUT_TYPE_LABELS[cut.type as CUT_TYPE]}</span>
-                  </div>
-
-                  {/* Duration */}
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconClock className="h-4 w-4" />
-                      Tempo de Execução
-                    </span>
-                    <span className={cn("text-sm font-semibold", getDuration() ? "text-foreground" : "text-muted-foreground italic")}>
-                      {getDuration() || "Não iniciado"}
-                    </span>
-                  </div>
-
-                  {/* Recut Reason */}
-                  {cut.reason && (
-                    <div className="flex justify-between items-center bg-orange-50 dark:bg-orange-900/20 rounded-lg px-4 py-2.5 border border-orange-200 dark:border-orange-800">
-                      <span className="text-sm font-medium text-orange-700 dark:text-orange-300 flex items-center gap-2">
-                        <IconAlertCircle className="h-4 w-4" />
-                        Motivo do Retrabalho
-                      </span>
-                      <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">{CUT_REQUEST_REASON_LABELS[cut.reason as CUT_REQUEST_REASON]}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Task Information Card */}
-          <Card className="border flex flex-col animate-in fade-in-50 duration-800">
-            <CardHeader className="pb-6">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <IconClipboardList className="h-5 w-5 text-muted-foreground" />
-                  Informações da Tarefa
-                </CardTitle>
-                {cut.task && (
-                  <Button variant="outline" size="sm" onClick={() => navigate(routes.production.schedule.details(cut.task!.id))}>
-                    <IconExternalLink className="h-4 w-4 mr-2" />
-                    Ver Tarefa
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 flex-1">
-              {cut.task ? (
-                <div className="space-y-4">
-                  {/* Task Name */}
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconClipboardList className="h-4 w-4" />
-                      Nome da Tarefa
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">{cut.task.name}</span>
-                  </div>
-
-                  {/* Serial Number */}
-                  {cut.task.serialNumber && (
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <IconHash className="h-4 w-4" />
-                        Número de Série
-                      </span>
-                      <span className="text-sm font-semibold text-foreground">{cut.task.serialNumber}</span>
-                    </div>
-                  )}
-
-                  {/* Customer */}
-                  {cut.task.customer && (
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <IconUser className="h-4 w-4" />
-                        Cliente
-                      </span>
-                      <span className="text-sm font-semibold text-foreground">{cut.task.customer.fantasyName}</span>
-                    </div>
-                  )}
-
-                  {/* Sector */}
-                  {cut.task.sector && (
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <IconBuildingFactory className="h-4 w-4" />
-                        Setor
-                      </span>
-                      <span className="text-sm font-semibold text-foreground">{cut.task.sector.name}</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <IconClipboardList className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Nenhuma tarefa associada</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          </div>
-
-          {/* Child Cuts (Recuts) Section - Full width if exists */}
-          {cut.childCuts && cut.childCuts.length > 0 && (
-            <div>
-                <Card className="border flex flex-col animate-in fade-in-50 duration-900">
-              <CardHeader className="pb-6">
-                <CardTitle className="flex items-center gap-2">
-                  <IconReload className="h-5 w-5 text-muted-foreground" />
-                  Retrabalhos Realizados
-                  <Badge variant="secondary" className="ml-2">
-                    {cut.childCuts.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 flex-1">
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {cut.childCuts.map((childCut) => (
-                    <div
-                      key={childCut.id}
-                      className="bg-muted/50 rounded-lg px-4 py-3 hover:bg-muted/70 transition-colors cursor-pointer"
-                      onClick={() => navigate(routes.production.cutting.details(childCut.id))}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 flex-1">
-                          <IconScissors className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium truncate">{childCut.file?.filename || "Recorte"}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={getStatusBadgeVariant(childCut.status as CUT_STATUS)} className="text-xs">
-                            {CUT_STATUS_LABELS[childCut.status as CUT_STATUS]}
-                          </Badge>
-                          <IconChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </div>
-
-                      {childCut.reason && (
-                        <div className="flex items-center gap-1 mt-2">
-                          <IconAlertCircle className="h-3 w-3 text-orange-500" />
-                          <span className="text-xs text-orange-600">{CUT_REQUEST_REASON_LABELS[childCut.reason as CUT_REQUEST_REASON]}</span>
-                        </div>
-                      )}
-
-                      <div className="text-xs text-muted-foreground mt-2">
-                        Criado {formatRelativeTime(childCut.createdAt)}
-                      </div>
-                    </div>
-                  ))}
-                  </div>
-                </CardContent>
-              </Card>
-              </div>
-            )}
-
-            {/* Other Cuts and Changelog Row - 1/2 each */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Other Cuts from Same Task */}
-              <Card className={cn("border flex flex-col animate-in fade-in-50 duration-850", otherTaskCuts.length === 0 ? "lg:col-span-2" : "")}>
-            {otherTaskCuts.length > 0 ? (
-              <>
-                <CardHeader className="pb-6">
-                  <CardTitle className="flex items-center gap-2">
-                    <IconScissors className="h-5 w-5 text-muted-foreground" />
-                    Outros Recortes da Tarefa
-                    <Badge variant="secondary" className="ml-2">
-                      {otherTaskCuts.length}
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 flex-1">
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {otherTaskCuts.map((otherCut) => (
-                      <div
-                        key={otherCut.id}
-                        className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-2.5 hover:bg-muted/70 transition-colors cursor-pointer"
-                        onClick={() => navigate(routes.production.cutting.details(otherCut.id))}
-                      >
-                        <div className="flex items-center gap-2 flex-1">
-                          <IconFile className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium truncate">{otherCut.file?.filename || "Sem nome"}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={getStatusBadgeVariant(otherCut.status as CUT_STATUS)} className="text-xs">
-                            {CUT_STATUS_LABELS[otherCut.status as CUT_STATUS]}
-                          </Badge>
-                          <IconChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </>
-            ) : (
-              <ChangelogHistory
-                entityType={CHANGE_LOG_ENTITY_TYPE.CUT}
-                entityId={cut.id}
-                entityName={cut.file?.filename || "Recorte"}
-                entityCreatedAt={cut.createdAt}
-                maxHeight="400px"
-                className="h-full"
-              />
-              )}
-              </Card>
-
-              {/* Changelog Section - Only show if there are other cuts */}
-              {otherTaskCuts.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1000">
-              <ChangelogHistory
-                entityType={CHANGE_LOG_ENTITY_TYPE.CUT}
-                entityId={cut.id}
-                entityName={cut.file?.filename || "Recorte"}
-                entityCreatedAt={cut.createdAt}
-                maxHeight="400px"
-                className="h-full"
-                />
-              </Card>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Status Change Dialog */}
-      <AlertDialog open={statusChangeDialogOpen} onOpenChange={setStatusChangeDialogOpen}>
-        <AlertDialogContent className="max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl">Confirmar Mudança de Status</AlertDialogTitle>
-            <AlertDialogDescription className="text-base">Você está prestes a alterar o status do recorte.</AlertDialogDescription>
-          </AlertDialogHeader>
-          {pendingStatus && (
-            <div className="rounded-lg bg-muted p-4 my-4 space-y-3">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Arquivo:</span>
-                  <p className="font-medium mt-1">{cut.file?.filename || "Sem nome"}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Tipo:</span>
-                  <p className="font-medium mt-1">{CUT_TYPE_LABELS[cut.type as CUT_TYPE]}</p>
-                </div>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Status Atual</p>
-                  <Badge variant={getStatusBadgeVariant(cut.status as CUT_STATUS)}>{CUT_STATUS_LABELS[cut.status as CUT_STATUS]}</Badge>
-                </div>
-                <IconArrowRight className="h-5 w-5 text-muted-foreground" />
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Novo Status</p>
-                  <Badge variant={getStatusBadgeVariant(pendingStatus)}>{CUT_STATUS_LABELS[pendingStatus]}</Badge>
-                </div>
-              </div>
-              {pendingStatus === CUT_STATUS.COMPLETED && (
-                <div className="text-sm text-muted-foreground bg-green-50 dark:bg-green-950 p-3 rounded-md">
-                  <IconInfoCircle className="h-4 w-4 inline mr-2 text-green-500" />O horário de conclusão será registrado automaticamente.
-                </div>
-              )}
-            </div>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isUpdating}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmStatusChange} disabled={isUpdating}>
-              {isUpdating ? (
-                <>
-                  <LoadingSpinner className="mr-2 h-4 w-4" />
-                  Processando...
-                </>
-              ) : (
-                "Confirmar Mudança"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </PrivilegeRoute>
+    <>
+      <DetailPage<Cut>
+        detailKey="cut-detail"
+        data={cut}
+        isLoading={isLoading}
+        error={errorNode}
+        emptyMessage="Recorte não encontrado."
+        sections={sections}
+        title={cut?.file?.filename || "Recorte"}
+        icon={IconCut}
+        actions={actions}
+        hideEmptyFields
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Produção", href: routes.production.root },
+          { label: "Recortes", href: routes.production.cutting.list },
+          { label: cut?.file?.filename || "Recorte" },
+        ]}
+        navigation={{
+          ids: (location.state as { ids?: string[] } | null)?.ids,
+          toRoute: (rid) => routes.production.cutting.details(rid),
+        }}
+      />
+      {dialog}
+    </>
   );
-};
+}
+
+export const CuttingDetailsPage = () => (
+  <PrivilegeRoute requiredPrivilege={PAGE_PRIVILEGES}>
+    <CuttingDetailsContent />
+  </PrivilegeRoute>
+);
 
 export default CuttingDetailsPage;

@@ -25,6 +25,7 @@ import {
   AIRBRUSHING_STATUS,
   AIRBRUSHING_PAYMENT_STATUS,
   CUT_STATUS,
+  CUT_ORIGIN,
   BORROW_STATUS,
   PPE_REQUEST_STATUS,
   PPE_DELIVERY_STATUS,
@@ -474,6 +475,12 @@ export const ENTITY_BADGE_CONFIG = {
     [CUT_STATUS.PENDING]: "gray" as BadgeVariant,
     [CUT_STATUS.CUTTING]: "blue" as BadgeVariant,
     [CUT_STATUS.COMPLETED]: "green" as BadgeVariant,
+  },
+
+  // Cut Origin — Plano = blue, Solicitação (rework) = yellow
+  CUT_ORIGIN: {
+    [CUT_ORIGIN.PLAN]: "blue" as BadgeVariant,
+    [CUT_ORIGIN.REQUEST]: "yellow" as BadgeVariant,
   },
 
   // Borrow Status
