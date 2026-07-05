@@ -1,6 +1,8 @@
 import React, { useCallback } from "react";
 
 import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
+import { Badge } from "@/components/ui/badge";
+import { CUT_ORIGIN, CUT_ORIGIN_LABELS, CUT_STATUS_LABELS, getBadgeVariant } from "@/constants";
 import { cn } from "@/lib/utils";
 import type { Cut, File } from "@/types";
 import { getApiBaseUrl } from "@/utils/file";
@@ -77,9 +79,31 @@ export function CutsSection({ cuts, view }: { cuts: Cut[]; view: FileViewMode })
 
   return (
     <div className={cn(view === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-      {cuts.map(
-        (cut) => cut.file && <FileItem key={cut.id} file={cut.file} viewMode={view} onPreview={handlePreview} onDownload={handleDownload} showActions />,
-      )}
+      {cuts.map((cut) => {
+        if (!cut.file) return null;
+        // A task's "Recortes" mixes PLAN cuts with REQUEST (rework) cuts. Without a marker
+        // they look identical, so the count can seem to disagree with the task-edit "Plano de
+        // Corte" section (which only manages PLAN cuts). Badge each cut's status, and flag
+        // reworks explicitly so it's clear which cuts are re-cut requests.
+        const isRework = cut.origin === CUT_ORIGIN.REQUEST;
+        return (
+          <div key={cut.id} className="relative">
+            <FileItem file={cut.file} viewMode={view} onPreview={handlePreview} onDownload={handleDownload} showActions />
+            <div className="pointer-events-none absolute left-1.5 top-1.5 z-10 flex flex-wrap gap-1">
+              {cut.status && (
+                <Badge variant={getBadgeVariant(cut.status, "CUT")} className="h-5 px-1.5 text-[10px] shadow-sm">
+                  {CUT_STATUS_LABELS[cut.status]}
+                </Badge>
+              )}
+              {isRework && (
+                <Badge variant="warning" className="h-5 px-1.5 text-[10px] shadow-sm">
+                  {CUT_ORIGIN_LABELS[cut.origin]}
+                </Badge>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
