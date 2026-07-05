@@ -143,7 +143,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     canEditObservation,
     canEditIdentity, canEditSector, canEditBonification,
     canEditDates, canEditResponsibles, canEditServices,
-    canEditLayout, canEditPaint,
+    canEditLayout, canEditPaint, canEditCuts,
   } = useTaskPermissions();
 
   // Sector-specific business logic (not permission checks)
@@ -151,13 +151,19 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const isCommercialUser = privilege === SECTOR_PRIVILEGES.COMMERCIAL;
   const isDesignerUser = privilege === SECTOR_PRIVILEGES.DESIGNER;
 
-  // Fetch cuts separately using useCutsByTask hook (same approach as detail page)
+  // Fetch cuts separately using useCutsByTask hook (same approach as detail page).
+  // Scope to PLAN cuts ONLY: the task-edit "Plano de Corte" section must never touch
+  // REQUEST (rework) cuts — those are managed via the re-cut request flow, and merging
+  // them here silently corrupts/deletes in-progress reworks (audit B2). limit:100 avoids
+  // the default 20-row cap so reconciliation sees every plan cut (audit C).
   const { data: cutsData } = useCutsByTask({
     taskId: task.id,
     filters: {
+      where: { origin: CUT_ORIGIN.PLAN },
       include: {
         file: true,
       },
+      limit: 100,
     },
   });
 
@@ -166,7 +172,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   // (create / edit / remove) without relying on the submit closure being fresh.
   const originalCutsRef = useRef<any[]>([]);
   useEffect(() => {
-    originalCutsRef.current = cutsData?.data || [];
+    // Defense-in-depth: only PLAN cuts feed the reconciliation, even if the query
+    // ever returns mixed origins. REQUEST (rework) cuts must never be reconciled here.
+    originalCutsRef.current = (cutsData?.data || []).filter(
+      (c: any) => (c.origin ?? CUT_ORIGIN.PLAN) === CUT_ORIGIN.PLAN,
+    );
   }, [cutsData]);
 
   // Initialize artwork files from existing task data
@@ -748,8 +758,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const mapDataToForm = useCallback((taskData: Task): TaskUpdateFormData => {
 
     // Group cuts by fileId and type to get proper quantities
-    // Use cutsData from separate query instead of taskData.cuts
-    const cuts = cutsData?.data || [];
+    // Use cutsData from separate query instead of taskData.cuts.
+    // PLAN-only (defense-in-depth): REQUEST cuts are never edited via the task form.
+    const cuts = (cutsData?.data || []).filter(
+      (c: any) => (c.origin ?? CUT_ORIGIN.PLAN) === CUT_ORIGIN.PLAN,
+    );
     const groupedCuts = (() => {
       if (cuts.length === 0) {
         
@@ -2154,19 +2167,30 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
               .map((c: any) => c.id)
               .filter((id: string) => !keptIds.has(id));
 
-            // 1) Deletions
+            // 1) Deletions. Batch endpoints report per-item failures in the envelope
+            // (data.totalFailed) and may still resolve with success:true — so we MUST
+            // inspect the response and fail loudly, otherwise a swallowed failure lets
+            // the "removed" cut reappear after refetch (audit B/D, the reported bug).
             if (cutIdsToDelete.length > 0) {
-              await cutService.batchDeleteCuts({ cutIds: cutIdsToDelete });
+              const res: any = await cutService.batchDeleteCuts({ cutIds: cutIdsToDelete });
+              const failed = res?.data?.totalFailed ?? 0;
+              if (res?.success === false || failed > 0) {
+                throw new Error(`Não foi possível remover ${failed || cutIdsToDelete.length} recorte(s).`);
+              }
             }
             // 2) Type edits on preserved cuts (keeps status/progress)
             if (cutsToUpdate.length > 0) {
-              await cutService.batchUpdateCuts({
+              const res: any = await cutService.batchUpdateCuts({
                 cuts: cutsToUpdate.map((u) => ({ id: u.id, type: u.type })),
               });
+              const failed = res?.data?.totalFailed ?? 0;
+              if (res?.success === false || failed > 0) {
+                throw new Error(`Não foi possível atualizar ${failed || cutsToUpdate.length} recorte(s).`);
+              }
             }
             // 3) Extra units of an already-uploaded file (no re-upload needed)
             if (cutsToCreateFromFileId.length > 0) {
-              await cutService.batchCreateCuts({
+              const res: any = await cutService.batchCreateCuts({
                 cuts: cutsToCreateFromFileId.map((c) => ({
                   fileId: c.fileId,
                   type: c.type,
@@ -2174,6 +2198,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                   taskId: task.id,
                 })),
               });
+              const failed = res?.data?.totalFailed ?? 0;
+              if (res?.success === false || failed > 0) {
+                throw new Error(`Não foi possível criar ${failed || cutsToCreateFromFileId.length} recorte(s).`);
+              }
             }
             // 4) Brand-new uploads (multipart; backend fans out by quantity)
             for (const c of cutsToCreateWithFile) {
@@ -2193,7 +2221,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             }
           } catch (cutError: any) {
             console.error('[TaskEditForm] Cut reconciliation failed:', cutError);
-            toast.error('Não foi possível salvar todos os recortes. Verifique e tente novamente.');
+            // Make the UI reflect what actually persisted before surfacing the error.
+            await queryClient.invalidateQueries({ queryKey: cutKeys.all });
+            toast.error(cutError?.message || 'Não foi possível salvar todos os recortes. Verifique e tente novamente.');
+            // Do NOT report the overall save as successful: re-throw so navigation is
+            // skipped and the user stays on the form seeing the real (refreshed) cut state.
+            throw cutError;
           }
 
           // Refresh the separately-queried cut lists so the detail page reflects the
@@ -3523,7 +3556,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                   </AccordionTrigger>
                   <AccordionContent>
                     <CardContent className="pt-0">
-                      <MultiCutSelector ref={multiCutSelectorRef} control={form.control} disabled={isSubmitting} onCutsCountChange={setCutsCount} />
+                      <MultiCutSelector ref={multiCutSelectorRef} control={form.control} disabled={isSubmitting || !canEditCuts} onCutsCountChange={setCutsCount} />
                     </CardContent>
                   </AccordionContent>
                 </Card>

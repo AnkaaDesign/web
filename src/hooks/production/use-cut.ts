@@ -120,6 +120,8 @@ export const useCutsByFile = createSpecializedQueryHook<{ fileId: string; filter
 // Hook for cuts by task
 export const useCutsByTask = createSpecializedQueryHook<{ taskId: string; filters?: Partial<CutGetManyFormData> }, CutGetManyResponse>({
   queryKeyFn: ({ taskId, filters }) => cutKeys.byTask(taskId, filters),
-  queryFn: ({ taskId, filters }) => getCuts({ ...filters, where: { taskId } }),
+  // Merge any caller-provided `where` (e.g. { origin: PLAN }) with the taskId scope
+  // instead of clobbering it, so callers can narrow the result set.
+  queryFn: ({ taskId, filters }) => getCuts({ ...filters, where: { ...(filters?.where || {}), taskId } }),
   staleTime: 1000 * 60 * 5,
 });

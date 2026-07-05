@@ -176,16 +176,17 @@ export function canManageCutStatus(user: PermissionUser | null): boolean {
 }
 
 /**
- * Can user request a new cut?
- * DESIGNER and ADMIN can request cuts (cut requests create cuts via
- * POST /cuts, which the API restricts to these roles)
+ * Can user request a new (re-)cut?
+ * ADMIN, PRODUCTION_MANAGER, or a PRODUCTION team leader — the people who discover a
+ * bad/lost/wrong cut on the floor. Matches the API re-cut authorization and Flutter
+ * canRequestCut. (Plain PRODUCTION and DESIGNER cannot request re-cuts.)
  */
 export function canRequestCut(user: PermissionUser | null): boolean {
   if (!user) return false;
-  return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.DESIGNER,
-    SECTOR_PRIVILEGES.ADMIN,
-  ]);
+  if (hasAnyPrivilege(user, [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER])) {
+    return true;
+  }
+  return isTeamLeader(user) && hasAnyPrivilege(user, [SECTOR_PRIVILEGES.PRODUCTION]);
 }
 
 // =====================

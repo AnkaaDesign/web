@@ -94,6 +94,9 @@ export function useTaskPermissions() {
   const canEditServices = !isWarehouse;
   const canEditLayout = !isFinancial && !isDesigner;
   const canEditPaint = !isWarehouse && !isDesigner;
+  // Plan-cut add/remove in the task form maps to POST /cuts + DELETE /cuts/batch,
+  // which the API restricts to DESIGNER/ADMIN. Everyone else views cuts read-only.
+  const canEditCuts = isAdmin || isDesigner;
 
   return {
     // User info
@@ -143,6 +146,7 @@ export function useTaskPermissions() {
     canEditServices,
     canEditLayout,
     canEditPaint,
+    canEditCuts,
   };
 }
 
