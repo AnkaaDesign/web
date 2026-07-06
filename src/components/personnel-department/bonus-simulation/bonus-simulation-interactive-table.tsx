@@ -36,8 +36,15 @@ import { cn } from "@/lib/utils";
 import { CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../constants";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
+import { usePersistedState } from "@/hooks/common/use-persisted-state";
 import { toast } from "@/components/ui/sonner";
 import { BonusSimulationFilters } from "./bonus-simulation-filters";
+
+// localStorage keys — persist filters/sort/task config so the user returns to
+// exactly where they left off after navigating away.
+const FILTERS_STORAGE_KEY = "bonus-simulation-filters";
+const SORT_STORAGE_KEY = "bonus-simulation-sort";
+const TASK_STORAGE_KEY = "bonus-simulation-task";
 
 // Position levels mapping
 const POSITIONS = [
@@ -151,17 +158,17 @@ interface BonusSimulationInteractiveTableProps {
 
 export function BonusSimulationInteractiveTable({ className, embedded: _embedded = false }: BonusSimulationInteractiveTableProps) {
   // State
-  const [taskQuantity, setTaskQuantity] = useState<number>(0); // Will be set from current period
-  const [originalTaskQuantity, setOriginalTaskQuantity] = useState<number>(0); // Store original for restore
-  const [taskInput, setTaskInput] = useState<string>('0,0'); // String value for controlled input (Brazilian format) - 1 decimal
+  const [taskQuantity, setTaskQuantity] = usePersistedState<number>(`${TASK_STORAGE_KEY}-quantity`, 0); // Will be set from current period
+  const [originalTaskQuantity, setOriginalTaskQuantity] = useState<number>(0); // Store original for restore (always the fetched value)
+  const [taskInput, setTaskInput] = usePersistedState<string>(`${TASK_STORAGE_KEY}-input`, '0,0'); // String value for controlled input (Brazilian format) - 1 decimal
   const [averageInput, setAverageInput] = useState<string>('0,00'); // String value for controlled input (Brazilian format) - 2 decimals
   const [simulatedUsers, setSimulatedUsers] = useState<SimulatedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [liveTaskInfo, setLiveTaskInfo] = useState<{ rawCount: number; weightedCount: number; suspendedCount: number; eligibleUsers: number; averageTasksPerEmployee: number } | null>(null);
 
-  // Filter state - no default filters, show all eligible users
+  // Filter state - no default filters, show all eligible users (persisted)
   const [showFiltersModal, setShowFiltersModal] = useState(false);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = usePersistedState(FILTERS_STORAGE_KEY, {
     sectorIds: [] as string[],
     positionIds: [] as string[],
     includeUserIds: [] as string[],
@@ -169,9 +176,9 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     showOnlyEligible: true // Default to showing only eligible users
   });
 
-  // Sorting state
-  const [sortColumn, setSortColumn] = useState<'payrollNumber' | 'name' | 'sectorName' | 'position' | 'performanceLevel' | 'bonusAmount' | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  // Sorting state (persisted)
+  const [sortColumn, setSortColumn] = usePersistedState<'payrollNumber' | 'name' | 'sectorName' | 'position' | 'performanceLevel' | 'bonusAmount' | null>(`${SORT_STORAGE_KEY}-column`, null);
+  const [sortDirection, setSortDirection] = usePersistedState<'asc' | 'desc'>(`${SORT_STORAGE_KEY}-direction`, 'asc');
 
   // Get current bonus period for task counting
   // Get current payroll period (26th-25th cycle) - centralized utility
@@ -226,11 +233,16 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
         // Store task info for the period info display
         setLiveTaskInfo({ rawCount, weightedCount: weightedTaskCount, suspendedCount, eligibleUsers, averageTasksPerEmployee });
 
-        // Only set if taskQuantity is still 0 (initial state)
         if (weightedTaskCount > 0) {
-          setTaskQuantity(weightedTaskCount);
+          // originalTaskQuantity is always the fetched period value (baseline
+          // for "Restaurar" + the modified indicator).
           setOriginalTaskQuantity(weightedTaskCount);
-          setTaskInput(weightedTaskCount.toFixed(1).replace('.', ','));
+          // Only seed the working quantity when the user has no persisted
+          // override (still at the initial 0) — otherwise keep their value.
+          if (taskQuantity === 0) {
+            setTaskQuantity(weightedTaskCount);
+            setTaskInput(weightedTaskCount.toFixed(1).replace('.', ','));
+          }
         }
       } catch (err) {
         console.error('[BonusSimulation] Failed to fetch weighted task count:', err);

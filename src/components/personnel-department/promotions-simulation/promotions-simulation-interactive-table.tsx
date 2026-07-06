@@ -26,6 +26,8 @@ import {
   IconArrowDown,
   IconArrowUpRight,
   IconArrowDownRight,
+  IconChevronLeft,
+  IconChevronRight,
   IconSelector
 } from "@tabler/icons-react";
 import { formatCurrency, getBonusPeriod, getCurrentPayrollPeriod, formatDate } from "../../../utils";
@@ -38,10 +40,19 @@ import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
 import { GenericColumnVisibilityManager } from "@/components/ui/generic-column-visibility-manager";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
+import { usePersistedState } from "@/hooks/common/use-persisted-state";
 import { toast } from "@/components/ui/sonner";
 import { PromotionsSimulationFilters } from "./promotions-simulation-filters";
 
-const COLUMN_STORAGE_KEY = "promotions-simulation-visible-columns";
+// Bumped to v2 when the Performance column was restored so the new column
+// appears for users who already had column preferences saved.
+const COLUMN_STORAGE_KEY = "promotions-simulation-visible-columns-v2";
+
+// localStorage keys — persist filters/sort/task config so the user returns to
+// exactly where they left off after navigating away.
+const FILTERS_STORAGE_KEY = "promotions-simulation-filters";
+const SORT_STORAGE_KEY = "promotions-simulation-sort";
+const TASK_STORAGE_KEY = "promotions-simulation-task";
 
 // Read the current monthly remuneration off a position. Backend populates the
 // virtual `remuneration` field from the current MonetaryValue; fall back to the
@@ -73,12 +84,71 @@ function DeltaCell({ value, zeroThreshold = 0 }: { value: number; zeroThreshold?
   );
 }
 
+// Performance level selector with chevron buttons (0-5). Mirrors the bonus
+// simulation — editing it re-runs /bonus/simulate for the "Bônus Previsto".
+interface PerformanceLevelSelectorProps {
+  value: number;
+  onChange: (value: number) => void;
+  isModified?: boolean;
+  disabled?: boolean;
+  className?: string;
+}
+
+function PerformanceLevelSelector({ value, onChange, isModified, disabled, className }: PerformanceLevelSelectorProps) {
+  const handleDecrease = () => {
+    const newValue = Math.max(0, value - 1);
+    if (newValue !== value) onChange(newValue);
+  };
+  const handleIncrease = () => {
+    const newValue = Math.min(5, value + 1);
+    if (newValue !== value) onChange(newValue);
+  };
+
+  return (
+    <div className={cn("flex items-center gap-1", className)}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={handleDecrease}
+        disabled={disabled || value <= 0}
+        className="h-7 w-7 p-0 hover:bg-muted"
+        title="Diminuir nível"
+      >
+        <IconChevronLeft className="h-4 w-4" />
+      </Button>
+      <div
+        className={cn(
+          "flex items-center justify-center w-8 h-7 font-semibold text-sm",
+          isModified ? "text-orange-600" : "text-foreground",
+          disabled && "opacity-50"
+        )}
+        title={`Nível de desempenho: ${value} (0-5)`}
+      >
+        {value}
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={handleIncrease}
+        disabled={disabled || value >= 5}
+        className="h-7 w-7 p-0 hover:bg-muted"
+        title="Aumentar nível"
+      >
+        <IconChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
 // Export columns configuration
 const EXPORT_COLUMNS: ExportColumn<SimulatedUser>[] = [
   { id: "payrollNumber", label: "Nº Folha", getValue: (u: SimulatedUser) => u.payrollNumber?.toString() || "-" },
   { id: "name", label: "Nome", getValue: (u: SimulatedUser) => u.name },
   { id: "sectorName", label: "Setor", getValue: (u: SimulatedUser) => u.sectorName || "-" },
   { id: "positionName", label: "Cargo", getValue: (u: SimulatedUser) => u.positionName },
+  { id: "performanceLevel", label: "Performance", getValue: (u: SimulatedUser) => u.performanceLevel.toString() },
   { id: "currentRemuneration", label: "Remun. Atual", getValue: (u: SimulatedUser) => formatCurrency(u.originalRemuneration) },
   { id: "expectedRemuneration", label: "Remun. Prevista", getValue: (u: SimulatedUser) => formatCurrency(u.expectedRemuneration) },
   { id: "remunerationDiff", label: "Dif. Remun.", getValue: (u: SimulatedUser) => formatSignedCurrency(u.expectedRemuneration - u.originalRemuneration) },
@@ -88,7 +158,7 @@ const EXPORT_COLUMNS: ExportColumn<SimulatedUser>[] = [
 ];
 
 const DEFAULT_VISIBLE_COLUMNS = new Set([
-  "payrollNumber", "name", "sectorName", "positionName",
+  "payrollNumber", "name", "sectorName", "positionName", "performanceLevel",
   "currentRemuneration", "expectedRemuneration", "remunerationDiff",
   "bonusAtual", "bonusPrevisto", "bonusDiff"
 ]);
@@ -122,6 +192,7 @@ type SortColumn =
   | 'name'
   | 'sectorName'
   | 'positionName'
+  | 'performanceLevel'
   | 'currentRemuneration'
   | 'expectedRemuneration'
   | 'remunerationDiff'
@@ -138,16 +209,16 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
   const [simulatedUsers, setSimulatedUsers] = useState<SimulatedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Task-count controls (mirrors the bonus simulation)
-  const [taskQuantity, setTaskQuantity] = useState<number>(0);
+  // Task-count controls (mirrors the bonus simulation) — quantity/input persisted
+  const [taskQuantity, setTaskQuantity] = usePersistedState<number>(`${TASK_STORAGE_KEY}-quantity`, 0);
   const [originalTaskQuantity, setOriginalTaskQuantity] = useState<number>(0);
-  const [taskInput, setTaskInput] = useState<string>('0,0');
+  const [taskInput, setTaskInput] = usePersistedState<string>(`${TASK_STORAGE_KEY}-input`, '0,0');
   const [averageInput, setAverageInput] = useState<string>('0,00');
   const [liveTaskInfo, setLiveTaskInfo] = useState<{ rawCount: number; weightedCount: number; suspendedCount: number; eligibleUsers: number; averageTasksPerEmployee: number } | null>(null);
 
-  // Filter state - promotions view shows all active collaborators by default
+  // Filter state - promotions view shows all active collaborators by default (persisted)
   const [showFiltersModal, setShowFiltersModal] = useState(false);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = usePersistedState(FILTERS_STORAGE_KEY, {
     sectorIds: [] as string[],
     positionIds: [] as string[],
     includeUserIds: [] as string[],
@@ -155,9 +226,9 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
     showOnlyEligible: false
   });
 
-  // Sorting state
-  const [sortColumn, setSortColumn] = useState<SortColumn>('name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  // Sorting state (persisted)
+  const [sortColumn, setSortColumn] = usePersistedState<SortColumn>(`${SORT_STORAGE_KEY}-column`, 'name');
+  const [sortDirection, setSortDirection] = usePersistedState<'asc' | 'desc'>(`${SORT_STORAGE_KEY}-direction`, 'asc');
 
   // Column visibility (persisted to localStorage)
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(COLUMN_STORAGE_KEY, DEFAULT_VISIBLE_COLUMNS);
@@ -223,9 +294,15 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
         const averageTasksPerEmployee = Number(liveData.averageTasksPerEmployee) || 0;
         setLiveTaskInfo({ rawCount, weightedCount, suspendedCount, eligibleUsers, averageTasksPerEmployee });
         if (weightedCount > 0) {
-          setTaskQuantity(weightedCount);
+          // originalTaskQuantity is always the fetched period value (baseline
+          // for "Restaurar" + the modified indicator).
           setOriginalTaskQuantity(weightedCount);
-          setTaskInput(weightedCount.toFixed(1).replace('.', ','));
+          // Only seed the working quantity when the user has no persisted
+          // override (still at the initial 0) — otherwise keep their value.
+          if (taskQuantity === 0) {
+            setTaskQuantity(weightedCount);
+            setTaskInput(weightedCount.toFixed(1).replace('.', ','));
+          }
         }
       } catch (err) {
         console.error('[PromotionsSimulation] Failed to fetch weighted task count:', err);
@@ -329,6 +406,7 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
         case 'name': aValue = a.name.toLowerCase(); bValue = b.name.toLowerCase(); break;
         case 'sectorName': aValue = (a.sectorName || '').toLowerCase(); bValue = (b.sectorName || '').toLowerCase(); break;
         case 'positionName': aValue = a.positionName.toLowerCase(); bValue = b.positionName.toLowerCase(); break;
+        case 'performanceLevel': aValue = a.performanceLevel; bValue = b.performanceLevel; break;
         case 'currentRemuneration': aValue = a.originalRemuneration; bValue = b.originalRemuneration; break;
         case 'expectedRemuneration': aValue = a.expectedRemuneration; bValue = b.expectedRemuneration; break;
         case 'remunerationDiff': aValue = a.expectedRemuneration - a.originalRemuneration; bValue = b.expectedRemuneration - b.originalRemuneration; break;
@@ -541,6 +619,14 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
       prev.map(user => (user.id === userId
         ? { ...user, positionId: newPositionId, positionName: target.name, expectedRemuneration: target.remuneration }
         : user)),
+    );
+  };
+
+  // Performance level only feeds the simulated bonus (never base remuneration).
+  // Changing it re-runs /bonus/simulate for "Bônus Previsto".
+  const handlePerformanceLevelChange = (userId: string, newLevel: number) => {
+    setSimulatedUsers(prev =>
+      prev.map(user => (user.id === userId ? { ...user, performanceLevel: newLevel } : user)),
     );
   };
 
@@ -777,6 +863,18 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
           </div>
         );
       },
+    },
+    {
+      key: 'performanceLevel', label: 'Performance', align: 'center', px: 160, sortColumn: 'performanceLevel',
+      cell: (u) => (
+        <div className="px-3 py-1 flex items-center justify-center">
+          <PerformanceLevelSelector
+            value={u.performanceLevel}
+            onChange={(newLevel) => handlePerformanceLevelChange(u.id, newLevel)}
+            isModified={u.performanceLevel !== u.originalPerformanceLevel}
+          />
+        </div>
+      ),
     },
     {
       key: 'currentRemuneration', label: 'Remun. Atual', align: 'right', px: 130, sortColumn: 'currentRemuneration',

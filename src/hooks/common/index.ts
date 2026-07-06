@@ -48,6 +48,7 @@ export type {
 // Import directly from "@/hooks/common/use-unified-table-state" if the unified versions are needed.
 export * from "./use-column-widths";
 export * from "./use-column-visibility";
+export * from "./use-persisted-state";
 export * from "./use-advanced-table-selection";
 export {
   usePaginationState,
