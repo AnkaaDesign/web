@@ -1967,6 +1967,10 @@ export const NAVIGATION_MENU: MenuItem[] = [
             icon: "arrowsExchange",
             path: "/departamento-pessoal/promocoes",
             requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+            children: [
+              { id: "dp-promocoes-simulacao", title: "Simulação de Promoções", icon: "trendingUp", path: "/departamento-pessoal/promocoes/simulacao-de-promocoes" },
+              { id: "dp-promocoes-detalhes", title: "Detalhes", icon: "eye", path: "/departamento-pessoal/promocoes/detalhes/:id", isDynamic: true },
+            ],
           },
           {
             id: "dp-cargos",

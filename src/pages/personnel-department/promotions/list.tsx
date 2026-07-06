@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconUserUp } from "@tabler/icons-react";
+import { IconUserUp, IconTrendingUp } from "@tabler/icons-react";
 import { UserPositionHistoryList } from "@/components/personnel-department/user-position-history/list/user-position-history-list";
 import { PromoteDialog } from "@/components/personnel-department/user-position-history/promote/promote-dialog";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -9,6 +10,7 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const PromotionListPage = () => {
   usePageTracker({ title: "Promoções" });
+  const navigate = useNavigate();
   const [showPromoteDialog, setShowPromoteDialog] = useState(false);
 
   return (
@@ -20,6 +22,13 @@ export const PromotionListPage = () => {
           favoritePage={FAVORITE_PAGES.DEPARTAMENTO_PESSOAL_PROMOCOES_LISTAR}
           breadcrumbs={[{ label: "Início", href: "/" }, { label: "Departamento Pessoal", href: routes.personnelDepartment.root }, { label: "Promoções" }]}
           actions={[
+            {
+              key: "simulate",
+              label: "Simular Promoções",
+              icon: IconTrendingUp,
+              onClick: () => navigate(routes.personnelDepartment.promotions.simulation),
+              variant: "outline" as const,
+            },
             {
               key: "promote",
               label: "Promover Colaborador",

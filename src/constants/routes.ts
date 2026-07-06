@@ -549,6 +549,7 @@ export const routes = {
     promotions: {
       details: (id: string) => `/departamento-pessoal/promocoes/detalhes/${id}`,
       root: "/departamento-pessoal/promocoes",
+      simulation: "/departamento-pessoal/promocoes/simulacao-de-promocoes",
     },
     benefits: {
       create: "/departamento-pessoal/beneficios/cadastrar",
