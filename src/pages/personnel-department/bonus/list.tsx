@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { useApplyPeriodAdjustment, usePeriodAdjustment } from "@/hooks/personnel-department/use-bonus";
@@ -415,6 +416,7 @@ export default function BonusListPage() {
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState("");
 
   const {
     sortConfigs,
@@ -567,11 +569,27 @@ export default function BonusListPage() {
     const bonuses = bonusData.data;
     const combined: BonusRow[] = [];
 
+    // Accent-insensitive name search term
+    const normalizedSearch = searchTerm
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
     bonuses.forEach((bonus: any) => {
       if (!bonus) return;
 
       const user = bonus.user;
       if (!user) return;
+
+      // Client-side name search (accent-insensitive)
+      if (normalizedSearch) {
+        const normalizedName = (user.name || "")
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+        if (!normalizedName.includes(normalizedSearch)) return;
+      }
 
       // Apply client-side filters (similar to payroll list)
       // When specific users are selected, skip sector/position filters
@@ -737,7 +755,7 @@ export default function BonusListPage() {
       }
       return 0;
     });
-  }, [bonusData, sortConfigs, filters]);
+  }, [bonusData, sortConfigs, filters, searchTerm]);
 
   const handleApplyFilters = async (newFilters: BonusFiltersData) => {
     setIsRefreshing(true);
@@ -887,6 +905,14 @@ export default function BonusListPage() {
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Departamento Pessoal", href: routes.personnelDepartment.root }, { label: "Bônus" }]}
           actions={[
             {
+              key: "simulation",
+              label: "Simulação de Bônus",
+              icon: IconCalculator,
+              onClick: () => navigate(routes.personnelDepartment.bonus.simulation),
+              variant: "outline",
+              tooltip: "Abrir a simulação interativa de bônus",
+            } as any,
+            {
               key: "rules",
               label: "Regras",
               icon: IconInfoCircle,
@@ -937,15 +963,13 @@ export default function BonusListPage() {
         <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
           <CardContent className="px-6 pt-6 pb-4 flex-shrink-0">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => navigate(routes.personnelDepartment.bonus.simulation)}
-                  variant="outline"
-                  size="default"
-                >
-                  <IconCalculator className="h-4 w-4 mr-2" />
-                  Simulação de Bônus
-                </Button>
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <TableSearchInput
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  placeholder="Buscar colaborador..."
+                  className="w-full max-w-sm"
+                />
               </div>
 
               <div className="flex items-center gap-2">

@@ -2588,6 +2588,7 @@ export enum FAVORITE_PAGES {
   DEPARTAMENTO_PESSOAL_RESCISOES_LISTAR = "/departamento-pessoal/rescisoes",
   DEPARTAMENTO_PESSOAL_REAJUSTES_LISTAR = "/departamento-pessoal/reajustes",
   DEPARTAMENTO_PESSOAL_PROMOCOES_LISTAR = "/departamento-pessoal/promocoes",
+  DEPARTAMENTO_PESSOAL_PROMOCOES_SIMULACAO = "/departamento-pessoal/promocoes/simulacao-de-promocoes",
   DEPARTAMENTO_PESSOAL_BENEFICIOS_LISTAR = "/departamento-pessoal/beneficios",
   DEPARTAMENTO_PESSOAL_BENEFICIOS_ADESOES_LISTAR = "/departamento-pessoal/beneficios/adesoes",
 

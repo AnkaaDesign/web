@@ -121,6 +121,7 @@ const PersonnelDepartmentLoansList = lazy(() => import("@/pages/personnel-depart
 const PersonnelDepartmentSalaryAdjustmentsList = lazy(() => import("@/pages/personnel-department/salary-adjustments/list").then((module) => ({ default: module.SalaryAdjustmentListPage })));
 const PersonnelDepartmentSalaryAdjustmentDetails = lazy(() => import("@/pages/personnel-department/salary-adjustments/details/[id]").then((module) => ({ default: module.SalaryAdjustmentDetailPage })));
 const PersonnelDepartmentPromotionsList = lazy(() => import("@/pages/personnel-department/promotions/list").then((module) => ({ default: module.PromotionListPage })));
+const PersonnelDepartmentPromotionsSimulation = lazy(() => import("@/pages/personnel-department/simulacao-promocoes").then((module) => ({ default: module.default })));
 const PersonnelDepartmentPromotionDetails = lazy(() => import("@/pages/personnel-department/promotions/details/[id]").then((module) => ({ default: module.PromotionDetailPage })));
 
 // Personnel Department - Admissões + Rescisões (W3B)
@@ -3086,6 +3087,15 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PersonnelDepartmentPromotionsList />
+                    </Suspense>
+                  }
+                />
+                {/* Promotions simulation route - under promotions domain */}
+                <Route
+                  path={routes.personnelDepartment.promotions.simulation}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonnelDepartmentPromotionsSimulation />
                     </Suspense>
                   }
                 />
