@@ -441,6 +441,30 @@ export interface MatchCandidate {
   cleanGroup?: boolean;
 }
 
+/**
+ * REVERSE match candidate: given an NF (fiscal document), the transactions that
+ * could settle it. Mirror of `MatchCandidate` but from the NF's perspective —
+ * each row is a bank transaction scored against the note.
+ */
+export interface TransactionMatchCandidate {
+  transactionId: string;
+  postedAt: string;
+  amount: number; // signed as stored
+  absAmount: number; // magnitude
+  type: TransactionType; // 'CREDIT' | 'DEBIT'
+  subtype: string | null;
+  counterpartyName: string | null;
+  counterpartyCnpjCpf: string | null;
+  memo: string | null;
+  bankName: string | null;
+  reconciliationStatus: ReconciliationStatus;
+  confidence: number; // 0-100
+  daysDelta: number;
+  amountDelta: number;
+  remainingValue: number; // tx magnitude still free to allocate to this NF
+  rationale: string;
+}
+
 export interface OfxImportFileResult {
   fileName: string;
   statements: Array<{

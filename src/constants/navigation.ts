@@ -688,30 +688,22 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       {
-        // Unified Notas Fiscais surface — one page with a direction toggle
-        // (Emitidas = NFS-e we issue via Elotech; Recebidas = supplier NFs via
-        // SIEG). Sector-defaulted: FINANCIAL/COMMERCIAL → Emitidas, ACCOUNTING →
-        // Recebidas. Replaces both the old "NFS-e Emitidas" and the
-        // "Conciliação > Notas Fiscais" entries.
+        // Notas Fiscais — the ISSUED-side surface: NFS-e we emit via Elotech
+        // (Emitidas). Owned by FINANCIAL + COMMERCIAL, who bill customers. They
+        // have NO Conciliação Bancária access, so this is their NF entry. The
+        // RECEIVED (supplier) side lives under "Conciliação Bancária → Notas
+        // Fiscais" for ADMIN + ACCOUNTING — keeping the two directions in
+        // separate menus for separate sectors, so neither sees a duplicate.
         id: "notas-fiscais",
         title: "Notas Fiscais",
         icon: "receipt",
         path: "/financeiro/notas-fiscais",
-        requiredPrivilege: [
-          SECTOR_PRIVILEGES.ADMIN,
-          SECTOR_PRIVILEGES.FINANCIAL,
-          SECTOR_PRIVILEGES.COMMERCIAL,
-          SECTOR_PRIVILEGES.ACCOUNTING,
-        ],
+        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL],
         children: [
-          // Document detail opens from two surfaces — the Notas Fiscais list
-          // (/notas-fiscais/:id) and a reconciled transaction
-          // (/conciliacao/notas/:id). Register both as dynamic children so the
-          // active-nav resolver maps them onto "Notas Fiscais" instead of falling
-          // back to the top-level "Financeiro" prefix match (which left the detail
-          // page with no highlighted nav item).
+          // Emitidas detail (/notas-fiscais/:id). The recebidas/reconciliation
+          // detail (/conciliacao/notas/:id) is registered under Conciliação
+          // Bancária → Notas Fiscais instead, so it highlights there.
           { id: "notas-fiscais-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/notas-fiscais/:id", isDynamic: true },
-          { id: "notas-fiscais-conciliacao-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/conciliacao/notas/:id", isDynamic: true },
         ],
       },
       {
@@ -749,7 +741,10 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Conciliação Bancária",
         icon: "arrowsExchange2",
         path: "/financeiro/conciliacao/extrato",
-        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
+        // Bank reconciliation (extrato + received supplier NFs) is an ADMIN +
+        // ACCOUNTING surface. FINANCIAL/COMMERCIAL handle the ISSUED (Elotech
+        // NFS-e) side via the standalone "Notas Fiscais" entry instead.
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING],
         children: [
           // Extrato is the single Conciliação Bancária view — it absorbed the
           // former Saídas/Entradas pages (now CREDIT/DEBIT + status filters on
@@ -761,7 +756,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
             icon: "fileSpreadsheet",
             path: "/financeiro/conciliacao/extrato",
             order: 1,
-            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN],
             children: [
               // Transaction detail opens from the Extrato list but lives at a
               // sibling path (/transacoes/:id, not /extrato/:id). Register it as a
@@ -769,6 +764,21 @@ export const NAVIGATION_MENU: MenuItem[] = [
               // Conciliação Bancária instead of falling back to the top-level
               // "Financeiro" prefix match.
               { id: "conciliacao-transacao-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/conciliacao/transacoes/:id", isDynamic: true },
+            ],
+          },
+          {
+            // Received-NF (recebidas) reconciliation surface — the accounting NF
+            // list, hosted under Conciliação Bancária so BOTH sides (extrato +
+            // notas) are conciliated from one menu. Renders the same list as the
+            // standalone /financeiro/notas-fiscais recebidas view.
+            id: "conciliacao-notas",
+            title: "Notas Fiscais",
+            icon: "receipt",
+            path: "/financeiro/conciliacao/notas",
+            order: 2,
+            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN],
+            children: [
+              { id: "conciliacao-notas-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/conciliacao/notas/:id", isDynamic: true },
             ],
           },
           {
@@ -781,7 +791,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
             icon: "repeat",
             path: "/financeiro/contas-recorrentes",
             order: 4,
-            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN],
           },
           {
             // Manage the transaction category set (the only place to edit it).
@@ -790,7 +800,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
             icon: "tags",
             path: "/financeiro/conciliacao/categorias",
             order: 5,
-            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+            requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN],
           },
         ],
       },

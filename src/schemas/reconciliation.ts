@@ -22,7 +22,9 @@ export const manualMatchSchema = z
     // Resolve the non-NF remainder of the payment (marketplace frete/seguro/
     // taxas) WITHOUT a category — just a reason. Marks the tx RECONCILED and
     // is appended to the notes. Omit to leave the remainder open (→ Parcial).
-    remainderReason: z.enum(["FRETE", "SEGURO", "TAXAS", "OUTROS"]).optional(),
+    remainderReason: z
+      .enum(["FRETE", "SEGURO", "TAXAS", "ITEM_SEM_NOTA", "OUTROS"])
+      .optional(),
     notes: z.string().max(500).optional(),
   })
   .refine(

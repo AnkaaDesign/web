@@ -34,23 +34,21 @@ interface UserPositionHistoryCardProps {
 
 const NO_DATE = "Sem data";
 
-/** Per-reason icon node — keeps the timeline legible (promoção ↑, rebaixamento ↓). */
+/**
+ * Per-reason icon node — a BARE, reason-coloured icon (promoção ↑, rebaixamento ↓),
+ * matching the ChangelogHistory / EmploymentHistory timeline rails exactly (same
+ * `w-12 h-12` node, no circular badge). Returns only the icon's text colour.
+ */
 function reasonIconNode(reason: string) {
   switch (reason) {
     case POSITION_CHANGE_REASON.PROMOTION:
-      return {
-        Icon: IconTrendingUp,
-        className: "bg-green-100 dark:bg-green-900/30 border-green-700/40 text-green-700 dark:text-green-400",
-      };
+      return { Icon: IconTrendingUp, className: "text-green-600 dark:text-green-400" };
     case POSITION_CHANGE_REASON.DEMOTION:
-      return {
-        Icon: IconTrendingDown,
-        className: "bg-red-100 dark:bg-red-900/30 border-red-700/40 text-red-700 dark:text-red-400",
-      };
+      return { Icon: IconTrendingDown, className: "text-red-600 dark:text-red-400" };
     case POSITION_CHANGE_REASON.TRANSFER:
-      return { Icon: IconArrowsHorizontal, className: "bg-muted border-border text-muted-foreground" };
+      return { Icon: IconArrowsHorizontal, className: "text-muted-foreground" };
     default:
-      return { Icon: IconAdjustments, className: "bg-muted border-border text-muted-foreground" };
+      return { Icon: IconAdjustments, className: "text-muted-foreground" };
   }
 }
 
@@ -153,17 +151,15 @@ export function UserPositionHistoryCard({ userId, className, maxHeight = "500px"
                     <div key={record.id} className="relative">
                       {!isLastItem && <div className="absolute left-6 top-12 bottom-0 w-0.5 bg-border" />}
 
-                      <div className="flex items-start gap-4">
-                        {/* Reason icon node on the timeline rail */}
+                      <div className="flex items-start gap-4 group">
+                        {/* Reason icon node on the timeline rail — bare icon, same as the reference cards */}
                         <div className="relative z-10 flex items-center justify-center w-12 h-12">
-                          <div className={cn("flex items-center justify-center w-10 h-10 rounded-full border", nodeClassName)}>
-                            <Icon className="h-5 w-5" />
-                          </div>
+                          <Icon className={cn("h-5 w-5 transition-transform group-hover:scale-110", nodeClassName)} />
                         </div>
 
                         {/* Cargo change card */}
                         <div className="flex-1 bg-card-nested rounded-xl p-4 border border-border">
-                          <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center justify-between gap-2 mb-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <PositionChangeSummary history={record} />
                               <Badge variant={getReasonBadgeVariant(record.reason)} className="text-xs whitespace-nowrap">

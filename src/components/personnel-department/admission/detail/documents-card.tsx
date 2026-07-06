@@ -134,7 +134,8 @@ function DocumentRow({ admissionId, document }: DocumentRowProps) {
         )}
       </div>
 
-      {/* Controls — status combobox + file preview + upload on a single row. */}
+      {/* Controls — fixed-width slots so status / preview / upload line up as columns
+          across every row (received rows have a thumbnail, pending rows don't). */}
       <div className="flex flex-nowrap items-center gap-2 sm:flex-shrink-0">
         {/* Status — the combobox IS the status control (no redundant badge). */}
         <Combobox
@@ -145,21 +146,24 @@ function DocumentRow({ admissionId, document }: DocumentRowProps) {
           clearable={false}
           disabled={isBusy}
           placeholder="Status"
-          triggerClassName={cn("h-8 w-40 text-xs font-medium", getDocStatusTriggerClass(document.status))}
+          triggerClassName={cn("h-8 w-36 text-xs font-medium", getDocStatusTriggerClass(document.status))}
         />
 
-        {/* File preview (when an arquivo is anexado) — clica para abrir. */}
-        {document.file && (
+        {/* File preview — reserved 48px slot so rows without a file keep the columns aligned. */}
+        {document.file ? (
           <FileThumbnail
             file={document.file}
             size="sm"
+            className="shrink-0"
             onClick={() => window.open(getFileUrl(document.file!), "_blank", "noopener,noreferrer")}
           />
+        ) : (
+          <div className="h-12 w-12 shrink-0" aria-hidden />
         )}
 
-        {/* Upload */}
+        {/* Upload — fixed width so "Substituir" / "Enviar" share one right edge. */}
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
-        <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
+        <Button type="button" variant="outline" size="sm" className="w-32 shrink-0" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
           {isBusy ? <IconLoader2 className="h-4 w-4 mr-1 animate-spin" /> : <IconUpload className="h-4 w-4 mr-1" />}
           {document.fileId ? "Substituir" : "Enviar"}
         </Button>

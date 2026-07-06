@@ -146,7 +146,11 @@ export function ReconciliationTransactionDetailPage() {
               </strong>{" "}
               / {formatCurrency(matchState.target)}
               {matchState.selectedCount > 0 && !matchState.valid && (
-                <span className="text-amber-600"> · Faltam {formatCurrency(matchState.missing)}</span>
+                <span className="text-amber-600">
+                  {" "}·{" "}
+                  {matchState.allocated > matchState.target ? "Excede" : "Faltam"}{" "}
+                  {formatCurrency(matchState.missing)}
+                </span>
               )}
             </span>
           ) : undefined

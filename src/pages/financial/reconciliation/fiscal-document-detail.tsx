@@ -8,6 +8,7 @@ import {
   IconArrowUpRight,
   IconBuildingStore,
   IconCopy,
+  IconDeviceFloppy,
   IconDownload,
   IconExternalLink,
   IconFileInvoice,
@@ -42,6 +43,7 @@ import type {
   FiscalAddress,
   FiscalDocument,
   FiscalDocumentStatus,
+  ReconciliationStatus,
 } from "@/types/reconciliation";
 
 /** The bank transaction embedded in a fiscal document's match record. */
@@ -51,7 +53,14 @@ type LinkedTransaction = NonNullable<
 import {
   docTypeLabel,
 } from "@/components/financial/reconciliation/fiscal-doc-badge";
-import { getConfidenceBadgeVariant } from "@/components/financial/reconciliation/match-status-badge";
+import {
+  MatchStatusBadge,
+  getConfidenceBadgeVariant,
+} from "@/components/financial/reconciliation/match-status-badge";
+import {
+  FiscalDocMatchSection,
+  type MatchSaveState,
+} from "@/components/financial/reconciliation/fiscal-doc-match-section";
 import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";
 
 const SEFAZ_CONSULTA_URL =
@@ -134,13 +143,7 @@ export function ReconciliationFiscalDocumentDetailPage() {
   const { toast } = useToast();
   usePageTracker({ title: "Detalhe da Nota Fiscal", icon: "receipt" });
 
-  const {
-    data: doc,
-    isLoading,
-    error,
-    refetch,
-    isRefetching,
-  } = useFiscalDocument(id);
+  const { data: doc, isLoading, error } = useFiscalDocument(id);
 
   // XML download (lazy — only fetched once the user clicks).
   const [requestXml, setRequestXml] = useState(false);
@@ -165,6 +168,9 @@ export function ReconciliationFiscalDocumentDetailPage() {
     matchCount: number;
   } | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  // The match section reports its save-ability + allocation totals up so the
+  // Salvar button and running "Alocado / Faltam" summary live in the header.
+  const [matchState, setMatchState] = useState<MatchSaveState | null>(null);
   const runUnmatch = (txId: string) =>
     unmatchMut.mutate(txId, { onSuccess: () => setUnmatchTarget(null) });
   const handleUnmatchRequest = (txId: string, totalForTx: number) => {
@@ -237,6 +243,35 @@ export function ReconciliationFiscalDocumentDetailPage() {
   const title =
     `${docTypeLabel(doc.docType)} ${doc.nfNumber ? `#${doc.nfNumber}` : ""}`.trim();
 
+  // NF conciliation state — derived for the status badge. ENTRADA (received)
+  // notes settle against bank debits: the open balance is the total minus the
+  // non-reversed allocations, so a partial payment reads PARTIAL and a fully
+  // covered note RECONCILED. SAIDA (emitted) notes never get a bank match —
+  // their durable link is the faturamento — so fall back to the API `linked`
+  // flag. reversedAt / adjustmentAmount aren't guaranteed on the trimmed match
+  // embed, so read them defensively.
+  const activeNfMatches = (doc.matches ?? []).filter(
+    (m) => (m as { reversedAt?: string | null }).reversedAt == null,
+  );
+  const nfAllocated = activeNfMatches.reduce(
+    (sum, m) =>
+      sum +
+      (m.allocatedAmount ?? 0) +
+      ((m as { adjustmentAmount?: number | null }).adjustmentAmount ?? 0),
+    0,
+  );
+  const nfOpenBalance = Number((doc.totalValue - nfAllocated).toFixed(2));
+  const nfStatus: ReconciliationStatus =
+    doc.operationType === "SAIDA"
+      ? doc.linked
+        ? "RECONCILED"
+        : "PENDING"
+      : nfOpenBalance <= 0.05 && activeNfMatches.length > 0
+        ? "RECONCILED"
+        : activeNfMatches.length > 0
+          ? "PARTIAL"
+          : "PENDING";
+
   return (
     <Frame>
       <PageHeader
@@ -245,24 +280,60 @@ export function ReconciliationFiscalDocumentDetailPage() {
         breadcrumbs={[
           { label: "Início", href: routes.home },
           { label: "Financeiro", href: routes.financial.root },
+          // The received-NF reconciliation surface lives under Conciliação
+          // Bancária → Notas Fiscais (the fiscal-document side of conciliation).
           {
-            // The unified "Notas Fiscais" surface lives directly under Financeiro
-            // (it replaced the old "Conciliação › Notas Fiscais" entry), so the
-            // trail must match the menu hierarchy — no Conciliação Bancária level.
+            label: "Conciliação Bancária",
+            href: routes.financial.reconciliation.root,
+          },
+          {
             label: "Notas Fiscais",
-            href: routes.financial.nfse.root,
+            href: routes.financial.reconciliation.fiscalDocuments,
           },
           { label: title },
         ]}
+        headerExtra={
+          matchState ? (
+            <span className="text-sm whitespace-nowrap mr-1">
+              Alocado{" "}
+              <strong
+                className={
+                  matchState.valid ? "text-emerald-600" : "text-amber-600"
+                }
+              >
+                {formatCurrency(matchState.allocated)}
+              </strong>{" "}
+              / {formatCurrency(matchState.target)}
+              {matchState.selectedCount > 0 && !matchState.valid && (
+                <span className="text-amber-600">
+                  {" "}
+                  ·{" "}
+                  {matchState.allocated > matchState.target
+                    ? "Excede"
+                    : "Faltam"}{" "}
+                  {formatCurrency(matchState.missing)}
+                </span>
+              )}
+            </span>
+          ) : undefined
+        }
         actions={[
-          {
-            key: "refresh",
-            label: "Atualizar",
-            icon: IconRefresh,
-            onClick: () => refetch(),
-            loading: isRefetching,
-            variant: "outline" as const,
-          },
+          // Salvar conciliação — surfaced only while the match section reports a
+          // selectable state (see FiscalDocMatchSection.onSaveStateChange). Merged
+          // ahead of the existing NF-info actions (refresh / SEFAZ / XML).
+          ...(matchState
+            ? [
+                {
+                  key: "save",
+                  label: matchState.label ?? "Salvar conciliação",
+                  icon: IconDeviceFloppy,
+                  onClick: () => matchState.save(),
+                  disabled: !matchState.canSave,
+                  loading: matchState.saving,
+                  variant: "default" as const,
+                },
+              ]
+            : []),
           ...(SEFAZ_DOC_TYPES.has(doc.docType)
             ? [
                 {
@@ -280,7 +351,9 @@ export function ReconciliationFiscalDocumentDetailPage() {
             icon: IconDownload,
             onClick: () => setRequestXml(true),
             disabled: !doc.rawXmlFileId,
-            variant: "default" as const,
+            // Yields the primary slot to "Salvar conciliação" while a match is
+            // in progress; otherwise stays the default (primary) NF action.
+            variant: matchState ? ("outline" as const) : ("default" as const),
           },
         ]}
         className="flex-shrink-0"
@@ -300,7 +373,11 @@ export function ReconciliationFiscalDocumentDetailPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Identificação */}
-            <SectionCard title="Identificação" icon={IconFileInvoice}>
+            <SectionCard
+              title="Identificação"
+              icon={IconFileInvoice}
+              headerRight={<MatchStatusBadge status={nfStatus} />}
+            >
               <InfoRow
                 label="Status"
                 value={
@@ -642,6 +719,16 @@ export function ReconciliationFiscalDocumentDetailPage() {
               />
             </SectionCard>
           )}
+
+          {/* Conciliar — pick a bank transaction that settles this note. The
+              NF-side mirror of the transaction page's "Candidatas à conciliação".
+              Self-gates: renders (and reports a header save state) only for
+              ENTRADA notes with an open balance; otherwise it returns null and
+              clears the header state. */}
+          <FiscalDocMatchSection
+            fiscalDocument={doc}
+            onSaveStateChange={setMatchState}
+          />
         </div>
       </div>
 
@@ -669,19 +756,25 @@ export function ReconciliationFiscalDocumentDetailPage() {
 function SectionCard({
   title,
   icon: Icon,
+  headerRight,
   children,
 }: {
   title: string;
   icon: (props: { className?: string }) => React.ReactNode;
+  /** Optional trailing node in the card header (e.g. a status badge). */
+  headerRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <Card className="shadow-sm border border-border">
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2">
-          <Icon className="h-5 w-5 text-muted-foreground" />
-          {title}
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2">
+            <Icon className="h-5 w-5 text-muted-foreground" />
+            {title}
+          </CardTitle>
+          {headerRight}
+        </div>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="space-y-3">{children}</div>

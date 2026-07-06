@@ -127,6 +127,8 @@ function DocumentationRow({ userId, document, canEdit }: DocumentationRowProps) 
       {/* Controls — status combobox IS the status (no redundant badge), file
           thumbnail (click-to-open) + upload, all on a single compact row. */}
       {canEdit ? (
+        // Fixed-width slots so status / preview / upload line up as columns across
+        // every row (received rows have a thumbnail, pending rows don't).
         <div className="flex flex-nowrap items-center gap-2 sm:flex-shrink-0">
           <Combobox
             value={document.status}
@@ -138,11 +140,14 @@ function DocumentationRow({ userId, document, canEdit }: DocumentationRowProps) 
             placeholder="Status"
             triggerClassName="h-8 w-44 text-xs"
           />
-          {document.file && (
-            <FileThumbnail file={document.file} size="sm" onClick={() => window.open(getFileUrl(document.file!), "_blank", "noopener,noreferrer")} />
+          {/* Preview — reserved 48px slot so rows without a file keep the columns aligned. */}
+          {document.file ? (
+            <FileThumbnail file={document.file} size="sm" className="shrink-0" onClick={() => window.open(getFileUrl(document.file!), "_blank", "noopener,noreferrer")} />
+          ) : (
+            <div className="h-12 w-12 shrink-0" aria-hidden />
           )}
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
-          <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
+          <Button type="button" variant="outline" size="sm" className="w-32 shrink-0" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
             {isBusy ? <IconLoader2 className="h-4 w-4 mr-1 animate-spin" /> : <IconUpload className="h-4 w-4 mr-1" />}
             {document.fileId ? "Substituir" : "Enviar"}
           </Button>

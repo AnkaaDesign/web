@@ -4,25 +4,32 @@ import {
   IconArrowDownLeft,
   IconArrowUpRight,
   IconBuildingBank,
+  IconFilter,
   IconHelpCircle,
   IconRefresh,
   IconUpload,
 } from "@tabler/icons-react";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Combobox } from "@/components/ui/combobox";
 import { FinancialKpiCard } from "@/components/financial/common/financial-kpi-card";
+import { parseMonthKey } from "@/components/financial/reconciliation/month-nav";
 import {
-  MonthNav,
-  monthBounds,
-  monthKey,
-  parseMonthKey,
-} from "@/components/financial/reconciliation/month-nav";
+  PeriodNav,
+  currentPeriod,
+  type Period,
+} from "@/components/financial/reconciliation/period-nav";
+import {
+  StatementFilterSheet,
+  getDefaultStatementFilters,
+} from "@/components/financial/reconciliation/statement-filter-sheet";
 import { TransactionsByDateAccordion } from "@/components/financial/reconciliation/transactions-by-date-accordion";
 import {
   buildDatesForPeriod,
+  deriveDateRange,
   effectivePeriodDates,
 } from "@/components/financial/reconciliation/date-utils";
 import { OfxImportDialog } from "@/components/financial/reconciliation/ofx-import-dialog";
@@ -72,21 +79,48 @@ function parseTypes(raw: string | null): TransactionType[] {
   return parsed.length ? parsed : ALL_TYPES;
 }
 
-// The card selection (Entradas/Saídas + status buckets) persists across visits
-// in localStorage so the user's chosen view sticks. A URL param still wins when
-// present (shared/deep links); otherwise we fall back to the stored value, then
-// to the defaults (everything on).
+// The card selection (Entradas/Saídas + status buckets) + the chosen period
+// persist across visits in localStorage so the user's view sticks. A URL param
+// still wins when present (shared/deep links); otherwise we fall back to the
+// stored value, then to the defaults.
 const TYPES_STORAGE_KEY = "reconciliation-statement:types";
 const BUCKETS_STORAGE_KEY = "reconciliation-statement:buckets";
-const MONTH_STORAGE_KEY = "reconciliation-statement:month";
+const PERIOD_STORAGE_KEY = "reconciliation-statement:period";
+const MONTHS_RE = /^(0[1-9]|1[0-2])$/;
 
-function readStoredMonth(): Date | null {
+/** Parse the year+months period from URL params (JSON or CSV months). */
+function parsePeriodFromUrl(params: URLSearchParams): Period | null {
+  const yearRaw = params.get("year");
+  const monthsRaw = params.get("months");
+  if (!yearRaw || !monthsRaw) return null;
+  const year = Number(yearRaw);
+  if (!Number.isFinite(year)) return null;
+  let months: string[] = [];
+  try {
+    const parsed = JSON.parse(monthsRaw);
+    if (Array.isArray(parsed)) months = parsed.map(String);
+  } catch {
+    months = monthsRaw.split(",").map(s => s.trim()).filter(Boolean);
+  }
+  months = months.filter(m => MONTHS_RE.test(m));
+  if (!months.length) return null;
+  return { year, months };
+}
+
+function readStoredPeriod(): Period | null {
   if (typeof window === "undefined") return null;
   try {
-    return parseMonthKey(window.localStorage.getItem(MONTH_STORAGE_KEY));
+    const raw = window.localStorage.getItem(PERIOD_STORAGE_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (p && typeof p.year === "number" && Array.isArray(p.months)) {
+      const months = p.months.map(String).filter((m: string) => MONTHS_RE.test(m));
+      if (months.length) return { year: p.year, months };
+    }
   } catch {
-    return null;
+    /* ignore */
   }
+  return null;
 }
 
 function readStoredSelection<T extends string>(key: string, allowed: readonly T[]): T[] | null {
@@ -102,7 +136,7 @@ function readStoredSelection<T extends string>(key: string, allowed: readonly T[
   }
 }
 
-function writeStoredSelection(key: string, value: readonly string[]): void {
+function writeStoredSelection(key: string, value: unknown): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
@@ -123,12 +157,13 @@ function accountLabelOf(t: BankTransaction): string {
 
 /**
  * Extrato — the single Conciliação Bancária view. It shows one account's
- * transactions for the selected month, grouped into expandable/collapsible day
+ * transactions for the selected period, grouped into expandable/collapsible day
  * rows, and absorbs what used to be the Saídas/Entradas/Transações pages: the
  * Entradas/Saídas summary cards toggle a CREDIT/DEBIT type filter, the status
  * buckets (Pendentes/Parciais/Conciliadas/Ignoradas) filter by conciliação
  * status, and each row funnels into the matching flow, category assignment or
- * ignore — plus the "Verificar" auto-match pass and the "Como funciona" modal.
+ * ignore. An inline period stepper browses month-to-month; the "Filtros" sheet
+ * holds the multi-month period + the value range.
  */
 export const ReconciliationStatementPage = () => {
   usePageTracker({ title: "Extrato - Conciliação", icon: "building-bank" });
@@ -136,10 +171,15 @@ export const ReconciliationStatementPage = () => {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [month, setMonth] = useState<Date>(() => {
-    const raw = searchParams.get("mes");
-    if (raw) return parseMonthKey(raw) ?? new Date();
-    return readStoredMonth() ?? new Date();
+  const [period, setPeriod] = useState<Period>(() => {
+    const fromUrl = parsePeriodFromUrl(searchParams);
+    if (fromUrl) return fromUrl;
+    // Backward-compat: a legacy single-month `?mes=YYYY-MM` deeplink.
+    const mes = parseMonthKey(searchParams.get("mes"));
+    if (mes) {
+      return { year: mes.getFullYear(), months: [String(mes.getMonth() + 1).padStart(2, "0")] };
+    }
+    return readStoredPeriod() ?? currentPeriod();
   });
   const [accountKey, setAccountKey] = useState<string>(
     () => searchParams.get("conta") || "",
@@ -147,6 +187,19 @@ export const ReconciliationStatementPage = () => {
   const [searchText, setSearchText] = useState(
     () => searchParams.get("search") || "",
   );
+  // Price range (magnitude, R$) set in the Filtros sheet. Applied client-side on
+  // the absolute amount — the same basis the totals/type/bucket filters use — so
+  // it narrows credits and debits alike without fighting the signed row value.
+  const [amountMin, setAmountMin] = useState<number | null>(() => {
+    const raw = searchParams.get("valorMin");
+    const n = Number(raw);
+    return raw && Number.isFinite(n) ? n : null;
+  });
+  const [amountMax, setAmountMax] = useState<number | null>(() => {
+    const raw = searchParams.get("valorMax");
+    const n = Number(raw);
+    return raw && Number.isFinite(n) ? n : null;
+  });
   const [types, setTypes] = useState<TransactionType[]>(() => {
     const raw = searchParams.get("tipo");
     if (raw !== null) return parseTypes(raw);
@@ -160,15 +213,22 @@ export const ReconciliationStatementPage = () => {
   const debouncedSearch = useDebouncedValue(searchText.trim(), 300);
   const [importOpen, setImportOpen] = useState(false);
   const [scoringHelpOpen, setScoringHelpOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Keep month/account/search/type/status shareable in the URL.
+  // Keep period/account/search/value/type/status shareable in the URL.
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
-    params.set("mes", monthKey(month));
+    params.delete("mes"); // superseded by year/months
+    params.set("year", String(period.year));
+    params.set("months", JSON.stringify(period.months));
     if (accountKey) params.set("conta", accountKey);
     else params.delete("conta");
     if (searchText) params.set("search", searchText);
     else params.delete("search");
+    if (amountMin != null) params.set("valorMin", String(amountMin));
+    else params.delete("valorMin");
+    if (amountMax != null) params.set("valorMax", String(amountMax));
+    else params.delete("valorMax");
     if (types.length !== ALL_TYPES.length)
       params.set("tipo", [...types].sort().join(","));
     else params.delete("tipo");
@@ -179,9 +239,9 @@ export const ReconciliationStatementPage = () => {
       setSearchParams(params, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, accountKey, searchText, types, buckets]);
+  }, [period, accountKey, searchText, amountMin, amountMax, types, buckets]);
 
-  // Persist the card selection + month so the chosen view sticks across visits/reloads.
+  // Persist the card selection + period so the chosen view sticks across visits.
   useEffect(() => {
     writeStoredSelection(TYPES_STORAGE_KEY, types);
   }, [types]);
@@ -189,15 +249,14 @@ export const ReconciliationStatementPage = () => {
     writeStoredSelection(BUCKETS_STORAGE_KEY, buckets);
   }, [buckets]);
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(MONTH_STORAGE_KEY, monthKey(month));
-    } catch {
-      /* quota / private-mode — non-fatal */
-    }
-  }, [month]);
+    writeStoredSelection(PERIOD_STORAGE_KEY, period);
+  }, [period]);
 
-  const { from, to } = useMemo(() => monthBounds(month), [month]);
+  // Inclusive [dateFrom, dateTo] over the selected month(s) for the server query.
+  const dateRange = useMemo(
+    () => deriveDateRange(period.year, period.months),
+    [period],
+  );
 
   // Newest first. `search` (memo/FITID) + `counterparty` (name/CNPJ) OR together
   // server-side. No type/status filter server-side — the same payload feeds the
@@ -207,15 +266,15 @@ export const ReconciliationStatementPage = () => {
     pageSize: PERIOD_PAGE_SIZE,
     sortBy: "postedAt",
     sortDir: "desc",
-    dateFrom: from.toISOString(),
-    dateTo: to.toISOString(),
+    dateFrom: dateRange?.dateFrom,
+    dateTo: dateRange?.dateTo,
     search: debouncedSearch || undefined,
     counterparty: debouncedSearch || undefined,
   });
 
   const rows = useMemo(() => data?.data ?? [], [data]);
 
-  // Accounts present in the month — drives the selector. The statement only
+  // Accounts present in the period — drives the selector. The statement only
   // makes sense per account, so we always narrow to one.
   const accounts = useMemo(() => {
     const map = new Map<string, string>();
@@ -226,21 +285,22 @@ export const ReconciliationStatementPage = () => {
     return [...map.entries()].map(([key, label]) => ({ key, label }));
   }, [rows]);
 
-  // Default to the first account of the month (and recover when the persisted
-  // account has no rows in the selected month).
+  // Default to the first account of the period (and recover when the persisted
+  // account has no rows in the selected period).
   const effectiveAccountKey = useMemo(() => {
     if (accountKey && accounts.some(a => a.key === accountKey)) return accountKey;
     return accounts[0]?.key ?? "";
   }, [accountKey, accounts]);
 
-  // The full account set — drives the month totals (credits/debits),
+  // The full account set — drives the period totals (credits/debits),
   // independent of the active type/status filter.
   const statementRows = useMemo(
     () => rows.filter(t => accountKeyOf(t) === effectiveAccountKey),
     [rows, effectiveAccountKey],
   );
 
-  // Narrow by the selected CREDIT/DEBIT types, then by the status buckets.
+  // Narrow by the selected CREDIT/DEBIT types, then by the price range, then by
+  // the status buckets.
   const typedRows = useMemo(
     () =>
       types.length === ALL_TYPES.length
@@ -248,10 +308,21 @@ export const ReconciliationStatementPage = () => {
         : statementRows.filter(t => types.includes(t.type)),
     [statementRows, types],
   );
+  // Price range on the absolute amount (magnitude). Feeds both the bucket summary
+  // and the table so the counts agree with what the range shows.
+  const rangeRows = useMemo(() => {
+    if (amountMin == null && amountMax == null) return typedRows;
+    return typedRows.filter(t => {
+      const amt = Math.abs(Number(t.amount) || 0);
+      if (amountMin != null && amt < amountMin) return false;
+      if (amountMax != null && amt > amountMax) return false;
+      return true;
+    });
+  }, [typedRows, amountMin, amountMax]);
   const visibleRows = useMemo(() => {
     const allowed = new Set(buckets.flatMap(b => BUCKET_STATUSES[b]));
-    return typedRows.filter(t => allowed.has(t.reconciliationStatus));
-  }, [typedRows, buckets]);
+    return rangeRows.filter(t => allowed.has(t.reconciliationStatus));
+  }, [rangeRows, buckets]);
 
   const totals = useMemo(() => {
     let credits = 0;
@@ -264,8 +335,8 @@ export const ReconciliationStatementPage = () => {
     return { credits, debits };
   }, [statementRows]);
 
-  // Status buckets summarized over the current type selection, so the counts
-  // reflect what the table will show once a bucket is toggled.
+  // Status buckets summarized over the current type + price-range selection, so
+  // the counts reflect what the table will show once a bucket is toggled.
   const bucketSummary = useMemo(() => {
     const out: Record<BucketKey, { count: number; total: number }> = {
       PENDING: { count: 0, total: 0 },
@@ -273,13 +344,13 @@ export const ReconciliationStatementPage = () => {
       RECONCILED: { count: 0, total: 0 },
       IGNORED: { count: 0, total: 0 },
     };
-    for (const t of typedRows) {
+    for (const t of rangeRows) {
       const b = bucketOf(t.reconciliationStatus);
       out[b].count += 1;
       out[b].total += Math.abs(Number(t.amount) || 0);
     }
     return out;
-  }, [typedRows]);
+  }, [rangeRows]);
 
   const toggleType = useCallback(
     (t: TransactionType) =>
@@ -294,20 +365,30 @@ export const ReconciliationStatementPage = () => {
     );
   }, []);
 
+  // How many Filtros-sheet dimensions are non-default (period + value range).
+  const activeFilterCount = useMemo(() => {
+    const def = getDefaultStatementFilters();
+    let c = 0;
+    if (period.year !== def.year) c++;
+    if (period.months.length !== 1 || period.months[0] !== def.months[0]) c++;
+    if (amountMin != null) c++;
+    if (amountMax != null) c++;
+    return c;
+  }, [period, amountMin, amountMax]);
+
   // Collapse the calendar to only the days that contain a matching transaction
   // (and auto-expand them) whenever a search/filter narrows the result set; the
-  // default browse view keeps the full month calendar (empty days collapsed).
+  // default browse view keeps the full period calendar (empty days collapsed).
   const narrowing =
     debouncedSearch.length > 0 ||
+    amountMin != null ||
+    amountMax != null ||
     types.length !== ALL_TYPES.length ||
     buckets.length !== ALL_BUCKETS.length;
 
   const periodDates = useMemo(
-    () =>
-      buildDatesForPeriod(month.getFullYear(), [
-        String(month.getMonth() + 1).padStart(2, "0"),
-      ]),
-    [month],
+    () => buildDatesForPeriod(period.year, period.months),
+    [period],
   );
   const dates = useMemo(
     () =>
@@ -376,11 +457,12 @@ export const ReconciliationStatementPage = () => {
               label: "Verificar",
               icon: IconRefresh,
               onClick: () => {
+                if (!dateRange) return;
                 // Single pipeline (classify → match → categorize) scoped to the
-                // visible month. The endpoint suppresses the interceptor toast;
+                // visible period. The endpoint suppresses the interceptor toast;
                 // we summarize the three stages ourselves.
                 runMut.mutate(
-                  { dateStart: from.toISOString(), dateEnd: to.toISOString() },
+                  { dateStart: dateRange.dateFrom, dateEnd: dateRange.dateTo },
                   {
                     onSuccess: r => {
                       const classified = r.classified?.processed ?? 0;
@@ -479,14 +561,28 @@ export const ReconciliationStatementPage = () => {
                   placeholder="Conta bancária"
                   searchPlaceholder="Buscar conta..."
                   clearable={false}
-                  className="w-full sm:w-[300px] flex-shrink-0"
+                  className="w-full sm:w-[280px] flex-shrink-0"
                   triggerClassName="h-10 w-full"
                 />
-                <MonthNav
-                  month={month}
-                  onChange={setMonth}
+                <PeriodNav
+                  period={period}
+                  onChange={setPeriod}
                   className="flex-shrink-0"
                 />
+                <Button
+                  variant={activeFilterCount > 0 ? "default" : "outline"}
+                  onClick={() => setShowFilters(true)}
+                  className="group flex-shrink-0"
+                >
+                  <IconFilter
+                    className={
+                      activeFilterCount > 0
+                        ? "h-4 w-4"
+                        : "h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors"
+                    }
+                  />
+                  <span>Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}</span>
+                </Button>
               </div>
 
               <div className="flex-1 min-h-0 overflow-auto">
@@ -509,6 +605,22 @@ export const ReconciliationStatementPage = () => {
           </Card>
         </div>
       </div>
+
+      <StatementFilterSheet
+        open={showFilters}
+        onOpenChange={setShowFilters}
+        filters={{
+          year: period.year,
+          months: period.months,
+          amountMin: amountMin ?? undefined,
+          amountMax: amountMax ?? undefined,
+        }}
+        onApply={f => {
+          setPeriod({ year: f.year, months: f.months });
+          setAmountMin(f.amountMin ?? null);
+          setAmountMax(f.amountMax ?? null);
+        }}
+      />
 
       <IgnoreTransactionDialog
         open={ignoreDialog.open}

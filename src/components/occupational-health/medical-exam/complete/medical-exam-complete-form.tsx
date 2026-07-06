@@ -43,13 +43,6 @@ const allResultOptions = [
 // "Apto com restrições" não se aplica a quem está saindo.
 const dismissalResultOptions = allResultOptions.filter((option) => option.value !== MEDICAL_EXAM_RESULT.FIT_WITH_RESTRICTIONS);
 
-/** Soma `months` meses a uma data (validade do ASO periódico: 12 ou 24 meses). */
-function addMonths(date: Date, months: number): Date {
-  const result = new Date(date);
-  result.setMonth(result.getMonth() + months);
-  return result;
-}
-
 export function MedicalExamCompleteForm({ exam, onCompleted, onCancel, disabled, className }: MedicalExamCompleteFormProps) {
   const completeMutation = useCompleteMedicalExam();
   const uploadMutation = useUploadMedicalExamDocument();
@@ -97,18 +90,6 @@ export function MedicalExamCompleteForm({ exam, onCompleted, onCancel, disabled,
   // só admite Apto/Inapto como resultado.
   const isDismissal = exam?.type === MEDICAL_EXAM_TYPE.DISMISSAL;
   const resultOptions = isDismissal ? dismissalResultOptions : allResultOptions;
-
-  /**
-   * Validade = data do exame + 12/24 meses. Também grava a periodicidade (em meses)
-   * para que o próximo periódico seja agendado automaticamente pelo backend.
-   */
-  const applyExpiresPreset = (months: number) => {
-    const baseDate = form.getValues("examDate");
-    form.setValue("expiresAt", addMonths(baseDate ? new Date(baseDate) : new Date(), months), { shouldDirty: true });
-    if (isPeriodic) {
-      form.setValue("periodicityMonths", months, { shouldDirty: true });
-    }
-  };
 
   const handleAsoFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -168,14 +149,6 @@ export function MedicalExamCompleteForm({ exam, onCompleted, onCancel, disabled,
               render={({ field }) => (
                 <FormItem>
                   <DateTimeInput field={field as any} label="Validade (opcional)" mode="date" disabled={busy} />
-                  <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyExpiresPreset(12)} disabled={busy}>
-                      +12 meses
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyExpiresPreset(24)} disabled={busy}>
-                      +24 meses
-                    </Button>
-                  </div>
                   <FormMessage />
                 </FormItem>
               )}

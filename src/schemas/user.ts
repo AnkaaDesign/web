@@ -1181,6 +1181,11 @@ export const userUpdateSchema = z
         errorMap: () => ({ message: "categoria de colaborador inválida" }),
       })
       .optional(),
+    // Prestador (terceirizado/PJ) identity — applied to the CURRENT EmploymentContract
+    // by the service (bound to <ProviderFields /> in the edit form). Without these here,
+    // zodResolver strips them from the update payload and the CNPJ is silently not saved.
+    providerName: z.string().nullable().optional(),
+    providerCnpj: z.string().nullable().optional(),
     phone: phoneSchema.nullable().optional(),
     positionId: z.string().uuid("Cargo inválido").nullable().optional(),
     pis: pisSchema.nullable().optional(),

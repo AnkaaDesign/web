@@ -140,6 +140,31 @@ export function useMatchCandidates(
   });
 }
 
+/**
+ * REVERSE candidates: given an NF (fiscal document), the bank transactions that
+ * could settle it. Mirror of `useMatchCandidates` from the note's perspective.
+ * Keyed inline under the `reconciliation` namespace so prefix-based
+ * invalidations by `reconciliationKeys.all` still match.
+ */
+export function useTransactionCandidates(
+  fiscalDocumentId: string | undefined,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: fiscalDocumentId
+      ? (["reconciliation", "transactionCandidates", fiscalDocumentId] as const)
+      : reconciliationKeys.all,
+    queryFn: () =>
+      fiscalDocumentId
+        ? reconciliationService
+            .getTransactionCandidates(fiscalDocumentId)
+            .then((r) => r.data)
+        : Promise.reject(),
+    enabled: !!fiscalDocumentId && enabled,
+    staleTime: 30_000,
+  });
+}
+
 export function useMatchTransaction() {
   const qc = useQueryClient();
   return useMutation({

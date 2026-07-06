@@ -75,11 +75,22 @@ export function FiscalItemsTable({
       (categories ?? [])
         .filter(c => c.isActive)
         .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
-        .map(c => ({ value: c.id, label: c.name, metadata: { color: c.color } })),
+        .map(c => ({
+          value: c.id,
+          label: c.name,
+          // The chart-of-accounts cost group, shown as the option subtitle so the
+          // picker reads "category — accounting group".
+          description: getAccountingTypeLabel(c) ?? undefined,
+          metadata: { color: c.color },
+        })),
     [categories],
   );
 
-  const showQtyCols = !isNfse;
+  // Always render the Qtd/Unitário columns — even for NFSe (which has no line
+  // quantities, so they read "—"). Keeping the SAME column set for every doc type
+  // makes every candidate/linked-NF items table line up identically instead of
+  // NFSe cards being laid out differently from NFe cards.
+  const showQtyCols = true;
   const footerTotal = toNum(totalValue) ?? items.reduce((s, i) => s + (toNum(i.totalValue) ?? 0), 0);
   // Columns: Código, Descrição, Categoria, [Qtd, Unitário], Total (always last).
   const leadingCols = 3 + (showQtyCols ? 2 : 0); // up to but not including Total
@@ -205,10 +216,16 @@ export function FiscalItemsTable({
 
 function renderCategoryOption(o: ComboboxOption, _selected: boolean) {
   const color = (o.metadata as { color?: string | null } | undefined)?.color;
+  const group = o.description;
   return (
-    <span className="flex items-center gap-2 truncate">
+    <span className="flex items-center gap-2 min-w-0">
       {color && <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />}
-      <span className="truncate">{o.label}</span>
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate">{o.label}</span>
+        {group && (
+          <span className="truncate text-[10px] leading-tight text-muted-foreground">{group}</span>
+        )}
+      </span>
     </span>
   );
 }

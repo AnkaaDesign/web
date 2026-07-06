@@ -37,7 +37,7 @@ const DATE_COLUMN_WIDTH = 170;
  * that when present, falling back to the same derivation so the column stays
  * correct against an older API response that hasn't shipped `linked` yet.
  */
-function isLinked(doc: FiscalDocument): boolean {
+export function isLinked(doc: FiscalDocument): boolean {
   if (typeof doc.linked === "boolean") return doc.linked;
   if (doc.operationType === "SAIDA") {
     return !!doc.nfseDocument?.invoiceId || !!doc.nfseDocument?.taskId;
@@ -195,7 +195,6 @@ export function FiscalDocumentsByDateAccordion({
         width: "110px",
         align: "center",
       },
-      { key: "accessKey", header: "Chave", width: "150px" },
       { key: "emitter", header: "Emitente" },
       { key: "destinatario", header: "Destinatário" },
       { key: "entrada", header: "Entrada", width: "140px", align: "right" },
@@ -438,7 +437,9 @@ function DayGroup({
           if (c.key === "entrada") {
             return (
               <TableCell key={c.key} className="p-0 !border-r-0 text-right">
-                {!isEmpty && summary.entradaTotal > 0 ? (
+                {/* Hide the day's aggregate once expanded so it doesn't compete
+                    with each note's own value in the rows below (mirrors Extrato). */}
+                {!isOpen && !isEmpty && summary.entradaTotal > 0 ? (
                   <div className="px-4 py-2.5 text-right leading-tight">
                     <span className="text-sm font-semibold tabular-nums text-emerald-700 whitespace-nowrap">
                       {formatCurrency(summary.entradaTotal)}
@@ -451,7 +452,7 @@ function DayGroup({
           if (c.key === "saida") {
             return (
               <TableCell key={c.key} className="p-0 !border-r-0 text-right">
-                {!isEmpty && summary.saidaTotal > 0 ? (
+                {!isOpen && !isEmpty && summary.saidaTotal > 0 ? (
                   <div className="px-4 py-2.5 text-right leading-tight">
                     <span className="text-sm font-semibold tabular-nums text-red-700 whitespace-nowrap">
                       {formatCurrency(summary.saidaTotal)}

@@ -69,6 +69,26 @@ const SOURCE_LABEL: Record<ReconciliationSource, string> = {
  *  90–99: azul    (inProgress)
  *    100: verde   (completed)
  */
+/**
+ * Trims a candidate's rationale for card display. The card already shows the
+ * day-gap as its own badge ("3d" / "mesmo dia"), so the date-proximity phrases
+ * the scorer emits ("Datas próximas (3 dias)", "Janela de 5 dias") — and the
+ * non-informative "Aproximação por valor/data" fallback — are dropped to avoid
+ * echoing the badge. Returns only the DISTINCTIVE signals (CNPJ / value / name),
+ * separated by " · ", or "" when nothing but date proximity remains so the caller
+ * can hide the line entirely.
+ */
+export function formatMatchRationale(rationale: string | null | undefined): string {
+  if (!rationale) return "";
+  return rationale
+    .split("•")
+    .map(s => s.trim())
+    .filter(
+      s => s && !/^(Datas? próximas?|Janela de|Aproxima[çc][ãa]o)/i.test(s),
+    )
+    .join(" · ");
+}
+
 export function getConfidenceBadgeVariant(confidence: number): BadgeProps["variant"] {
   if (confidence >= 100) return "completed";
   if (confidence >= 90) return "inProgress";

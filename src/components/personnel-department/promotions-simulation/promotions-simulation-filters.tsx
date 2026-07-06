@@ -8,6 +8,7 @@ import {
   IconBriefcase,
   IconUserCheck,
   IconUserMinus,
+  IconCoin,
 } from "@tabler/icons-react";
 import { useUsers, usePositions } from "../../../hooks";
 import { CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../constants";
@@ -270,11 +271,12 @@ export function PromotionsSimulationFilters({
           </div>
 
           {/* Only Bonus-Eligible Users */}
-          <div className="space-y-2 p-3 border rounded-lg">
-            <Label htmlFor="only-eligible" className="text-sm font-medium">
+          <div>
+            <Label htmlFor="only-eligible" className="text-sm font-medium mb-1.5 block flex items-center gap-2">
+              <IconCoin size={16} />
               Apenas Elegíveis a Bônus
             </Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mb-3">
               Mostrar apenas colaboradores com cargo bonificável e desempenho maior que zero
             </p>
             <Combobox

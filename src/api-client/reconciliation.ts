@@ -20,6 +20,7 @@ import type {
   TransactionCategory,
   TransactionCategoryListParams,
   TransactionFilters,
+  TransactionMatchCandidate,
   UpdateTransactionCategoryPayload,
   XmlImportResult,
 } from "@/types/reconciliation";
@@ -79,6 +80,11 @@ export const reconciliationService = {
   getTransaction: (transactionId: string) =>
     apiClient.get<BankTransaction>(
       `/financial/reconciliation/transactions/${transactionId}`,
+    ),
+
+  getTransactionCandidates: (fiscalDocumentId: string) =>
+    apiClient.get<TransactionMatchCandidate[]>(
+      `/financial/reconciliation/fiscal-documents/${fiscalDocumentId}/transaction-candidates`,
     ),
 
   getFiscalDocument: (id: string) =>

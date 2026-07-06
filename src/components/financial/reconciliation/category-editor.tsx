@@ -83,6 +83,9 @@ export function CategoryEditor({
     return sorted.map(c => ({
       value: c.id,
       label: c.name,
+      // Cost group shown as the option subtitle so each option reads
+      // "category — accounting group".
+      description: groupOf(c),
       // The Combobox groups options by `category`; we feed it the cost group.
       category: groupOf(c),
     }));

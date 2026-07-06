@@ -30,7 +30,10 @@ import type {
 } from "@/types/reconciliation";
 import { ADJUSTMENT_REASON_LABELS, ADJUSTMENT_REASON_ORDER } from "@/types/reconciliation";
 import type { ManualMatchPayload } from "@/schemas/reconciliation";
-import { getConfidenceBadgeVariant } from "./match-status-badge";
+import {
+  formatMatchRationale,
+  getConfidenceBadgeVariant,
+} from "./match-status-badge";
 import { FiscalItemsTable } from "./fiscal-items-table";
 import { docTypeLabel, docTypeVariant } from "./fiscal-doc-badge";
 
@@ -78,7 +81,13 @@ export function TransactionMatchSection({
   // seguro estendido, taxas…) is accounted. A resolving reason marks the tx
   // RECONCILED; "DEFERRED" (or null) leaves it PARTIAL for another transaction.
   const [remainderReason, setRemainderReason] = useState<
-    "FRETE" | "SEGURO" | "TAXAS" | "OUTROS" | "DEFERRED" | null
+    | "FRETE"
+    | "SEGURO"
+    | "TAXAS"
+    | "ITEM_SEM_NOTA"
+    | "OUTROS"
+    | "DEFERRED"
+    | null
   >(null);
   // Per-note shortfall write-off: when this payment settles a note for LESS than
   // its total, the user picks a reason (Desconto, Frete…) so the note closes as
@@ -140,14 +149,17 @@ export function TransactionMatchSection({
             return { ...a, [id]: candidate.totalValue };
           }
           // The NF's open balance — its full total minus what OTHER transactions
-          // already paid (installments). Never allocate more than this.
+          // already paid (installments). Never allocate more than this, and never
+          // more than the payment can still cover: cap at min(openBalance, txRemaining).
+          // When the payment is already fully allocated (txRemaining ≤ 0) the new
+          // note defaults to 0 so the user rebalances manually instead of the
+          // selection silently over-allocating past the transaction amount.
           const openBalance = candidate.remainingValue ?? candidate.totalValue;
           const alreadySelected = Object.entries(a)
             .filter(([k]) => k !== id)
             .reduce((s, [, v]) => s + (v || 0), 0);
           const txRemaining = txAmount - existingAllocated - alreadySelected;
-          const def =
-            txRemaining > 0 ? Math.min(openBalance, txRemaining) : openBalance;
+          const def = Math.min(openBalance, Math.max(txRemaining, 0));
           return { ...a, [id]: Number(def.toFixed(2)) };
         });
       } else {
@@ -167,9 +179,6 @@ export function TransactionMatchSection({
       return next;
     });
   };
-
-  const setAllocation = (id: string, value: number) =>
-    setAllocations((a) => ({ ...a, [id]: value }));
 
   const setAdjustment = (id: string, reason: AdjustmentReason | null) =>
     setAdjustmentByDoc((m) => ({ ...m, [id]: reason }));
@@ -200,22 +209,17 @@ export function TransactionMatchSection({
     [existingMatches],
   );
 
-  // A single selected note takes the WHOLE payment — a transaction is one payment
-  // event, so when it settles one note the entire amount goes there (paid-less →
-  // parcela/discount, paid-more → surcharge; the resolver sorts out the diff). No
-  // splitting, so the allocation is pinned to the transaction amount and the
-  // per-note "Valor a alocar" input is hidden. The input only appears when SEVERAL
-  // notes share one payment (then the amount must be divided among them).
-  const soleSelectedId =
-    selectedIds.length === 1 &&
-    !candById.get(selectedIds[0])?.isOrderGroup
-      ? selectedIds[0]
-      : null;
-  useEffect(() => {
-    if (!soleSelectedId) return;
-    const full = Number((txAmount - existingAllocated).toFixed(2));
-    setAllocations((a) => (a[soleSelectedId] === full ? a : { [soleSelectedId]: full }));
-  }, [soleSelectedId, txAmount, existingAllocated]);
+  // Each selected note defaults its allocation (in `toggleSelect`) to what the
+  // payment can still cover, capped at the note's own open balance. So a single
+  // note worth LESS than the payment allocates only its own total and the surplus
+  // surfaces below as "Restante sem nota" (frete/seguro/taxas) instead of
+  // over-allocating the note; a note worth MORE than the payment (installment)
+  // takes the whole payment as a PARTIAL. Selecting a SECOND note then splits the
+  // payment across both by open balance — never inheriting a stale full-payment
+  // value from the single-note case (that used to leave the first note allocated
+  // the entire payment, so two notes summed past the transaction amount). The
+  // per-note "Valor a alocar" input appears only when SEVERAL notes share one
+  // payment (then the split is editable).
   const newlyAllocated = useMemo(
     () => selectedIds.reduce((sum, id) => sum + (allocations[id] || 0), 0),
     [selectedIds, allocations],
@@ -593,12 +597,8 @@ export function TransactionMatchSection({
                     candidate={c}
                     checked={selectedIds.includes(c.fiscalDocumentId)}
                     allocation={allocations[c.fiscalDocumentId]}
-                    txAmount={txAmount}
                     multiSelect={selectedIds.length > 1}
                     onToggle={() => toggleSelect(c.fiscalDocumentId, c)}
-                    onAllocationChange={(v) =>
-                      setAllocation(c.fiscalDocumentId, v)
-                    }
                     adjustmentReason={
                       adjustmentByDoc[c.fiscalDocumentId] ?? null
                     }
@@ -643,6 +643,7 @@ export function TransactionMatchSection({
                       { key: "FRETE", label: "Frete" },
                       { key: "SEGURO", label: "Seguro estendido" },
                       { key: "TAXAS", label: "Taxas / tarifas" },
+                      { key: "ITEM_SEM_NOTA", label: "Item sem nota" },
                       { key: "OUTROS", label: "Outros" },
                       { key: "DEFERRED", label: "Outra transação (depois)" },
                     ] as const
@@ -711,22 +712,18 @@ function CandidateRow({
   candidate: c,
   checked,
   allocation,
-  txAmount,
   multiSelect,
   adjustmentReason,
   onToggle,
-  onAllocationChange,
   onAdjustmentChange,
   onItemCategoryChange,
 }: {
   candidate: MatchCandidate;
   checked: boolean;
   allocation: number | undefined;
-  txAmount: number;
   multiSelect: boolean;
   adjustmentReason: AdjustmentReason | null;
   onToggle: () => void;
-  onAllocationChange: (value: number) => void;
   onAdjustmentChange: (reason: AdjustmentReason | null) => void;
   onItemCategoryChange: (itemId: string, categoryId: string | null) => void;
 }) {
@@ -774,7 +771,7 @@ function CandidateRow({
       )}
     >
       <div className="px-3 py-3">
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
           {c.isOrderGroup ? (
             <span
               className="inline-flex items-center gap-1 rounded-md bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide shrink-0"
@@ -867,12 +864,20 @@ function CandidateRow({
             )}
           </div>
         </div>
+
+        {/* Why this note is suggested — distinctive signals only (CNPJ / valor /
+            nome). The day gap already has its own badge above, so date-proximity
+            phrasing is stripped and the line hides when only proximity remains. */}
+        {formatMatchRationale(c.rationale) && (
+          <p className="mt-1.5 text-xs text-muted-foreground/90 truncate">
+            {formatMatchRationale(c.rationale)}
+          </p>
+        )}
       </div>
 
-      {/* Services / items of the NF, with per-line category combobox. When
-          selected, the amount allocated to THIS transaction is editable below —
-          defaulting to the NF total, or to the remaining payment when the NF is
-          worth more than the payment (installment / parcela). */}
+      {/* Services / items of the NF, with per-line category combobox. When several
+          notes share one payment, each note is auto-settled for its own open
+          balance (shown read-only below); a single note takes the whole payment. */}
       {c.items && c.items.length > 0 && (
         <FiscalItemsTable
           items={c.items}
@@ -898,44 +903,36 @@ function CandidateRow({
         </div>
       )}
 
-      {/* Editable allocation — how much of this payment settles this NF. Enables
-          linking one NF across several installment transactions: each pays a
-          PARTIAL slice of the same NF. Order groups link at their full summed
-          value, so no per-NF input. Stops propagation so editing doesn't toggle. */}
+      {/* Allocation — read-only. When several notes share one payment each note is
+          auto-settled for its own open balance (capped by what the payment still
+          has free); the amount is shown for transparency but never edited. Any
+          leftover or shortfall is resolved by the settlement panel below and the
+          header's Alocado / Faltam summary. */}
       {checked && showAllocationInput && (
         <div
           className={cn(
-            "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2.5 border-t border-border bg-muted/10",
+            "flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-2.5 border-t border-border bg-muted/10",
             alreadyPaid && "border-t-0",
           )}
-          onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-              Valor a alocar
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+            Valor a alocar
+          </span>
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-sm font-semibold tabular-nums text-foreground">
+              {formatCurrency(paid)}
             </span>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                R$
+            {paid + 0.05 < openBalance ? (
+              <span className="text-xs text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                parcial de {formatCurrency(openBalance)}
+                {alreadyPaid ? " em aberto" : ""}
               </span>
-              <Input
-                type="number"
-                step={0.01}
-                min={0}
-                max={Math.max(openBalance, txAmount)}
-                value={allocation ?? ""}
-                onChange={(v) => {
-                  const n = v === "" || v == null ? 0 : Number(v);
-                  onAllocationChange(Number.isFinite(n) ? n : 0);
-                }}
-                className="h-8 w-32 pl-8 text-right tabular-nums"
-              />
-            </div>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              de {formatCurrency(openBalance)}
-              {alreadyPaid ? " em aberto" : ""}
-            </span>
-          </div>
+            ) : (
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                (valor da nota)
+              </span>
+            )}
+          </span>
         </div>
       )}
 

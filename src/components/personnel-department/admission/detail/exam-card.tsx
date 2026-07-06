@@ -16,8 +16,8 @@ interface ExamCardProps {
 /**
  * Cartão (1/2 da largura, mesmo estilo do Colaborador/Checklist) que trata o
  * Exame Admissional (ASO) inline — agendar e concluir sem sair da página. O
- * status (quando agendado) fica no cabeçalho; o link "Ver ASO" fica no rodapé,
- * no MESMO estilo do "Ver colaborador".
+ * status (quando agendado) fica no cabeçalho; o próprio título é um link que
+ * abre o ASO (quando já existe um exame vinculado).
  */
 export function ExamCard({ admission, className }: ExamCardProps) {
   const isCancelled = admission.status === ADMISSION_STATUS.CANCELLED;
@@ -29,10 +29,24 @@ export function ExamCard({ admission, className }: ExamCardProps) {
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <IconStethoscope className="h-5 w-5 text-muted-foreground" />
-            Exame Admissional (ASO)
-          </div>
+          {/* Título clicável quando há ASO — abre o exame (substitui o antigo link "Ver ASO"). */}
+          {exam ? (
+            <Link
+              to={routes.occupationalHealth.medicalExams.details(exam.id)}
+              target="_blank"
+              className="group flex min-w-0 items-center gap-2 transition-colors hover:text-green-600 dark:hover:text-green-500"
+              title="Abrir ASO"
+            >
+              <IconStethoscope className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-green-600 dark:group-hover:text-green-500" />
+              <span className="truncate">Exame Admissional (ASO)</span>
+              <IconExternalLink className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-green-600 dark:group-hover:text-green-500" />
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              <IconStethoscope className="h-5 w-5 text-muted-foreground" />
+              Exame Admissional (ASO)
+            </div>
+          )}
           {/* Status só quando NÃO concluído (Agendado). Concluído mostra os dados no corpo. */}
           {exam && !examCompleted && (
             <Badge variant={getBadgeVariantFromStatus(exam.status, "MEDICAL_EXAM")} className="text-xs">
@@ -52,19 +66,6 @@ export function ExamCard({ admission, className }: ExamCardProps) {
           hideTitle
           disabled={isCancelled || isCompleted}
         />
-
-        {exam && (
-          <div className="pt-2">
-            <Link
-              to={routes.occupationalHealth.medicalExams.details(exam.id)}
-              target="_blank"
-              className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700 dark:text-green-600 dark:hover:text-green-500 hover:underline"
-            >
-              Ver ASO
-              <IconExternalLink className="h-4 w-4" />
-            </Link>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
