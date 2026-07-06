@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,12 @@ const COLUMN_STORAGE_KEY = "promotions-simulation-visible-columns-v2";
 const FILTERS_STORAGE_KEY = "promotions-simulation-filters";
 const SORT_STORAGE_KEY = "promotions-simulation-sort";
 const TASK_STORAGE_KEY = "promotions-simulation-task";
+const OVERRIDES_STORAGE_KEY = "promotions-simulation-row-overrides";
+
+// Per-row simulation edits (keyed by user id) persisted so the Cargo /
+// Performance changes survive navigation. Only the fields the user actually
+// touched are stored; everything else is rebuilt from the fresh user fetch.
+type RowOverride = { positionId?: string; performanceLevel?: number };
 
 // Read the current monthly remuneration off a position. Backend populates the
 // virtual `remuneration` field from the current MonetaryValue; fall back to the
@@ -230,6 +236,12 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
   const [sortColumn, setSortColumn] = usePersistedState<SortColumn>(`${SORT_STORAGE_KEY}-column`, 'name');
   const [sortDirection, setSortDirection] = usePersistedState<'asc' | 'desc'>(`${SORT_STORAGE_KEY}-direction`, 'asc');
 
+  // Per-row Cargo/Performance edits (persisted). Read via ref in the init
+  // effect so applying them doesn't make every edit rebuild the whole table.
+  const [rowOverrides, setRowOverrides] = usePersistedState<Record<string, RowOverride>>(OVERRIDES_STORAGE_KEY, {});
+  const rowOverridesRef = useRef(rowOverrides);
+  rowOverridesRef.current = rowOverrides;
+
   // Column visibility (persisted to localStorage)
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(COLUMN_STORAGE_KEY, DEFAULT_VISIBLE_COLUMNS);
 
@@ -355,11 +367,27 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
             bonusPrevisto: 0,
           } as SimulatedUser;
         });
-        setSimulatedUsers(users);
+
+        // Re-apply persisted per-row edits. Position overrides need the target
+        // position (name + remuneration) — skipped until positionById is ready,
+        // then re-applied when this effect re-runs on positionById change.
+        const overrides = rowOverridesRef.current;
+        const withOverrides = users.map(u => {
+          const o = overrides[u.id];
+          if (!o) return u;
+          let next = u;
+          if (o.positionId) {
+            const target = positionById.get(o.positionId);
+            if (target) next = { ...next, positionId: o.positionId, positionName: target.name, expectedRemuneration: target.remuneration };
+          }
+          if (o.performanceLevel !== undefined) next = { ...next, performanceLevel: o.performanceLevel };
+          return next;
+        });
+        setSimulatedUsers(withOverrides);
       }
       setIsLoading(false);
     }
-  }, [usersData]);
+  }, [usersData, positionById]);
 
   // Apply filters to get visible users
   const filteredUsers = useMemo(() => {
@@ -620,6 +648,7 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
         ? { ...user, positionId: newPositionId, positionName: target.name, expectedRemuneration: target.remuneration }
         : user)),
     );
+    setRowOverrides(prev => ({ ...prev, [userId]: { ...prev[userId], positionId: newPositionId } }));
   };
 
   // Performance level only feeds the simulated bonus (never base remuneration).
@@ -628,6 +657,7 @@ export function PromotionsSimulationInteractiveTable({ className }: PromotionsSi
     setSimulatedUsers(prev =>
       prev.map(user => (user.id === userId ? { ...user, performanceLevel: newLevel } : user)),
     );
+    setRowOverrides(prev => ({ ...prev, [userId]: { ...prev[userId], performanceLevel: newLevel } }));
   };
 
   const hasActiveFilters = hasManualFilters || filters.showOnlyEligible;
