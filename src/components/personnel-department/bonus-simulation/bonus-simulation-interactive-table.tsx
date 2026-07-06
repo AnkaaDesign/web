@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +45,11 @@ import { BonusSimulationFilters } from "./bonus-simulation-filters";
 const FILTERS_STORAGE_KEY = "bonus-simulation-filters";
 const SORT_STORAGE_KEY = "bonus-simulation-sort";
 const TASK_STORAGE_KEY = "bonus-simulation-task";
+const OVERRIDES_STORAGE_KEY = "bonus-simulation-row-overrides";
+
+// Per-row simulation edits (keyed by user id) persisted so the Cargo /
+// Performance changes survive navigation. Only touched fields are stored.
+type RowOverride = { position?: string; performanceLevel?: number };
 
 // Position levels mapping
 const POSITIONS = [
@@ -180,6 +185,12 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   const [sortColumn, setSortColumn] = usePersistedState<'payrollNumber' | 'name' | 'sectorName' | 'position' | 'performanceLevel' | 'bonusAmount' | null>(`${SORT_STORAGE_KEY}-column`, null);
   const [sortDirection, setSortDirection] = usePersistedState<'asc' | 'desc'>(`${SORT_STORAGE_KEY}-direction`, 'asc');
 
+  // Per-row Cargo/Performance edits (persisted). Read via ref in the init
+  // effect so applying them doesn't make every edit rebuild the whole table.
+  const [rowOverrides, setRowOverrides] = usePersistedState<Record<string, RowOverride>>(OVERRIDES_STORAGE_KEY, {});
+  const rowOverridesRef = useRef(rowOverrides);
+  rowOverridesRef.current = rowOverrides;
+
   // Get current bonus period for task counting
   // Get current payroll period (26th-25th cycle) - centralized utility
   // If today is Sept 26th or later, this returns October
@@ -294,7 +305,19 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
             bonusAmount: 0,
           };
         }) as SimulatedUser[];
-        setSimulatedUsers(users);
+
+        // Re-apply persisted per-row edits (Cargo / Performance).
+        const overrides = rowOverridesRef.current;
+        const withOverrides = users.map(u => {
+          const o = overrides[u.id];
+          if (!o) return u;
+          return {
+            ...u,
+            ...(o.position !== undefined ? { position: o.position } : {}),
+            ...(o.performanceLevel !== undefined ? { performanceLevel: o.performanceLevel } : {}),
+          };
+        });
+        setSimulatedUsers(withOverrides);
       }
       setIsLoading(false);
     }
@@ -622,12 +645,14 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     setSimulatedUsers(prev =>
       prev.map(user => (user.id === userId ? { ...user, position: newPosition } : user)),
     );
+    setRowOverrides(prev => ({ ...prev, [userId]: { ...prev[userId], position: newPosition } }));
   };
 
   const handlePerformanceLevelChange = (userId: string, newLevel: number) => {
     setSimulatedUsers(prev =>
       prev.map(user => (user.id === userId ? { ...user, performanceLevel: newLevel } : user)),
     );
+    setRowOverrides(prev => ({ ...prev, [userId]: { ...prev[userId], performanceLevel: newLevel } }));
   };
 
   const hasActiveFilters =
