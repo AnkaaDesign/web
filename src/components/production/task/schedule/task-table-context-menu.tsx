@@ -133,7 +133,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         )}
 
         {/* Quote layout - COMMERCIAL only. Counterpart of the admin "Adicionar Layouts"
-            (artworks) bulk form: edits the quote's approved layout (layoutFileId) instead. */}
+            (layouts) bulk form: edits the quote's approved layout (layoutFileId) instead. */}
         {isCommercial && (
           <DropdownMenuItem onClick={() => handleAction("quoteLayout")}>
             <IconPhoto className="mr-2 h-4 w-4" />
@@ -180,7 +180,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleAction("bulkLayout")}>
                 <IconLayout className="mr-2 h-4 w-4" />
-                Layout do Caminhão
+                Medidas do Implemento
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleAction("copyFromTask")}>

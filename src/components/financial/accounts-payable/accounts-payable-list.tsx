@@ -835,18 +835,10 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
               )}
 
               {ctxRow.source === "AIRBRUSHING" && ctxRow.paymentState !== "PAID" && (
-                <>
-                  {ctxRow.paymentState !== "PARTIALLY_PAID" && (
-                    <DropdownMenuItem onClick={() => runAction(() => settleAirbrushing(ctxRow.id, AIRBRUSHING_PAYMENT_STATUS.PARTIALLY_PAID))}>
-                      <IconProgressCheck className="mr-2 h-4 w-4" />
-                      Marcar como parcialmente pago
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={() => runAction(() => settleAirbrushing(ctxRow.id, AIRBRUSHING_PAYMENT_STATUS.PAID))}>
-                    <IconCash className="mr-2 h-4 w-4" />
-                    Marcar como pago
-                  </DropdownMenuItem>
-                </>
+                <DropdownMenuItem onClick={() => runAction(() => settleAirbrushing(ctxRow.id, AIRBRUSHING_PAYMENT_STATUS.PAID))}>
+                  <IconCash className="mr-2 h-4 w-4" />
+                  Marcar como pago
+                </DropdownMenuItem>
               )}
 
               {ctxRow.source === "RECURRENT_PAYABLE" &&

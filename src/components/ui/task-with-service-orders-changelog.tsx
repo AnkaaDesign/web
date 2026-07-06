@@ -169,13 +169,13 @@ const LogoDisplay = ({
 };
 
 // Extract the actual file ID from changelog file values, which come in several shapes:
-// - artworks: { id: artworkId, fileId, file: { id } } (the artwork ID is NOT the file ID)
+// - layouts: { id: layoutId, fileId, file: { id } } (the artwork ID is NOT the file ID)
 // - baseFiles/budgets/invoices/receipts: { id: fileId, filename, thumbnailUrl }
 // - legacy entries: a plain string ID
-const extractChangelogFileId = (file: any, isArtworkField: boolean): string | undefined => {
+const extractChangelogFileId = (file: any, isLayoutField: boolean): string | undefined => {
   if (typeof file === "string") return file;
   if (!file || typeof file !== "object") return undefined;
-  if (isArtworkField) return file.fileId || file.file?.id || file.id;
+  if (isLayoutField) return file.fileId || file.file?.id || file.id;
   return file.id;
 };
 
@@ -531,13 +531,13 @@ const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
     const time = new Date(changelog.createdAt).getTime();
     const isCreateAction = changelog.action === CHANGE_LOG_ACTION.CREATE;
     const isLayoutEntity =
-      changelog.entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT;
+      changelog.entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT_MEASURE;
 
     // For LAYOUT CREATE actions, group by time (within 1 second) to combine all sides
     if (isCreateAction && isLayoutEntity) {
       // Check if we can add to current group (same entity type, within 1 second)
       const canGroupWithCurrent =
-        currentEntityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT &&
+        currentEntityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT_MEASURE &&
         currentAction === CHANGE_LOG_ACTION.CREATE &&
         currentTime !== null &&
         Math.abs(time - currentTime) < 1000;
@@ -802,8 +802,8 @@ const ChangelogTimelineItem = ({
         ? "Ordem de Serviço"
         : entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK
           ? "Caminhão"
-          : entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT
-            ? "Layout"
+          : entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT_MEASURE
+            ? "Medidas do Implemento"
             : entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE
               ? "Orçamento"
               : entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM
@@ -952,7 +952,7 @@ const ChangelogTimelineItem = ({
                 )}
 
                 {/* Layout Details - Show side, measurements and doors per side */}
-                {entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT && (
+                {entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT_MEASURE && (
                   <div className="flex flex-col gap-3 my-2">
                     {changelogGroup
                       .map((layoutChange) => {
@@ -967,8 +967,8 @@ const ChangelogTimelineItem = ({
                         const layoutDetails = parseValue(layoutChange.newValue);
 
                         if (
-                          !layoutDetails?.layoutSections ||
-                          layoutDetails.layoutSections.length === 0
+                          !layoutDetails?.sections ||
+                          layoutDetails.sections.length === 0
                         ) {
                           return null;
                         }
@@ -977,12 +977,12 @@ const ChangelogTimelineItem = ({
                           (layoutDetails.height || 0) * 100,
                         );
                         const totalWidth = Math.round(
-                          layoutDetails.layoutSections.reduce(
+                          layoutDetails.sections.reduce(
                             (sum: number, s: any) => sum + (s.width || 0) * 100,
                             0,
                           ),
                         );
-                        const doorCount = layoutDetails.layoutSections.filter(
+                        const doorCount = layoutDetails.sections.filter(
                           (s: any) => s.isDoor,
                         ).length;
 
@@ -1004,7 +1004,7 @@ const ChangelogTimelineItem = ({
                             ? "Lado Sapo"
                             : isBack
                               ? "Traseira"
-                              : "Layout";
+                              : "Medidas";
 
                         const sortOrder = isLeft
                           ? 1
@@ -2141,8 +2141,8 @@ const ChangelogTimelineItem = ({
                                 </>
                               );
                             })()
-                          ) : changelog.field === "artworks" ||
-                            changelog.field === "artworkIds" ||
+                          ) : changelog.field === "layouts" ||
+                            changelog.field === "layoutIds" ||
                             changelog.field === "baseFiles" ||
                             changelog.field === "baseFileIds" ||
                             changelog.field === "budgets" ||
@@ -2181,11 +2181,11 @@ const ChangelogTimelineItem = ({
                                       </span>
                                     );
                                   }
-                                  const isArtworkField =
-                                    changelog.field === "artworks" ||
-                                    changelog.field === "artworkIds";
+                                  const isLayoutField =
+                                    changelog.field === "layouts" ||
+                                    changelog.field === "layoutIds";
                                   const fileIds = files.map((file: any) =>
-                                    extractChangelogFileId(file, isArtworkField),
+                                    extractChangelogFileId(file, isLayoutField),
                                   );
                                   return (
                                     <div className="flex flex-wrap gap-2 mt-1">
@@ -2235,11 +2235,11 @@ const ChangelogTimelineItem = ({
                                       </span>
                                     );
                                   }
-                                  const isArtworkField =
-                                    changelog.field === "artworks" ||
-                                    changelog.field === "artworkIds";
+                                  const isLayoutField =
+                                    changelog.field === "layouts" ||
+                                    changelog.field === "layoutIds";
                                   const fileIds = files.map((file: any) =>
-                                    extractChangelogFileId(file, isArtworkField),
+                                    extractChangelogFileId(file, isLayoutField),
                                   );
                                   return (
                                     <div className="flex flex-wrap gap-2 mt-1">
@@ -2445,15 +2445,15 @@ const ChangelogTimelineItem = ({
 
                               const layoutSides = [
                                 {
-                                  key: "leftSideLayoutId",
+                                  key: "leftSideMeasureId",
                                   label: "Lado Motorista",
                                 },
                                 {
-                                  key: "rightSideLayoutId",
+                                  key: "rightSideMeasureId",
                                   label: "Lado Sapo",
                                 },
                                 {
-                                  key: "backSideLayoutId",
+                                  key: "backSideMeasureId",
                                   label: "Traseira",
                                 },
                               ];
@@ -3128,7 +3128,7 @@ export function TaskWithServiceOrdersChangelog({
     refetch: refetchLayoutChangelogs,
   } = useChangeLogs({
     where: {
-      entityType: CHANGE_LOG_ENTITY_TYPE.LAYOUT,
+      entityType: CHANGE_LOG_ENTITY_TYPE.IMPLEMENT_MEASURE,
       entityId: layoutIds.length > 0 ? { in: layoutIds } : undefined,
     },
     include: {
@@ -3273,7 +3273,7 @@ export function TaskWithServiceOrdersChangelog({
     );
     const filteredLogs = allLogs.filter((log) => {
       if (
-        log.entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT &&
+        log.entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT_MEASURE &&
         log.action === CHANGE_LOG_ACTION.CREATE
       ) {
         const logTime = new Date(log.createdAt).getTime();
@@ -3293,9 +3293,9 @@ export function TaskWithServiceOrdersChangelog({
       if (log.oldValue === undefined || log.newValue === undefined) return true;
       if (log.oldValue === null || log.newValue === null) return true;
 
-      // For array fields (artworks, layouts as files, etc.), compare serialized values
+      // For array fields (layouts, layouts as files, etc.), compare serialized values
       const arrayFields = [
-        "artworks", "artworkIds", "baseFileIds", "baseFiles",
+        "layouts", "layoutIds", "baseFileIds", "baseFiles",
         "budgets", "invoices", "receipts",
       ];
       if (log.field && arrayFields.includes(log.field)) {

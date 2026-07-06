@@ -121,9 +121,9 @@ export function TaskHistoryContextMenu({
   const canAccessAdvancedMenu = isAdmin || isFinancialUser || isLogisticOrCommercial || isDesigner || isProductionManager;
 
   // Per-item advanced menu permissions
-  // COMMERCIAL is intentionally excluded from the artworks form: they get the
-  // quote-layout form instead (edits TaskQuote.layoutFileId, not task artworks)
-  const canAccessArtworks = isAdmin || isDesigner || isProductionManager;
+  // COMMERCIAL is intentionally excluded from the layouts form: they get the
+  // quote-layout form instead (edits TaskQuote.layoutFileId, not task layouts)
+  const canAccessLayouts = isAdmin || isDesigner || isProductionManager;
   const canAccessCutPlan = isAdmin || isDesigner || isProductionManager;
   const canAccessPaints = canAccessAdvancedMenu && !isDesigner;
 
@@ -335,7 +335,7 @@ export function TaskHistoryContextMenu({
   };
 
   // Status action handlers
-  // Note: Artwork validation removed for manual status changes
+  // Note: Layout validation removed for manual status changes
   // Automatic sync still works - when artwork SO becomes COMPLETED, task auto-transitions
   const handleStart = async () => {
     try {
@@ -725,7 +725,7 @@ export function TaskHistoryContextMenu({
                 <span className="truncate data-[state=open]:text-accent-foreground">Avançados</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                {canAccessArtworks && (
+                {canAccessLayouts && (
                   <DropdownMenuItem onClick={handleBulkArts}>
                     <IconPhoto className="mr-2 h-4 w-4" />
                     <span className="truncate">Adicionar Layouts</span>
@@ -761,7 +761,7 @@ export function TaskHistoryContextMenu({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleBulkLayout}>
                   <IconLayout className="mr-2 h-4 w-4" />
-                  <span className="truncate">Layout do Caminhão</span>
+                  <span className="truncate">Medidas do Implemento</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleCopyFromTask}>

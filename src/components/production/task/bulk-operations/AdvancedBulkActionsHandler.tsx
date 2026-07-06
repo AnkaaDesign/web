@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { FileUploadField, type FileWithPreview, FileSuggestions } from "@/components/common/file";
-import { ArtworkFileUploadField } from "../form/artwork-file-upload-field";
+import { LayoutFileUploadField } from "../form/layout-file-upload-field";
 import { GeneralPaintingSelector } from "../form/general-painting-selector";
 import { LogoPaintsSelector } from "../form/logo-paints-selector";
 import { MultiCutSelector, type MultiCutSelectorRef } from "../form/multi-cut-selector";
@@ -23,7 +23,7 @@ import { useCurrentUser } from "../../../../hooks";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { LayoutForm } from "@/components/production/layout/layout-form";
+import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 import type { Task } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
 
@@ -79,8 +79,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
   const [isLoadingData, setIsLoadingData] = useState(false);
 
   // States for file uploads (new files, like task form)
-  const [artworkFiles, setArtworkFiles] = useState<FileWithPreview[]>([]);
-  const [artworkStatuses, setArtworkStatuses] = useState<Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>>({});
+  const [layouts, setLayouts] = useState<FileWithPreview[]>([]);
+  const [layoutStatuses, setLayoutStatuses] = useState<Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>>({});
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
   const [cutsCount, setCutsCount] = useState(0);
 
@@ -109,7 +109,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
     generalPainting: any | null;
     paintIds: string[];
     logoPaints: any[];
-    artworkFiles: Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string; thumbnailUrl?: string | null }>;
+    layouts: Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string; thumbnailUrl?: string | null }>;
     baseFiles: Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>;
     cuts: Array<any>;
     serviceOrders: Array<any>;
@@ -118,7 +118,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
     generalPainting: null,
     paintIds: [],
     logoPaints: [],
-    artworkFiles: [],
+    layouts: [],
     baseFiles: [],
     cuts: [],
     serviceOrders: [],
@@ -145,8 +145,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
   const resetForm = (_type: BulkOperationType) => {
     // Reset all file states
-    setArtworkFiles([]);
-    setArtworkStatuses({});
+    setLayouts([]);
+    setLayoutStatuses({});
     setBaseFiles([]);
     setCutsCount(0);
 
@@ -167,7 +167,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       generalPainting: null,
       paintIds: [],
       logoPaints: [],
-      artworkFiles: [],
+      layouts: [],
       baseFiles: [],
       cuts: [],
       serviceOrders: [],
@@ -214,16 +214,16 @@ export const AdvancedBulkActionsHandler = forwardRef<
             },
           };
           const include = {
-            artworks: { include: { file: true } },
+            layouts: { include: { file: true } },
             baseFiles: true,
             cuts: { include: { file: true } },
             logoPaints: PAINT_DISPLAY_SELECT,
             generalPainting: PAINT_DISPLAY_SELECT,
             truck: {
               include: {
-                leftSideLayout: { include: { layoutSections: true } },
-                rightSideLayout: { include: { layoutSections: true } },
-                backSideLayout: { include: { layoutSections: true } },
+                leftSideMeasure: { include: { sections: true } },
+                rightSideMeasure: { include: { sections: true } },
+                backSideMeasure: { include: { sections: true } },
               },
             },
             serviceOrders: { include: { assignedTo: true } },
@@ -240,7 +240,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             generalPainting: null as any,
             paintIds: [] as string[],
             logoPaints: [] as any[],
-            artworkFiles: [] as Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string; thumbnailUrl?: string | null }>,
+            layouts: [] as Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string; thumbnailUrl?: string | null }>,
             baseFiles: [] as Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>,
             cuts: [] as Array<any>,
             serviceOrders: [] as Array<any>,
@@ -266,14 +266,14 @@ export const AdvancedBulkActionsHandler = forwardRef<
             computed.logoPaints = firstTaskForPaints.logoPaints.filter(p => commonPaintIds.includes(p.id));
           }
 
-          // Find artworks that ALL tasks have in common (by filename, since each task may have different file IDs)
-          // NOTE: task.artworks are now Artwork entities with a nested file property
-          // Artwork entity: { id: artworkId, fileId, status, file?: { id, filename, originalName, thumbnailUrl, ... } }
+          // Find layouts that ALL tasks have in common (by filename, since each task may have different file IDs)
+          // NOTE: task.layouts are now Layout entities with a nested file property
+          // Layout entity: { id: layoutId, fileId, status, file?: { id, filename, originalName, thumbnailUrl, ... } }
           if (tasks.length > 0) {
             // Collect all unique filenames from all tasks
             const allFilenames = new Set<string>();
             tasks.forEach(task => {
-              (task.artworks || []).forEach((artwork: any) => {
+              (task.layouts || []).forEach((artwork: any) => {
                 // artwork.file contains the actual File data
                 const file = artwork.file || artwork;
                 const filename = file.originalName || file.filename;
@@ -283,28 +283,28 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
             // Filter to only filenames that exist in ALL tasks
             const commonFilenames = Array.from(allFilenames).filter(filename =>
-              tasks.every(task => (task.artworks || []).some((artwork: any) => {
+              tasks.every(task => (task.layouts || []).some((artwork: any) => {
                 const file = artwork.file || artwork;
                 return (file.originalName || file.filename) === filename;
               }))
             );
 
-            // Find the first task that has artworks to use as reference
-            const taskWithArtworks = tasks.find(t => t.artworks && t.artworks.length > 0);
+            // Find the first task that has layouts to use as reference
+            const taskWithLayouts = tasks.find(t => t.layouts && t.layouts.length > 0);
 
-            if (taskWithArtworks && taskWithArtworks.artworks && commonFilenames.length > 0) {
+            if (taskWithLayouts && taskWithLayouts.layouts && commonFilenames.length > 0) {
               // For each common filename, use the reference task's file data
-              const commonArtworks = taskWithArtworks.artworks.filter((artwork: any) => {
+              const commonLayouts = taskWithLayouts.layouts.filter((artwork: any) => {
                 const file = artwork.file || artwork;
                 return commonFilenames.includes(file.originalName || file.filename);
               });
 
-              computed.artworkFiles = commonArtworks.map((artwork: any) => {
-                // Extract File data from Artwork entity
+              computed.layouts = commonLayouts.map((artwork: any) => {
+                // Extract File data from Layout entity
                 const file = artwork.file || artwork;
                 const fileId = artwork.fileId || file.id;
                 return {
-                  id: fileId, // File ID (not Artwork entity ID)
+                  id: fileId, // File ID (not Layout entity ID)
                   name: file.filename || file.originalName || 'artwork',
                   originalName: file.originalName,
                   size: file.size || 0,
@@ -481,15 +481,15 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
           // Pre-fill existing files for display
           if (type === 'arts') {
-            setArtworkFiles(computed.artworkFiles as any);
+            setLayouts(computed.layouts as any);
             // Initialize artwork statuses from existing artwork data
             const initialStatuses: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
-            computed.artworkFiles.forEach((f: any) => {
+            computed.layouts.forEach((f: any) => {
               if (f.uploadedFileId) {
                 initialStatuses[f.uploadedFileId] = f.status || 'DRAFT';
               }
             });
-            setArtworkStatuses(initialStatuses);
+            setLayoutStatuses(initialStatuses);
           } else if (type === 'baseFiles') {
             setBaseFiles(computed.baseFiles as any);
           } else if (type === 'cuttingPlans') {
@@ -504,11 +504,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
             if (tasksWithTrucks.length > 0) {
               const convertLayoutToFormState = (layout: any) => {
-                if (!layout || !layout.layoutSections || layout.layoutSections.length === 0) return null;
+                if (!layout || !layout.sections || layout.sections.length === 0) return null;
                 return {
                   height: layout.height,
                   photoId: layout.photoId || null,
-                  layoutSections: layout.layoutSections
+                  sections: layout.sections
                     .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
                     .map((s: any) => ({
                       width: s.width,
@@ -524,8 +524,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 if (!a && !b) return true;
                 if (!a || !b) return false;
                 if (a.height !== b.height) return false;
-                const aSections = a.layoutSections || [];
-                const bSections = b.layoutSections || [];
+                const aSections = a.sections || [];
+                const bSections = b.sections || [];
                 if (aSections.length !== bSections.length) return false;
                 const aSorted = [...aSections].sort((x: any, y: any) => (x.position ?? 0) - (y.position ?? 0));
                 const bSorted = [...bSections].sort((x: any, y: any) => (x.position ?? 0) - (y.position ?? 0));
@@ -536,19 +536,19 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
               const firstTaskWithTruck = tasksWithTrucks[0];
               if (firstTaskWithTruck?.truck) {
-                const firstLeft = firstTaskWithTruck.truck.leftSideLayout;
-                const firstRight = firstTaskWithTruck.truck.rightSideLayout;
-                const firstBack = firstTaskWithTruck.truck.backSideLayout;
+                const firstLeft = firstTaskWithTruck.truck.leftSideMeasure;
+                const firstRight = firstTaskWithTruck.truck.rightSideMeasure;
+                const firstBack = firstTaskWithTruck.truck.backSideMeasure;
 
                 // Check if all tasks share the same layout content per side
                 const allShareLeft = firstLeft && tasksWithTrucks.every(
-                  (t: any) => layoutsMatch(t.truck?.leftSideLayout, firstLeft)
+                  (t: any) => layoutsMatch(t.truck?.leftSideMeasure, firstLeft)
                 );
                 const allShareRight = firstRight && tasksWithTrucks.every(
-                  (t: any) => layoutsMatch(t.truck?.rightSideLayout, firstRight)
+                  (t: any) => layoutsMatch(t.truck?.rightSideMeasure, firstRight)
                 );
                 const allShareBack = firstBack && tasksWithTrucks.every(
-                  (t: any) => layoutsMatch(t.truck?.backSideLayout, firstBack)
+                  (t: any) => layoutsMatch(t.truck?.backSideMeasure, firstBack)
                 );
 
                 const preloadedLayouts = {
@@ -603,73 +603,73 @@ export const AdvancedBulkActionsHandler = forwardRef<
     try {
       const updateData: any = {};
       // Declare file arrays at function scope so they're accessible later
-      let newArtworkFiles: File[] = [];
+      let newLayouts: File[] = [];
       let newBaseFiles: File[] = [];
 
       switch (operationType) {
         case "arts":
           // New files to upload via FormData
-          newArtworkFiles = artworkFiles.filter(f => f instanceof File) as File[];
+          newLayouts = layouts.filter(f => f instanceof File) as File[];
 
-          // Determine which common artworks were explicitly REMOVED (user clicked X)
-          const currentFilenames = artworkFiles
+          // Determine which common layouts were explicitly REMOVED (user clicked X)
+          const currentFilenames = layouts
             .filter(f => !(f instanceof File))
             .map((f: any) => f.originalName || f.name);
-          const removedFileIds = commonValues.artworkFiles
+          const removedFileIds = commonValues.layouts
             .filter((f: any) => !currentFilenames.includes(f.originalName || f.name))
             .map((f: any) => f.uploadedFileId || f.id);
 
           const hasRemovals = removedFileIds.length > 0;
 
           // Detect suggestion files: already-uploaded files the user added from the
-          // suggestion picker that are NOT part of the pre-loaded common artworks.
-          const commonArtworkFileIds = new Set(
-            commonValues.artworkFiles.map((f: any) => f.uploadedFileId || f.id).filter(Boolean)
+          // suggestion picker that are NOT part of the pre-loaded common layouts.
+          const commonLayoutIds = new Set(
+            commonValues.layouts.map((f: any) => f.uploadedFileId || f.id).filter(Boolean)
           );
-          const addedSuggestionFileIds = artworkFiles
+          const addedSuggestionFileIds = layouts
             .filter(f => !(f instanceof File) && (f as any).uploaded && ((f as any).uploadedFileId || (f as any).id))
             .map((f: any) => f.uploadedFileId || f.id)
-            .filter((id: string) => id && !commonArtworkFileIds.has(id));
+            .filter((id: string) => id && !commonLayoutIds.has(id));
           const hasAddedSuggestions = addedSuggestionFileIds.length > 0;
 
-          // Send artworkIds (SET mode) when files were removed OR suggestions were added.
-          // For pure new-file uploads (no removals, no suggestions), skip artworkIds so
+          // Send layoutIds (SET mode) when files were removed OR suggestions were added.
+          // For pure new-file uploads (no removals, no suggestions), skip layoutIds so
           // the backend uses ADD mode and doesn't touch existing task-artwork connections.
           if (hasRemovals || hasAddedSuggestions) {
-            const perTaskArtworkIds: Record<string, string[]> = {};
+            const perTaskLayoutIds: Record<string, string[]> = {};
             currentTasks.forEach(task => {
               const keptIds: string[] = [];
-              (task.artworks || []).forEach((artwork: any) => {
-                // In flattened format from API: artwork.id = File ID, artwork.artworkId = Artwork entity ID
+              (task.layouts || []).forEach((artwork: any) => {
+                // In flattened format from API: artwork.id = File ID, artwork.layoutId = Layout entity ID
                 // artwork.fileId and artwork.file don't exist in flattened format
                 const file = artwork.file || artwork;
-                const artworkFileId = artwork.fileId || file.id;
-                if (artworkFileId && !removedFileIds.includes(artworkFileId)) {
-                  // Send File IDs so the backend conversion path applies artworkStatuses
-                  keptIds.push(artworkFileId);
+                const layoutFileId = artwork.fileId || file.id;
+                if (layoutFileId && !removedFileIds.includes(layoutFileId)) {
+                  // Send File IDs so the backend conversion path applies layoutStatuses
+                  keptIds.push(layoutFileId);
                 }
               });
               // Append suggestion file IDs that aren't already on this task
               addedSuggestionFileIds.forEach((id: string) => {
                 if (!keptIds.includes(id)) keptIds.push(id);
               });
-              perTaskArtworkIds[task.id] = keptIds;
+              perTaskLayoutIds[task.id] = keptIds;
             });
-            updateData._perTaskArtworkIds = perTaskArtworkIds;
+            updateData._perTaskLayoutIds = perTaskLayoutIds;
           }
 
-          if (newArtworkFiles.length > 0) {
-            updateData._hasNewArtworkFiles = true;
+          if (newLayouts.length > 0) {
+            updateData._hasNewLayouts = true;
           }
 
           // Send artwork statuses for status changes
-          if (Object.keys(artworkStatuses).length > 0) {
-            updateData._artworkStatuses = artworkStatuses;
+          if (Object.keys(layoutStatuses).length > 0) {
+            updateData._layoutStatuses = layoutStatuses;
           }
           break;
 
         case "baseFiles":
-          // Get new base files that need to be uploaded (via FormData, like artworks)
+          // Get new base files that need to be uploaded (via FormData, like layouts)
           newBaseFiles = baseFiles.filter(f => f instanceof File) as File[];
 
           // Get filenames that should be kept (from existing files in baseFiles state)
@@ -857,9 +857,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // - Tasks WITHOUT trucks: truck is created with embedded layouts
           console.log('[BulkActions] layout case - layoutStates:', JSON.stringify({ left: layoutStates.left, right: layoutStates.right, back: layoutStates.back }));
           const hasAnyLayoutState =
-            (layoutStates.left?.layoutSections?.length && layoutStates.left.layoutSections.length > 0) ||
-            (layoutStates.right?.layoutSections?.length && layoutStates.right.layoutSections.length > 0) ||
-            (layoutStates.back?.layoutSections?.length && layoutStates.back.layoutSections.length > 0);
+            (layoutStates.left?.sections?.length && layoutStates.left.sections.length > 0) ||
+            (layoutStates.right?.sections?.length && layoutStates.right.sections.length > 0) ||
+            (layoutStates.back?.sections?.length && layoutStates.back.sections.length > 0);
 
           console.log('[BulkActions] hasAnyLayoutState:', hasAnyLayoutState, 'currentTasks:', currentTasks.length);
           if (hasAnyLayoutState) {
@@ -870,10 +870,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
             // Left side layout data
             const leftLayout = layoutStates.left;
-            if (leftLayout?.layoutSections?.length && leftLayout.layoutSections.length > 0) {
-              truckWithLayouts.leftSideLayout = {
+            if (leftLayout?.sections?.length && leftLayout.sections.length > 0) {
+              truckWithLayouts.leftSideMeasure = {
                 height: leftLayout.height,
-                layoutSections: leftLayout.layoutSections.map((s: any, idx: number) => ({
+                sections: leftLayout.sections.map((s: any, idx: number) => ({
                   width: s.width,
                   isDoor: s.isDoor || false,
                   doorHeight: s.doorHeight,
@@ -889,10 +889,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
             // Right side layout data
             const rightLayout = layoutStates.right;
-            if (rightLayout?.layoutSections?.length && rightLayout.layoutSections.length > 0) {
-              truckWithLayouts.rightSideLayout = {
+            if (rightLayout?.sections?.length && rightLayout.sections.length > 0) {
+              truckWithLayouts.rightSideMeasure = {
                 height: rightLayout.height,
-                layoutSections: rightLayout.layoutSections.map((s: any, idx: number) => ({
+                sections: rightLayout.sections.map((s: any, idx: number) => ({
                   width: s.width,
                   isDoor: s.isDoor || false,
                   doorHeight: s.doorHeight,
@@ -908,10 +908,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
             // Back side layout data
             const backLayout = layoutStates.back;
-            if (backLayout?.layoutSections?.length && backLayout.layoutSections.length > 0) {
-              truckWithLayouts.backSideLayout = {
+            if (backLayout?.sections?.length && backLayout.sections.length > 0) {
+              truckWithLayouts.backSideMeasure = {
                 height: backLayout.height,
-                layoutSections: backLayout.layoutSections.map((s: any, idx: number) => ({
+                sections: backLayout.sections.map((s: any, idx: number) => ({
                   width: s.width,
                   isDoor: s.isDoor || false,
                   doorHeight: s.doorHeight,
@@ -1064,24 +1064,24 @@ export const AdvancedBulkActionsHandler = forwardRef<
       }
 
       // Extract per-task data and internal flags
-      const perTaskArtworkIds = updateData._perTaskArtworkIds;
+      const perTaskLayoutIds = updateData._perTaskLayoutIds;
       const perTaskBaseFileIds = updateData._perTaskBaseFileIds;
       const perTaskTruckUpdates = updateData._perTaskTruckUpdates;
-      const hasNewArtworkFiles = updateData._hasNewArtworkFiles;
+      const hasNewLayouts = updateData._hasNewLayouts;
       const hasNewBaseFiles = updateData._hasNewBaseFiles;
       const layoutPhotoFiles = updateData._layoutPhotoFiles as Array<{ side: string; file: File }> | undefined;
-      const artworkStatusesMap = updateData._artworkStatuses as Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> | undefined;
+      const layoutStatusesMap = updateData._layoutStatuses as Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> | undefined;
 
-      delete updateData._perTaskArtworkIds;
+      delete updateData._perTaskLayoutIds;
       delete updateData._perTaskBaseFileIds;
       delete updateData._perTaskTruckUpdates;
-      delete updateData._hasNewArtworkFiles;
+      delete updateData._hasNewLayouts;
       delete updateData._hasNewBaseFiles;
       delete updateData._layoutPhotoFiles;
-      delete updateData._artworkStatuses;
+      delete updateData._layoutStatuses;
 
-      const hasPerTaskData = perTaskArtworkIds || perTaskBaseFileIds || perTaskTruckUpdates;
-      const hasData = Object.keys(updateData).length > 0 || hasPerTaskData || artworkStatusesMap || hasNewArtworkFiles;
+      const hasPerTaskData = perTaskLayoutIds || perTaskBaseFileIds || perTaskTruckUpdates;
+      const hasData = Object.keys(updateData).length > 0 || hasPerTaskData || layoutStatusesMap || hasNewLayouts;
       console.log('[BulkActions] hasPerTaskData:', hasPerTaskData, 'hasData:', hasData, 'updateData keys:', Object.keys(updateData), 'perTaskTruckUpdates:', perTaskTruckUpdates);
 
       if (!hasData) {
@@ -1095,13 +1095,13 @@ export const AdvancedBulkActionsHandler = forwardRef<
         tasks: currentTaskIds.map(id => {
           const taskData = { ...updateData };
 
-          // Add per-task artworkIds if available
-          // Always send artworkIds when perTaskArtworkIds is set (even if empty for some tasks)
-          // because we need to tell backend the final state of artworks
-          if (perTaskArtworkIds) {
-            const ids = perTaskArtworkIds[id];
+          // Add per-task layoutIds if available
+          // Always send layoutIds when perTaskLayoutIds is set (even if empty for some tasks)
+          // because we need to tell backend the final state of layouts
+          if (perTaskLayoutIds) {
+            const ids = perTaskLayoutIds[id];
             // Always include the array - this tells backend what files to keep/set
-            taskData.artworkIds = ids || [];
+            taskData.layoutIds = ids || [];
           }
 
           // Add per-task baseFileIds if available and this task has explicit IDs set
@@ -1118,8 +1118,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
           }
 
           // Add artwork statuses for status changes
-          if (artworkStatusesMap) {
-            taskData.artworkStatuses = artworkStatusesMap;
+          if (layoutStatusesMap) {
+            taskData.layoutStatuses = layoutStatusesMap;
           }
 
           return {
@@ -1130,10 +1130,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
       };
 
       // Check if we need to send as FormData (files present)
-      const hasArtworkFilesToUpload = hasNewArtworkFiles && newArtworkFiles.length > 0;
+      const hasLayoutsToUpload = hasNewLayouts && newLayouts.length > 0;
       const hasBaseFilesToUpload = hasNewBaseFiles && newBaseFiles.length > 0;
       const hasLayoutPhotoFiles = layoutPhotoFiles && layoutPhotoFiles.length > 0;
-      const needsFormData = hasArtworkFilesToUpload || hasBaseFilesToUpload || hasLayoutPhotoFiles;
+      const needsFormData = hasLayoutsToUpload || hasBaseFilesToUpload || hasLayoutPhotoFiles;
       console.log('[BulkActions] about to call batchUpdateAsync, needsFormData:', needsFormData, 'batchRequest tasks:', batchRequest.tasks.length, JSON.stringify(batchRequest.tasks[0]));
 
       if (needsFormData) {
@@ -1143,13 +1143,13 @@ export const AdvancedBulkActionsHandler = forwardRef<
         formData.append('tasks', JSON.stringify(batchRequest.tasks));
 
         // Add artwork files if present
-        if (hasArtworkFilesToUpload) {
-          newArtworkFiles.forEach((file) => {
-            formData.append('artworks', file);
+        if (hasLayoutsToUpload) {
+          newLayouts.forEach((file) => {
+            formData.append('layouts', file);
           });
         }
 
-        // Add base files if present (same pattern as artworks)
+        // Add base files if present (same pattern as layouts)
         if (hasBaseFilesToUpload) {
           newBaseFiles.forEach((file) => {
             formData.append('baseFiles', file);
@@ -1157,10 +1157,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
         }
 
         // Add layout photo files if present
-        // Backend expects: layoutPhotos.leftSide, layoutPhotos.rightSide, layoutPhotos.backSide
+        // Backend expects: implementMeasurePhotos.leftSide, implementMeasurePhotos.rightSide, implementMeasurePhotos.backSide
         if (hasLayoutPhotoFiles) {
           layoutPhotoFiles.forEach(({ side, file }) => {
-            formData.append(`layoutPhotos.${side}`, file);
+            formData.append(`implementMeasurePhotos.${side}`, file);
           });
         }
 
@@ -1201,7 +1201,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       baseFiles: "Arquivos Base",
       paints: "Adicionar Tintas",
       cuttingPlans: "Adicionar Plano de Corte",
-      layout: "Aplicar Layout do Caminhão",
+      layout: "Aplicar Medidas do Implemento",
       serviceOrder: "Ordem de Servico",
     };
     return titles[operationType];
@@ -1233,23 +1233,23 @@ export const AdvancedBulkActionsHandler = forwardRef<
       case "arts":
         return (
           <div className="space-y-4">
-            <ArtworkFileUploadField
-              onFilesChange={setArtworkFiles}
+            <LayoutFileUploadField
+              onFilesChange={setLayouts}
               onStatusChange={(fileId, status) => {
-                setArtworkStatuses(prev => ({ ...prev, [fileId]: status }));
+                setLayoutStatuses(prev => ({ ...prev, [fileId]: status }));
               }}
               maxFiles={10}
               disabled={isSubmitting}
               showPreview={true}
-              existingFiles={artworkFiles}
+              existingFiles={layouts}
               placeholder="Selecione layouts para as tarefas"
               label="Layouts"
               variant="card"
             >
               <FileSuggestions
                 customerId={commonCustomerId}
-                fileContext="tasksArtworks"
-                excludeFileIds={artworkFiles.map(f => f.uploadedFileId || f.id).filter(Boolean)}
+                fileContext="tasksLayouts"
+                excludeFileIds={layouts.map(f => f.uploadedFileId || f.id).filter(Boolean)}
                 onSelect={(newFile) => {
                   const fileWithPreview: FileWithPreview = {
                     id: newFile.id,
@@ -1263,11 +1263,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
                     thumbnailUrl: newFile.thumbnailUrl || undefined,
                     status: 'DRAFT',
                   } as FileWithPreview;
-                  setArtworkFiles(prev => [...prev, fileWithPreview]);
+                  setLayouts(prev => [...prev, fileWithPreview]);
                 }}
                 disabled={isSubmitting}
               />
-            </ArtworkFileUploadField>
+            </LayoutFileUploadField>
           </div>
         );
 
@@ -1369,7 +1369,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       case "layout":
         // Calculate total length for the current side
         const currentLayoutState = layoutStates[selectedLayoutSide];
-        const totalLength = currentLayoutState?.layoutSections?.reduce(
+        const totalLength = currentLayoutState?.sections?.reduce(
           (sum: number, s: any) => sum + (s.width || 0), 0
         ) || 0;
 
@@ -1386,7 +1386,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
                   disabled={isSubmitting}
                 >
                   Motorista
-                  {layoutStates.left?.layoutSections?.length && layoutStates.left.layoutSections.length > 0 && (
+                  {layoutStates.left?.sections?.length && layoutStates.left.sections.length > 0 && (
                     <Badge variant="success" className="ml-2">
                       Configurado
                     </Badge>
@@ -1400,7 +1400,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
                   disabled={isSubmitting}
                 >
                   Sapo
-                  {layoutStates.right?.layoutSections?.length > 0 && (
+                  {layoutStates.right?.sections?.length > 0 && (
                     <Badge variant="success" className="ml-2">
                       Configurado
                     </Badge>
@@ -1414,7 +1414,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
                   disabled={isSubmitting}
                 >
                   Traseira
-                  {layoutStates.back?.layoutSections?.length > 0 && (
+                  {layoutStates.back?.sections?.length > 0 && (
                     <Badge variant="success" className="ml-2">
                       Configurado
                     </Badge>
@@ -1432,7 +1432,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             </div>
 
             {/* Visual Layout Editor - exactly like task edit form */}
-            <LayoutForm
+            <ImplementMeasureForm
               selectedSide={selectedLayoutSide}
               layout={currentLayoutState}
               disabled={isSubmitting}
@@ -1445,9 +1445,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
             />
 
             {/* Info alert */}
-            {(layoutStates.left?.layoutSections?.length > 0 ||
-              layoutStates.right?.layoutSections?.length > 0 ||
-              layoutStates.back?.layoutSections?.length > 0) && (
+            {(layoutStates.left?.sections?.length > 0 ||
+              layoutStates.right?.sections?.length > 0 ||
+              layoutStates.back?.sections?.length > 0) && (
               <Alert className="mt-2">
                 <AlertDescription>
                   Os layouts configurados serão aplicados a todos os caminhões das {currentTaskIds.length} tarefas selecionadas.

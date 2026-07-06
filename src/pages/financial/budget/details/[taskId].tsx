@@ -72,7 +72,7 @@ export const FinancialBudgetDetailPage = () => {
       include: {
         customer: true,
         truck: true,
-        artworks: { include: { file: true } },
+        layouts: { include: { file: true } },
         baseFiles: true,
         responsibles: true,
       },
@@ -115,20 +115,20 @@ export const FinancialBudgetDetailPage = () => {
   // Task-specific state
   const [showResponsibleErrors, setShowResponsibleErrors] = useState(false);
   const [responsibleRows, setResponsibleRows] = useState<ResponsibleRowData[]>([]);
-  const [artworkFiles, setArtworkFiles] = useState<FileWithPreview[]>([]);
-  const [artworkStatuses, setArtworkStatuses] = useState<Record<string, string>>({});
+  const [layouts, setLayouts] = useState<FileWithPreview[]>([]);
+  const [layoutStatuses, setLayoutStatuses] = useState<Record<string, string>>({});
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
   // Snapshots of the relation sets as loaded from the task. Used at submit time to
   // tell whether the user actually changed each set; if not, we OMIT the key so
   // the API preserves it (absence = preserve). Sending an empty array would WIPE
   // the relation (finding I40).
   const loadedBaseFileIdsRef = useRef<string[]>([]);
-  const loadedArtworkFileIdsRef = useRef<string[]>([]);
-  const loadedArtworkStatusesRef = useRef<Record<string, string>>({});
+  const loadedLayoutIdsRef = useRef<string[]>([]);
+  const loadedLayoutStatusesRef = useRef<Record<string, string>>({});
   const loadedResponsibleIdsRef = useRef<string[]>([]);
 
-  const handleArtworkFilesChange = useCallback((files: FileWithPreview[]) => {
-    setArtworkFiles(files);
+  const handleLayoutsChange = useCallback((files: FileWithPreview[]) => {
+    setLayouts(files);
   }, []);
 
   const handleBaseFilesChange = useCallback((files: FileWithPreview[]) => {
@@ -137,12 +137,12 @@ export const FinancialBudgetDetailPage = () => {
 
   // Set a task-artwork's status (DRAFT/APPROVED/REPROVED) from the layout card's
   // colored selector. Keyed by File id — same map the submit remap reads, so the change
-  // persists and shows in Step 1 on reload. Also mirror onto artworkFiles so the Step-1
+  // persists and shows in Step 1 on reload. Also mirror onto layouts so the Step-1
   // dropdown reflects it immediately. Last action wins.
-  const handleArtworkLayoutStatusChange = useCallback(
+  const handleLayoutStatusChange = useCallback(
     (fileId: string, status: string) => {
-      setArtworkStatuses((prev) => ({ ...prev, [fileId]: status }));
-      setArtworkFiles((prev) =>
+      setLayoutStatuses((prev) => ({ ...prev, [fileId]: status }));
+      setLayouts((prev) =>
         prev.map((f) => {
           const fId = (f as any).uploadedFileId || f.id;
           if (fId !== fileId) return f;
@@ -151,7 +151,7 @@ export const FinancialBudgetDetailPage = () => {
           // submit upload sends an empty body and the API rejects it ("Nenhum arquivo
           // enviado."). Object.assign keeps the File instance (and its bytes) intact.
           // `prev.map` still returns a new array, so React re-renders. Mirrors
-          // ArtworkFileUploadField's own status-change pattern.
+          // LayoutFileUploadField's own status-change pattern.
           return Object.assign(f, { status }) as FileWithPreview;
         }),
       );
@@ -439,7 +439,7 @@ export const FinancialBudgetDetailPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, existingQuote?.id]); // use IDs — object refs change on every refetch and would wipe unsaved edits
 
-  // Initialize task-specific state (responsibles, artworks) when task loads
+  // Initialize task-specific state (responsibles, layouts) when task loads
   useEffect(() => {
     if (!task) return;
 
@@ -464,11 +464,11 @@ export const FinancialBudgetDetailPage = () => {
       (r: any) => r.id,
     );
 
-    // Artworks
-    loadedArtworkFileIdsRef.current = (task.artworks || []).map(
+    // Layouts
+    loadedLayoutIdsRef.current = (task.layouts || []).map(
       (artwork: any) => (artwork.file || artwork).id,
     );
-    loadedArtworkStatusesRef.current = (task.artworks || []).reduce(
+    loadedLayoutStatusesRef.current = (task.layouts || []).reduce(
       (acc: Record<string, string>, artwork: any) => {
         const fileId = (artwork.file || artwork).id;
         if (artwork.status) acc[fileId] = artwork.status;
@@ -476,8 +476,8 @@ export const FinancialBudgetDetailPage = () => {
       },
       {},
     );
-    if (task.artworks && task.artworks.length > 0) {
-      const artworkFilesList = task.artworks.map((artwork: any) => {
+    if (task.layouts && task.layouts.length > 0) {
+      const layoutsList = task.layouts.map((artwork: any) => {
         const file = artwork.file || artwork;
         return {
           id: file.id,
@@ -494,14 +494,14 @@ export const FinancialBudgetDetailPage = () => {
           status: artwork.status || "DRAFT",
         } as FileWithPreview;
       });
-      setArtworkFiles(artworkFilesList);
+      setLayouts(layoutsList);
 
       const statuses: Record<string, string> = {};
-      task.artworks!.forEach((artwork: any) => {
+      task.layouts!.forEach((artwork: any) => {
         const fileId = (artwork.file || artwork).id;
         if (artwork.status) statuses[fileId] = artwork.status;
       });
-      setArtworkStatuses(statuses);
+      setLayoutStatuses(statuses);
     }
 
     // Base files
@@ -527,7 +527,7 @@ export const FinancialBudgetDetailPage = () => {
     );
     // Seed editable state by task IDENTITY only — NOT the full `task` object ref,
     // which changes on every react-query background refetch. Re-running on a refetch
-    // called setArtworkFiles/setBaseFiles and WIPED unsaved uploads the user had just
+    // called setLayouts/setBaseFiles and WIPED unsaved uploads the user had just
     // added (and selected as a quote layout). That left the layout pointing at a local
     // temp id with no file left to upload, so submit sent the temp id and the API
     // rejected it ("Invalid uuid"). Mirrors the sibling effect's `[task?.id]` guard.
@@ -632,20 +632,20 @@ export const FinancialBudgetDetailPage = () => {
       // layout the user selected from a brand-new Step-1 artwork (still a local id
       // at selection time) can be remapped to the real File id below (see Bug 1).
       const localIdToRealFileId: Record<string, string> = {};
-      const uploadedArtworkIds: string[] = [];
-      const remappedArtworkStatuses: Record<string, string> = {};
+      const uploadedLayoutIds: string[] = [];
+      const remappedLayoutStatuses: Record<string, string> = {};
       // The status dropdown keys onStatusChange by `uploadedFileId || id`, so a
       // persisted artwork's status lands under its File id while a brand-new file's
       // lands under its local id. Read BOTH so neither case is missed.
       const statusForFile = (file: FileWithPreview): string | undefined =>
-        artworkStatuses[(file as any).uploadedFileId] ?? artworkStatuses[file.id];
-      for (const file of artworkFiles) {
+        layoutStatuses[(file as any).uploadedFileId] ?? layoutStatuses[file.id];
+      for (const file of layouts) {
         if (file.uploaded && file.uploadedFileId) {
-          uploadedArtworkIds.push(file.uploadedFileId);
+          uploadedLayoutIds.push(file.uploadedFileId);
           localIdToRealFileId[file.id] = file.uploadedFileId;
           const status = statusForFile(file);
           if (status) {
-            remappedArtworkStatuses[file.uploadedFileId] = status;
+            remappedLayoutStatuses[file.uploadedFileId] = status;
           }
         } else if (!file.error) {
           try {
@@ -653,16 +653,16 @@ export const FinancialBudgetDetailPage = () => {
               fileContext: "artwork",
             });
             if (response.success && response.data) {
-              uploadedArtworkIds.push(response.data.id);
+              uploadedLayoutIds.push(response.data.id);
               localIdToRealFileId[file.id] = response.data.id;
               const status = statusForFile(file);
               if (status) {
-                remappedArtworkStatuses[response.data.id] = status;
+                remappedLayoutStatuses[response.data.id] = status;
               }
             }
           } catch (error: any) {
             toast.error(
-              `Erro ao enviar artwork ${file.name}: ${error.message}`,
+              `Erro ao enviar layout ${file.name}: ${error.message}`,
             );
           }
         }
@@ -709,13 +709,13 @@ export const FinancialBudgetDetailPage = () => {
           }
           return f;
         });
-      setArtworkFiles((prev) => markUploaded(prev, localIdToRealFileId));
+      setLayouts((prev) => markUploaded(prev, localIdToRealFileId));
       setBaseFiles((prev) => markUploaded(prev, baseLocalIdToRealFileId));
 
       // 2. Resolve the ordered layout File ids (up to 2 slots) from the current
       // layoutFiles state — NOT from form.data, which isn't updated when the user
       // removes a file via the upload widget. Upload any new files, preserve the
-      // connection for pre-existing ones. Always use FILE ids, never Artwork ids.
+      // connection for pre-existing ones. Always use FILE ids, never Layout ids.
       //
       // A layout may have been selected from a brand-new Step-1 artwork file that
       // had no server File id yet at selection time (only a local id). Those Step-1
@@ -853,27 +853,27 @@ export const FinancialBudgetDetailPage = () => {
         taskUpdateData.truck = truckPayload;
       }
 
-      // Artworks live in separate state (not RHF). Detect a real change by
+      // Layouts live in separate state (not RHF). Detect a real change by
       // comparing the resolved File-id set and per-file statuses against the
-      // loaded snapshot. Only then send artworkIds/artworkStatuses; otherwise
-      // omit so existing artworks are preserved (not wiped).
-      const loadedArtworkIds = loadedArtworkFileIdsRef.current;
-      const artworkIdsChanged =
-        uploadedArtworkIds.length !== loadedArtworkIds.length ||
-        uploadedArtworkIds.some((id, i) => id !== loadedArtworkIds[i]);
-      const loadedStatuses = loadedArtworkStatusesRef.current;
+      // loaded snapshot. Only then send layoutIds/layoutStatuses; otherwise
+      // omit so existing layouts are preserved (not wiped).
+      const loadedLayoutIds = loadedLayoutIdsRef.current;
+      const layoutIdsChanged =
+        uploadedLayoutIds.length !== loadedLayoutIds.length ||
+        uploadedLayoutIds.some((id, i) => id !== loadedLayoutIds[i]);
+      const loadedStatuses = loadedLayoutStatusesRef.current;
       const statusKeys = new Set([
-        ...Object.keys(remappedArtworkStatuses),
+        ...Object.keys(remappedLayoutStatuses),
         ...Object.keys(loadedStatuses),
       ]);
-      const artworkStatusesChanged = Array.from(statusKeys).some(
-        (k) => remappedArtworkStatuses[k] !== loadedStatuses[k],
+      const layoutStatusesChanged = Array.from(statusKeys).some(
+        (k) => remappedLayoutStatuses[k] !== loadedStatuses[k],
       );
-      if (artworkIdsChanged || artworkStatusesChanged) {
+      if (layoutIdsChanged || layoutStatusesChanged) {
         // Send the full resolved set so adds AND removals persist.
-        taskUpdateData.artworkIds = uploadedArtworkIds;
-        if (Object.keys(remappedArtworkStatuses).length > 0) {
-          taskUpdateData.artworkStatuses = remappedArtworkStatuses;
+        taskUpdateData.layoutIds = uploadedLayoutIds;
+        if (Object.keys(remappedLayoutStatuses).length > 0) {
+          taskUpdateData.layoutStatuses = remappedLayoutStatuses;
         }
       }
 
@@ -1102,8 +1102,8 @@ export const FinancialBudgetDetailPage = () => {
     taskId,
     existingQuote,
     layoutFiles,
-    artworkFiles,
-    artworkStatuses,
+    layouts,
+    layoutStatuses,
     responsibleRows,
     queryClient,
     createQuoteMutation,
@@ -1166,33 +1166,33 @@ export const FinancialBudgetDetailPage = () => {
   const isLastStep = currentStep === totalSteps;
 
   // Step-2's "Layout Aprovado" picker is sourced from these options. Build them
-  // from the LIVE artworkFiles state (what the user is editing in Step 1) merged
-  // with the persisted task.artworks, deduped by File id, images only. This makes
+  // from the LIVE layouts state (what the user is editing in Step 1) merged
+  // with the persisted task.layouts, deduped by File id, images only. This makes
   // a layout just added in Step 1 immediately selectable in Step 2 (Bug 1).
   // For a not-yet-uploaded file the option `id` is the file's stable LOCAL id; at
   // submit it is remapped to the real File id (see localIdToRealFileId).
   // Persisted-artwork METADATA keyed by File id — used only to enrich the live entries
   // below (path/originalName/thumbnail). NOT a source of options on its own.
-  const persistedArtworkByFileId = new Map<string, any>();
-  (task.artworks || []).forEach((artwork: any) => {
+  const persistedLayoutByFileId = new Map<string, any>();
+  (task.layouts || []).forEach((artwork: any) => {
     const file = artwork.file || artwork;
     if (!(file.mimetype || "").startsWith("image/")) return;
-    persistedArtworkByFileId.set(file.id, { file, artwork });
+    persistedLayoutByFileId.set(file.id, { file, artwork });
   });
-  // Options come from the LIVE Step-1 files (artworkFiles) — the single source of truth
-  // for which layouts the task currently has. artworkFiles is seeded from task.artworks
+  // Options come from the LIVE Step-1 files (layouts) — the single source of truth
+  // for which layouts the task currently has. layouts is seeded from task.layouts
   // on load and reflects every add/remove, so a layout REMOVED in Step 1 no longer shows
-  // here (the old code merged task.artworks first, so removed arts lingered — the bug),
+  // here (the old code merged task.layouts first, so removed arts lingered — the bug),
   // and a layout just ADDED is immediately selectable.
-  const artworksById = new Map<string, any>();
-  artworkFiles.forEach((file: any) => {
+  const layoutsById = new Map<string, any>();
+  layouts.forEach((file: any) => {
     if (!(file.type || "").startsWith("image/")) return;
     const key = file.uploadedFileId || file.id;
-    const persisted = persistedArtworkByFileId.get(key);
+    const persisted = persistedLayoutByFileId.get(key);
     const pf = persisted?.file;
-    artworksById.set(key, {
+    layoutsById.set(key, {
       id: key,
-      artworkId: persisted?.artwork?.artworkId || persisted?.artwork?.id,
+      layoutId: persisted?.artwork?.layoutId || persisted?.artwork?.id,
       filename: file.name || pf?.filename,
       originalName: file.name || pf?.originalName,
       thumbnailUrl: file.thumbnailUrl || pf?.thumbnailUrl || null,
@@ -1205,7 +1205,7 @@ export const FinancialBudgetDetailPage = () => {
       size: file.size ?? pf?.size,
     });
   });
-  const artworks = Array.from(artworksById.values());
+  const layoutImageOptions = Array.from(layoutsById.values());
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
@@ -1278,9 +1278,9 @@ export const FinancialBudgetDetailPage = () => {
               showResponsibleErrors={showResponsibleErrors}
               baseFiles={baseFiles}
               onBaseFilesChange={handleBaseFilesChange}
-              artworkFiles={artworkFiles}
-              onArtworkFilesChange={handleArtworkFilesChange}
-              onArtworkStatusChange={handleArtworkLayoutStatusChange}
+              layouts={layouts}
+              onLayoutsChange={handleLayoutsChange}
+              onLayoutStatusChange={handleLayoutStatusChange}
             />
           </div>
 
@@ -1289,7 +1289,7 @@ export const FinancialBudgetDetailPage = () => {
               disabled={isSubmitting || !canEdit}
               layoutFiles={layoutFiles}
               onLayoutFilesChange={setLayoutFiles}
-              artworks={artworks}
+              layouts={layoutImageOptions}
               customersCache={customersCache}
               selectedCustomers={selectedCustomers}
               setSelectedCustomers={setSelectedCustomers}

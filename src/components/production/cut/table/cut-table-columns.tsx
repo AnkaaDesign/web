@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { IconFileOff } from "@tabler/icons-react";
-import type { Cut } from "../../../../types";
+import type { Cut, File as AnkaaFile } from "../../../../types";
 import {
   CUT_ORIGIN,
   CUT_STATUS_LABELS,
@@ -11,6 +12,7 @@ import {
 import { formatDateTime } from "../../../../utils";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
+import { FileTypeIcon } from "@/components/ui/file-type-icon";
 import { getApiBaseUrl } from "@/config/api";
 import type { DataTableColumnDef, SectorDefaults } from "@/components/ui/datatable";
 
@@ -24,6 +26,34 @@ export const CUT_SECTOR_DEFAULTS: SectorDefaults = {};
 const muted = (text: string) => <span className="text-sm text-muted-foreground whitespace-nowrap">{text}</span>;
 
 const thumbnailUrl = (fileId: string) => `${getApiBaseUrl()}/files/thumbnail/${fileId}?size=small`;
+
+/**
+ * File preview thumbnail for the list. Tries the on-demand thumbnail endpoint; when the backend
+ * can't render one (e.g. EPS/vector files) the <img> errors — instead of leaving a broken image
+ * showing the alt filename, we fall back to the colored file-type icon (the same vector-bezier icon
+ * the detail page shows). Keyed by file id upstream so the error state resets per row.
+ */
+function CutFilePreview({ file }: { file?: AnkaaFile }) {
+  const [errored, setErrored] = useState(false);
+  return (
+    <div className="flex items-center justify-center">
+      <div className="w-12 h-12 rounded-md overflow-hidden bg-muted/20 flex items-center justify-center">
+        {!file ? (
+          <IconFileOff className="w-5 h-5 text-muted-foreground/50" />
+        ) : errored ? (
+          <FileTypeIcon filename={file.filename} mimeType={file.mimetype} size="lg" />
+        ) : (
+          <img
+            src={thumbnailUrl(file.id)}
+            alt={file.filename}
+            className="w-full h-full object-contain"
+            onError={() => setErrored(true)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 /** Human reason label: the recut reason when set, otherwise the origin's default meaning. */
 function cutReasonLabel(cut: Cut): string {
@@ -64,19 +94,7 @@ export function createCutColumns(): DataTableColumnDef<Cut>[] {
       size: 72,
       minSize: 64,
       meta: { headerLabel: "Arquivo", align: "center", excludeFromExport: true },
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center">
-          {row.original.file ? (
-            <div className="w-12 h-12 rounded-md overflow-hidden">
-              <img src={thumbnailUrl(row.original.file.id)} alt={row.original.file.filename} className="w-full h-full object-cover" />
-            </div>
-          ) : (
-            <div className="w-12 h-12 rounded-md bg-muted/20 flex items-center justify-center">
-              <IconFileOff className="w-5 h-5 text-muted-foreground/50" />
-            </div>
-          )}
-        </div>
-      ),
+      cell: ({ row }) => <CutFilePreview key={row.original.file?.id ?? "none"} file={row.original.file} />,
     },
     {
       id: "fileName",

@@ -1,110 +1,21 @@
-import { useState, useRef, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeader } from "@/components/ui/page-header";
 import { AirbrushingForm } from "@/components/production/airbrushing/form/airbrushing-form";
-import type { AirbrushingFormHandle } from "@/components/production/airbrushing/form/airbrushing-form";
-import { IconSpray, IconCheck, IconLoader2 } from "@tabler/icons-react";
-import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
+import { SECTOR_PRIVILEGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import type { Airbrushing } from "../../../types";
 
 export const AirbrushingCreate = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const formRef = useRef<AirbrushingFormHandle>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [canSubmit, setCanSubmit] = useState(false);
 
-  // Get task ID from URL params if provided
+  // Optional deep-link: pre-select a task via ?taskId=
   const taskId = searchParams.get("taskId");
 
   // Track page for analytics
   usePageTracker({ title: "Aerografia - Criar" });
 
-  const handleSuccess = (airbrushing: Airbrushing) => {
-    navigate(routes.production.airbrushings.details(airbrushing.id));
-  };
-
-  const handleCancel = () => {
-    navigate(routes.production.airbrushings.root);
-  };
-
-  // Update canSubmit whenever form state changes
-  const handleFormStateChange = useCallback(() => {
-    if (formRef.current) {
-      setCanSubmit(formRef.current.canSubmit());
-    }
-  }, []);
-
-  const handleSubmit = async () => {
-    if (!formRef.current) {
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const success = await formRef.current.handleSubmit();
-
-      // If validation failed (returned false), reset submitting state
-      if (!success) {
-        setIsSubmitting(false);
-      }
-      // If success (returned true), navigation will unmount the component
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Error submitting airbrushing:", error);
-      }
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL]}>
-      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <PageHeader
-          variant="form"
-          title="Nova Aerografia"
-          icon={IconSpray}
-          favoritePage={FAVORITE_PAGES.PRODUCAO_AEROGRAFIA_CADASTRAR}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Produção", href: routes.production.root },
-            { label: "Aerografia", href: routes.production.airbrushings.root },
-            { label: "Criar" },
-          ]}
-          actions={[
-            {
-              key: "cancel",
-              label: "Cancelar",
-              onClick: handleCancel,
-              variant: "outline" as const,
-              disabled: isSubmitting,
-            },
-            {
-              key: "submit",
-              label: "Cadastrar",
-              icon: isSubmitting ? IconLoader2 : IconCheck,
-              onClick: handleSubmit,
-              variant: "default" as const,
-              disabled: isSubmitting || !canSubmit,
-              loading: isSubmitting,
-            },
-          ]}
-          className="flex-shrink-0"
-        />
-        <div className="flex-1 overflow-y-auto pb-6">
-          <AirbrushingForm
-            ref={formRef}
-            mode="create"
-            initialTaskId={taskId || undefined}
-            onSuccess={handleSuccess}
-            onCancel={handleCancel}
-            onFormStateChange={handleFormStateChange}
-          />
-        </div>
-      </div>
+      <AirbrushingForm mode="create" initialTaskId={taskId || undefined} />
     </PrivilegeRoute>
   );
 };

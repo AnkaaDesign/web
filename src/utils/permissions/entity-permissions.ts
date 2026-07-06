@@ -224,6 +224,30 @@ export function canDeleteAirbrushings(user: PermissionUser | null): boolean {
   ]);
 }
 
+/**
+ * CANONICAL money-visibility gate for airbrushing (Aerografia).
+ *
+ * Single source of truth for who may see monetary/payment information on an
+ * airbrushing: price, paymentStatus, paidAt, the invoice/receipt financial
+ * files, and Contas a Pagar rows. Use this everywhere (list columns, detail
+ * sections, task-detail card, form price/payment fields) — do NOT re-derive
+ * ad-hoc {FINANCIAL, ADMIN} sets, and do NOT use useCanViewPrices() (which only
+ * excludes WAREHOUSE and is far too permissive for painter payments).
+ *
+ * COMMERCIAL is included because they quote/set the airbrushing price.
+ */
+export const AIRBRUSHING_FINANCE_PRIVILEGES = [
+  SECTOR_PRIVILEGES.FINANCIAL,
+  SECTOR_PRIVILEGES.ACCOUNTING,
+  SECTOR_PRIVILEGES.ADMIN,
+  SECTOR_PRIVILEGES.COMMERCIAL,
+] as const;
+
+export function canViewAirbrushingFinancials(user: PermissionUser | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [...AIRBRUSHING_FINANCE_PRIVILEGES]);
+}
+
 // =====================
 // OBSERVATION PERMISSIONS
 // =====================

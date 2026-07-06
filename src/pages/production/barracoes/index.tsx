@@ -116,18 +116,18 @@ export function GaragesPage() {
           spot: true,
           plate: true,
           chassisNumber: true,
-          leftSideLayout: {
+          leftSideMeasure: {
             select: {
-              layoutSections: {
+              sections: {
                 select: {
                   width: true,
                 },
               },
             },
           },
-          rightSideLayout: {
+          rightSideMeasure: {
             select: {
-              layoutSections: {
+              sections: {
                 select: {
                   width: true,
                 },
@@ -275,12 +275,12 @@ export function GaragesPage() {
     return filtered.map((task): GarageTruck => {
       const truck = task.truck as any;
 
-      // Get layout sections from leftSideLayout or rightSideLayout
-      const layout = truck?.leftSideLayout || truck?.rightSideLayout;
-      const layoutSections = layout?.layoutSections || [];
+      // Get layout sections from leftSideMeasure or rightSideMeasure
+      const layout = truck?.leftSideMeasure || truck?.rightSideMeasure;
+      const sections = layout?.sections || [];
 
       // Calculate truck length from layout sections
-      const sectionsSum = layoutSections.reduce(
+      const sectionsSum = sections.reduce(
         (sum: number, section: { width: number }) => sum + (section.width || 0),
         0
       );
@@ -333,7 +333,7 @@ export function GaragesPage() {
         cleared: !!(task as any).cleared,
       spotIsExplicit: !!(truck?.spot), // true when truck has an actual DB spot (not defaulted)
         finishedAt: (task as any).finishedAt || null,
-        layoutInfo: layoutSections.length > 0 ? `${layoutSections.length} seções` : null,
+        layoutInfo: sections.length > 0 ? `${sections.length} seções` : null,
         artworkInfo: null, // Can be enhanced later with artwork file count
         sectorId: (task as any).sector?.id || null,
         sectorName: (task as any).sector?.name || null,

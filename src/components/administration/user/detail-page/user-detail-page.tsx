@@ -102,13 +102,6 @@ const PAGE_PRIVILEGES = [
 // `canEditUsers` (HR/ACCOUNTING/ADMIN), so it doubles as the inline-edit gate.
 const HR_ACC_ADMIN = [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN];
 
-// Map a collaborator-status variant onto the (narrower) header status-badge variant set.
-function headerStatusVariant(v: ReturnType<typeof getCollaboratorStatus>["variant"]): "default" | "secondary" | "destructive" | "outline" {
-  if (v === "red") return "destructive";
-  if (v === "gray") return "secondary";
-  return "default";
-}
-
 /** WhatsApp deep-link for a raw BR phone number (prefixes 55 when missing). */
 function whatsappHref(phone: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -700,11 +693,6 @@ function UserDetailContent() {
     return <Navigate to={routes.administration.collaborators.root} replace />;
   }
 
-  const status = user ? (() => {
-    const s = getCollaboratorStatus(user);
-    return { label: s.label, variant: headerStatusVariant(s.variant), icon: IconShieldCheck };
-  })() : undefined;
-
   return (
     <>
       <DetailPage<User>
@@ -716,7 +704,6 @@ function UserDetailContent() {
         title={user?.name ?? "Colaborador"}
         icon={IconUser}
         breadcrumbs={breadcrumbs}
-        status={status}
         actions={actions}
         hideEmptyFields
         navigation={{

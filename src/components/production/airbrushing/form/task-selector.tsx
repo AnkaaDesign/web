@@ -1,509 +1,162 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
-import { IconSearch, IconFilter } from "@tabler/icons-react";
-import { useTasks, useCustomers, useUsers, useSectors } from "../../../../hooks";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { LoadingSpinner } from "@/components/ui/loading";
-import { Combobox } from "@/components/ui/combobox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
+import { useMemo } from "react";
+import { useTasks } from "../../../../hooks";
+import { useCurrentUser } from "@/hooks/common/use-auth";
 import { cn } from "@/lib/utils";
-import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
-import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
-import { useDebounce } from "@/hooks/common/use-debounce";
-import { TASK_STATUS_LABELS } from "../../../../constants";
-import { formatDate } from "../../../../utils";
+import { DataTable, type DataTableColumnDef, type DataTableFilterDef } from "@/components/ui/datatable";
+import { IconCircle, IconCircleCheckFilled } from "@tabler/icons-react";
+import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
+import { createTaskPreparationColumns } from "@/components/production/task/preparation/task-prep-columns";
+import type { ClusteredTask } from "@/components/production/task/preparation/cluster-tasks";
 import type { Task } from "../../../../types";
+
+/**
+ * Rich include mirroring the task-preparation table (`task-prep-page` LIST_INCLUDE) so every reused
+ * prep column has the data it renders — service-order progress, forecast reschedule flag, the truck
+ * measures behind "Medidas", the quote billing customers ("Faturar Para"), painting, sector, etc.
+ */
+const LIST_INCLUDE = {
+  serviceOrders: { select: { id: true, type: true, status: true, assignedToId: true, description: true, observation: true } },
+  forecastHistory: {
+    select: { source: true, previousDate: true, newDate: true, reason: true, createdAt: true },
+    where: { source: "MANUAL", previousDate: { not: null } },
+    orderBy: { createdAt: "desc" },
+    take: 1,
+  },
+  customer: { select: { id: true, fantasyName: true, corporateName: true } },
+  truck: {
+    select: {
+      id: true,
+      plate: true,
+      category: true,
+      chassisNumber: true,
+      implementType: true,
+      leftSideMeasure: { select: { id: true, height: true, sections: { select: { id: true, width: true } } } },
+      rightSideMeasure: { select: { id: true, height: true, sections: { select: { id: true, width: true } } } },
+    },
+  },
+  quote: {
+    select: {
+      id: true,
+      total: true,
+      status: true,
+      customerConfigs: { select: { customer: { select: { corporateName: true, fantasyName: true } } } },
+    },
+  },
+  generalPainting: { select: { id: true, name: true, hex: true } },
+  sector: { select: { id: true, name: true } },
+  responsibles: { select: { id: true, name: true } },
+} as const;
 
 interface TaskSelectorProps {
   selectedTasks: Set<string>;
   onSelectTask: (taskId: string) => void;
-  onSelectAll: () => void;
+  /** Unused for airbrushing (single task) — kept for interface compatibility. */
+  onSelectAll?: () => void;
   className?: string;
   isSelected?: (taskId: string) => boolean;
-  // URL state props
-  showSelectedOnly?: boolean;
-  searchTerm?: string;
-  statusIds?: string[];
-  customerIds?: string[];
-  userIds?: string[];
-  sectorIds?: string[];
-  onSearchTermChange?: (term: string) => void;
-  onStatusIdsChange?: (ids: string[]) => void;
-  onCustomerIdsChange?: (ids: string[]) => void;
-  onUserIdsChange?: (ids: string[]) => void;
-  onSectorIdsChange?: (ids: string[]) => void;
-  onShowSelectedOnlyChange?: (value: boolean) => void;
-  // Sorting props
-  sortConfigs?: Array<{ column: string; direction: "asc" | "desc" }>;
-  toggleSort?: (column: string) => void;
-  getSortDirection?: (column: string) => "asc" | "desc" | null;
-  getSortOrder?: (column: string) => number | null;
-  // Pagination props
-  page?: number; // 0-based from useTableState
-  pageSize?: number;
-  totalRecords?: number;
-  onPageChange?: (page: number) => void; // Expects 0-based
-  onPageSizeChange?: (pageSize: number) => void;
-  onTotalRecordsChange?: (total: number) => void;
 }
 
+/**
+ * Single-select task picker for the airbrushing wizard (Step 2). Reuses the FULL task-preparation
+ * column set (`createTaskPreparationColumns`) + its per-sector default layout + filters on the new
+ * `DataTable` base, so it exposes exactly the same column/visibility/filter options as the Agenda /
+ * task-preparation table. A leading radio column + `onRowClick` provide single selection.
+ */
 export const TaskSelector = ({
   selectedTasks,
   onSelectTask,
   className,
   isSelected = (taskId: string) => selectedTasks.has(taskId),
-  // URL state props
-  showSelectedOnly: showSelectedOnlyProp,
-  searchTerm: searchTermProp,
-  statusIds: statusIdsProp,
-  customerIds: customerIdsProp,
-  userIds: userIdsProp,
-  sectorIds: sectorIdsProp,
-  onSearchTermChange,
-  onStatusIdsChange,
-  onCustomerIdsChange,
-  onUserIdsChange,
-  onSectorIdsChange,
-  // Sorting props
-  sortConfigs: sortConfigsProp,
-  toggleSort: _toggleSortProp,
-  getSortDirection: _getSortDirectionProp,
-  getSortOrder: _getSortOrderProp,
-  // Pagination props
-  page: pageProp,
-  pageSize: pageSizeProp,
-  totalRecords: _totalRecordsProp,
-  onPageChange,
-  onPageSizeChange,
-  onTotalRecordsChange,
 }: TaskSelectorProps) => {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { data: user } = useCurrentUser();
+  const currentUserId = (user as { id?: string } | undefined)?.id;
 
-  // Get scrollbar width info
-  const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
+  // Same display scope as the preparation page; load the whole active set for client-side
+  // search/filter/sort (the API caps limit at 1000, matching the prep buckets).
+  const { data, isLoading } = useTasks({
+    shouldDisplayInPreparation: true,
+    include: LIST_INCLUDE as never,
+    limit: 1000,
+    orderBy: { forecastDate: "asc" },
+    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+  } as never);
 
-  // Form state - always use local state for immediate UI updates
-  const [localSearchTerm, setLocalSearchTerm] = useState(searchTermProp || "");
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const tasks = (((data as { data?: Task[] } | undefined)?.data ?? []) as ClusteredTask[]);
 
-  // Local filter state for modal (only applied when "Apply" is clicked)
-  const [tempStatusIds, setTempStatusIds] = useState<string[]>([]);
-  const [tempCustomerIds, setTempCustomerIds] = useState<string[]>([]);
-  const [tempUserIds, setTempUserIds] = useState<string[]>([]);
-  const [tempSectorIds, setTempSectorIds] = useState<string[]>([]);
+  const prepColumns = useMemo(() => createTaskPreparationColumns({ currentUserId }), [currentUserId]);
 
-  // Sync prop changes to local state
-  useEffect(() => {
-    if (searchTermProp !== undefined) {
-      setLocalSearchTerm(searchTermProp);
-    }
-  }, [searchTermProp]);
-
-  // Always use local state for immediate UI feedback
-  const searchTerm = localSearchTerm;
-  const statusIds = statusIdsProp || [];
-  const customerIds = customerIdsProp || [];
-  const userIds = userIdsProp || [];
-  const sectorIds = sectorIdsProp || [];
-
-  // Initialize temp state from URL state ONLY when modal opens
-  useEffect(() => {
-    if (isFilterModalOpen) {
-      setTempStatusIds(statusIdsProp || []);
-      setTempCustomerIds(customerIdsProp || []);
-      setTempUserIds(userIdsProp || []);
-      setTempSectorIds(sectorIdsProp || []);
-    }
-  }, [isFilterModalOpen]); // Only depend on modal open state
-
-  // Get page size - use prop or default to 20
-  const currentPageSize = pageSizeProp || 20;
-
-  // Use props directly for pagination and sorting
-  // pageProp is 0-based from useTableState, convert to 1-based for internal use
-  const page = pageProp !== undefined ? pageProp + 1 : 1;
-  const sortConfigs = sortConfigsProp || [{ column: "name", direction: "asc" as const }];
-
-  // Debounce search term with longer delay
-  const debouncedSearchTerm = useDebounce(searchTerm, 500);
-
-  // Build query parameters for tasks - show only tasks that should display in agenda (same as preparation page)
-  const taskQuery = useMemo(() => {
-    const query: any = {
-      searchingFor: debouncedSearchTerm || undefined,
-      page: page - 1, // Convert from 1-based (UI) to 0-based (API)
-      limit: currentPageSize,
-      // Use the same logic as preparation page: shouldDisplayInPreparation flag
-      shouldDisplayInPreparation: true,
-      // Note: status filter is intentionally not set, matching preparation page behavior
-      include: {
-        sector: true,
-        customer: true,
-        createdBy: true,
-        serviceOrders: true,
-        files: true,
-        airbrushings: true,
-        bonifications: true,
+  // Prepend a single-select radio indicator; the preparation columns are reused verbatim after it.
+  const columns = useMemo<DataTableColumnDef<ClusteredTask>[]>(
+    () => [
+      {
+        id: "__select",
+        header: "",
+        size: 48,
+        minSize: 48,
+        enableSorting: false,
+        enableHiding: false,
+        enableResizing: false,
+        meta: { headerLabel: "" },
+        cell: ({ row }) =>
+          isSelected(row.original.id) ? (
+            <IconCircleCheckFilled className="h-5 w-5 text-primary" />
+          ) : (
+            <IconCircle className="h-5 w-5 text-muted-foreground/40" />
+          ),
       },
-    };
+      ...prepColumns,
+    ],
+    [prepColumns, isSelected],
+  );
 
-    // Add filters - override default status filter if provided
-    if (statusIds.length > 0) {
-      query.status = statusIds;
+  // Same declarative filters as the preparation table.
+  const filterDefs = useMemo<DataTableFilterDef<ClusteredTask>[]>(() => {
+    const custMap = new Map<string, string>();
+    for (const t of tasks) {
+      if (t.customer?.id) custMap.set(t.customer.id, t.customer.corporateName || t.customer.fantasyName || t.customer.id);
     }
-    if (customerIds.length > 0) {
-      query.customerIds = customerIds;
-    }
-    if (userIds.length > 0) {
-      query.createdByIds = userIds;
-    }
-    if (sectorIds.length > 0) {
-      query.sectorIds = sectorIds;
-    }
-
-    // Add sorting
-    if (sortConfigs.length > 0) {
-      query.orderBy = convertSortConfigsToOrderBy(sortConfigs);
-    } else {
-      query.orderBy = { name: "asc" };
-    }
-
-    return query;
-  }, [debouncedSearchTerm, page, currentPageSize, statusIds, customerIds, userIds, sectorIds, sortConfigs]);
-
-  // Fetch tasks
-  const { data: taskResponse, isLoading } = useTasks(taskQuery);
-  const tasks = taskResponse?.data || [];
-  const totalRecords = taskResponse?.meta?.totalRecords || 0;
-
-  // Update total records when data changes
-  useEffect(() => {
-    if (onTotalRecordsChange && taskResponse?.meta?.totalRecords !== undefined) {
-      onTotalRecordsChange(taskResponse.meta.totalRecords);
-    }
-  }, [taskResponse?.meta?.totalRecords, onTotalRecordsChange]);
-
-  // Fetch filter data (API has max limit of 100)
-  const { data: customersResponse } = useCustomers({ limit: 100, orderBy: { fantasyName: "asc" } });
-  const { data: usersResponse } = useUsers({ limit: 100, orderBy: { name: "asc" } });
-  const { data: sectorsResponse } = useSectors({ limit: 100, orderBy: { name: "asc" } });
-
-  const customers = customersResponse?.data || [];
-  const users = usersResponse?.data || [];
-  const sectors = sectorsResponse?.data || [];
-
-  // Filter displayed tasks if showing selected only
-  const displayedTasks = useMemo(() => {
-    if (showSelectedOnlyProp && selectedTasks.size > 0) {
-      return tasks.filter((task) => selectedTasks.has(task.id));
-    }
-    return tasks;
-  }, [tasks, showSelectedOnlyProp, selectedTasks]);
-
-  // Handle search input change
-  const handleSearchChange = (value: string) => {
-    setLocalSearchTerm(value);
-    if (onSearchTermChange) {
-      onSearchTermChange(value);
-    }
-  };
-
-  // Handle filter modal apply
-  const handleApplyFilters = () => {
-    if (onStatusIdsChange) onStatusIdsChange(tempStatusIds);
-    if (onCustomerIdsChange) onCustomerIdsChange(tempCustomerIds);
-    if (onUserIdsChange) onUserIdsChange(tempUserIds);
-    if (onSectorIdsChange) onSectorIdsChange(tempSectorIds);
-    setIsFilterModalOpen(false);
-  };
-
-  // Handle clear all filters
-  const handleClearAllFilters = () => {
-    setTempStatusIds([]);
-    setTempCustomerIds([]);
-    setTempUserIds([]);
-    setTempSectorIds([]);
-    if (onStatusIdsChange) onStatusIdsChange([]);
-    if (onCustomerIdsChange) onCustomerIdsChange([]);
-    if (onUserIdsChange) onUserIdsChange([]);
-    if (onSectorIdsChange) onSectorIdsChange([]);
-  };
-
-  // Handle row click
-  const handleRowClick = (task: Task, event: React.MouseEvent) => {
-    // Don't handle clicks on interactive elements
-    const target = event.target as HTMLElement;
-    if (target.closest('input[type="checkbox"]') || target.closest("button")) {
-      return;
-    }
-    onSelectTask(task.id);
-  };
-
-  // Get active filter count
-  const activeFilterCount = statusIds.length + customerIds.length + userIds.length + sectorIds.length;
+    const customerOptions = Array.from(custMap, ([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+    return [
+      { key: "forecastDate", label: "Previsão", type: "date-range", accessor: (r) => r.forecastDate },
+      { key: "term", label: "Prazo", type: "date-range", accessor: (r) => r.term },
+      { key: "createdAt", label: "Data de Criação", type: "date-range", accessor: (r) => r.createdAt },
+      { key: "customerId", label: "Razão Social", type: "multiselect", options: customerOptions, accessor: (r) => r.customer?.id ?? "" },
+      {
+        key: "truckCategory",
+        label: "Categoria",
+        type: "multiselect",
+        options: Object.entries(TRUCK_CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
+        accessor: (r) => r.truck?.category ?? "",
+      },
+      {
+        key: "implementType",
+        label: "Tipo de Implemento",
+        type: "multiselect",
+        options: Object.entries(IMPLEMENT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+        accessor: (r) => r.truck?.implementType ?? "",
+      },
+    ];
+  }, [tasks]);
 
   return (
-    <div className={cn("flex flex-col h-full space-y-4", className)}>
-      {/* Search and Controls */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="flex-1 relative">
-          <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar tarefas..." value={searchTerm} onChange={(value) => handleSearchChange(value as string)} className="pl-10 bg-transparent" />
-        </div>
-        <div className="flex gap-2">
-          <Dialog open={isFilterModalOpen} onOpenChange={setIsFilterModalOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="relative">
-                <IconFilter className="h-4 w-4 mr-2" />
-                Filtros
-                {activeFilterCount > 0 && (
-                  <Badge className="ml-2 h-5 w-5 p-0 text-xs" variant="destructive">
-                    {activeFilterCount}
-                  </Badge>
-                )}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Filtros de Tarefas</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Combobox
-                    options={Object.entries(TASK_STATUS_LABELS).map(([value, label]) => ({
-                      value,
-                      label,
-                    }))}
-                    mode="multiple"
-                    value={tempStatusIds}
-                    onValueChange={(value) => {
-                      if (Array.isArray(value)) {
-                        setTempStatusIds(value);
-                      }
-                    }}
-                    placeholder="Selecionar status..."
-                    searchPlaceholder="Buscar status..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Clientes</Label>
-                  <Combobox
-                    options={customers.map((customer) => ({
-                      value: customer.id,
-                      label: customer.fantasyName,
-                    }))}
-                    mode="multiple"
-                    value={tempCustomerIds}
-                    onValueChange={(value) => {
-                      if (Array.isArray(value)) {
-                        setTempCustomerIds(value);
-                      }
-                    }}
-                    placeholder="Selecionar clientes..."
-                    searchPlaceholder="Buscar clientes..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Usuários</Label>
-                  <Combobox
-                    options={users.map((user) => ({
-                      value: user.id,
-                      label: user.name,
-                    }))}
-                    mode="multiple"
-                    value={tempUserIds}
-                    onValueChange={(value) => {
-                      if (Array.isArray(value)) {
-                        setTempUserIds(value);
-                      }
-                    }}
-                    placeholder="Selecionar usuários..."
-                    searchPlaceholder="Buscar usuários..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Setores</Label>
-                  <Combobox
-                    options={sectors.map((sector) => ({
-                      value: sector.id,
-                      label: sector.name,
-                    }))}
-                    mode="multiple"
-                    value={tempSectorIds}
-                    onValueChange={(value) => {
-                      if (Array.isArray(value)) {
-                        setTempSectorIds(value);
-                      }
-                    }}
-                    placeholder="Selecionar setores..."
-                    searchPlaceholder="Buscar setores..."
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={handleClearAllFilters}>
-                  Limpar todos
-                </Button>
-                <Button onClick={handleApplyFilters}>Aplicar filtros</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      {/* Table Container */}
-      <div className="flex-1 min-h-0">
-        <div className={cn("rounded-lg flex flex-col overflow-hidden h-full")}>
-          {/* Fixed Header Table */}
-          <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
-            <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
-              <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
-                <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-                  <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                    <div className="flex items-center justify-center h-full w-full px-2">
-                      <Checkbox
-                        checked={displayedTasks.length > 0 && displayedTasks.every((task) => isSelected(task.id))}
-                        indeterminate={displayedTasks.some((task) => isSelected(task.id)) && !displayedTasks.every((task) => isSelected(task.id))}
-                        onCheckedChange={() => {
-                          const allTasksSelected = displayedTasks.every((task) => isSelected(task.id));
-                          if (allTasksSelected) {
-                            // Deselect all displayed tasks
-                            displayedTasks.forEach((task) => {
-                              if (isSelected(task.id)) {
-                                onSelectTask(task.id);
-                              }
-                            });
-                          } else {
-                            // Select all displayed tasks that aren't already selected
-                            displayedTasks.forEach((task) => {
-                              if (!isSelected(task.id)) {
-                                onSelectTask(task.id);
-                              }
-                            });
-                          }
-                        }}
-                        aria-label="Select all tasks"
-                        disabled={displayedTasks.length === 0}
-                        data-checkbox
-                      />
-                    </div>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
-                    <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">Nome</div>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
-                    <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">Cliente</div>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
-                    <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">N° Série</div>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
-                    <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">Setor</div>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
-                    <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">Prazo</div>
-                  </TableHead>
-                  {/* Scrollbar spacer - only show if not overlay scrollbar */}
-                  {!isOverlay && (
-                    <TableHead style={{ width: `${scrollbarWidth}px`, minWidth: `${scrollbarWidth}px` }} className="bg-muted p-0 border-0 !border-r-0 shrink-0"></TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-            </Table>
-          </div>
-
-          {/* Scrollable Body Container */}
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden border-l border-r border-border">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <LoadingSpinner />
-              </div>
-            ) : displayedTasks.length === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="text-lg font-medium mb-2">Nenhuma tarefa encontrada</div>
-                  <div className="text-sm text-muted-foreground">{searchTerm ? "Ajuste os filtros para ver mais resultados." : "Nenhuma tarefa disponível"}</div>
-                </div>
-              </div>
-            ) : (
-              <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
-                <TableBody>
-                  {displayedTasks.map((task, index) => (
-                    <TableRow
-                      key={task.id}
-                      data-testid="task-row"
-                      data-selected={isSelected(task.id) ? "true" : "false"}
-                      className={cn(
-                        "cursor-pointer transition-colors border-b border-border",
-                        index % 2 === 1 && "bg-muted/10",
-                        "hover:bg-muted/20",
-                        isSelected(task.id) && "bg-muted/30 hover:bg-muted/40",
-                      )}
-                      onClick={(e: React.MouseEvent) => handleRowClick(task, e)}
-                    >
-                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                          <Checkbox checked={isSelected(task.id)} onCheckedChange={() => onSelectTask(task.id)} aria-label={`Select ${task.name}`} data-checkbox />
-                        </div>
-                      </TableCell>
-                      <TableCell className="p-0 !border-r-0">
-                        <div className="px-4 py-2">
-                          <TruncatedTextWithTooltip text={task.name} className="font-medium" />
-                        </div>
-                      </TableCell>
-                      <TableCell className="p-0 !border-r-0">
-                        <div className="px-4 py-2">
-                          {task.customer?.fantasyName ? <TruncatedTextWithTooltip text={task.customer.fantasyName} /> : <span className="text-muted-foreground">-</span>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="p-0 !border-r-0">
-                        <div className="px-4 py-2">{task.serialNumber || <span className="text-muted-foreground">-</span>}</div>
-                      </TableCell>
-                      <TableCell className="p-0 !border-r-0">
-                        <div className="px-4 py-2">
-                          {task.sector?.name ? <Badge variant="outline">{task.sector.name}</Badge> : <span className="text-muted-foreground">-</span>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="p-0 !border-r-0">
-                        <div className="px-4 py-2">{task.term ? <span className="text-sm">{formatDate(task.term)}</span> : <span className="text-muted-foreground">-</span>}</div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-
-          {/* Pagination Footer */}
-          <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
-            <SimplePaginationAdvanced
-              currentPage={page - 1} // SimplePaginationAdvanced expects 0-based, convert from internal 1-based
-              totalPages={Math.ceil(totalRecords / currentPageSize)}
-              onPageChange={(newPage) => {
-                // SimplePaginationAdvanced provides 0-based, onPageChange expects 0-based (useTableState.setPage)
-                if (onPageChange) {
-                  onPageChange(newPage);
-                }
-              }}
-              pageSize={currentPageSize}
-              totalItems={totalRecords}
-              pageSizeOptions={[20, 40, 60, 100]}
-              onPageSizeChange={onPageSizeChange || (() => {})}
-              showPageSizeSelector={true}
-              showGoToPage={true}
-              showPageInfo={true}
-            />
-          </div>
-        </div>
-      </div>
+    <div className={cn("flex h-full min-h-0 flex-col", className)}>
+      <DataTable<ClusteredTask>
+        tableId="airbrushing-task-selector"
+        data={tasks}
+        columns={columns}
+        filterDefs={filterDefs}
+        getRowId={(t) => t.id}
+        onRowClick={(t) => onSelectTask(t.id)}
+        isLoading={isLoading}
+        enableSelection={false}
+        enableShare={false}
+        syncUrl={false}
+        estimateRowHeight={44}
+        searchPlaceholder="Buscar tarefas..."
+        emptyMessage="Nenhuma tarefa encontrada. Ajuste os filtros para ver mais resultados."
+        className="flex-1 min-h-0"
+      />
     </div>
   );
 };

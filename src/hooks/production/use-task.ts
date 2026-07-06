@@ -23,14 +23,14 @@ import {
   userKeys,
   sectorKeys,
   paintKeys,
-  artworkKeys,
+  layoutKeys,
   truckKeys,
   garageKeys,
   changeLogKeys,
   cutKeys,
 } from "../common/query-keys";
-import { layoutQueryKeys } from "../administration/use-layout";
-import { layoutSectionQueryKeys } from "../administration/use-layout-section";
+import { implementMeasureQueryKeys } from "../administration/use-implement-measure";
+import { implementMeasureSectionQueryKeys } from "../administration/use-implement-measure-section";
 
 // ===============================================
 // TASK HOOKS
@@ -291,9 +291,9 @@ export function useTaskMutations() {
         queryKey: observationKeys.byTask(variables.id),
       });
 
-      // Invalidate artworks for this task
+      // Invalidate layouts for this task
       queryClient.invalidateQueries({
-        queryKey: artworkKeys.byEntity("task", variables.id),
+        queryKey: layoutKeys.byEntity("task", variables.id),
       });
     },
   });
@@ -309,9 +309,9 @@ export function useTaskMutations() {
         queryKey: garageKeys.all,
       });
 
-      // Invalidate artworks since task might have had attached artworks
+      // Invalidate layouts since task might have had attached layouts
       queryClient.invalidateQueries({
-        queryKey: artworkKeys.all,
+        queryKey: layoutKeys.all,
       });
     },
   });
@@ -371,10 +371,10 @@ export function useTaskBatchMutations() {
       queryKey: changeLogKeys.all,
     });
     queryClient.invalidateQueries({
-      queryKey: layoutQueryKeys.all,
+      queryKey: implementMeasureQueryKeys.all,
     });
     queryClient.invalidateQueries({
-      queryKey: layoutSectionQueryKeys.all,
+      queryKey: implementMeasureSectionQueryKeys.all,
     });
     queryClient.invalidateQueries({
       queryKey: cutKeys.all,
@@ -461,15 +461,15 @@ export function useTaskBatchMutations() {
             queryKey: observationKeys.byTask(task.id),
           });
 
-          // Invalidate artworks for this task
+          // Invalidate layouts for this task
           queryClient.invalidateQueries({
-            queryKey: artworkKeys.byEntity("task", task.id),
+            queryKey: layoutKeys.byEntity("task", task.id),
           });
 
           // Invalidate layout queries for this task's truck
           if ((task as any).truck?.id) {
             queryClient.invalidateQueries({
-              queryKey: layoutQueryKeys.byTruck((task as any).truck.id),
+              queryKey: implementMeasureQueryKeys.byTruck((task as any).truck.id),
             });
           }
 
@@ -532,9 +532,9 @@ export function useTaskBatchMutations() {
         queryKey: garageKeys.all,
       });
 
-      // Invalidate artworks since tasks might have had attached artworks
+      // Invalidate layouts since tasks might have had attached layouts
       queryClient.invalidateQueries({
-        queryKey: artworkKeys.all,
+        queryKey: layoutKeys.all,
       });
     },
   });

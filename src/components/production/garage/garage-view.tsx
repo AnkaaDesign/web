@@ -125,7 +125,7 @@ export interface GarageTruck {
   spotIsExplicit?: boolean; // Whether the truck has an explicit DB spot (vs defaulted to YARD_WAIT for display)
   finishedAt?: string | null; // Task completion date - null if not complete
   layoutInfo?: string | null; // Layout description
-  artworkInfo?: string | null; // Artwork description
+  artworkInfo?: string | null; // Layout description
   sectorId?: string | null; // Task sector ID
   sectorName?: string | null; // Task sector name
   serviceOrders?: Array<{

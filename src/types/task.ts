@@ -74,7 +74,7 @@ export interface Task extends BaseEntity {
   observation?: Observation;
   generalPainting?: Paint;
   createdBy?: User;
-  artworks?: File[];
+  layouts?: File[];
   logoPaints?: Paint[];
   serviceOrders?: ServiceOrder[];
   airbrushings?: Airbrushing[];
@@ -141,7 +141,7 @@ export interface TaskIncludes {
     | {
         include?: UserIncludes;
       };
-  artworks?:
+  layouts?:
     | boolean
     | {
         include?: FileIncludes;

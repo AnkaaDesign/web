@@ -41,7 +41,7 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
 
   const tasks = tasksResponse?.data || [];
 
-  // Collect all task documents by type (excluding artworks)
+  // Collect all task documents by type (excluding layouts)
   const { reimbursements, reimbursementInvoices, totalDocuments } = useMemo(() => {
     const reimbursements: FileType[] = [];
     const reimbursementInvoices: FileType[] = [];

@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FilePreviewCard } from "@/components/common/file";
-import { generateLayoutSVG } from "@/utils/generate-layout-svg";
+import { generateImplementMeasureSVG } from "@/utils/generate-implement-measure-svg";
 import {
   CUT_TYPE_LABELS,
   CUT_STATUS_LABELS,
@@ -1033,7 +1033,7 @@ const ChangelogTimelineItem = ({
               )}
 
             {/* Layout Details with SVG Visualization - Show all layouts in group horizontally */}
-            {entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT && (
+            {entityType === CHANGE_LOG_ENTITY_TYPE.IMPLEMENT_MEASURE && (
               <div className="flex flex-row flex-wrap gap-3 mb-3">
                 {changelogGroup
                   .map((layoutChange) => {
@@ -1050,8 +1050,8 @@ const ChangelogTimelineItem = ({
                     }
 
                     if (
-                      !layoutDetails?.layoutSections ||
-                      layoutDetails.layoutSections.length === 0
+                      !layoutDetails?.sections ||
+                      layoutDetails.sections.length === 0
                     ) {
                       return null;
                     }
@@ -1069,7 +1069,7 @@ const ChangelogTimelineItem = ({
                               reason.includes("backside") ||
                               reason.includes("traseira")
                             ? "Traseira"
-                            : "Layout";
+                            : "Medidas";
 
                     // Determine sort order: left=1, right=2, back=3, other=4
                     const sortOrder =
@@ -1097,7 +1097,7 @@ const ChangelogTimelineItem = ({
                       <div className="border rounded-lg bg-white/50 dark:bg-muted/30 backdrop-blur-sm p-1.5">
                         <div
                           dangerouslySetInnerHTML={{
-                            __html: generateLayoutSVG(layoutDetails),
+                            __html: generateImplementMeasureSVG(layoutDetails),
                           }}
                           className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[140px] [&>svg]:max-h-[60px]"
                         />
@@ -2098,9 +2098,9 @@ const ChangelogTimelineItem = ({
                                   );
                                 })()}
                               </>
-                            ) : changelog.field === "truck.leftSideLayoutId" ||
-                              changelog.field === "truck.rightSideLayoutId" ||
-                              changelog.field === "truck.backSideLayoutId" ? (
+                            ) : changelog.field === "truck.leftSideMeasureId" ||
+                              changelog.field === "truck.rightSideMeasureId" ||
+                              changelog.field === "truck.backSideMeasureId" ? (
                               // Special handling for truck layout fields - show SVG visualization
                               (() => {
                                 const parseLayoutValue = (val: any) => {
@@ -2133,7 +2133,7 @@ const ChangelogTimelineItem = ({
                                     ? "Lado Sapo"
                                     : changelog.field.includes("backSide")
                                       ? "Traseira"
-                                      : "Layout";
+                                      : "Medidas";
 
                                 return (
                                   <div className="space-y-2">
@@ -2142,8 +2142,8 @@ const ChangelogTimelineItem = ({
                                     </div>
 
                                     {oldLayout &&
-                                      oldLayout.layoutSections &&
-                                      oldLayout.layoutSections.length > 0 && (
+                                      oldLayout.sections &&
+                                      oldLayout.sections.length > 0 && (
                                         <div>
                                           <span className="text-sm text-muted-foreground mb-1 block">
                                             Antes:
@@ -2152,7 +2152,7 @@ const ChangelogTimelineItem = ({
                                             <div
                                               dangerouslySetInnerHTML={{
                                                 __html:
-                                                  generateLayoutSVG(oldLayout),
+                                                  generateImplementMeasureSVG(oldLayout),
                                               }}
                                               className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[140px] [&>svg]:max-h-[60px]"
                                             />
@@ -2161,8 +2161,8 @@ const ChangelogTimelineItem = ({
                                       )}
 
                                     {newLayout &&
-                                      newLayout.layoutSections &&
-                                      newLayout.layoutSections.length > 0 && (
+                                      newLayout.sections &&
+                                      newLayout.sections.length > 0 && (
                                         <div>
                                           <span className="text-sm text-muted-foreground mb-1 block">
                                             Depois:
@@ -2171,7 +2171,7 @@ const ChangelogTimelineItem = ({
                                             <div
                                               dangerouslySetInnerHTML={{
                                                 __html:
-                                                  generateLayoutSVG(newLayout),
+                                                  generateImplementMeasureSVG(newLayout),
                                               }}
                                               className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[140px] [&>svg]:max-h-[60px]"
                                             />
@@ -2179,8 +2179,8 @@ const ChangelogTimelineItem = ({
                                         </div>
                                       )}
 
-                                    {!oldLayout?.layoutSections?.length &&
-                                      !newLayout?.layoutSections?.length && (
+                                    {!oldLayout?.sections?.length &&
+                                      !newLayout?.sections?.length && (
                                         <div className="text-sm text-muted-foreground">
                                           Layout modificado (sem visualização
                                           disponível)
@@ -2226,8 +2226,8 @@ const ChangelogTimelineItem = ({
                                   )}
                                 </div>
                               </>
-                            ) : changelog.field === "artworks" ||
-                              changelog.field === "artworkIds" ||
+                            ) : changelog.field === "layouts" ||
+                              changelog.field === "layoutIds" ||
                               changelog.field === "baseFileIds" ||
                               changelog.field === "budgets" ||
                               changelog.field === "invoices" ||
@@ -2377,15 +2377,15 @@ const ChangelogTimelineItem = ({
 
                                 const layoutSides = [
                                   {
-                                    key: "leftSideLayoutId",
+                                    key: "leftSideMeasureId",
                                     label: "Lado Motorista",
                                   },
                                   {
-                                    key: "rightSideLayoutId",
+                                    key: "rightSideMeasureId",
                                     label: "Lado Sapo",
                                   },
                                   {
-                                    key: "backSideLayoutId",
+                                    key: "backSideMeasureId",
                                     label: "Traseira",
                                   },
                                 ];

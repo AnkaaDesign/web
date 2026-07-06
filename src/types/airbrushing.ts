@@ -16,9 +16,11 @@ export interface Airbrushing extends BaseEntity {
   startedAt: Date | null; // Actual start timestamp
   finishedAt: Date | null; // Actual finish timestamp
   price: number | null;
-  status: AIRBRUSHING_STATUS; // "Pendente", "Em Andamento", "Finalizado"
-  statusOrder: number; // 1=Pendente, 2=Em Andamento, 3=Finalizado
+  status: AIRBRUSHING_STATUS; // "Pendente", "Em Produção", "Finalizado", "Cancelado"
+  statusOrder: number; // 1=Pendente, 2=Em Produção, 3=Finalizado, 4=Cancelado
   paymentStatus: AIRBRUSHING_PAYMENT_STATUS;
+  /** Stamped when paymentStatus becomes PAID — windows "paid this month" on Contas a Pagar. */
+  paidAt?: Date | null;
   taskId: string;
   painterId?: string | null;
 
@@ -27,7 +29,7 @@ export interface Airbrushing extends BaseEntity {
   painter?: User | null;
   receipts?: File[];
   invoices?: File[];
-  artworks?: File[];
+  layouts?: File[];
 }
 
 // =====================
@@ -50,7 +52,7 @@ export interface AirbrushingIncludes {
     | {
         include?: FileIncludes;
       };
-  artworks?:
+  layouts?:
     | boolean
     | {
         include?: FileIncludes;

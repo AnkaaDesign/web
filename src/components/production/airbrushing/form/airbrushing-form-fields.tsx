@@ -1,8 +1,9 @@
 import { useFormContext, useWatch } from "react-hook-form";
-import { FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { IconInfoCircle } from "@tabler/icons-react";
 import { PainterSelector } from "./painter-selector";
 import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_PAYMENT_STATUS_LABELS } from "../../../../constants";
 
@@ -10,9 +11,15 @@ interface AirbrushingFormFieldsProps {
   control: any;
   disabled?: boolean;
   initialPainter?: { id: string; name: string; email?: string | null; status?: string | null };
+  /**
+   * Whether the current user may see monetary/payment information.
+   * Gate for `price` + `paymentStatus` — derived from the canonical
+   * `canViewAirbrushingFinancials(user)`. When false these fields are hidden.
+   */
+  canViewFinancials?: boolean;
 }
 
-export function AirbrushingFormFields({ control, disabled, initialPainter }: AirbrushingFormFieldsProps) {
+export function AirbrushingFormFields({ control, disabled, initialPainter, canViewFinancials = true }: AirbrushingFormFieldsProps) {
   const { setValue } = useFormContext();
 
   // Watch status reactively to gate the payment status field (never mirror form state with useState)
@@ -33,22 +40,8 @@ export function AirbrushingFormFields({ control, disabled, initialPainter }: Air
 
   return (
     <div className="space-y-4">
-      {/* Row 1: Price | Painter */}
+      {/* Row 1: Painter | Price (price gated behind financial visibility) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField
-          control={control}
-          name="price"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Preço do Serviço</FormLabel>
-              <FormControl>
-                <Input type="currency" value={field.value || undefined} onChange={field.onChange} placeholder="R$ 0,00" disabled={disabled} className="bg-transparent" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
         <FormField
           control={control}
           name="painterId"
@@ -62,9 +55,25 @@ export function AirbrushingFormFields({ control, disabled, initialPainter }: Air
             </FormItem>
           )}
         />
+
+        {canViewFinancials && (
+          <FormField
+            control={control}
+            name="price"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Preço do Serviço</FormLabel>
+                <FormControl>
+                  <Input type="currency" value={field.value ?? undefined} onChange={field.onChange} placeholder="R$ 0,00" disabled={disabled} className="bg-transparent" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
       </div>
 
-      {/* Row 2: Status | Payment Status (gated on COMPLETED) */}
+      {/* Row 2: Status | Payment Status (payment gated behind financial visibility + COMPLETED) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
           control={control}
@@ -95,31 +104,37 @@ export function AirbrushingFormFields({ control, disabled, initialPainter }: Air
           )}
         />
 
-        <FormField
-          control={control}
-          name="paymentStatus"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Status do Pagamento</FormLabel>
-              <FormControl>
-                <Combobox
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  options={paymentStatusOptions}
-                  placeholder="Selecione o status do pagamento"
-                  searchable={false}
-                  clearable={false}
-                  disabled={disabled || !isCompleted}
-                />
-              </FormControl>
-              {!isCompleted && <FormDescription>Disponível somente após a conclusão da aerografia</FormDescription>}
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {canViewFinancials && (
+          <FormField
+            control={control}
+            name="paymentStatus"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-1.5">
+                  Status do Pagamento
+                  {!isCompleted && (
+                    <IconInfoCircle className="h-3.5 w-3.5 text-muted-foreground" title="Disponível somente após a conclusão da aerografia" />
+                  )}
+                </FormLabel>
+                <FormControl>
+                  <Combobox
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={paymentStatusOptions}
+                    placeholder="Selecione o status do pagamento"
+                    searchable={false}
+                    clearable={false}
+                    disabled={disabled || !isCompleted}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
       </div>
 
-      {/* Row 3: Expected dates */}
+      {/* Row 3: Planned dates */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
           control={control}
@@ -134,25 +149,6 @@ export function AirbrushingFormFields({ control, disabled, initialPainter }: Air
           name="finishDate"
           render={({ field }) => (
             <DateTimeInput field={field} label="Término Previsto" mode="date" context="end" disabled={disabled} />
-          )}
-        />
-      </div>
-
-      {/* Row 4: Actual dates */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField
-          control={control}
-          name="startedAt"
-          render={({ field }) => (
-            <DateTimeInput field={field} label="Iniciado em" mode="datetime" context="start" disabled={disabled} />
-          )}
-        />
-
-        <FormField
-          control={control}
-          name="finishedAt"
-          render={({ field }) => (
-            <DateTimeInput field={field} label="Finalizado em" mode="datetime" context="end" disabled={disabled} />
           )}
         />
       </div>

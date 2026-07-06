@@ -352,8 +352,8 @@ export const fileKeys = {
     ["files", "suggestions", customerId, fileContext, excludeIds] as const,
 };
 
-// Alias for artworks (task files are now called artworks)
-export const artworkKeys = fileKeys;
+// Alias for layouts (task files are now called layouts)
+export const layoutKeys = fileKeys;
 
 // =====================================================
 // Garage Query Keys

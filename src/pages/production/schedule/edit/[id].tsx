@@ -102,7 +102,7 @@ export const TaskEditPage = () => {
         },
       },
       generalPainting: true,
-      artworks: true,
+      layouts: true,
       budget: true,
       budgets: true,
       invoices: true,
@@ -120,7 +120,7 @@ export const TaskEditPage = () => {
         include: {
           receipts: true,
           invoices: true,
-          artworks: true,
+          layouts: true,
           painter: true,
         },
       },

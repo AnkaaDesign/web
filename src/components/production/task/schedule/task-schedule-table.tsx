@@ -1,22 +1,48 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  type SortingState,
+  type VisibilityState,
+} from "@tanstack/react-table";
 import type { Task } from "../../../../types";
-import { routes, TASK_STATUS } from "../../../../constants";
-import { formatDate, getHoursBetween, isDateInPast, calculateTaskMeasures, formatTaskMeasures, formatTruckSpot } from "../../../../utils";
+import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
 import { useAuth } from "@/contexts/auth-context";
-import { canEditTasks } from "@/utils/permissions/entity-permissions";
+import { canEditTasks, canDeleteTasks, canFinishTask, canLeaderManageTask } from "@/utils/permissions/entity-permissions";
+import { canViewQuote } from "@/utils/permissions/quote-permissions";
+import { isTeamLeader } from "@/utils/user";
+import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
+import { getTaskQuoteEditRoute } from "@/utils/task";
+import { useReturnTo } from "@/hooks/common/use-return-to";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { DeadlineCountdown } from "./deadline-countdown";
-import { getRowColorClass } from "./task-table-utils";
 import { IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
-import { PAINT_FINISH, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, SERVICE_ORDER_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
-import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
-import { ServiceOrderCell } from "../history/service-order-cell";
-import { TaskTableContextMenu, type TaskAction } from "./task-table-context-menu";
+import {
+  IconPlayerPlay,
+  IconCheck,
+  IconCopy,
+  IconBuildingFactory2,
+  IconEdit,
+  IconTrash,
+  IconFileInvoice,
+  IconSettings2,
+  IconPhoto,
+  IconFileText,
+  IconPalette,
+  IconCut,
+  IconClipboardCopy,
+  IconLayout,
+  IconCalendarTime,
+  IconReceipt,
+} from "@tabler/icons-react";
+import { DataTableContextMenu, type DataTableContextMenuState, type DataTableRowAction } from "@/components/ui/datatable";
+import { getRowColorClass } from "./task-table-utils";
+import { createTaskScheduleColumns } from "./task-schedule-columns";
 import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetStatusModal } from "./set-status-modal";
@@ -25,12 +51,36 @@ import { SetQuoteLayoutModal } from "./set-quote-layout-modal";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { toast } from "@/components/ui/sonner";
-import { getTaskQuoteEditRoute } from "@/utils/task";
-import { useReturnTo } from "@/hooks/common/use-return-to";
-import { Checkbox } from "@/components/ui/checkbox";
-import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { TableSortUtils, createColumnConfigMap, type SortableColumnConfig, type SortConfig, type SortDirection } from "@/utils/table-sort-utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+/** Internal action keys — mirror the previous bespoke context-menu (TaskAction). */
+type TaskAction =
+  | "start"
+  | "finish"
+  | "duplicate"
+  | "setSector"
+  | "setTerm"
+  | "setStatus"
+  | "edit"
+  | "delete"
+  | "bulkArts"
+  | "bulkBaseFiles"
+  | "bulkPaints"
+  | "bulkCuttingPlans"
+  | "copyFromTask"
+  | "bulkServiceOrder"
+  | "bulkLayout"
+  | "quote"
+  | "quoteLayout";
 
 interface TaskScheduleTableProps {
   tasks: Task[];
@@ -47,642 +97,479 @@ interface TaskScheduleTableProps {
   onSingleClickSelect?: (taskId: string) => void; // Handler to update last clicked task
 }
 
-interface TaskRow extends Task {
-  isOverdue: boolean;
-  hoursRemaining: number | null;
-}
-
-export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: externalSelectedTaskIds, onSelectedTaskIdsChange, advancedActionsRef: externalAdvancedActionsRef, allSelectedTasks, isSelectingSourceTask, onSourceTaskSelect, onStartCopyFromTask, onShiftClickSelect, onSingleClickSelect }: TaskScheduleTableProps) {
+export function TaskScheduleTable({
+  tasks,
+  visibleColumns,
+  selectedTaskIds: externalSelectedTaskIds,
+  onSelectedTaskIdsChange,
+  advancedActionsRef: externalAdvancedActionsRef,
+  allSelectedTasks,
+  isSelectingSourceTask,
+  onSourceTaskSelect,
+  onStartCopyFromTask,
+  onShiftClickSelect,
+  onSingleClickSelect,
+}: TaskScheduleTableProps) {
   const navigate = useNavigate();
   const returnTo = useReturnTo();
   const { user } = useAuth();
   const canEdit = canEditTasks(user);
-  const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([]);
 
-  // Use external selection state if provided, otherwise use internal state
+  // Selection: shared across all sector tables when the parent provides it.
   const [internalSelectedTaskIds, setInternalSelectedTaskIds] = useState<Set<string>>(new Set());
   const selectedTaskIds = externalSelectedTaskIds ?? internalSelectedTaskIds;
   const setSelectedTaskIds = onSelectedTaskIdsChange ?? setInternalSelectedTaskIds;
-  const [_duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+
+  const [taskToDuplicate, setTaskToDuplicate] = useState<Task | null>(null);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [setTermModalOpen, setSetTermModalOpen] = useState(false);
   const [quoteLayoutModalOpen, setQuoteLayoutModalOpen] = useState(false);
-  const [taskToDuplicate, setTaskToDuplicate] = useState<Task | null>(null);
   const [tasksToUpdate, setTasksToUpdate] = useState<Task[]>([]);
 
-  // Use external advanced actions ref if provided, otherwise use internal ref
   const internalAdvancedActionsRef = React.useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
   const advancedActionsRef = externalAdvancedActionsRef ?? internalAdvancedActionsRef;
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    tasks: Task[];
-  } | null>(null);
-  const [deleteDialog, setDeleteDialog] = useState<{
-    tasks: Task[];
-    isBulk: boolean;
-  } | null>(null);
 
-  const { updateAsync, createAsync, deleteAsync: deleteTaskAsync } = useTaskMutations();
+  const [contextMenu, setContextMenu] = useState<DataTableContextMenuState<Task> | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ tasks: Task[] } | null>(null);
+
+  const { updateAsync, deleteAsync: deleteTaskAsync } = useTaskMutations();
   const { batchUpdateAsync } = useTaskBatchMutations();
 
-  // Custom sort function for serialNumberOrPlate (multi-field)
-  const sortSerialNumberOrPlate = useCallback((a: TaskRow, b: TaskRow, direction: SortDirection): number => {
-    const aValue = a.serialNumber || a.truck?.plate || "";
-    const bValue = b.serialNumber || b.truck?.plate || "";
-    return TableSortUtils.compareValues(aValue, bValue, direction);
-  }, []);
+  // --- shared column model (DataTable base column defs) ---
+  const columns = useMemo(() => createTaskScheduleColumns({ includeServiceOrders: false }), []);
 
-  // Define all columns with enhanced sort configuration
-  const sortableColumns = useMemo<SortableColumnConfig[]>(
-    () => [
-      {
-        key: "name",
-        header: "LOGOMARCA",
-        sortable: true,
-        accessor: "name",
-        dataType: "string",
-      },
-      {
-        key: "customer.fantasyName",
-        header: "CLIENTE",
-        sortable: true,
-        accessor: "customer.fantasyName",
-        dataType: "string",
-      },
-      {
-        key: "generalPainting",
-        header: "PINTURA",
-        sortable: true,
-        accessor: (task: TaskRow) => task.generalPainting?.name || "",
-        dataType: "string",
-      },
-      {
-        key: "serialNumberOrPlate",
-        header: "IDENTIFICADOR",
-        sortable: true,
-        accessor: (task: TaskRow) => task.serialNumber || task.truck?.plate || "",
-        customSortFunction: sortSerialNumberOrPlate,
-        dataType: "custom",
-      },
-      {
-        key: "spot",
-        header: "LOCAL",
-        sortable: true,
-        accessor: (task: TaskRow) => task.truck?.spot || "",
-        dataType: "string",
-      },
-      {
-        key: "chassisNumber",
-        header: "Nº CHASSI",
-        sortable: true,
-        accessor: (task: TaskRow) => task.truck?.chassisNumber || "",
-        dataType: "string",
-      },
-      {
-        key: "sector.name",
-        header: "SETOR",
-        sortable: true,
-        accessor: "sector.name",
-        dataType: "string",
-      },
-      {
-        key: "entryDate",
-        header: "ENTRADA",
-        sortable: true,
-        accessor: "entryDate",
-        dataType: "date",
-      },
-      {
-        key: "startedAt",
-        header: "INICIADO EM",
-        sortable: true,
-        accessor: "startedAt",
-        dataType: "date",
-      },
-      {
-        key: "term",
-        header: "PRAZO",
-        sortable: true,
-        accessor: "term",
-        dataType: "date",
-      },
-      {
-        key: "measures",
-        header: "MEDIDAS",
-        sortable: true,
-        accessor: (task: TaskRow) => calculateTaskMeasures(task) || 0,
-        dataType: "number",
-      },
-      {
-        key: "remainingTime",
-        header: "TEMPO RESTANTE",
-        sortable: true,
-        accessor: (task: TaskRow) => {
-          if (!task.term) return Infinity;
-          const now = new Date();
-          const deadline = new Date(task.term);
-          return deadline.getTime() - now.getTime();
-        },
-        dataType: "number",
-      },
-    ],
-    [sortSerialNumberOrPlate],
-  );
-
-  // Create column config map for sorting
-  const columnConfigMap = useMemo(() => createColumnConfigMap(sortableColumns), [sortableColumns]);
-
-  // Get user's sector privilege for service order column visibility
-  const userSectorPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
-  const visibleServiceOrderTypes = useMemo(() => getVisibleServiceOrderTypes(userSectorPrivilege), [userSectorPrivilege]);
-
-  // Define display columns (includes select and non-sortable columns)
-  const allColumns = useMemo(
-    () => {
-      const baseColumns = [
-        { id: "select", header: "", width: TABLE_LAYOUT.checkbox.className, sortable: false },
-        { id: "name", header: "LOGOMARCA", width: "w-[180px]", sortable: true },
-        { id: "customer.fantasyName", header: "CLIENTE", width: "w-[150px]", sortable: true },
-        { id: "measures", header: "MEDIDAS", width: "w-[110px]", sortable: true },
-        { id: "generalPainting", header: "PINTURA", width: "w-[100px]", sortable: true },
-      ];
-
-      // Add service order columns based on user privilege
-      const serviceOrderColumns = [
-        { id: "serviceOrders.production", header: "OS PRODUÇÃO", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.PRODUCTION },
-        { id: "serviceOrders.commercial", header: "OS COMERCIAL", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.COMMERCIAL },
-        { id: "serviceOrders.logistic", header: "OS LOGÍSTICA", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.LOGISTIC },
-        { id: "serviceOrders.artwork", header: "OS ARTE", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.ARTWORK },
-      ].filter(col => visibleServiceOrderTypes.includes(col.type));
-
-      const remainingColumns = [
-        { id: "serialNumberOrPlate", header: "IDENTIFICADOR", width: "w-[140px]", sortable: true },
-        { id: "spot", header: "LOCAL", width: "w-[120px]", sortable: true },
-        { id: "chassisNumber", header: "Nº CHASSI", width: "w-[140px]", sortable: true },
-        { id: "sector.name", header: "SETOR", width: "w-[120px]", sortable: true },
-        { id: "entryDate", header: "ENTRADA", width: "w-[110px]", sortable: true },
-        { id: "startedAt", header: "INICIADO EM", width: "w-[110px]", sortable: true },
-        { id: "term", header: "PRAZO", width: "w-[110px]", sortable: true },
-        { id: "remainingTime", header: "TEMPO RESTANTE", width: "w-[130px]", sortable: true },
-      ];
-
-      return [...baseColumns, ...serviceOrderColumns, ...remainingColumns];
-    },
-    [visibleServiceOrderTypes],
-  );
-
-  // All columns are visible by default
-  // Only show select column for users who can edit tasks
-  const columns = useMemo(() => {
-    const baseColumns = canEdit ? allColumns.filter((col) => col.id === "select") : [];
-    const visibleDataColumns = allColumns.filter((col) => {
-      if (col.id === "select") return false;
-      if (!visibleColumns || visibleColumns.size === 0) return true;
-      return visibleColumns.has(col.id);
-    });
-    return [...baseColumns, ...visibleDataColumns];
-  }, [allColumns, visibleColumns, canEdit]);
-
-  // Prepare tasks with deadline info and apply cumulative sorting
-  const preparedTasks = useMemo<TaskRow[]>(() => {
-    const tasksWithInfo = tasks.map((task) => {
-      const isOverdue = task.term ? isDateInPast(task.term) : false;
-      const hoursRemaining = task.term && !isOverdue ? getHoursBetween(new Date(), task.term) : null;
-
-      return {
-        ...task,
-        isOverdue,
-        hoursRemaining,
-      };
-    });
-
-    // Apply multi-column cumulative sorting
-    if (sortConfigs.length > 0) {
-      return TableSortUtils.sortItems(tasksWithInfo, sortConfigs, columnConfigMap);
+  // Controlled visibility from the shared ColumnVisibilityManager (parent-owned Set). Empty/undefined
+  // Set → show every column, mirroring the previous behavior.
+  const columnVisibility = useMemo<VisibilityState>(() => {
+    const v: VisibilityState = {};
+    for (const c of columns) {
+      v[c.id] = !visibleColumns || visibleColumns.size === 0 ? true : visibleColumns.has(c.id);
     }
+    return v;
+  }, [columns, visibleColumns]);
 
-    return tasksWithInfo;
-  }, [tasks, sortConfigs, columnConfigMap]);
+  // Per-group cumulative multi-sort (each sector table sorts independently, as before).
+  const [sorting, setSorting] = useState<SortingState>([]);
 
+  const table = useReactTable<Task>({
+    data: tasks,
+    columns,
+    state: { columnVisibility, sorting },
+    onSortingChange: setSorting,
+    getRowId: (t) => t.id,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableSorting: true,
+    enableMultiSort: true,
+    isMultiSortEvent: () => true,
+    enableSortingRemoval: true,
+    maxMultiSortColCount: 5,
+  });
+
+  const rows = table.getRowModel().rows;
+  const preparedTaskIds = useMemo(() => rows.map((r) => r.id), [rows]);
+
+  // --- selection helpers (shared Set) ---
   const handleSelectAll = useCallback(
     (checked: boolean) => {
-      const currentTableTaskIds = preparedTasks.map((t) => t.id);
-
-      if (checked) {
-        // Add all tasks from this table to selection
-        const newSelected = new Set(selectedTaskIds);
-        currentTableTaskIds.forEach(id => newSelected.add(id));
-        setSelectedTaskIds(newSelected);
-      } else {
-        // Remove all tasks from this table from selection
-        const newSelected = new Set(selectedTaskIds);
-        currentTableTaskIds.forEach(id => newSelected.delete(id));
-        setSelectedTaskIds(newSelected);
-      }
+      const next = new Set(selectedTaskIds);
+      if (checked) preparedTaskIds.forEach((id) => next.add(id));
+      else preparedTaskIds.forEach((id) => next.delete(id));
+      setSelectedTaskIds(next);
     },
-    [preparedTasks, selectedTaskIds, setSelectedTaskIds],
+    [preparedTaskIds, selectedTaskIds, setSelectedTaskIds],
   );
 
   const handleSelectTask = useCallback(
     (taskId: string, checked: boolean) => {
-      const newSelected = new Set(selectedTaskIds);
-      if (checked) {
-        newSelected.add(taskId);
-      } else {
-        newSelected.delete(taskId);
-      }
-      setSelectedTaskIds(newSelected);
+      const next = new Set(selectedTaskIds);
+      if (checked) next.add(taskId);
+      else next.delete(taskId);
+      setSelectedTaskIds(next);
     },
-    [selectedTaskIds],
+    [selectedTaskIds, setSelectedTaskIds],
   );
 
   const handleRowClick = useCallback(
     (e: React.MouseEvent, taskId: string) => {
-      // Don't navigate if clicking checkbox or if it's a context menu click
-      if ((e.target as HTMLElement).closest("[data-checkbox]") || e.button === 2) {
-        return;
-      }
+      if ((e.target as HTMLElement).closest("[data-checkbox]") || e.button === 2) return;
 
-      // Handle source task selection mode (copy from task)
+      // Source-pick mode (copy from task): click picks the source.
       if (isSelectingSourceTask && onSourceTaskSelect) {
-        const task = preparedTasks.find((t) => t.id === taskId);
-        if (task) {
-          onSourceTaskSelect(task);
-        }
+        const task = tasks.find((t) => t.id === taskId);
+        if (task) onSourceTaskSelect(task);
         return;
       }
 
-      // Handle selection with Ctrl/Cmd or Shift
       if (e.ctrlKey || e.metaKey) {
-        console.log("[RowClick] Ctrl/Cmd click - toggling selection");
         handleSelectTask(taskId, !selectedTaskIds.has(taskId));
-        // Update last clicked task for cross-table shift+click
         onSingleClickSelect?.(taskId);
       } else if (e.shiftKey) {
-        // Shift+click - use cross-table selection (works even with no prior selection)
-        if (onShiftClickSelect) {
-          onShiftClickSelect(taskId);
-        } else if (selectedTaskIds.size > 0) {
-          // Fallback: Implement shift-click range selection within this table only
-          const lastSelectedId = Array.from(selectedTaskIds).pop();
-          const lastSelectedIndex = preparedTasks.findIndex((t) => t.id === lastSelectedId);
-          const currentIndex = preparedTasks.findIndex((t) => t.id === taskId);
-
-          if (lastSelectedIndex !== -1 && currentIndex !== -1) {
-            const start = Math.min(lastSelectedIndex, currentIndex);
-            const end = Math.max(lastSelectedIndex, currentIndex);
-            const rangeIds = preparedTasks.slice(start, end + 1).map((t) => t.id);
-            setSelectedTaskIds(new Set([...selectedTaskIds, ...rangeIds]));
-          }
-        }
+        if (onShiftClickSelect) onShiftClickSelect(taskId);
       } else {
-        // Normal click - navigate
         navigate(routes.production.schedule.details(taskId));
       }
     },
-    [navigate, selectedTaskIds, preparedTasks, handleSelectTask, isSelectingSourceTask, onSourceTaskSelect, onShiftClickSelect, onSingleClickSelect],
+    [navigate, selectedTaskIds, tasks, handleSelectTask, isSelectingSourceTask, onSourceTaskSelect, onShiftClickSelect, onSingleClickSelect],
   );
 
+  // --- bulk-action dispatch (opens modals / calls mutations / advanced handler) ---
+  const handleAction = useCallback(
+    async (action: TaskAction, actionTasks: Task[]) => {
+      switch (action) {
+        case "start":
+          for (const task of actionTasks) {
+            if (task.status === TASK_STATUS.WAITING_PRODUCTION || task.status === TASK_STATUS.PREPARATION) {
+              await updateAsync({ id: task.id, data: { status: TASK_STATUS.IN_PRODUCTION } });
+            }
+          }
+          break;
+        case "finish":
+          for (const task of actionTasks) {
+            if (task.status === TASK_STATUS.IN_PRODUCTION) {
+              await updateAsync({ id: task.id, data: { status: TASK_STATUS.COMPLETED } });
+            }
+          }
+          break;
+        case "duplicate":
+          if (actionTasks.length === 1) setTaskToDuplicate(actionTasks[0]);
+          break;
+        case "setSector":
+          setTasksToUpdate(actionTasks);
+          setSetSectorModalOpen(true);
+          break;
+        case "setStatus":
+          setTasksToUpdate(actionTasks);
+          setSetStatusModalOpen(true);
+          break;
+        case "setTerm":
+          setTasksToUpdate(actionTasks);
+          setSetTermModalOpen(true);
+          break;
+        case "quoteLayout":
+          setTasksToUpdate(actionTasks);
+          setQuoteLayoutModalOpen(true);
+          break;
+        case "edit":
+          if (actionTasks.length === 1) {
+            if (user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL) {
+              navigate(getTaskQuoteEditRoute(actionTasks[0]), { state: { returnTo } });
+            } else {
+              navigate(routes.production.schedule.edit(actionTasks[0].id));
+            }
+          } else {
+            const ids = actionTasks.map((t) => t.id).join(",");
+            navigate(`${routes.production.schedule.batchEdit}?ids=${ids}`);
+          }
+          break;
+        case "quote":
+          if (actionTasks.length === 1) navigate(getTaskQuoteEditRoute(actionTasks[0]), { state: { returnTo } });
+          break;
+        case "delete":
+          setDeleteDialog({ tasks: actionTasks });
+          break;
+        case "bulkArts":
+          advancedActionsRef.current?.openModal("arts", actionTasks.map((t) => t.id));
+          break;
+        case "bulkBaseFiles":
+          advancedActionsRef.current?.openModal("baseFiles", actionTasks.map((t) => t.id));
+          break;
+        case "bulkPaints":
+          advancedActionsRef.current?.openModal("paints", actionTasks.map((t) => t.id));
+          break;
+        case "bulkCuttingPlans":
+          advancedActionsRef.current?.openModal("cuttingPlans", actionTasks.map((t) => t.id));
+          break;
+        case "bulkServiceOrder":
+          advancedActionsRef.current?.openModal("serviceOrder", actionTasks.map((t) => t.id));
+          break;
+        case "bulkLayout":
+          advancedActionsRef.current?.openModal("layout", actionTasks.map((t) => t.id));
+          break;
+        case "copyFromTask":
+          onStartCopyFromTask?.(actionTasks);
+          break;
+      }
+    },
+    [updateAsync, navigate, returnTo, user, advancedActionsRef, onStartCopyFromTask],
+  );
+
+  // --- right-click context menu: reuse the DataTable base menu (DataTableContextMenu +
+  //     DataTableRowAction). Rows target the SHARED cross-table selection when the clicked row is
+  //     part of it, else just the clicked row (matches the previous behavior). ---
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, task: Task) => {
       e.preventDefault();
       e.stopPropagation();
-
-      // Check if clicked task is part of selection
-      const isTaskSelected = selectedTaskIds.has(task.id);
       const hasSelection = selectedTaskIds.size > 0;
-
-      if (hasSelection && isTaskSelected) {
-        // Show context menu for all selected tasks (from all tables if provided)
-        const selectedTasksList = allSelectedTasks && allSelectedTasks.length > 0
-          ? allSelectedTasks
-          : preparedTasks.filter((t) => selectedTaskIds.has(t.id));
-        setContextMenu({
-          x: e.clientX,
-          y: e.clientY,
-          tasks: selectedTasksList,
-        });
-      } else {
-        // Show context menu for just the clicked task
-        setContextMenu({
-          x: e.clientX,
-          y: e.clientY,
-          tasks: [task],
-        });
-      }
+      const targets =
+        hasSelection && selectedTaskIds.has(task.id)
+          ? allSelectedTasks && allSelectedTasks.length > 0
+            ? allSelectedTasks
+            : tasks.filter((t) => selectedTaskIds.has(t.id))
+          : [task];
+      setContextMenu({ x: e.clientX, y: e.clientY, rows: targets, isBulk: targets.length > 1 });
     },
-    [selectedTaskIds, preparedTasks, allSelectedTasks],
+    [selectedTaskIds, allSelectedTasks, tasks],
   );
 
-  const handleSort = useCallback(
-    (column: string, _event?: React.MouseEvent) => {
-      if (!allColumns.find((col) => col.id === column)?.sortable) return;
+  // User-level permission flags (row-independent).
+  const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  const isProductionManager = user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
+  const isCommercial = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
+  const isTeamLeaderUser = user ? isTeamLeader(user) : false;
+  const canDelete = canDeleteTasks(user);
+  const canFinish = canFinishTask(user);
+  const userCanViewQuote = canViewQuote(user?.sector?.privileges || "");
 
-      // Always use cumulative multi-sort mode
-      const multiSort = true;
+  const menuRows = contextMenu?.rows ?? [];
+  const advancedGroup = useMemo(() => ({ id: "advanced", label: "Avançados", icon: <IconSettings2 className="mr-2 h-4 w-4" /> }), []);
 
-      setSortConfigs((currentConfigs) => {
-        return TableSortUtils.toggleColumnSort(currentConfigs, column, { multiSort });
-      });
-    },
-    [allColumns],
-  );
+  const rowActions = useMemo<DataTableRowAction<Task>[]>(() => {
+    const canManageStatus = (rs: Task[]) => isAdmin || (isTeamLeaderUser && rs.every((t) => canLeaderManageTask(user, t.sectorId)));
+    const hasFinishable = (rs: Task[]) => rs.some((t) => t.status === TASK_STATUS.IN_PRODUCTION && areAllServiceOrdersComplete(t.serviceOrders));
+    const hasWaiting = (rs: Task[]) => rs.some((t) => t.status === TASK_STATUS.WAITING_PRODUCTION);
+    const hasPreparation = (rs: Task[]) => rs.some((t) => t.status === TASK_STATUS.PREPARATION);
 
-  const handleAction = useCallback(
-    async (action: TaskAction, tasks: Task[]) => {
-      switch (action) {
-        case "start":
-          // Note: startedAt is auto-filled by the backend when status changes to IN_PRODUCTION
-          for (const task of tasks) {
-            if (task.status === TASK_STATUS.WAITING_PRODUCTION || task.status === TASK_STATUS.PREPARATION) {
-              await updateAsync({
-                id: task.id,
-                data: { status: TASK_STATUS.IN_PRODUCTION },
-              });
-            }
-          }
-          break;
+    return [
+      {
+        key: "start",
+        label: "Iniciar",
+        icon: <IconPlayerPlay className="mr-2 h-4 w-4 text-green-700" />,
+        hidden: (rs) => !(canManageStatus(rs) && (hasWaiting(rs) || hasPreparation(rs))),
+        onClick: (rs) => handleAction("start", rs),
+      },
+      {
+        key: "finish",
+        label: "Finalizar",
+        icon: <IconCheck className="mr-2 h-4 w-4 text-green-700" />,
+        hidden: (rs) => !(canFinish && hasFinishable(rs)),
+        onClick: (rs) => handleAction("finish", rs),
+      },
+      {
+        key: "edit",
+        label: menuRows.length > 1 ? "Editar em lote" : "Editar",
+        icon: <IconEdit className="mr-2 h-4 w-4" />,
+        separatorBefore: true,
+        hidden: () => !canEdit,
+        onClick: (rs) => handleAction("edit", rs),
+      },
+      {
+        key: "duplicate",
+        label: "Criar Cópias",
+        icon: <IconCopy className="mr-2 h-4 w-4" />,
+        hidden: (rs) => !((isAdmin || isCommercial) && rs.length === 1),
+        onClick: (rs) => handleAction("duplicate", rs),
+      },
+      {
+        key: "quote",
+        label: getTaskQuoteDisplayLabel(menuRows[0]?.quote?.status),
+        icon: <IconReceipt className="mr-2 h-4 w-4" />,
+        hidden: (rs) => !(userCanViewQuote && rs.length === 1 && !isCommercial),
+        onClick: (rs) => handleAction("quote", rs),
+      },
+      {
+        key: "setSector",
+        label: menuRows.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor",
+        icon: <IconBuildingFactory2 className="mr-2 h-4 w-4" />,
+        hidden: () => !(isAdmin || isProductionManager),
+        onClick: (rs) => handleAction("setSector", rs),
+      },
+      {
+        key: "setTerm",
+        label: menuRows.some((t) => t.term) ? "Alterar Prazo" : "Definir Prazo",
+        icon: <IconCalendarTime className="mr-2 h-4 w-4" />,
+        hidden: () => !(isAdmin || isProductionManager || isCommercial),
+        onClick: (rs) => handleAction("setTerm", rs),
+      },
+      {
+        key: "quoteLayout",
+        label: menuRows.some((t) => (((t as { quote?: { layoutFiles?: unknown[] } }).quote?.layoutFiles?.length ?? 0) > 0)) ? "Alterar Layout" : "Adicionar Layout",
+        icon: <IconPhoto className="mr-2 h-4 w-4" />,
+        hidden: () => !isCommercial,
+        onClick: (rs) => handleAction("quoteLayout", rs),
+      },
+      {
+        key: "setStatus",
+        label: "Alterar Status",
+        icon: <IconFileInvoice className="mr-2 h-4 w-4" />,
+        hidden: () => !isAdmin,
+        onClick: (rs) => handleAction("setStatus", rs),
+      },
+      // --- "Avançados" submenu (ADMIN only) ---
+      {
+        key: "bulkArts",
+        label: "Adicionar Layouts",
+        icon: <IconPhoto className="mr-2 h-4 w-4" />,
+        separatorBefore: true,
+        group: advancedGroup,
+        hidden: () => !isAdmin,
+        onClick: (rs) => handleAction("bulkArts", rs),
+      },
+      {
+        key: "bulkBaseFiles",
+        label: "Arquivos Base",
+        icon: <IconFileText className="mr-2 h-4 w-4" />,
+        group: advancedGroup,
+        hidden: () => !isAdmin,
+        onClick: (rs) => handleAction("bulkBaseFiles", rs),
+      },
+      {
+        key: "bulkPaints",
+        label: "Adicionar Tintas",
+        icon: <IconPalette className="mr-2 h-4 w-4" />,
+        group: advancedGroup,
+        hidden: () => !isAdmin,
+        onClick: (rs) => handleAction("bulkPaints", rs),
+      },
+      {
+        key: "bulkCuttingPlans",
+        label: "Adicionar Plano de Corte",
+        icon: <IconCut className="mr-2 h-4 w-4" />,
+        group: advancedGroup,
+        hidden: () => !isAdmin,
+        onClick: (rs) => handleAction("bulkCuttingPlans", rs),
+      },
+      {
+        key: "bulkServiceOrder",
+        label: "Ordem de Serviço",
+        icon: <IconFileInvoice className="mr-2 h-4 w-4" />,
+        group: advancedGroup,
+        hidden: () => !isAdmin,
+        onClick: (rs) => handleAction("bulkServiceOrder", rs),
+      },
+      {
+        key: "bulkLayout",
+        label: "Medidas do Implemento",
+        icon: <IconLayout className="mr-2 h-4 w-4" />,
+        group: advancedGroup,
+        hidden: () => !isAdmin,
+        onClick: (rs) => handleAction("bulkLayout", rs),
+      },
+      {
+        key: "copyFromTask",
+        label: "Copiar de Outra Tarefa",
+        icon: <IconClipboardCopy className="mr-2 h-4 w-4" />,
+        separatorBefore: true,
+        group: advancedGroup,
+        hidden: () => !isAdmin,
+        onClick: (rs) => handleAction("copyFromTask", rs),
+      },
+      // --- delete (ADMIN only) ---
+      {
+        key: "delete",
+        label: menuRows.length > 1 ? "Excluir selecionadas" : "Excluir",
+        icon: <IconTrash className="mr-2 h-4 w-4" />,
+        variant: "destructive",
+        separatorBefore: true,
+        hidden: () => !canDelete,
+        onClick: (rs) => handleAction("delete", rs),
+      },
+    ];
+  }, [menuRows, advancedGroup, isAdmin, isProductionManager, isCommercial, isTeamLeaderUser, canEdit, canDelete, canFinish, userCanViewQuote, user, handleAction]);
 
-        case "finish":
-          // Note: finishedAt is auto-filled by the backend when status changes to COMPLETED
-          for (const task of tasks) {
-            if (task.status === TASK_STATUS.IN_PRODUCTION) {
-              await updateAsync({
-                id: task.id,
-                data: { status: TASK_STATUS.COMPLETED },
-              });
-            }
-          }
-          break;
-
-        case "duplicate":
-          if (tasks.length === 1) {
-            setTaskToDuplicate(tasks[0]);
-            setDuplicateModalOpen(true);
-          }
-          break;
-
-        case "setSector":
-          setTasksToUpdate(tasks);
-          setSetSectorModalOpen(true);
-          break;
-
-        case "setStatus":
-          setTasksToUpdate(tasks);
-          setSetStatusModalOpen(true);
-          break;
-
-        case "view":
-          if (tasks.length === 1) {
-            navigate(routes.production.schedule.details(tasks[0].id));
-          }
-          break;
-
-        case "edit":
-          if (tasks.length === 1) {
-            if (user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL) {
-              navigate(getTaskQuoteEditRoute(tasks[0]), { state: { returnTo } });
-            } else {
-              navigate(routes.production.schedule.edit(tasks[0].id));
-            }
-          } else {
-            // Batch edit
-            const ids = tasks.map((t) => t.id).join(",");
-            const batchUrl = `${routes.production.schedule.batchEdit}?ids=${ids}`;
-            navigate(batchUrl);
-          }
-          break;
-
-        case "quote":
-          if (tasks.length === 1) {
-            navigate(getTaskQuoteEditRoute(tasks[0]), { state: { returnTo } });
-          }
-          break;
-
-        case "delete":
-          setDeleteDialog({
-            tasks,
-            isBulk: tasks.length > 1,
-          });
-          break;
-
-        case "bulkArts":
-          if (advancedActionsRef.current) {
-            const taskIds = tasks.map(t => t.id);
-            advancedActionsRef.current.openModal("arts", taskIds);
-          }
-          break;
-
-        case "bulkDocuments":
-          if (advancedActionsRef.current) {
-            const taskIds = tasks.map(t => t.id);
-            advancedActionsRef.current.openModal("documents", taskIds);
-          }
-          break;
-
-        case "bulkPaints":
-          if (advancedActionsRef.current) {
-            const taskIds = tasks.map(t => t.id);
-            advancedActionsRef.current.openModal("paints", taskIds);
-          }
-          break;
-
-        case "bulkCuttingPlans":
-          if (advancedActionsRef.current) {
-            const taskIds = tasks.map(t => t.id);
-            advancedActionsRef.current.openModal("cuttingPlans", taskIds);
-          }
-          break;
-
-        case "copyFromTask":
-          if (onStartCopyFromTask) {
-            onStartCopyFromTask(tasks);
-          }
-          break;
-
-        case "setTerm":
-          setTasksToUpdate(tasks);
-          setSetTermModalOpen(true);
-          break;
-
-        case "quoteLayout":
-          setTasksToUpdate(tasks);
-          setQuoteLayoutModalOpen(true);
-          break;
-
-        case "bulkLayout":
-          if (advancedActionsRef.current) {
-            const taskIds = tasks.map(t => t.id);
-            advancedActionsRef.current.openModal("layout", taskIds);
-          }
-          break;
-
-        case "bulkServiceOrder":
-          if (advancedActionsRef.current) {
-            const taskIds = tasks.map(t => t.id);
-            advancedActionsRef.current.openModal("serviceOrder", taskIds);
-          }
-          break;
-
-        case "bulkBaseFiles":
-          if (advancedActionsRef.current) {
-            const taskIds = tasks.map(t => t.id);
-            advancedActionsRef.current.openModal("baseFiles", taskIds);
-          }
-          break;
-      }
-    },
-    [updateAsync, createAsync, deleteTaskAsync, navigate, onStartCopyFromTask],
-  );
-
+  // --- modal confirm handlers ---
   const confirmDelete = async () => {
     if (!deleteDialog) return;
-
     try {
-      for (const task of deleteDialog.tasks) {
-        await deleteTaskAsync(task.id);
-      }
+      for (const task of deleteDialog.tasks) await deleteTaskAsync(task.id);
       setSelectedTaskIds(new Set());
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Error deleting task(s):", error);
-      }
+    } catch {
+      // api-client already surfaced the error toast
     } finally {
       setDeleteDialog(null);
     }
   };
 
-  // handleDuplicateConfirm is now handled internally by TaskDuplicateModal
-
   const handleSetSectorConfirm = async (sectorId: string | null) => {
-    await batchUpdateAsync({
-      tasks: tasksToUpdate.map((task) => ({
-        id: task.id,
-        data: { sectorId },
-      })),
-    });
+    await batchUpdateAsync({ tasks: tasksToUpdate.map((task) => ({ id: task.id, data: { sectorId } })) });
     setTasksToUpdate([]);
   };
 
   const handleSetStatusConfirm = async (status: TASK_STATUS) => {
     try {
-      await batchUpdateAsync({
-        tasks: tasksToUpdate.map((task) => ({
-          id: task.id,
-          data: { status },
-        })),
+      await batchUpdateAsync({ tasks: tasksToUpdate.map((task) => ({ id: task.id, data: { status } })) });
+      const count = tasksToUpdate.length;
+      toast.success(`${count} tarefa${count > 1 ? "s" : ""} atualizada${count > 1 ? "s" : ""}`, {
+        description: count === 1 ? tasksToUpdate[0].name : `${count} tarefas atualizadas`,
       });
-
-      const taskCount = tasksToUpdate.length;
-
-      toast.success(
-        `${taskCount} tarefa${taskCount > 1 ? "s" : ""} atualizada${taskCount > 1 ? "s" : ""}`,
-        {
-          description: taskCount === 1 ? tasksToUpdate[0].name : `${taskCount} tarefas atualizadas`,
-        }
-      );
-
       setTasksToUpdate([]);
       setSelectedTaskIds(new Set());
-    } catch (error) {
-      toast.error("Erro ao atualizar status", {
-        description: "Não foi possível atualizar o status das tarefas. Tente novamente.",
-      });
+    } catch {
+      toast.error("Erro ao atualizar status", { description: "Não foi possível atualizar o status das tarefas. Tente novamente." });
     }
   };
 
   const handleSetTermConfirm = async (term: Date | null) => {
-    await batchUpdateAsync({
-      tasks: tasksToUpdate.map((task) => ({
-        id: task.id,
-        data: { term },
-      })),
-    });
+    await batchUpdateAsync({ tasks: tasksToUpdate.map((task) => ({ id: task.id, data: { term } })) });
     setTasksToUpdate([]);
   };
 
-  // Close context menu when clicking outside
-  React.useEffect(() => {
-    const handleClick = () => setContextMenu(null);
-    document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
-  }, []);
-
-  const getRowClassName = (task: TaskRow) => {
-    return cn(
-      "cursor-pointer transition-colors",
-      getRowColorClass(task),
-      isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary"
-    );
-  };
-
   if (tasks.length === 0) {
-    return <div className="border rounded-md p-8 text-center text-muted-foreground">Nenhuma tarefa neste setor</div>;
+    return <div className="rounded-md border p-8 text-center text-muted-foreground">Nenhuma tarefa neste setor</div>;
   }
+
+  const headers = table.getHeaderGroups()[0]?.headers ?? [];
+  const multiSort = sorting.length > 1;
+  const allSelectedInGroup = preparedTaskIds.length > 0 && preparedTaskIds.every((id) => selectedTaskIds.has(id));
+  const someSelectedInGroup = preparedTaskIds.some((id) => selectedTaskIds.has(id));
 
   return (
     <>
-      <div className="border border-border rounded-md overflow-hidden task-schedule-table">
+      <div className="task-schedule-table overflow-hidden rounded-lg border border-border">
         <Table>
           <TableHeader className="[&_tr]:!border-b [&_tr]:border-border [&_tr]:hover:bg-muted">
-            <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              {columns.map((column) => {
-                const isSortable = column.sortable !== false;
-                const sortConfig = sortConfigs.find((config) => config.column === column.id);
-                const isSorted = !!sortConfig;
-                const sortOrder = sortConfig?.order;
-                const sortDirection = sortConfig?.direction;
-
+            <TableRow className="bg-muted even:bg-muted hover:bg-muted">
+              {canEdit && (
+                <TableHead className="w-10 bg-muted p-0 !border-r-0">
+                  <div className="flex h-full min-h-[2.5rem] w-full items-center justify-center px-2">
+                    <Checkbox
+                      checked={allSelectedInGroup}
+                      indeterminate={someSelectedInGroup && !allSelectedInGroup}
+                      onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                      data-checkbox
+                    />
+                  </div>
+                </TableHead>
+              )}
+              {headers.map((header) => {
+                const column = header.column;
+                const canSort = column.getCanSort();
+                const sorted = column.getIsSorted();
+                const align = column.columnDef.meta?.align ?? "left";
+                const width = column.getSize();
                 return (
-                  <TableHead key={column.id} className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0", column.width)}>
-                    {column.id === "select" ? (
-                      <div className="flex items-center justify-center h-full w-full px-2 min-h-[2.5rem]">
-                        <Checkbox
-                          checked={(() => {
-                            // Check if ALL tasks from THIS table are selected
-                            const currentTableTaskIds = preparedTasks.map(t => t.id);
-                            return currentTableTaskIds.length > 0 && currentTableTaskIds.every(id => selectedTaskIds.has(id));
-                          })()}
-                          indeterminate={(() => {
-                            // Check if SOME (but not all) tasks from THIS table are selected
-                            const currentTableTaskIds = preparedTasks.map(t => t.id);
-                            const selectedFromThisTable = currentTableTaskIds.filter(id => selectedTaskIds.has(id)).length;
-                            return selectedFromThisTable > 0 && selectedFromThisTable < currentTableTaskIds.length;
-                          })()}
-                          onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
-                          data-checkbox
-                        />
-                      </div>
-                    ) : isSortable ? (
+                  <TableHead
+                    key={header.id}
+                    style={{ width, minWidth: column.columnDef.minSize }}
+                    className="whitespace-nowrap bg-muted p-0 text-xs font-bold uppercase text-foreground !border-r-0"
+                  >
+                    {canSort ? (
                       <button
-                        onClick={(e) => handleSort(column.id, e)}
-                        className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
-                        title={isSorted ? `Ordenado: ${sortOrder! + 1}º (${sortDirection === "asc" ? "crescente" : "decrescente"}). Clique novamente para inverter direção` : "Clique para adicionar à ordenação"}
+                        onClick={column.getToggleSortingHandler()}
+                        className={cn(
+                          "flex h-full min-h-[2.5rem] w-full cursor-pointer items-center gap-1 border-0 bg-transparent px-4 py-2 transition-colors hover:bg-muted/80",
+                          align === "right" && "justify-end",
+                          align === "center" && "justify-center",
+                        )}
+                        title={sorted ? "Clique novamente para inverter/ remover a ordenação" : "Clique para ordenar"}
                       >
-                        <span className="truncate">{column.header}</span>
-                        <div className="inline-flex items-center ml-1 gap-0.5">
-                          {!isSorted && <IconSelector className="h-4 w-4 text-muted-foreground" />}
-                          {isSorted && (
-                            <>
-                              {sortDirection === "asc" ? (
-                                <IconChevronUp className="h-4 w-4 text-foreground" />
-                              ) : (
-                                <IconChevronDown className="h-4 w-4 text-foreground" />
-                              )}
-                              {sortConfigs.length > 1 && (
-                                <span className="text-[10px] font-bold text-foreground bg-primary/20 rounded-full w-4 h-4 flex items-center justify-center">
-                                  {sortOrder! + 1}
-                                </span>
-                              )}
-                            </>
+                        <span className="truncate">{flexRender(column.columnDef.header, header.getContext())}</span>
+                        <span className="inline-flex items-center gap-0.5">
+                          {!sorted && <IconSelector className="h-4 w-4 text-muted-foreground" />}
+                          {sorted === "asc" && <IconChevronUp className="h-4 w-4 text-foreground" />}
+                          {sorted === "desc" && <IconChevronDown className="h-4 w-4 text-foreground" />}
+                          {sorted && multiSort && column.getSortIndex() >= 0 && (
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-foreground">
+                              {column.getSortIndex() + 1}
+                            </span>
                           )}
-                        </div>
+                        </span>
                       </button>
                     ) : (
-                      <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                        <span className="truncate">{column.header}</span>
+                      <div className="flex h-full min-h-[2.5rem] items-center px-4 py-2">
+                        <span className="truncate">{flexRender(column.columnDef.header, header.getContext())}</span>
                       </div>
                     )}
                   </TableHead>
@@ -691,122 +578,58 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
             </TableRow>
           </TableHeader>
           <TableBody>
-            {preparedTasks.map((task, index) => (
-              <tr
-                key={task.id}
-                className={cn("cursor-pointer transition-colors", index < preparedTasks.length - 1 && "border-b border-border", getRowClassName(task))}
-                onClick={(e) => handleRowClick(e, task.id)}
-                onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
-              >
-                {columns.map((column) => (
-                  <TableCell key={column.id} className="py-2 truncate max-w-0 whitespace-nowrap">
-                    {column.id === "select" && (
+            {rows.map((row, index) => {
+              const task = row.original;
+              return (
+                <tr
+                  key={row.id}
+                  className={cn(
+                    "cursor-pointer transition-colors",
+                    index < rows.length - 1 && "border-b border-border/50",
+                    getRowColorClass(task),
+                    isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary",
+                  )}
+                  onClick={(e) => handleRowClick(e, task.id)}
+                  onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
+                >
+                  {canEdit && (
+                    <TableCell className="w-10 py-2">
                       <div
                         className="flex items-center justify-center"
                         onClick={(e) => {
                           e.stopPropagation();
-                          const isCurrentlySelected = selectedTaskIds.has(task.id);
-
-                          console.log("[Checkbox] Click detected", {
-                            taskId: task.id,
-                            shiftKey: e.shiftKey,
-                            isCurrentlySelected,
-                          });
-
-                          // Handle shift+click for range selection
+                          const isSelected = selectedTaskIds.has(task.id);
                           if (e.shiftKey && onShiftClickSelect) {
-                            console.log("[Checkbox] Shift+click - calling onShiftClickSelect");
                             onShiftClickSelect(task.id);
                           } else {
-                            // Normal click - toggle selection
-                            handleSelectTask(task.id, !isCurrentlySelected);
-                            // Track last clicked for shift+click selection
-                            if (!isCurrentlySelected) {
-                              onSingleClickSelect?.(task.id);
-                            }
+                            handleSelectTask(task.id, !isSelected);
+                            if (!isSelected) onSingleClickSelect?.(task.id);
                           }
                         }}
                       >
-                        <Checkbox
-                          checked={selectedTaskIds.has(task.id)}
-                          // Prevent double-handling - we handle everything in the parent div onClick
-                          onCheckedChange={() => {}}
-                          data-checkbox
-                        />
+                        <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => {}} data-checkbox />
                       </div>
-                    )}
-                    {column.id === "name" && <span className="font-medium truncate block">{task.name}</span>}
-                    {column.id === "customer.fantasyName" && <span className="truncate block">{task.customer?.fantasyName || "-"}</span>}
-                    {column.id === "generalPainting" &&
-                      (task.generalPainting
-                        ? (() => {
-                            const paintFinish = task.generalPainting.finish as PAINT_FINISH;
-
-                            return (
-                              <div className="-my-2 flex items-center">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="w-16 h-8 rounded-md ring-1 ring-border shadow-sm overflow-hidden">
-                                        {task.generalPainting.colorPreview ? (
-                                          <img src={task.generalPainting.colorPreview} alt={task.generalPainting.name} className="w-full h-full object-cover" loading="lazy" />
-                                        ) : (
-                                          <CanvasNormalMapRenderer
-                                            baseColor={task.generalPainting.hex || "#888888"}
-                                            finish={paintFinish || PAINT_FINISH.SOLID}
-                                            width={64}
-                                            height={32}
-                                            quality="medium"
-                                            className="w-full h-full"
-                                          />
-                                        )}
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="max-w-xs">
-                                      <div className="space-y-1">
-                                        <div className="font-semibold">{task.generalPainting.name}</div>
-                                        <div className="text-xs text-muted-foreground space-y-0.5">
-                                          {task.generalPainting.paintType?.name && <div>{task.generalPainting.paintType.name}</div>}
-                                          {task.generalPainting.finish && <div>{PAINT_FINISH_LABELS[task.generalPainting.finish as PAINT_FINISH]}</div>}
-                                          {task.generalPainting.manufacturer && <div>{TRUCK_MANUFACTURER_LABELS[task.generalPainting.manufacturer]}</div>}
-                                          {task.generalPainting.paintBrand?.name && !task.generalPainting.manufacturer && <div>{task.generalPainting.paintBrand?.name}</div>}
-                                        </div>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            );
-                          })()
-                        : "-")}
-                    {column.id === "serviceOrders.production" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} />}
-                    {column.id === "serviceOrders.commercial" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.COMMERCIAL} />}
-                    {column.id === "serviceOrders.logistic" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.LOGISTIC} />}
-                    {column.id === "serviceOrders.artwork" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.ARTWORK} />}
-                    {column.id === "serialNumberOrPlate" && <span className="truncate block">{task.serialNumber || task.truck?.plate || "-"}</span>}
-                    {column.id === "spot" && (
-                      task.truck?.spot ? (
-                        <Badge variant="default" className="font-mono">{formatTruckSpot(task.truck.spot)}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )
-                    )}
-                    {column.id === "chassisNumber" && <span className="truncate block font-mono">{task.truck?.chassisNumber || "-"}</span>}
-                    {column.id === "sector.name" && <span className="truncate block">{task.sector?.name || "-"}</span>}
-                    {column.id === "entryDate" && <span className="truncate block">{task.entryDate ? formatDate(task.entryDate) : "-"}</span>}
-                    {column.id === "startedAt" && <span className="truncate block">{task.startedAt ? formatDate(task.startedAt) : "-"}</span>}
-                    {column.id === "term" && (task.term ? <span className="truncate block">{formatDate(task.term)}</span> : "-")}
-                    {column.id === "measures" && <span className="truncate block">{formatTaskMeasures(task)}</span>}
-                    {column.id === "remainingTime" &&
-                      (task.term && task.status !== TASK_STATUS.COMPLETED && task.status !== TASK_STATUS.CANCELLED ? (
-                        <DeadlineCountdown deadline={task.term} isOverdue={task.isOverdue} />
-                      ) : (
-                        "-"
-                      ))}
-                  </TableCell>
-                ))}
-              </tr>
-            ))}
+                    </TableCell>
+                  )}
+                  {row.getVisibleCells().map((cell) => {
+                    const align = cell.column.columnDef.meta?.align ?? "left";
+                    return (
+                      <TableCell
+                        key={cell.id}
+                        style={{ width: cell.column.getSize() }}
+                        className={cn(
+                          "max-w-0 truncate whitespace-nowrap py-2",
+                          align === "right" && "text-right",
+                          align === "center" && "text-center",
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -814,30 +637,24 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       <TaskDuplicateModal
         task={taskToDuplicate}
         open={!!taskToDuplicate}
-        onOpenChange={(open) => { if (!open) { setTaskToDuplicate(null); setDuplicateModalOpen(false); } }}
-        onSuccess={() => { setTaskToDuplicate(null); setDuplicateModalOpen(false); }}
+        onOpenChange={(open) => {
+          if (!open) setTaskToDuplicate(null);
+        }}
+        onSuccess={() => setTaskToDuplicate(null)}
       />
 
       <SetSectorModal open={setSectorModalOpen} onOpenChange={setSetSectorModalOpen} tasks={tasksToUpdate} onConfirm={handleSetSectorConfirm} />
-
       <SetStatusModal open={setStatusModalOpen} onOpenChange={setSetStatusModalOpen} tasks={tasksToUpdate} onConfirm={handleSetStatusConfirm} />
-
       <SetTermModal open={setTermModalOpen} onOpenChange={setSetTermModalOpen} tasks={tasksToUpdate} onConfirm={handleSetTermConfirm} />
-
       <SetQuoteLayoutModal open={quoteLayoutModalOpen} onOpenChange={setQuoteLayoutModalOpen} tasks={tasksToUpdate} />
 
-      {/* Only render AdvancedBulkActionsHandler if using internal ref (not shared) */}
+      {/* Only render AdvancedBulkActionsHandler if using internal ref (not shared with the content). */}
       {!externalAdvancedActionsRef && (
-        <AdvancedBulkActionsHandler
-          ref={advancedActionsRef}
-          selectedTaskIds={selectedTaskIds}
-          onClearSelection={() => setSelectedTaskIds(new Set())}
-        />
+        <AdvancedBulkActionsHandler ref={advancedActionsRef} selectedTaskIds={selectedTaskIds} onClearSelection={() => setSelectedTaskIds(new Set())} />
       )}
 
-      <TaskTableContextMenu contextMenu={contextMenu} onClose={() => setContextMenu(null)} onAction={handleAction} />
+      <DataTableContextMenu state={contextMenu} onClose={() => setContextMenu(null)} actions={rowActions} />
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

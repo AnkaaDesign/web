@@ -68,8 +68,8 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
             case "serviceOrders":
               row[headerKey] = task.serviceOrders?.length || 0;
               break;
-            case "hasArtworks":
-              row[headerKey] = (task.artworks?.length || 0) > 0 ? "Sim" : "Não";
+            case "hasLayouts":
+              row[headerKey] = (task.layouts?.length || 0) > 0 ? "Sim" : "Não";
               break;
             case "hasObservation":
               row[headerKey] = task.observation ? "Sim" : "Não";
@@ -181,8 +181,8 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
             case "serviceOrders":
               row[headerKey] = task.serviceOrders?.length || 0;
               break;
-            case "hasArtworks":
-              row[headerKey] = (task.artworks?.length || 0) > 0 ? "Sim" : "Não";
+            case "hasLayouts":
+              row[headerKey] = (task.layouts?.length || 0) > 0 ? "Sim" : "Não";
               break;
             case "hasObservation":
               row[headerKey] = task.observation ? "Sim" : "Não";

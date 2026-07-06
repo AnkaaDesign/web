@@ -37,7 +37,7 @@ export const truckIncludeSchema = z
         }),
       ])
       .optional(),
-    leftSideLayout: z
+    leftSideMeasure: z
       .union([
         z.boolean(),
         z.object({
@@ -49,7 +49,7 @@ export const truckIncludeSchema = z
         }),
       ])
       .optional(),
-    rightSideLayout: z
+    rightSideMeasure: z
       .union([
         z.boolean(),
         z.object({
@@ -61,7 +61,7 @@ export const truckIncludeSchema = z
         }),
       ])
       .optional(),
-    backSideLayout: z
+    backSideMeasure: z
       .union([
         z.boolean(),
         z.object({
@@ -475,9 +475,9 @@ export const truckCreateSchema = z.object({
   taskId: z.string().uuid("Tarefa inválida"),
 
   // Optional relations
-  leftSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
-  rightSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
-  backSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
+  leftSideMeasureId: z.string().uuid("Medida inválida").nullable().optional(),
+  rightSideMeasureId: z.string().uuid("Medida inválida").nullable().optional(),
+  backSideMeasureId: z.string().uuid("Medida inválida").nullable().optional(),
 });
 
 export const truckUpdateSchema = z.object({
@@ -504,9 +504,9 @@ export const truckUpdateSchema = z.object({
 
   // Optional relations
   taskId: z.string().uuid("Tarefa inválida").optional(),
-  leftSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
-  rightSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
-  backSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
+  leftSideMeasureId: z.string().uuid("Medida inválida").nullable().optional(),
+  rightSideMeasureId: z.string().uuid("Medida inválida").nullable().optional(),
+  backSideMeasureId: z.string().uuid("Medida inválida").nullable().optional(),
 });
 
 // =====================
@@ -581,7 +581,7 @@ export const mapTruckToFormData = createMapToFormDataHelper<Truck, TruckUpdateFo
   implementType: truck.implementType || undefined,
   spot: truck.spot || undefined,
   taskId: truck.taskId,
-  leftSideLayoutId: truck.leftSideLayoutId || undefined,
-  rightSideLayoutId: truck.rightSideLayoutId || undefined,
-  backSideLayoutId: truck.backSideLayoutId || undefined,
+  leftSideMeasureId: truck.leftSideMeasureId || undefined,
+  rightSideMeasureId: truck.rightSideMeasureId || undefined,
+  backSideMeasureId: truck.backSideMeasureId || undefined,
 }));

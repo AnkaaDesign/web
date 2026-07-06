@@ -21,7 +21,7 @@ interface SetQuoteLayoutModalProps {
 
 /**
  * Commercial counterpart of the admin "Adicionar Layouts" bulk form.
- * Instead of editing task artworks, it sets the quote's approved layout files
+ * Instead of editing task layouts, it sets the quote's approved layout files
  * (TaskQuote.layoutFiles, up to 2) for every selected task that has a quote.
  * layoutFileIds is a safe-after-billing field, so this also works on locked quotes.
  */

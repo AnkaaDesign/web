@@ -47,10 +47,10 @@ import { TaskNameAutocomplete } from "./task-name-autocomplete";
 import { ServiceSelectorAutoGrouped } from "./service-selector-auto-grouped";
 import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
-import { LayoutForm } from "@/components/production/layout/layout-form";
+import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
 import { FileUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
-import { ArtworkFileUploadField } from "./artwork-file-upload-field";
+import { LayoutFileUploadField } from "./layout-file-upload-field";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole } from "@/types/responsible";
 import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
@@ -98,7 +98,7 @@ export const TaskCreateForm = () => {
   const showPaint = isAdminUser || isCommercialUser;
   const showLogoPaints = isAdminUser; // Commercial can't see logo paints
   const showLayout = isAdminUser || isLogisticUser || isProductionManagerUser;
-  const showArtworks = isAdminUser || isCommercialUser;
+  const showLayouts = isAdminUser || isCommercialUser;
 
   // Initialize form
   const form = useForm<TaskCreateFormSchemaType>({
@@ -212,17 +212,17 @@ export const TaskCreateForm = () => {
   const [currentLayoutStates, setCurrentLayoutStates] = useState<Record<'left' | 'right' | 'back', any>>({
     left: {
       height: 2.4,
-      layoutSections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
+      sections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
       photoId: null,
     },
     right: {
       height: 2.4,
-      layoutSections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
+      sections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
       photoId: null,
     },
     back: {
       height: 2.42,
-      layoutSections: [{ width: 2.42, isDoor: false, doorHeight: null, position: 0 }],
+      sections: [{ width: 2.42, isDoor: false, doorHeight: null, position: 0 }],
       photoId: null,
     },
   });
@@ -233,8 +233,8 @@ export const TaskCreateForm = () => {
   useEffect(() => {
     const leftLayout = currentLayoutStates.left;
     const rightLayout = currentLayoutStates.right;
-    const leftSections = leftLayout?.layoutSections;
-    const rightSections = rightLayout?.layoutSections;
+    const leftSections = leftLayout?.sections;
+    const rightSections = rightLayout?.sections;
 
     if (leftSections && leftSections.length > 0 && rightSections && rightSections.length > 0) {
       const leftTotalWidth = leftSections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
@@ -261,10 +261,10 @@ export const TaskCreateForm = () => {
     setBaseFileIds(files.filter(f => f.uploaded && f.uploadedFileId).map(f => f.uploadedFileId!));
   }, []);
 
-  // File upload states - artworks
+  // File upload states - layouts
   const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>([]);
   const [uploadedFileIds, setUploadedFileIds] = useState<string[]>([]);
-  const [artworkStatuses, setArtworkStatuses] = useState<Record<string, string>>({});
+  const [layoutStatuses, setLayoutStatuses] = useState<Record<string, string>>({});
 
   const handleFilesChange = useCallback((files: FileWithPreview[]) => {
     setUploadedFiles(files);
@@ -338,26 +338,26 @@ export const TaskCreateForm = () => {
         const { plates, serialNumbers, name, customerId, status, category, implementType, forecastDate, term, details, paintId, paintIds } = data;
 
         // Upload artwork files that haven't been uploaded yet
-        const artworkFileIds: string[] = [...uploadedFileIds];
-        const remappedArtworkStatuses: Record<string, string> = {};
+        const layoutIds: string[] = [...uploadedFileIds];
+        const remappedLayoutStatuses: Record<string, string> = {};
         for (const file of uploadedFiles) {
           if (file.uploaded && file.uploadedFileId) {
             // Already uploaded - keep existing ID and remap status
-            if (artworkStatuses[file.id]) {
-              remappedArtworkStatuses[file.uploadedFileId] = artworkStatuses[file.id];
+            if (layoutStatuses[file.id]) {
+              remappedLayoutStatuses[file.uploadedFileId] = layoutStatuses[file.id];
             }
           } else if (!file.error) {
             try {
               const response = await uploadSingleFile(file, { fileContext: 'artwork' });
               if (response.success && response.data) {
-                artworkFileIds.push(response.data.id);
+                layoutIds.push(response.data.id);
                 // Remap artwork status from local file ID to backend File ID
-                if (artworkStatuses[file.id]) {
-                  remappedArtworkStatuses[response.data.id] = artworkStatuses[file.id];
+                if (layoutStatuses[file.id]) {
+                  remappedLayoutStatuses[response.data.id] = layoutStatuses[file.id];
                 }
               }
             } catch (error: any) {
-              toast.error(`Erro ao enviar artwork ${file.name}: ${error.message}`);
+              toast.error(`Erro ao enviar layout ${file.name}: ${error.message}`);
             }
           }
         }
@@ -405,10 +405,10 @@ export const TaskCreateForm = () => {
           for (const side of modifiedLayoutSides) {
             const sideData = currentLayoutStates[side];
             if (sideData) {
-              const key = side === "left" ? "leftSideLayout" : side === "right" ? "rightSideLayout" : "backSideLayout";
+              const key = side === "left" ? "leftSideMeasure" : side === "right" ? "rightSideMeasure" : "backSideMeasure";
               layoutData[key] = {
                 height: sideData.height,
-                layoutSections: sideData.layoutSections || sideData.sections,
+                sections: sideData.sections || sideData.sections,
                 photoId: sideData.photoId || null,
               };
             }
@@ -427,8 +427,8 @@ export const TaskCreateForm = () => {
             term: term || undefined,
             paintId: paintId || undefined,
             paintIds: paintIds && paintIds.length > 0 ? paintIds : undefined,
-            artworkIds: artworkFileIds.length > 0 ? artworkFileIds : undefined,
-            artworkStatuses: artworkFileIds.length > 0 && Object.keys(remappedArtworkStatuses).length > 0 ? remappedArtworkStatuses : undefined,
+            layoutIds: layoutIds.length > 0 ? layoutIds : undefined,
+            layoutStatuses: layoutIds.length > 0 && Object.keys(remappedLayoutStatuses).length > 0 ? remappedLayoutStatuses : undefined,
             baseFileIds: uploadedBaseFileIds.length > 0 ? uploadedBaseFileIds : undefined,
             responsibleIds: existingRepIds.length > 0 ? existingRepIds : undefined,
             // Service orders are cloned per task (individual instances)
@@ -572,7 +572,7 @@ export const TaskCreateForm = () => {
         isSubmittingRef.current = false;
       }
     },
-    [createAsync, responsibleRows, customerIdValue, uploadedFileIds, baseFileIds, uploadedFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, artworkStatuses, allowNavigation],
+    [createAsync, responsibleRows, customerIdValue, uploadedFileIds, baseFileIds, uploadedFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, layoutStatuses, allowNavigation],
   );
 
   // Get form state
@@ -624,7 +624,7 @@ export const TaskCreateForm = () => {
       <div className="flex-1 overflow-y-auto pb-6">
         <Form {...form}>
           <form id="task-form-submit" className="container mx-auto max-w-5xl">
-            <div className={openAccordion === 'base-files' || openAccordion === 'artworks' ? 'pb-64' : ''}>
+            <div className={openAccordion === 'base-files' || openAccordion === 'layouts' ? 'pb-64' : ''}>
               <Accordion
                 type="single"
                 collapsible
@@ -874,7 +874,7 @@ export const TaskCreateForm = () => {
                   </Card>
                 </AccordionItem>
 
-                {/* Layout do Caminhão - LOGISTIC/ADMIN */}
+                {/* Medidas do Implemento - LOGISTIC/ADMIN */}
                 {showLayout && (
                   <AccordionItem
                     value="layout"
@@ -886,7 +886,7 @@ export const TaskCreateForm = () => {
                         <CardHeader className="flex-1 py-4">
                           <CardTitle className="flex items-center gap-2">
                             <IconRuler className="h-5 w-5" />
-                            Layout do Caminhão
+                            Medidas do Implemento
                           </CardTitle>
                         </CardHeader>
                       </AccordionTrigger>
@@ -913,7 +913,7 @@ export const TaskCreateForm = () => {
                                 <span className="text-sm font-semibold text-foreground">
                                   {(() => {
                                     const currentLayout = currentLayoutStates[selectedLayoutSide];
-                                    const sections = currentLayout?.layoutSections;
+                                    const sections = currentLayout?.sections;
                                     if (!sections || sections.length === 0) return "0cm";
                                     const totalWidthMeters = sections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
                                     const totalWidthCm = Math.round(totalWidthMeters * 100);
@@ -922,7 +922,7 @@ export const TaskCreateForm = () => {
                                 </span>
                               </div>
                             </div>
-                            <LayoutForm
+                            <ImplementMeasureForm
                               selectedSide={selectedLayoutSide}
                               layout={currentLayoutStates[selectedLayoutSide]}
                               validationError={layoutWidthError}
@@ -1023,11 +1023,11 @@ export const TaskCreateForm = () => {
                   </Card>
                 </AccordionItem>
 
-                {/* Artworks/Layouts - COMMERCIAL/ADMIN */}
-                {showArtworks && (
+                {/* Layouts/Layouts - COMMERCIAL/ADMIN */}
+                {showLayouts && (
                   <AccordionItem
-                    value="artworks"
-                    id="accordion-item-artworks"
+                    value="layouts"
+                    id="accordion-item-layouts"
                     className="border border-border rounded-lg"
                   >
                     <Card className="border-0">
@@ -1041,10 +1041,10 @@ export const TaskCreateForm = () => {
                       </AccordionTrigger>
                       <AccordionContent>
                         <CardContent className="pt-0">
-                          <ArtworkFileUploadField
+                          <LayoutFileUploadField
                             onFilesChange={handleFilesChange}
                             onStatusChange={(fileId, status) => {
-                              setArtworkStatuses(prev => ({
+                              setLayoutStatuses(prev => ({
                                 ...prev,
                                 [fileId]: status,
                               }));
@@ -1060,7 +1060,7 @@ export const TaskCreateForm = () => {
                             {/* Reuse a layout already used for this customer (no re-upload). */}
                             <FileSuggestions
                               customerId={customerIdValue ?? undefined}
-                              fileContext="tasksArtworks"
+                              fileContext="tasksLayouts"
                               excludeFileIds={uploadedFiles
                                 .map((f) => (f as any).uploadedFileId || f.id)
                                 .filter(Boolean)}
@@ -1081,7 +1081,7 @@ export const TaskCreateForm = () => {
                               }}
                               disabled={isSubmitting}
                             />
-                          </ArtworkFileUploadField>
+                          </LayoutFileUploadField>
                         </CardContent>
                       </AccordionContent>
                     </Card>

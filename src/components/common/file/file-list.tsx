@@ -168,7 +168,7 @@ export function FileList({ className }: FileListProps) {
     () => ({
       ...queryFilters,
       include: {
-        tasksArtworks: true,
+        tasksLayouts: true,
         customerLogo: true,
         supplierLogo: true,
         orderReceipts: true,
@@ -260,9 +260,9 @@ export function FileList({ className }: FileListProps) {
                   <div className="text-xs text-muted-foreground">{file.mimetype}</div>
 
                   {/* Show file associations if any */}
-                  {file.tasksArtworks && file.tasksArtworks.length > 0 && (
+                  {file.tasksLayouts && file.tasksLayouts.length > 0 && (
                     <div className="text-xs text-blue-600 mt-1">
-                      📋 {file.tasksArtworks.length} tarefa{file.tasksArtworks.length > 1 ? "s" : ""}
+                      📋 {file.tasksLayouts.length} tarefa{file.tasksLayouts.length > 1 ? "s" : ""}
                     </div>
                   )}
                   {file.customerLogo && file.customerLogo.length > 0 && (

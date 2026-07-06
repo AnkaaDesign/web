@@ -41,7 +41,7 @@ export const airbrushingIncludeSchema = z
         z.object({
           include: z
             .object({
-              tasksArtworks: z.boolean().optional(),
+              tasksLayouts: z.boolean().optional(),
               customerLogo: z.boolean().optional(),
               taskBudget: z.boolean().optional(),
               taskNfe: z.boolean().optional(),
@@ -66,7 +66,7 @@ export const airbrushingIncludeSchema = z
         z.object({
           include: z
             .object({
-              tasksArtworks: z.boolean().optional(),
+              tasksLayouts: z.boolean().optional(),
               customerLogo: z.boolean().optional(),
               taskBudget: z.boolean().optional(),
               taskNfe: z.boolean().optional(),
@@ -85,13 +85,13 @@ export const airbrushingIncludeSchema = z
         }),
       ])
       .optional(),
-    artworks: z
+    layouts: z
       .union([
         z.boolean(),
         z.object({
           include: z
             .object({
-              tasksArtworks: z.boolean().optional(),
+              tasksLayouts: z.boolean().optional(),
               customerLogo: z.boolean().optional(),
               taskBudget: z.boolean().optional(),
               taskNfe: z.boolean().optional(),
@@ -102,7 +102,7 @@ export const airbrushingIncludeSchema = z
               observations: z.boolean().optional(),
               airbrushingReceipts: z.boolean().optional(),
               airbrushingInvoices: z.boolean().optional(),
-              airbrushingArtworks: z.boolean().optional(),
+              airbrushingLayouts: z.boolean().optional(),
               externalOperationBudget: z.boolean().optional(),
               externalOperationNfe: z.boolean().optional(),
               externalOperationReceipt: z.boolean().optional(),
@@ -607,9 +607,9 @@ export const airbrushingCreateSchema = z
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
     receiptIds: z.array(z.string().uuid()).optional(),
     invoiceIds: z.array(z.string().uuid()).optional(),
-    artworkIds: z.array(z.string().uuid()).optional(),
-    // artworkStatuses can be a plain object or array with object (for FormData serialization)
-    artworkStatuses: z.union([
+    layoutIds: z.array(z.string().uuid()).optional(),
+    // layoutStatuses can be a plain object or array with object (for FormData serialization)
+    layoutStatuses: z.union([
       z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED'])),
       z.array(z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED']))),
     ]).optional(),
@@ -635,9 +635,9 @@ export const airbrushingUpdateSchema = z
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
     receiptIds: z.array(z.string().uuid()).optional(),
     invoiceIds: z.array(z.string().uuid()).optional(),
-    artworkIds: z.array(z.string().uuid()).optional(),
-    // artworkStatuses can be a plain object or array with object (for FormData serialization)
-    artworkStatuses: z.union([
+    layoutIds: z.array(z.string().uuid()).optional(),
+    // layoutStatuses can be a plain object or array with object (for FormData serialization)
+    layoutStatuses: z.union([
       z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED'])),
       z.array(z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED']))),
     ]).optional(),
@@ -723,7 +723,7 @@ export const airbrushingCreateNestedSchema = z
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
     receiptIds: z.array(z.string().uuid()).optional(),
     invoiceIds: z.array(z.string().uuid()).optional(),
-    artworkIds: z.array(z.string().uuid()).optional(),
+    layoutIds: z.array(z.string().uuid()).optional(),
   })
   .transform(toFormData);
 
@@ -745,6 +745,6 @@ export const mapAirbrushingToFormData = createMapToFormDataHelper<Airbrushing, A
   painterId: airbrushing.painterId,
   receiptIds: airbrushing.receipts?.map((file) => file.id),
   invoiceIds: airbrushing.invoices?.map((file) => file.id),
-  // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
-  artworkIds: airbrushing.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id),
+  // layoutIds must be File IDs (artwork.fileId or artwork.file.id), not Layout entity IDs
+  layoutIds: airbrushing.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id),
 }));

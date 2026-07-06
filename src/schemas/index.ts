@@ -88,7 +88,7 @@ export * from "./serviceOrder";
 export * from "./supplier";
 export * from "./task";
 export * from "./warehouse-location";
-export * from "./layout";
+export * from "./implementMeasure";
 export * from "./user";
 export * from "./dashboard";
 export * from "./auth";

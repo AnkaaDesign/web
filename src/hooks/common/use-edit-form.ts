@@ -101,8 +101,8 @@ function isEmptyItem(item: any, fieldName: string): boolean {
   if (fieldName === 'airbrushings') {
     const hasPrice = item.price !== null && item.price !== undefined && Number(item.price) >= 0;
     const hasDates = item.startDate || item.finishDate;
-    const hasFiles = (item.receiptFiles?.length > 0) || (item.invoiceFiles?.length > 0) || (item.artworkFiles?.length > 0);
-    const hasIds = (item.receiptIds?.length > 0) || (item.invoiceIds?.length > 0) || (item.artworkIds?.length > 0);
+    const hasFiles = (item.receiptFiles?.length > 0) || (item.invoiceFiles?.length > 0) || (item.layouts?.length > 0);
+    const hasIds = (item.receiptIds?.length > 0) || (item.invoiceIds?.length > 0) || (item.layoutIds?.length > 0);
     // Also check if it's an existing airbrushing (has real UUID id)
     const isExisting = item.id && typeof item.id === 'string' && !item.id.startsWith('airbrushing-');
     return !hasPrice && !hasDates && !hasFiles && !hasIds && !isExisting;

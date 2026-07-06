@@ -151,7 +151,7 @@ export function DesignarServiceOrderDialog({
         // Commercial service orders: commercial and admin users
         return [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN];
       case SERVICE_ORDER_TYPE.ARTWORK:
-        // Artwork service orders: designer and admin users
+        // Layout service orders: designer and admin users
         return [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN];
       default:
         return undefined;

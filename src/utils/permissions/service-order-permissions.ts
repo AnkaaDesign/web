@@ -214,7 +214,7 @@ export function getAllowedServiceOrderStatuses(
 
   // ARTWORK has special approval workflow with WAITING_APPROVE status
   if (serviceOrderType === SERVICE_ORDER_TYPE.ARTWORK) {
-    const artworkStatuses: SERVICE_ORDER_STATUS[] = [
+    const layoutStatuses: SERVICE_ORDER_STATUS[] = [
       SERVICE_ORDER_STATUS.PENDING,
       SERVICE_ORDER_STATUS.IN_PROGRESS,
       ...(canPause ? [SERVICE_ORDER_STATUS.PAUSED] : []),
@@ -226,17 +226,17 @@ export function getAllowedServiceOrderStatuses(
     if (canCancel) {
       // DESIGNER cannot set COMPLETED (only WAITING_APPROVE for admin approval)
       if (sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
-        return [...artworkStatuses.filter(s => s !== SERVICE_ORDER_STATUS.COMPLETED), SERVICE_ORDER_STATUS.CANCELLED];
+        return [...layoutStatuses.filter(s => s !== SERVICE_ORDER_STATUS.COMPLETED), SERVICE_ORDER_STATUS.CANCELLED];
       }
-      return [...artworkStatuses, SERVICE_ORDER_STATUS.CANCELLED];
+      return [...layoutStatuses, SERVICE_ORDER_STATUS.CANCELLED];
     }
 
     // DESIGNER cannot set COMPLETED (only WAITING_APPROVE for admin approval)
     if (sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
-      return artworkStatuses.filter(s => s !== SERVICE_ORDER_STATUS.COMPLETED);
+      return layoutStatuses.filter(s => s !== SERVICE_ORDER_STATUS.COMPLETED);
     }
 
-    return artworkStatuses;
+    return layoutStatuses;
   }
 
   // PRODUCTION, COMMERCIAL, LOGISTIC: Simple workflow without WAITING_APPROVE

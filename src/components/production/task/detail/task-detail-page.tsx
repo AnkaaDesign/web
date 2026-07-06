@@ -36,7 +36,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { useTaskDetail, useTaskMutations, useForecastHistory, useRescheduleForecast } from "@/hooks/production/use-task";
 import { useCutsByTask } from "@/hooks/production/use-cut";
 import { useAirbrushingsByTask } from "@/hooks/production/use-airbrushing";
-import { useLayoutsByTruck } from "@/hooks/administration/use-layout";
+import { useImplementMeasuresByTruck } from "@/hooks/administration/use-implement-measure";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -47,7 +47,7 @@ import { getCustomers } from "@/api-client/customer";
 import { getSectors } from "@/api-client/sector";
 import { isValidTaskStatusTransition, getTaskQuoteEditRoute } from "@/utils/task";
 import { getAvailableQuoteStatusTransitions, canViewQuote, canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
-import { canEditTasks, canFinishTask } from "@/utils/permissions/entity-permissions";
+import { canEditTasks, canFinishTask, canViewAirbrushingFinancials as computeCanViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
 import { isTeamLeader } from "@/utils/user";
@@ -77,11 +77,11 @@ import { TaskServiceOrderGroup } from "./service-orders-section";
 import { QuoteBillingBreakdown } from "./sections/quote-billing-section";
 import { PaintsSection } from "./sections/paints-section";
 import { ResponsiblesSection } from "./sections/responsibles-section";
-import { TruckLayoutSection } from "./sections/truck-layout-section";
-import { ArtworksSection, getVisibleArtworks, downloadAllArtworks } from "./sections/artworks-section";
+import { TruckImplementMeasureSection } from "./sections/truck-implement-measure-section";
+import { LayoutsSection, getVisibleLayouts, downloadAllLayouts } from "./sections/layouts-section";
 import { FilesSection, getVisibleTaskFiles, downloadAllTaskFiles } from "./sections/files-section";
 import { CutsSection, downloadAllCuts } from "./sections/cuts-section";
-import { AirbrushingsSection } from "./sections/airbrushings-section";
+import { AirbrushingsSection, downloadAllAirbrushingFiles, getAirbrushingFiles } from "./sections/airbrushings-section";
 import { DossieSection, getDossieServiceOrders, countDossieFiles, downloadAllDossieFiles, exportTaskDossiePdf } from "./sections/dossie-section";
 
 // Page audience — mirrors the legacy task-detail PrivilegeRoute (every production-adjacent sector).
@@ -147,8 +147,8 @@ function ViewToggle({ view, onChange }: { view: FileViewMode; onChange: (v: File
 }
 
 // Heavier than the list include, but matched to what the detail page actually renders. Truck layout
-// objects are NOT pulled here — `useLayoutsByTruck` (used by the layout section) fetches them, and the
-// changelog only needs the scalar `*SideLayoutId` FKs that come with `truck: true`.
+// objects are NOT pulled here — `useImplementMeasuresByTruck` (used by the layout section) fetches them, and the
+// changelog only needs the scalar `*SideMeasureId` FKs that come with `truck: true`.
 const DETAIL_INCLUDE = {
   customer: { include: { logo: true } },
   sector: true,
@@ -158,7 +158,7 @@ const DETAIL_INCLUDE = {
   serviceOrders: { include: { assignedTo: true, checkinFiles: true, checkoutFiles: true } },
   baseFiles: true,
   projectFiles: true,
-  artworks: { include: { file: true } },
+  layouts: { include: { file: true } },
   observation: { include: { files: true } },
   generalPainting: {
     include: {
@@ -190,7 +190,7 @@ const DETAIL_INCLUDE = {
 const ALL_DETAIL_SECTION_IDS = [
   "overview", "dates", "quote",
   "so-COMMERCIAL", "so-ARTWORK", "so-LOGISTIC", "so-PRODUCTION",
-  "artworks", "layout", "files", "cuts", "airbrushings", "observation", "paints", "dossie", "changelog",
+  "layouts", "layout", "files", "cuts", "airbrushings", "observation", "paints", "dossie", "changelog",
 ] as const;
 
 /** Build a detail config showing exactly `visible` (in that order), the rest hidden. Sections gated by
@@ -212,13 +212,13 @@ function detailSectorConfig(visible: string[]): Partial<PersistedDetailConfig> {
  * and falls back to the authored defaults. Sections the sector can't access auto-drop.
  */
 const TASK_DETAIL_SECTOR_DEFAULTS: Partial<Record<SECTOR_PRIVILEGES, Partial<PersistedDetailConfig>>> = {
-  [SECTOR_PRIVILEGES.PRODUCTION]: detailSectorConfig(["overview", "so-PRODUCTION", "paints", "layout", "artworks", "cuts", "airbrushings", "files", "observation", "dates", "dossie"]),
+  [SECTOR_PRIVILEGES.PRODUCTION]: detailSectorConfig(["overview", "so-PRODUCTION", "paints", "layout", "layouts", "cuts", "airbrushings", "files", "observation", "dates", "dossie"]),
   [SECTOR_PRIVILEGES.WAREHOUSE]: detailSectorConfig(["overview", "so-PRODUCTION", "paints", "layout", "files", "observation", "dates"]),
-  [SECTOR_PRIVILEGES.LOGISTIC]: detailSectorConfig(["overview", "dates", "so-LOGISTIC", "so-PRODUCTION", "dossie", "layout", "files", "artworks", "observation"]),
-  [SECTOR_PRIVILEGES.PRODUCTION_MANAGER]: detailSectorConfig(["overview", "dates", "so-PRODUCTION", "so-ARTWORK", "so-LOGISTIC", "so-COMMERCIAL", "artworks", "layout", "paints", "cuts", "files", "observation", "dossie", "quote", "changelog"]),
-  [SECTOR_PRIVILEGES.COMMERCIAL]: detailSectorConfig(["overview", "quote", "dates", "so-COMMERCIAL", "so-ARTWORK", "artworks", "layout", "files", "observation"]),
-  [SECTOR_PRIVILEGES.FINANCIAL]: detailSectorConfig(["quote", "overview", "dates", "files"]),
-  [SECTOR_PRIVILEGES.DESIGNER]: detailSectorConfig(["overview", "so-ARTWORK", "artworks", "layout", "cuts", "paints", "files", "dates", "so-PRODUCTION", "observation"]),
+  [SECTOR_PRIVILEGES.LOGISTIC]: detailSectorConfig(["overview", "dates", "so-LOGISTIC", "so-PRODUCTION", "dossie", "layout", "files", "layouts", "observation"]),
+  [SECTOR_PRIVILEGES.PRODUCTION_MANAGER]: detailSectorConfig(["overview", "dates", "so-PRODUCTION", "so-ARTWORK", "so-LOGISTIC", "so-COMMERCIAL", "layouts", "layout", "paints", "cuts", "files", "observation", "dossie", "quote", "changelog"]),
+  [SECTOR_PRIVILEGES.COMMERCIAL]: detailSectorConfig(["overview", "quote", "dates", "so-COMMERCIAL", "so-ARTWORK", "layouts", "layout", "files", "observation"]),
+  [SECTOR_PRIVILEGES.FINANCIAL]: detailSectorConfig(["quote", "overview", "dates", "airbrushings", "files"]),
+  [SECTOR_PRIVILEGES.DESIGNER]: detailSectorConfig(["overview", "so-ARTWORK", "layouts", "layout", "cuts", "paints", "files", "dates", "so-PRODUCTION", "observation"]),
 };
 
 export function TaskDetailPage() {
@@ -287,7 +287,7 @@ function TaskDetailContent() {
   const { data: airbrushingsResponse } = useAirbrushingsByTask(
     {
       taskId: id!,
-      params: { include: { artworks: { include: { file: true } }, receipts: true, invoices: true }, orderBy: { createdAt: "desc" } },
+      params: { include: { layouts: { include: { file: true } }, receipts: true, invoices: true, painter: true }, orderBy: { createdAt: "desc" } },
     } as never,
     { enabled: !!id } as never,
   );
@@ -296,14 +296,14 @@ function TaskDetailContent() {
   // Truck dimensions (width × height in cm) derived from any available side layout — shown as a
   // read-only overview field so non-leader PRODUCTION (who can't see the gated layout section) still
   // get the vehicle size. Faithful port of the legacy `truckDimensions`/"Caminhão" overview row.
-  const { data: truckLayouts } = useLayoutsByTruck(task?.truck?.id || "", { enabled: !!task?.truck?.id });
+  const { data: truckLayouts } = useImplementMeasuresByTruck(task?.truck?.id || "", { enabled: !!task?.truck?.id });
   const truckDimensions = useMemo(() => {
-    type SideLayout = { height: number; layoutSections?: { width: number }[] };
-    const sides = truckLayouts as { leftSideLayout?: SideLayout; rightSideLayout?: SideLayout; backSideLayout?: SideLayout } | undefined;
-    const layout = sides?.leftSideLayout || sides?.rightSideLayout || sides?.backSideLayout;
+    type SideLayout = { height: number; sections?: { width: number }[] };
+    const sides = truckLayouts as { leftSideMeasure?: SideLayout; rightSideMeasure?: SideLayout; backSideMeasure?: SideLayout } | undefined;
+    const layout = sides?.leftSideMeasure || sides?.rightSideMeasure || sides?.backSideMeasure;
     if (!layout) return null;
     const height = Math.round(layout.height * 100);
-    const totalWidth = Math.round((layout.layoutSections ?? []).reduce((sum, s) => sum + s.width * 100, 0));
+    const totalWidth = Math.round((layout.sections ?? []).reduce((sum, s) => sum + s.width * 100, 0));
     return { width: totalWidth, height };
   }, [truckLayouts]);
 
@@ -334,7 +334,7 @@ function TaskDetailContent() {
     SECTOR_PRIVILEGES.LOGISTIC,
     SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   ]);
-  const canViewArtworkBadges = has([
+  const canViewLayoutBadges = has([
     SECTOR_PRIVILEGES.ADMIN,
     SECTOR_PRIVILEGES.COMMERCIAL,
     SECTOR_PRIVILEGES.FINANCIAL,
@@ -342,11 +342,13 @@ function TaskDetailContent() {
     SECTOR_PRIVILEGES.DESIGNER,
     SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   ]);
-  const canViewRestricted = canViewArtworkBadges; // responsibles / forecast
+  const canViewRestricted = canViewLayoutBadges; // responsibles / forecast
   const canViewLayout =
     has([SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]) ||
     (role === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader(user as never));
-  const canViewAirbrushingFinancials = has([SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]);
+  // Canonical airbrushing money-visibility gate (FINANCIAL / ACCOUNTING / ADMIN / COMMERCIAL) —
+  // single source of truth shared with the list/detail/form. Do NOT re-derive an ad-hoc set here.
+  const canViewAirbrushingFinancials = computeCanViewAirbrushingFinancials(user as never);
   const canAccessAirbrushingDetails = has([SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL]);
   const canAccessCustomerPages = has([SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.COMMERCIAL]);
   // Legacy hid ALL service-order cards from FINANCIAL (FINANCIAL_HIDDEN_SECTIONS), even though the
@@ -360,11 +362,12 @@ function TaskDetailContent() {
     role !== SECTOR_PRIVILEGES.FINANCIAL &&
     (role !== SECTOR_PRIVILEGES.PRODUCTION || isTeamLeader(user as never));
 
-  // Grid/list view mode for the Layouts (artworks) and Arquivos (files) galleries — owned here so the
+  // Grid/list view mode for the Layouts (layouts) and Arquivos (files) galleries — owned here so the
   // toggle can live in the section header actions (right side) while the section renders only the body.
-  const [artworksView, setArtworksView] = useState<FileViewMode>("grid");
+  const [layoutsView, setLayoutsView] = useState<FileViewMode>("grid");
   const [filesView, setFilesView] = useState<FileViewMode>("grid");
   const [cutsView, setCutsView] = useState<FileViewMode>("grid");
+  const [airbrushingsView, setAirbrushingsView] = useState<FileViewMode>("grid");
 
   // Quote-status reason (captured for a PENDING downgrade) is read by onCommit after beforeCommit.
   const quoteReasonRef = useRef<string | undefined>(undefined);
@@ -415,17 +418,17 @@ function TaskDetailContent() {
     return { data: out, hasMore: out.length === limit };
   }, []);
 
-  // Artworks the current user may see (badges-viewers see all; everyone else only APPROVED).
-  const filteredArtworks = useMemo(() => {
-    const arts = (task?.artworks ?? []) as Array<{ file?: unknown; status?: string }>;
-    return arts.filter((a) => (a.file || (a as { filename?: string }).filename) && (canViewArtworkBadges || a.status === "APPROVED"));
-  }, [task?.artworks, canViewArtworkBadges]);
+  // Layouts the current user may see (badges-viewers see all; everyone else only APPROVED).
+  const filteredLayouts = useMemo(() => {
+    const arts = (task?.layouts ?? []) as Array<{ file?: unknown; status?: string }>;
+    return arts.filter((a) => (a.file || (a as { filename?: string }).filename) && (canViewLayoutBadges || a.status === "APPROVED"));
+  }, [task?.layouts, canViewLayoutBadges]);
 
   const hasLayout = !!(
     task?.truck &&
-    ((task.truck as { leftSideLayoutId?: string }).leftSideLayoutId ||
-      (task.truck as { rightSideLayoutId?: string }).rightSideLayoutId ||
-      (task.truck as { backSideLayoutId?: string }).backSideLayoutId)
+    ((task.truck as { leftSideMeasureId?: string }).leftSideMeasureId ||
+      (task.truck as { rightSideMeasureId?: string }).rightSideMeasureId ||
+      (task.truck as { backSideMeasureId?: string }).backSideMeasureId)
   );
   const hasDossie = useMemo(
     () =>
@@ -950,41 +953,41 @@ function TaskDetailContent() {
             render: (t: Task) => <TaskServiceOrderGroup task={t} type={type} role={role} currentUserId={currentUserId} />,
           }) as DetailSectionDef<Task>,
       ),
-      // Medidas do Caminhão (SVG layout preview).
+      // Medidas do Implemento (SVG layout preview).
       ...(hasLayout && canViewLayout
         ? [
             {
               id: "layout",
-              label: "Medidas do Caminhão",
+              label: "Medidas do Implemento",
               icon: IconRulerMeasure,
               span: 2 as const,
-              render: (t: Task) => <TruckLayoutSection truckId={t.truck!.id} taskName={t.name} />,
+              render: (t: Task) => <TruckImplementMeasureSection truckId={t.truck!.id} taskName={t.name} />,
             } as DetailSectionDef<Task>,
           ]
         : []),
-      // Layouts (artworks).
-      ...(filteredArtworks.length > 0
+      // Layouts (layouts).
+      ...(filteredLayouts.length > 0
         ? [
             {
-              id: "artworks",
-              label: titleWithCount("Layouts", filteredArtworks.length),
+              id: "layouts",
+              label: titleWithCount("Layouts", filteredLayouts.length),
               icon: IconPhoto,
               span: 2 as const,
               headerActions: (t: Task) => {
-                const arts = getVisibleArtworks(t, canViewArtworkBadges);
+                const arts = getVisibleLayouts(t, canViewLayoutBadges);
                 return (
                   <>
                     {arts.length > 1 ? (
-                      <Button variant="default" size="sm" className="h-7 gap-1 text-xs" onClick={() => void downloadAllArtworks(arts)}>
+                      <Button variant="default" size="sm" className="h-7 gap-1 text-xs" onClick={() => void downloadAllLayouts(arts)}>
                         <IconDownload className="h-3.5 w-3.5" />
                         Baixar Todos
                       </Button>
                     ) : null}
-                    <ViewToggle view={artworksView} onChange={setArtworksView} />
+                    <ViewToggle view={layoutsView} onChange={setLayoutsView} />
                   </>
                 );
               },
-              render: (t: Task) => <ArtworksSection task={t} canViewBadges={canViewArtworkBadges} view={artworksView} />,
+              render: (t: Task) => <LayoutsSection task={t} canViewBadges={canViewLayoutBadges} view={layoutsView} />,
             } as DetailSectionDef<Task>,
           ]
         : []),
@@ -1044,11 +1047,42 @@ function TaskDetailContent() {
         ? [
             {
               id: "airbrushings",
-              label: "Aerografias",
+              label: titleWithCount("Aerografias", airbrushings.length),
               icon: IconBrush,
               span: 2 as const,
+              // Clicking the title opens the airbrushing's own page: its detail when there is a
+              // single one, otherwise the full airbrushing list. Gated to viewers who can reach it.
+              onTitleClick: canAccessAirbrushingDetails
+                ? () =>
+                    navigate(
+                      airbrushings.length === 1
+                        ? routes.production.airbrushings.details((airbrushings[0] as { id: string }).id)
+                        : routes.production.airbrushings.list,
+                    )
+                : undefined,
+              headerActions: (t: Task) => (
+                <>
+                  {getAirbrushingFiles(airbrushings, canViewAirbrushingFinancials).length > 1 ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-7 gap-1 text-xs"
+                      onClick={() => void downloadAllAirbrushingFiles(airbrushings, t.name, canViewAirbrushingFinancials)}
+                    >
+                      <IconDownload className="h-3.5 w-3.5" />
+                      Baixar Todos
+                    </Button>
+                  ) : null}
+                  <ViewToggle view={airbrushingsView} onChange={setAirbrushingsView} />
+                </>
+              ),
               render: () => (
-                <AirbrushingsSection airbrushings={airbrushings} canViewFinancials={canViewAirbrushingFinancials} canAccessDetails={canAccessAirbrushingDetails} />
+                <AirbrushingsSection
+                  airbrushings={airbrushings}
+                  canViewFinancials={canViewAirbrushingFinancials}
+                  canAccessDetails={canAccessAirbrushingDetails}
+                  view={airbrushingsView}
+                />
               ),
             } as DetailSectionDef<Task>,
           ]
@@ -1119,9 +1153,9 @@ function TaskDetailContent() {
             truckId={t.truck?.id}
             layoutIds={
               [
-                (t.truck as { leftSideLayoutId?: string } | undefined)?.leftSideLayoutId,
-                (t.truck as { rightSideLayoutId?: string } | undefined)?.rightSideLayoutId,
-                (t.truck as { backSideLayoutId?: string } | undefined)?.backSideLayoutId,
+                (t.truck as { leftSideMeasureId?: string } | undefined)?.leftSideMeasureId,
+                (t.truck as { rightSideMeasureId?: string } | undefined)?.rightSideMeasureId,
+                (t.truck as { backSideMeasureId?: string } | undefined)?.backSideMeasureId,
               ].filter(Boolean) as string[]
             }
             quoteId={showQuote ? t.quote?.id : undefined}
@@ -1156,21 +1190,22 @@ function TaskDetailContent() {
     // changes on refetch (e.g. after an SO is completed), so recompute the closure then.
     task?.serviceOrders,
     task?.responsibles?.length,
-    filteredArtworks.length,
+    filteredLayouts.length,
     cuts.length,
     airbrushings.length,
     hasLayout,
     hasDossie,
     canViewLayout,
-    canViewArtworkBadges,
+    canViewLayoutBadges,
     canViewBaseFiles,
     canViewCheckinFiles,
     canViewRestricted,
     visibleSoTypes,
     canViewChangelog,
-    artworksView,
+    layoutsView,
     filesView,
     cutsView,
+    airbrushingsView,
     setTaskField,
     confirm,
     askReason,

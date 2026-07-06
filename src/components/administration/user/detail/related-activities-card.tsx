@@ -26,7 +26,6 @@ const ACTIVITY_TYPE_COLORS: Record<string, { bg: string; icon: string; text: str
   [ACTIVITY_REASON.ORDER_RECEIVED]: { bg: "bg-muted/50", icon: "text-muted-foreground", text: "text-foreground" },
   [ACTIVITY_REASON.PRODUCTION_USAGE]: { bg: "bg-primary/10", icon: "text-primary", text: "text-foreground" },
   [ACTIVITY_REASON.PPE_DELIVERY]: { bg: "bg-[hsl(var(--success))]/10", icon: "text-[hsl(var(--success))]", text: "text-foreground" },
-  [ACTIVITY_REASON.BORROW]: { bg: "bg-[hsl(var(--warning))]/10", icon: "text-[hsl(var(--warning))]", text: "text-foreground" },
   [ACTIVITY_REASON.RETURN]: { bg: "bg-[hsl(var(--info))]/10", icon: "text-[hsl(var(--info))]", text: "text-foreground" },
   [ACTIVITY_REASON.EXTERNAL_OPERATION]: { bg: "bg-[hsl(var(--error))]/10", icon: "text-[hsl(var(--error))]", text: "text-foreground" },
   [ACTIVITY_REASON.EXTERNAL_OPERATION_RETURN]: { bg: "bg-[hsl(var(--info))]/10", icon: "text-[hsl(var(--info))]", text: "text-foreground" },

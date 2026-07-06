@@ -30,14 +30,15 @@ import {
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
-import { useTaskMutations, useCutsByTask } from "../../../../hooks";
-import { cutKeys } from "../../../../hooks/common/query-keys";
+import { useTaskMutations, useCutsByTask, useAirbrushingsByTask } from "../../../../hooks";
+import { cutKeys, airbrushingKeys } from "../../../../hooks/common/query-keys";
 import { cutService } from "../../../../api-client/cut";
+import { airbrushingService } from "../../../../api-client/airbrushing";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole } from "@/types/responsible";
 import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, BONIFICATION_STATUS, BONIFICATION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS } from "../../../../constants";
-import { createFormDataWithContext } from "@/utils/form-data-helper";
+import { createFormDataWithContext, createAirbrushingFormData } from "@/utils/form-data-helper";
 import { areAllProductionServiceOrdersComplete } from "@/utils/serviceOrder";
 import { useAuth } from "../../../../contexts/auth-context";
 import { useTaskPermissions } from '@/hooks/common/use-task-permissions';
@@ -60,16 +61,16 @@ import type { ServiceOrderData } from "./designar-service-order-dialog";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
 import { FileUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
-import { ArtworkFileUploadField } from "./artwork-file-upload-field";
+import { LayoutFileUploadField } from "./layout-file-upload-field";
 import { getApiBaseUrl } from "@/config/api";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/components/ui/sonner";
 import { toTitleCase } from "../../../../utils";
 // Quote is now accessed via context menu, not from the edit form
-import { LayoutForm } from "@/components/production/layout/layout-form";
+import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 import { SpotSelector } from "./spot-selector";
-import { useLayoutsByTruck, useLayoutMutations } from "../../../../hooks";
+import { useImplementMeasuresByTruck, useImplementMeasureMutations } from "../../../../hooks";
 import { TRUCK_SPOT } from "../../../../constants";
 
 interface TaskEditFormProps {
@@ -112,6 +113,105 @@ const convertToFileWithPreview = (file: any | any[] | undefined | null): FileWit
   } as FileWithPreview];
 };
 
+/**
+ * Reconciliation plan for a task's airbrushings — the airbrushing analog of the cut
+ * reconciliation. Airbrushings are individual DB rows carrying their own status /
+ * payment workflow + file attachments, so on save we diff the form's rows against the
+ * loaded DB snapshot and touch ONLY what changed: create genuinely-new rows, update the
+ * ones whose fields/files changed (preserving the rest), and delete the ones the user
+ * removed. Driving deletes/updates off this diff (instead of shipping the array inside
+ * the task payload) is what fixes the "remove all airbrushings never persists" bug —
+ * a removed row is now an explicit delete rather than a swallowed empty array.
+ *
+ * `uploaded` mock Files (existing attachments re-hydrated by the selector) are kept as
+ * ID references; only genuinely-new `File` objects (uploaded === falsy) are sent as
+ * multipart. Rows with new files must use the single multipart create/update endpoint
+ * (the JSON batch endpoints can't carry uploads) — matching how cuts fan brand-new
+ * uploads out to `createCut` while batching everything else.
+ */
+type AirbrushingFiles = { receipts: File[]; invoices: File[]; layouts: File[] };
+type AirbrushingCreateOp = { data: Record<string, any>; files: AirbrushingFiles };
+type AirbrushingUpdateOp = { id: string; data: Record<string, any>; files: AirbrushingFiles };
+
+function planAirbrushingReconciliation(
+  originalList: any[],
+  formList: any[],
+): { toCreate: AirbrushingCreateOp[]; toUpdate: AirbrushingUpdateOp[]; toDelete: string[]; hasChanges: boolean } {
+  const originalById = new Map<string, any>((originalList || []).map((a) => [a.id, a]));
+
+  const uploadedIds = (files: any[]): string[] =>
+    (files || []).filter((f) => f?.uploaded).map((f) => f.uploadedFileId || f.id).filter(Boolean);
+  const newFilesOf = (files: any[]): File[] =>
+    (files || []).filter((f) => f instanceof File && !(f as any).uploaded) as File[];
+  const time = (d: any): number | null => (d ? new Date(d).getTime() : null);
+  const sameIds = (a: string[], b: string[]): boolean => a.slice().sort().join(",") === b.slice().sort().join(",");
+  const origFileIds = (files: any[]): string[] =>
+    (files || []).map((f: any) => f.fileId || f.file?.id || f.id).filter(Boolean);
+
+  // A brand-new row is only worth creating if it carries real data (guards the default
+  // empty row `mapDataToForm` seeds so it never counts as a change / phantom airbrushing).
+  const isMeaningful = (a: any): boolean =>
+    a.price != null || !!a.startDate || !!a.finishDate || !!a.startedAt || !!a.finishedAt || !!a.painterId ||
+    uploadedIds(a.receiptFiles).length > 0 || uploadedIds(a.invoiceFiles).length > 0 || uploadedIds(a.layouts).length > 0 ||
+    newFilesOf(a.receiptFiles).length > 0 || newFilesOf(a.invoiceFiles).length > 0 || newFilesOf(a.layouts).length > 0;
+
+  const rowChanged = (a: any, orig: any): boolean => {
+    if ((a.price ?? null) !== (orig.price ?? null)) return true;
+    if (a.status !== orig.status) return true;
+    if ((a.paymentStatus ?? null) !== (orig.paymentStatus ?? null)) return true;
+    if ((a.painterId ?? null) !== (orig.painterId ?? null)) return true;
+    if (time(a.startDate) !== time(orig.startDate)) return true;
+    if (time(a.finishDate) !== time(orig.finishDate)) return true;
+    if (time(a.startedAt) !== time(orig.startedAt)) return true;
+    if (time(a.finishedAt) !== time(orig.finishedAt)) return true;
+    if (!sameIds(uploadedIds(a.receiptFiles), origFileIds(orig.receipts))) return true;
+    if (!sameIds(uploadedIds(a.invoiceFiles), origFileIds(orig.invoices))) return true;
+    if (!sameIds(uploadedIds(a.layouts), origFileIds(orig.layouts))) return true;
+    if (newFilesOf(a.receiptFiles).length > 0 || newFilesOf(a.invoiceFiles).length > 0 || newFilesOf(a.layouts).length > 0) return true;
+    return false;
+  };
+
+  const buildData = (a: any): Record<string, any> => ({
+    status: a.status,
+    paymentStatus: a.paymentStatus,
+    price: a.price ?? null,
+    startDate: a.startDate ?? null,
+    finishDate: a.finishDate ?? null,
+    startedAt: a.startedAt ?? null,
+    finishedAt: a.finishedAt ?? null,
+    painterId: a.painterId ?? null,
+    receiptIds: uploadedIds(a.receiptFiles),
+    invoiceIds: uploadedIds(a.invoiceFiles),
+    layoutIds: uploadedIds(a.layouts),
+  });
+
+  const toCreate: AirbrushingCreateOp[] = [];
+  const toUpdate: AirbrushingUpdateOp[] = [];
+  const keptIds = new Set<string>();
+
+  for (const a of formList || []) {
+    const files: AirbrushingFiles = {
+      receipts: newFilesOf(a.receiptFiles),
+      invoices: newFilesOf(a.invoiceFiles),
+      layouts: newFilesOf(a.layouts),
+    };
+    const orig = originalById.get(a.id);
+    if (orig) {
+      // Existing row: always kept; updated in place only if something actually changed
+      // (preserving its status/payment/timestamps otherwise).
+      keptIds.add(a.id);
+      if (rowChanged(a, orig)) toUpdate.push({ id: a.id, data: buildData(a), files });
+    } else if (isMeaningful(a)) {
+      toCreate.push({ data: buildData(a), files });
+    }
+  }
+
+  // Anything in the DB the form no longer keeps is a removal.
+  const toDelete = (originalList || []).map((a) => a.id).filter((id: string) => !keptIds.has(id));
+
+  return { toCreate, toUpdate, toDelete, hasChanges: toCreate.length > 0 || toUpdate.length > 0 || toDelete.length > 0 };
+}
+
 export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigationState }: TaskEditFormProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -126,7 +226,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const updateAsync = async (params: any) => {
     console.log('[Task Update] 🚀 Submitting with params:', params);
     console.log('[Task Update] Quote data being sent:', params.data?.quote ? JSON.stringify(params.data.quote, null, 2) : 'NO QUOTE DATA');
-    // NOTE: artworkStatuses is now added in the FormData/JSON preparation sections
+    // NOTE: layoutStatuses is now added in the FormData/JSON preparation sections
     // to avoid duplicates and to properly filter temp IDs vs real UUIDs
     const result = await taskMutations.updateAsync(params);
     return result;
@@ -179,14 +279,33 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     );
   }, [cutsData]);
 
+  // Fetch the task's airbrushings separately (same approach as cuts + the detail page):
+  // limit:100 avoids the default 20-row cap so the save-time reconciliation sees every
+  // persisted airbrushing. The painter/file relations are needed to diff kept-file IDs.
+  const { data: airbrushingsData } = useAirbrushingsByTask({
+    taskId: task.id,
+    params: {
+      include: { layouts: { include: { file: true } }, receipts: true, invoices: true, painter: true },
+      limit: 100,
+    },
+  } as never);
+
+  // Always-current snapshot of the task's persisted airbrushings (individual DB rows),
+  // used at submit time to reconcile the form value against reality (create/edit/remove)
+  // without relying on the submit closure being fresh — mirrors originalCutsRef.
+  const originalAirbrushingsRef = useRef<any[]>([]);
+  useEffect(() => {
+    originalAirbrushingsRef.current = (airbrushingsData as { data?: any[] } | undefined)?.data || [];
+  }, [airbrushingsData]);
+
   // Initialize artwork files from existing task data
-  // NOTE: task.artworks are now Artwork entities with a nested file property
+  // NOTE: task.layouts are now Layout entities with a nested file property
   const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>(
-    (task.artworks || []).map(artwork => {
-      // artwork is an Artwork entity with { id, fileId, status, file?: File }
+    (task.layouts || []).map(artwork => {
+      // artwork is an Layout entity with { id, fileId, status, file?: File }
       const file = (artwork as any).file || artwork; // artwork.file if included, fallback to artwork for backward compat
       return {
-        id: file.id, // File ID (not Artwork ID)
+        id: file.id, // File ID (not Layout ID)
         name: file.filename || file.name || 'artwork',
         size: file.size || 0,
         type: file.mimetype || file.type || 'application/octet-stream',
@@ -199,14 +318,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       } as FileWithPreview;
     })
   );
-  // artworkIds should be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
+  // layoutIds should be File IDs (artwork.fileId or artwork.file.id), not Layout entity IDs
   const [_uploadedFileIds, setUploadedFileIds] = useState<string[]>(
-    task.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || []
+    task.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || []
   );
 
   // Track artwork statuses for approval workflow (File ID → status)
-  const [artworkStatuses, setArtworkStatuses] = useState<Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>>(
-    task.artworks?.reduce((acc, artwork) => {
+  const [layoutStatuses, setLayoutStatuses] = useState<Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>>(
+    task.layouts?.reduce((acc, artwork) => {
       const fileId = (artwork as any).fileId || (artwork as any).file?.id;
       if (fileId) {
         acc[fileId] = (artwork as any).status || 'DRAFT';
@@ -216,33 +335,33 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   );
 
   // Track if artwork status has been changed (needs to be BEFORE useEffect that uses it)
-  const [hasArtworkStatusChanges, setHasArtworkStatusChanges] = useState(false);
+  const [hasLayoutStatusChanges, setHasLayoutStatusChanges] = useState(false);
 
-  // Track if artworks have been modified (added or removed) - separate from status changes
-  const [hasArtworkFileChanges, setHasArtworkFileChanges] = useState(false);
+  // Track if layouts have been modified (added or removed) - separate from status changes
+  const [hasLayoutFileChanges, setHasLayoutFileChanges] = useState(false);
 
-  // Sync uploadedFiles and artworkStatuses when task.artworks changes (after successful update)
+  // Sync uploadedFiles and layoutStatuses when task.layouts changes (after successful update)
   useEffect(() => {
-    console.log('[Task Update] 🔄 useEffect triggered for task.artworks sync', {
-      taskArtworksLength: task.artworks?.length || 0,
+    console.log('[Task Update] 🔄 useEffect triggered for task.layouts sync', {
+      taskLayoutsLength: task.layouts?.length || 0,
       taskId: task.id,
       currentUploadedFilesLength: uploadedFiles.length,
-      hasArtworkStatusChanges,
+      hasLayoutStatusChanges,
     });
 
     // CRITICAL FIX: Don't sync if user has made changes that haven't been submitted yet
     // This prevents the useEffect from clearing user changes when React Query refetches stale data
-    if (hasArtworkStatusChanges) {
+    if (hasLayoutStatusChanges) {
       console.log('[Task Update] 🔄 SKIPPING full sync - user has unsaved artwork status changes');
       // IMPORTANT: Even when skipping, we need to ensure uploadedFiles structure is correct
-      // to prevent empty artworkIds during submission. Only sync the file list, not statuses.
-      if (task.artworks && uploadedFiles.length === 0) {
-        console.warn('[Task Update] ⚠️ CRITICAL: uploadedFiles is empty but task has artworks! Syncing file list only (preserving status changes)');
-        const newUploadedFiles = task.artworks.map(artwork => {
+      // to prevent empty layoutIds during submission. Only sync the file list, not statuses.
+      if (task.layouts && uploadedFiles.length === 0) {
+        console.warn('[Task Update] ⚠️ CRITICAL: uploadedFiles is empty but task has layouts! Syncing file list only (preserving status changes)');
+        const newUploadedFiles = task.layouts.map(artwork => {
           const file = (artwork as any).file || artwork;
           const fileId = (artwork as any).fileId || file.id;
-          // Preserve user's pending status changes from artworkStatuses state
-          const pendingStatus = artworkStatuses[fileId];
+          // Preserve user's pending status changes from layoutStatuses state
+          const pendingStatus = layoutStatuses[fileId];
           return {
             id: file.id,
             name: file.filename || file.name || 'artwork',
@@ -258,13 +377,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         });
         console.log('[Task Update] 🔄 Emergency sync: Restored uploadedFiles structure while preserving status changes');
         setUploadedFiles(newUploadedFiles);
-        setUploadedFileIds(task.artworks.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id));
+        setUploadedFileIds(task.layouts.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id));
       }
       return;
     }
 
-    if (task.artworks) {
-      const newUploadedFiles = task.artworks.map(artwork => {
+    if (task.layouts) {
+      const newUploadedFiles = task.layouts.map(artwork => {
         const file = (artwork as any).file || artwork;
         return {
           id: file.id,
@@ -282,9 +401,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
       console.log('[Task Update] 🔄 Setting new uploadedFiles:', newUploadedFiles);
       setUploadedFiles(newUploadedFiles);
-      setUploadedFileIds(task.artworks.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id));
+      setUploadedFileIds(task.layouts.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id));
 
-      const newStatuses = task.artworks.reduce((acc, artwork) => {
+      const newStatuses = task.layouts.reduce((acc, artwork) => {
         const fileId = (artwork as any).fileId || (artwork as any).file?.id;
         if (fileId) {
           acc[fileId] = (artwork as any).status || 'DRAFT';
@@ -292,14 +411,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         return acc;
       }, {} as Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>);
 
-      console.log('[Task Update] 🔄 Setting new artworkStatuses:', newStatuses);
-      setArtworkStatuses(newStatuses);
-      setHasArtworkStatusChanges(false); // Reset the flag after sync
-      setHasArtworkFileChanges(false); // Reset the file changes flag after sync
-      console.log('[Task Update] 🔄 Reset hasArtworkStatusChanges and hasArtworkFileChanges to false');
+      console.log('[Task Update] 🔄 Setting new layoutStatuses:', newStatuses);
+      setLayoutStatuses(newStatuses);
+      setHasLayoutStatusChanges(false); // Reset the flag after sync
+      setHasLayoutFileChanges(false); // Reset the file changes flag after sync
+      console.log('[Task Update] 🔄 Reset hasLayoutStatusChanges and hasLayoutFileChanges to false');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task.artworks, task.id]); // Only re-run when task.artworks or task.id changes (reads from closure for other values)
+  }, [task.layouts, task.id]); // Only re-run when task.layouts or task.id changes (reads from closure for other values)
 
   // Initialize base files from existing task data
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>(
@@ -439,7 +558,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
   const [hasLayoutChanges, setHasLayoutChanges] = useState(false);
   const [hasFileChanges, setHasFileChanges] = useState(false);
-  // hasArtworkStatusChanges is now defined earlier (line 195) to avoid temporal dead zone
+  // hasLayoutStatusChanges is now defined earlier (line 195) to avoid temporal dead zone
   const [layoutWidthError, setLayoutWidthError] = useState<string | null>(null);
   const [observationFiles, setObservationFiles] = useState<FileWithPreview[]>(
     convertToFileWithPreview(task.observation?.files)
@@ -513,9 +632,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     // Services
     serviceOrders: "serviceOrders",
     // Layout
-    leftSideLayout: "layout",
-    rightSideLayout: "layout",
-    backSideLayout: "layout",
+    leftSideMeasure: "layout",
+    rightSideMeasure: "layout",
+    backSideMeasure: "layout",
     // Spot
     spot: "spot",
     // Paint
@@ -530,7 +649,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     projectFileIds: "project-files",
     checkinFileIds: "checkin-files",
     checkoutFileIds: "checkout-files",
-    artworkIds: "artworks",
+    layoutIds: "layouts",
     // Observation
     observation: "observation",
   }), []);
@@ -571,17 +690,17 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     const defaults = {
       left: {
         height: 2.4,
-        layoutSections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
+        sections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
         photoId: null,
       },
       right: {
         height: 2.4,
-        layoutSections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
+        sections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
         photoId: null,
       },
       back: {
         height: 2.42,
-        layoutSections: [{ width: 2.42, isDoor: false, doorHeight: null, position: 0 }],
+        sections: [{ width: 2.42, isDoor: false, doorHeight: null, position: 0 }],
         photoId: null,
       },
     };
@@ -617,7 +736,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     }
   }, [openAccordion, scrollToAccordion]);
 
-  const { data: layoutsData } = useLayoutsByTruck(truckId || "", { enabled: !!truckId });
+  const { data: layoutsData } = useImplementMeasuresByTruck(truckId || "", { enabled: !!truckId });
 
   // Calculate truck length from layout sections for spot selector
   // Uses the same two-tier cabin logic as garage view and API:
@@ -625,11 +744,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   // 7-10m body: 2.4m cabin (larger trucks)
   // >= 10m body: no cabin (semi-trailers)
   const truckLength = useMemo(() => {
-    const layout = layoutsData?.leftSideLayout || layoutsData?.rightSideLayout;
-    if (!layout?.layoutSections || layout.layoutSections.length === 0) {
+    const layout = layoutsData?.leftSideMeasure || layoutsData?.rightSideMeasure;
+    if (!layout?.sections || layout.sections.length === 0) {
       return null;
     }
-    const sectionsSum = layout.layoutSections.reduce(
+    const sectionsSum = layout.sections.reduce(
       (sum: number, s: any) => sum + (s.width || 0),
       0
     );
@@ -650,7 +769,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   useEffect(() => {
     
   }, [layoutsData, truckId, truckLength]);
-  const { createOrUpdateTruckLayout: _createOrUpdateTruckLayout, delete: deleteLayout } = useLayoutMutations();
+  const { createOrUpdateTruckMeasure: _createOrUpdateTruckMeasure, delete: deleteLayout } = useImplementMeasureMutations();
   const [shouldDeleteLayouts, setShouldDeleteLayouts] = useState(false);
 
   // CRITICAL FIX: Sync currentLayoutStates with fresh backend data after save
@@ -668,46 +787,46 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       };
 
       // Sync left side
-      if (layoutsData.leftSideLayout?.layoutSections) {
+      if (layoutsData.leftSideMeasure?.sections) {
         newStates.left = {
-          height: layoutsData.leftSideLayout.height,
-          layoutSections: layoutsData.leftSideLayout.layoutSections.map((s: any) => ({
+          height: layoutsData.leftSideMeasure.height,
+          sections: layoutsData.leftSideMeasure.sections.map((s: any) => ({
             width: s.width,
             isDoor: s.isDoor,
             doorHeight: s.doorHeight,
             position: s.position,
           })),
-          photoId: layoutsData.leftSideLayout.photoId,
+          photoId: layoutsData.leftSideMeasure.photoId,
         };
         
       }
 
       // Sync right side
-      if (layoutsData.rightSideLayout?.layoutSections) {
+      if (layoutsData.rightSideMeasure?.sections) {
         newStates.right = {
-          height: layoutsData.rightSideLayout.height,
-          layoutSections: layoutsData.rightSideLayout.layoutSections.map((s: any) => ({
+          height: layoutsData.rightSideMeasure.height,
+          sections: layoutsData.rightSideMeasure.sections.map((s: any) => ({
             width: s.width,
             isDoor: s.isDoor,
             doorHeight: s.doorHeight,
             position: s.position,
           })),
-          photoId: layoutsData.rightSideLayout.photoId,
+          photoId: layoutsData.rightSideMeasure.photoId,
         };
         
       }
 
       // Sync back side
-      if (layoutsData.backSideLayout?.layoutSections) {
+      if (layoutsData.backSideMeasure?.sections) {
         newStates.back = {
-          height: layoutsData.backSideLayout.height,
-          layoutSections: layoutsData.backSideLayout.layoutSections.map((s: any) => ({
+          height: layoutsData.backSideMeasure.height,
+          sections: layoutsData.backSideMeasure.sections.map((s: any) => ({
             width: s.width,
             isDoor: s.isDoor,
             doorHeight: s.doorHeight,
             position: s.position,
           })),
-          photoId: layoutsData.backSideLayout.photoId,
+          photoId: layoutsData.backSideMeasure.photoId,
         };
         
       }
@@ -724,16 +843,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   // (because defaults will be created). DON'T mark changes when there are existing layouts.
   useEffect(() => {
     // This effect has been simplified since layout section is always available with accordion
-    // Layout changes are now tracked only when user actually modifies the layout via LayoutForm
+    // Layout changes are now tracked only when user actually modifies the layout via ImplementMeasureForm
   }, []);
 
   // Real-time validation of layout width balance
   useEffect(() => {
     // Use current editing state if available, otherwise use saved data
-    const leftLayout = currentLayoutStates.left || layoutsData?.leftSideLayout;
-    const rightLayout = currentLayoutStates.right || layoutsData?.rightSideLayout;
-    const leftSections = leftLayout?.sections || leftLayout?.layoutSections;
-    const rightSections = rightLayout?.sections || rightLayout?.layoutSections;
+    const leftLayout = currentLayoutStates.left || layoutsData?.leftSideMeasure;
+    const rightLayout = currentLayoutStates.right || layoutsData?.rightSideMeasure;
+    const leftSections = leftLayout?.sections || leftLayout?.sections;
+    const rightSections = rightLayout?.sections || rightLayout?.sections;
 
     // Only validate if both sides exist and have sections
     if (leftSections && leftSections.length > 0 && rightSections && rightSections.length > 0) {
@@ -862,8 +981,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           finishedAt: null,
         }];
       })(),
-      // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
-      artworkIds: taskData.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
+      // layoutIds must be File IDs (artwork.fileId or artwork.file.id), not Layout entity IDs
+      layoutIds: taskData.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
       baseFileIds: taskData.baseFiles?.map((f) => f.id) || [],
       truck: {
         plate: taskData.truck?.plate || null,
@@ -900,12 +1019,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             painter: a.painter || null,
             receiptIds: a.receipts?.map((r: any) => r.id) || [],
             invoiceIds: a.invoices?.map((n: any) => n.id) || [],
-            // CRITICAL: artworkIds should be File IDs (artwork.fileId), not Artwork entity IDs
-            artworkIds: a.artworks?.map((art: any) => art.fileId || art.file?.id || art.id) || [],
+            // CRITICAL: layoutIds should be File IDs (artwork.fileId), not Layout entity IDs
+            layoutIds: a.layouts?.map((art: any) => art.fileId || art.file?.id || art.id) || [],
             receipts: a.receipts || [],
             invoices: a.invoices || [],
-            // Map Artwork entities to their File representation for display
-            artworks: a.artworks?.map((art: any) => art.file || art) || [],
+            // Map Layout entities to their File representation for display
+            layouts: a.layouts?.map((art: any) => art.file || art) || [],
           }))
         : [{
             // Default empty airbrushing row
@@ -921,10 +1040,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             painter: null,
             receiptIds: [],
             invoiceIds: [],
-            artworkIds: [],
+            layoutIds: [],
             receipts: [],
             invoices: [],
-            artworks: [],
+            layouts: [],
           }],
       observation: taskData.observation ? {
         description: taskData.observation.description || "",
@@ -1010,9 +1129,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           changedData.paintIds = ensureArray(changedData.paintIds);
         }
 
-        // Ensure artworkIds is an array
-        if (changedData.artworkIds) {
-          changedData.artworkIds = ensureArray(changedData.artworkIds);
+        // Ensure layoutIds is an array
+        if (changedData.layoutIds) {
+          changedData.layoutIds = ensureArray(changedData.layoutIds);
         }
 
         // Ensure baseFileIds is an array
@@ -1025,22 +1144,19 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           changedData.cuts = ensureArray(changedData.cuts);
         }
 
-        // Ensure airbrushings is an array
-        if (changedData.airbrushings) {
-          changedData.airbrushings = ensureArray(changedData.airbrushings);
-        }
+        // (Airbrushings are stripped from changedData below and reconciled separately.)
 
-        // Ensure truck layoutSections are arrays
+        // Ensure truck sections are arrays
         if (changedData.truck) {
           const truck = changedData.truck as any;
-          if (truck.leftSideLayout?.layoutSections) {
-            truck.leftSideLayout.layoutSections = ensureArray(truck.leftSideLayout.layoutSections);
+          if (truck.leftSideMeasure?.sections) {
+            truck.leftSideMeasure.sections = ensureArray(truck.leftSideMeasure.sections);
           }
-          if (truck.rightSideLayout?.layoutSections) {
-            truck.rightSideLayout.layoutSections = ensureArray(truck.rightSideLayout.layoutSections);
+          if (truck.rightSideMeasure?.sections) {
+            truck.rightSideMeasure.sections = ensureArray(truck.rightSideMeasure.sections);
           }
-          if (truck.backSideLayout?.layoutSections) {
-            truck.backSideLayout.layoutSections = ensureArray(truck.backSideLayout.layoutSections);
+          if (truck.backSideMeasure?.sections) {
+            truck.backSideMeasure.sections = ensureArray(truck.backSideMeasure.sections);
           }
         }
 
@@ -1073,30 +1189,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           delete changedData.quote;
         }
 
-        // Filter out empty airbrushings (airbrushings with no meaningful data)
-        if (changedData.airbrushings && Array.isArray(changedData.airbrushings)) {
-          changedData.airbrushings = changedData.airbrushings.filter((airbrushing: any) => {
-            const hasPrice = airbrushing.price !== null && airbrushing.price !== undefined;
-            const hasStartDate = airbrushing.startDate !== null && airbrushing.startDate !== undefined;
-            const hasFinishDate = airbrushing.finishDate !== null && airbrushing.finishDate !== undefined;
-            const hasStartedAt = airbrushing.startedAt !== null && airbrushing.startedAt !== undefined;
-            const hasFinishedAt = airbrushing.finishedAt !== null && airbrushing.finishedAt !== undefined;
-            const hasReceiptFiles = airbrushing.receiptIds && airbrushing.receiptIds.length > 0;
-            const hasInvoiceFiles = airbrushing.invoiceIds && airbrushing.invoiceIds.length > 0;
-            const hasArtworkFiles = airbrushing.artworkIds && airbrushing.artworkIds.length > 0;
-            const hasNewReceiptFiles = airbrushing.receiptFiles && airbrushing.receiptFiles.some((f: any) => f instanceof File);
-            const hasNewInvoiceFiles = airbrushing.invoiceFiles && airbrushing.invoiceFiles.some((f: any) => f instanceof File);
-            const hasNewArtworkFiles = airbrushing.artworkFiles && airbrushing.artworkFiles.some((f: any) => f instanceof File);
-            const hasPainter = airbrushing.painterId !== null && airbrushing.painterId !== undefined;
-
-            return hasPrice || hasStartDate || hasFinishDate || hasStartedAt || hasFinishedAt || hasPainter || hasReceiptFiles || hasInvoiceFiles || hasArtworkFiles || hasNewReceiptFiles || hasNewInvoiceFiles || hasNewArtworkFiles;
-          });
-
-          // If no valid airbrushings remain, remove entirely
-          if (changedData.airbrushings.length === 0) {
-            delete changedData.airbrushings;
-          }
-        }
+        // Airbrushings are NEVER shipped inside the task payload — they are reconciled
+        // separately after the task update (see the reconciliation block below), exactly
+        // like cuts. Strip them here so the task endpoint never double-handles them; the
+        // reconciliation reads the live form value via form.getValues('airbrushings').
+        // (The old code deleted an EMPTY airbrushings array here, which is precisely why
+        //  "remove all airbrushings" never transmitted and the rows reappeared on reload.)
+        delete changedData.airbrushings;
 
         // =====================
         // CHECK FOR CHANGES AFTER FILTERING
@@ -1129,17 +1228,27 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           return false;
         })();
 
+        // Plan the airbrushing reconciliation once (create/update/delete) from the live form
+        // value vs the DB snapshot — reused both for change detection and the post-update
+        // reconciliation. hasAirbrushingChanges is the airbrushing analog of hasCutChanges:
+        // it fires on new rows, edited rows, AND removals (fixing the remove-all bug).
+        const airbrushingPlan = planAirbrushingReconciliation(
+          originalAirbrushingsRef.current || [],
+          (form.getValues('airbrushings') as any[]) || [],
+        );
+        const hasAirbrushingChanges = airbrushingPlan.hasChanges;
+
         // Validate that we have changes (form, layout, file changes, artwork status changes, or cuts to create)
         console.log('[TaskEditForm] Change detection:', {
           changedDataKeys: Object.keys(changedData),
           changedDataLength: Object.keys(changedData).length,
           hasLayoutChanges,
           hasFileChanges,
-          hasArtworkStatusChanges,
+          hasLayoutStatusChanges,
           hasCutsToCreate,
           hasCutChanges,
         });
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutChanges && !hasNewResponsibles) {
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasLayoutStatusChanges && !hasCutChanges && !hasNewResponsibles && !hasAirbrushingChanges) {
           console.log('[TaskEditForm] ❌ Early return: no changes detected');
           return;
         }
@@ -1191,17 +1300,17 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
           const deletePromises: Promise<any>[] = [];
 
-          if (layoutsData.leftSideLayout?.id) {
+          if (layoutsData.leftSideMeasure?.id) {
             
-            deletePromises.push(deleteLayout(layoutsData.leftSideLayout.id));
+            deletePromises.push(deleteLayout(layoutsData.leftSideMeasure.id));
           }
-          if (layoutsData.rightSideLayout?.id) {
+          if (layoutsData.rightSideMeasure?.id) {
             
-            deletePromises.push(deleteLayout(layoutsData.rightSideLayout.id));
+            deletePromises.push(deleteLayout(layoutsData.rightSideMeasure.id));
           }
-          if (layoutsData.backSideLayout?.id) {
+          if (layoutsData.backSideMeasure?.id) {
             
-            deletePromises.push(deleteLayout(layoutsData.backSideLayout.id));
+            deletePromises.push(deleteLayout(layoutsData.backSideMeasure.id));
           }
 
           if (deletePromises.length > 0) {
@@ -1227,9 +1336,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             
             const sideData = currentLayoutStates[side];
 
-            if (sideData && sideData.layoutSections && sideData.layoutSections.length > 0) {
+            if (sideData && sideData.sections && sideData.sections.length > 0) {
               // Map internal side names to API field names
-              const layoutFieldName = side === 'left' ? 'leftSideLayout' : side === 'right' ? 'rightSideLayout' : 'backSideLayout';
+              const layoutFieldName = side === 'left' ? 'leftSideMeasure' : side === 'right' ? 'rightSideMeasure' : 'backSideMeasure';
               const sideName = side === 'left' ? 'leftSide' : side === 'right' ? 'rightSide' : 'backSide';
 
               // Extract photo file if present
@@ -1240,7 +1349,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
               consolidatedTruck[layoutFieldName] = {
                 height: sideData.height,
-                layoutSections: sideData.layoutSections,
+                sections: sideData.sections,
                 photoId: sideData.photoId || null,
               };
               
@@ -1255,20 +1364,28 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         }
 
         // If only cuts exist (no other changes), we still need to update the task to trigger cut reconciliation
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && hasCutChanges) {
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasLayoutStatusChanges && hasCutChanges) {
 
           (changedData as any)._onlyCuts = true; // Marker field to prevent empty body
         }
 
         // If only new responsibles exist (no other changes), we still need to update the task
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutChanges && hasNewResponsibles) {
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasLayoutStatusChanges && !hasCutChanges && hasNewResponsibles) {
           console.log('[TaskEditForm] Only new responsibles detected, adding marker field');
           (changedData as any)._onlyNewResponsibles = true; // Marker field to prevent empty body
         }
 
+        // If only airbrushings changed (no other changes), we still need a non-empty task
+        // update so the request succeeds and the post-update airbrushing reconciliation runs
+        // (mirrors the _onlyCuts marker).
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasLayoutStatusChanges && !hasCutChanges && !hasNewResponsibles && hasAirbrushingChanges) {
+          console.log('[TaskEditForm] Only airbrushing changes detected, adding marker field');
+          (changedData as any)._onlyAirbrushings = true; // Marker field to prevent empty body
+        }
+
         // Check if we have new files that need to be uploaded
-        
-        const newArtworkFiles = uploadedFiles.filter(f => !f.uploaded);
+
+        const newLayouts = uploadedFiles.filter(f => !f.uploaded);
         const newBaseFiles = baseFiles.filter(f => !f.uploaded);
         const newProjectFiles = projectFiles.filter(f => !f.uploaded);
         const newObservationFiles = observationFiles.filter(f => !f.uploaded);
@@ -1277,13 +1394,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         const changedCuts = changedData.cuts as any[] || [];
         const hasCutFiles = changedCuts.some(cut => cut.file && cut.file instanceof File);
 
-        // Check for airbrushing files
-        const airbrushings = changedData.airbrushings as any[] || [];
-        const hasAirbrushingFiles = airbrushings.some(a =>
-          (a.receiptFiles && a.receiptFiles.some((f: any) => f instanceof File)) ||
-          (a.invoiceFiles && a.invoiceFiles.some((f: any) => f instanceof File)) ||
-          (a.artworkFiles && a.artworkFiles.some((f: any) => f instanceof File))
-        );
+        // NOTE: airbrushing files are uploaded during the separate airbrushing
+        // reconciliation (below), NOT with the task multipart — so they intentionally do
+        // NOT contribute to hasNewFiles / the task-update FormData path.
 
         // Collect new checkin/checkout files across all service orders
         const allNewCheckinFiles: { soId: string; file: File }[] = [];
@@ -1312,9 +1425,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
         const hasNewCheckinCheckoutFiles = allNewCheckinFiles.length > 0 || allNewCheckoutFiles.length > 0;
 
-        const hasNewFiles = newArtworkFiles.length > 0 ||
+        const hasNewFiles = newLayouts.length > 0 ||
                            newBaseFiles.length > 0 || newProjectFiles.length > 0 ||
-                           hasCutFiles || hasAirbrushingFiles ||
+                           hasCutFiles ||
                            newObservationFiles.length > 0 || layoutPhotoFiles.length > 0 ||
                            hasNewCheckinCheckoutFiles;
 
@@ -1330,8 +1443,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           // Prepare files object for the helper
           const files: Record<string, File[]> = {};
 
-          if (newArtworkFiles.length > 0) {
-            files.artworks = newArtworkFiles.filter(f => f instanceof File) as File[];
+          if (newLayouts.length > 0) {
+            files.layouts = newLayouts.filter(f => f instanceof File) as File[];
           }
           if (newBaseFiles.length > 0) {
             files.baseFiles = newBaseFiles.filter(f => f instanceof File) as File[];
@@ -1356,8 +1469,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           if (layoutPhotoFiles.length > 0) {
             
             layoutPhotoFiles.forEach(({ side, file }) => {
-              // Backend expects: layoutPhotos.leftSide, layoutPhotos.rightSide, layoutPhotos.backSide
-              files[`layoutPhotos.${side}`] = [file];
+              // Backend expects: implementMeasurePhotos.leftSide, implementMeasurePhotos.rightSide, implementMeasurePhotos.backSide
+              files[`implementMeasurePhotos.${side}`] = [file];
               
             });
           }
@@ -1368,49 +1481,19 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             delete changedData.cuts;
           }
 
-          // Extract files from airbrushing objects (filtering was done earlier)
-          const airbrushings = changedData.airbrushings as any[] || [];
-          if (airbrushings.length > 0) {
-            airbrushings.forEach((airbrushing, index) => {
-              // Extract files from airbrushing objects
-              if (airbrushing.receiptFiles && Array.isArray(airbrushing.receiptFiles)) {
-                const airbrushingReceipts = airbrushing.receiptFiles.filter((f: any) => f instanceof File);
-                if (airbrushingReceipts.length > 0) {
-                  files[`airbrushings[${index}].receipts`] = airbrushingReceipts;
-                }
-                // Remove file objects from airbrushing data to avoid sending them in JSON body
-                delete airbrushing.receiptFiles;
-              }
-              if (airbrushing.invoiceFiles && Array.isArray(airbrushing.invoiceFiles)) {
-                const airbrushingInvoices = airbrushing.invoiceFiles.filter((f: any) => f instanceof File);
-                if (airbrushingInvoices.length > 0) {
-                  files[`airbrushings[${index}].invoices`] = airbrushingInvoices;
-                }
-                // Remove file objects from airbrushing data to avoid sending them in JSON body
-                delete airbrushing.invoiceFiles;
-              }
-              if (airbrushing.artworkFiles && Array.isArray(airbrushing.artworkFiles)) {
-                const airbrushingArtworks = airbrushing.artworkFiles.filter((f: any) => f instanceof File);
-                if (airbrushingArtworks.length > 0) {
-                  files[`airbrushings[${index}].artworks`] = airbrushingArtworks;
-                }
-                // Remove file objects from airbrushing data to avoid sending them in JSON body
-                delete airbrushing.artworkFiles;
-              }
-              // Remove the painter relation object (display-only) - only painterId is sent
-              delete airbrushing.painter;
-            });
-          }
+          // Airbrushings are reconciled separately (create/update/delete + their file
+          // uploads) after the task update — never sent with the task multipart.
+          delete changedData.airbrushings;
 
           // Fields that should NEVER be sent via FormData to avoid huge payloads
           // These are large arrays that bloat the payload size
           // MUST MATCH fieldsToOmitIfUnchanged in useEditForm config
-          // NOTE: 'cuts' are excluded - created separately via POST /cuts
-          // NOTE: 'airbrushings', 'quote', 'serviceOrders' are NOT excluded - they use filtering logic
+          // NOTE: 'cuts' and 'airbrushings' are excluded - reconciled separately via their own endpoints
           const excludedFields = new Set([
             'cuts',
+            'airbrushings',
             'paintIds',
-            'artworkIds',
+            'layoutIds',
             'baseFileIds',
             'reimbursementIds',
             'reimbursementInvoiceIds',
@@ -1473,9 +1556,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
           // Extract IDs of uploaded (existing) files from uploadedFiles state
           // IMPORTANT: Always use uploadedFiles as source of truth - it reflects user's current selection
-          // including any files they removed. We no longer fall back to task.artworks because
+          // including any files they removed. We no longer fall back to task.layouts because
           // that would restore files the user intentionally deleted.
-          const currentArtworkIds = uploadedFiles
+          const currentLayoutIds = uploadedFiles
             .filter(f => f.uploaded)
             .map(f => f.uploadedFileId || f.id)
             .filter(Boolean) as string[];
@@ -1483,27 +1566,27 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           console.log('[Task Update] 📦 FormData - Using uploadedFiles as source of truth:', {
             uploadedFilesCount: uploadedFiles.length,
             uploadedFilesUploaded: uploadedFiles.filter(f => f.uploaded).length,
-            currentArtworkIds,
-            hasArtworkStatusChanges,
+            currentLayoutIds,
+            hasLayoutStatusChanges,
           });
 
           const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentProjectFileIds = projectFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           console.log('[Task Update] 📦 FormData - File IDs being sent:', {
-            hasArtworkStatusChanges,
-            hasArtworkFileChanges,
+            hasLayoutStatusChanges,
+            hasLayoutFileChanges,
             uploadedFilesLength: uploadedFiles.length,
-            taskArtworksLength: task.artworks?.length || 0,
-            currentArtworkIds,
-            artworkStatuses: Object.keys(artworkStatuses).length > 0 ? artworkStatuses : 'empty',
+            taskLayoutsLength: task.layouts?.length || 0,
+            currentLayoutIds,
+            layoutStatuses: Object.keys(layoutStatuses).length > 0 ? layoutStatuses : 'empty',
           });
 
-          // Only send artworkIds if the user actually modified artworks
+          // Only send layoutIds if the user actually modified layouts
           // Sending it unconditionally causes accidental clearing when sectors without artwork access submit the form
-          // Financial users cannot see/edit artworks (section is hidden), so they should never send artworkIds
+          // Financial users cannot see/edit layouts (section is hidden), so they should never send layoutIds
           // This matches the pattern used for baseFileIds and other file types
-          if (!isFinancialUser && (hasArtworkFileChanges || newArtworkFiles.length > 0 || hasArtworkStatusChanges)) {
-            dataForFormData.artworkIds = currentArtworkIds;
+          if (!isFinancialUser && (hasLayoutFileChanges || newLayouts.length > 0 || hasLayoutStatusChanges)) {
+            dataForFormData.layoutIds = currentLayoutIds;
           }
           // Only send baseFileIds if the user actually modified base files
           // Sending it unconditionally causes accidental clearing when other sectors submit the form
@@ -1573,11 +1656,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
               console.log('[TaskEditForm] 📤 FormData - _soFileMapping:', fileMapping);
             }
           }
-          // Note: artworkStatuses will be added later (around line 1125) after processing
+          // Note: layoutStatuses will be added later (around line 1125) after processing
           // This ensures we use the state variable directly, not a rebuilt version
 
           // CRITICAL: Clean up malformed data before creating FormData
-          const fileIdFields = ['artworkIds', 'baseFileIds'];
+          const fileIdFields = ['layoutIds', 'baseFileIds'];
           const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate', 'term'];
 
           for (const field of fileIdFields) {
@@ -1644,56 +1727,56 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             
           }
 
-          // CRITICAL: Build artworkStatuses as a UUID-keyed OBJECT
+          // CRITICAL: Build layoutStatuses as a UUID-keyed OBJECT
           // Backend schema expects: z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED']))
-          // For FormData: wrap in array so it gets sent as artworkStatuses[0]=JSON.stringify(object)
+          // For FormData: wrap in array so it gets sent as layoutStatuses[0]=JSON.stringify(object)
           // Backend preprocess will parse the JSON and merge into proper record format
-          const existingArtworkStatusesMap: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
-          currentArtworkIds.forEach(fileId => {
+          const existingLayoutStatusesMap: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
+          currentLayoutIds.forEach(fileId => {
             // Get status from state first (user's pending changes take priority)
-            const statusFromState = artworkStatuses[fileId];
+            const statusFromState = layoutStatuses[fileId];
             if (statusFromState) {
-              existingArtworkStatusesMap[fileId] = statusFromState;
+              existingLayoutStatusesMap[fileId] = statusFromState;
             } else {
               // Try to find the file and get its status
               const file = uploadedFiles.find(f => (f.uploadedFileId || f.id) === fileId);
               const statusFromFile = file?.status;
-              existingArtworkStatusesMap[fileId] = (statusFromFile as 'DRAFT' | 'APPROVED' | 'REPROVED') || 'DRAFT';
+              existingLayoutStatusesMap[fileId] = (statusFromFile as 'DRAFT' | 'APPROVED' | 'REPROVED') || 'DRAFT';
             }
           });
 
-          // Build newArtworkStatuses for NEW files being uploaded (array matching new files order)
-          const newArtworkStatuses: ('DRAFT' | 'APPROVED' | 'REPROVED')[] = [];
+          // Build newLayoutStatuses for NEW files being uploaded (array matching new files order)
+          const newLayoutStatuses: ('DRAFT' | 'APPROVED' | 'REPROVED')[] = [];
           uploadedFiles.forEach((file) => {
             if (!file.uploaded && !file.uploadedFileId) {
-              // New file being uploaded - get status from artworkStatuses state or default to DRAFT
+              // New file being uploaded - get status from layoutStatuses state or default to DRAFT
               const fileId = file.uploadedFileId || file.name || file.id; // Use name or id as fallback for new files
-              const status = artworkStatuses[fileId] || file.status || 'DRAFT';
-              newArtworkStatuses.push(status as 'DRAFT' | 'APPROVED' | 'REPROVED');
+              const status = layoutStatuses[fileId] || file.status || 'DRAFT';
+              newLayoutStatuses.push(status as 'DRAFT' | 'APPROVED' | 'REPROVED');
             }
           });
 
-          console.log('[Task Update] 📦 FormData - Artwork statuses debug:', {
+          console.log('[Task Update] 📦 FormData - Layout statuses debug:', {
             uploadedFilesCount: uploadedFiles.length,
-            artworkStatusesFromState: artworkStatuses,
-            currentArtworkIds,
-            existingArtworkStatusesMap,
-            newFileStatuses: newArtworkStatuses,
-            hasArtworkStatusChanges,
+            layoutStatusesFromState: layoutStatuses,
+            currentLayoutIds,
+            existingLayoutStatusesMap,
+            newFileStatuses: newLayoutStatuses,
+            hasLayoutStatusChanges,
           });
 
           // Send statuses for existing files as UUID-keyed object wrapped in array for FormData
-          // FormData helper will send: artworkStatuses[0]=JSON.stringify({uuid1: status1, uuid2: status2})
+          // FormData helper will send: layoutStatuses[0]=JSON.stringify({uuid1: status1, uuid2: status2})
           // Backend preprocess expects array-like with JSON string values to parse and merge
-          if (Object.keys(existingArtworkStatusesMap).length > 0) {
-            dataForFormData.artworkStatuses = [existingArtworkStatusesMap];
-            console.log('[Task Update] 📦 FormData - Including artworkStatuses (UUID-keyed object in array):', existingArtworkStatusesMap);
+          if (Object.keys(existingLayoutStatusesMap).length > 0) {
+            dataForFormData.layoutStatuses = [existingLayoutStatusesMap];
+            console.log('[Task Update] 📦 FormData - Including layoutStatuses (UUID-keyed object in array):', existingLayoutStatusesMap);
           }
 
           // Send statuses for new files being uploaded (array matching new files order)
-          if (newArtworkStatuses.length > 0) {
-            dataForFormData.newArtworkStatuses = newArtworkStatuses;
-            console.log('[Task Update] 📦 FormData - Including newArtworkStatuses:', newArtworkStatuses);
+          if (newLayoutStatuses.length > 0) {
+            dataForFormData.newLayoutStatuses = newLayoutStatuses;
+            console.log('[Task Update] 📦 FormData - Including newLayoutStatuses:', newLayoutStatuses);
           }
 
           // Handle responsibles - only send if there's an actual change
@@ -1750,6 +1833,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           // Remove marker fields before sending to API
           delete dataForFormData._onlyCuts;
           delete dataForFormData._onlyNewResponsibles;
+          delete dataForFormData._onlyAirbrushings;
 
           // Use the helper to create FormData with proper context
           const formData = createFormDataWithContext(
@@ -1774,7 +1858,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           // DEBUG: Log what's actually in the FormData
           console.log('[Task Update] 📤 FormData contents:');
           for (const [key, value] of formData.entries()) {
-            if (key === 'artworkIds' || key.startsWith('artworkIds[') || key === 'artworkStatuses') {
+            if (key === 'layoutIds' || key.startsWith('layoutIds[') || key === 'layoutStatuses') {
               console.log(`  ${key}: ${value}`);
             }
           }
@@ -1784,7 +1868,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             data: formData as any,
             query: {
               include: {
-                artworks: true,
+                layouts: true,
                 baseFiles: true,
                 projectFiles: true,
                 checkinFiles: true,
@@ -1844,71 +1928,76 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           // Sending cuts here would cause backend to deleteMany + create, losing existing cut statuses
           delete submitData.cuts;
 
+          // CRITICAL: Exclude airbrushings from JSON submission - they are reconciled separately
+          // (create/update/delete) after the task update. Sending them here would let the task
+          // endpoint replace/lose their status, payment, timestamps, and file links.
+          delete (submitData as any).airbrushings;
+
           // Exclude responsibleIds - handled separately below to avoid false changelog entries
           delete submitData.responsibleIds;
 
           // Even if no new files, check for deleted files
           // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
           // Extract IDs of uploaded (existing) files
-          const currentArtworkIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentLayoutIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentProjectFileIds = projectFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           // Send file IDs arrays when files exist
           // Backend uses these to replace all files via 'set' operation
-          // CRITICAL: Always send artworkIds when artworkStatuses is present to prevent removal
+          // CRITICAL: Always send layoutIds when layoutStatuses is present to prevent removal
           // If only status changed (no file add/remove), we must send existing file IDs
-          console.log('[Task Update] 📊 Artwork Debug Info:', {
+          console.log('[Task Update] 📊 Layout Debug Info:', {
             uploadedFiles: uploadedFiles,
             uploadedFilesLength: uploadedFiles.length,
             uploadedFilesWithFlag: uploadedFiles.filter(f => f.uploaded),
-            currentArtworkIds: currentArtworkIds,
-            hasArtworkStatusChanges,
-            hasArtworkFileChanges,
-            artworkStatuses: Object.keys(artworkStatuses).length > 0 ? artworkStatuses : 'empty',
-            taskArtworks: task.artworks?.length || 0,
+            currentLayoutIds: currentLayoutIds,
+            hasLayoutStatusChanges,
+            hasLayoutFileChanges,
+            layoutStatuses: Object.keys(layoutStatuses).length > 0 ? layoutStatuses : 'empty',
+            taskLayouts: task.layouts?.length || 0,
           });
 
-          // CRITICAL: Always send artworkIds when:
-          // 1. There are artwork IDs to send (keeping some artworks)
+          // CRITICAL: Always send layoutIds when:
+          // 1. There are artwork IDs to send (keeping some layouts)
           // 2. Status changes were made
-          // 3. Artwork files were modified (added or removed) - even if resulting in empty array
-          // 4. Task originally had artworks (to handle removal case)
-          const taskHadArtworks = task.artworks && task.artworks.length > 0;
-          const shouldSendArtworkIds = currentArtworkIds.length > 0 || hasArtworkStatusChanges || hasArtworkFileChanges || taskHadArtworks;
+          // 3. Layout files were modified (added or removed) - even if resulting in empty array
+          // 4. Task originally had layouts (to handle removal case)
+          const taskHadLayouts = task.layouts && task.layouts.length > 0;
+          const shouldSendLayoutIds = currentLayoutIds.length > 0 || hasLayoutStatusChanges || hasLayoutFileChanges || taskHadLayouts;
 
-          if (shouldSendArtworkIds) {
-            submitData.artworkIds = [...currentArtworkIds]; // Spread to ensure it's an array (may be empty for removal)
-            console.log('[Task Update] ✅ Including artworkIds:', submitData.artworkIds, {
+          if (shouldSendLayoutIds) {
+            submitData.layoutIds = [...currentLayoutIds]; // Spread to ensure it's an array (may be empty for removal)
+            console.log('[Task Update] ✅ Including layoutIds:', submitData.layoutIds, {
               reason: {
-                hasIds: currentArtworkIds.length > 0,
-                hasStatusChanges: hasArtworkStatusChanges,
-                hasFileChanges: hasArtworkFileChanges,
-                taskHadArtworks,
+                hasIds: currentLayoutIds.length > 0,
+                hasStatusChanges: hasLayoutStatusChanges,
+                hasFileChanges: hasLayoutFileChanges,
+                taskHadLayouts,
               }
             });
           } else {
-            console.log('[Task Update] ⚠️ NOT including artworkIds (task had no artworks and no changes)');
+            console.log('[Task Update] ⚠️ NOT including layoutIds (task had no layouts and no changes)');
           }
 
           // Send artwork statuses for approval workflow as UUID-keyed object
           // Backend schema expects: z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED']))
-          const existingArtworkStatusesJson: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
-          currentArtworkIds.forEach(fileId => {
+          const existingLayoutStatusesJson: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
+          currentLayoutIds.forEach(fileId => {
             // Get status from state first (user's pending changes take priority)
-            const statusFromState = artworkStatuses[fileId];
+            const statusFromState = layoutStatuses[fileId];
             if (statusFromState) {
-              existingArtworkStatusesJson[fileId] = statusFromState;
+              existingLayoutStatusesJson[fileId] = statusFromState;
             } else {
               // Try to find the file and get its status
               const file = uploadedFiles.find(f => (f.uploadedFileId || f.id) === fileId);
               const statusFromFile = file?.status;
-              existingArtworkStatusesJson[fileId] = (statusFromFile as 'DRAFT' | 'APPROVED' | 'REPROVED') || 'DRAFT';
+              existingLayoutStatusesJson[fileId] = (statusFromFile as 'DRAFT' | 'APPROVED' | 'REPROVED') || 'DRAFT';
             }
           });
 
-          if (Object.keys(existingArtworkStatusesJson).length > 0) {
-            (submitData as any).artworkStatuses = existingArtworkStatusesJson;
-            console.log('[Task Update] ✅ Including artworkStatuses in JSON (UUID-keyed object):', existingArtworkStatusesJson);
+          if (Object.keys(existingLayoutStatusesJson).length > 0) {
+            (submitData as any).layoutStatuses = existingLayoutStatusesJson;
+            console.log('[Task Update] ✅ Including layoutStatuses in JSON (UUID-keyed object):', existingLayoutStatusesJson);
           }
           // Only send baseFileIds if the user actually modified base files
           if (hasBaseFileChanges) {
@@ -1953,7 +2042,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
           // CRITICAL: Clean up malformed data before sending
           // Remove empty objects that should be arrays or dates
-          const fileIdFields = ['artworkIds', 'baseFileIds'];
+          const fileIdFields = ['layoutIds', 'baseFileIds'];
           const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate', 'term'];
 
           for (const field of fileIdFields) {
@@ -2062,6 +2151,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           // Remove marker fields before sending to API
           delete (submitData as any)._onlyCuts;
           delete (submitData as any)._onlyNewResponsibles;
+          delete (submitData as any)._onlyAirbrushings;
 
           // Attach forecast reschedule reason if forecastDate changed
           if (showForecastReason && forecastReason && 'forecastDate' in submitData) {
@@ -2081,7 +2171,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             data: submitData,
             query: {
               include: {
-                artworks: true,
+                layouts: true,
                 baseFiles: true,
                 projectFiles: true,
                 checkinFiles: true,
@@ -2234,17 +2324,100 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           // before this reconciliation runs).
           await queryClient.invalidateQueries({ queryKey: cutKeys.all });
 
+          // ============================================================
+          // Reconcile airbrushings (create / edit / remove) against the DB — the
+          // airbrushing analog of the cut reconciliation above. Airbrushings are
+          // individual rows with their own status / payment workflow + file attachments,
+          // so we touch only what changed (plan computed pre-update). Deletes are the fix
+          // for the reported "remove all airbrushings never persists" bug: a removed row
+          // is an explicit batch delete instead of a swallowed empty array.
+          //
+          // Split by files: rows carrying NEW uploads must use the single multipart
+          // create/update endpoint (JSON batch endpoints can't carry files); metadata-only
+          // rows batch as JSON. Batch envelopes report per-item failures (data.totalFailed)
+          // while still resolving success:true, so we inspect and fail loudly — otherwise a
+          // "removed"/failed airbrushing silently reappears after refetch.
+          // ============================================================
+          try {
+            const { toCreate, toUpdate, toDelete } = airbrushingPlan;
+            const customerInfo = task.customer
+              ? {
+                  id: task.customer.id,
+                  name: task.customer.corporateName || task.customer.fantasyName,
+                  fantasyName: task.customer.fantasyName,
+                }
+              : undefined;
+            const hasFiles = (f: AirbrushingFiles) => f.receipts.length > 0 || f.invoices.length > 0 || f.layouts.length > 0;
+
+            // 1) Deletions (JSON batch).
+            if (toDelete.length > 0) {
+              const res: any = await airbrushingService.batchDeleteAirbrushings({ airbrushingIds: toDelete } as any);
+              const failed = res?.data?.totalFailed ?? 0;
+              if (res?.success === false || failed > 0) {
+                throw new Error(`Não foi possível remover ${failed || toDelete.length} aerografia(s).`);
+              }
+            }
+
+            // 2) Updates. Metadata-only edits batch as JSON (preserving untouched fields);
+            //    rows with new file uploads go through the single multipart endpoint.
+            const updatesNoFiles = toUpdate.filter((u) => !hasFiles(u.files));
+            const updatesWithFiles = toUpdate.filter((u) => hasFiles(u.files));
+            if (updatesNoFiles.length > 0) {
+              const res: any = await airbrushingService.batchUpdateAirbrushings({
+                airbrushings: updatesNoFiles.map((u) => ({ id: u.id, data: u.data })),
+              } as any);
+              const failed = res?.data?.totalFailed ?? 0;
+              if (res?.success === false || failed > 0) {
+                throw new Error(`Não foi possível atualizar ${failed || updatesNoFiles.length} aerografia(s).`);
+              }
+            }
+            for (const u of updatesWithFiles) {
+              const formData = createAirbrushingFormData(u.data, u.files, customerInfo);
+              await airbrushingService.updateAirbrushing(u.id, formData as any);
+            }
+
+            // 3) Creations. Same split: metadata-only → JSON batch create; new files →
+            //    single multipart create. taskId links each row to this task.
+            const createsNoFiles = toCreate.filter((c) => !hasFiles(c.files));
+            const createsWithFiles = toCreate.filter((c) => hasFiles(c.files));
+            if (createsNoFiles.length > 0) {
+              const res: any = await airbrushingService.batchCreateAirbrushings({
+                airbrushings: createsNoFiles.map((c) => ({ ...c.data, taskId: task.id })),
+              } as any);
+              const failed = res?.data?.totalFailed ?? 0;
+              if (res?.success === false || failed > 0) {
+                throw new Error(`Não foi possível criar ${failed || createsNoFiles.length} aerografia(s).`);
+              }
+            }
+            for (const c of createsWithFiles) {
+              const formData = createAirbrushingFormData({ ...c.data, taskId: task.id }, c.files, customerInfo);
+              await airbrushingService.createAirbrushing(formData as any);
+            }
+          } catch (airbrushingError: any) {
+            console.error('[TaskEditForm] Airbrushing reconciliation failed:', airbrushingError);
+            // Make the UI reflect what actually persisted before surfacing the error.
+            await queryClient.invalidateQueries({ queryKey: airbrushingKeys.all });
+            toast.error(airbrushingError?.message || 'Não foi possível salvar todas as aerografias. Verifique e tente novamente.');
+            // Do NOT report the overall save as successful: re-throw so navigation is skipped
+            // and the user stays on the form seeing the real (refreshed) airbrushing state.
+            throw airbrushingError;
+          }
+
+          // Refresh the separately-queried airbrushing lists so the detail page reflects
+          // the reconciliation immediately.
+          await queryClient.invalidateQueries({ queryKey: airbrushingKeys.all });
+
           // Layout photos are uploaded WITH the task update (not separately like cuts)
           // The backend handles them in the transaction at lines 683-728 of task.service.ts
 
           console.log('[Task Update] ✅ SUCCESS - Update completed, response:', result);
-          console.log('[Task Update] Artworks in response:', result?.data?.artworks);
+          console.log('[Task Update] Layouts in response:', result?.data?.layouts);
 
           // Reset artwork changes flags after successful submission
-          if (hasArtworkStatusChanges || hasArtworkFileChanges) {
+          if (hasLayoutStatusChanges || hasLayoutFileChanges) {
             console.log('[Task Update] 🔄 Resetting artwork flags after successful submission');
-            setHasArtworkStatusChanges(false);
-            setHasArtworkFileChanges(false);
+            setHasLayoutStatusChanges(false);
+            setHasLayoutFileChanges(false);
           }
 
           // Reset base file changes flag after successful submission
@@ -2281,7 +2454,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         }, 100);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, uploadedFiles, baseFiles, projectFiles, observationFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasLayoutStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, uploadedFiles, baseFiles, projectFiles, observationFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -2302,7 +2475,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     fieldsToOmitIfUnchanged: [
       "cuts",
       "paintIds",
-      "artworkIds",
+      "layoutIds",
       "baseFileIds",
       "reimbursementIds",
       "reimbursementInvoiceIds",
@@ -2326,12 +2499,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     // Get IDs of files that are being kept
     const keptFileIds = new Set(files.map(f => f.uploadedFileId || f.id).filter(Boolean));
 
-    // Clean up artworkStatuses to remove entries for files that were removed
-    setArtworkStatuses(prev => {
+    // Clean up layoutStatuses to remove entries for files that were removed
+    setLayoutStatuses(prev => {
       const cleaned = { ...prev };
       for (const fileId of Object.keys(cleaned)) {
         if (!keptFileIds.has(fileId)) {
-          console.log('[Task Update] 🗑️ Removing artworkStatus for deleted file:', fileId);
+          console.log('[Task Update] 🗑️ Removing layoutStatus for deleted file:', fileId);
           delete cleaned[fileId];
         }
       }
@@ -2341,9 +2514,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     setUploadedFiles(files);
     setHasFileChanges(true);
     // Mark that artwork files have been modified (added or removed)
-    // This ensures artworkIds is always sent when artworks change, even if empty
-    setHasArtworkFileChanges(true);
-    console.log('[Task Update] 📁 Artwork files changed, count:', files.length);
+    // This ensures layoutIds is always sent when layouts change, even if empty
+    setHasLayoutFileChanges(true);
+    console.log('[Task Update] 📁 Layout files changed, count:', files.length);
     // Files will be submitted with the form, not uploaded separately
   };
 
@@ -2559,7 +2732,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   }, [responsibleRows]);
 
   // Compute hasChanges including cuts to create, artwork status changes, and new responsibles
-  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges || hasCutsToCreate || hasNewResponsibles;
+  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasLayoutStatusChanges || hasCutsToCreate || hasNewResponsibles;
 
   console.log('[TaskEditForm] hasChanges calculation:', {
     hasChanges,
@@ -2567,7 +2740,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     formFieldChanges: Object.keys(formFieldChanges),
     hasLayoutChanges,
     hasFileChanges,
-    hasArtworkStatusChanges,
+    hasLayoutStatusChanges,
     hasCutsToCreate,
     hasNewResponsibles
   });
@@ -2644,7 +2817,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   useEffect(() => {
     if (onFormStateChange) {
       const changedFields = getChangedFields();
-      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges || hasCutsToCreate || hasNewResponsibles;
+      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges || hasLayoutStatusChanges || hasCutsToCreate || hasNewResponsibles;
 
       // Check if form is valid (no blocking validation errors)
       // This matches the form's internal validation but WITHOUT the hasChanges check
@@ -2667,7 +2840,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     form.formState.isValid,
     hasLayoutChanges,
     hasFileChanges,
-    hasArtworkStatusChanges,
+    hasLayoutStatusChanges,
     hasCutsToCreate,
     hasNewResponsibles,
     isSubmitting,
@@ -2756,7 +2929,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           Submit
         </button>
 
-        <div className={openAccordion === 'base-files' || openAccordion === 'artworks' || openAccordion === 'project-files' || openAccordion === 'checkin-files' || openAccordion === 'checkout-files' ? 'pb-64' : ''}>
+        <div className={openAccordion === 'base-files' || openAccordion === 'layouts' || openAccordion === 'project-files' || openAccordion === 'checkin-files' || openAccordion === 'checkout-files' ? 'pb-64' : ''}>
           <Accordion
             type="single"
             collapsible
@@ -3320,7 +3493,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
                 {/* Quote is now accessed via context menu - removed from edit form */}
 
-                {/* Layout do Caminhão - Only visible to ADMIN, LOGISTIC, and PRODUCTION team leaders */}
+                {/* Medidas do Implemento - Only visible to ADMIN, LOGISTIC, and PRODUCTION team leaders */}
                 {canViewLayout && (
           <AccordionItem
             value="layout"
@@ -3332,7 +3505,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
                         <IconRuler className="h-5 w-5" />
-                        Layout do Caminhão
+                        Medidas do Implemento
                       </CardTitle>
                     </CardHeader>
                   </AccordionTrigger>
@@ -3344,7 +3517,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                           <div className="flex gap-2">
                             <Button type="button" variant={selectedLayoutSide === "left" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("left")}>
                               Motorista
-                              {layoutsData?.leftSideLayout && (
+                              {layoutsData?.leftSideMeasure && (
                                 <Badge variant="success" className="ml-2">
                                   Configurado
                                 </Badge>
@@ -3352,7 +3525,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                             </Button>
                             <Button type="button" variant={selectedLayoutSide === "right" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("right")}>
                               Sapo
-                              {layoutsData?.rightSideLayout && (
+                              {layoutsData?.rightSideMeasure && (
                                 <Badge variant="success" className="ml-2">
                                   Configurado
                                 </Badge>
@@ -3360,7 +3533,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                             </Button>
                             <Button type="button" variant={selectedLayoutSide === "back" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("back")}>
                               Traseira
-                              {layoutsData?.backSideLayout && (
+                              {layoutsData?.backSideMeasure && (
                                 <Badge variant="success" className="ml-2">
                                   Configurado
                                 </Badge>
@@ -3375,13 +3548,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                               {(() => {
                                 const currentState = currentLayoutStates[selectedLayoutSide];
                                 const savedLayout = selectedLayoutSide === "left"
-                                  ? layoutsData?.leftSideLayout
+                                  ? layoutsData?.leftSideMeasure
                                   : selectedLayoutSide === "right"
-                                    ? layoutsData?.rightSideLayout
-                                    : layoutsData?.backSideLayout;
+                                    ? layoutsData?.rightSideMeasure
+                                    : layoutsData?.backSideMeasure;
 
                                 const currentLayout = currentState || savedLayout;
-                                const sections = currentLayout?.sections || currentLayout?.layoutSections;
+                                const sections = currentLayout?.sections || currentLayout?.sections;
 
                                 if (!sections || sections.length === 0) return "0cm";
                                 const totalWidthMeters = sections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
@@ -3393,14 +3566,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                         </div>
 
                         {/* Layout Form - Read-only for Financial and Designer users */}
-                        <LayoutForm
+                        <ImplementMeasureForm
                           selectedSide={selectedLayoutSide}
                           layout={(() => {
                             const savedLayout = selectedLayoutSide === "left"
-                              ? layoutsData?.leftSideLayout
+                              ? layoutsData?.leftSideMeasure
                               : selectedLayoutSide === "right"
-                                ? layoutsData?.rightSideLayout
-                                : layoutsData?.backSideLayout;
+                                ? layoutsData?.rightSideMeasure
+                                : layoutsData?.backSideMeasure;
 
                             if (modifiedLayoutSides.has(selectedLayoutSide) && currentLayoutStates[selectedLayoutSide]) {
                               return currentLayoutStates[selectedLayoutSide];
@@ -3411,12 +3584,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                           validationError={layoutWidthError}
                           onChange={(side, layoutData) => {
                             const savedLayout = side === "left"
-                              ? layoutsData?.leftSideLayout
+                              ? layoutsData?.leftSideMeasure
                               : side === "right"
-                                ? layoutsData?.rightSideLayout
-                                : layoutsData?.backSideLayout;
+                                ? layoutsData?.rightSideMeasure
+                                : layoutsData?.backSideMeasure;
 
-                            const hasSavedLayout = savedLayout?.layoutSections && savedLayout.layoutSections.length > 0;
+                            const hasSavedLayout = savedLayout?.sections && savedLayout.sections.length > 0;
                             const isFirstEmitForSide = !initialLayoutStateEmittedRef.current.has(side);
 
                             if (!hasSavedLayout && isFirstEmitForSide) {
@@ -3885,11 +4058,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           </AccordionItem>
                 )}
 
-                {/* Artworks/Layouts Card - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
+                {/* Layouts/Layouts Card - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
                 {canViewReimbursement && (
           <AccordionItem
-            value="artworks"
-            id="accordion-item-artworks"
+            value="layouts"
+            id="accordion-item-layouts"
             className="border border-border rounded-lg"
           >
                 <Card className="border-0">
@@ -3903,20 +4076,20 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                   </AccordionTrigger>
                   <AccordionContent>
                     <CardContent className="pt-0">
-                      <ArtworkFileUploadField
+                      <LayoutFileUploadField
                         onFilesChange={handleFilesChange}
                         onStatusChange={(fileId, status) => {
-                          console.log('[Task Update] 🎨 Status changed:', { fileId, status, hasArtworkStatusChanges });
-                          setArtworkStatuses(prev => {
+                          console.log('[Task Update] 🎨 Status changed:', { fileId, status, hasLayoutStatusChanges });
+                          setLayoutStatuses(prev => {
                             const newStatuses = {
                               ...prev,
                               [fileId]: status,
                             };
-                            console.log('[Task Update] 🎨 New artworkStatuses:', newStatuses);
+                            console.log('[Task Update] 🎨 New layoutStatuses:', newStatuses);
                             return newStatuses;
                           });
-                          setHasArtworkStatusChanges(true);
-                          console.log('[Task Update] 🎨 Set hasArtworkStatusChanges to true');
+                          setHasLayoutStatusChanges(true);
+                          console.log('[Task Update] 🎨 Set hasLayoutStatusChanges to true');
                         }}
                         maxFiles={5}
                         disabled={isSubmitting}
@@ -3928,7 +4101,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       >
                         <FileSuggestions
                           customerId={task.customerId ?? undefined}
-                          fileContext="tasksArtworks"
+                          fileContext="tasksLayouts"
                           excludeFileIds={uploadedFiles.map(f => f.uploadedFileId || f.id).filter(Boolean)}
                           onSelect={(newFile) => {
                             const fileWithPreview: FileWithPreview = {
@@ -3944,12 +4117,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                               status: 'DRAFT',
                             } as FileWithPreview;
                             setUploadedFiles(prev => [...prev, fileWithPreview]);
-                            setHasArtworkFileChanges(true);
+                            setHasLayoutFileChanges(true);
                             setHasFileChanges(true);
                           }}
                           disabled={isSubmitting}
                         />
-                      </ArtworkFileUploadField>
+                      </LayoutFileUploadField>
                     </CardContent>
                   </AccordionContent>
                 </Card>

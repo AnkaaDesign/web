@@ -96,10 +96,10 @@ const LIST_INCLUDE = {
       chassisNumber: true,
       implementType: true,
       // Layouts power the (default-hidden) "Medidas" column — formatTaskMeasures reads
-      // height + the layoutSections' widths off the left/right side. Keep the nested select
+      // height + the sections' widths off the left/right side. Keep the nested select
       // minimal (just those fields) so the payload stays lean.
-      leftSideLayout: { select: { id: true, height: true, layoutSections: { select: { id: true, width: true } } } },
-      rightSideLayout: { select: { id: true, height: true, layoutSections: { select: { id: true, width: true } } } },
+      leftSideMeasure: { select: { id: true, height: true, sections: { select: { id: true, width: true } } } },
+      rightSideMeasure: { select: { id: true, height: true, sections: { select: { id: true, width: true } } } },
     },
   },
   quote: {
@@ -289,7 +289,7 @@ export function TaskPreparationPage() {
       try {
         const full = await taskService.getTaskById(source.id, {
           include: {
-            artworks: { include: { file: true } },
+            layouts: { include: { file: true } },
             budgets: true,
             invoices: true,
             receipts: true,
@@ -299,9 +299,9 @@ export function TaskPreparationPage() {
             serviceOrders: true,
             truck: {
               include: {
-                leftSideLayout: { include: { layoutSections: true, photo: true } },
-                rightSideLayout: { include: { layoutSections: true, photo: true } },
-                backSideLayout: { include: { layoutSections: true, photo: true } },
+                leftSideMeasure: { include: { sections: true, photo: true } },
+                rightSideMeasure: { include: { sections: true, photo: true } },
+                backSideMeasure: { include: { sections: true, photo: true } },
               },
             },
           },
@@ -658,14 +658,14 @@ export function TaskPreparationPage() {
       },
       {
         key: "adv-layout",
-        label: "Layout do Caminhão",
+        label: "Medidas do Implemento",
         icon: <IconLayout className="h-4 w-4" />,
         requiredPrivilege: ADVANCED,
         onClick: (rows) => advancedRef.current?.openModal("layout", rows.map((r) => r.id)),
       },
       {
         // COMMERCIAL sets the quote's approved layout files (TaskQuote.layoutFiles) — distinct from the
-        // truck "Layout do Caminhão" above. (Faithful port of the legacy COMMERCIAL-only menu item.)
+        // truck "Medidas do Implemento" above. (Faithful port of the legacy COMMERCIAL-only menu item.)
         key: "adv-quote-layout",
         label: "Layout do Orçamento",
         icon: <IconPhoto className="h-4 w-4" />,

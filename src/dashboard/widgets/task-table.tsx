@@ -25,8 +25,8 @@ import {
 } from "@tabler/icons-react";
 
 import {
-  ARTWORK_STATUS,
-  ARTWORK_STATUS_LABELS,
+  LAYOUT_STATUS,
+  LAYOUT_STATUS_LABELS,
   BONIFICATION_STATUS,
   BONIFICATION_STATUS_LABELS,
   IMPLEMENT_TYPE,
@@ -413,7 +413,7 @@ type ColumnKey =
   | "soLogisticCount"
   | "soArtworkCount"
   // characteristics
-  | "hasArtworks"
+  | "hasLayouts"
   | "hasOpenSO"
   | "hasBudget"
   | "hasObservation";
@@ -456,7 +456,7 @@ const COLUMN_KEY_VALUES = [
   "soCommercialCount",
   "soLogisticCount",
   "soArtworkCount",
-  "hasArtworks",
+  "hasLayouts",
   "hasOpenSO",
   "hasBudget",
   "hasObservation",
@@ -494,33 +494,33 @@ function dateClassFor(
 }
 
 // ============================================================================
-// Artworks cell + modal
+// Layouts cell + modal
 // ============================================================================
-// The "Artes" column displays the artwork count and overrides the row click
+// The "Layouts" column displays the layout count and overrides the row click
 // to open an inline modal listing every artwork for the task with its status.
 // Clicking a thumbnail in the listing hands off to the shared FilePreviewModal
 // so the user can preview/download/zoom the file with the same UX as the rest
 // of the app. Badges follow the same `approved` / `rejected` variants used in
-// the task detail page (`components/production/task/artwork/artwork-status-badge.tsx`)
+// the task detail page (`components/production/task/layout/layout-status-badge.tsx`)
 // so the visual language stays consistent.
 
-function artworkStatusBadgeVariant(
-  status: ARTWORK_STATUS,
+function layoutStatusBadgeVariant(
+  status: LAYOUT_STATUS,
 ): "approved" | "rejected" | "secondary" {
   switch (status) {
-    case ARTWORK_STATUS.APPROVED:
+    case LAYOUT_STATUS.APPROVED:
       return "approved";
-    case ARTWORK_STATUS.REPROVED:
+    case LAYOUT_STATUS.REPROVED:
       return "rejected";
     default:
       return "secondary";
   }
 }
 
-type TaskArtwork = {
+type TaskLayout = {
   id: string;
-  artworkId?: string;
-  status: ARTWORK_STATUS;
+  layoutId?: string;
+  status: LAYOUT_STATUS;
   filename: string;
   originalName?: string;
   path?: string;
@@ -529,9 +529,9 @@ type TaskArtwork = {
   thumbnailUrl?: string | null;
 };
 
-function ArtworksCell({ task }: { task: Task }) {
-  const artworks = ((task as any).artworks ?? []) as TaskArtwork[];
-  const count = artworks.length;
+function LayoutsCell({ task }: { task: Task }) {
+  const layouts = ((task as any).layouts ?? []) as TaskLayout[];
+  const count = layouts.length;
   const [listOpen, setListOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
@@ -551,15 +551,15 @@ function ArtworksCell({ task }: { task: Task }) {
 
   // Status breakdown — drives the cell color so users see at a glance whether
   // anything still needs approval.
-  const counts = artworks.reduce(
+  const counts = layouts.reduce(
     (acc, a) => {
       acc[a.status] = (acc[a.status] ?? 0) + 1;
       return acc;
     },
     {} as Record<string, number>,
   );
-  const hasReproved = (counts[ARTWORK_STATUS.REPROVED] ?? 0) > 0;
-  const hasDraft = (counts[ARTWORK_STATUS.DRAFT] ?? 0) > 0;
+  const hasReproved = (counts[LAYOUT_STATUS.REPROVED] ?? 0) > 0;
+  const hasDraft = (counts[LAYOUT_STATUS.DRAFT] ?? 0) > 0;
   const allApproved = !hasReproved && !hasDraft;
   const cellColor = hasReproved
     ? "text-red-500"
@@ -596,7 +596,7 @@ function ArtworksCell({ task }: { task: Task }) {
           }
         }}
         className={`text-sm tabular-nums font-medium hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-1 ${cellColor}`}
-        aria-label={`Ver ${count} ${count === 1 ? "arte" : "artes"} da tarefa`}
+        aria-label={`Ver ${count} ${count === 1 ? "layout" : "layouts"} da tarefa`}
       >
         {count}
       </button>
@@ -607,16 +607,16 @@ function ArtworksCell({ task }: { task: Task }) {
           onClick={(e) => e.stopPropagation()}
         >
           <DialogHeader>
-            <DialogTitle>Artes — {task.name ?? task.serialNumber ?? ""}</DialogTitle>
+            <DialogTitle>Layouts — {task.name ?? task.serialNumber ?? ""}</DialogTitle>
             <DialogDescription>
-              {count} {count === 1 ? "arte" : "artes"} ·{" "}
-              {(Object.keys(counts) as ARTWORK_STATUS[])
-                .map((s) => `${counts[s]} ${ARTWORK_STATUS_LABELS[s] ?? s}`)
+              {count} {count === 1 ? "layout" : "layouts"} ·{" "}
+              {(Object.keys(counts) as LAYOUT_STATUS[])
+                .map((s) => `${counts[s]} ${LAYOUT_STATUS_LABELS[s] ?? s}`)
                 .join(" · ")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[60vh] overflow-auto pr-1">
-            {artworks.map((art, idx) => {
+            {layouts.map((art, idx) => {
               const thumb = getFileThumbnailUrl(art as any) || art.thumbnailUrl || null;
               const label = art.originalName || art.filename;
               return (
@@ -643,11 +643,11 @@ function ArtworksCell({ task }: { task: Task }) {
                   </div>
                   <div className="flex items-center gap-1.5 min-w-0">
                     <Badge
-                      variant={artworkStatusBadgeVariant(art.status)}
+                      variant={layoutStatusBadgeVariant(art.status)}
                       size="sm"
                       className="shrink-0"
                     >
-                      {ARTWORK_STATUS_LABELS[art.status] ?? art.status}
+                      {LAYOUT_STATUS_LABELS[art.status] ?? art.status}
                     </Badge>
                     <span className="truncate text-xs text-foreground min-w-0">
                       {label}
@@ -661,7 +661,7 @@ function ArtworksCell({ task }: { task: Task }) {
       </Dialog>
 
       <FilePreviewModal
-        files={artworks as any}
+        files={layouts as any}
         initialFileIndex={previewIndex ?? 0}
         open={previewIndex !== null}
         onOpenChange={(v) => {
@@ -1061,10 +1061,10 @@ function buildColumnCatalog(): ColumnDef[] {
     // — they're auto-migrated to the rich `soProduction`/etc. columns above
     // (which render as count when `cellModes.serviceOrder === "count"`).
     {
-      key: "hasArtworks",
-      label: "Artes",
+      key: "hasLayouts",
+      label: "Layouts",
       track: "minmax(0, 0.6fr)",
-      render: (t) => <ArtworksCell task={t} />,
+      render: (t) => <LayoutsCell task={t} />,
     },
     {
       key: "hasOpenSO",
@@ -1357,7 +1357,7 @@ const taskTableConfigSchemaInner = z.object({
       createdRange: dateRangeSchema,
       entryRange: dateRangeSchema,
       hasOpenSO: z.enum(TRI_STATE).default("any"),
-      hasArtworks: z.enum(TRI_STATE).default("any"),
+      hasLayouts: z.enum(TRI_STATE).default("any"),
       hasObservation: z.enum(TRI_STATE).default("any"),
       hasBudget: z.enum(TRI_STATE).default("any"),
       isOverdue: z.enum(TRI_STATE).default("any"),
@@ -1384,7 +1384,7 @@ const taskTableConfigSchemaInner = z.object({
       createdRange: { from: null, to: null },
       entryRange: { from: null, to: null },
       hasOpenSO: "any",
-      hasArtworks: "any",
+      hasLayouts: "any",
       hasObservation: "any",
       hasBudget: "any",
       isOverdue: "any",
@@ -1558,8 +1558,8 @@ function buildQueryParams(
     });
   }
 
-  if (f.hasArtworks === "yes") ANDs.push({ artworks: { some: {} } });
-  if (f.hasArtworks === "no") ANDs.push({ artworks: { none: {} } });
+  if (f.hasLayouts === "yes") ANDs.push({ layouts: { some: {} } });
+  if (f.hasLayouts === "no") ANDs.push({ layouts: { none: {} } });
 
   if (f.hasObservation === "yes") ANDs.push({ observation: { isNot: null as any } });
   if (f.hasObservation === "no") ANDs.push({ observation: null as any });
@@ -1652,7 +1652,7 @@ const TASK_INCLUDE = {
   // is not a direct relation on TaskQuote, only on TaskQuoteCustomerConfig,
   // and Prisma rejects the unknown field.
   quote: true,
-  artworks: true,
+  layouts: true,
   responsibles: true,
 } as const;
 
@@ -2075,7 +2075,7 @@ function TaskTableRender({
       try {
         const full = await taskService.getTaskById(sourceTask.id, {
           include: {
-            artworks: { include: { file: true } },
+            layouts: { include: { file: true } },
             budgets: true,
             invoices: true,
             receipts: true,
@@ -2085,9 +2085,9 @@ function TaskTableRender({
             serviceOrders: true,
             truck: {
               include: {
-                leftSideLayout: { include: { layoutSections: true, photo: true } },
-                rightSideLayout: { include: { layoutSections: true, photo: true } },
-                backSideLayout: { include: { layoutSections: true, photo: true } },
+                leftSideMeasure: { include: { sections: true, photo: true } },
+                rightSideMeasure: { include: { sections: true, photo: true } },
+                backSideMeasure: { include: { sections: true, photo: true } },
               },
             },
           },
@@ -3267,13 +3267,13 @@ function TaskTableConfigComponent({
             <Label className="text-xs">Tem artes</Label>
             <Combobox
               mode="single"
-              value={c.filters.hasArtworks}
+              value={c.filters.hasLayouts}
               onValueChange={(v) =>
                 setFilter(
-                  "hasArtworks",
+                  "hasLayouts",
                   (typeof v === "string"
                     ? v
-                    : "any") as TaskTableConfig["filters"]["hasArtworks"],
+                    : "any") as TaskTableConfig["filters"]["hasLayouts"],
                 )
               }
               options={triStateOptions}
@@ -3581,7 +3581,7 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
       createdRange: { from: null, to: null },
       entryRange: { from: null, to: null },
       hasOpenSO: "any",
-      hasArtworks: "any",
+      hasLayouts: "any",
       hasObservation: "any",
       hasBudget: "any",
       isOverdue: "any",

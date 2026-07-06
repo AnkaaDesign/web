@@ -59,20 +59,20 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
       },
       truck: {
         include: {
-          leftSideLayout: {
+          leftSideMeasure: {
             include: {
-              layoutSections: true,
+              sections: true,
             },
           },
-          rightSideLayout: {
+          rightSideMeasure: {
             include: {
-              layoutSections: true,
+              sections: true,
             },
           },
         },
       },
       sector: true,
-      artworks: {
+      layouts: {
         include: {
           file: true,
         },
@@ -83,8 +83,8 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
 
   const task = taskResponse?.data;
 
-  // Check if user can view artwork badges and non-approved artworks
-  const canViewArtworkBadges = currentUser && (
+  // Check if user can view artwork badges and non-approved layouts
+  const canViewLayoutBadges = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
@@ -96,9 +96,9 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
   const layoutDimensions = useMemo(() => {
     if (!task?.truck) return null;
     const truck = task.truck as any;
-    const layout = truck?.leftSideLayout || truck?.rightSideLayout;
-    if (!layout || !layout.layoutSections || layout.layoutSections.length === 0) return null;
-    const totalLength = layout.layoutSections.reduce(
+    const layout = truck?.leftSideMeasure || truck?.rightSideMeasure;
+    if (!layout || !layout.sections || layout.sections.length === 0) return null;
+    const totalLength = layout.sections.reduce(
       (sum: number, section: { width: number }) => sum + (section.width || 0),
       0
     );
@@ -115,17 +115,17 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
     return new Date(task.term) < new Date();
   }, [task]);
 
-  // Filter artworks: show all if user can view badges, otherwise only approved
+  // Filter layouts: show all if user can view badges, otherwise only approved
   // Note: artwork can have file data nested in .file OR directly on artwork object
-  const filteredArtworks = useMemo(() => {
-    if (!task?.artworks) return [];
+  const filteredLayouts = useMemo(() => {
+    if (!task?.layouts) return [];
 
-    return (task.artworks as any[]).filter((artwork) => {
+    return (task.layouts as any[]).filter((artwork) => {
       // Check if artwork has file data - either nested in .file or directly on artwork
       const hasFileData = artwork.file || artwork.filename || artwork.path;
-      return hasFileData && (canViewArtworkBadges || artwork.status === 'APPROVED');
+      return hasFileData && (canViewLayoutBadges || artwork.status === 'APPROVED');
     });
-  }, [task, canViewArtworkBadges]);
+  }, [task, canViewLayoutBadges]);
 
   const handleOpenTaskDetail = () => {
     if (taskId) {
@@ -141,8 +141,8 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
 
   // Handle file preview
   const handlePreview = (_file: any, index: number) => {
-    // Get all file data from filtered artworks
-    const allFiles = filteredArtworks.map(artwork => artwork.file || artwork);
+    // Get all file data from filtered layouts
+    const allFiles = filteredLayouts.map(artwork => artwork.file || artwork);
     setPreviewFiles(allFiles);
     setPreviewIndex(index);
     setIsPreviewOpen(true);
@@ -325,7 +325,7 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconLayoutGrid className="h-4 w-4" />
-                  Layout do Caminhão
+                  Medidas do Implemento
                 </span>
                 <span className="text-sm font-semibold text-foreground">
                   {Math.round(layoutDimensions.totalLength * 100)} x {Math.round(layoutDimensions.height * 100)} cm
@@ -408,15 +408,15 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
               );
             })()}
 
-            {/* Artworks */}
-            {filteredArtworks.length > 0 && (
+            {/* Layouts */}
+            {filteredLayouts.length > 0 && (
               <div className="flex justify-between items-start bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2 pt-1">
                   <IconFiles className="h-4 w-4" />
                   Layouts
                 </span>
                 <div className="flex flex-wrap gap-2 justify-end">
-                  {filteredArtworks.map((artwork: any, index: number) => {
+                  {filteredLayouts.map((artwork: any, index: number) => {
                     // File data can be nested in .file or directly on artwork
                     const fileData = artwork.file || artwork;
                     return (
@@ -430,7 +430,7 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
                           showActions
                           showMetadata={false}
                         />
-                        {canViewArtworkBadges && artwork.status && (
+                        {canViewLayoutBadges && artwork.status && (
                           <div className="absolute top-1 right-1">
                             <Badge
                               variant={artwork.status === 'APPROVED' ? 'approved' : artwork.status === 'REJECTED' ? 'rejected' : 'secondary'}

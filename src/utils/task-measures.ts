@@ -14,14 +14,14 @@ export function calculateTaskMeasures(task: Task): number | null {
   const { truck } = task;
 
   // Try left side layout first, then right side (both have the same dimensions)
-  const layout = truck.leftSideLayout || truck.rightSideLayout;
+  const layout = truck.leftSideMeasure || truck.rightSideMeasure;
 
-  if (!layout?.layoutSections || layout.layoutSections.length === 0) {
+  if (!layout?.sections || layout.sections.length === 0) {
     return null;
   }
 
   // Calculate total width by summing all section widths
-  const totalWidth = layout.layoutSections.reduce(
+  const totalWidth = layout.sections.reduce(
     (sum, section) => sum + section.width,
     0
   );
@@ -44,14 +44,14 @@ export function getTaskDimensions(task: Task): { width: number; height: number }
   const { truck } = task;
 
   // Try left side layout first, then right side (both have the same dimensions)
-  const layout = truck.leftSideLayout || truck.rightSideLayout;
+  const layout = truck.leftSideMeasure || truck.rightSideMeasure;
 
-  if (!layout?.layoutSections || layout.layoutSections.length === 0) {
+  if (!layout?.sections || layout.sections.length === 0) {
     return null;
   }
 
   // Calculate total width by summing all section widths
-  const totalWidth = layout.layoutSections.reduce(
+  const totalWidth = layout.sections.reduce(
     (sum, section) => sum + section.width,
     0
   );

@@ -270,7 +270,7 @@ export const DEFAULT_TASK_SERVICE_ORDER = {
 
 /**
  * All default service orders created automatically for new tasks.
- * Includes: 1 Commercial, 3 Artwork, 2 Logistic
+ * Includes: 1 Commercial, 3 Layout, 2 Logistic
  */
 export const DEFAULT_TASK_SERVICE_ORDERS = [
   { type: SERVICE_ORDER_TYPE.COMMERCIAL, description: 'Em Negociação' },

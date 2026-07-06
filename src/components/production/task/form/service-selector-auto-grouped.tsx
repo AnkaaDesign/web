@@ -560,7 +560,7 @@ function ServiceRow({
         // Commercial service orders: commercial and admin users
         return [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN];
       case SERVICE_ORDER_TYPE.ARTWORK:
-        // Artwork service orders: designer and admin users
+        // Layout service orders: designer and admin users
         return [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN];
       default:
         return undefined;
@@ -656,7 +656,7 @@ function ServiceRow({
             SERVICE_ORDER_STATUS.CANCELLED,
           ];
         }
-        // Artwork designers submit for approval rather than completing directly.
+        // Layout designers submit for approval rather than completing directly.
         if (isArtworkType && isDesigner) return [
           SERVICE_ORDER_STATUS.PENDING,
           SERVICE_ORDER_STATUS.IN_PROGRESS,
@@ -768,7 +768,7 @@ function ServiceRow({
         ];
 
       // ── WAITING_APPROVE ───────────────────────────────────────────────────
-      // Artwork approval gate. Admin approves (→ COMPLETED) or rejects (→ IN_PROGRESS).
+      // Layout approval gate. Admin approves (→ COMPLETED) or rejects (→ IN_PROGRESS).
       // Designer can withdraw (→ IN_PROGRESS). No PAUSED from this state.
       case SERVICE_ORDER_STATUS.WAITING_APPROVE:
         if (isAdmin) return [

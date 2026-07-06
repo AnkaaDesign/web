@@ -275,13 +275,13 @@ export function extractActiveFilters(
     });
   }
 
-  if (filters.hasArtworks) {
+  if (filters.hasLayouts) {
     activeFilters.push({
-      key: "hasArtworks",
-      label: "Tem Arte",
+      key: "hasLayouts",
+      label: "Tem Layout",
       value: "Sim",
       iconType: "palette",
-      onRemove: () => onRemoveFilter("hasArtworks"),
+      onRemove: () => onRemoveFilter("hasLayouts"),
     });
   }
 
@@ -440,8 +440,8 @@ export function createFilterRemover(currentFilters: Partial<TaskGetManyFormData>
       case "hasObservation":
         delete newFilters.hasObservation;
         break;
-      case "hasArtworks":
-        delete newFilters.hasArtworks;
+      case "hasLayouts":
+        delete newFilters.hasLayouts;
         break;
       case "hasPaints":
         delete newFilters.hasPaints;

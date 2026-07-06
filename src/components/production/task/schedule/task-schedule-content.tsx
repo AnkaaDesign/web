@@ -117,19 +117,19 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
       },
       truck: {
         include: {
-          leftSideLayout: {
+          leftSideMeasure: {
             include: {
-              layoutSections: true,
+              sections: true,
             },
           },
-          rightSideLayout: {
+          rightSideMeasure: {
             include: {
-              layoutSections: true,
+              sections: true,
             },
           },
-          backSideLayout: {
+          backSideMeasure: {
             include: {
-              layoutSections: true,
+              sections: true,
             },
           },
         },
@@ -180,16 +180,16 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   const handleSourceTaskSelected = useCallback(async (sourceTask: Task) => {
     console.log('[CopyFromTask] ========== handleSourceTaskSelected CALLED ==========');
     console.log('[CopyFromTask] Source task ID:', sourceTask?.id);
-    console.log('[CopyFromTask] Source task artworks:', sourceTask?.artworks);
+    console.log('[CopyFromTask] Source task layouts:', sourceTask?.layouts);
 
     // CRITICAL FIX: Refetch the source task with proper includes to get artwork fileIds
-    // The task from the table doesn't have the file relationship loaded on artworks
+    // The task from the table doesn't have the file relationship loaded on layouts
     try {
       console.log(`[CopyFromTask] Refetching source task ${sourceTask.id} with full artwork details...`);
 
       const fullSourceTask = await taskService.getTaskById(sourceTask.id, {
         include: {
-          artworks: { include: { file: true } },  // ✅ Include file relationship
+          layouts: { include: { file: true } },  // ✅ Include file relationship
           budgets: true,
           invoices: true,
           receipts: true,
@@ -199,9 +199,9 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
           serviceOrders: true,
           truck: {
             include: {
-              leftSideLayout: { include: { layoutSections: true, photo: true } },
-              rightSideLayout: { include: { layoutSections: true, photo: true } },
-              backSideLayout: { include: { layoutSections: true, photo: true } },
+              leftSideMeasure: { include: { sections: true, photo: true } },
+              rightSideMeasure: { include: { sections: true, photo: true } },
+              backSideMeasure: { include: { sections: true, photo: true } },
             },
           },
         },
@@ -212,8 +212,8 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
       }
 
       console.log(
-        `[CopyFromTask] Fetched source task with ${fullSourceTask.data.artworks?.length || 0} artworks`,
-        fullSourceTask.data.artworks
+        `[CopyFromTask] Fetched source task with ${fullSourceTask.data.layouts?.length || 0} layouts`,
+        fullSourceTask.data.layouts
       );
 
       // Move to confirming step with fully loaded source task

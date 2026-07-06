@@ -29,9 +29,9 @@ export const TASK_HISTORY_LIST_INCLUDE = {
   },
   truck: {
     include: {
-      leftSideLayout: { include: { layoutSections: true } },
-      rightSideLayout: { include: { layoutSections: true } },
-      backSideLayout: { include: { layoutSections: true } },
+      leftSideMeasure: { include: { sections: true } },
+      rightSideMeasure: { include: { sections: true } },
+      backSideMeasure: { include: { sections: true } },
     },
   },
   quote: { include: { customerConfigs: { include: { customer: { select: { id: true, corporateName: true, fantasyName: true } } } } } },

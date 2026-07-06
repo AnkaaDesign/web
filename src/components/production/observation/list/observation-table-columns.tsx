@@ -1,94 +1,82 @@
-import React from "react";
 import type { Observation } from "../../../../types";
 import { formatDate } from "../../../../utils";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { IconPaperclip } from "@tabler/icons-react";
+import type { DataTableColumnDef } from "@/components/ui/datatable";
 
-export interface ObservationColumn {
-  key: string;
-  header: string;
-  accessor: (observation: Observation) => React.ReactNode;
-  sortable: boolean;
-  className?: string;
-  align?: "left" | "center" | "right";
-}
+const muted = (text: string) => <span className="text-sm text-muted-foreground whitespace-nowrap">{text}</span>;
 
-export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["task.name", "description", "filesCount", "createdAt"]);
-}
-
-export function createObservationColumns(): ObservationColumn[] {
+/** The observation-list column set as generic `DataTableColumnDef`s for the new DataTable. */
+export function createObservationColumns(): DataTableColumnDef<Observation>[] {
   return [
     {
-      key: "task.name",
-      header: "TAREFA",
-      accessor: (observation) => (
-        <div className="space-y-1">
-          {observation.task ? (
-            <TruncatedTextWithTooltip text={observation.task.name} className="font-medium" />
-          ) : (
-            <span className="text-muted-foreground">-</span>
-          )}
-        </div>
-      ),
-      sortable: true,
-      className: TABLE_LAYOUT.firstDataColumn.className,
-      align: "left",
+      // Dot-free id: the column id feeds a `--col-<id>-size` CSS custom property, and a dot is an
+      // invalid custom-property ident — a dotted id silently breaks this column's width/resize var.
+      id: "taskName",
+      header: "Tarefa",
+      accessorFn: (row) => row.task?.name || "",
+      enableSorting: true,
+      size: 260,
+      minSize: 180,
+      meta: { headerLabel: "Tarefa", exportValue: (row) => row.task?.name || "" },
+      cell: ({ getValue }) => {
+        const v = getValue() as string;
+        return v ? <TruncatedTextWithTooltip text={v} className="text-sm font-medium" /> : muted("-");
+      },
     },
     {
-      key: "description",
-      header: "DESCRIÇÃO",
-      accessor: (observation) => (
-        <div className="space-y-1">
-          <TruncatedTextWithTooltip text={observation.description} className="text-sm" />
-        </div>
-      ),
-      sortable: true,
-      className: "min-w-[300px]",
-      align: "left",
+      id: "description",
+      header: "Descrição",
+      accessorFn: (row) => row.description || "",
+      enableSorting: true,
+      size: 360,
+      minSize: 240,
+      meta: { headerLabel: "Descrição", exportValue: (row) => row.description || "" },
+      cell: ({ getValue }) => {
+        const v = getValue() as string;
+        return v ? <TruncatedTextWithTooltip text={v} className="text-sm" /> : muted("-");
+      },
     },
     {
-      key: "filesCount",
-      header: "ARQUIVOS",
-      accessor: (observation) => (
-        <div className="flex items-center gap-1.5">
-          {observation.files && observation.files.length > 0 ? (
-            <>
-              <IconPaperclip className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{observation.files.length}</span>
-            </>
-          ) : (
-            <span className="text-sm text-muted-foreground">-</span>
-          )}
-        </div>
-      ),
-      sortable: false,
-      className: "w-32",
-      align: "left",
+      // Files count — no server-sortable field, so sorting is disabled (matches the old table).
+      id: "filesCount",
+      header: "Arquivos",
+      accessorFn: (row) => row.files?.length ?? 0,
+      enableSorting: false,
+      size: 120,
+      minSize: 100,
+      meta: { headerLabel: "Arquivos", exportValue: (row) => row.files?.length ?? 0 },
+      cell: ({ row }) => {
+        const count = row.original.files?.length ?? 0;
+        return count > 0 ? (
+          <div className="flex items-center gap-1.5">
+            <IconPaperclip className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium tabular-nums">{count}</span>
+          </div>
+        ) : (
+          muted("-")
+        );
+      },
     },
     {
-      key: "createdAt",
-      header: "CRIADO EM",
-      accessor: (observation) => (
-        <div className="text-sm">{formatDate(observation.createdAt)}</div>
-      ),
-      sortable: true,
-      className: "w-40",
-      align: "left",
+      id: "createdAt",
+      header: "Criado em",
+      accessorKey: "createdAt",
+      enableSorting: true,
+      size: 150,
+      minSize: 120,
+      meta: { headerLabel: "Criado em", exportValue: (row) => (row.createdAt ? formatDate(row.createdAt) : "") },
+      cell: ({ row }) => muted(row.original.createdAt ? formatDate(row.original.createdAt) : "-"),
     },
     {
-      key: "updatedAt",
-      header: "ATUALIZADO EM",
-      accessor: (observation) => (
-        <div className="text-sm">{formatDate(observation.updatedAt)}</div>
-      ),
-      sortable: true,
-      className: "w-40",
-      align: "left",
+      id: "updatedAt",
+      header: "Atualizado em",
+      accessorKey: "updatedAt",
+      enableSorting: true,
+      size: 150,
+      minSize: 120,
+      meta: { defaultVisible: false, headerLabel: "Atualizado em", exportValue: (row) => (row.updatedAt ? formatDate(row.updatedAt) : "") },
+      cell: ({ row }) => muted(row.original.updatedAt ? formatDate(row.original.updatedAt) : "-"),
     },
   ];
 }
-
-// Export alias for backwards compatibility
-export const getObservationTableColumns = createObservationColumns;

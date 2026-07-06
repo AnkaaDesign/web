@@ -18,7 +18,7 @@ import { getApiBaseUrl } from "@/config/api";
 
 export interface FileSuggestionsProps {
   customerId?: string;
-  fileContext: "tasksArtworks" | "taskBaseFiles" | "taskProjectFiles";
+  fileContext: "tasksLayouts" | "taskBaseFiles" | "taskProjectFiles";
   excludeFileIds: string[];
   onSelect: (newFile: AnkaaFile) => void;
   disabled?: boolean;
@@ -44,7 +44,7 @@ const getFileIcon = (file: AnkaaFile) => {
 
 /**
  * Renders ONLY the recommendation cards — as a fragment of flex items — so they sit in
- * the SAME horizontal strip as the attached-layout cards (the ArtworkFileUploadField
+ * the SAME horizontal strip as the attached-layout cards (the LayoutFileUploadField
  * card row places this between the layouts and the add-card). Same size/shape as a
  * layout card, but a dashed border + amber "Recomendado" badge + "Usar" action make it
  * unmistakably a recommendation, not a selected layout.

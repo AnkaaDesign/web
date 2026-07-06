@@ -329,15 +329,15 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     observation: "Observação",
     truck: "Caminhão",
     createdBy: "Criado por",
-    artworks: "Layouts",
-    artworkIds: "Layouts",
+    layouts: "Layouts",
+    layoutIds: "Layouts",
     baseFiles: "Arquivos Base",
     baseFileIds: "Arquivos Base",
     logoPaints: "Tintas da Logomarca",
     logoPaintIds: "Tintas da Logomarca",
     paints: "Tintas da logomarca",
     groundPaints: "Fundos da Tinta",
-    layouts: "Layouts do Veículo",
+    implementMeasures: "Medidas do Implemento",
     bonifications: "Bonificações",
     services: "Serviços", // Legacy - for historical changelog records
     serviceOrders: "Ordens de Serviço",
@@ -354,9 +354,9 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     // Direct truck fields (when truck data is embedded in task changelog)
     category: "Categoria do Caminhão",
     implementType: "Tipo de Implemento",
-    "truck.leftSideLayoutId": "Layout Lado Motorista",
-    "truck.rightSideLayoutId": "Layout Lado Sapo",
-    "truck.backSideLayoutId": "Layout Traseira",
+    "truck.leftSideMeasureId": "Medidas Lado Motorista",
+    "truck.rightSideMeasureId": "Medidas Lado Sapo",
+    "truck.backSideMeasureId": "Medidas Traseira",
     // Nested relationship fields
     "customer.fantasyName": "Nome Fantasia do Cliente",
     "customer.corporateName": "Razão Social do Cliente",
@@ -818,12 +818,12 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     observation: "Observação",
     position: "Posição",
   },
-  [CHANGE_LOG_ENTITY_TYPE.LAYOUT]: {
+  [CHANGE_LOG_ENTITY_TYPE.IMPLEMENT_MEASURE]: {
     height: "Altura",
     photoId: "Foto",
-    leftSideLayoutId: "Layout Lateral Esquerdo",
-    rightSideLayoutId: "Layout Lateral Direito",
-    backSideLayoutId: "Layout Traseiro",
+    leftSideMeasureId: "Medidas Lateral Esquerda",
+    rightSideMeasureId: "Medidas Lateral Direita",
+    backSideMeasureId: "Medidas Traseira",
     // Nested fields
     "photo.name": "Nome da Foto",
     "photo.path": "Caminho da Foto",
@@ -853,7 +853,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     size: "Tamanho",
     thumbnailUrl: "URL da Miniatura",
     // Relationship fields
-    tasksArtworks: "Artes das Tarefas",
+    tasksLayouts: "Layouts das Tarefas",
     customerLogo: "Logo do Cliente",
     supplierLogo: "Logo do Fornecedor",
     observations: "Observações",
@@ -1244,8 +1244,8 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
 
     // Task-specific array handling
     if (entityType === CHANGE_LOG_ENTITY_TYPE.TASK) {
-      if (field === "artworks") {
-        return `${value.length} ${value.length === 1 ? "arte" : "artes"}`;
+      if (field === "layouts") {
+        return `${value.length} ${value.length === 1 ? "layout" : "layouts"}`;
       }
       if (field === "baseFiles") {
         return `${value.length} ${value.length === 1 ? "arquivo base" : "arquivos base"}`;
@@ -2523,7 +2523,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
 
     // Handle individual truck layout fields
     if (
-      (field === "truck.leftSideLayoutId" || field === "truck.rightSideLayoutId" || field === "truck.backSideLayoutId") &&
+      (field === "truck.leftSideMeasureId" || field === "truck.rightSideMeasureId" || field === "truck.backSideMeasureId") &&
       entityType === CHANGE_LOG_ENTITY_TYPE.TASK
     ) {
       const layout = value as any;
@@ -2537,12 +2537,12 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       return "Definido";
     }
 
-    // Handle layouts object (truck vehicle layouts) - format as readable summary
-    if (field === "layouts" && entityType === CHANGE_LOG_ENTITY_TYPE.TASK) {
+    // Handle implementMeasures object (truck implement measures) - format as readable summary
+    if (field === "implementMeasures" && entityType === CHANGE_LOG_ENTITY_TYPE.TASK) {
       const layoutSides = [
-        { key: "leftSideLayoutId", label: "Lado Motorista" },
-        { key: "rightSideLayoutId", label: "Lado Sapo" },
-        { key: "backSideLayoutId", label: "Traseira" },
+        { key: "leftSideMeasureId", label: "Lado Motorista" },
+        { key: "rightSideMeasureId", label: "Lado Sapo" },
+        { key: "backSideMeasureId", label: "Traseira" },
       ];
       const layoutData = value as any;
       const parts: string[] = [];

@@ -54,7 +54,7 @@ const EMPTY_TASK_FILTERS: Record<string, unknown> = {
   finishedPreset: "any",
   createdPreset: "any",
   hasOpenSO: "any",
-  hasArtworks: "any",
+  hasLayouts: "any",
   hasObservation: "any",
   hasBudget: "any",
   isOverdue: "any",
@@ -285,7 +285,7 @@ function productionManagerLayout(): DashboardLayout {
             "observation",
             "soLogistic",
             "soProduction",
-            "hasArtworks",
+            "hasLayouts",
             "term",
           ],
           columnLabels: {
@@ -355,7 +355,7 @@ function productionManagerLayout(): DashboardLayout {
             "observation",
             "soLogistic",
             "soArtwork",
-            "hasArtworks",
+            "hasLayouts",
             "forecastDate",
             "term",
           ],
@@ -504,7 +504,7 @@ function warehouseLayout(): DashboardLayout {
 // DESIGNER
 // ----------------------------------------------------------------
 // Workflow: creates the artwork/layout for each truck. Their queue is
-// "tasks in PREPARATION that don't have artworks yet" — those are the
+// "tasks in PREPARATION that don't have layouts yet" — those are the
 // ones that need their hands. After upload they'd want to see what's
 // recently approved (their delivered work).
 // ============================================================
@@ -518,7 +518,7 @@ function designerLayout(): DashboardLayout {
       taskWidget(
         { cols: 4, rows: 2 },
         {
-          title: "Tarefas sem Artes",
+          title: "Tarefas sem Layouts",
           columns: [
             "name",
             "customerName",
@@ -529,7 +529,7 @@ function designerLayout(): DashboardLayout {
           ],
           filters: {
             status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION],
-            hasArtworks: "no",
+            hasLayouts: "no",
           },
           sort: { key: "term", direction: "asc" },
           limit: 30,
@@ -538,11 +538,11 @@ function designerLayout(): DashboardLayout {
       taskWidget(
         { cols: 2, rows: 2 },
         {
-          title: "Em Preparação (com artes)",
+          title: "Em Preparação (com layouts)",
           columns: ["name", "customerName", "generalPainting", "logoPaints", "term"],
           filters: {
             status: [TASK_STATUS.PREPARATION],
-            hasArtworks: "yes",
+            hasLayouts: "yes",
           },
           sort: { key: "term", direction: "asc" },
         },
@@ -569,7 +569,7 @@ function designerLayout(): DashboardLayout {
 // PLOTTING
 // ----------------------------------------------------------------
 // Workflow: cuts the vinyl using a plotter once the artwork is ready.
-// They need to see tasks that have artworks and are waiting on cuts.
+// They need to see tasks that have layouts and are waiting on cuts.
 // "OS Arte" count is a useful indicator of work assigned to them.
 // ============================================================
 function plottingLayout(): DashboardLayout {
@@ -593,7 +593,7 @@ function plottingLayout(): DashboardLayout {
           ],
           filters: {
             status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION],
-            hasArtworks: "yes",
+            hasLayouts: "yes",
           },
           sort: { key: "term", direction: "asc" },
           limit: 30,
@@ -688,7 +688,7 @@ function logisticLayout(): DashboardLayout {
             "sector",
             "observation",
             "soLogistic",
-            "hasArtworks",
+            "hasLayouts",
             "term",
           ],
           columnLabels: {
@@ -756,7 +756,7 @@ function logisticLayout(): DashboardLayout {
             "serialNumber",
             "observation",
             "soLogistic",
-            "hasArtworks",
+            "hasLayouts",
             "forecastDate",
             "term",
           ],

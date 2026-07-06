@@ -118,7 +118,7 @@ export function TaskHistoryTablePage() {
     priv === SECTOR_PRIVILEGES.ADMIN;
   const canDarEntrada = isAdmin || priv === SECTOR_PRIVILEGES.LOGISTIC || isProductionManager;
   const canAccessAdvancedMenu = isAdmin || isFinancial || isLogisticOrCommercial || isDesigner || isProductionManager;
-  const canAccessArtworks = isAdmin || isDesigner || isProductionManager;
+  const canAccessLayouts = isAdmin || isDesigner || isProductionManager;
   const canAccessCutPlan = isAdmin || isDesigner || isProductionManager;
   const canAccessPaints = canAccessAdvancedMenu && !isDesigner;
   const canCancel = isAdmin || isFinancial || isLogisticOrCommercial;
@@ -389,7 +389,7 @@ export function TaskHistoryTablePage() {
     try {
       const full = await getTaskById(sourceTask.id, {
         include: {
-          artworks: { include: { file: true } },
+          layouts: { include: { file: true } },
           budgets: true,
           invoices: true,
           receipts: true,
@@ -399,9 +399,9 @@ export function TaskHistoryTablePage() {
           serviceOrders: true,
           truck: {
             include: {
-              leftSideLayout: { include: { layoutSections: true, photo: true } },
-              rightSideLayout: { include: { layoutSections: true, photo: true } },
-              backSideLayout: { include: { layoutSections: true, photo: true } },
+              leftSideMeasure: { include: { sections: true, photo: true } },
+              rightSideMeasure: { include: { sections: true, photo: true } },
+              backSideMeasure: { include: { sections: true, photo: true } },
             },
           },
         },
@@ -548,7 +548,7 @@ export function TaskHistoryTablePage() {
         label: "Adicionar Layouts",
         icon: <IconPhoto className="h-4 w-4" />,
         group: ADVANCED_GROUP,
-        hidden: () => !canAccessAdvancedMenu || !canAccessArtworks,
+        hidden: () => !canAccessAdvancedMenu || !canAccessLayouts,
         onClick: (r) => openAdvanced("arts", r),
       },
       {
@@ -593,7 +593,7 @@ export function TaskHistoryTablePage() {
       },
       {
         key: "adv-truck-layout",
-        label: "Layout do Caminhão",
+        label: "Medidas do Implemento",
         icon: <IconLayout className="h-4 w-4" />,
         group: ADVANCED_GROUP,
         hidden: () => !canAccessAdvancedMenu,
@@ -638,7 +638,7 @@ export function TaskHistoryTablePage() {
     canFinish,
     canViewQuoteMenu,
     canAccessAdvancedMenu,
-    canAccessArtworks,
+    canAccessLayouts,
     canAccessPaints,
     canAccessCutPlan,
     canCancel,

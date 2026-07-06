@@ -178,7 +178,7 @@ export function createTaskFormData(
     budgets?: File[];
     receipts?: File[];
     invoices?: File[];
-    artworks?: File[];
+    layouts?: File[];
   },
   customer?: FormDataOptions['customer']
 ): FormData {
@@ -220,7 +220,7 @@ export function createAirbrushingFormData(
   files: {
     receipts?: File[];
     invoices?: File[];
-    artworks?: File[];
+    layouts?: File[];
   },
   customer?: FormDataOptions['customer']
 ): FormData {

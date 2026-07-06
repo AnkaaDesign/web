@@ -32,10 +32,10 @@ interface AirbrushingItem {
   painter?: { id: string; name: string; email?: string | null; status?: string | null } | null;
   receiptFiles: FileWithPreview[];
   invoiceFiles: FileWithPreview[];
-  artworkFiles: FileWithPreview[];
+  layouts: FileWithPreview[];
   receiptIds?: string[];
   invoiceIds?: string[];
-  artworkIds?: string[];
+  layoutIds?: string[];
   uploading?: boolean;
   error?: string;
 }
@@ -97,13 +97,13 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           ...convertFilesToFileWithPreview(airbrushing.invoices || []),
           ...(airbrushing.invoiceFiles || [])
         ],
-        artworkFiles: [
-          ...convertFilesToFileWithPreview(airbrushing.artworks || []),
-          ...(airbrushing.artworkFiles || [])
+        layouts: [
+          ...convertFilesToFileWithPreview(airbrushing.layouts || []),
+          ...(airbrushing.layouts || [])
         ],
         receiptIds: airbrushing.receiptIds || [],
         invoiceIds: airbrushing.invoiceIds || [],
-        artworkIds: airbrushing.artworkIds || [],
+        layoutIds: airbrushing.layoutIds || [],
       }));
     });
 
@@ -153,13 +153,13 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
               ...convertFilesToFileWithPreview(airbrushing.invoices || []),
               ...(airbrushing.invoiceFiles || [])
             ],
-            artworkFiles: [
-              ...convertFilesToFileWithPreview(airbrushing.artworks || []),
-              ...(airbrushing.artworkFiles || [])
+            layouts: [
+              ...convertFilesToFileWithPreview(airbrushing.layouts || []),
+              ...(airbrushing.layouts || [])
             ],
             receiptIds: airbrushing.receiptIds || [],
             invoiceIds: airbrushing.invoiceIds || [],
-            artworkIds: airbrushing.artworkIds || [],
+            layoutIds: airbrushing.layoutIds || [],
           };
         });
         setAirbrushings(newAirbrushings);
@@ -197,11 +197,11 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           painter: airbrushing.painter,
           receiptIds: airbrushing.receiptIds || [],
           invoiceIds: airbrushing.invoiceIds || [],
-          artworkIds: airbrushing.artworkIds || [],
+          layoutIds: airbrushing.layoutIds || [],
           // Include the actual files for submission with the form
           receiptFiles: airbrushing.receiptFiles,
           invoiceFiles: airbrushing.invoiceFiles,
-          artworkFiles: airbrushing.artworkFiles,
+          layouts: airbrushing.layouts,
         };
       });
       field.onChange(formValue);
@@ -232,10 +232,10 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         painter: null,
         receiptFiles: [],
         invoiceFiles: [],
-        artworkFiles: [],
+        layouts: [],
         receiptIds: [],
         invoiceIds: [],
-        artworkIds: [],
+        layoutIds: [],
       };
       setAirbrushings((prev) => [...prev, newAirbrushing]);
     }, []);
@@ -284,12 +284,12 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       [updateAirbrushing],
     );
 
-    const handleArtworkFilesChange = useCallback(
+    const handleLayoutsChange = useCallback(
       (airbrushingId: string, files: FileWithPreview[]) => {
         // Store files without uploading - they'll be submitted with the form
         updateAirbrushing(airbrushingId, {
-          artworkFiles: files,
-          artworkIds: files.filter(f => f.uploaded).map(f => f.uploadedFileId!).filter(Boolean),
+          layouts: files,
+          layoutIds: files.filter(f => f.uploaded).map(f => f.uploadedFileId!).filter(Boolean),
         });
       },
       [updateAirbrushing],
@@ -384,7 +384,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       <FormLabel>Preço</FormLabel>
                       <Input
                         type="currency"
-                        value={airbrushing.price || undefined}
+                        value={airbrushing.price ?? undefined}
                         onChange={(value) => {
                           updateAirbrushing(airbrushing.id, {
                             price: typeof value === 'number' ? value : null,
@@ -510,15 +510,15 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                     />
                   </div>
 
-                  {/* Artworks - aligns with Conclusão */}
+                  {/* Layouts - aligns with Conclusão */}
                   <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                     <FormLabel className="flex items-center gap-2">
                       <IconPhoto className="h-4 w-4" />
                       Layouts
                     </FormLabel>
                     <FileUploadField
-                      onFilesChange={(files) => handleArtworkFilesChange(airbrushing.id, files)}
-                      existingFiles={airbrushing.artworkFiles}
+                      onFilesChange={(files) => handleLayoutsChange(airbrushing.id, files)}
+                      existingFiles={airbrushing.layouts}
                       maxFiles={20}
                       showPreview={true}
                       variant="compact"

@@ -86,7 +86,7 @@ interface UseTaskFormUrlStateOptions {
     };
 
     // File references
-    artworkIds?: string[];
+    layoutIds?: string[];
   };
 }
 
@@ -229,7 +229,7 @@ const taskFormFilterConfig = {
   },
 
   // File Upload References (not actual files)
-  artworkIds: {
+  layoutIds: {
     schema: z.array(z.string().uuid()).default([]),
     defaultValue: [] as string[],
     debounceMs: 0,
@@ -283,8 +283,8 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
       if (initialData.truck !== undefined) {
         config.truck = { ...config.truck, defaultValue: initialData.truck };
       }
-      if (initialData.artworkIds !== undefined) {
-        config.artworkIds = { ...config.artworkIds, defaultValue: initialData.artworkIds };
+      if (initialData.layoutIds !== undefined) {
+        config.layoutIds = { ...config.layoutIds, defaultValue: initialData.layoutIds };
       }
     }
 
@@ -307,7 +307,7 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
   const generalPaintingId = filters.generalPaintingId;
   const logoPaintIds = filters.logoPaintIds || [];
   const truck = filters.truck || { xPosition: null, yPosition: null, garageId: null };
-  const artworkIds = filters.artworkIds || [];
+  const layoutIds = filters.layoutIds || [];
 
   // Update functions
   const updateName = useCallback(
@@ -401,9 +401,9 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
     [setFilter],
   );
 
-  const updateArtworkIds = useCallback(
+  const updateLayoutIds = useCallback(
     (ids: string[]) => {
-      setFilter("artworkIds", ids.length > 0 ? ids : undefined);
+      setFilter("layoutIds", ids.length > 0 ? ids : undefined);
     },
     [setFilter],
   );
@@ -582,9 +582,9 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
       truck: truck,
 
       // Files
-      artworkIds: artworkIds.length > 0 ? artworkIds : undefined,
+      layoutIds: layoutIds.length > 0 ? layoutIds : undefined,
     };
-  }, [name, customerId, sectorId, serialNumber, details, entryDate, term, serviceOrders, cuts, airbrushing, generalPaintingId, logoPaintIds, truck, artworkIds]);
+  }, [name, customerId, sectorId, serialNumber, details, entryDate, term, serviceOrders, cuts, airbrushing, generalPaintingId, logoPaintIds, truck, layoutIds]);
 
   const resetForm = useCallback(() => {
     resetFilters();
@@ -605,12 +605,12 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
       airbrushing !== null ||
       generalPaintingId !== undefined ||
       logoPaintIds.length > 0 ||
-      artworkIds.length > 0 ||
+      layoutIds.length > 0 ||
       truck.xPosition !== null ||
       truck.yPosition !== null ||
       truck.garageId !== null
     );
-  }, [name, customerId, sectorId, serialNumber, details, entryDate, term, serviceOrders, cuts, airbrushing, generalPaintingId, logoPaintIds, artworkIds, truck]);
+  }, [name, customerId, sectorId, serialNumber, details, entryDate, term, serviceOrders, cuts, airbrushing, generalPaintingId, logoPaintIds, layoutIds, truck]);
 
   return {
     // Core Form State
@@ -627,7 +627,7 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
     generalPaintingId,
     logoPaintIds,
     truck,
-    artworkIds,
+    layoutIds,
     validation,
 
     // Update Functions
@@ -644,7 +644,7 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
     updateGeneralPaintingId,
     updateLogoPaintIds,
     updateTruck,
-    updateArtworkIds,
+    updateLayoutIds,
 
     // Helper Functions
     addServiceOrder,
@@ -666,7 +666,7 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
     hasAirbrushing: airbrushing !== null,
     hasGeneralPainting: generalPaintingId !== undefined,
     logoPaintCount: logoPaintIds.length,
-    artworkCount: artworkIds.length,
+    layoutCount: layoutIds.length,
 
     // URL State Management Functions
     resetFilter,

@@ -1,2 +1,2 @@
-export { ObservationInfoCard } from "./observation-info-card";
-export { ObservationDetailSkeleton } from "./observation-detail-skeleton";
+export { ObservationDetailPage } from "./observation-detail-page";
+export { ObservationFilesSection } from "./observation-files-section";

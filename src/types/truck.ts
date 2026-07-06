@@ -2,7 +2,7 @@
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
 import type { Task, TaskIncludes, TaskOrderBy } from "./task";
-import type { Layout, LayoutIncludes } from "./layout";
+import type { ImplementMeasure, ImplementMeasureIncludes } from "./implementMeasure";
 import type { ORDER_BY_DIRECTION, TRUCK_CATEGORY, IMPLEMENT_TYPE, TRUCK_SPOT } from "../constants";
 
 // =====================
@@ -23,13 +23,13 @@ export interface Truck extends BaseEntity {
 
   // Relations
   taskId: string;
-  leftSideLayoutId: string | null;
-  rightSideLayoutId: string | null;
-  backSideLayoutId: string | null;
+  leftSideMeasureId: string | null;
+  rightSideMeasureId: string | null;
+  backSideMeasureId: string | null;
   task?: Task;
-  leftSideLayout?: Layout;
-  rightSideLayout?: Layout;
-  backSideLayout?: Layout;
+  leftSideMeasure?: ImplementMeasure;
+  rightSideMeasure?: ImplementMeasure;
+  backSideMeasure?: ImplementMeasure;
 }
 
 // =====================
@@ -42,20 +42,20 @@ export interface TruckIncludes {
     | {
         include?: TaskIncludes;
       };
-  leftSideLayout?:
+  leftSideMeasure?:
     | boolean
     | {
-        include?: LayoutIncludes;
+        include?: ImplementMeasureIncludes;
       };
-  rightSideLayout?:
+  rightSideMeasure?:
     | boolean
     | {
-        include?: LayoutIncludes;
+        include?: ImplementMeasureIncludes;
       };
-  backSideLayout?:
+  backSideMeasure?:
     | boolean
     | {
-        include?: LayoutIncludes;
+        include?: ImplementMeasureIncludes;
       };
 }
 
@@ -124,9 +124,9 @@ export interface TruckCreateFormData {
   implementType?: IMPLEMENT_TYPE | null;
   spot?: TRUCK_SPOT | null;
   taskId?: string;
-  leftSideLayoutId?: string | null;
-  rightSideLayoutId?: string | null;
-  backSideLayoutId?: string | null;
+  leftSideMeasureId?: string | null;
+  rightSideMeasureId?: string | null;
+  backSideMeasureId?: string | null;
 }
 
 export interface TruckUpdateFormData {
@@ -136,9 +136,9 @@ export interface TruckUpdateFormData {
   implementType?: IMPLEMENT_TYPE | null;
   spot?: TRUCK_SPOT | null;
   taskId?: string;
-  leftSideLayoutId?: string | null;
-  rightSideLayoutId?: string | null;
-  backSideLayoutId?: string | null;
+  leftSideMeasureId?: string | null;
+  rightSideMeasureId?: string | null;
+  backSideMeasureId?: string | null;
 }
 
 export interface TruckQueryFormData {

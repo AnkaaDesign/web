@@ -37,7 +37,7 @@ import { ResponsibleManager } from "@/components/administration/customer/respons
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { FileUploadField } from "@/components/common/file";
-import { ArtworkFileUploadField } from "@/components/production/task/form/artwork-file-upload-field";
+import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
 import { FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import type { ResponsibleRowData } from "@/types/responsible";
 
@@ -49,9 +49,9 @@ interface BudgetStepTaskProps {
   showResponsibleErrors: boolean;
   baseFiles: FileWithPreview[];
   onBaseFilesChange: (files: FileWithPreview[]) => void;
-  artworkFiles: FileWithPreview[];
-  onArtworkFilesChange: (files: FileWithPreview[]) => void;
-  onArtworkStatusChange: (fileId: string, status: string) => void;
+  layouts: FileWithPreview[];
+  onLayoutsChange: (files: FileWithPreview[]) => void;
+  onLayoutStatusChange: (fileId: string, status: string) => void;
   onPaintCreated?: (paint: any) => void;
 }
 
@@ -63,9 +63,9 @@ export function BudgetStepTask({
   showResponsibleErrors,
   baseFiles,
   onBaseFilesChange,
-  artworkFiles,
-  onArtworkFilesChange,
-  onArtworkStatusChange,
+  layouts,
+  onLayoutsChange,
+  onLayoutStatusChange,
   onPaintCreated,
 }: BudgetStepTaskProps) {
   const { user } = useAuth();
@@ -77,7 +77,7 @@ export function BudgetStepTask({
 
   const showResponsibles = isAdminUser || isCommercialUser;
   const showPaint = isAdminUser || isCommercialUser;
-  const showArtworks = isAdminUser || isCommercialUser;
+  const showLayouts = isAdminUser || isCommercialUser;
 
   // Watch form values
   const plates = useWatch({ control, name: "plates" }) || [];
@@ -106,7 +106,7 @@ export function BudgetStepTask({
   }, [isEditMode, plates, serialNumbers]);
 
   return (
-    <div className={openAccordion === 'base-files' || openAccordion === 'artworks' ? 'pb-64' : ''}>
+    <div className={openAccordion === 'base-files' || openAccordion === 'layouts' ? 'pb-64' : ''}>
       <Accordion
         type="single"
         collapsible
@@ -474,11 +474,11 @@ export function BudgetStepTask({
           </Card>
         </AccordionItem>
 
-        {/* 6. Artworks - COMMERCIAL/ADMIN */}
-        {showArtworks && (
+        {/* 6. Layouts - COMMERCIAL/ADMIN */}
+        {showLayouts && (
           <AccordionItem
-            value="artworks"
-            id="accordion-item-artworks"
+            value="layouts"
+            id="accordion-item-layouts"
             className="border border-border rounded-lg"
           >
             <Card className="border-0">
@@ -487,9 +487,9 @@ export function BudgetStepTask({
                   <CardTitle className="flex items-center gap-2">
                     <IconPhoto className="h-5 w-5" />
                     Layouts
-                    {artworkFiles.length > 0 && (
+                    {layouts.length > 0 && (
                       <Badge variant="secondary" className="ml-1">
-                        {artworkFiles.length}
+                        {layouts.length}
                       </Badge>
                     )}
                   </CardTitle>
@@ -497,13 +497,13 @@ export function BudgetStepTask({
               </AccordionTrigger>
               <AccordionContent>
                 <CardContent className="pt-0">
-                  <ArtworkFileUploadField
-                    onFilesChange={onArtworkFilesChange}
-                    onStatusChange={onArtworkStatusChange}
+                  <LayoutFileUploadField
+                    onFilesChange={onLayoutsChange}
+                    onStatusChange={onLayoutStatusChange}
                     maxFiles={5}
                     disabled={disabled}
                     showPreview={true}
-                    existingFiles={artworkFiles}
+                    existingFiles={layouts}
                     placeholder="Adicione layouts relacionados à tarefa"
                     label="Layouts anexados"
                     variant="card"
@@ -511,8 +511,8 @@ export function BudgetStepTask({
                     {/* Reuse a layout already used for this customer (no re-upload). */}
                     <FileSuggestions
                       customerId={customerIdValue ?? undefined}
-                      fileContext="tasksArtworks"
-                      excludeFileIds={artworkFiles
+                      fileContext="tasksLayouts"
+                      excludeFileIds={layouts
                         .map((f) => (f as any).uploadedFileId || f.id)
                         .filter(Boolean)}
                       onSelect={(newFile) => {
@@ -528,11 +528,11 @@ export function BudgetStepTask({
                           thumbnailUrl: newFile.thumbnailUrl || undefined,
                           status: "DRAFT",
                         } as FileWithPreview;
-                        onArtworkFilesChange([...artworkFiles, fileWithPreview]);
+                        onLayoutsChange([...layouts, fileWithPreview]);
                       }}
                       disabled={disabled}
                     />
-                  </ArtworkFileUploadField>
+                  </LayoutFileUploadField>
                 </CardContent>
               </AccordionContent>
             </Card>

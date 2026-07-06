@@ -33,7 +33,6 @@ export function ActivityReasonBadge({ reason, className, size = "default" }: Act
         return "warning";
 
       // Neutral/Process reasons - Blue
-      case ACTIVITY_REASON.BORROW:
       case ACTIVITY_REASON.EXTERNAL_OPERATION_RETURN:
         return "info";
 

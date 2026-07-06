@@ -189,19 +189,19 @@ export function TaskHistoryTable({
       },
       truck: {
         include: {
-          leftSideLayout: {
+          leftSideMeasure: {
             include: {
-              layoutSections: true,
+              sections: true,
             },
           },
-          rightSideLayout: {
+          rightSideMeasure: {
             include: {
-              layoutSections: true,
+              sections: true,
             },
           },
-          backSideLayout: {
+          backSideMeasure: {
             include: {
-              layoutSections: true,
+              sections: true,
             },
           },
         },

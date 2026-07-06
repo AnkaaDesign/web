@@ -1,6 +1,6 @@
 // Types and constants for task copy functionality
 
-// CopyableTaskField uses API schema field names (e.g., baseFileIds, artworkIds)
+// CopyableTaskField uses API schema field names (e.g., baseFileIds, layoutIds)
 // to match the backend validation schema for the copy-from endpoint
 export type CopyableTaskField =
   | 'all'
@@ -14,7 +14,7 @@ export type CopyableTaskField =
   | 'customerId'
   | 'quoteId'
   | 'paintId'
-  | 'artworkIds'
+  | 'layoutIds'
   | 'baseFileIds'
   | 'projectFileIds'
   | 'logoPaintIds'
@@ -26,7 +26,7 @@ export type CopyableTaskField =
   | 'serviceOrders:ARTWORK'
   | 'implementType'
   | 'category'
-  | 'layouts'
+  | 'implementMeasures'
   | 'observation';
 
 export interface CopyableFieldMetadata {
@@ -47,7 +47,7 @@ export const COPYABLE_TASK_FIELDS: CopyableTaskField[] = [
   'customerId',
   'quoteId',
   'paintId',
-  'artworkIds',
+  'layoutIds',
   'baseFileIds',
   'projectFileIds',
   'logoPaintIds',
@@ -59,7 +59,7 @@ export const COPYABLE_TASK_FIELDS: CopyableTaskField[] = [
   'serviceOrders:ARTWORK',
   'implementType',
   'category',
-  'layouts',
+  'implementMeasures',
   'observation',
 ];
 
@@ -90,8 +90,8 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
   // Logo paints (Cores da Logomarca) - hidden for Commercial users
   logoPaintIds: ['ADMIN', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
-  // Artworks (Layouts files) - hidden for Warehouse, Financial, Logistic
-  artworkIds: ['ADMIN', 'COMMERCIAL', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  // Layouts (Layouts files) - hidden for Warehouse, Financial, Logistic
+  layoutIds: ['ADMIN', 'COMMERCIAL', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Base files - accessible by most sectors
   baseFileIds: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
@@ -115,8 +115,8 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
   implementType: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
   category: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
-  // Medidas do Caminhão - hidden for Warehouse, Financial, Designer, Commercial
-  layouts: ['ADMIN', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  // Medidas do Implemento - hidden for Warehouse, Financial, Designer, Commercial
+  implementMeasures: ['ADMIN', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Observation - hidden for Warehouse, Financial, Designer, Logistic, Commercial
   observation: ['ADMIN', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
@@ -224,7 +224,7 @@ export const COPYABLE_FIELD_METADATA: Record<CopyableTaskField, CopyableFieldMet
     description: 'Configurações de cores da logomarca',
     category: 'Pintura',
   },
-  artworkIds: {
+  layoutIds: {
     label: 'Layouts',
     description: 'Arquivos de layout',
     category: 'Arquivos',
@@ -279,9 +279,9 @@ export const COPYABLE_FIELD_METADATA: Record<CopyableTaskField, CopyableFieldMet
     description: 'Categoria do veículo',
     category: 'Veículo',
   },
-  layouts: {
-    label: 'Medidas',
-    description: 'Medidas do caminhão (esquerdo, direito, traseiro)',
+  implementMeasures: {
+    label: 'Medidas do Implemento',
+    description: 'Medidas do implemento (esquerda, direita, traseira)',
     category: 'Veículo',
   },
   observation: {

@@ -212,7 +212,7 @@ export function TaskHistoryList({
       if (params.get("hasAssignee") === "true") filters.hasAssignee = true;
       if (params.get("hasTruck") === "true") filters.hasTruck = true;
       if (params.get("hasObservation") === "true") filters.hasObservation = true;
-      if (params.get("hasArtworks") === "true") filters.hasArtworks = true;
+      if (params.get("hasLayouts") === "true") filters.hasLayouts = true;
       if (params.get("hasPaints") === "true") filters.hasPaints = true;
       if (params.get("hasBonifications") === "true") filters.hasBonifications = true;
       if (params.get("hasServiceOrders") === "true") filters.hasServiceOrders = true;
@@ -256,7 +256,7 @@ export function TaskHistoryList({
     if (filters.hasAssignee) params.hasAssignee = "true";
     if (filters.hasTruck) params.hasTruck = "true";
     if (filters.hasObservation) params.hasObservation = "true";
-    if (filters.hasArtworks) params.hasArtworks = "true";
+    if (filters.hasLayouts) params.hasLayouts = "true";
     if (filters.hasPaints) params.hasPaints = "true";
     if (filters.hasBonifications) params.hasBonifications = "true";
     if (filters.hasServiceOrders) params.hasServiceOrders = "true";
@@ -436,7 +436,7 @@ export function TaskHistoryList({
     try {
       const fullSourceTask = await taskService.getTaskById(sourceTask.id, {
         include: {
-          artworks: { include: { file: true } },
+          layouts: { include: { file: true } },
           budgets: true,
           invoices: true,
           receipts: true,
@@ -446,9 +446,9 @@ export function TaskHistoryList({
           serviceOrders: true,
           truck: {
             include: {
-              leftSideLayout: { include: { layoutSections: true, photo: true } },
-              rightSideLayout: { include: { layoutSections: true, photo: true } },
-              backSideLayout: { include: { layoutSections: true, photo: true } },
+              leftSideMeasure: { include: { sections: true, photo: true } },
+              rightSideMeasure: { include: { sections: true, photo: true } },
+              backSideMeasure: { include: { sections: true, photo: true } },
             },
           },
         },

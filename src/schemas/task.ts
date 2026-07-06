@@ -53,7 +53,7 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
           z.object({
             include: z
               .object({
-                artworks: z.boolean().optional(),
+                layouts: z.boolean().optional(),
                 task: z.boolean().optional(),
               })
               .optional(),
@@ -109,13 +109,13 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
           }),
         ])
         .optional(),
-      artworks: z
+      layouts: z
         .union([
           z.boolean(),
           z.object({
             include: z
               .object({
-                tasksArtworks: z.boolean().optional(),
+                tasksLayouts: z.boolean().optional(),
                 customerLogo: z.boolean().optional(),
                 taskBudget: z.boolean().optional(),
                 taskNfe: z.boolean().optional(),
@@ -188,7 +188,7 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
             include: z
               .object({
                 task: z.boolean().optional(),
-                artworks: z.boolean().optional(),
+                layouts: z.boolean().optional(),
                 receipts: z.boolean().optional(),
                 invoices: z.boolean().optional(),
                 painter: z.boolean().optional(),
@@ -348,7 +348,7 @@ export const taskWhereSchema: z.ZodSchema<any> = z.lazy(() =>
       observation: z.any().optional(),
       generalPainting: z.any().optional(),
       createdBy: z.any().optional(),
-      artworks: z
+      layouts: z
         .object({
           some: z.any().optional(),
           every: z.any().optional(),
@@ -493,12 +493,12 @@ const taskTransform = (data: any): any => {
     delete data.hasObservation;
   }
 
-  if (data.hasArtworks === true) {
-    andConditions.push({ artworks: { some: {} } });
-    delete data.hasArtworks;
-  } else if (data.hasArtworks === false) {
-    andConditions.push({ artworks: { none: {} } });
-    delete data.hasArtworks;
+  if (data.hasLayouts === true) {
+    andConditions.push({ layouts: { some: {} } });
+    delete data.hasLayouts;
+  } else if (data.hasLayouts === false) {
+    andConditions.push({ layouts: { none: {} } });
+    delete data.hasLayouts;
   }
 
   if (data.hasPaints === true) {
@@ -828,7 +828,7 @@ export const taskGetManySchema = z
     hasAssignee: z.boolean().optional(),
     hasTruck: z.boolean().optional(),
     hasObservation: z.boolean().optional(),
-    hasArtworks: z.boolean().optional(),
+    hasLayouts: z.boolean().optional(),
     hasPaints: z.boolean().optional(),
     hasServiceOrders: z.boolean().optional(),
     hasAirbrushing: z.boolean().optional(),
@@ -1106,26 +1106,26 @@ const taskServiceOrdersArraySchema = z.preprocess(
   z.array(taskServiceOrderCreateSchema).optional()
 );
 
-// Layout section schema for truck layouts
-const layoutSectionSchema = z.object({
+// Measure section schema for implement measures
+const measureSectionSchema = z.object({
   width: z.number().positive(),
   isDoor: z.boolean().default(false),
   doorHeight: z.number().nullable().optional(),
   position: z.number().int().min(0).optional(),
 });
 
-// Layout side schema (left, right, back)
-const layoutSideSchema = z
+// Measure side schema (left, right, back)
+const measureSideSchema = z
   .object({
-    id: z.string().uuid().optional(), // Existing layout ID for updates
+    id: z.string().uuid().optional(), // Existing implement measure ID for updates
     height: z.number().positive(),
-    layoutSections: z.array(layoutSectionSchema),
+    sections: z.array(measureSectionSchema),
     photoId: z.string().uuid().nullable().optional(),
   })
   .nullable()
   .optional();
 
-// Consolidated truck schema with basic fields AND layouts
+// Consolidated truck schema with basic fields AND implement measures
 const taskTruckCreateSchema = z.object({
   // Basic truck fields
   plate: z
@@ -1149,14 +1149,14 @@ const taskTruckCreateSchema = z.object({
   xPosition: z.number().nullable().optional(),
   yPosition: z.number().nullable().optional(),
   garageId: z.string().uuid("Garagem inválida").nullable().optional(),
-  // Layout data - embedded in truck for single payload (new layouts)
-  leftSideLayout: layoutSideSchema,
-  rightSideLayout: layoutSideSchema,
-  backSideLayout: layoutSideSchema,
-  // Shared layout IDs - for batch creation (connect to existing layouts)
-  leftSideLayoutId: z.string().uuid().nullable().optional(),
-  rightSideLayoutId: z.string().uuid().nullable().optional(),
-  backSideLayoutId: z.string().uuid().nullable().optional(),
+  // Implement measure data - embedded in truck for single payload (new measures)
+  leftSideMeasure: measureSideSchema,
+  rightSideMeasure: measureSideSchema,
+  backSideMeasure: measureSideSchema,
+  // Shared implement measure IDs - for batch creation (connect to existing measures)
+  leftSideMeasureId: z.string().uuid().nullable().optional(),
+  rightSideMeasureId: z.string().uuid().nullable().optional(),
+  backSideMeasureId: z.string().uuid().nullable().optional(),
 });
 
 // =====================
@@ -1199,7 +1199,7 @@ export const taskCreateSchema = z
     // Relations - Many-to-many file relations (arrays)
     reimbursementIds: z.array(z.string().uuid("Reimbursement inválido")).optional(),
     reimbursementInvoiceIds: z.array(z.string().uuid("Reimbursement invoice inválida")).optional(),
-    artworkIds: z.array(z.string().uuid("Arquivo inválido")).optional(), // Maps to artworks
+    layoutIds: z.array(z.string().uuid("Arquivo inválido")).optional(), // Maps to layouts
     baseFileIds: z.array(z.string().uuid("Arquivo base inválido")).optional(), // Maps to baseFiles
     projectFileIds: z.array(z.string().uuid("Arquivo de projeto inválido")).optional(),
     checkinFileIds: z.array(z.string().uuid("Arquivo de checkin inválido")).optional(),
@@ -1333,7 +1333,7 @@ export const taskUpdateSchema = z
     // Relations - Many-to-many file relations (arrays)
     reimbursementIds: z.array(z.string().uuid("Reimbursement inválido")).optional(),
     reimbursementInvoiceIds: z.array(z.string().uuid("Reimbursement invoice inválida")).optional(),
-    artworkIds: z.array(z.string().uuid("Arquivo inválido")).optional(), // Maps to artworks
+    layoutIds: z.array(z.string().uuid("Arquivo inválido")).optional(), // Maps to layouts
     baseFileIds: z.array(z.string().uuid("Arquivo base inválido")).optional(), // Maps to baseFiles
     projectFileIds: z.array(z.string().uuid("Arquivo de projeto inválido")).optional(),
     checkinFileIds: z.array(z.string().uuid("Arquivo de checkin inválido")).optional(),
@@ -1521,8 +1521,8 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   // Many-to-many relations (arrays)
   reimbursementIds: task.reimbursements?.map((reimbursement) => reimbursement.id),
   reimbursementInvoiceIds: task.reimbursementInvoices?.map((reimbursementInvoice) => reimbursementInvoice.id),
-  // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
-  artworkIds: task.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id),
+  // layoutIds must be File IDs (artwork.fileId or artwork.file.id), not Layout entity IDs
+  layoutIds: task.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id),
   baseFileIds: task.baseFiles?.map((baseFile) => baseFile.id),
   projectFileIds: task.projectFiles?.map((f) => f.id),
   checkinFileIds: task.checkinFiles?.map((f) => f.id),

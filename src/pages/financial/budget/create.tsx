@@ -94,22 +94,22 @@ export const FinancialBudgetCreatePage = () => {
   }]);
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
   const [baseFileIds, setBaseFileIds] = useState<string[]>([]);
-  const [artworkFiles, setArtworkFiles] = useState<FileWithPreview[]>([]);
-  const [artworkFileIds, setArtworkFileIds] = useState<string[]>([]);
-  const [artworkStatuses, setArtworkStatuses] = useState<Record<string, string>>({});
+  const [layouts, setLayouts] = useState<FileWithPreview[]>([]);
+  const [layoutIds, setLayoutIds] = useState<string[]>([]);
+  const [layoutStatuses, setLayoutStatuses] = useState<Record<string, string>>({});
 
   const handleBaseFilesChange = useCallback((files: FileWithPreview[]) => {
     setBaseFiles(files);
     setBaseFileIds(files.filter(f => f.uploaded && f.uploadedFileId).map(f => f.uploadedFileId!));
   }, []);
 
-  const handleArtworkFilesChange = useCallback((files: FileWithPreview[]) => {
-    setArtworkFiles(files);
-    setArtworkFileIds(files.filter(f => f.uploaded && f.uploadedFileId).map(f => f.uploadedFileId!));
+  const handleLayoutsChange = useCallback((files: FileWithPreview[]) => {
+    setLayouts(files);
+    setLayoutIds(files.filter(f => f.uploaded && f.uploadedFileId).map(f => f.uploadedFileId!));
   }, []);
 
-  const handleArtworkStatusChange = useCallback((fileId: string, status: string) => {
-    setArtworkStatuses(prev => ({ ...prev, [fileId]: status }));
+  const handleLayoutStatusChange = useCallback((fileId: string, status: string) => {
+    setLayoutStatuses(prev => ({ ...prev, [fileId]: status }));
   }, []);
 
   const handleResponsibleRowsChange = useCallback((rows: ResponsibleRowData[]) => {
@@ -294,12 +294,12 @@ export const FinancialBudgetCreatePage = () => {
     } : undefined,
   }), [reviewTaskCustomer]);
 
-  // Step-2 "Layout Aprovado" options come from the LIVE Step-1 layouts (artworkFiles).
-  // A new budget has no persisted task.artworks, so without this the selection shows
+  // Step-2 "Layout Aprovado" options come from the LIVE Step-1 layouts (layouts).
+  // A new budget has no persisted task.layouts, so without this the selection shows
   // "Nenhum layout na tarefa" even after a layout was added in Step 1 (image files only).
-  const artworks = useMemo(
+  const layoutImageOptions = useMemo(
     () =>
-      artworkFiles
+      layouts
         .filter((f) => (f.type || "").startsWith("image/"))
         .map((f) => {
           const id = (f as any).uploadedFileId || f.id;
@@ -314,7 +314,7 @@ export const FinancialBudgetCreatePage = () => {
             size: f.size,
           };
         }),
-    [artworkFiles],
+    [layouts],
   );
 
   // Dynamic steps based on customer count
@@ -450,27 +450,27 @@ export const FinancialBudgetCreatePage = () => {
       // layout selected from a Step-1 artwork (a local temp id at selection time) can be
       // remapped to the real File id below — otherwise the temp id reaches the API and is
       // rejected as a non-UUID.
-      const uploadedArtworkIds: string[] = [...artworkFileIds];
-      const remappedArtworkStatuses: Record<string, string> = {};
+      const uploadedLayoutIds: string[] = [...layoutIds];
+      const remappedLayoutStatuses: Record<string, string> = {};
       const localIdToRealFileId: Record<string, string> = {};
-      for (const file of artworkFiles) {
+      for (const file of layouts) {
         if (file.uploaded && file.uploadedFileId) {
           localIdToRealFileId[file.id] = file.uploadedFileId;
-          if (artworkStatuses[file.id]) {
-            remappedArtworkStatuses[file.uploadedFileId] = artworkStatuses[file.id];
+          if (layoutStatuses[file.id]) {
+            remappedLayoutStatuses[file.uploadedFileId] = layoutStatuses[file.id];
           }
         } else if (!file.error) {
           try {
             const response = await uploadSingleFile(file, { fileContext: 'artwork' });
             if (response.success && response.data) {
-              uploadedArtworkIds.push(response.data.id);
+              uploadedLayoutIds.push(response.data.id);
               localIdToRealFileId[file.id] = response.data.id;
-              if (artworkStatuses[file.id]) {
-                remappedArtworkStatuses[response.data.id] = artworkStatuses[file.id];
+              if (layoutStatuses[file.id]) {
+                remappedLayoutStatuses[response.data.id] = layoutStatuses[file.id];
               }
             }
           } catch (error: any) {
-            toast.error(`Erro ao enviar artwork ${file.name}: ${error.message}`);
+            toast.error(`Erro ao enviar layout ${file.name}: ${error.message}`);
           }
         }
       }
@@ -623,8 +623,8 @@ export const FinancialBudgetCreatePage = () => {
           term: data.term || undefined,
           paintId: data.paintId || undefined,
           paintIds: data.paintIds && data.paintIds.length > 0 ? data.paintIds : undefined,
-          artworkIds: uploadedArtworkIds.length > 0 ? uploadedArtworkIds : undefined,
-          artworkStatuses: uploadedArtworkIds.length > 0 && Object.keys(remappedArtworkStatuses).length > 0 ? remappedArtworkStatuses : undefined,
+          layoutIds: uploadedLayoutIds.length > 0 ? uploadedLayoutIds : undefined,
+          layoutStatuses: uploadedLayoutIds.length > 0 && Object.keys(remappedLayoutStatuses).length > 0 ? remappedLayoutStatuses : undefined,
           baseFileIds: uploadedBaseFileIds.length > 0 ? uploadedBaseFileIds : undefined,
           responsibleIds: existingRepIds.length > 0 ? existingRepIds : undefined,
           serviceOrders: serviceOrders.length > 0 ? serviceOrders.map((so: any) => ({
@@ -729,9 +729,9 @@ export const FinancialBudgetCreatePage = () => {
   }, [
     form,
     responsibleRows,
-    artworkFiles,
-    artworkFileIds,
-    artworkStatuses,
+    layouts,
+    layoutIds,
+    layoutStatuses,
     baseFiles,
     baseFileIds,
     layoutFiles,
@@ -826,9 +826,9 @@ export const FinancialBudgetCreatePage = () => {
               showResponsibleErrors={showResponsibleErrors}
               baseFiles={baseFiles}
               onBaseFilesChange={handleBaseFilesChange}
-              artworkFiles={artworkFiles}
-              onArtworkFilesChange={handleArtworkFilesChange}
-              onArtworkStatusChange={handleArtworkStatusChange}
+              layouts={layouts}
+              onLayoutsChange={handleLayoutsChange}
+              onLayoutStatusChange={handleLayoutStatusChange}
               onPaintCreated={handlePaintCreated}
             />
           </div>
@@ -838,7 +838,7 @@ export const FinancialBudgetCreatePage = () => {
               disabled={isSubmitting}
               layoutFiles={layoutFiles}
               onLayoutFilesChange={setLayoutFiles}
-              artworks={artworks}
+              layouts={layoutImageOptions}
               customersCache={customersCache}
               selectedCustomers={selectedCustomers}
               setSelectedCustomers={setSelectedCustomers}

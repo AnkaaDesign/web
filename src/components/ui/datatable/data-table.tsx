@@ -85,6 +85,14 @@ export interface DataTableProps<TData> {
    * `navigate(detail(row.id), { state: { ids: meta.orderedIds } })`.
    */
   onRowClick?: (row: TData, meta: DataTableRowClickMeta) => void;
+  /**
+   * Optional per-row className hook — the returned classes are merged onto the rendered row
+   * (alongside the built-in striping/selection/hover classes). Additive and OPTIONAL: callers
+   * that omit it are completely unaffected. Use for row-level tinting driven by row data (e.g. a
+   * schedule tinting rows by deadline). Keep the returned classes purely visual (background/text);
+   * layout/positioning is owned by the table.
+   */
+  getRowClassName?: (row: TData) => string;
   searchPlaceholder?: string;
   /**
    * Optional heading rendered INSIDE the card, above the toolbar/search input (e.g. a section
@@ -168,6 +176,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     filterDefs: rawFilterDefs = EMPTY_FILTER_DEFS,
     rowActions = EMPTY_ROW_ACTIONS,
     onRowClick,
+    getRowClassName,
     searchPlaceholder,
     title,
     titleCount,
@@ -753,12 +762,17 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
             isExpanded={enableExpansion && row.getIsExpanded()}
             selected={row.getIsSelected()}
             selectedBelow={vi.index < rows.length - 1 ? (rows[vi.index + 1]?.getIsSelected() ?? false) : false}
-            isLastRow={vi.index === rows.length - 1}
+            // Only drop the last row's border when it sits FLUSH against a self-bordering boundary — i.e.
+            // autoHeight (content-tight frame). In the scrolling layout the last row floats above the
+            // pagination/frame (empty space when content is short), so it must keep its own separator; the
+            // pagination bar's `-mt-px` collapses the doubled line when content DOES fill and scrolls flush.
+            dropBottomBorder={autoHeight && !windowed && vi.index === rows.length - 1}
             absoluteIndex={vi.index}
             virtualStart={vi.start - scrollMargin}
             measureRef={rowVirtualizer.measureElement}
             columnsKey={columnsKey}
             alignMap={alignMap}
+            rowClassName={getRowClassName?.(row.original)}
             onSelectRow={handleSelectRow}
             onToggleExpand={handleToggleExpand}
             onContextMenu={handleRowContext}
@@ -844,7 +858,9 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
                 </div>
 
                 {enablePagination && !autoHeight && (
-                  <div className="border-t border-border bg-muted/40 px-4">
+                  // `-mt-px` lets this divider overlap (not stack on top of) the last row's bottom border
+                  // when content fills and scrolls flush; over empty space (short content) it's invisible.
+                  <div className="-mt-px border-t border-border bg-muted/40 px-4">
                     <DataTablePagination table={table} totalItems={totalItems} pageSizeOptions={dt.pageSizeOptions} />
                   </div>
                 )}
@@ -986,12 +1002,15 @@ interface DataRowProps<TData> {
   isExpanded: boolean;
   selected: boolean;
   selectedBelow: boolean;
-  isLastRow: boolean;
+  /** Drop this row's bottom separator because it sits flush against a self-bordering boundary. */
+  dropBottomBorder: boolean;
   absoluteIndex: number;
   virtualStart: number;
   measureRef: (node: Element | null) => void;
   columnsKey: string;
   alignMap: Record<string, ColumnAlign>;
+  /** Optional caller-supplied per-row classes (e.g. deadline tint) merged onto the row. */
+  rowClassName?: string;
   onSelectRow: (row: Row<TData>, shiftKey: boolean) => void;
   onToggleExpand: (row: Row<TData>) => void;
   onContextMenu: (e: ReactMouseEvent, row: Row<TData>) => void;
@@ -1006,11 +1025,12 @@ function DataRowInner<TData>({
   isExpanded,
   selected,
   selectedBelow,
-  isLastRow,
+  dropBottomBorder,
   absoluteIndex,
   virtualStart,
   measureRef,
   alignMap,
+  rowClassName,
   onSelectRow,
   onToggleExpand,
   onContextMenu,
@@ -1026,13 +1046,16 @@ function DataRowInner<TData>({
       style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${virtualStart}px)` }}
       className={cn(
         "flex transition-colors hover:bg-muted/70",
-        // The LAST row drops its bottom border — the table frame already draws one there (otherwise
-        // the two stack into a doubled line, visible on a non-scrolling/autoHeight table).
-        !(selected && selectedBelow) && !isLastRow && "border-b border-border",
+        // Every row draws its own bottom separator. The last row drops it ONLY when flush against a
+        // self-bordering boundary (autoHeight frame) — see `dropBottomBorder` at the call site — otherwise
+        // the two would stack into a doubled line.
+        !(selected && selectedBelow) && !dropBottomBorder && "border-b border-border",
         // Zebra striping by absolute position — applies uniformly to parents AND child rows so the
         // even/odd alternation is never broken (child rows are distinguished by the indent/chevron).
         absoluteIndex % 2 === 1 && "bg-muted/50 shadow-[0_-1px_0_0_hsl(var(--muted)/0.5)]",
         onRowClick && "cursor-pointer",
+        // Caller-supplied per-row classes (e.g. deadline tint) — last so they can override the bg above.
+        rowClassName,
       )}
     >
       {enableSelection && (
@@ -1107,7 +1130,7 @@ const DataRow = memo(DataRowInner, (prev, next) => {
     prev.row.original === next.row.original &&
     prev.selected === next.selected &&
     prev.selectedBelow === next.selectedBelow &&
-    prev.isLastRow === next.isLastRow &&
+    prev.dropBottomBorder === next.dropBottomBorder &&
     prev.virtualStart === next.virtualStart &&
     prev.absoluteIndex === next.absoluteIndex &&
     prev.enableSelection === next.enableSelection &&
@@ -1115,6 +1138,7 @@ const DataRow = memo(DataRowInner, (prev, next) => {
     prev.canExpand === next.canExpand &&
     prev.isExpanded === next.isExpanded &&
     prev.columnsKey === next.columnsKey &&
+    prev.rowClassName === next.rowClassName &&
     prev.onSelectRow === next.onSelectRow &&
     prev.onToggleExpand === next.onToggleExpand &&
     prev.onContextMenu === next.onContextMenu &&

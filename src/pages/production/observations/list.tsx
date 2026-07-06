@@ -1,46 +1,23 @@
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeader } from "@/components/ui/page-header";
-import { ObservationList } from "@/components/production/observation/list";
-import { IconPlus } from "@tabler/icons-react";
-import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
-import { useNavigate } from "react-router-dom";
+import { ObservationTablePage } from "@/components/production/observation/list";
+import { SECTOR_PRIVILEGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { useAuth } from "@/contexts/auth-context";
-import { canCreateObservations } from "@/utils/permissions/entity-permissions";
 
 export const ObservationsList = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-
   // Track page for analytics
   usePageTracker({ title: "Observações - Lista", icon: "observations_list" });
 
-  const canCreate = canCreateObservations(user); // ADMIN, COMMERCIAL, FINANCIAL, WAREHOUSE, PRODUCTION_MANAGER (matches API)
-
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <PageHeader
-          variant="list"
-          title="Observações"
-          favoritePage={FAVORITE_PAGES.PRODUCAO_OBSERVACOES_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Produção", href: routes.production.root }, { label: "Observações" }]}
-          actions={canCreate ? [
-            {
-              key: "create",
-              label: "Nova Observação",
-              icon: IconPlus,
-              onClick: () => navigate(routes.production.observations.create),
-              variant: "default",
-            },
-          ] : []}
-          className="flex-shrink-0"
-        />
-
-        <div className="flex-1 min-h-0 pb-6 flex flex-col">
-          <ObservationList className="h-full" />
-        </div>
-      </div>
+    <PrivilegeRoute
+      requiredPrivilege={[
+        SECTOR_PRIVILEGES.PRODUCTION,
+        SECTOR_PRIVILEGES.WAREHOUSE,
+        SECTOR_PRIVILEGES.FINANCIAL,
+        SECTOR_PRIVILEGES.COMMERCIAL,
+        SECTOR_PRIVILEGES.ADMIN,
+      ]}
+    >
+      <ObservationTablePage />
     </PrivilegeRoute>
   );
 };

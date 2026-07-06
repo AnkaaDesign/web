@@ -23,7 +23,7 @@ const DUPLICATE_TASK_INCLUDE = {
     },
   },
   baseFiles: true,
-  artworks: {
+  layouts: {
     include: {
       file: true,
     },
@@ -45,14 +45,14 @@ const DUPLICATE_TASK_INCLUDE = {
   logoPaints: true,
   truck: {
     include: {
-      leftSideLayout: {
-        include: { layoutSections: true },
+      leftSideMeasure: {
+        include: { sections: true },
       },
-      rightSideLayout: {
-        include: { layoutSections: true },
+      rightSideMeasure: {
+        include: { sections: true },
       },
-      backSideLayout: {
-        include: { layoutSections: true },
+      backSideMeasure: {
+        include: { sections: true },
       },
     },
   },
@@ -190,8 +190,8 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       reimbursementIds: sourceTask.reimbursements?.map((r: any) => r.id) || [],
       reimbursementInvoiceIds: sourceTask.reimbursementInvoices?.map((r: any) => r.id) || [],
 
-      // Artworks (shared references - pass File IDs, API converts to Artwork entity IDs)
-      artworkIds: sourceTask.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
+      // Layouts (shared references - pass File IDs, API converts to Layout entity IDs)
+      layoutIds: sourceTask.layouts?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
 
       // Base files (shared references - File IDs)
       baseFileIds: sourceTask.baseFiles?.map((f: any) => f.id) || [],
@@ -225,9 +225,9 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
             category: truckData?.category || null,
             implementType: truckData?.implementType || null,
             // Share existing layouts (connect to same layout records)
-            leftSideLayoutId: truckData?.leftSideLayout?.id || truckData?.leftSideLayoutId || null,
-            rightSideLayoutId: truckData?.rightSideLayout?.id || truckData?.rightSideLayoutId || null,
-            backSideLayoutId: truckData?.backSideLayout?.id || truckData?.backSideLayoutId || null,
+            leftSideMeasureId: truckData?.leftSideMeasure?.id || truckData?.leftSideMeasureId || null,
+            rightSideMeasureId: truckData?.rightSideMeasure?.id || truckData?.rightSideMeasureId || null,
+            backSideMeasureId: truckData?.backSideMeasure?.id || truckData?.backSideMeasureId || null,
           }
         : null,
 

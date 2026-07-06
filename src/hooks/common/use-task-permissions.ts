@@ -81,7 +81,7 @@ export function useTaskPermissions() {
   const canViewObservation = !isWarehouse && !isFinancial && !isDesigner && !isLogistic && !isProductionManager && !isCommercial;
   // PRODUCTION can VIEW the observation section but must not edit it (API rejects observation writes from PRODUCTION)
   const canEditObservation = canViewObservation && !isProduction;
-  const canViewArtworkBadges = isAdmin || isCommercial || isFinancial || isLogistic || isProductionManager || isDesigner;
+  const canViewLayoutBadges = isAdmin || isCommercial || isFinancial || isLogistic || isProductionManager || isDesigner;
   const canViewDocuments = isAdmin || isFinancial;
 
   // -- Field editability (controls disabled state) ------------------------
@@ -134,7 +134,7 @@ export function useTaskPermissions() {
     canViewReimbursement,
     canViewObservation,
     canEditObservation,
-    canViewArtworkBadges,
+    canViewLayoutBadges,
     canViewDocuments,
 
     // Field editability

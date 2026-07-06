@@ -27,9 +27,9 @@ import { getCustomers } from "@/api-client";
 import { getApiBaseUrl } from "@/config/api";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 
-interface ArtworkOption {
+interface LayoutOption {
   id: string;
-  artworkId?: string;
+  layoutId?: string;
   filename?: string;
   originalName?: string;
   thumbnailUrl?: string | null;
@@ -69,7 +69,7 @@ const isUuid = (id?: string | null): boolean =>
 
 // Comparable {id, name, size} for matching a task art against a quote layout File.
 type ImageKey = { id?: string; name: string; size: number };
-const imageKeyOfArt = (a: ArtworkOption): ImageKey => ({
+const imageKeyOfArt = (a: LayoutOption): ImageKey => ({
   id: a.id,
   name: (a.originalName || a.filename || "").trim(),
   size: a.size || 0,
@@ -90,7 +90,7 @@ interface BudgetStepInfoProps {
   disabled?: boolean;
   layoutFiles: FileWithPreview[];
   onLayoutFilesChange: (files: FileWithPreview[]) => void;
-  artworks?: ArtworkOption[];
+  layouts?: LayoutOption[];
   customersCache: React.MutableRefObject<Map<string, any>>;
   selectedCustomers: Map<string, any>;
   setSelectedCustomers: (customers: Map<string, any>) => void;
@@ -119,7 +119,7 @@ export function BudgetStepInfo({
   disabled,
   layoutFiles,
   onLayoutFilesChange,
-  artworks,
+  layouts,
   customersCache,
   selectedCustomers: _selectedCustomers,
   setSelectedCustomers,
@@ -171,10 +171,10 @@ export function BudgetStepInfo({
 
   // The task's image layouts — the candidates for the budget's approved layout
   // (up to 2 chosen). Sourced live from Step 1; there is no upload in this step.
-  const artworkOptions = useMemo(() => {
-    if (!artworks || artworks.length === 0) return [];
-    return artworks.filter((a) => (a.mimetype || "").startsWith("image/"));
-  }, [artworks]);
+  const layoutOptions = useMemo(() => {
+    if (!layouts || layouts.length === 0) return [];
+    return layouts.filter((a) => (a.mimetype || "").startsWith("image/"));
+  }, [layouts]);
 
   const handleGuaranteeOptionChange = useCallback(
     (value: string) => {
@@ -327,7 +327,7 @@ export function BudgetStepInfo({
   const selectedCustomerIds = customerConfigs.map((c: any) => c.customerId);
 
   // --- Layout Aprovado picker --------------------------------------------------
-  // The budget's approved layout is chosen FROM the task's layouts (artworks). There
+  // The budget's approved layout is chosen FROM the task's layouts (layouts). There
   // is NO upload here — new images are added to the task in Step 1. Up to 2 may be
   // marked as the approved layout.
   const syncLayoutIds = useCallback(
@@ -347,7 +347,7 @@ export function BudgetStepInfo({
   // Is this task art part of the approved layout? Matched by id OR same image
   // (filename+size) so a separate-but-identical quote layout File still reads selected.
   const isArtSelected = useCallback(
-    (art: ArtworkOption) =>
+    (art: LayoutOption) =>
       layoutFiles.some((lf) => sameImage(imageKeyOfFile(lf), imageKeyOfArt(art))),
     [layoutFiles],
   );
@@ -356,7 +356,7 @@ export function BudgetStepInfo({
   // separately via the card's status selector). Same-image files are removed even when
   // their File id differs from the art's, so the duplicate-record case toggles cleanly.
   const toggleArt = useCallback(
-    (art: ArtworkOption) => {
+    (art: LayoutOption) => {
       const ak = imageKeyOfArt(art);
       const selected = layoutFiles.some((lf) =>
         sameImage(imageKeyOfFile(lf), ak),
@@ -394,11 +394,11 @@ export function BudgetStepInfo({
     () =>
       layoutFiles.filter(
         (lf) =>
-          !artworkOptions.some((a) =>
+          !layoutOptions.some((a) =>
             sameImage(imageKeyOfFile(lf), imageKeyOfArt(a)),
           ),
       ),
-    [layoutFiles, artworkOptions],
+    [layoutFiles, layoutOptions],
   );
   const removeOrphan = useCallback(
     (f: FileWithPreview) => {
@@ -418,7 +418,7 @@ export function BudgetStepInfo({
   //  3. otherwise the server thumbnail endpoint keyed by the real File id.
   // Brand-new local files have a generated local `id` (not a real File id), so the
   // thumbnail endpoint would 404 for them — hence the preview fallback.
-  const getArtworkThumbnailSrc = useCallback((artwork: ArtworkOption): string => {
+  const getLayoutThumbnailSrc = useCallback((artwork: LayoutOption): string => {
     if (artwork.thumbnailUrl) return artwork.thumbnailUrl;
     if (artwork.preview) return artwork.preview;
     return `${getApiBaseUrl()}/files/thumbnail/${artwork.id}`;
@@ -430,8 +430,8 @@ export function BudgetStepInfo({
   // to download/new-tab. So we pass a COMPLETE object (like FileSuggestions does):
   // a guaranteed image mimetype (derived from the filename ext when the option's is
   // empty), a filename WITH extension, id, size, thumbnailUrl and path.
-  const openArtworkInViewer = useCallback(
-    (artwork: ArtworkOption) => {
+  const openLayoutInViewer = useCallback(
+    (artwork: LayoutOption) => {
       const filename =
         artwork.filename || artwork.originalName || "layout.png";
       const mimetype =
@@ -705,12 +705,12 @@ export function BudgetStepInfo({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {artworkOptions.length > 0 || orphanLayoutFiles.length > 0 ? (
+          {layoutOptions.length > 0 || orphanLayoutFiles.length > 0 ? (
             <div className="space-y-3">
               <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
                 {/* Task layouts — selectable. Click the image OR "Selecionar" to toggle;
                     "Ver" opens the viewer. Status is managed on the task (Step 1). */}
-                {artworkOptions.map((art) => {
+                {layoutOptions.map((art) => {
                   const selected = isArtSelected(art);
                   const blockSelect =
                     !selected && (disabled || selectedCount >= 2);
@@ -737,7 +737,7 @@ export function BudgetStepInfo({
                         )}
                       >
                         <img
-                          src={getArtworkThumbnailSrc(art)}
+                          src={getLayoutThumbnailSrc(art)}
                           alt={name}
                           className="h-full w-full object-cover"
                           onError={(e) => {
@@ -762,7 +762,7 @@ export function BudgetStepInfo({
                             variant="outline"
                             size="sm"
                             className="h-8 flex-1 px-2"
-                            onClick={() => openArtworkInViewer(art)}
+                            onClick={() => openLayoutInViewer(art)}
                           >
                             <IconEye className="mr-1 h-3.5 w-3.5" />
                             Ver

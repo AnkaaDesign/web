@@ -466,7 +466,6 @@ export const ENTITY_BADGE_CONFIG = {
   // Airbrushing Payment Status
   AIRBRUSHING_PAYMENT: {
     [AIRBRUSHING_PAYMENT_STATUS.PENDING]: "pending" as BadgeVariant,        // Amber - awaiting payment
-    [AIRBRUSHING_PAYMENT_STATUS.PARTIALLY_PAID]: "orange" as BadgeVariant,  // Orange - partially paid
     [AIRBRUSHING_PAYMENT_STATUS.PAID]: "green" as BadgeVariant,             // Green - fully paid
   },
 

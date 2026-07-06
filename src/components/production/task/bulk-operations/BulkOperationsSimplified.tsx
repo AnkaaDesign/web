@@ -54,7 +54,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
   }));
 
   // Filter options by type
-  const artworkOptions = fileOptions.filter((_opt, index) => {
+  const layoutOptions = fileOptions.filter((_opt, index) => {
     const file = files[index];
     if (!file || !file.name) return false;
     return String(file.name).match(/\.(jpg|jpeg|png|gif|svg|pdf|ai|eps)$/i);
@@ -103,7 +103,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       switch (operationType) {
         case "arts":
           if (selectedArtIds.length > 0) {
-            updateData.artworkIds = selectedArtIds;
+            updateData.layoutIds = selectedArtIds;
           }
           break;
 
@@ -209,8 +209,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 mode="multiple"
                 value={selectedArtIds}
                 onValueChange={(value) => setSelectedArtIds(Array.isArray(value) ? value : [])}
-                options={artworkOptions}
-                placeholder="Selecione arquivos de arte..."
+                options={layoutOptions}
+                placeholder="Selecione arquivos de layout..."
                 disabled={isSubmitting}
                 searchable
               />
