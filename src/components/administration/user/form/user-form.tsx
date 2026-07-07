@@ -147,7 +147,7 @@ export function UserForm(props: UserFormProps) {
   // Watch the worker category to drive the contract-type vs provider fields.
   const employeeType = useWatch({ control: form.control, name: "employeeType" as any }) as EMPLOYEE_TYPE | undefined;
   const isClt = !employeeType || employeeType === EMPLOYEE_TYPE.CLT;
-  const isProvider = employeeType === EMPLOYEE_TYPE.TERCEIRIZADO || employeeType === EMPLOYEE_TYPE.PJ;
+  const isProvider = employeeType === EMPLOYEE_TYPE.PJ;
 
   // Union membership gates the authorization-date picker.
   const unionMember = useWatch({ control: form.control, name: "unionMember" as any }) as boolean | undefined;
@@ -169,6 +169,18 @@ export function UserForm(props: UserFormProps) {
       }
     }
   }, [selectedSectorId, sectorPrivilege, form]);
+
+  // Off-folha categories (terceirizado/PJ/autônomo/estagiário) carry NO contract
+  // modality. The ContractTypeSelector is hidden for them, but the field keeps
+  // its stale value in form state — which the API's employeeType↔contractType
+  // integrity check rejects ("Dados do corpo da requisição inválidos"). Clear it
+  // whenever the category switches to a provider so both client validation and
+  // the submitted payload stay consistent (mirrors buildCreatePayload).
+  useEffect(() => {
+    if (isProvider && form.getValues("contractType" as any) != null) {
+      form.setValue("contractType" as any, null, { shouldDirty: true, shouldValidate: true });
+    }
+  }, [isProvider, form]);
 
   // Reset form when defaultValues change in update mode (e.g., new user data loaded)
   const isInitialMountRef = useRef(true);
@@ -253,7 +265,7 @@ export function UserForm(props: UserFormProps) {
       admissionDate,
       contract: {
         employeeType: employeeType ?? EMPLOYEE_TYPE.CLT,
-        // Off-folha categories (TERCEIRIZADO/PJ/AUTÔNOMO) carry no legal modality.
+        // Off-folha categories (PJ/AUTÔNOMO) carry no legal modality.
         contractType: isOffPayroll ? null : (contractType ?? CONTRACT_TYPE.EXPERIENCE_PERIOD_1),
         contractStatus: contractStatus ?? CONTRACT_STATUS.ACTIVE,
         admissionDate,
@@ -366,7 +378,7 @@ export function UserForm(props: UserFormProps) {
                   required={false}
                 />
                 <BirthDateInput disabled={isSubmitting} required={mode === "create"} />
-                <PayrollNumberInput disabled={isSubmitting} />
+                <PayrollNumberInput disabled={isSubmitting} required={isClt} />
               </div>
             </CardContent>
           </Card>

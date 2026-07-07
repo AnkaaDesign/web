@@ -86,7 +86,6 @@ export enum CONTRACT_STATUS {
 export enum EMPLOYEE_TYPE {
   CLT = "CLT",
   INTERN = "INTERN",
-  TERCEIRIZADO = "TERCEIRIZADO",
   PJ = "PJ",
   AUTONOMOUS = "AUTONOMOUS",
 }

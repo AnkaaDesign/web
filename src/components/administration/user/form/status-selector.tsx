@@ -48,7 +48,7 @@ export function EmployeeTypeSelector({ disabled = false, required = true }: Sele
 
 /**
  * Contract-TYPE selector (Experiência / Efetivado / ...). Only meaningful for
- * CLT collaborators — callers should hide it for TERCEIRIZADO / PJ / etc.
+ * CLT collaborators — callers should hide it for PJ / etc.
  */
 export function ContractTypeSelector({ disabled = false, required = true }: SelectorProps) {
   const options = useMemo(
@@ -74,7 +74,7 @@ export function ContractTypeSelector({ disabled = false, required = true }: Sele
 }
 
 /**
- * Provider (prestador) fields shown for TERCEIRIZADO / PJ contracts.
+ * Provider (prestador) fields shown for PJ contracts.
  * Bound to the nested `contract.providerName` / `contract.providerCnpj`.
  */
 export function ProviderFields({

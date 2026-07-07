@@ -110,7 +110,11 @@ export function PositionSelector<_T extends FieldValues = FieldValues>({
               queryFn={queryPositions}
               initialOptions={initialOptions}
               value={field.value ?? ""}
-              onValueChange={field.onChange}
+              // Combobox emits `undefined` on "limpar" (clear). `undefined` is
+              // dropped by JSON.stringify, so the API never receives positionId
+              // and the position is never cleared. Coerce the empty/nullish case
+              // to explicit `null` (schema is .nullable()) so the clear persists.
+              onValueChange={(value) => field.onChange(value == null || value === "" ? null : value)}
               placeholder={placeholder}
               emptyText={emptyMessage}
               disabled={disabled}

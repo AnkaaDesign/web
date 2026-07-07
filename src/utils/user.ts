@@ -666,7 +666,6 @@ const CONTRACT_STATUS_FALLBACK_LABELS: Record<string, string> = {
 
 const OFF_PAYROLL_LABELS: Record<string, string> = {
   [EMPLOYEE_TYPE.INTERN]: "Estagiário",
-  [EMPLOYEE_TYPE.TERCEIRIZADO]: "Terceirizado",
   [EMPLOYEE_TYPE.PJ]: "PJ",
   [EMPLOYEE_TYPE.AUTONOMOUS]: "Autônomo",
 };

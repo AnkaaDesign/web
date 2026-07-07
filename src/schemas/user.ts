@@ -1117,16 +1117,19 @@ export const userCreateSchema = z
     dependentsCount: z.number().int().min(0).default(0),
     hasSimplifiedDeduction: z.boolean().default(true),
 
-    // Payroll info — required at create time. Required by Secullum (NumeroFolha)
-    // and by all payroll calculations. Existing rows with NULL can still be
-    // edited (userUpdateSchema keeps it nullable.optional).
+    // Payroll info — required at create time for on-folha (CLT) collaborators
+    // (Secullum NumeroFolha + payroll calculations). Off-payroll providers
+    // (terceirizado/PJ) don't occupy a folha, so it's exempted via the refine
+    // below. Existing rows with NULL can still be edited (userUpdateSchema keeps
+    // it nullable.optional).
     payrollNumber: z
       .number({
-        required_error: "Número da folha é obrigatório",
         invalid_type_error: "Número da folha deve ser numérico",
       })
       .int()
-      .positive("Número da folha deve ser positivo"),
+      .positive("Número da folha deve ser positivo")
+      .nullable()
+      .optional(),
 
     // Nested PPE size creation for new users
     ppeSize: ppeSizeCreateNestedSchema.optional(),
@@ -1149,13 +1152,25 @@ export const userCreateSchema = z
   .refine(
     (data) => {
       // Cargo is required for on-folha collaborators. Off-payroll providers
-      // (terceirizado/PJ) don't occupy a cargo, so it stays optional for them.
-      const isProvider = data.employeeType === EMPLOYEE_TYPE.TERCEIRIZADO || data.employeeType === EMPLOYEE_TYPE.PJ;
+      // (PJ) don't occupy a cargo, so it stays optional for them.
+      const isProvider = data.employeeType === EMPLOYEE_TYPE.PJ;
       return isProvider || !!data.positionId;
     },
     {
       message: "Cargo é obrigatório",
       path: ["positionId"],
+    },
+  )
+  .refine(
+    (data) => {
+      // Número da folha é obrigatório apenas para colaboradores CLT (on-folha).
+      // PJ não ocupa folha, então fica opcional para eles.
+      const isProvider = data.employeeType === EMPLOYEE_TYPE.PJ;
+      return isProvider || (data.payrollNumber !== null && data.payrollNumber !== undefined);
+    },
+    {
+      message: "Número da folha é obrigatório",
+      path: ["payrollNumber"],
     },
   );
 

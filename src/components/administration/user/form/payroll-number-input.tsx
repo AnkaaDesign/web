@@ -6,9 +6,12 @@ import type { UserCreateFormData, UserUpdateFormData } from "../../../../schemas
 
 interface PayrollNumberInputProps {
   disabled?: boolean;
+  // Número da folha só é obrigatório para colaboradores CLT (on-folha).
+  // Terceirizados/PJ não ocupam folha, então o asterisco não deve aparecer.
+  required?: boolean;
 }
 
-export function PayrollNumberInput({ disabled }: PayrollNumberInputProps) {
+export function PayrollNumberInput({ disabled, required = false }: PayrollNumberInputProps) {
   const form = useFormContext<UserCreateFormData | UserUpdateFormData>();
 
   return (
@@ -20,7 +23,7 @@ export function PayrollNumberInput({ disabled }: PayrollNumberInputProps) {
           <FormLabel className="flex items-center gap-2">
             <IconHash className="h-4 w-4 text-muted-foreground" />
             Número da Folha
-            <span className="text-destructive ml-0.5">*</span>
+            {required && <span className="text-destructive ml-0.5">*</span>}
           </FormLabel>
           <FormControl>
             <Input

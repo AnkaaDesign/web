@@ -428,7 +428,6 @@ export const ENTITY_BADGE_CONFIG = {
   EMPLOYEE_TYPE: {
     [EMPLOYEE_TYPE.CLT]: "green" as BadgeVariant,
     [EMPLOYEE_TYPE.INTERN]: "blue" as BadgeVariant,
-    [EMPLOYEE_TYPE.TERCEIRIZADO]: "purple" as BadgeVariant,
     [EMPLOYEE_TYPE.PJ]: "orange" as BadgeVariant,
     [EMPLOYEE_TYPE.AUTONOMOUS]: "created" as BadgeVariant,
   },

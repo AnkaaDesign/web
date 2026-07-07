@@ -154,7 +154,7 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
   // Worker category drives the contract-type / provider fields.
   const employeeType = useWatch({ control: form.control, name: "employeeType" as any }) as EMPLOYEE_TYPE | undefined;
   const isClt = !employeeType || employeeType === EMPLOYEE_TYPE.CLT;
-  const isProvider = employeeType === EMPLOYEE_TYPE.TERCEIRIZADO || employeeType === EMPLOYEE_TYPE.PJ;
+  const isProvider = employeeType === EMPLOYEE_TYPE.PJ;
 
   // ----- CPF auto-detect (rehire path) -----
   const cpfValue = useWatch({ control: form.control, name: "cpf" as any }) as string | null | undefined;
