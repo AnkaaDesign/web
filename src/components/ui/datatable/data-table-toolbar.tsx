@@ -121,9 +121,14 @@ function DataTableToolbarInner<TData>({
         {customActions}
 
         {enableExpansion && (
-          <Button variant="outline" onClick={onToggleExpandAll} className="gap-2" title={allExpanded ? "Recolher todos os grupos" : "Expandir todos os grupos"}>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onToggleExpandAll}
+            title={allExpanded ? "Recolher todos os grupos" : "Expandir todos os grupos"}
+            aria-label={allExpanded ? "Recolher tudo" : "Expandir tudo"}
+          >
             {allExpanded ? <IconChevronsUp className="h-4 w-4" /> : <IconChevronsDown className="h-4 w-4" />}
-            {allExpanded ? "Recolher tudo" : "Expandir tudo"}
           </Button>
         )}
 

@@ -4,7 +4,6 @@ import {
   IconArrowDownLeft,
   IconArrowUpRight,
   IconBuildingBank,
-  IconFilter,
   IconHelpCircle,
   IconRefresh,
   IconUpload,
@@ -12,9 +11,9 @@ import {
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { TableSearchInput } from "@/components/ui/table-search-input";
-import { Combobox } from "@/components/ui/combobox";
+import { Input } from "@/components/ui/input";
+import { IconBan, IconCategory } from "@tabler/icons-react";
+import { DataTable, type DataTableColumnDef } from "@/components/ui/datatable";
 import { FinancialKpiCard } from "@/components/financial/common/financial-kpi-card";
 import { parseMonthKey } from "@/components/financial/reconciliation/month-nav";
 import {
@@ -22,16 +21,15 @@ import {
   currentPeriod,
   type Period,
 } from "@/components/financial/reconciliation/period-nav";
+import { STATEMENT_COLUMNS } from "@/components/financial/reconciliation/statement-columns";
 import {
-  StatementFilterSheet,
-  getDefaultStatementFilters,
-} from "@/components/financial/reconciliation/statement-filter-sheet";
-import { TransactionsByDateAccordion } from "@/components/financial/reconciliation/transactions-by-date-accordion";
-import {
-  buildDatesForPeriod,
-  deriveDateRange,
-  effectivePeriodDates,
-} from "@/components/financial/reconciliation/date-utils";
+  buildDateGroups,
+  isDateGroup,
+  GroupDateLabel,
+  GroupProgressBar,
+  type GroupedRow,
+} from "@/components/financial/common/date-grouped-rows";
+import { deriveDateRange } from "@/components/financial/reconciliation/date-utils";
 import { OfxImportDialog } from "@/components/financial/reconciliation/ofx-import-dialog";
 import { ScoringWorkflowDialog } from "@/components/financial/reconciliation/scoring-workflow-dialog";
 import { IgnoreTransactionDialog } from "@/components/financial/reconciliation/ignore-transaction-dialog";
@@ -52,7 +50,6 @@ import {
   useRunAutoMatch,
 } from "@/hooks/financial/use-reconciliation";
 import { useUrlDialog } from "@/hooks/common/use-url-dialog";
-import { useDebouncedValue } from "@/hooks/common/use-debounced-value";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useToast } from "@/hooks/common/use-toast";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "@/constants";
@@ -181,12 +178,6 @@ export const ReconciliationStatementPage = () => {
     }
     return readStoredPeriod() ?? currentPeriod();
   });
-  const [accountKey, setAccountKey] = useState<string>(
-    () => searchParams.get("conta") || "",
-  );
-  const [searchText, setSearchText] = useState(
-    () => searchParams.get("search") || "",
-  );
   // Price range (magnitude, R$) set in the Filtros sheet. Applied client-side on
   // the absolute amount — the same basis the totals/type/bucket filters use — so
   // it narrows credits and debits alike without fighting the signed row value.
@@ -210,10 +201,8 @@ export const ReconciliationStatementPage = () => {
     if (raw !== null) return parseBuckets(raw, ALL_BUCKETS);
     return readStoredSelection(BUCKETS_STORAGE_KEY, ALL_BUCKETS) ?? ALL_BUCKETS;
   });
-  const debouncedSearch = useDebouncedValue(searchText.trim(), 300);
   const [importOpen, setImportOpen] = useState(false);
   const [scoringHelpOpen, setScoringHelpOpen] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
 
   // Keep period/account/search/value/type/status shareable in the URL.
   useEffect(() => {
@@ -221,10 +210,7 @@ export const ReconciliationStatementPage = () => {
     params.delete("mes"); // superseded by year/months
     params.set("year", String(period.year));
     params.set("months", JSON.stringify(period.months));
-    if (accountKey) params.set("conta", accountKey);
-    else params.delete("conta");
-    if (searchText) params.set("search", searchText);
-    else params.delete("search");
+    params.delete("conta"); // account selector removed — statement is Sicredi-only
     if (amountMin != null) params.set("valorMin", String(amountMin));
     else params.delete("valorMin");
     if (amountMax != null) params.set("valorMax", String(amountMax));
@@ -239,7 +225,7 @@ export const ReconciliationStatementPage = () => {
       setSearchParams(params, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, accountKey, searchText, amountMin, amountMax, types, buckets]);
+  }, [period, amountMin, amountMax, types, buckets]);
 
   // Persist the card selection + period so the chosen view sticks across visits.
   useEffect(() => {
@@ -268,8 +254,6 @@ export const ReconciliationStatementPage = () => {
     sortDir: "desc",
     dateFrom: dateRange?.dateFrom,
     dateTo: dateRange?.dateTo,
-    search: debouncedSearch || undefined,
-    counterparty: debouncedSearch || undefined,
   });
 
   const rows = useMemo(() => data?.data ?? [], [data]);
@@ -285,12 +269,13 @@ export const ReconciliationStatementPage = () => {
     return [...map.entries()].map(([key, label]) => ({ key, label }));
   }, [rows]);
 
-  // Default to the first account of the period (and recover when the persisted
-  // account has no rows in the selected period).
+  // Statement is Sicredi-only (bank code 748) — pick that account by default,
+  // falling back to the first account present when no Sicredi row is in view.
   const effectiveAccountKey = useMemo(() => {
-    if (accountKey && accounts.some(a => a.key === accountKey)) return accountKey;
+    const sicredi = rows.find(t => t.bankCode === "748" || /sicredi/i.test(t.bankName ?? ""));
+    if (sicredi) return accountKeyOf(sicredi);
     return accounts[0]?.key ?? "";
-  }, [accountKey, accounts]);
+  }, [rows, accounts]);
 
   // The full account set — drives the period totals (credits/debits),
   // independent of the active type/status filter.
@@ -365,39 +350,21 @@ export const ReconciliationStatementPage = () => {
     );
   }, []);
 
-  // How many Filtros-sheet dimensions are non-default (period + value range).
-  const activeFilterCount = useMemo(() => {
-    const def = getDefaultStatementFilters();
-    let c = 0;
-    if (period.year !== def.year) c++;
-    if (period.months.length !== 1 || period.months[0] !== def.months[0]) c++;
-    if (amountMin != null) c++;
-    if (amountMax != null) c++;
-    return c;
-  }, [period, amountMin, amountMax]);
-
-  // Collapse the calendar to only the days that contain a matching transaction
-  // (and auto-expand them) whenever a search/filter narrows the result set; the
-  // default browse view keeps the full period calendar (empty days collapsed).
-  const narrowing =
-    debouncedSearch.length > 0 ||
-    amountMin != null ||
-    amountMax != null ||
-    types.length !== ALL_TYPES.length ||
-    buckets.length !== ALL_BUCKETS.length;
-
-  const periodDates = useMemo(
-    () => buildDatesForPeriod(period.year, period.months),
-    [period],
-  );
-  const dates = useMemo(
+  // Day grouping — one banner per posted day (newest first), entradas green /
+  // saídas red — the same accordion the Notas Fiscais / Contas a Receber use.
+  const groupedRows = useMemo(
     () =>
-      effectivePeriodDates(
-        periodDates,
-        visibleRows.map(t => t.postedAt),
-        narrowing,
-      ),
-    [periodDates, visibleRows, narrowing],
+      buildDateGroups(visibleRows, {
+        getDate: (t) => t.postedAt,
+        getGreen: (t) => (t.type === "CREDIT" ? Math.abs(Number(t.amount) || 0) : 0),
+        getRed: (t) => (t.type !== "CREDIT" ? Math.abs(Number(t.amount) || 0) : 0),
+        getResolved: (t) =>
+          t.reconciliationStatus === "RECONCILED" ||
+          t.reconciliationStatus === "PARTIAL" ||
+          t.reconciliationStatus === "IGNORED",
+        direction: "desc",
+      }),
+    [visibleRows],
   );
 
   // ----- row quick actions (URL-driven dialogs) ----------------------------
@@ -535,92 +502,101 @@ export const ReconciliationStatementPage = () => {
         </div>
 
         <div className="flex-1 min-h-0 pb-6 flex flex-col">
-          <Card className="flex flex-col shadow-sm border border-border h-full">
-            <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-shrink-0">
-                <div className="flex flex-1 min-w-0">
-                  <TableSearchInput
-                    value={searchText}
-                    onChange={setSearchText}
-                    placeholder="Buscar por contraparte, descrição ou FITID..."
+          <DataTable<GroupedRow<BankTransaction>>
+            tableId="reconciliation-statement"
+            data={groupedRows}
+            columns={STATEMENT_COLUMNS as unknown as DataTableColumnDef<GroupedRow<BankTransaction>>[]}
+            getRowId={row => row.id}
+            isLoading={isLoading}
+            enablePagination={false}
+            enableSelection={false}
+            enableRowPinning={false}
+            enableShare={false}
+            enableExpansion
+            defaultExpanded
+            getSubRows={row => (isDateGroup(row) ? row.children : undefined)}
+            isGroupRow={isDateGroup}
+            renderGroupCell={(row, columnId, { isExpanded }) => {
+              if (!isDateGroup(row)) return null;
+              switch (columnId) {
+                case "date":
+                  return <GroupDateLabel group={row} />;
+                // Day totals sit under their columns and hide once the day is expanded (rows show them).
+                case "credit":
+                  return !isExpanded && row.greenTotal > 0 ? (
+                    <span className="tabular-nums text-emerald-700 dark:text-emerald-400">{formatCurrency(row.greenTotal)}</span>
+                  ) : null;
+                case "debit":
+                  return !isExpanded && row.redTotal > 0 ? (
+                    <span className="tabular-nums text-red-700 dark:text-red-400">{formatCurrency(row.redTotal)}</span>
+                  ) : null;
+                case "reconciliationStatus":
+                  return <GroupProgressBar resolved={row.resolvedCount} count={row.count} />;
+                default:
+                  return null;
+              }
+            }}
+            searchPlaceholder="Buscar por contraparte, descrição ou categoria..."
+            toolbarActions={
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="currency"
+                    value={amountMin}
+                    onChange={v => setAmountMin(typeof v === "number" ? v : null)}
+                    placeholder="Valor mín"
+                    className="h-9 w-32"
+                  />
+                  <span className="text-muted-foreground text-xs">–</span>
+                  <Input
+                    type="currency"
+                    value={amountMax}
+                    onChange={v => setAmountMax(typeof v === "number" ? v : null)}
+                    placeholder="Valor máx"
+                    className="h-9 w-32"
                   />
                 </div>
-                <Combobox
-                  mode="single"
-                  value={effectiveAccountKey || undefined}
-                  onValueChange={v => {
-                    const key =
-                      typeof v === "string"
-                        ? v
-                        : Array.isArray(v)
-                          ? v[0]
-                          : undefined;
-                    if (key) setAccountKey(key);
-                  }}
-                  options={accounts.map(a => ({ value: a.key, label: a.label }))}
-                  placeholder="Conta bancária"
-                  searchPlaceholder="Buscar conta..."
-                  clearable={false}
-                  className="w-full sm:w-[280px] flex-shrink-0"
-                  triggerClassName="h-10 w-full"
-                />
-                <PeriodNav
-                  period={period}
-                  onChange={setPeriod}
-                  className="flex-shrink-0"
-                />
-                <Button
-                  variant={activeFilterCount > 0 ? "default" : "outline"}
-                  onClick={() => setShowFilters(true)}
-                  className="group flex-shrink-0"
-                >
-                  <IconFilter
-                    className={
-                      activeFilterCount > 0
-                        ? "h-4 w-4"
-                        : "h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors"
-                    }
-                  />
-                  <span>Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}</span>
-                </Button>
+                <PeriodNav period={period} onChange={setPeriod} className="flex-shrink-0" />
               </div>
-
-              <div className="flex-1 min-h-0 overflow-auto">
-                <TransactionsByDateAccordion
-                  data={visibleRows}
-                  dates={dates}
-                  isLoading={isLoading}
-                  autoExpand={narrowing}
-                  persistKey="reconciliation-statement"
-                  onIgnore={tx => ignoreDialog.set(tx.id)}
-                  onChangeCategory={tx => categoryDialog.set(tx.id)}
-                  onViewDetails={tx =>
-                    navigate(
-                      routes.financial.reconciliation.transactionDetail(tx.id),
-                    )
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
+            }
+            rowActions={[
+              {
+                key: "change-category",
+                label: "Alterar categoria",
+                icon: <IconCategory className="h-4 w-4" />,
+                hidden: rows => {
+                  const r = rows[0];
+                  return !r || isDateGroup(r);
+                },
+                onClick: rows => {
+                  const r = rows[0];
+                  if (r && !isDateGroup(r)) categoryDialog.set(r.id);
+                },
+              },
+              {
+                key: "ignore",
+                label: "Ignorar",
+                icon: <IconBan className="h-4 w-4" />,
+                hidden: rows => {
+                  const r = rows[0];
+                  return !r || isDateGroup(r) || r.reconciliationStatus === "IGNORED";
+                },
+                onClick: rows => {
+                  const r = rows[0];
+                  if (r && !isDateGroup(r)) ignoreDialog.set(r.id);
+                },
+              },
+            ]}
+            onRowClick={row => {
+              if (!isDateGroup(row)) navigate(routes.financial.reconciliation.transactionDetail(row.id));
+            }}
+            emptyMessage="Nenhuma transação encontrada"
+            exportTitle="Extrato"
+            exportFilename="extrato"
+            className="h-full"
+          />
         </div>
       </div>
-
-      <StatementFilterSheet
-        open={showFilters}
-        onOpenChange={setShowFilters}
-        filters={{
-          year: period.year,
-          months: period.months,
-          amountMin: amountMin ?? undefined,
-          amountMax: amountMax ?? undefined,
-        }}
-        onApply={f => {
-          setPeriod({ year: f.year, months: f.months });
-          setAmountMin(f.amountMin ?? null);
-          setAmountMax(f.amountMax ?? null);
-        }}
-      />
 
       <IgnoreTransactionDialog
         open={ignoreDialog.open}

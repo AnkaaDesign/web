@@ -91,6 +91,7 @@ export function BillingTable({ className, searchingFor, filters }: BillingTableP
                 installments: {
                   select: {
                     id: true,
+                    number: true,
                     dueDate: true,
                     status: true,
                   },

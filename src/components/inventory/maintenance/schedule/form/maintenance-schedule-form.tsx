@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { maintenanceScheduleCreateSchema, maintenanceScheduleUpdateSchema, type MaintenanceScheduleCreateFormData, type MaintenanceScheduleUpdateFormData } from "../../../../../schemas";
-import { SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, WEEK_DAY_LABELS, MONTH_LABELS } from "../../../../../constants";
+import { SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, WEEK_DAY_LABELS, MONTH_LABELS, MONTH_OCCURRENCE_LABELS } from "../../../../../constants";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
@@ -71,6 +71,13 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
   const watchMonth = form.watch("month");
   const watchSpecificDate = form.watch("specificDate");
   const watchNextRun = form.watch("nextRun");
+  const watchMonthlySchedule = form.watch("monthlySchedule");
+
+  // Mutual-exclusion flags for the monthly day config: a filled fixed day greys
+  // out the positional pair (occurrence + weekday) and vice-versa. Mirrors the
+  // order-schedule form.
+  const fixedFilled = watchDayOfMonth != null && String(watchDayOfMonth) !== "";
+  const positionalFilled = !!watchMonthlySchedule?.occurrence || !!watchMonthlySchedule?.dayOfWeek;
 
   // Custom validation check for enabling submit button without triggering schema errors
   const checkRequiredFields = useMemo(() => {
@@ -92,7 +99,8 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
       case SCHEDULE_FREQUENCY.TRIANNUAL:
       case SCHEDULE_FREQUENCY.QUADRIMESTRAL:
       case SCHEDULE_FREQUENCY.SEMI_ANNUAL:
-        return !!watchDayOfMonth || !!watchNextRun;
+        // Fixed day-of-month OR complete positional pair (occurrence + weekday).
+        return !!watchDayOfMonth || (positionalFilled && !!watchMonthlySchedule?.occurrence && !!watchMonthlySchedule?.dayOfWeek) || !!watchNextRun;
       case SCHEDULE_FREQUENCY.ANNUAL:
         return (!!watchDayOfMonth && !!watchMonth) || !!watchNextRun;
       case SCHEDULE_FREQUENCY.DAILY:
@@ -102,7 +110,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
       default:
         return true;
     }
-  }, [mode, watchName, watchItemId, watchFrequency, watchDayOfWeek, watchDayOfMonth, watchMonth, watchSpecificDate, watchNextRun]);
+  }, [mode, watchName, watchItemId, watchFrequency, watchDayOfWeek, watchDayOfMonth, watchMonth, watchSpecificDate, watchNextRun, positionalFilled, watchMonthlySchedule]);
 
   // Group frequencies by their behavior for optimized rendering
   const frequencyGroups = useMemo(
@@ -180,9 +188,28 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
           form.setError("dayOfWeek", { message: "Dia da semana é obrigatório para frequência semanal" });
           return;
         }
-        if (frequency === SCHEDULE_FREQUENCY.MONTHLY && !data.dayOfMonth) {
-          form.setError("dayOfMonth", { message: "Dia do mês é obrigatório para frequência mensal" });
-          return;
+        // MONTHLY family accepts EITHER a fixed dayOfMonth OR a complete positional
+        // pair (occurrence + weekday). Only error when neither is provided.
+        const monthlyFamily = frequencyGroups.needsDayOfMonth.includes(frequency as SCHEDULE_FREQUENCY) && frequency !== SCHEDULE_FREQUENCY.ANNUAL;
+        if (monthlyFamily) {
+          const hasFixed = data.dayOfMonth != null && String(data.dayOfMonth) !== "";
+          const hasPositional = !!data.monthlySchedule?.occurrence && !!data.monthlySchedule?.dayOfWeek;
+          const positionalPartial = (!!data.monthlySchedule?.occurrence || !!data.monthlySchedule?.dayOfWeek) && !hasPositional;
+          if (!hasFixed && !hasPositional) {
+            form.setError("dayOfMonth", { message: "Informe o dia do mês ou a ocorrência + dia da semana" });
+            return;
+          }
+          if (positionalPartial) {
+            if (!data.monthlySchedule?.occurrence) form.setError("monthlySchedule.occurrence", { message: "Selecione a ocorrência" });
+            if (!data.monthlySchedule?.dayOfWeek) form.setError("monthlySchedule.dayOfWeek", { message: "Selecione o dia da semana" });
+            return;
+          }
+          // Enforce mutual exclusion in the payload: carry exactly one branch.
+          if (hasFixed) {
+            data.monthlySchedule = undefined;
+          } else if (hasPositional) {
+            data.dayOfMonth = undefined;
+          }
         }
         if (frequency === SCHEDULE_FREQUENCY.ANNUAL && (!data.dayOfMonth || !data.month)) {
           if (!data.dayOfMonth) {
@@ -469,7 +496,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                               min={1}
                               max={31}
                               placeholder="1-31"
-                              disabled={isSubmitting}
+                              disabled={isSubmitting || (watchFrequency !== SCHEDULE_FREQUENCY.ANNUAL && positionalFilled)}
                               className="bg-transparent"
                               ref={field.ref}
                               value={field.value ?? ""}
@@ -482,6 +509,56 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                       )}
                     />
                   )}
+
+                  {/* Positional monthly config (occurrence + weekday, e.g. "1st Monday").
+                      Shown alongside the fixed day-of-month for the MONTHLY family
+                      (not ANNUAL); filling one side disables the other. */}
+                  {watchFrequency &&
+                    frequencyGroups.needsDayOfMonth.includes(watchFrequency as SCHEDULE_FREQUENCY) &&
+                    watchFrequency !== SCHEDULE_FREQUENCY.ANNUAL && (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="monthlySchedule.occurrence"
+                          render={({ field }) => (
+                            <FormItem className="flex-1 min-w-[150px]">
+                              <FormLabel>Ocorrência</FormLabel>
+                              <FormControl>
+                                <Combobox
+                                  value={field.value || undefined}
+                                  onValueChange={field.onChange}
+                                  disabled={isSubmitting || fixedFilled}
+                                  options={Object.entries(MONTH_OCCURRENCE_LABELS).map(([value, label]) => ({ value, label }))}
+                                  placeholder="Primeira, Segunda…"
+                                  searchable={false}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="monthlySchedule.dayOfWeek"
+                          render={({ field }) => (
+                            <FormItem className="flex-1 min-w-[150px]">
+                              <FormLabel>Dia da Semana</FormLabel>
+                              <FormControl>
+                                <Combobox
+                                  value={field.value || undefined}
+                                  onValueChange={field.onChange}
+                                  disabled={isSubmitting || fixedFilled}
+                                  options={Object.entries(WEEK_DAY_LABELS).map(([value, label]) => ({ value, label }))}
+                                  placeholder="Selecione o dia da semana"
+                                  searchable={false}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </>
+                    )}
 
                   {/* Next run date field (for all except ONCE and CUSTOM) */}
                   {watchFrequency && frequencyGroups.needsNextRun.includes(watchFrequency as SCHEDULE_FREQUENCY) && (
@@ -512,6 +589,13 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                     />
                   )}
                 </div>
+
+                {/* Helper for the mutually-exclusive monthly day config. */}
+                {watchFrequency &&
+                  frequencyGroups.needsDayOfMonth.includes(watchFrequency as SCHEDULE_FREQUENCY) &&
+                  watchFrequency !== SCHEDULE_FREQUENCY.ANNUAL && (
+                    <p className="text-xs text-muted-foreground mt-3">Informe o dia do mês OU a ocorrência + dia da semana.</p>
+                  )}
               </CardContent>
             </Card>
 

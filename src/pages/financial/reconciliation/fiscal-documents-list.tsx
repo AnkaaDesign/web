@@ -6,25 +6,25 @@ import {
   IconCheck,
   IconClockHour4,
   IconCloudDownload,
+  IconCopy,
   IconEqual,
-  IconFilter,
+  IconEye,
   IconReceipt,
   IconRefresh,
   IconUpload,
 } from "@tabler/icons-react";
+import type { FiscalDocumentsFiltersUi } from "@/components/financial/reconciliation/fiscal-documents-filter-sheet";
+import { isLinked } from "@/components/financial/reconciliation/fiscal-documents-by-date-accordion";
+import { FISCAL_DOCUMENT_COLUMNS } from "@/components/financial/reconciliation/fiscal-documents-columns";
+import { DataTable, type DataTableColumnDef } from "@/components/ui/datatable";
 import {
-  FiscalDocumentsFilterSheet,
-  type FiscalDocumentsFiltersUi,
-} from "@/components/financial/reconciliation/fiscal-documents-filter-sheet";
-import {
-  FiscalDocumentsByDateAccordion,
-  isLinked,
-} from "@/components/financial/reconciliation/fiscal-documents-by-date-accordion";
-import {
-  buildDatesForPeriod,
-  deriveDateRange,
-  effectivePeriodDates,
-} from "@/components/financial/reconciliation/date-utils";
+  buildDateGroups,
+  isDateGroup,
+  GroupDateLabel,
+  GroupProgressBar,
+  type GroupedRow,
+} from "@/components/financial/common/date-grouped-rows";
+import { deriveDateRange } from "@/components/financial/reconciliation/date-utils";
 import {
   PeriodNav,
   periodLabel,
@@ -34,16 +34,14 @@ import {
 import { FinancialKpiCard } from "@/components/financial/common/financial-kpi-card";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TableSearchInput } from "@/components/ui/table-search-input";
+import { Input } from "@/components/ui/input";
 import { XmlImportDialog } from "@/components/financial/reconciliation/xml-import-dialog";
 import {
   useFiscalDocuments,
   useSiegFetch,
   useSiegStatus,
 } from "@/hooks/financial/use-reconciliation";
-import { useDebouncedValue } from "@/hooks/common/use-debounced-value";
 import { useToast } from "@/hooks/common/use-toast";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { SECTOR_PRIVILEGES, FAVORITE_PAGES, routes } from "@/constants";
@@ -218,9 +216,6 @@ export const FiscalDocumentsListContent = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [searchText, setSearchText] = useState(
-    () => searchParams.get("search") || "",
-  );
   const [operations, setOperations] = useState<OperationType[]>(() => {
     const raw = searchParams.get("operacao");
     if (raw !== null) return parseOperations(raw);
@@ -241,10 +236,6 @@ export const FiscalDocumentsListContent = () => {
     parseFiltersFromUrl(searchParams),
   );
 
-  // Debounced value drives the server query + the matching-dates collapse so we
-  // don't refetch (pageSize=1000) on every keystroke.
-  const debouncedSearch = useDebouncedValue(searchText.trim(), 300);
-  const [showFilters, setShowFilters] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
   // Backward-compat: a legacy `?nfId=` deeplink (old detail sheet) now routes to
@@ -266,8 +257,7 @@ export const FiscalDocumentsListContent = () => {
   // Keep the whole view shareable in the URL (single sync effect, Extrato-style).
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
-    if (searchText) params.set("search", searchText);
-    else params.delete("search");
+    params.delete("search"); // search now handled by the DataTable toolbar
     if (operations.length !== ALL_OPERATIONS.length)
       params.set("operacao", [...operations].sort().join(","));
     else params.delete("operacao");
@@ -302,7 +292,7 @@ export const FiscalDocumentsListContent = () => {
       setSearchParams(params, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText, operations, buckets, filters]);
+  }, [operations, buckets, filters]);
 
   // Persist the card selection so the chosen view sticks across visits.
   useEffect(() => {
@@ -317,21 +307,15 @@ export const FiscalDocumentsListContent = () => {
     return deriveDateRange(filters.year, filters.months);
   }, [filters.year, filters.months]);
 
-  const periodDates = useMemo(() => {
-    if (!filters.year || !filters.months?.length) return [];
-    return buildDatesForPeriod(filters.year, filters.months);
-  }, [filters.year, filters.months]);
-
-  // Server query: date range + search + the sheet's filters (docType, price,
-  // CNPJ, status, vínculo). Operation and conciliation bucket are applied
-  // CLIENT-side over this payload, so toggling a card is instant and the totals
-  // reflect the whole period.
+  // Server query: date range + the sheet's filters (docType, price, CNPJ, status,
+  // vínculo). Operation and conciliation bucket are applied CLIENT-side over this
+  // payload, so toggling a card is instant and the totals reflect the whole
+  // period. Free-text search is handled client-side by the DataTable toolbar.
   const { data, isLoading, refetch } = useFiscalDocuments({
     page: 1,
     pageSize: PERIOD_PAGE_SIZE,
     sortBy: "issueDate",
     sortDir: "desc",
-    search: debouncedSearch || undefined,
     docType: filters.docType,
     status: filters.status,
     dateFrom: dateRange?.dateFrom,
@@ -405,32 +389,28 @@ export const FiscalDocumentsListContent = () => {
     [],
   );
 
-  // Collapse the calendar to only the days that contain a matching document
-  // (and auto-expand them) whenever a search/filter narrows the result set; the
-  // default browse view keeps the full period calendar (empty days collapsed).
-  const narrowing = useMemo(
+  // Day grouping — one banner per emission day (newest first), entradas green /
+  // saídas red — the same accordion the Extrato / Contas a Receber use.
+  const groupedRows = useMemo(
     () =>
-      debouncedSearch.length > 0 ||
-      operations.length !== ALL_OPERATIONS.length ||
-      buckets.length !== ALL_NF_BUCKETS.length ||
-      !!filters.docType ||
-      !!filters.status ||
-      filters.valueMin !== undefined ||
-      filters.valueMax !== undefined ||
-      !!filters.emitCnpj ||
-      !!filters.destCnpj ||
-      filters.hasMatch !== undefined,
-    [debouncedSearch, operations, buckets, filters],
+      buildDateGroups(visibleRows, {
+        getDate: (d) => d.issueDate,
+        getGreen: (d) => (d.operationType === "ENTRADA" ? Number(d.totalValue) || 0 : 0),
+        getRed: (d) => (d.operationType !== "ENTRADA" ? Number(d.totalValue) || 0 : 0),
+        getResolved: (d) => isLinked(d),
+        direction: "desc",
+      }),
+    [visibleRows],
   );
 
-  const dates = useMemo(
-    () =>
-      effectivePeriodDates(
-        periodDates,
-        visibleRows.map(d => d.issueDate),
-        narrowing,
-      ),
-    [periodDates, visibleRows, narrowing],
+  const handleCopyKey = useCallback(
+    (accessKey: string) => {
+      navigator.clipboard
+        .writeText(accessKey)
+        .then(() => toast({ title: "Chave copiada", variant: "success" }))
+        .catch(() => toast({ title: "Não foi possível copiar a chave", variant: "destructive" }));
+    },
+    [toast],
   );
 
   const siegStatus = useSiegStatus();
@@ -464,48 +444,6 @@ export const FiscalDocumentsListContent = () => {
     }),
     [filters.year, filters.months],
   );
-
-  // The sheet opens showing the current view: its own filters + a mirror of the
-  // operation axis (owned by the cards) so its Operação control stays in sync.
-  const sheetFiltersUi = useMemo<FiscalDocumentsFiltersUi>(
-    () => ({
-      ...filters,
-      operationType: operations.length === 1 ? operations[0] : undefined,
-    }),
-    [filters, operations],
-  );
-
-  const handleFilterApply = useCallback((next: FiscalDocumentsFiltersUi) => {
-    // Fold the operation axis into the client-side cards (single source of truth).
-    setOperations(next.operationType ? [next.operationType] : ALL_OPERATIONS);
-    // Everything else (period, price, docType, CNPJ, status, vínculo) is
-    // sheet-managed and drives the server query.
-    setFilters({
-      docType: next.docType,
-      status: next.status,
-      year: next.year,
-      months: next.months,
-      valueMin: next.valueMin,
-      valueMax: next.valueMax,
-      emitCnpj: next.emitCnpj,
-      destCnpj: next.destCnpj,
-      hasMatch: next.hasMatch,
-    });
-  }, []);
-
-  // Only the sheet-managed filters count toward the Filtros badge — operation,
-  // bucket and period are surfaced by the cards / inline PeriodNav.
-  const activeFilterCount = useMemo(() => {
-    let c = 0;
-    if (filters.docType) c++;
-    if (filters.status) c++;
-    if (filters.valueMin !== undefined) c++;
-    if (filters.valueMax !== undefined) c++;
-    if (filters.emitCnpj) c++;
-    if (filters.destCnpj) c++;
-    if (filters.hasMatch !== undefined) c++;
-    return c;
-  }, [filters]);
 
   const periodTitle = useMemo(
     () => `Notas Fiscais - ${periodLabel(period)}`,
@@ -600,71 +538,104 @@ export const FiscalDocumentsListContent = () => {
         </div>
 
         <div className="flex-1 min-h-0 pb-6 flex flex-col">
-          <Card className="flex flex-col shadow-sm border border-border h-full">
-            <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-shrink-0">
-                <div className="flex flex-1 min-w-0">
-                  <TableSearchInput
-                    value={searchText}
-                    onChange={setSearchText}
-                    placeholder="Buscar por chave, número, emitente ou destinatário..."
+          <DataTable<GroupedRow<FiscalDocument>>
+            tableId="reconciliation-fiscal-documents"
+            data={groupedRows}
+            columns={FISCAL_DOCUMENT_COLUMNS as unknown as DataTableColumnDef<GroupedRow<FiscalDocument>>[]}
+            getRowId={row => row.id}
+            isLoading={isLoading}
+            enablePagination={false}
+            enableSelection={false}
+            enableRowPinning={false}
+            enableShare={false}
+            enableExpansion
+            defaultExpanded
+            getSubRows={row => (isDateGroup(row) ? row.children : undefined)}
+            isGroupRow={isDateGroup}
+            renderGroupCell={(row, columnId, { isExpanded }) => {
+              if (!isDateGroup(row)) return null;
+              switch (columnId) {
+                case "date":
+                  return <GroupDateLabel group={row} />;
+                case "entrada":
+                  return !isExpanded && row.greenTotal > 0 ? (
+                    <span className="tabular-nums text-emerald-700 dark:text-emerald-400">{formatCurrency(row.greenTotal)}</span>
+                  ) : null;
+                case "saida":
+                  return !isExpanded && row.redTotal > 0 ? (
+                    <span className="tabular-nums text-red-700 dark:text-red-400">{formatCurrency(row.redTotal)}</span>
+                  ) : null;
+                case "linked":
+                  return <GroupProgressBar resolved={row.resolvedCount} count={row.count} />;
+                default:
+                  return null;
+              }
+            }}
+            searchPlaceholder="Buscar por razão social, CNPJ, destinatário ou tipo..."
+            toolbarActions={
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="currency"
+                    value={filters.valueMin ?? null}
+                    onChange={v => setFilters(f => ({ ...f, valueMin: typeof v === "number" ? v : undefined }))}
+                    placeholder="Valor mín"
+                    className="h-9 w-32"
+                  />
+                  <span className="text-muted-foreground text-xs">–</span>
+                  <Input
+                    type="currency"
+                    value={filters.valueMax ?? null}
+                    onChange={v => setFilters(f => ({ ...f, valueMax: typeof v === "number" ? v : undefined }))}
+                    placeholder="Valor máx"
+                    className="h-9 w-32"
                   />
                 </div>
                 <PeriodNav
                   period={period}
-                  onChange={next =>
-                    setFilters(f => ({
-                      ...f,
-                      year: next.year,
-                      months: next.months,
-                    }))
-                  }
+                  onChange={next => setFilters(f => ({ ...f, year: next.year, months: next.months }))}
                   className="flex-shrink-0"
                 />
-                <Button
-                  variant={activeFilterCount > 0 ? "default" : "outline"}
-                  onClick={() => setShowFilters(true)}
-                  className="group h-10 flex-shrink-0"
-                >
-                  <IconFilter
-                    className={
-                      activeFilterCount > 0
-                        ? "h-4 w-4"
-                        : "h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors"
-                    }
-                  />
-                  <span>
-                    Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-                  </span>
-                </Button>
               </div>
-
-              <div className="flex-1 min-h-0 overflow-auto">
-                <FiscalDocumentsByDateAccordion
-                  data={visibleRows}
-                  dates={dates}
-                  isLoading={isLoading}
-                  autoExpand={narrowing}
-                  onViewDetails={doc =>
-                    navigate(
-                      routes.financial.reconciliation.fiscalDocumentDetail(
-                        doc.id,
-                      ),
-                    )
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
+            }
+            rowActions={[
+              {
+                key: "view",
+                label: "Ver detalhes",
+                icon: <IconEye className="h-4 w-4" />,
+                hidden: rows => {
+                  const r = rows[0];
+                  return !r || isDateGroup(r);
+                },
+                onClick: rows => {
+                  const r = rows[0];
+                  if (r && !isDateGroup(r)) navigate(routes.financial.reconciliation.fiscalDocumentDetail(r.id));
+                },
+              },
+              {
+                key: "copy-key",
+                label: "Copiar chave",
+                icon: <IconCopy className="h-4 w-4" />,
+                hidden: rows => {
+                  const r = rows[0];
+                  return !r || isDateGroup(r);
+                },
+                onClick: rows => {
+                  const r = rows[0];
+                  if (r && !isDateGroup(r)) handleCopyKey(r.accessKey);
+                },
+              },
+            ]}
+            onRowClick={row => {
+              if (!isDateGroup(row)) navigate(routes.financial.reconciliation.fiscalDocumentDetail(row.id));
+            }}
+            emptyMessage="Nenhuma nota fiscal encontrada"
+            exportTitle="Notas Fiscais"
+            exportFilename="notas-fiscais"
+            className="h-full"
+          />
         </div>
       </div>
-
-      <FiscalDocumentsFilterSheet
-        open={showFilters}
-        onOpenChange={setShowFilters}
-        filters={sheetFiltersUi}
-        onApply={handleFilterApply}
-      />
 
       <XmlImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </>

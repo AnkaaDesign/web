@@ -132,6 +132,26 @@ export interface DataTableProps<TData> {
   defaultExpanded?: boolean | Record<string, boolean>;
   /** Persist expansion to the saved layout (keyed by rowId). Defaults to false (transient). */
   persistExpansion?: boolean;
+  /**
+   * Grouped/accordion mode: mark a row as a full-width GROUP HEADER (e.g. a date banner). When this
+   * returns true for a row, the table skips its per-column cells and renders `renderGroupRow(row)` as
+   * a single banner cell spanning the row (the expansion chevron is kept, so the banner toggles its
+   * children). Pair with `enableExpansion` + `getSubRows` (group rows return their leaf rows as
+   * children). Leaf rows render normally through the columns, so resizing/column-management/search are
+   * unaffected. Pre-sort the top-level group array by date yourself — group rows have no column values.
+   */
+  isGroupRow?: (row: TData) => boolean;
+  /** Banner content for a group row (date + aggregate). Rendered inside a single full-width cell. */
+  renderGroupRow?: (row: TData) => ReactNode;
+  /**
+   * Column-ALIGNED group header: return the banner content for one column of a group row (e.g. the
+   * date in the first column, the day's Entrada total under the Entrada column, a progress bar under
+   * Status). Takes precedence over `renderGroupRow` — each visible column gets its own cell at the
+   * same width as the leaf rows, so the aggregates line up under their columns like a spreadsheet
+   * subtotal. Return null for columns that should stay empty. `opts.isExpanded` lets you HIDE the
+   * day's totals while the group is open (the rows already show them) and keep them when collapsed.
+   */
+  renderGroupCell?: (row: TData, columnId: string, opts: { isExpanded: boolean }) => ReactNode;
   defaultPageSize?: number;
   defaultSorting?: { id: string; desc: boolean }[];
   estimateRowHeight?: number;
@@ -194,6 +214,9 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     getRowCanExpand,
     defaultExpanded,
     persistExpansion = false,
+    isGroupRow,
+    renderGroupRow,
+    renderGroupCell,
     defaultPageSize = 40,
     defaultSorting = [],
     estimateRowHeight = 41,
@@ -758,6 +781,10 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
             row={row}
             enableSelection={enableSelection}
             enableExpansion={enableExpansion}
+            isGroupRow={!!isGroupRow?.(row.original)}
+            groupContent={isGroupRow?.(row.original) ? renderGroupRow?.(row.original) : null}
+            renderGroupCell={renderGroupCell}
+            uniformRowHeight={!!isGroupRow}
             canExpand={enableExpansion && row.getCanExpand()}
             isExpanded={enableExpansion && row.getIsExpanded()}
             selected={row.getIsSelected()}
@@ -998,6 +1025,14 @@ interface DataRowProps<TData> {
   row: Row<TData>;
   enableSelection: boolean;
   enableExpansion: boolean;
+  /** This row is a full-width group header (banner), not a per-column data row. */
+  isGroupRow: boolean;
+  /** Banner content for a group row (ignored for leaf rows). */
+  groupContent: ReactNode;
+  /** Column-aligned banner content for a group row (per column). Takes precedence over groupContent. */
+  renderGroupCell?: (row: TData, columnId: string, opts: { isExpanded: boolean }) => ReactNode;
+  /** Enforce a shared row-height floor so group banners and leaf rows line up (grouped tables only). */
+  uniformRowHeight?: boolean;
   canExpand: boolean;
   isExpanded: boolean;
   selected: boolean;
@@ -1021,6 +1056,10 @@ function DataRowInner<TData>({
   row,
   enableSelection,
   enableExpansion,
+  isGroupRow,
+  groupContent,
+  renderGroupCell,
+  uniformRowHeight,
   canExpand,
   isExpanded,
   selected,
@@ -1037,6 +1076,72 @@ function DataRowInner<TData>({
   onRowClick,
 }: DataRowProps<TData>) {
   const cells = row.getVisibleCells();
+  // Continuous zebra by VISIBLE position — group banners and leaf rows alternate as one sequence, and
+  // it re-stripes automatically as groups expand/collapse (the visible index shifts). Odd rows tinted.
+  const zebra = absoluteIndex % 2 === 1;
+  // Group header (date banner): skip the per-column cells and render one full-width banner cell.
+  // The expansion chevron is kept so the banner toggles its children (the whole banner is clickable).
+  if (isGroupRow) {
+    return (
+      <tr
+        ref={measureRef}
+        data-index={absoluteIndex}
+        onClick={() => onToggleExpand(row)}
+        onContextMenu={(e) => onContextMenu(e, row)}
+        style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${virtualStart}px)` }}
+        className={cn(
+          // The day banner is part of the SAME continuous zebra as the rows (odd rows tinted); it is set
+          // apart only by bold text + a THICK top border that marks the start of each day.
+          "flex min-h-11 cursor-pointer items-stretch text-sm font-semibold transition-colors hover:bg-muted/70",
+          zebra && "bg-muted/50",
+          "border-t-2 border-b border-border",
+          rowClassName,
+        )}
+      >
+        {enableSelection && <td className="flex w-10 min-w-10 shrink-0" aria-hidden />}
+        {enableExpansion && (
+          <td className="flex w-9 min-w-9 shrink-0 items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            {canExpand ? (
+              <button
+                type="button"
+                aria-label={isExpanded ? "Recolher" : "Expandir"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand(row);
+                }}
+                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/40 hover:text-foreground"
+              >
+                <IconChevronRight className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")} />
+              </button>
+            ) : null}
+          </td>
+        )}
+        {renderGroupCell ? (
+          // Column-aligned banner: one cell per column at the same width as the leaf rows, so the
+          // day's aggregates line up under their columns (Entrada/Saída totals, progress under Status).
+          cells.map((cell, i) => {
+            const isLast = i === cells.length - 1;
+            const align = alignMap[cell.column.id] ?? "left";
+            return (
+              <td
+                key={cell.id}
+                style={{ flexGrow: isLast ? 1 : 0, flexShrink: 0, flexBasis: `calc(var(--col-${cell.column.id}-size) * 1px)` }}
+                className={cn(
+                  "flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap px-4 py-2",
+                  align === "center" && "justify-center",
+                  align === "right" && "justify-end",
+                )}
+              >
+                {renderGroupCell(row.original, cell.column.id, { isExpanded })}
+              </td>
+            );
+          })
+        ) : (
+          <td className="flex min-w-0 flex-1 items-center gap-2 px-4 py-2">{groupContent}</td>
+        )}
+      </tr>
+    );
+  }
   return (
     <tr
       ref={measureRef}
@@ -1046,13 +1151,14 @@ function DataRowInner<TData>({
       style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${virtualStart}px)` }}
       className={cn(
         "flex transition-colors hover:bg-muted/70",
+        // Grouped tables share a row-height floor so the leaf rows line up with their day banners.
+        uniformRowHeight && "min-h-11",
         // Every row draws its own bottom separator. The last row drops it ONLY when flush against a
         // self-bordering boundary (autoHeight frame) — see `dropBottomBorder` at the call site — otherwise
         // the two would stack into a doubled line.
         !(selected && selectedBelow) && !dropBottomBorder && "border-b border-border",
-        // Zebra striping by absolute position — applies uniformly to parents AND child rows so the
-        // even/odd alternation is never broken (child rows are distinguished by the indent/chevron).
-        absoluteIndex % 2 === 1 && "bg-muted/50 shadow-[0_-1px_0_0_hsl(var(--muted)/0.5)]",
+        // Continuous zebra by visible position (shared with the group banners) — odd rows tinted.
+        zebra && "bg-muted/50 shadow-[0_-1px_0_0_hsl(var(--muted)/0.5)]",
         onRowClick && "cursor-pointer",
         // Caller-supplied per-row classes (e.g. deadline tint) — last so they can override the bg above.
         rowClassName,
@@ -1135,6 +1241,9 @@ const DataRow = memo(DataRowInner, (prev, next) => {
     prev.absoluteIndex === next.absoluteIndex &&
     prev.enableSelection === next.enableSelection &&
     prev.enableExpansion === next.enableExpansion &&
+    prev.isGroupRow === next.isGroupRow &&
+    prev.groupContent === next.groupContent &&
+    prev.renderGroupCell === next.renderGroupCell &&
     prev.canExpand === next.canExpand &&
     prev.isExpanded === next.isExpanded &&
     prev.columnsKey === next.columnsKey &&

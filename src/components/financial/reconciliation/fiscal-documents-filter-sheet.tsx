@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import {
   IconFilter,
   IconCalendar,
-  IconCash,
   IconBuilding,
 } from "@tabler/icons-react";
 import type {
@@ -134,8 +133,6 @@ export function FiscalDocumentsFilterSheet({ open, onOpenChange, filters, onAppl
       (local.months.length !== 1 || local.months[0] !== def.months?.[0])
     )
       c++;
-    if (local.valueMin !== undefined) c++;
-    if (local.valueMax !== undefined) c++;
     if (local.emitCnpj) c++;
     if (local.destCnpj) c++;
     if (local.hasMatch !== undefined) c++;
@@ -319,42 +316,7 @@ export function FiscalDocumentsFilterSheet({ open, onOpenChange, filters, onAppl
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <IconCash className="h-4 w-4" />
-              Faixa de valor
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Mínimo</Label>
-                <Input
-                  type="currency"
-                  value={local.valueMin ?? null}
-                  onChange={v =>
-                    setLocal(s => ({
-                      ...s,
-                      valueMin: typeof v === "number" ? v : undefined,
-                    }))
-                  }
-                  placeholder="R$ 0,00"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Máximo</Label>
-                <Input
-                  type="currency"
-                  value={local.valueMax ?? null}
-                  onChange={v =>
-                    setLocal(s => ({
-                      ...s,
-                      valueMax: typeof v === "number" ? v : undefined,
-                    }))
-                  }
-                  placeholder="R$ 0,00"
-                />
-              </div>
-            </div>
-          </div>
+          {/* Faixa de valor moved inline to the toolbar (next to the search input). */}
     </FilterDrawer>
   );
 }

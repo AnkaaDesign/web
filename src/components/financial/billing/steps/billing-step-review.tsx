@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
-import { formatCurrency, formatDate, formatChassis, formatCNPJ, formatCPF } from "@/utils";
+import { formatCurrency, formatDate, formatChassis, formatCNPJ, formatCPF, formatPaidInstallmentLabel } from "@/utils";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 import type { TRUCK_CATEGORY, IMPLEMENT_TYPE } from "@/constants/enums";
 import { generatePaymentText } from "@/utils/quote-text-generators";
@@ -697,32 +697,58 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                               </div>
                               <DownloadAllBoletosButton installments={installments} />
                             </div>
-                            <div className="divide-y divide-border/50 rounded-md border border-border/50 overflow-hidden">
-                              {installments.map((installment: any) => (
-                                <div key={installment.id} className="px-3 py-2 hover:bg-muted/40 transition-colors">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
-                                      <span className="text-xs text-muted-foreground">
-                                        {formatDate(installment.dueDate)}
-                                      </span>
-                                      <span className="text-xs font-medium">
+                            <div className="rounded-md border border-border/50 overflow-x-auto">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b border-border/50 bg-muted/40 text-muted-foreground">
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Parcela</th>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Status</th>
+                                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Valor</th>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Vencimento</th>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Pago em</th>
+                                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Ações</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/50">
+                                  {installments.map((installment: any) => (
+                                    <tr key={installment.id} className="hover:bg-muted/40 transition-colors">
+                                      <td className="px-3 py-2 tabular-nums text-muted-foreground whitespace-nowrap">
+                                        {installment.number}/{installments.length}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <UnifiedInstallmentBadge installment={installment} />
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
                                         {formatCurrency(installment.amount)}
-                                      </span>
-                                      <UnifiedInstallmentBadge installment={installment} />
-                                    </div>
-                                    <BoletoActions
-                                      installmentId={installment.id}
-                                      bankSlip={installment.bankSlip}
-                                      dueDate={installment.dueDate}
-                                      installmentStatus={installment.status}
-                                      installmentPaymentMethod={installment.paymentMethod}
-                                      receiptFiles={installment.receiptFiles}
-                                      observations={installment.observations}
-                                      canManage={!disabled}
-                                    />
-                                  </div>
-                                </div>
-                              ))}
+                                      </td>
+                                      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                                        {formatDate(installment.dueDate)}
+                                      </td>
+                                      <td className="px-3 py-2 whitespace-nowrap">
+                                        {installment.paidAt ? (
+                                          <span className="text-emerald-700">{formatDate(installment.paidAt)}</span>
+                                        ) : (
+                                          <span className="text-muted-foreground">-</span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <div className="flex justify-end">
+                                          <BoletoActions
+                                            installmentId={installment.id}
+                                            bankSlip={installment.bankSlip}
+                                            dueDate={installment.dueDate}
+                                            installmentStatus={installment.status}
+                                            installmentPaymentMethod={installment.paymentMethod}
+                                            receiptFiles={installment.receiptFiles}
+                                            observations={installment.observations}
+                                            canManage={!disabled}
+                                          />
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
                           </div>
                         )}
@@ -1069,14 +1095,10 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
 // =====================
 
 function getPaymentMethodLabel(bankSlip: any, installment?: any): string {
-  // Check installment paymentMethod first (more reliable)
-  const instMethod = installment?.paymentMethod;
-  if (instMethod === 'BANK_SLIP') return 'Paga (Boleto)';
-  if (instMethod === 'PIX') return 'Paga (PIX)';
-  if (instMethod === 'CASH') return 'Paga (Dinheiro)';
-  if (instMethod === 'TRANSFER') return 'Paga (Transferência)';
-  if (instMethod === 'OTHER') return 'Paga (Outro)';
-  if (instMethod) return `Paga (${instMethod})`;
+  // Check installment paymentMethod first (more reliable). Normalizing here keeps
+  // raw "BOLETO" and enum "BANK_SLIP" from rendering as two different badges.
+  const instLabel = formatPaidInstallmentLabel(installment?.paymentMethod);
+  if (instLabel) return instLabel;
 
   // Fallback to bankSlip sicrediStatus
   const method = bankSlip?.sicrediStatus;

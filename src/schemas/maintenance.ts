@@ -3,7 +3,32 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, dateRangeSchema } from "./common";
 import type { Maintenance, MaintenanceItem } from "../types";
-import { MAINTENANCE_STATUS, SCHEDULE_FREQUENCY } from "../constants";
+import { MAINTENANCE_STATUS, SCHEDULE_FREQUENCY, MONTH_OCCURRENCE, WEEK_DAY } from "../constants";
+
+// Inline nested-create payload for the schedule's MonthlyScheduleConfig.
+// Used when the user picks "Dia da semana específico do mês" (e.g. 1st Thursday)
+// instead of a flat day-of-month. Wire name is `monthlySchedule` to match the
+// API repo (which destructures this key and emits a Prisma nested create); the
+// read-side relation is still `monthlyConfig`. Mirrors order-schedule.ts.
+const monthlyScheduleInlineSchema = z
+  .object({
+    occurrence: z.nativeEnum(MONTH_OCCURRENCE, { errorMap: () => ({ message: "Ocorrência inválida" }) }),
+    dayOfWeek: z.nativeEnum(WEEK_DAY, { errorMap: () => ({ message: "Dia da semana inválido" }) }),
+  })
+  .strict();
+
+// The form always registers `monthlySchedule.occurrence`/`.dayOfWeek`, so an
+// untouched positional pair reaches Zod as `{ occurrence: undefined, dayOfWeek:
+// undefined }` — an object, so `.optional()` alone would still validate it and
+// fail both required enums. Collapse an all-empty object to `undefined` first so
+// it's genuinely skipped; a partially-filled object still validates (fill both).
+const optionalMonthlyScheduleSchema = z.preprocess((val) => {
+  if (val && typeof val === "object") {
+    const v = val as { occurrence?: unknown; dayOfWeek?: unknown };
+    if (!v.occurrence && !v.dayOfWeek) return undefined;
+  }
+  return val;
+}, monthlyScheduleInlineSchema.optional());
 
 // =====================
 // Maintenance Include Schemas
@@ -1506,6 +1531,12 @@ export const maintenanceScheduleCreateSchema = z
     monthlyConfigId: z.string().uuid("Configuração mensal inválida").optional(),
     yearlyConfigId: z.string().uuid("Configuração anual inválida").optional(),
 
+    // Inline positional config (sibling to monthlyConfigId). Wire name
+    // `monthlySchedule` matches the API repo's create/update destructure. When
+    // set, dayOfMonth must be omitted — backend creates a MonthlyScheduleConfig
+    // row + links it to the schedule ("nth weekday of month", e.g. 1st Monday).
+    monthlySchedule: optionalMonthlyScheduleSchema,
+
     // Runtime fields
     nextRun: z.coerce.date().optional(),
   })
@@ -1525,7 +1556,7 @@ export const maintenanceScheduleCreateSchema = z
         case SCHEDULE_FREQUENCY.TRIANNUAL:
         case SCHEDULE_FREQUENCY.QUADRIMESTRAL:
         case SCHEDULE_FREQUENCY.SEMI_ANNUAL:
-          return !!data.dayOfMonth || !!data.monthlyConfigId || !!data.nextRun;
+          return !!data.dayOfMonth || !!data.monthlyConfigId || !!data.monthlySchedule || !!data.nextRun;
         case SCHEDULE_FREQUENCY.ANNUAL:
           return (!!data.dayOfMonth && !!data.month) || !!data.yearlyConfigId || !!data.nextRun;
         case SCHEDULE_FREQUENCY.CUSTOM:
@@ -1573,6 +1604,10 @@ export const maintenanceScheduleUpdateSchema = z
     weeklyConfigId: z.string().uuid().nullable().optional(),
     monthlyConfigId: z.string().uuid().nullable().optional(),
     yearlyConfigId: z.string().uuid().nullable().optional(),
+
+    // Inline positional config — wire name `monthlySchedule` matches the API
+    // repo's upsert path (creates if missing, updates if exists).
+    monthlySchedule: optionalMonthlyScheduleSchema,
 
     // Auto-creation fields
     finishedAt: z.coerce.date().nullable().optional(),

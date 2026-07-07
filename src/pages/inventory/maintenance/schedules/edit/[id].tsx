@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "@/components/ui/page-header";
-import { routes, FAVORITE_PAGES } from "../../../../../constants";
+import { routes, FAVORITE_PAGES, MONTH_OCCURRENCE, WEEK_DAY } from "../../../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconCalendar, IconCheck, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
 import { MaintenanceScheduleForm } from "@/components/inventory/maintenance/schedule/form";
@@ -30,6 +30,7 @@ export const EditMaintenanceSchedulePage = () => {
   } = useMaintenanceSchedule(id!, {
     include: {
       item: true,
+      monthlyConfig: true,
     },
     enabled: !!id,
   });
@@ -169,9 +170,18 @@ export const EditMaintenanceSchedulePage = () => {
     isActive: schedule.isActive,
     maintenanceItemsConfig: schedule.maintenanceItemsConfig as any || [],
     specificDate: schedule.specificDate ? new Date(schedule.specificDate) : undefined,
-    dayOfMonth: schedule.dayOfMonth || undefined,
+    dayOfMonth: schedule.dayOfMonth ?? schedule.monthlyConfig?.dayOfMonth ?? undefined,
     dayOfWeek: schedule.dayOfWeek || undefined,
     month: schedule.month || undefined,
+    // Round-trip the positional monthly config (occurrence + weekday) into the
+    // write-side `monthlySchedule` key. Only when both halves are present.
+    monthlySchedule:
+      schedule.monthlyConfig?.occurrence && schedule.monthlyConfig?.dayOfWeek
+        ? {
+            occurrence: schedule.monthlyConfig.occurrence as MONTH_OCCURRENCE,
+            dayOfWeek: schedule.monthlyConfig.dayOfWeek as WEEK_DAY,
+          }
+        : undefined,
     nextRun: schedule.nextRun ? new Date(schedule.nextRun) : undefined,
   };
 

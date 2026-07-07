@@ -10,21 +10,25 @@ const renderDate = (date: Date | string | null | undefined) => {
   return <span className="whitespace-nowrap">{formatDate(date)}</span>;
 };
 
-const findCurrentInstallmentDueDate = (task: Task): Date | null => {
+// Due date of the FIRST installment (parcela nº 1) across all customer configs,
+// regardless of its status — so every task quote shows a vencimento, not only
+// the ones currently "DUE". Falls back to the earliest due date when parcelas
+// aren't numbered from 1.
+const findFirstInstallmentDueDate = (task: Task): Date | null => {
   const configs = task.quote?.customerConfigs;
   if (!configs || configs.length === 0) return null;
-  let earliest: Date | null = null;
+  let best: { number: number; due: Date } | null = null;
   for (const config of configs) {
     for (const installment of config.installments || []) {
-      if (installment.status !== "OVERDUE" && installment.status !== "PENDING") continue;
       const due = installment.dueDate ? new Date(installment.dueDate) : null;
       if (!due) continue;
-      if (!earliest || due.getTime() < earliest.getTime()) {
-        earliest = due;
+      const number = installment.number ?? Number.MAX_SAFE_INTEGER;
+      if (!best || number < best.number || (number === best.number && due.getTime() < best.due.getTime())) {
+        best = { number, due };
       }
     }
   }
-  return earliest;
+  return best?.due ?? null;
 };
 
 export function createBillingColumns(): StandardizedColumn<Task>[] {
@@ -106,10 +110,7 @@ export function createBillingColumns(): StandardizedColumn<Task>[] {
       header: "VENCIMENTO",
       sortable: false,
       width: "9%",
-      render: (task) => {
-        if (task.quote?.status !== "DUE") return <span className="text-muted-foreground">-</span>;
-        return renderDate(findCurrentInstallmentDueDate(task));
-      },
+      render: (task) => renderDate(findFirstInstallmentDueDate(task)),
     },
     {
       key: "quote.statusOrder",

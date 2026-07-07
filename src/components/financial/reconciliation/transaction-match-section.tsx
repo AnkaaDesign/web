@@ -167,7 +167,9 @@ export function TransactionMatchSection({
         // their full summed value (handled in handleSave), so they aren't capped.
         setAllocations((a) => {
           if (candidate.isOrderGroup) {
-            return { ...a, [id]: candidate.totalValue };
+            // totalValue is a Decimal-as-string over JSON — coerce so it doesn't
+            // string-concatenate when `newlyAllocated` sums the selections.
+            return { ...a, [id]: Number(candidate.totalValue) || 0 };
           }
           // The NF's open balance — its full total minus what OTHER transactions
           // already paid (installments). Never allocate more than this, and never
@@ -226,7 +228,10 @@ export function TransactionMatchSection({
       .map(([code, docs]) => ({ code, count: docs.size }));
   }, [existingMatches]);
   const existingAllocated = useMemo(
-    () => existingMatches.reduce((sum, m) => sum + (m.allocatedAmount || 0), 0),
+    // `allocatedAmount` is a Prisma Decimal that serializes to a STRING over JSON,
+    // so `sum + "65.80"` would string-concatenate (two linked NFs → "065.8074.70"
+    // → NaN). Coerce every term to a real number before summing.
+    () => existingMatches.reduce((sum, m) => sum + (Number(m.allocatedAmount) || 0), 0),
     [existingMatches],
   );
 
@@ -373,10 +378,10 @@ export function TransactionMatchSection({
       if (m.fiscalDocumentId) {
         expanded.push({
           fiscalDocumentId: m.fiscalDocumentId,
-          amount: m.allocatedAmount || 0,
+          amount: Number(m.allocatedAmount) || 0,
           // Preserve any write-off already recorded on this note (re-sending the
           // match without it would clear it on the backend).
-          adjustmentAmount: m.adjustmentAmount ?? undefined,
+          adjustmentAmount: m.adjustmentAmount != null ? Number(m.adjustmentAmount) : undefined,
           adjustmentReason: m.adjustmentReason ?? undefined,
         });
       }
@@ -391,11 +396,11 @@ export function TransactionMatchSection({
         for (const m of c.members) {
           expanded.push({
             fiscalDocumentId: m.fiscalDocumentId,
-            amount: m.totalValue,
+            amount: Number(m.totalValue) || 0,
           });
         }
       } else {
-        const amount = allocations[id] ?? c?.totalValue ?? 0;
+        const amount = Number(allocations[id] ?? c?.totalValue ?? 0) || 0;
         // Signed settlement adjustment: note total − what this payment covers.
         // >0 = paid less (discount, positive write-off); <0 = paid more (frete/
         // seguro surcharge, negative). Sent only when the user chose a reason so

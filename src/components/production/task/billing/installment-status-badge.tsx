@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { INSTALLMENT_STATUS_LABELS } from '@/constants/enum-labels';
 import type { INSTALLMENT_STATUS } from '@/constants/enums';
 import { cn } from '@/lib/utils';
+import { formatPaidInstallmentLabel } from '@/utils';
 
 interface InstallmentStatusBadgeProps {
   status: INSTALLMENT_STATUS | string | null;
@@ -21,14 +22,6 @@ const statusVariantMap: Record<string, string> = {
   CANCELLED: 'cancelled',
 };
 
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  PIX: 'Paga (PIX)',
-  CASH: 'Paga (Dinheiro)',
-  TRANSFER: 'Paga (Transferência)',
-  BANK_SLIP: 'Paga (Boleto)',
-  OTHER: 'Paga (Outro)',
-};
-
 export function InstallmentStatusBadge({ status, className, size = 'default', paidExternally, paymentMethod }: InstallmentStatusBadgeProps) {
   if (!status) return null;
 
@@ -36,7 +29,8 @@ export function InstallmentStatusBadge({ status, className, size = 'default', pa
   let label = INSTALLMENT_STATUS_LABELS[status as INSTALLMENT_STATUS] || status;
 
   if (status === 'PAID' && paymentMethod) {
-    label = PAYMENT_METHOD_LABELS[paymentMethod] || `Paga (${paymentMethod})`;
+    // Normalize so raw "BOLETO" and enum "BANK_SLIP" render one consistent label.
+    label = formatPaidInstallmentLabel(paymentMethod) ?? label;
   } else if (status === 'PAID' && paidExternally) {
     label = 'Paga (por fora)';
   }

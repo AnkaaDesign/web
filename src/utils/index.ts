@@ -14,6 +14,7 @@ export * from "./customer";
 export * from "./dataOperationEnumGetters";
 export * from "./date";
 export * from "./enumLabelGetter";
+export * from "./installment-payment-method";
 export * from "./enumMappers";
 export * from "./ppe";
 export * from "./ppe-size-mapping";

@@ -13,23 +13,20 @@ import {
   IconInfoCircle,
   IconCalendarEvent,
   IconRepeat,
-  IconAlertTriangleFilled,
   IconBox,
   IconExternalLink,
   IconCurrencyDollar,
-  IconBoxMultiple,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ItemsNeededList } from "@/components/inventory/maintenance/common/items-needed-list";
 import { MaintenanceHistoryTable } from "@/components/inventory/maintenance/common/maintenance-history-table";
-import { formatDate, formatDateTime, determineStockLevel, getStockLevelMessage, formatCurrency } from "../../../../../utils";
+import { formatDate, formatDateTime, formatCurrency } from "../../../../../utils";
 import { useMaintenanceSchedule, useItems, useCanViewPrices } from "../../../../../hooks";
-import { MAINTENANCE_STATUS, routes, getDynamicFrequencyLabel, CHANGE_LOG_ENTITY_TYPE, STOCK_LEVEL_LABELS, MEASURE_UNIT_LABELS, ORDER_STATUS, MEASURE_UNIT, STOCK_LEVEL } from "../../../../../constants";
+import { MAINTENANCE_STATUS, routes, getDynamicFrequencyLabel, CHANGE_LOG_ENTITY_TYPE } from "../../../../../constants";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { useState } from "react";
 import {
@@ -280,23 +277,19 @@ export function MaintenanceScheduleDetailPage() {
           <div className="space-y-4 mt-4">
             {/* Core Information Grid - Configuration and Item */}
             <div className="animate-in fade-in-50 duration-700">
-          {/* Mobile: Single column stacked */}
-          <div className="block lg:hidden space-y-4">
-            <ScheduleConfigurationCard schedule={schedule} isOverdue={isOverdue} totalCost={totalCost} className="h-full" />
-            <MaintenanceItemCard schedule={schedule} className="h-full" />
-          </div>
+              {/* Mobile: Single column stacked */}
+              <div className="block lg:hidden space-y-4">
+                <ScheduleConfigurationCard schedule={schedule} isOverdue={isOverdue} totalCost={totalCost} className="h-full" />
+                <MaintenanceItemCard schedule={schedule} className="h-full" />
+              </div>
 
-          {/* Desktop/Tablet: 2 columns grid */}
-          <div className="hidden lg:block">
-            <div className="grid grid-cols-2 gap-4">
-              <ScheduleConfigurationCard schedule={schedule} isOverdue={isOverdue} totalCost={totalCost} className="h-full" />
-              <MaintenanceItemCard schedule={schedule} className="h-full" />
-            </div>
-            </div>
-
-            {/* Maintenance History - Full Width */}
-            <div className="animate-in fade-in-50 duration-800">
-              <MaintenanceHistoryCard schedule={schedule} nextMaintenance={nextMaintenance} />
+              {/* Desktop/Tablet: 2 columns grid */}
+              <div className="hidden lg:block">
+                <div className="grid grid-cols-2 gap-4">
+                  <ScheduleConfigurationCard schedule={schedule} isOverdue={isOverdue} totalCost={totalCost} className="h-full" />
+                  <MaintenanceItemCard schedule={schedule} className="h-full" />
+                </div>
+              </div>
             </div>
 
             {/* Items Needed - Full Width */}
@@ -305,6 +298,11 @@ export function MaintenanceScheduleDetailPage() {
                 <ItemsNeededList itemsConfig={itemsNeededConfig} />
               </div>
             )}
+
+            {/* Maintenance History - Full Width */}
+            <div className="animate-in fade-in-50 duration-800">
+              <MaintenanceHistoryCard schedule={schedule} nextMaintenance={nextMaintenance} />
+            </div>
 
             {/* Changelog History - Full Width */}
             <div className="animate-in fade-in-50 duration-1000">
@@ -470,7 +468,6 @@ function ScheduleConfigurationCard({ schedule, isOverdue, totalCost, className }
 // Maintenance Item Card Component
 function MaintenanceItemCard({ schedule, className }: { schedule: any; className?: string }) {
   const navigate = useNavigate();
-  const canViewPrices = useCanViewPrices();
   const item = schedule.item;
 
   if (!item) {
@@ -491,50 +488,6 @@ function MaintenanceItemCard({ schedule, className }: { schedule: any; className
       </Card>
     );
   }
-
-  // Get the most recent price from the prices array
-  const currentPrice = item.prices && item.prices.length > 0 ? item.prices[0].value : null;
-
-  // Check if item has active orders
-  const activeOrderStatuses = [ORDER_STATUS.CREATED, ORDER_STATUS.PARTIALLY_FULFILLED, ORDER_STATUS.FULFILLED, ORDER_STATUS.PARTIALLY_RECEIVED];
-
-  const hasActiveOrder = item.orderItems?.some((orderItem: any) => orderItem.order && activeOrderStatuses.includes(orderItem.order.status)) || false;
-
-  // Determine stock level using the unified algorithm
-  const stockLevel = determineStockLevel({
-    quantity: item.quantity || 0,
-    reorderPoint: item.reorderPoint || null,
-    maxQuantity: item.maxQuantity || null,
-    hasActiveOrder,
-    stockModel: item.stockModel ?? null,
-    fixedTargetQuantity: item.fixedTargetQuantity ?? null,
-  });
-
-  // Get color based on stock level
-  const getStockColor = () => {
-    switch (stockLevel) {
-      case STOCK_LEVEL.NEGATIVE_STOCK:
-        return "text-neutral-500";
-      case STOCK_LEVEL.OUT_OF_STOCK:
-        return "text-red-700";
-      case STOCK_LEVEL.CRITICAL:
-        return "text-orange-500";
-      case STOCK_LEVEL.LOW:
-        return "text-yellow-500";
-      case STOCK_LEVEL.OPTIMAL:
-        return "text-green-700";
-      case STOCK_LEVEL.OVERSTOCKED:
-        return "text-purple-600";
-      default:
-        return "text-neutral-500";
-    }
-  };
-
-  const stockStatus = {
-    color: getStockColor(),
-    label: STOCK_LEVEL_LABELS[stockLevel],
-    description: getStockLevelMessage(stockLevel, item.quantity || 0, item.reorderPoint || null),
-  };
 
   const handleViewItem = () => {
     navigate(routes.inventory.products.details(item.id));
@@ -594,53 +547,6 @@ function MaintenanceItemCard({ schedule, className }: { schedule: any; className
                   {item.supplier ? item.supplier.fantasyName || item.supplier.name : <span className="text-muted-foreground italic">Não definido</span>}
                 </span>
               </div>
-            </div>
-          </div>
-
-          {/* Stock and Price Section */}
-          <div className="pt-6 border-t border-border">
-            <h3 className="text-base font-semibold mb-4 text-foreground">{canViewPrices ? "Estoque e Preço" : "Estoque"}</h3>
-            <div className={cn("grid grid-cols-1 gap-4", canViewPrices && "md:grid-cols-2")}>
-              <div className="bg-muted/30 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <IconBoxMultiple className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Estoque Atual</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger className="inline-flex cursor-help">
-                        <IconAlertTriangleFilled className={cn("w-5 h-5 flex-shrink-0", stockStatus.color)} aria-label={stockStatus.label} />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="space-y-1">
-                          <p className="font-semibold">{stockStatus.label}</p>
-                          <p className="text-xs">{stockStatus.description}</p>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  <p className="text-2xl font-bold text-foreground">
-                    {item.quantity % 1 === 0
-                      ? item.quantity.toLocaleString("pt-BR")
-                      : item.quantity.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-                {item.measureUnit && <p className="text-sm text-muted-foreground mt-1">{MEASURE_UNIT_LABELS[item.measureUnit as MEASURE_UNIT]}</p>}
-              </div>
-              {canViewPrices && (
-                <div className="bg-muted/30 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <IconCurrencyDollar className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-muted-foreground">Preço Unitário</span>
-                  </div>
-                  {currentPrice !== null && currentPrice !== undefined ? (
-                    <p className="text-2xl font-bold text-foreground">{formatCurrency(currentPrice)}</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Não definido</p>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </div>
