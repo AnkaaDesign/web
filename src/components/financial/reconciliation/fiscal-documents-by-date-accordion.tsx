@@ -4,6 +4,7 @@ import {
   IconChevronRight,
   IconCopy,
   IconEye,
+  IconFileOff,
   IconLink,
   IconReceipt,
   IconReceipt2,
@@ -25,6 +26,10 @@ import { cn } from "@/lib/utils";
 import { routes } from "@/constants";
 import { formatCNPJ, formatCnpjCpf, formatCurrency } from "@/utils";
 import type { FiscalDocument } from "@/types/reconciliation";
+import {
+  OFF_BANK_RESOLUTION_LABELS,
+  OFF_BANK_RESOLUTION_HINTS,
+} from "@/types/reconciliation";
 import { docTypeLabel, docTypeVariant } from "./fiscal-doc-badge";
 import { formatDayHeader, toLocalDateKey } from "./date-utils";
 
@@ -200,7 +205,7 @@ export function FiscalDocumentsByDateAccordion({
       { key: "entrada", header: "Entrada", width: "140px", align: "right" },
       { key: "saida", header: "Saída", width: "140px", align: "right" },
       { key: "status", header: "Status", width: "120px", align: "center" },
-      { key: "linked", header: "Vinculada", width: "220px" },
+      { key: "linked", header: "Situação", width: "220px" },
     ],
     [],
   );
@@ -639,6 +644,19 @@ function renderCell(
           >
             {badge}
           </Link>
+        );
+      }
+      // Off-bank settled (credit-card / bonificação / no-payment): the note will
+      // never carry a bank match — show WHAT/WHY instead of a dash.
+      if (d.offBankResolvedAt && d.offBankResolution) {
+        return (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-500/30 px-2 py-0.5 text-xs font-semibold"
+            title={OFF_BANK_RESOLUTION_HINTS[d.offBankResolution]}
+          >
+            <IconFileOff className="h-3 w-3" />
+            {OFF_BANK_RESOLUTION_LABELS[d.offBankResolution]}
+          </span>
         );
       }
       const matches = d.matches ?? [];

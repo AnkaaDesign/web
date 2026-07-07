@@ -61,6 +61,27 @@ interface Props {
   onSaveStateChange?: (state: MatchSaveState | null) => void;
 }
 
+// Mirror of the API's `valueScore` (reconciliation-matcher.service.ts) so the
+// candidate confidence can be re-scored CLIENT-SIDE against the REMAINING
+// unallocated amount as notes are selected. Only the value component of the
+// score depends on the target amount; date/CNPJ/name are unaffected, so we swap
+// just the value slice: liveConfidence = confidence − valueScore(fullPayment) +
+// valueScore(remaining). Keep the tiers in sync with the backend.
+const VALUE_SCORE_PERFECT_TOLERANCE = 0.5;
+function clientValueScore(txAmount: number, docTotal: number): number {
+  const diff = Math.abs(txAmount - docTotal);
+  const ratio = diff / Math.max(txAmount, docTotal, 0.01);
+  if (diff <= VALUE_SCORE_PERFECT_TOLERANCE) return 35;
+  if (ratio <= 0.005) return 30;
+  if (ratio <= 0.01) return 24;
+  if (ratio <= 0.02) return 18;
+  if (ratio <= 0.035) return 14;
+  if (ratio <= 0.06) return 11;
+  if (ratio <= 0.1) return 6;
+  if (ratio <= 0.15) return 3;
+  return 0;
+}
+
 /**
  * Reconciliation controls for a single transaction, rendered as page sections
  * (no dialog shell). The save action + allocation summary are surfaced in the
@@ -228,6 +249,45 @@ export function TransactionMatchSection({
   // backend match requires ≥1 NF); ignore orphan rows when nothing is selected.
   // NF-only allocated (before resolving the non-NF remainder).
   const nfAllocated = existingAllocated + newlyAllocated;
+
+  // Live confidence re-rank: the value component of each candidate's confidence
+  // is scored against how much of the payment is STILL open, so as the user
+  // links notes the remaining candidates re-rank by how well they fit the
+  // residual (e.g. after allocating R$10 of R$100, a R$90 note jumps to the top).
+  // The residual excludes notes already allocated (existing partial matches) and
+  // the current selection. When nothing is allocated the residual equals the full
+  // payment, so idle confidence is identical to the server's.
+  const rankTarget = Number((txAmount - existingAllocated - newlyAllocated).toFixed(2));
+  const rankedCandidates = useMemo(() => {
+    const list = candidates ?? [];
+    const meaningfulResidual = rankTarget > VALUE_SCORE_PERFECT_TOLERANCE;
+    const withLive = list.map((c) => {
+      const noteVal = c.remainingValue ?? c.totalValue;
+      // Order groups carry a summed synthetic value; re-scoring them against a
+      // partial residual is misleading, so keep their server confidence.
+      const displayConfidence =
+        meaningfulResidual && !c.isOrderGroup
+          ? Math.max(
+              0,
+              Math.min(
+                100,
+                c.confidence -
+                  clientValueScore(txAmount, noteVal) +
+                  clientValueScore(rankTarget, noteVal),
+              ),
+            )
+          : c.confidence;
+      return { c, displayConfidence };
+    });
+    // Selected notes stay pinned on top (they're part of the in-progress match);
+    // the rest sort by live confidence so the best fit for the residual floats up.
+    return withLive.sort((a, b) => {
+      const aSel = selectedIds.includes(a.c.fiscalDocumentId) ? 1 : 0;
+      const bSel = selectedIds.includes(b.c.fiscalDocumentId) ? 1 : 0;
+      if (aSel !== bSel) return bSel - aSel;
+      return b.displayConfidence - a.displayConfidence;
+    });
+  }, [candidates, rankTarget, txAmount, selectedIds]);
   // The part of the payment not backed by an NF — the "restante sem nota".
   const remainder = Number((txAmount - nfAllocated).toFixed(2));
   // A resolving reason (frete/seguro/taxas/outros — NOT "deferred") accounts for
@@ -252,14 +312,23 @@ export function TransactionMatchSection({
     transaction.reconciliationStatus === "RECONCILED" &&
     hasExistingMatch &&
     existingAllocated + 0.05 >= txAmount;
-  // Show candidates when pending/partial, OR when the transaction was expecting
-  // an NF but no NF has been linked yet — so that assigning a category (which
-  // may flip status to RECONCILED) does not hide the match section.
+  // Show candidates whenever the transaction still needs work:
+  //  - PENDING: nothing linked yet.
+  //  - PARTIAL: some NFs linked but the payment isn't fully covered — the user
+  //    deferred the rest ("Outra transação (depois)") to continue LATER. This is
+  //    the case that used to break: the old `!hasExistingMatch` gate hid the
+  //    candidate panel the moment one NF was linked, so reopening a partial
+  //    conciliation showed only "Desvincular" with no way to add the remaining
+  //    notes. A PARTIAL tx always has an existing match, so it must be allowed
+  //    to coexist with one ("Adicionar outra nota").
+  //  - expectsFiscalDocument with no match yet: assigning a category may flip the
+  //    status to RECONCILED, and we still want the match section visible.
+  // A fully RECONCILED tx (covered by NFs, or remainder resolved by a reason) is
+  // done — the panel stays hidden there.
   const showCandidates =
-    !hasExistingMatch &&
-    (transaction.reconciliationStatus === "PENDING" ||
-      transaction.reconciliationStatus === "PARTIAL" ||
-      transaction.expectsFiscalDocument === true);
+    transaction.reconciliationStatus === "PENDING" ||
+    transaction.reconciliationStatus === "PARTIAL" ||
+    (!hasExistingMatch && transaction.expectsFiscalDocument === true);
 
   const hasMatchChanges = selectedIds.length > 0;
   // Allow saving even when the allocated amount differs from the transaction —
@@ -591,10 +660,11 @@ export function TransactionMatchSection({
               </p>
             ) : (
               <div className="space-y-6">
-                {candidates.map((c) => (
+                {rankedCandidates.map(({ c, displayConfidence }) => (
                   <CandidateRow
                     key={c.fiscalDocumentId}
                     candidate={c}
+                    displayConfidence={displayConfidence}
                     checked={selectedIds.includes(c.fiscalDocumentId)}
                     allocation={allocations[c.fiscalDocumentId]}
                     multiSelect={selectedIds.length > 1}
@@ -710,6 +780,7 @@ export function TransactionMatchSection({
  */
 function CandidateRow({
   candidate: c,
+  displayConfidence,
   checked,
   allocation,
   multiSelect,
@@ -719,6 +790,9 @@ function CandidateRow({
   onItemCategoryChange,
 }: {
   candidate: MatchCandidate;
+  /** Confidence re-scored against the remaining unallocated amount; falls back
+   *  to the server confidence when no partial allocation is in progress. */
+  displayConfidence?: number;
   checked: boolean;
   allocation: number | undefined;
   multiSelect: boolean;
@@ -727,6 +801,8 @@ function CandidateRow({
   onAdjustmentChange: (reason: AdjustmentReason | null) => void;
   onItemCategoryChange: (itemId: string, categoryId: string | null) => void;
 }) {
+  // Round for display; keep the server value when no re-rank target is active.
+  const shownConfidence = Math.round(displayConfidence ?? c.confidence);
   // A single NF paid in installments allocates only PART of its total to this
   // transaction; the value is editable so the user can split it. Order groups
   // sum several NFs at their full value and aren't individually editable.
@@ -846,8 +922,8 @@ function CandidateRow({
             >
               {c.daysDelta === 0 ? "mesmo dia" : `${c.daysDelta}d`}
             </Badge>
-            <Badge variant={getConfidenceBadgeVariant(c.confidence)}>
-              {c.confidence}%
+            <Badge variant={getConfidenceBadgeVariant(shownConfidence)}>
+              {shownConfidence}%
             </Badge>
             {!c.isOrderGroup && (
               <Link

@@ -77,6 +77,34 @@ export const ADJUSTMENT_REASON_LABELS: Record<AdjustmentReason, string> = {
   OUTROS: "Outros",
 };
 
+/** Why a received note is settled WITHOUT a bank transaction (it will never
+ *  match a bank line). Auto-detected on import from tPag/natureza, or set
+ *  manually. Mirrors the API enum FiscalDocOffBankResolution. */
+export type OffBankResolution =
+  | "BONIFICACAO"
+  | "CARTAO_CREDITO"
+  | "SEM_PAGAMENTO"
+  | "PAGO_OUTRA_FORMA"
+  | "OUTROS";
+
+export const OFF_BANK_RESOLUTION_LABELS: Record<OffBankResolution, string> = {
+  BONIFICACAO: "Bonificação / Doação",
+  CARTAO_CREDITO: "Cartão de crédito",
+  SEM_PAGAMENTO: "Sem pagamento",
+  PAGO_OUTRA_FORMA: "Pago por fora",
+  OUTROS: "Outros",
+};
+
+/** Short "why it will never match" hint shown under the flag. */
+export const OFF_BANK_RESOLUTION_HINTS: Record<OffBankResolution, string> = {
+  BONIFICACAO: "Brinde/doação — sem pagamento, não há transação bancária",
+  CARTAO_CREDITO: "Pago no cartão — liquidado na fatura, não aparece no extrato",
+  SEM_PAGAMENTO: "Remessa sem pagamento (comodato, conserto…)",
+  PAGO_OUTRA_FORMA:
+    "Pago fora da conta da empresa (cartão pessoal, dinheiro, outra conta) — não aparece no extrato",
+  OUTROS: "Conciliada sem transação bancária",
+};
+
 /** Order used to render the shortfall reason selector. */
 export const ADJUSTMENT_REASON_ORDER: AdjustmentReason[] = [
   "DESCONTO",
@@ -296,6 +324,14 @@ export interface FiscalDocument {
   destName: string | null;
   nfNumber: string | null;
   paymentMethods: unknown;
+  // Off-bank settlement: a received note closed WITHOUT a bank transaction
+  // (credit-card / bonificação / no-payment). When set, the note shows a flag
+  // instead of a linked transaction and is excluded from candidate pools.
+  offBankResolution?: OffBankResolution | null;
+  offBankResolvedAt?: string | null;
+  offBankResolutionSource?: ReconciliationSource | null;
+  offBankResolvedById?: string | null;
+  offBankResolutionNotes?: string | null;
   siegId: string | null;
   rawXmlFileId: string | null;
   fetchedAt: string;

@@ -12,6 +12,7 @@ import type {
   FiscalDocumentFilters,
   ImportSummary,
   MatchCandidate,
+  OffBankResolution,
   OutflowForecast,
   ReconciliationPaginatedResponse,
   ReconciliationStatistics,
@@ -115,6 +116,16 @@ export const reconciliationService = {
   unmatchFiscalDocument: (fiscalDocumentId: string) =>
     apiClient.post(
       `/financial/reconciliation/fiscal-documents/${fiscalDocumentId}/unmatch`,
+    ),
+
+  /** Close a note without a bank transaction (or clear it with resolution: null). */
+  setOffBankResolution: (
+    fiscalDocumentId: string,
+    payload: { resolution: OffBankResolution | null; notes?: string },
+  ) =>
+    apiClient.post<FiscalDocument>(
+      `/financial/reconciliation/fiscal-documents/${fiscalDocumentId}/off-bank-resolution`,
+      payload,
     ),
 
   ignoreTransaction: (transactionId: string, payload: IgnoreReasonPayload) =>

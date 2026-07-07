@@ -10,6 +10,7 @@ import type {
   ClassifyBatchPayload,
   CreateTransactionCategoryPayload,
   FiscalDocumentFilters,
+  OffBankResolution,
   TransactionCategoryListParams,
   TransactionFilters,
   UpdateTransactionCategoryPayload,
@@ -136,7 +137,11 @@ export function useMatchCandidates(
             .then((r) => r.data)
         : Promise.reject(),
     enabled: !!transactionId && enabled,
-    staleTime: 30_000,
+    // Always re-fetch on mount: a candidate note may have been consumed by
+    // ANOTHER transaction since this list was last cached (an NF fully allocated
+    // elsewhere must never linger here). The server already excludes matched
+    // notes; staleTime 0 guarantees the client reflects that on every open.
+    staleTime: 0,
   });
 }
 
@@ -208,6 +213,33 @@ export function useUnmatchFiscalDocument() {
     mutationFn: (fiscalDocumentId: string) =>
       reconciliationService
         .unmatchFiscalDocument(fiscalDocumentId)
+        .then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reconciliationKeys.all });
+    },
+  });
+}
+
+/**
+ * Set (or clear, with resolution: null) the off-bank settlement of a received
+ * note — a note that will never match a bank line (credit-card / bonificação /
+ * no-payment). Invalidates the whole namespace so the NF detail, the documents
+ * list buckets, and every candidate pool refresh.
+ */
+export function useSetOffBankResolution() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      fiscalDocumentId,
+      resolution,
+      notes,
+    }: {
+      fiscalDocumentId: string;
+      resolution: OffBankResolution | null;
+      notes?: string;
+    }) =>
+      reconciliationService
+        .setOffBankResolution(fiscalDocumentId, { resolution, notes })
         .then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });

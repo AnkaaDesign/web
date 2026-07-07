@@ -18,6 +18,11 @@ import {
   IconReceipt2,
   IconReceiptTax,
   IconRefresh,
+  IconRotateClockwise,
+  IconGift,
+  IconCreditCard,
+  IconFileOff,
+  IconWallet,
   IconUser,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -31,6 +36,7 @@ import {
   useFiscalDocument,
   useFiscalDocumentXml,
   useSetFiscalItemCategory,
+  useSetOffBankResolution,
   useUnmatchTransaction,
   useUnmatchFiscalDocument,
 } from "@/hooks/financial/use-reconciliation";
@@ -43,7 +49,13 @@ import type {
   FiscalAddress,
   FiscalDocument,
   FiscalDocumentStatus,
+  OffBankResolution,
+  ReconciliationSource,
   ReconciliationStatus,
+} from "@/types/reconciliation";
+import {
+  OFF_BANK_RESOLUTION_LABELS,
+  OFF_BANK_RESOLUTION_HINTS,
 } from "@/types/reconciliation";
 
 /** The bank transaction embedded in a fiscal document's match record. */
@@ -168,6 +180,7 @@ export function ReconciliationFiscalDocumentDetailPage() {
     matchCount: number;
   } | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const offBankMut = useSetOffBankResolution();
   // The match section reports its save-ability + allocation totals up so the
   // Salvar button and running "Alocado / Faltam" summary live in the header.
   const [matchState, setMatchState] = useState<MatchSaveState | null>(null);
@@ -261,16 +274,22 @@ export function ReconciliationFiscalDocumentDetailPage() {
     0,
   );
   const nfOpenBalance = Number((doc.totalValue - nfAllocated).toFixed(2));
+  // Off-bank settled (credit-card / bonificação / no-payment): the note will
+  // never match a bank line, so it's "resolved" without any transaction.
+  const isOffBankResolved =
+    !!doc.offBankResolvedAt && activeNfMatches.length === 0;
   const nfStatus: ReconciliationStatus =
     doc.operationType === "SAIDA"
       ? doc.linked
         ? "RECONCILED"
         : "PENDING"
-      : nfOpenBalance <= 0.05 && activeNfMatches.length > 0
+      : isOffBankResolved
         ? "RECONCILED"
-        : activeNfMatches.length > 0
-          ? "PARTIAL"
-          : "PENDING";
+        : nfOpenBalance <= 0.05 && activeNfMatches.length > 0
+          ? "RECONCILED"
+          : activeNfMatches.length > 0
+            ? "PARTIAL"
+            : "PENDING";
 
   return (
     <Frame>
@@ -567,9 +586,7 @@ export function ReconciliationFiscalDocumentDetailPage() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <SubHeading icon={IconArrowsExchange2}>
-                        {doc.matches.length > 1
-                          ? "Transações vinculadas"
-                          : "Transação vinculada"}
+                        Situação
                       </SubHeading>
                       {doc.matches.length > 1 && (
                         <Button
@@ -615,6 +632,25 @@ export function ReconciliationFiscalDocumentDetailPage() {
                       })}
                     </div>
                   </div>
+                )}
+
+                {/* Conciliada sem transação — flag shown INSTEAD of a linked
+                    transaction for notes that will never match a bank line
+                    (credit-card / bonificação / no-payment). Explains what and
+                    why, plus a "Reabrir" to clear it so it expects a match. */}
+                {isOffBankResolved && doc.offBankResolution && (
+                  <OffBankResolutionCard
+                    resolution={doc.offBankResolution}
+                    source={doc.offBankResolutionSource ?? null}
+                    notes={doc.offBankResolutionNotes ?? null}
+                    onReopen={() =>
+                      offBankMut.mutate({
+                        fiscalDocumentId: doc.id,
+                        resolution: null,
+                      })
+                    }
+                    reopening={offBankMut.isPending}
+                  />
                 )}
 
                 {/* Orçamento / Faturamento — direction-aware "vinculada" for
@@ -724,11 +760,29 @@ export function ReconciliationFiscalDocumentDetailPage() {
               NF-side mirror of the transaction page's "Candidatas à conciliação".
               Self-gates: renders (and reports a header save state) only for
               ENTRADA notes with an open balance; otherwise it returns null and
-              clears the header state. */}
-          <FiscalDocMatchSection
-            fiscalDocument={doc}
-            onSaveStateChange={setMatchState}
-          />
+              clears the header state. Hidden when the note is closed off-bank —
+              there is no transaction to look for. */}
+          {!isOffBankResolved && (
+            <FiscalDocMatchSection
+              fiscalDocument={doc}
+              onSaveStateChange={setMatchState}
+            />
+          )}
+
+          {/* Manual "resolver sem transação" — for an ENTRADA note with no bank
+              link that the import-time auto-detection didn't catch (e.g. a bonus
+              note without the tell-tale natureza). Lets the user close it with a
+              reason so it drops out of Pendentes and the candidate pools. */}
+          {!isOffBankResolved &&
+            doc.operationType === "ENTRADA" &&
+            activeNfMatches.length === 0 && (
+              <OffBankResolvePicker
+                busy={offBankMut.isPending}
+                onResolve={(resolution) =>
+                  offBankMut.mutate({ fiscalDocumentId: doc.id, resolution })
+                }
+              />
+            )}
         </div>
       </div>
 
@@ -883,6 +937,138 @@ function LinkedTransactionCard({
           <IconLinkOff className="h-3.5 w-3.5 mr-1" />
           Desvincular
         </Button>
+      </div>
+    </div>
+  );
+}
+
+const OFF_BANK_ICONS: Record<
+  OffBankResolution,
+  (props: { className?: string }) => React.ReactNode
+> = {
+  BONIFICACAO: IconGift,
+  CARTAO_CREDITO: IconCreditCard,
+  SEM_PAGAMENTO: IconFileOff,
+  PAGO_OUTRA_FORMA: IconWallet,
+  OUTROS: IconFileOff,
+};
+
+/**
+ * Flag shown INSTEAD of a linked bank transaction for a note that will never
+ * match a bank line. States what (the reason) and why (the hint), whether it was
+ * auto-detected or set by hand, and offers a "Reabrir" to clear it.
+ */
+function OffBankResolutionCard({
+  resolution,
+  source,
+  notes,
+  onReopen,
+  reopening,
+}: {
+  resolution: OffBankResolution;
+  source: ReconciliationSource | null;
+  notes: string | null;
+  onReopen: () => void;
+  reopening: boolean;
+}) {
+  const Icon = OFF_BANK_ICONS[resolution];
+  return (
+    <div className="space-y-3">
+      <SubHeading icon={IconArrowsExchange2}>Situação</SubHeading>
+      <div className="rounded-lg border border-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-500/10 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <Icon className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div className="min-w-0 space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-medium text-sm text-emerald-900 dark:text-emerald-200">
+                  Conciliada sem transação · {OFF_BANK_RESOLUTION_LABELS[resolution]}
+                </span>
+                <Badge size="sm" variant={source === "MANUAL" ? "secondary" : "outline"}>
+                  {source === "MANUAL" ? "Manual" : "Automático"}
+                </Badge>
+              </div>
+              <p className="text-xs text-emerald-800/80 dark:text-emerald-300/80">
+                {OFF_BANK_RESOLUTION_HINTS[resolution]}
+              </p>
+              {notes && (
+                <p className="text-xs text-muted-foreground italic">“{notes}”</p>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={reopening}
+            onClick={onReopen}
+            title="Reabrir — voltar a exigir uma transação bancária"
+          >
+            <IconRotateClockwise className="h-4 w-4 mr-1" />
+            Reabrir
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Manual "resolver sem transação" control for an ENTRADA note the auto-detection
+ * didn't catch. Pick a reason → the note closes off-bank and drops out of the
+ * pending list + candidate pools.
+ */
+function OffBankResolvePicker({
+  busy,
+  onResolve,
+}: {
+  busy: boolean;
+  onResolve: (resolution: OffBankResolution) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const options: OffBankResolution[] = [
+    "PAGO_OUTRA_FORMA",
+    "CARTAO_CREDITO",
+    "BONIFICACAO",
+    "SEM_PAGAMENTO",
+    "OUTROS",
+  ];
+  if (!open) {
+    return (
+      <div className="rounded-lg border border-dashed border-border p-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <IconFileOff className="h-4 w-4" />
+          Esta nota não será paga por transação bancária?
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          Resolver sem transação
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-border p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">Motivo — por que não haverá transação?</span>
+        <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+          Cancelar
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {options.map((r) => {
+          const Icon = OFF_BANK_ICONS[r];
+          return (
+            <Button
+              key={r}
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => onResolve(r)}
+            >
+              <Icon className="h-4 w-4 mr-1" />
+              {OFF_BANK_RESOLUTION_LABELS[r]}
+            </Button>
+          );
+        })}
       </div>
     </div>
   );
