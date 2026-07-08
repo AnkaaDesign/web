@@ -327,7 +327,7 @@ function LinkedInstallmentsTable({
 }) {
   const cell = "px-3 py-2.5";
   const headCell = "px-3 h-11 align-middle";
-  const total = rows.reduce((s, r) => s + (r.match.allocatedAmount || 0), 0);
+  const total = rows.reduce((s, r) => s + (Number(r.match.allocatedAmount) || 0), 0);
   return (
     <div className="rounded-md border border-border/60 overflow-x-auto">
       <table className="w-full table-fixed text-sm">

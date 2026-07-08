@@ -332,7 +332,6 @@ export function MaintenanceScheduleDetailPage() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </div>
   );
 }
 
