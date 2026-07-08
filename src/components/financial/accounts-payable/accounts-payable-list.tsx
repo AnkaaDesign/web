@@ -234,10 +234,14 @@ function formatPaymentMethod(method: string | null): string {
   return PAYMENT_METHOD_LABELS[method.toUpperCase() as PAYMENT_METHOD] ?? method;
 }
 
+// Mirrors the API's OVERDUE sweep: a due-today obligation only turns "vencido"
+// 18h past SP-midnight, giving the day itself a chance to be paid first.
+const OVERDUE_GRACE_MS = 18 * 60 * 60 * 1000;
+
 function isOverdueRow(row: PayableRow): boolean {
   // Already-paid rows are never "vencido" — only unpaid dues past their date are.
   if (row.paymentState === "PAID" || row.paymentState === "EXPECTED" || !row.dueDate) return false;
-  return new Date(row.dueDate) < new Date();
+  return new Date(row.dueDate).getTime() + OVERDUE_GRACE_MS < Date.now();
 }
 
 function PayableTypeBadge({ row }: { row: PayableRow }) {
@@ -674,9 +678,8 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
         const dueDate = row.dueDate ? new Date(row.dueDate) : null;
         const overdue = isOverdueRow(row);
         return dueDate ? (
-          <span className={cn("text-sm whitespace-nowrap", overdue ? "text-destructive font-medium" : "text-muted-foreground")}>
+          <span className={cn("text-sm whitespace-nowrap", overdue ? "text-red-600 font-medium" : "text-muted-foreground")}>
             {formatDate(dueDate)}
-            {overdue && " (vencido)"}
           </span>
         ) : (
           <span className="text-sm text-muted-foreground">-</span>

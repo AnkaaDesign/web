@@ -30,6 +30,7 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
   // Initialize state from URL params
   const [desiredVolume, setDesiredVolume] = useState(() => searchParams.get("volume") || "2000");
   const [showPrices, setShowPrices] = useState(false);
+  const [showRatio, setShowRatio] = useState(true);
 
   // Effective price visibility: warehouse users can never view prices, then
   // the caller must allow it AND the toggle must be on.
@@ -457,6 +458,14 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
             </div>
           )}
 
+          {/* Ratio Toggle */}
+          <div className="flex items-center space-x-3">
+            <Label htmlFor="show-ratio" className="text-sm font-medium">
+              Exibir Proporção
+            </Label>
+            <Switch id="show-ratio" checked={showRatio} onCheckedChange={setShowRatio} />
+          </div>
+
           {/* Correction Mode Toggle */}
           <div className="flex items-center space-x-3">
             <Label htmlFor="correction-mode" className="text-sm font-medium">
@@ -505,11 +514,11 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
                     />
                   </div>
                 </TableHead>
-                <TableHead className="font-semibold text-xs uppercase">Item</TableHead>
-                <TableHead className="text-right font-semibold text-xs uppercase w-48">Peso (g)</TableHead>
+                <TableHead className="font-semibold text-xs uppercase">Componente</TableHead>
+                {showRatio && <TableHead className="text-right font-semibold text-xs uppercase w-40">Proporção</TableHead>}
+                {effectiveShowPrices && <TableHead className="text-right font-semibold text-xs uppercase w-48 whitespace-nowrap">Preço</TableHead>}
                 {correctionMode && <TableHead className="text-right font-semibold text-xs uppercase w-48">Correção</TableHead>}
-                {effectiveShowPrices && <TableHead className="text-right font-semibold text-xs uppercase w-48">Preço</TableHead>}
-                <TableHead className="text-right font-semibold text-xs uppercase w-40">Proporção</TableHead>
+                <TableHead className="text-right font-semibold text-xs uppercase w-48">Peso (g)</TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
@@ -550,11 +559,16 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="p-0 text-right">
-                    <div className="px-4 py-2 tabular-nums text-base">
-                      {component.weightInGrams > 20 ? Math.round(component.weightInGrams) : formatNumberWithDecimals(component.weightInGrams, 1)}
-                    </div>
-                  </TableCell>
+                  {showRatio && (
+                    <TableCell className="p-0 text-right">
+                      <div className="px-4 py-2 tabular-nums text-base">{formatNumberWithDecimals(component.ratio, 2)}%</div>
+                    </TableCell>
+                  )}
+                  {effectiveShowPrices && (
+                    <TableCell className="p-0 text-right">
+                      <div className="px-4 py-2 tabular-nums text-base whitespace-nowrap">{formatCurrency(component.price)}</div>
+                    </TableCell>
+                  )}
                   {correctionMode && (
                     <TableCell className="p-0 text-right">
                       <div className="px-4 py-2 tabular-nums text-base">
@@ -582,13 +596,10 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
                       </div>
                     </TableCell>
                   )}
-                  {effectiveShowPrices && (
-                    <TableCell className="p-0 text-right">
-                      <div className="px-4 py-2 tabular-nums text-base">{formatCurrency(component.price)}</div>
-                    </TableCell>
-                  )}
                   <TableCell className="p-0 text-right">
-                    <div className="px-4 py-2 tabular-nums text-base">{formatNumberWithDecimals(component.ratio, 2)}%</div>
+                    <div className="px-4 py-2 tabular-nums text-base">
+                      {component.weightInGrams > 20 ? Math.round(component.weightInGrams) : formatNumberWithDecimals(component.weightInGrams, 1)}
+                    </div>
                   </TableCell>
                   <TableCell className="p-0"></TableCell>
                 </TableRow>
@@ -599,9 +610,16 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
                 <TableCell className="p-0">
                   <div className="px-4 py-2 text-base">Total</div>
                 </TableCell>
-                <TableCell className="p-0 text-right">
-                  <div className="px-4 py-2 tabular-nums text-base">{totals.weight > 20 ? Math.round(totals.weight) : formatNumberWithDecimals(totals.weight, 1)}</div>
-                </TableCell>
+                {showRatio && (
+                  <TableCell className="p-0 text-right">
+                    <div className="px-4 py-2 text-base">100%</div>
+                  </TableCell>
+                )}
+                {effectiveShowPrices && (
+                  <TableCell className="p-0 text-right">
+                    <div className="px-4 py-2 tabular-nums text-base text-primary whitespace-nowrap">{formatCurrency(totals.price)}</div>
+                  </TableCell>
+                )}
                 {correctionMode && (
                   <TableCell className="p-0 text-right">
                     <div className="px-4 py-2 tabular-nums text-base text-blue-600">
@@ -609,13 +627,8 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
                     </div>
                   </TableCell>
                 )}
-                {effectiveShowPrices && (
-                  <TableCell className="p-0 text-right">
-                    <div className="px-4 py-2 tabular-nums text-base text-primary">{formatCurrency(totals.price)}</div>
-                  </TableCell>
-                )}
                 <TableCell className="p-0 text-right">
-                  <div className="px-4 py-2 text-base">100%</div>
+                  <div className="px-4 py-2 tabular-nums text-base">{totals.weight > 20 ? Math.round(totals.weight) : formatNumberWithDecimals(totals.weight, 1)}</div>
                 </TableCell>
                 <TableCell className="p-0"></TableCell>
               </TableRow>

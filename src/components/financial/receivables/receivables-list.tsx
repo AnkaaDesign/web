@@ -33,7 +33,8 @@ const RECEIVABLE_STATE_BADGE: Record<ReceivableState, BadgeProps["variant"]> = {
   AWAITING_RECEIPT: "pending", // amber — open receivable awaiting receipt
   PARTIALLY_RECEIVED: "orange",
   OVERDUE: "red",
-  RECEIVED: "completed", // green
+  // Blue — distinct from "Conciliada" (green), which is one step further (matched against the bank statement).
+  RECEIVED: "inProgress",
 };
 
 // --- Summary cards double as clickable filter buckets (Contas a Pagar pattern). --
@@ -237,7 +238,7 @@ const RECEIVABLE_COLUMNS: DataTableColumnDef<ReceivableRow>[] = [
     cell: ({ row }) => {
       const paidAt = row.original.paidAt ? new Date(row.original.paidAt) : null;
       return paidAt ? (
-        <span className="text-sm whitespace-nowrap text-emerald-700">{formatDate(paidAt)}</span>
+        <span className="text-sm whitespace-nowrap text-emerald-700 dark:text-emerald-400">{formatDate(paidAt)}</span>
       ) : (
         <span className="text-sm text-muted-foreground">-</span>
       );

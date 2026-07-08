@@ -6,9 +6,15 @@ import { useTasks } from "@/hooks";
 import { routes } from "@/constants";
 import { StandardizedTable } from "@/components/ui/standardized-table";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
-import { createBillingColumns } from "./billing-columns";
+import { createBillingColumns, findFirstInstallmentDueDate } from "./billing-columns";
 import type { BillingFilters } from "./billing-filter-sheet";
 import { IconFileInvoice } from "@tabler/icons-react";
+
+// Vencimento's value (first installment's due date) lives two relations deep
+// (quote -> customerConfigs -> installments), which Prisma can't order by
+// directly — so it's excluded from the server orderBy and sorted client-side
+// over the already-loaded page instead.
+const CLIENT_SORT_COLUMN = "currentInstallmentDueDate";
 
 interface BillingTableProps {
   className?: string;
@@ -57,9 +63,12 @@ export function BillingTable({ className, searchingFor, filters }: BillingTableP
       limit: pageSize,
       shouldDisplayForFinancial: true,
       ...(searchingFor && { searchingFor }),
-      ...(sortConfigs.length > 0 && {
-        orderBy: convertSortConfigsToOrderBy(sortConfigs),
-      }),
+      ...(() => {
+        const serverSortConfigs = sortConfigs.filter((s) => s.column !== CLIENT_SORT_COLUMN);
+        return serverSortConfigs.length > 0
+          ? { orderBy: convertSortConfigsToOrderBy(serverSortConfigs) }
+          : {};
+      })(),
       include: {
         customer: {
           select: {
@@ -143,9 +152,25 @@ export function BillingTable({ className, searchingFor, filters }: BillingTableP
     refetchOnWindowFocus: "always",
   });
 
-  const tasks = data?.data || [];
+  const rawTasks = data?.data || [];
   const totalRecords = data?.meta?.totalRecords || 0;
   const totalPages = data?.meta?.totalPages || 1;
+
+  // Client-side pass for Vencimento (see CLIENT_SORT_COLUMN) — only reorders
+  // the current page, since the underlying value can't be sorted server-side.
+  const dueDateSort = sortConfigs.find((s) => s.column === CLIENT_SORT_COLUMN);
+  const tasks = useMemo(() => {
+    if (!dueDateSort) return rawTasks;
+    const dir = dueDateSort.direction === "asc" ? 1 : -1;
+    return [...rawTasks].sort((a, b) => {
+      const aDate = findFirstInstallmentDueDate(a);
+      const bDate = findFirstInstallmentDueDate(b);
+      if (!aDate && !bDate) return 0;
+      if (!aDate) return 1; // nulls last regardless of direction
+      if (!bDate) return -1;
+      return (aDate.getTime() - bDate.getTime()) * dir;
+    });
+  }, [rawTasks, dueDateSort]);
 
   const handleRowClick = useCallback((task: Task) => {
     navigate(routes.financial.billing.details(task.id), { state: { returnTo } });

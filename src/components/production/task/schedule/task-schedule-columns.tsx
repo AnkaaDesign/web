@@ -122,7 +122,7 @@ export function createTaskScheduleColumns(options: TaskScheduleColumnsOptions = 
           <span className="inline-flex min-w-0 items-center gap-2">
             <span
               className="inline-block h-5 w-5 shrink-0 rounded-md border border-foreground/25 bg-center bg-cover"
-              style={{ background: gp.colorPreview ? `url(${gp.colorPreview}) center/cover` : gp.hex || "#888888" }}
+              style={{ background: gp.colorPreview ? `url("${encodeURI(gp.colorPreview)}") center/cover` : gp.hex || "#888888" }}
             />
             <TruncatedTextWithTooltip text={gp.name} className="truncate" />
           </span>

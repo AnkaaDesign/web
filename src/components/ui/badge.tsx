@@ -5,7 +5,7 @@ import { getBadgeVariant as getCentralizedBadgeVariant } from "../../constants";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex max-w-full items-center whitespace-nowrap rounded-md border px-2.5 py-0.5 text-xs font-medium transition-opacity focus:outline-none focus:ring-1 focus:ring-ring/30 focus:ring-offset-1",
+  "inline-flex max-w-full items-center overflow-hidden text-ellipsis whitespace-nowrap rounded-md border px-2.5 py-0.5 text-xs font-medium transition-opacity focus:outline-none focus:ring-1 focus:ring-ring/30 focus:ring-offset-1",
   {
     variants: {
       variant: {

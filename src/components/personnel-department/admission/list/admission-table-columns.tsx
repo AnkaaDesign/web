@@ -88,7 +88,8 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
       );
     },
     sortable: false,
-    className: "min-w-[180px]",
+    // table-layout:fixed ignora min-width — é o `w-` que define a largura da coluna.
+    className: "w-[180px] min-w-[180px]",
     align: "left",
   },
 
@@ -102,7 +103,8 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
       </Badge>
     ),
     sortable: true,
-    className: "min-w-[190px]",
+    // table-layout:fixed ignora min-width — é o `w-` que define a largura da coluna.
+    className: "w-[190px] min-w-[190px]",
     align: "left",
   },
 
@@ -142,7 +144,8 @@ export const createAdmissionColumns = (): AdmissionColumn[] => [
       );
     },
     sortable: false,
-    className: "min-w-[110px]",
+    // table-layout:fixed ignora min-width — é o `w-` que define a largura da coluna.
+    className: "w-[110px] min-w-[110px]",
     align: "left",
   },
 

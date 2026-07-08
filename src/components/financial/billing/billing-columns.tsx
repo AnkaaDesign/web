@@ -14,7 +14,10 @@ const renderDate = (date: Date | string | null | undefined) => {
 // regardless of its status — so every task quote shows a vencimento, not only
 // the ones currently "DUE". Falls back to the earliest due date when parcelas
 // aren't numbered from 1.
-const findFirstInstallmentDueDate = (task: Task): Date | null => {
+// Exported so the table can sort by this value client-side — the due date lives
+// two relations deep (quote -> customerConfigs -> installments), which Prisma
+// can't order by directly, so this column sorts within the loaded page only.
+export const findFirstInstallmentDueDate = (task: Task): Date | null => {
   const configs = task.quote?.customerConfigs;
   if (!configs || configs.length === 0) return null;
   let best: { number: number; due: Date } | null = null;
@@ -91,9 +94,12 @@ export function createBillingColumns(): StandardizedColumn<Task>[] {
       render: (task) => renderDate(task.finishedAt),
     },
     {
-      key: "quoteTotal",
+      // Dotted key matches the "quote.statusOrder" convention below — the generic
+      // path in convertSortConfigsToOrderBy turns this into { quote: { total } },
+      // a valid Prisma orderBy since Task -> TaskQuote is a to-one relation.
+      key: "quote.total",
       header: "VALOR",
-      sortable: false,
+      sortable: true,
       width: "10%",
       render: (task) => {
         const total = task.quote?.total;
@@ -106,9 +112,11 @@ export function createBillingColumns(): StandardizedColumn<Task>[] {
       },
     },
     {
+      // Sorted client-side (see billing-table.tsx) — the due date lives two
+      // relations deep, which Prisma can't order by directly.
       key: "currentInstallmentDueDate",
       header: "VENCIMENTO",
-      sortable: false,
+      sortable: true,
       width: "9%",
       render: (task) => renderDate(findFirstInstallmentDueDate(task)),
     },
