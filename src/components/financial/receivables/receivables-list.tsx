@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconCash,
   IconCheck,
+  IconChecks,
   IconCoins,
   IconProgressCheck,
   IconReceipt2,
@@ -38,28 +39,42 @@ const RECEIVABLE_STATE_BADGE: Record<ReceivableState, BadgeProps["variant"]> = {
 };
 
 // --- Summary cards double as clickable filter buckets (Contas a Pagar pattern). --
-type ReceivableBucketKey = "AWAITING" | "PARTIAL" | "OVERDUE" | "RECEIVED";
+// RECEIVED (Axis A — invoice status) splits into two cards along Axis B (bank
+// truth): RECEIVED = paid but not yet matched to a statement line; CONCILIADO =
+// paid AND matched. See isConciliada() below.
+type ReceivableBucketKey = "AWAITING" | "PARTIAL" | "OVERDUE" | "RECEIVED" | "CONCILIADO";
 
 const RECEIVABLE_BUCKETS: Record<
   ReceivableBucketKey,
-  { label: string; Icon: React.ComponentType<{ className?: string }>; tone: string; state: ReceivableState }
+  { label: string; Icon: React.ComponentType<{ className?: string }>; tone: string }
 > = {
-  AWAITING: { label: "Aguardando Recebimento", Icon: IconProgressCheck, tone: "text-amber-600 bg-amber-500/10", state: "AWAITING_RECEIPT" },
-  PARTIAL: { label: "Parcialmente Recebido", Icon: IconCoins, tone: "text-orange-600 bg-orange-500/10", state: "PARTIALLY_RECEIVED" },
-  OVERDUE: { label: "Vencido", Icon: IconReceipt2, tone: "text-red-600 bg-red-500/10", state: "OVERDUE" },
-  RECEIVED: { label: "Recebido no período", Icon: IconCash, tone: "text-emerald-600 bg-emerald-500/10", state: "RECEIVED" },
+  AWAITING: { label: "Aguardando Recebimento", Icon: IconProgressCheck, tone: "text-amber-600 bg-amber-500/10" },
+  PARTIAL: { label: "Parcialmente Recebido", Icon: IconCoins, tone: "text-orange-600 bg-orange-500/10" },
+  OVERDUE: { label: "Vencido", Icon: IconReceipt2, tone: "text-red-600 bg-red-500/10" },
+  // Blue — matches the "Recebido" badge in the Situação column.
+  RECEIVED: { label: "Recebido no período", Icon: IconCash, tone: "text-blue-600 bg-blue-500/10" },
+  // Green — matches the "Conciliada" badge; one step further than RECEIVED.
+  CONCILIADO: { label: "Conciliado no período", Icon: IconChecks, tone: "text-emerald-600 bg-emerald-500/10" },
 };
 
-const BUCKET_ORDER: ReceivableBucketKey[] = ["AWAITING", "PARTIAL", "OVERDUE", "RECEIVED"];
-// Default view: every open/overdue receivable; received-this-period is opt-in.
+const BUCKET_ORDER: ReceivableBucketKey[] = ["AWAITING", "PARTIAL", "OVERDUE", "RECEIVED", "CONCILIADO"];
+// Default view: every open/overdue receivable; received/conciliado-this-period is opt-in.
 const DEFAULT_BUCKETS: ReceivableBucketKey[] = ["AWAITING", "PARTIAL", "OVERDUE"];
 
-const STATE_TO_BUCKET: Record<ReceivableState, ReceivableBucketKey> = {
-  AWAITING_RECEIPT: "AWAITING",
-  PARTIALLY_RECEIVED: "PARTIAL",
-  OVERDUE: "OVERDUE",
-  RECEIVED: "RECEIVED",
-};
+// A RECEIVED row splits across two buckets depending on Axis B (bank match) —
+// so this is a function of the row, not a static per-state lookup.
+function bucketOf(row: ReceivableRow): ReceivableBucketKey {
+  switch (row.state) {
+    case "AWAITING_RECEIPT":
+      return "AWAITING";
+    case "PARTIALLY_RECEIVED":
+      return "PARTIAL";
+    case "OVERDUE":
+      return "OVERDUE";
+    case "RECEIVED":
+      return isConciliada(row) ? "CONCILIADO" : "RECEIVED";
+  }
+}
 
 // Row ordering rank: open/overdue first, received-this-period last.
 function receivableRank(state: ReceivableState): number {
@@ -71,8 +86,55 @@ const VALOR_MIN_PARAM = "valorMin";
 const VALOR_MAX_PARAM = "valorMax";
 const MONTHS_RE = /^(0[1-9]|1[0-2])$/;
 
-function parseBuckets(raw: string | null): ReceivableBucketKey[] {
-  if (raw === null) return DEFAULT_BUCKETS;
+// The card selection + chosen period persist across visits in localStorage so
+// the user's view sticks (mirrors the Extrato / Notas Fiscais pages). A URL
+// param still wins when present (shared/deep links); otherwise falls back to
+// the stored value, then the defaults.
+const BUCKETS_STORAGE_KEY = "financial-receivables:buckets";
+const PERIOD_STORAGE_KEY = "financial-receivables:period";
+
+function readStoredBuckets(): ReceivableBucketKey[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(BUCKETS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter((v): v is ReceivableBucketKey => (BUCKET_ORDER as string[]).includes(v));
+  } catch {
+    return null;
+  }
+}
+
+function readStoredPeriod(): Period | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(PERIOD_STORAGE_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (p && typeof p.year === "number" && Array.isArray(p.months)) {
+      const months = p.months.map(String).filter((m: string) => MONTHS_RE.test(m));
+      if (months.length) return { year: p.year, months };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function writeStored(key: string, value: unknown): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* quota / private-mode — non-fatal */
+  }
+}
+
+/** Parses the `?status=` CSV; `null` means "not present in the URL" (caller
+ *  falls back to localStorage, then DEFAULT_BUCKETS) rather than defaulting here. */
+function parseBuckets(raw: string | null): ReceivableBucketKey[] | null {
+  if (raw === null) return null;
   return raw.split(",").filter((s): s is ReceivableBucketKey => (BUCKET_ORDER as string[]).includes(s));
 }
 
@@ -288,9 +350,15 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // --- URL state: active filter buckets + period + value range --------------
-  const [buckets, setBuckets] = useState<ReceivableBucketKey[]>(() => parseBuckets(searchParams.get(STATUS_PARAM)));
-  const [period, setPeriod] = useState<Period>(() => parsePeriodFromUrl(searchParams) ?? currentPeriod());
+  // --- State: active filter buckets + period + value range. URL wins when
+  // present (shareable/deep link); otherwise falls back to localStorage, then
+  // the defaults (mirrors the Extrato / Notas Fiscais pages). -----------------
+  const [buckets, setBuckets] = useState<ReceivableBucketKey[]>(
+    () => parseBuckets(searchParams.get(STATUS_PARAM)) ?? readStoredBuckets() ?? DEFAULT_BUCKETS,
+  );
+  const [period, setPeriod] = useState<Period>(
+    () => parsePeriodFromUrl(searchParams) ?? readStoredPeriod() ?? currentPeriod(),
+  );
   const [amountMin, setAmountMin] = useState<number | null>(() => {
     const raw = searchParams.get(VALOR_MIN_PARAM);
     return raw != null && raw !== "" ? Number(raw) : null;
@@ -316,6 +384,14 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
       { replace: true },
     );
   }, [period, amountMin, amountMax, setSearchParams]);
+
+  // Persist the card selection + period so the chosen view sticks across visits.
+  useEffect(() => {
+    writeStored(BUCKETS_STORAGE_KEY, buckets);
+  }, [buckets]);
+  useEffect(() => {
+    writeStored(PERIOD_STORAGE_KEY, period);
+  }, [period]);
 
   // Toggle a summary card on/off and mirror the selection into the URL.
   const toggleBucket = (key: ReceivableBucketKey) => {
@@ -364,12 +440,13 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
       PARTIAL: { count: 0, total: 0 },
       OVERDUE: { count: 0, total: 0 },
       RECEIVED: { count: 0, total: 0 },
+      CONCILIADO: { count: 0, total: 0 },
     };
     for (const row of periodRows) {
-      const bucket = STATE_TO_BUCKET[row.state];
+      const bucket = bucketOf(row);
       out[bucket].count += 1;
-      // Open buckets show OUTSTANDING (amount − received); RECEIVED shows what came in.
-      out[bucket].total += bucket === "RECEIVED" ? row.paidAmount : row.amount - row.paidAmount;
+      // Open buckets show OUTSTANDING (amount − received); RECEIVED/CONCILIADO show what came in.
+      out[bucket].total += bucket === "RECEIVED" || bucket === "CONCILIADO" ? row.paidAmount : row.amount - row.paidAmount;
     }
     return out;
   }, [periodRows]);
@@ -379,7 +456,7 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
   const filteredRows = useMemo(() => {
     const active = new Set(buckets);
     return periodRows.filter((row) => {
-      if (!active.has(STATE_TO_BUCKET[row.state])) return false;
+      if (!active.has(bucketOf(row))) return false;
       if (amountMin != null && row.amount < amountMin) return false;
       if (amountMax != null && row.amount > amountMax) return false;
       return true;
@@ -464,7 +541,7 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
   return (
     <div className={cn("flex flex-col gap-4 h-full min-h-0", className)}>
       {/* Summary cards double as filter buckets — click to show only that status. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 flex-shrink-0">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 flex-shrink-0">
         {BUCKET_ORDER.map((key) => {
           const meta = RECEIVABLE_BUCKETS[key];
           const b = periodBucketSummary[key];

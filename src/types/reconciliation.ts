@@ -219,13 +219,15 @@ export interface ReconciliationMatchInstallment {
   paidAmount: number | null;
   paidAt: string | null;
   status: string;
+  // Normalized on the backend to the same shape whether the installment is
+  // backed by a classic Invoice or a Faturamento TaskQuoteCustomerConfig.
   invoice?: {
     id: string;
     totalAmount: number;
     status: string;
-    customer?: { id: string; fantasyName: string } | null;
+    customer?: { id: string; fantasyName: string; corporateName: string | null; cnpj: string | null } | null;
     task?: { id: string; name: string | null; serialNumber: string | null } | null;
-    installments?: { id: string }[];
+    installmentsCount: number;
   } | null;
 }
 

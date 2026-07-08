@@ -12,7 +12,7 @@ import {
 } from "@/hooks/financial/use-receivable";
 import { routes } from "@/constants";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatDate } from "@/utils";
+import { formatCnpjCpf, formatCurrency, formatDate } from "@/utils";
 import type {
   BankTransaction,
   ReconciliationMatchInstallment,
@@ -335,29 +335,32 @@ function LinkedInstallmentsTable({
           <col style={{ width: "5.625rem" }} />
           <col style={{ width: "16rem" }} />
           <col />
+          <col style={{ width: "10rem" }} />
           <col style={{ width: "6.25rem" }} />
           <col style={{ width: "7.5rem" }} />
           <col style={{ width: "7.5rem" }} />
           <col style={{ width: "8.125rem" }} />
-          <col style={{ width: "8.75rem" }} />
+          <col style={{ width: "9.5rem" }} />
         </colgroup>
         <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className={cn("text-left font-medium whitespace-nowrap", headCell)}>Parcela</th>
             <th className={cn("text-left font-medium whitespace-nowrap", headCell)}>Tarefa</th>
             <th className={cn("text-left font-medium", headCell)}>Cliente</th>
+            <th className={cn("text-left font-medium whitespace-nowrap", headCell)}>CNPJ</th>
             <th className={cn("text-left font-medium whitespace-nowrap", headCell)}>Situação</th>
             <th className={cn("text-right font-medium whitespace-nowrap", headCell)}>Vencimento</th>
             <th className={cn("text-right font-medium whitespace-nowrap", headCell)}>Pago em</th>
             <th className={cn("text-right font-medium whitespace-nowrap", headCell)}>Fatura</th>
-            <th className={cn("text-right font-medium whitespace-nowrap", headCell)}>Valor</th>
+            <th className={cn("text-right font-medium whitespace-nowrap", headCell)}>Valor da Parcela</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/60">
           {rows.map(({ match, installment: i }) => {
             const invoice = i.invoice;
-            const totalParcelas = invoice?.installments?.length ?? 0;
-            const customerName = invoice?.customer?.fantasyName;
+            const totalParcelas = invoice?.installmentsCount ?? 0;
+            const customer = invoice?.customer;
+            const customerName = customer?.corporateName || customer?.fantasyName;
             const task = invoice?.task;
             const taskLabel = task
               ? [task.serialNumber, task.name].filter(Boolean).join(" · ")
@@ -375,14 +378,14 @@ function LinkedInstallmentsTable({
                   {taskLabel && task?.id ? (
                     <Link
                       to={routes.financial.billing.details(task.id)}
-                      className="inline-flex items-center gap-1 truncate text-primary hover:underline"
+                      className="inline-flex items-center gap-1 truncate text-base font-medium text-blue-600 hover:underline dark:text-blue-400"
                       title="Ver tarefa"
                     >
                       <span className="truncate">{taskLabel}</span>
                       <IconExternalLink className="h-3.5 w-3.5 shrink-0" />
                     </Link>
                   ) : taskLabel ? (
-                    <p className="truncate text-muted-foreground" title={taskLabel}>
+                    <p className="truncate text-base text-muted-foreground" title={taskLabel}>
                       {taskLabel}
                     </p>
                   ) : (
@@ -393,6 +396,9 @@ function LinkedInstallmentsTable({
                   <p className="truncate font-medium" title={customerName ?? undefined}>
                     {customerName || "—"}
                   </p>
+                </td>
+                <td className={cn("tabular-nums whitespace-nowrap text-muted-foreground", cell)}>
+                  {formatCnpjCpf(customer?.cnpj) || "—"}
                 </td>
                 <td className={cell}>
                   {status ? (
@@ -421,7 +427,7 @@ function LinkedInstallmentsTable({
         </tbody>
         <tfoot className="bg-muted/30 border-t-2 border-border">
           <tr>
-            <td className={cell} colSpan={7} />
+            <td className={cell} colSpan={8} />
             <td className={cn("text-right font-bold text-base tabular-nums whitespace-nowrap", cell)}>
               {formatCurrency(total)}
             </td>
