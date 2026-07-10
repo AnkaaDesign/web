@@ -67,6 +67,12 @@ function FormulaRow({
       ? null
       : Math.max(0, global.requiredGrams - global.availableGrams)
     : c.missingGrams;
+  // "Total necessário" = combined demand of every selected paint/formula that
+  // shares this component (the global shared-stock figure that Estoque/Falta/Disp
+  // are already measured against). Falls back to this formula alone when the
+  // component isn't part of the global plan.
+  const totalRequiredGrams = global?.requiredGrams ?? c.requiredGrams;
+  const sharedWithOthers = totalRequiredGrams - c.requiredGrams > 0.5;
 
   const short = ratio != null && ratio < 1;
   const tone =
@@ -95,8 +101,13 @@ function FormulaRow({
       <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
         {c.ratio.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%
       </td>
-      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
         {formatGrams(c.requiredGrams)}
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+        <span className={cn("font-medium", sharedWithOthers && "text-foreground")}>
+          {formatGrams(totalRequiredGrams)}
+        </span>
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
         {availableGrams != null ? formatGrams(availableGrams) : formatUnits(availableUnits)}
@@ -151,7 +162,7 @@ export function PaintPlanDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl" hideClose>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-5xl" hideClose>
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between gap-3">
             <span className="flex min-w-0 items-center gap-3">
@@ -268,7 +279,12 @@ export function PaintPlanDetailModal({
                     <tr className="border-b border-border/40 text-[11px] uppercase text-muted-foreground">
                       <th className="px-3 py-2 text-left font-medium">Componente</th>
                       <th className="px-3 py-2 text-right font-medium">Prop.</th>
-                      <th className="px-3 py-2 text-right font-medium">Necessário</th>
+                      <th className="whitespace-nowrap px-3 py-2 text-right font-medium">
+                        Nesta fórmula
+                      </th>
+                      <th className="whitespace-nowrap px-3 py-2 text-right font-medium">
+                        Total necessário
+                      </th>
                       <th className="px-3 py-2 text-right font-medium">Estoque</th>
                       <th className="px-3 py-2 text-right font-medium">Falta</th>
                       <th className="px-3 py-2 text-right font-medium">Disp.</th>
