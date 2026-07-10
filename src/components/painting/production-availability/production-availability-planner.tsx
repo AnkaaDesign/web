@@ -107,6 +107,24 @@ export function ProductionAvailabilityPlanner() {
     return map;
   }, [result]);
 
+  const statusOf = useCallback(
+    (row: SelectionRow): PaintStatus =>
+      row.volumeLiters <= 0 ? "pending" : paintStatusById.get(row.paintId) ?? "pending",
+    [paintStatusById],
+  );
+
+  // Display order: sem fórmula → insuficiente → disponível → (pendente).
+  // Sort is stable, so ties keep their insertion order (manual paints first).
+  const orderedRows = useMemo(() => {
+    const rank: Record<PaintStatus, number> = {
+      "no-formula": 0,
+      insufficient: 1,
+      producible: 2,
+      pending: 3,
+    };
+    return [...rows].sort((a, b) => rank[statusOf(a)] - rank[statusOf(b)]);
+  }, [rows, statusOf]);
+
   const existingIds = useMemo(() => new Set(rows.map((r) => r.paintId)), [rows]);
 
   const handleVolumeChange = useCallback((paintId: string, volume: number) => {
@@ -226,11 +244,8 @@ export function ProductionAvailabilityPlanner() {
               ) : (
                 <>
                   <AddPaintCard resetKey={addKey} existingIds={existingIds} onAdd={handleAdd} />
-                  {rows.map((row) => {
-                    const status: PaintStatus =
-                      row.volumeLiters <= 0
-                        ? "pending"
-                        : paintStatusById.get(row.paintId) ?? "pending";
+                  {orderedRows.map((row) => {
+                    const status = statusOf(row);
                     return (
                       <PaintSelectionCard
                         key={row.paintId}
