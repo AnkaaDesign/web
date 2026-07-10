@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconReceipt2,
@@ -11,7 +11,6 @@ import {
   IconAlertTriangle,
   IconClock,
   IconCopy,
-  IconCircleCheck,
   IconBan,
   IconArrowBackUp,
 } from "@tabler/icons-react";
@@ -28,7 +27,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
@@ -106,12 +104,34 @@ function isAwaitingClearance(row: PayableRow): boolean {
   return row.paymentState === "PAID" && (row.clearanceState ?? "UNCLEARED") === "UNCLEARED";
 }
 
-// Row ordering rank: overdue first, then open obligations, then paid-this-month, then forecasts.
+// Row ordering rank: overdue first, then open obligations, then forecasts —
+// anything still unpaid, however it's classified — and Pago always last.
 function payableRank(state: PayableState): number {
-  if (state === "EXPECTED") return 3;
-  if (state === "PAID") return 2;
+  if (state === "PAID") return 3;
   if (state === "OVERDUE") return 0;
-  return 1;
+  if (state === "EXPECTED") return 2;
+  return 1; // AWAITING_PAYMENT / PARTIALLY_PAID
+}
+
+// Plain label for the "Tipo" column, mirroring PayableTypeBadge — used to sort
+// by type without dragging JSX into the comparator.
+function typeSortLabel(row: PayableRow): string {
+  switch (row.source) {
+    case "AIRBRUSHING":
+      return "Aerografia";
+    case "TAX":
+      return "Imposto";
+    case "PAYROLL":
+      return "Folha";
+    case "PAYROLL_SCHEDULED":
+      return row.subtype || "Folha programada";
+    case "RECURRING":
+    case "RECURRENT_PAYABLE":
+      return "Recorrente";
+    case "SCHEDULED":
+    default:
+      return "Pedidos";
+  }
 }
 
 // Privileges the airbrushing (aerografia) detail page itself accepts — mirror its
@@ -120,6 +140,17 @@ const AIRBRUSHING_VIEW_PRIVILEGES: SECTOR_PRIVILEGES[] = [
   SECTOR_PRIVILEGES.PRODUCTION,
   SECTOR_PRIVILEGES.FINANCIAL,
   SECTOR_PRIVILEGES.COMMERCIAL,
+  SECTOR_PRIVILEGES.ADMIN,
+];
+
+// Privileges the order DETAIL page itself accepts — mirror its PrivilegeRoute
+// (`pages/inventory/orders/details/[id].tsx`) so a payable row only links there
+// for users who can actually open it. Note ACCOUNTING has detail access even
+// though it has no access to the order LIST page / "Estoque" menu section.
+const ORDER_DETAIL_VIEW_PRIVILEGES: SECTOR_PRIVILEGES[] = [
+  SECTOR_PRIVILEGES.WAREHOUSE,
+  SECTOR_PRIVILEGES.FINANCIAL,
+  SECTOR_PRIVILEGES.ACCOUNTING,
   SECTOR_PRIVILEGES.ADMIN,
 ];
 
@@ -153,54 +184,11 @@ function clearanceOf(row: PayableRow): ClearanceState {
   return row.clearanceState ?? "UNCLEARED";
 }
 
-// --- C4 — per-order 3-way (Pedido ≟ NF ≟ Transação) consistency indicator. ----
-// ORDER rows only. `threeWayConsistency` is null/undefined until the order is
-// bank-backed (paid-on-paper / still open → nothing to cross-validate, so we
-// render nothing). Once bank-backed it is 'OK' (green check) or 'MISMATCH'
-// (amber warning) with a tooltip breaking down the three sums.
-function OrderThreeWayBadge({ row }: { row: PayableRow }) {
-  if (row.source !== "ORDER" || row.threeWayConsistency == null) return null;
-  const ok = row.threeWayConsistency === "OK";
-  const sums = row.threeWaySums;
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Badge
-            variant={ok ? "completed" : "warning"}
-            className="font-medium whitespace-nowrap w-fit gap-1 h-5 px-1.5 text-[10px] leading-4 cursor-default"
-          >
-            {ok ? <IconCircleCheck className="h-3 w-3" /> : <IconAlertTriangle className="h-3 w-3" />}
-            Pedido ≟ NF ≟ Transação
-          </Badge>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
-          <div className="space-y-1.5">
-            <p className="font-medium">{ok ? "Pedido, NF e transação conferem" : "Divergência entre pedido, NF e transação"}</p>
-            {sums && (
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 tabular-nums">
-                <span className="text-muted-foreground">Pedido (parcelas)</span>
-                <span className="text-right">{formatCurrency(sums.installment)}</span>
-                <span className="text-muted-foreground">NF vinculada</span>
-                <span className="text-right">{formatCurrency(sums.nf)}</span>
-                <span className="text-muted-foreground">Transação conciliada</span>
-                <span className="text-right">{formatCurrency(sums.tx)}</span>
-              </div>
-            )}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
 // Combined Pagamento × Conciliação badge per the reconciliation design:
 //   paymentState ≠ PAID                  → just the assertion badge (no clearance)
 //   PAID + UNCLEARED                     → "Pago · aguardando conciliação" (amber)
 //   PAID + CLEARED                       → "Pago e conciliado" (green) + clearedAt
 //   DISPUTED (any paymentState)          → "Divergência de valor" (red alert)
-// The 3-way (Pedido ≟ NF ≟ Transação) indicator rides below the assertion badge
-// for ORDER rows that are already bank-backed.
 function PayablePaymentCell({ row }: { row: PayableRow }) {
   // The conciliação (clearance) axis is hidden for now — until the payables
   // reconciliation workflow is decided, a PAID row is simply "Pago" (green),
@@ -222,7 +210,6 @@ function PayablePaymentCell({ row }: { row: PayableRow }) {
           Pago
         </Badge>
       )}
-      <OrderThreeWayBadge row={row} />
     </div>
   );
 }
@@ -242,6 +229,13 @@ function isOverdueRow(row: PayableRow): boolean {
   // Already-paid rows are never "vencido" — only unpaid dues past their date are.
   if (row.paymentState === "PAID" || row.paymentState === "EXPECTED" || !row.dueDate) return false;
   return new Date(row.dueDate).getTime() + OVERDUE_GRACE_MS < Date.now();
+}
+
+// Sort key for the "Pagamento" column — a row vencida by date always leads
+// (even if the server hasn't flipped its state to OVERDUE yet), then the same
+// rank the default ordering uses (overdue < aguardando/parcial < pago < previsto).
+function statusSortRank(row: PayableRow): number {
+  return isOverdueRow(row) ? -1 : payableRank(row.paymentState);
 }
 
 function PayableTypeBadge({ row }: { row: PayableRow }) {
@@ -301,6 +295,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
 
   const canManagePayments = hasAnyPrivilegeAccess(PAYMENT_MANAGER_PRIVILEGES);
   const canViewAirbrushing = hasAnyPrivilegeAccess(AIRBRUSHING_VIEW_PRIVILEGES);
+  const canViewOrderDetail = hasAnyPrivilegeAccess(ORDER_DETAIL_VIEW_PRIVILEGES);
 
   // --- URL state: debounced search + active filter buckets ------------------
   const urlSearch = searchParams.get(SEARCH_PARAM) || "";
@@ -310,6 +305,29 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // Competence month — same period switcher as the Extrato. Scopes the list (and
   // the summary cards) to obligations of the selected month.
   const [month, setMonth] = useState<Date>(() => parseMonthKey(searchParams.get(MONTH_PARAM)) ?? new Date());
+
+  // --- Column multi-sort (Tipo / Valor / Pagamento / Vencimento) — client-side. -
+  // Clicking a column appends it (asc); clicking it again flips to desc; a third
+  // click drops it. Multiple columns stack in click order (shown as 1/2/3... next
+  // to the arrow) and are applied left-to-right as tiebreakers. Defaults to
+  // Pagamento (status) then Vencimento, so the most urgent open payables — the
+  // ones due soonest — lead the list out of the box.
+  const [sortConfigs, setSortConfigs] = useState<{ field: string; direction: "asc" | "desc" }[]>([
+    { field: "payment", direction: "asc" },
+    { field: "dueDate", direction: "asc" },
+  ]);
+  const handleSort = useCallback((columnKey: string) => {
+    setSortConfigs((prev) => {
+      const idx = prev.findIndex((c) => c.field === columnKey);
+      if (idx === -1) return [...prev, { field: columnKey, direction: "asc" }];
+      if (prev[idx].direction === "asc") {
+        const next = [...prev];
+        next[idx] = { field: columnKey, direction: "desc" };
+        return next;
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
+  }, []);
 
   // Right-click payment menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: PayableRow } | null>(null);
@@ -427,7 +445,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // Payment mutations. Order transitions auto-invalidate the payables query
   // (keyed under orderKeys.all); airbrushing settles via its own update, so we
   // refetch the list manually afterward.
-  const { markAwaitingPaymentAsync, markPaidAsync, markInstallmentPaidAsync, updateAsync: updateOrderAsync } = useOrderMutations();
+  const { markAwaitingPaymentAsync, markPaidAsync, markInstallmentPaidAsync, attachReceiptsAsync } = useOrderMutations();
   const { updateAsync: updateAirbrushingAsync } = useAirbrushingMutations();
   const settlePayrollMonth = useSettlePayrollMonth();
   const triggerSchedule = useTriggerOrderSchedule();
@@ -453,25 +471,41 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     return base;
   }, [monthRows, buckets, debouncedSearch]);
 
-  // --- Flat ordering: real obligations first, overdue first, then due, then payee.
+  // Per-column comparator (ascending); direction/multi-key composition happens
+  // in `sortedRows` below.
+  const compareByField = (field: string, a: PayableRow, b: PayableRow): number => {
+    switch (field) {
+      case "type":
+        return typeSortLabel(a).localeCompare(typeSortLabel(b), "pt-BR");
+      case "amount":
+        return a.amount - b.amount;
+      case "payment":
+        return statusSortRank(a) - statusSortRank(b);
+      case "dueDate": {
+        const da = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
+        const db = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
+        return da - db;
+      }
+      default:
+        return 0;
+    }
+  };
+
+  // --- Ordering: applies every active column sort (in click order) left to
+  // right, falling back to payee then description as a stable final tiebreak.
   const sortedRows = useMemo(() => {
     const rows = [...filteredRows];
     rows.sort((a, b) => {
-      const rankA = payableRank(a.paymentState);
-      const rankB = payableRank(b.paymentState);
-      if (rankA !== rankB) return rankA - rankB;
-      const aOverdue = isOverdueRow(a);
-      const bOverdue = isOverdueRow(b);
-      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
-      const da = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
-      const db = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
-      if (da !== db) return da - db;
+      for (const { field, direction } of sortConfigs) {
+        const cmp = compareByField(field, a, b);
+        if (cmp !== 0) return direction === "asc" ? cmp : -cmp;
+      }
       const byPayee = a.payeeName.localeCompare(b.payeeName, "pt-BR");
       if (byPayee !== 0) return byPayee;
       return a.description.localeCompare(b.description, "pt-BR");
     });
     return rows;
-  }, [filteredRows]);
+  }, [filteredRows, sortConfigs]);
 
   const handleRowClick = (row: PayableRow) => {
     // A DISPUTED row's most useful target is the bank line that diverged, so the
@@ -487,8 +521,12 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       return;
     }
     if (row.source === "ORDER") {
-      // Accounting must not open order internals from Contas a Pagar — ORDER rows
-      // are not clickable here (they settle via the context menu, when payable).
+      // row.id is the orderId — open the order's own detail page (its breadcrumb
+      // hides the "Estoque"/"Pedidos" ancestor links for users, like ACCOUNTING,
+      // who can view the detail page but not the orders list). `from: "payables"`
+      // tells the detail page to show "Financeiro / Contas a Pagar" instead,
+      // matching the path actually taken.
+      if (canViewOrderDetail) navigate(routes.inventory.orders.details(row.id), { state: { from: "payables" } });
       return;
     }
     if (row.source === "AIRBRUSHING") {
@@ -553,10 +591,11 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // are not a single transaction, so we flip the PAYMENT STATUS FIRST: a validation
   // failure on mark-paid then aborts before any receipt is attached (the comprovante
   // does not need to precede the payment, and categorization is deferred to the
-  // Conciliação flow). The receipt is appended on top of the now-paid row (empty
-  // FormData → existing files are kept, new ones connected on top). If the receipt
-  // upload fails AFTER the payment is recorded, we surface a clear warning instead of
-  // letting the generic error imply the payment didn't go through.
+  // Conciliação flow). The receipt goes through the dedicated payment-side receipts
+  // endpoint (attachReceipts) — NOT the generic order update, which is WAREHOUSE/ADMIN
+  // only and would 403 for accounting/financial. If the receipt upload fails AFTER the
+  // payment is recorded, we surface a clear warning instead of letting the generic
+  // error imply the payment didn't go through.
   const confirmMarkPaid = async (receipts: File[]) => {
     const row = markPaidRow;
     if (!row) return;
@@ -570,7 +609,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       if (receipts.length > 0) {
         try {
           const formData = createOrderFormData({}, { receipts });
-          await updateOrderAsync({ id: row.id, data: formData as any });
+          await attachReceiptsAsync({ id: row.id, data: formData });
         } catch {
           // Payment is already recorded — don't let the receipt failure look like a
           // failed payment. Tell the user exactly what happened.
@@ -640,7 +679,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
         return <TruncatedTextWithTooltip text={row.description || "-"} className={cn("text-sm", isForecast && "italic text-muted-foreground", row.ignored && "line-through text-muted-foreground")} />;
       },
     },
-    { key: "type", header: "Tipo", width: 176, render: (row) => <PayableTypeBadge row={row} /> },
+    { key: "type", header: "Tipo", width: 176, sortable: true, render: (row) => <PayableTypeBadge row={row} /> },
     {
       key: "installment",
       header: "Parcela",
@@ -668,12 +707,13 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
         </div>
       ),
     },
-    { key: "amount", header: "Valor", width: 128, align: "right", render: (row) => <span className="text-sm font-medium tabular-nums">{formatCurrency(row.amount)}</span> },
-    { key: "payment", header: "Pagamento", width: 200, render: (row) => <PayablePaymentCell row={row} /> },
+    { key: "amount", header: "Valor", width: 128, align: "right", sortable: true, render: (row) => <span className="text-sm font-medium tabular-nums">{formatCurrency(row.amount)}</span> },
+    { key: "payment", header: "Pagamento", width: 200, sortable: true, render: (row) => <PayablePaymentCell row={row} /> },
     {
       key: "dueDate",
       header: "Vencimento",
       width: 144,
+      sortable: true,
       render: (row) => {
         const dueDate = row.dueDate ? new Date(row.dueDate) : null;
         const overdue = isOverdueRow(row);
@@ -792,6 +832,13 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
               emptyIcon={IconReceipt2}
               onRowClick={handleRowClick}
               onContextMenu={handleContextMenu}
+              onSort={handleSort}
+              getSortDirection={(columnKey) => sortConfigs.find((c) => c.field === columnKey)?.direction ?? null}
+              getSortOrder={(columnKey) => {
+                const idx = sortConfigs.findIndex((c) => c.field === columnKey);
+                return idx === -1 ? null : idx;
+              }}
+              sortConfigs={sortConfigs}
             />
           </div>
         </CardContent>

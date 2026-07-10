@@ -18,6 +18,7 @@ import {
   markOrderAwaitingPayment,
   markOrderPaid,
   markOrderInstallmentPaid,
+  attachOrderReceipts,
   batchMarkOrdersAwaitingPayment,
   batchMarkOrdersPaid,
   requestOrderPayment,
@@ -329,6 +330,15 @@ export const useOrderMutations = (options?: {
     },
   });
 
+  // Attach comprovante(s) to an order — payment-side endpoint so accounting can
+  // index a receipt when settling a payable without full order-edit rights.
+  const attachReceiptsMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: FormData }) => attachOrderReceipts(id, data),
+    onSuccess: (data) => {
+      invalidateQueries(data.data?.supplierId || undefined);
+    },
+  });
+
   // ADMIN: PENDING → AWAITING_PAYMENT (Requisitar Pagamento) and its reverse.
   const requestPaymentMutation = useMutation({
     mutationFn: (id: string) => requestOrderPayment(id),
@@ -351,6 +361,7 @@ export const useOrderMutations = (options?: {
     markAwaitingPaymentMutation.isPending ||
     markPaidMutation.isPending ||
     markInstallmentPaidMutation.isPending ||
+    attachReceiptsMutation.isPending ||
     requestPaymentMutation.isPending ||
     cancelPaymentRequestMutation.isPending;
 
@@ -361,6 +372,7 @@ export const useOrderMutations = (options?: {
     markAwaitingPaymentMutation.error ||
     markPaidMutation.error ||
     markInstallmentPaidMutation.error ||
+    attachReceiptsMutation.error ||
     requestPaymentMutation.error ||
     cancelPaymentRequestMutation.error;
 
@@ -377,6 +389,8 @@ export const useOrderMutations = (options?: {
     markPaidAsync: markPaidMutation.mutateAsync,
     markInstallmentPaid: markInstallmentPaidMutation.mutate,
     markInstallmentPaidAsync: markInstallmentPaidMutation.mutateAsync,
+    attachReceipts: attachReceiptsMutation.mutate,
+    attachReceiptsAsync: attachReceiptsMutation.mutateAsync,
     requestPayment: requestPaymentMutation.mutate,
     requestPaymentAsync: requestPaymentMutation.mutateAsync,
     cancelPaymentRequest: cancelPaymentRequestMutation.mutate,
@@ -391,6 +405,7 @@ export const useOrderMutations = (options?: {
     markAwaitingPaymentMutation,
     markPaidMutation,
     markInstallmentPaidMutation,
+    attachReceiptsMutation,
     requestPaymentMutation,
     cancelPaymentRequestMutation,
   };

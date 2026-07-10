@@ -172,6 +172,16 @@ export class OrderService {
     return response.data;
   }
 
+  /**
+   * Attach the comprovante(s) de pagamento to an order. Payment-side endpoint
+   * (financial roles) — separate from updateOrder so accounting can index a
+   * receipt without full order-edit rights. `data` is a multipart FormData.
+   */
+  async attachReceipts(id: string, data: FormData, query?: OrderQueryFormData): Promise<OrderUpdateResponse> {
+    const response = await apiClient.put<OrderUpdateResponse>(`${this.basePath}/${id}/receipts`, data, { params: query });
+    return response.data;
+  }
+
   async batchMarkAwaitingPayment(data: OrderBatchPaymentFormData, query?: OrderQueryFormData): Promise<OrderBatchUpdateResponse<OrderUpdateFormData>> {
     const response = await apiClient.put<OrderBatchUpdateResponse<OrderUpdateFormData>>(`${this.basePath}/batch/mark-awaiting-payment`, data, { params: query });
     return response.data;
@@ -396,6 +406,7 @@ export const settlePayrollMonth = (year: number, month: number, amount: number |
 export const markOrderAwaitingPayment = (id: string, query?: OrderQueryFormData) => orderService.markAwaitingPayment(id, query);
 export const markOrderPaid = (id: string, query?: OrderQueryFormData) => orderService.markPaid(id, query);
 export const markOrderInstallmentPaid = (installmentId: string, query?: OrderQueryFormData) => orderService.markInstallmentPaid(installmentId, query);
+export const attachOrderReceipts = (id: string, data: FormData, query?: OrderQueryFormData) => orderService.attachReceipts(id, data, query);
 export const batchMarkOrdersAwaitingPayment = (data: OrderBatchPaymentFormData, query?: OrderQueryFormData) => orderService.batchMarkAwaitingPayment(data, query);
 export const batchMarkOrdersPaid = (data: OrderBatchPaymentFormData, query?: OrderQueryFormData) => orderService.batchMarkPaid(data, query);
 export const requestOrderPayment = (id: string, query?: OrderQueryFormData) => orderService.requestPayment(id, query);
