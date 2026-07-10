@@ -6,6 +6,7 @@ import {
   IconArrowRight,
   IconLoader2,
   IconCheck,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import { routes } from "@/constants";
 import { useTaskDetail, useTaskMutations } from "@/hooks";
@@ -356,9 +357,13 @@ export const FinancialBudgetDetailPage = () => {
     setFormInitialized(true);
 
     // Set layout files from the included layoutFiles relation (array, up to 2).
+    // Use originalName (a quote layout is a private CLONE of a task layout: it
+    // keeps the source originalName but gets a generated filename, so matching on
+    // filename would show it as a separate "orphan" tile instead of highlighting
+    // its task-layout twin).
     const toLayoutFile = (file: any): FileWithPreview => ({
       id: file.id,
-      name: file.filename || "layout",
+      name: file.originalName || file.filename || "layout",
       size: file.size || 0,
       type: file.mimetype || "application/octet-stream",
       lastModified: Date.now(),
@@ -1207,6 +1212,14 @@ export const FinancialBudgetDetailPage = () => {
   });
   const layoutImageOptions = Array.from(layoutsById.values());
 
+  // Public "Ver Orçamento" link — lives in the page header (mirrors the invoice
+  // page's "Ver Dossiê"), not in a body card.
+  const budgetCustomerId = task?.customer?.id || task?.customerId;
+  const publicBudgetUrl =
+    existingQuote?.id && budgetCustomerId
+      ? routes.customer.budget(budgetCustomerId, existingQuote.id)
+      : null;
+
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
@@ -1219,13 +1232,20 @@ export const FinancialBudgetDetailPage = () => {
           { label: taskName },
         ]}
         onBreadcrumbNavigate={(path) => guardedNavigate(path)}
+        headerExtra={
+          publicBudgetUrl ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 whitespace-nowrap"
+              onClick={() => window.open(publicBudgetUrl, "_blank")}
+            >
+              <IconExternalLink className="h-4 w-4" />
+              Ver Orçamento
+            </Button>
+          ) : undefined
+        }
         actions={[
-          {
-            key: "cancel",
-            label: "Cancelar",
-            onClick: () => guardedNavigate(returnTo || routes.financial.budget.root),
-            variant: "outline" as const,
-          },
           ...(currentStep > 1
             ? [
                 {

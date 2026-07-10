@@ -187,11 +187,6 @@ export function BudgetStepReview({
   const [rejectReason, setRejectReason] = useState("");
   const [pendingRejectStatus, setPendingRejectStatus] = useState<string | null>(null);
 
-  // Public budget URL
-  const publicBudgetUrl = existingQuote?.id && task?.customer?.id
-    ? routes.customer.budget(task.customer.id, existingQuote.id)
-    : null;
-
   return (
     <div className="space-y-6">
       {/* Task Info Summary — with inline status */}
@@ -217,17 +212,6 @@ export function BudgetStepReview({
                   >
                     <IconExternalLink className="h-3.5 w-3.5" />
                     Ver Tarefa
-                  </Button>
-                )}
-                {publicBudgetUrl && (
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => window.open(publicBudgetUrl, "_blank")}
-                    className="gap-1.5 h-9"
-                  >
-                    <IconExternalLink className="h-3.5 w-3.5" />
-                    Visualizar
                   </Button>
                 )}
                 {canChangeStatus ? (

@@ -116,9 +116,9 @@ const toolGroups: ToolGroup[] = [
         icon: IconCalendarStats,
       },
       {
-        label: "Post-its",
+        label: "Notas",
         description: "Anotações rápidas e lembretes pessoais",
-        route: routes.tools.postIts.root,
+        route: routes.tools.notes.root,
         icon: IconNote,
       },
     ],

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   IconCurrencyDollar,
   IconChevronDown,
@@ -11,6 +12,7 @@ import {
   IconLoader2,
 } from '@tabler/icons-react';
 import { formatCurrency, formatDate } from '@/utils';
+import { formatInstallmentPaymentForm } from '@/utils/installment-payment-method';
 import { useInvoicesByTask } from '@/hooks/production/use-invoice';
 import { InvoiceStatusBadge } from './invoice-status-badge';
 import { InstallmentStatusBadge } from './installment-status-badge';
@@ -247,6 +249,10 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
                             <div className="divide-y divide-border">
                               {installments.map((installment) => {
                                 const boletoPdfFile = installment.bankSlip?.pdfFile;
+                                const paymentForm = formatInstallmentPaymentForm(
+                                  installment.paymentMethod,
+                                  !!installment.bankSlip,
+                                );
                                 return (
                                   <div key={installment.id} className="px-4 py-2.5 hover:bg-muted/40 transition-colors">
                                     <div className="flex items-center justify-between">
@@ -261,6 +267,11 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
                                           {formatCurrency(installment.amount)}
                                         </span>
                                         <InstallmentStatusBadge status={installment.status} size="sm" />
+                                        {paymentForm && (
+                                          <Badge variant="secondary" size="sm" className="font-medium whitespace-nowrap">
+                                            {paymentForm}
+                                          </Badge>
+                                        )}
                                         {installment.bankSlip && (
                                           <BankSlipStatusBadge status={installment.bankSlip.status} size="sm" />
                                         )}

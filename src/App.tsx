@@ -404,6 +404,7 @@ const PaintFormulasEdit = lazy(() => import("@/pages/painting/formulas/edit/[id]
 const PaintFormulaDetails = lazy(() => import("@/pages/painting/formulas/details/[id]").then((module) => ({ default: module.default })));
 const PaintCatalogFormulaDetails = lazy(() => import("@/pages/painting/catalog/details/[id]/formulas/details/[formulaId]").then((module) => ({ default: module.default })));
 const PaintProductionDetails = lazy(() => import("@/pages/painting/productions/details/[id]").then((module) => ({ default: module.default })));
+const PaintProductionAvailability = lazy(() => import("@/pages/painting/availability").then((module) => ({ default: module.default })));
 const ColorPalettePage = lazy(() => import("@/pages/tools/color-palette"));
 
 // Production
@@ -516,7 +517,7 @@ const QrCodeToolPage = lazy(() => import("@/pages/tools/qr-code").then((module) 
 const TimeCalculatorPage = lazy(() => import("@/pages/tools/time-calculator"));
 const OvertimeCostCalculatorPage = lazy(() => import("@/pages/tools/overtime-cost-calculator"));
 const EmployeeCostCalculatorPage = lazy(() => import("@/pages/tools/employee-cost-calculator"));
-const PostItsPage = lazy(() => import("@/pages/tools/post-its"));
+const NotesPage = lazy(() => import("@/pages/tools/notes"));
 const PaintMixCalculatorPage = lazy(() => import("@/pages/tools/paint-mix-calculator"));
 const WasteCertificateToolPage = lazy(() => import("@/pages/tools/waste-certificate").then((module) => ({ default: module.WasteCertificateToolPage })));
 
@@ -2570,6 +2571,14 @@ function App() {
                     </Suspense>
                   }
                 />
+                <Route
+                  path={routes.painting.availability.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PaintProductionAvailability />
+                    </Suspense>
+                  }
+                />
 
                 <Route
                   path={routes.painting.paintTypes.root}
@@ -3589,10 +3598,10 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.tools.postIts.root}
+                  path={routes.tools.notes.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <PostItsPage />
+                      <NotesPage />
                     </Suspense>
                   }
                 />

@@ -4,14 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
-import { formatCurrency, formatDate, formatChassis, formatCNPJ, formatCPF, formatPaidInstallmentLabel } from "@/utils";
+import { formatCurrency, formatDate, formatChassis, formatCNPJ, formatCPF, formatPaidInstallmentLabel, formatInstallmentPaymentForm } from "@/utils";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 import type { TRUCK_CATEGORY, IMPLEMENT_TYPE } from "@/constants/enums";
 import { generatePaymentText } from "@/utils/quote-text-generators";
 import { BoletoActions } from "@/components/production/task/billing/boleto-actions";
 import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
 import { NfseActions } from "@/components/production/task/billing/nfse-actions";
-import { NfseEnrichedInfo } from "@/components/production/task/billing/nfse-enriched-info";
+import { useNfseDetail } from "@/hooks/financial/use-nfse";
 import { canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
 import type { Invoice } from "@/types/invoice";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
@@ -698,15 +698,17 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                               <DownloadAllBoletosButton installments={installments} />
                             </div>
                             <div className="rounded-md border border-border/50 overflow-x-auto">
-                              <table className="w-full text-xs">
+                              <table className="w-full text-sm table-fixed">
                                 <thead>
                                   <tr className="border-b border-border/50 bg-muted/40 text-muted-foreground">
-                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Parcela</th>
-                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Status</th>
-                                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Valor</th>
-                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Vencimento</th>
-                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Pago em</th>
-                                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Ações</th>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-24">Parcela</th>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-36">Status</th>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-44">Vencimento</th>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-44">Pago em</th>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-40">Forma</th>
+                                    <th aria-hidden />
+                                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-40">Valor</th>
+                                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-56">Ações</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border/50">
@@ -718,9 +720,6 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                       <td className="px-3 py-2">
                                         <UnifiedInstallmentBadge installment={installment} />
                                       </td>
-                                      <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
-                                        {formatCurrency(installment.amount)}
-                                      </td>
                                       <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
                                         {formatDate(installment.dueDate)}
                                       </td>
@@ -730,6 +729,20 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                         ) : (
                                           <span className="text-muted-foreground">-</span>
                                         )}
+                                      </td>
+                                      <td className="px-3 py-2 whitespace-nowrap">
+                                        {(() => {
+                                          const form = formatInstallmentPaymentForm(installment.paymentMethod, !!installment.bankSlip);
+                                          return form ? (
+                                            <Badge variant="secondary" size="sm" className="font-medium whitespace-nowrap">{form}</Badge>
+                                          ) : (
+                                            <span className="text-muted-foreground">-</span>
+                                          );
+                                        })()}
+                                      </td>
+                                      <td aria-hidden />
+                                      <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
+                                        {formatCurrency(installment.amount)}
                                       </td>
                                       <td className="px-3 py-2">
                                         <div className="flex justify-end">
@@ -753,68 +766,61 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                           </div>
                         )}
 
-                        {/* NFS-e */}
-                        <div className="space-y-1">
+                        {/* NFS-e — same table layout as Parcelas above */}
+                        <div className="space-y-2">
                           <div className="flex items-center gap-2 text-sm font-semibold">
                             <IconFileInvoice className="h-3.5 w-3.5 text-muted-foreground" />
                             NFS-e
                           </div>
-                          {/* Active/Current NFS-e with cancel button inline */}
-                          {activeNfse && (
-                            <div className="rounded-md border border-border/50 px-3 py-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <NfseStatusBadge status={activeNfse.status} size="sm" />
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  {activeNfse.elotechNfseId && (
-                                    <NfsePdfButtons elotechNfseId={activeNfse.elotechNfseId} />
-                                  )}
-                                  {/* Cancel for authorized; reemit for error/pending */}
-                                  <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} canManage={!disabled} />
-                                </div>
-                              </div>
-                              {activeNfse.elotechNfseId && (
-                                <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} />
-                              )}
-                              {activeNfse.status === 'ERROR' && activeNfse.errorMessage && (
-                                <p className="text-xs text-destructive mt-1">{activeNfse.errorMessage}</p>
-                              )}
-                            </div>
-                          )}
-                          {/* No NFS-e at all — show emit button */}
-                          {!activeNfse && canceledNfses.length === 0 && (
-                            <div className="rounded-md border border-border/50 px-3 py-2 flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground">Nao emitida</span>
-                              <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} canManage={!disabled} />
-                            </div>
-                          )}
-                          {/* Canceled NFS-e entries — with reemit button on the last one */}
-                          {canceledNfses.map((doc: any, idx: number) => (
-                            <div
-                              key={doc.id}
-                              className="rounded-md border border-border/50 px-3 py-2 cursor-pointer hover:bg-muted/30 transition-colors"
-                              onClick={() => doc.elotechNfseId && navigate(routes.financial.nfse.detail(doc.elotechNfseId))}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <NfseStatusBadge status={doc.status} size="sm" />
-                                </div>
-                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                  {doc.elotechNfseId && (
-                                    <NfsePdfButtons elotechNfseId={doc.elotechNfseId} />
-                                  )}
-                                  {/* Reemit button — only on last cancelled when no active NFSe */}
-                                  {!activeNfse && idx === canceledNfses.length - 1 && (
-                                    <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} canManage={!disabled} />
-                                  )}
-                                </div>
-                              </div>
-                              {doc.elotechNfseId && (
-                                <NfseEnrichedInfo elotechNfseId={doc.elotechNfseId} />
-                              )}
-                            </div>
-                          ))}
+                          <div className="rounded-md border border-border/50 overflow-x-auto">
+                            <table className="w-full text-sm table-fixed">
+                              <thead>
+                                <tr className="border-b border-border/50 bg-muted/40 text-muted-foreground">
+                                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-24">Número</th>
+                                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-36">Status</th>
+                                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-44">Emissão</th>
+                                  <th aria-hidden />
+                                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-40">ISS</th>
+                                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-40">Valor</th>
+                                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-56">Ações</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border/50">
+                                {/* No NFS-e at all — single row with emit button */}
+                                {!activeNfse && canceledNfses.length === 0 && (
+                                  <tr>
+                                    <td colSpan={6} className="px-3 py-2 text-muted-foreground">Não emitida</td>
+                                    <td className="px-3 py-2">
+                                      <div className="flex justify-end">
+                                        <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} canManage={!disabled} />
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                                {/* Active/Current NFS-e — cancel/reemit inline */}
+                                {activeNfse && (
+                                  <NfseTableRow
+                                    doc={activeNfse}
+                                    showActions
+                                    invoiceId={configInvoice.id}
+                                    nfseDocuments={nfseDocuments}
+                                    canManage={!disabled}
+                                  />
+                                )}
+                                {/* Canceled NFS-e entries — reemit button only on the last one when no active */}
+                                {canceledNfses.map((doc: any, idx: number) => (
+                                  <NfseTableRow
+                                    key={doc.id}
+                                    doc={doc}
+                                    showActions={!activeNfse && idx === canceledNfses.length - 1}
+                                    invoiceId={configInvoice.id}
+                                    nfseDocuments={nfseDocuments}
+                                    canManage={!disabled}
+                                  />
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1316,5 +1322,67 @@ function NfsePdfButtons({ elotechNfseId }: { elotechNfseId: number }) {
         )}
       </Button>
     </>
+  );
+}
+
+/**
+ * One row of the NFS-e table. Loads Número/Emissão/Valor/ISS from the enriched
+ * NFS-e detail (same source as the old NfseEnrichedInfo card). `showActions`
+ * controls whether the cancel/reemit control is shown on this row.
+ */
+function NfseTableRow({
+  doc,
+  showActions,
+  invoiceId,
+  nfseDocuments,
+  canManage,
+}: {
+  doc: any;
+  showActions: boolean;
+  invoiceId: string;
+  nfseDocuments: any[];
+  canManage: boolean;
+}) {
+  const navigate = useNavigate();
+  // enabled:!!elotechNfseId inside the hook — passing 0 is a no-op (docs not yet emitted).
+  const { data } = useNfseDetail(doc.elotechNfseId ?? 0);
+  const detail: any = data?.data;
+  const numero = detail?.formDadosNFSe?.numeroNfse ?? doc.nfseNumber ?? null;
+  const emissao = detail?.formDadosNFSe?.dataEmissao ?? null;
+  const valor = detail?.formTotal?.totalNfse ?? null;
+  const iss = detail?.formImposto?.valorIss ?? null;
+  const clickable = !!doc.elotechNfseId;
+
+  return (
+    <tr
+      className={cn("hover:bg-muted/40 transition-colors", clickable && "cursor-pointer")}
+      onClick={clickable ? () => navigate(routes.financial.nfse.detail(doc.elotechNfseId)) : undefined}
+    >
+      <td className="px-3 py-2 tabular-nums font-medium whitespace-nowrap">{numero ?? "-"}</td>
+      <td
+        className="px-3 py-2"
+        title={doc.status === "ERROR" && doc.errorMessage ? doc.errorMessage : undefined}
+      >
+        <NfseStatusBadge status={doc.status} size="sm" />
+      </td>
+      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+        {emissao ? formatDate(emissao) : "-"}
+      </td>
+      <td aria-hidden />
+      <td className="px-3 py-2 text-right whitespace-nowrap">
+        {iss != null ? formatCurrency(iss) : "-"}
+      </td>
+      <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
+        {valor != null ? formatCurrency(valor) : "-"}
+      </td>
+      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-1">
+          {doc.elotechNfseId && <NfsePdfButtons elotechNfseId={doc.elotechNfseId} />}
+          {showActions && (
+            <NfseActions invoiceId={invoiceId} nfseDocuments={nfseDocuments} canManage={canManage} />
+          )}
+        </div>
+      </td>
+    </tr>
   );
 }

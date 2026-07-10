@@ -272,7 +272,7 @@ describe("ACCOUNTING tree matches the spec (Área Andressa)", () => {
       "Certificado de Resíduos",
       "Custo de Funcionário",
       "Custo de Horas Extras",
-      "Post-its",
+      "Notas",
     ]);
     const calendario = (tools.children || []).find((c) => c.id === "ferramentas-calendario")!;
     expect(calendario.path).toBe("/departamento-pessoal/calendario");

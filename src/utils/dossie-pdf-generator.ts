@@ -120,7 +120,7 @@ async function embedImage(doc: PDFDocument, bytes: Uint8Array) {
 }
 
 /** Draw text that wraps within maxWidth. Returns new Y position. */
-function drawWrappedText(page: PDFPage, text: string, x: number, y: number, font: PDFFont, size: number, color: ReturnType<typeof rgb>, maxWidth: number): number {
+function drawWrappedText(page: PDFPage, text: string, x: number, y: number, font: PDFFont, size: number, color: ReturnType<typeof rgb>, maxWidth: number, lineHeight = 1.4): number {
   const words = text.split(' ');
   let line = '';
   let curY = y;
@@ -130,7 +130,7 @@ function drawWrappedText(page: PDFPage, text: string, x: number, y: number, font
     const testWidth = font.widthOfTextAtSize(testLine, size);
     if (testWidth > maxWidth && line) {
       page.drawText(line, { x, y: curY, size, font, color });
-      curY -= size * 1.4;
+      curY -= size * lineHeight;
       line = word;
     } else {
       line = testLine;
@@ -138,7 +138,7 @@ function drawWrappedText(page: PDFPage, text: string, x: number, y: number, font
   }
   if (line) {
     page.drawText(line, { x, y: curY, size, font, color });
-    curY -= size * 1.4;
+    curY -= size * lineHeight;
   }
   return curY;
 }
@@ -202,7 +202,7 @@ async function drawHeader(page: PDFPage, doc: PDFDocument, font: PDFFont, fontBo
 
   // Green line
   page.drawRectangle({ x: ML, y, width: CW, height: 1, color: GREEN });
-  y -= 16;
+  y -= 22; // comfortable clearance so the title never touches the rule
 
   return y;
 }
@@ -378,35 +378,74 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
     ? clamp(SECTION_MIN + remainingSlack / sectionGapCount, SECTION_MIN, SECTION_MAX)
     : SECTION_MIN;
 
+  // Intelligent, MODERATE fill for a sparse cover: the emptier the page, the more
+  // generous the LEADING, the service-row breath and the section spacing — a mix
+  // scaled by how few services there are (`t`), all gently capped so it reads as a
+  // deliberately airy formal layout, never exaggerated. Type sizes are FIXED (the
+  // header/footer are fixed too, so scaling the body clashed and pushed the title
+  // into the header rule). Top-aligned — the title always sits just under the
+  // header rule; whatever the caps can't absorb stays a clean bottom margin.
+  // Layout-image covers let the image soak up the slack ⇒ base values.
+  // Keep in sync with the Flutter twin (quote_report_pdf_generator.dart).
+  let lineHeight = 1.4;
+  let rowGap = 12 + interServicePad;
+  let tightGap = TIGHT_PAD;
+  let sectionGap = sectionPad;
+  let halfGap = clamp(sectionPad * 0.5, 9, 14);
+  if (!layoutImagePresent) {
+    let contentH = titleH + TIGHT_PAD;
+    if (opts.contactName) contentH += salutationH + TIGHT_PAD;
+    contentH += introH + sectionPad; // intro block + gap
+    contentH += servicesHeaderH + halfGap;
+    contentH += servicesH + interServicePad * serviceCount;
+    contentH += halfGap;
+    contentH += opts.hasDiscount
+      ? 14 + 12 + PRE_SEP_MIN + POST_SEP_MIN + 13 + sectionPad
+      : 4 + 13 + sectionPad;
+    if (opts.paymentText) {
+      contentH += 14 + measureWrappedHeight(opts.paymentText, font, 10, CW) + sectionPad;
+    }
+    if (opts.guaranteeText) {
+      contentH += 14 + measureWrappedHeight(opts.guaranteeText, font, 10, CW) + sectionPad;
+    }
+    // t: 0 when the cover already fills the page, → 1 the sparser it gets.
+    const t = clamp((availableH - contentH) / 260, 0, 1);
+    lineHeight = 1.4 + 0.3 * t;                 // ≤ 1.7 — a touch more leading
+    rowGap = 12 + interServicePad + 11 * t;     // ≤ ~25 — the list breathes
+    tightGap = TIGHT_PAD + 4 * t;               // ≤ 14
+    sectionGap = sectionPad + 16 * t;           // ≤ ~38
+    halfGap = clamp(sectionGap * 0.5, 9, 18);
+  }
+
   // Title "DOSSIÊ"
   p1.drawText('DOSSIÊ', { x: ML, y, size: 14, font: fontBold, color: GREEN });
   const titleW = fontBold.widthOfTextAtSize('DOSSIÊ', 14);
   p1.drawRectangle({ x: ML, y: y - 2, width: titleW, height: 0.5, color: GREEN });
-  y -= titleH + TIGHT_PAD;
+  y -= titleH + tightGap;
 
   if (opts.contactName) {
     p1.drawText(`À ${opts.contactName}`, { x: ML, y, size: 11, font: fontBold, color: GREEN });
-    y -= salutationH + TIGHT_PAD;
+    y -= salutationH + tightGap;
   }
 
   // Intro paragraph — closes the letter-format header.
-  y = drawWrappedText(p1, introText, ML, y, font, 10, GRAY, CW);
-  y -= sectionPad;
+  y = drawWrappedText(p1, introText, ML, y, font, 10, GRAY, CW, lineHeight);
+  y -= sectionGap;
 
   // Services header — tighter to its list (caption-style).
   p1.drawText('Serviços Realizados', { x: ML, y, size: 12, font: fontBold, color: GREEN });
-  y -= servicesHeaderH + clamp(sectionPad * 0.5, 6, 12);
+  y -= servicesHeaderH + halfGap;
 
   // Service items
   for (const svc of renderedServices) {
     p1.drawText(svc.displaySvc, { x: ML + 12, y, size: 10, font, color: DARK });
     const priceW = font.widthOfTextAtSize(svc.priceText, 10);
     p1.drawText(svc.priceText, { x: W - MR - priceW, y, size: 10, font, color: DARK });
-    y -= 12 + interServicePad; // 12pt line + adaptive breath
+    y -= rowGap; // service line + adaptive breath
   }
 
   // Pre-totals breath (small, since totals follow services as a unit)
-  y -= clamp(sectionPad * 0.5, 6, 12);
+  y -= halfGap;
 
   // Totals — fixed comfortable spacing here; this is the previously cramped area.
   if (opts.hasDiscount) {
@@ -439,22 +478,22 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
   p1.drawText('Total', { x: ML + 12, y, size: 13, font: fontBold, color: DARK });
   const totalW = fontBold.widthOfTextAtSize(totalVal, 13);
   p1.drawText(totalVal, { x: W - MR - totalW, y, size: 13, font: fontBold, color: GREEN });
-  y -= 13 + sectionPad;
+  y -= 13 + sectionGap;
 
   // Payment conditions
   if (opts.paymentText) {
     p1.drawText('Condições de pagamento', { x: ML, y, size: 12, font: fontBold, color: GREEN });
     y -= 14;
-    y = drawWrappedText(p1, opts.paymentText, ML, y, font, 10, GRAY, CW);
-    y -= sectionPad;
+    y = drawWrappedText(p1, opts.paymentText, ML, y, font, 10, GRAY, CW, lineHeight);
+    y -= sectionGap;
   }
 
   // Guarantee
   if (opts.guaranteeText) {
     p1.drawText('Garantias', { x: ML, y, size: 12, font: fontBold, color: GREEN });
     y -= 14;
-    y = drawWrappedText(p1, opts.guaranteeText, ML, y, font, 10, GRAY, CW);
-    y -= sectionPad;
+    y = drawWrappedText(p1, opts.guaranteeText, ML, y, font, 10, GRAY, CW, lineHeight);
+    y -= sectionGap;
   }
 
   // Layout image — uses whatever vertical space is left, contains aspect ratio,

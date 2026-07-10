@@ -644,6 +644,51 @@ const renderPaintsCards = (paints: any[]) => {
 };
 
 // Timeline item component
+// Converte o HTML do editor de notas em texto puro (blocos/br → quebras de
+// linha; entidades comuns decodificadas; espaços colapsados).
+function stripHtmlToText(input: unknown): string {
+  if (input === null || input === undefined) return "";
+  let s = typeof input === "string" ? input : String(input);
+  // Desembrulha valores JSON-stringificados ("...").
+  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) {
+    try {
+      s = JSON.parse(s);
+    } catch {
+      /* mantém */
+    }
+  }
+  return s
+    .replace(/<\/(div|p|li|h[1-6])>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
+// Diff por CARACTERES: apara o prefixo e o sufixo comuns e devolve o miolo
+// adicionado/removido. Preciso o bastante para pegar edições dentro de uma
+// palavra (ex.: "Kennedy." → "Kenn" ⇒ removeu "edy.").
+function noteTextDiff(oldVal: unknown, newVal: unknown): { added: string; removed: string } {
+  const o = stripHtmlToText(oldVal);
+  const n = stripHtmlToText(newVal);
+  const max = Math.min(o.length, n.length);
+  let start = 0;
+  while (start < max && o[start] === n[start]) start++;
+  let endO = o.length;
+  let endN = n.length;
+  while (endO > start && endN > start && o[endO - 1] === n[endN - 1]) {
+    endO--;
+    endN--;
+  }
+  return { removed: o.slice(start, endO).trim(), added: n.slice(start, endN).trim() };
+}
+
 const ChangelogTimelineItem = ({
   changelogGroup,
   entityType,
@@ -1561,8 +1606,13 @@ const ChangelogTimelineItem = ({
                     <div key={changelog.id}>
                       {showSeparator && <Separator className="my-3 opacity-40" />}
 
-                      {/* Field name - Hide for services field as it renders as cards */}
-                      {changelog.field !== "services" && (
+                      {/* Field name - Hide for services (renders as cards) e para
+                          conteúdo/título de Nota (o diff já é autoexplicativo). */}
+                      {changelog.field !== "services" &&
+                        !(
+                          entityType === CHANGE_LOG_ENTITY_TYPE.NOTE &&
+                          (changelog.field === "content" || changelog.field === "title")
+                        ) && (
                         <div className="flex items-center justify-between mb-2">
                           <div className="text-sm text-muted-foreground">
                             <span className="text-muted-foreground">
@@ -2578,6 +2628,76 @@ const ChangelogTimelineItem = ({
                                       </span>
                                     </div>
                                   </>
+                                );
+                              })()
+                            ) : entityType === CHANGE_LOG_ENTITY_TYPE.NOTE &&
+                              (changelog.field === "content" ||
+                                changelog.field === "title") ? (
+                              // Notas: mostra um DIFF legível ("Você adicionou/removeu
+                              // «texto»") em vez do HTML cru antes/depois.
+                              (() => {
+                                const beforeText = stripHtmlToText(
+                                  changelog.oldValue,
+                                );
+                                const afterText = stripHtmlToText(
+                                  changelog.newValue,
+                                );
+                                const { added, removed } = noteTextDiff(
+                                  changelog.oldValue,
+                                  changelog.newValue,
+                                );
+                                if (!added && !removed) {
+                                  return (
+                                    <div className="text-sm text-muted-foreground">
+                                      Sem alteração de texto.
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div className="space-y-1.5">
+                                    {/* Resumo do que mudou */}
+                                    <div className="space-y-1">
+                                      {added && (
+                                        <div className="text-sm">
+                                          <span className="text-muted-foreground">
+                                            Adicionou{" "}
+                                          </span>
+                                          <span className="text-green-600 dark:text-green-400 font-medium">
+                                            “{added}”
+                                          </span>
+                                        </div>
+                                      )}
+                                      {removed && (
+                                        <div className="text-sm">
+                                          <span className="text-muted-foreground">
+                                            Removeu{" "}
+                                          </span>
+                                          <span className="text-red-600 dark:text-red-400 font-medium line-through">
+                                            “{removed}”
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {/* Texto completo antes/depois (sem HTML) */}
+                                    <div className="space-y-0.5 rounded-md bg-muted/40 px-2 py-1.5 text-xs">
+                                      <div className="whitespace-pre-wrap break-words">
+                                        <span className="text-muted-foreground">
+                                          Antes:{" "}
+                                        </span>
+                                        <span className="text-red-600/80 dark:text-red-400/80">
+                                          {beforeText || "(vazio)"}
+                                        </span>
+                                      </div>
+                                      <div className="whitespace-pre-wrap break-words">
+                                        <span className="text-muted-foreground">
+                                          Depois:{" "}
+                                        </span>
+                                        <span className="text-green-700/90 dark:text-green-400/90">
+                                          {afterText || "(vazio)"}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
                                 );
                               })()
                             ) : (

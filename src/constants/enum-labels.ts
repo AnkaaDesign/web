@@ -1312,7 +1312,7 @@ export const ENTITY_TYPE_LABELS: Record<ENTITY_TYPE, string> = {
   [ENTITY_TYPE.LEAVE]: "Afastamento",
   [ENTITY_TYPE.DEPENDENT]: "Dependente",
   [ENTITY_TYPE.AGENDA_EVENT]: "Evento de Agenda",
-  [ENTITY_TYPE.POSTIT]: "Post-it",
+  [ENTITY_TYPE.NOTE]: "Nota",
   [ENTITY_TYPE.FISPQ]: "FISPQ",
   [ENTITY_TYPE.RESPONSIBLE]: "Responsável",
   [ENTITY_TYPE.WAREHOUSE_LOCATION]: "Localização no Almoxarifado",
@@ -1776,7 +1776,7 @@ export const CHANGE_LOG_ENTITY_TYPE_LABELS: Record<CHANGE_LOG_ENTITY_TYPE, strin
   [CHANGE_LOG_ENTITY_TYPE.LEAVE]: "Afastamento",
   [CHANGE_LOG_ENTITY_TYPE.DEPENDENT]: "Dependente",
   [CHANGE_LOG_ENTITY_TYPE.AGENDA_EVENT]: "Evento de Agenda",
-  [CHANGE_LOG_ENTITY_TYPE.POSTIT]: "Post-it",
+  [CHANGE_LOG_ENTITY_TYPE.NOTE]: "Nota",
   [CHANGE_LOG_ENTITY_TYPE.FISPQ]: "FISPQ",
   [CHANGE_LOG_ENTITY_TYPE.PREFERENCES]: "Preferências",
   [CHANGE_LOG_ENTITY_TYPE.RESPONSIBLE]: "Responsável",
@@ -2212,7 +2212,7 @@ export const FAVORITE_PAGES_LABELS: Record<FAVORITE_PAGES, string> = {
 
   // Ferramentas
   [FAVORITE_PAGES.FERRAMENTAS_CUSTO_DE_FUNCIONARIO]: "Custo de Funcionário",
-  [FAVORITE_PAGES.FERRAMENTAS_POST_ITS]: "Post-its",
+  [FAVORITE_PAGES.FERRAMENTAS_NOTAS]: "Notas",
 
   // Favorites coverage — list/index pages wired for the favorites button
   [FAVORITE_PAGES.ADMINISTRACAO_NOTIFICACOES_CONFIGURACOES_LISTAR]: "Configurações de Notificação",

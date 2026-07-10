@@ -653,7 +653,10 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       display: flex;
       flex-direction: column;
       page-break-after: always;
-      page-break-inside: avoid;
+      /* No page-break-inside: avoid — the box is exactly one sheet tall, and
+         with that rule any sub-mm rounding shoved the WHOLE page onto sheet 2,
+         leaving the first sheet blank. overflow:hidden still clips it to one
+         page. */
       overflow: hidden;
       position: relative;
     }
@@ -859,6 +862,16 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       overflow: hidden;
     }
 
+    /* Equal flexible gaps between the intro, services and each terms block.
+       They spread the leftover vertical space EVENLY down the page so a
+       few-item budget fills the page instead of pooling one big void above the
+       footer; when the content is long they collapse to zero. Mirrors the
+       Flutter twin's pw.Spacer(flex: 1) seams. */
+    .page-content-gap {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+
     /* Footer - always at bottom, never overlaps content */
     .footer {
       padding-top: ${L.footerPaddingTop}mm;
@@ -975,7 +988,6 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
         height: 297mm;
         max-height: 297mm;
         page-break-after: always;
-        page-break-inside: avoid;
         overflow: hidden;
       }
 
@@ -1029,6 +1041,8 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
         })()}.</p>
       </div>
 
+      <div class="page-content-gap"></div>
+
       <!-- Services -->
       <section class="services-section">
         <h2 class="section-title-green">Serviços</h2>
@@ -1040,11 +1054,13 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 
       <!-- Delivery Term - customDeliveryDays takes priority over termDate -->
       ${data.customDeliveryDays ? `
+      <div class="page-content-gap"></div>
       <section class="terms-section">
         <h2 class="terms-title">Prazo de entrega</h2>
         <p class="terms-content">O prazo de entrega é de ${data.customDeliveryDays} dias úteis a partir da data de liberação.${data.simultaneousTasks && data.simultaneousTasks > 1 ? ` Neste período, ${data.simultaneousTasks} tarefas poderão ser produzidas simultaneamente.` : ''}</p>
       </section>
       ` : data.termDate ? `
+      <div class="page-content-gap"></div>
       <section class="terms-section">
         <h2 class="terms-title">Prazo de entrega</h2>
         <p class="terms-content">O prazo de entrega é de ${data.termDate}, desde que o implemento esteja nas condições previamente informada e não haja alterações nos serviços descritos.</p>
@@ -1053,6 +1069,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 
       <!-- Payment Terms -->
       ${data.paymentText ? `
+      <div class="page-content-gap"></div>
       <section class="terms-section">
         <h2 class="terms-title">Condições de pagamento</h2>
         <p class="terms-content">${escapeHtml(data.paymentText)}</p>
@@ -1061,11 +1078,14 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 
       <!-- Guarantee -->
       ${data.guaranteeText ? `
+      <div class="page-content-gap"></div>
       <section class="terms-section">
         <h2 class="terms-title">Garantias</h2>
         <p class="terms-content">${formatGuaranteeHtml(data.guaranteeText)}</p>
       </section>
       ` : ""}
+
+      <div class="page-content-gap"></div>
     </div>
 
     <!-- Footer -->

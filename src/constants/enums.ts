@@ -1365,7 +1365,7 @@ export enum ENTITY_TYPE {
   LEAVE = "LEAVE",
   DEPENDENT = "DEPENDENT",
   AGENDA_EVENT = "AGENDA_EVENT",
-  POSTIT = "POSTIT",
+  NOTE = "NOTE",
   FISPQ = "FISPQ",
   RESPONSIBLE = "RESPONSIBLE",
   WAREHOUSE_LOCATION = "WAREHOUSE_LOCATION",
@@ -2007,7 +2007,7 @@ export enum CHANGE_LOG_ENTITY_TYPE {
   LEAVE = "LEAVE",
   DEPENDENT = "DEPENDENT",
   AGENDA_EVENT = "AGENDA_EVENT",
-  POSTIT = "POSTIT",
+  NOTE = "NOTE",
   FISPQ = "FISPQ",
   PREFERENCES = "PREFERENCES",
   RESPONSIBLE = "RESPONSIBLE",
@@ -2602,7 +2602,7 @@ export enum FAVORITE_PAGES {
 
   // Ferramentas
   FERRAMENTAS_CUSTO_DE_FUNCIONARIO = "/ferramentas/custo-de-funcionario",
-  FERRAMENTAS_POST_ITS = "/ferramentas/post-its",
+  FERRAMENTAS_NOTAS = "/ferramentas/notas",
 
   // Favorites coverage — list/index pages wired for the favorites button
   // Administração

@@ -10,6 +10,10 @@ import type { WidgetCategory, WidgetDefinition } from "./types";
 
 class WidgetRegistry {
   private defs = new Map<string, WidgetDefinition<any>>();
+  // Ids registered as back-compat aliases: fully resolvable (get/has/render/
+  // sanitize), but excluded from the add-widget gallery so a legacy id does not
+  // surface a duplicate card. See `registerHidden`.
+  private hiddenIds = new Set<string>();
 
   register<T>(def: WidgetDefinition<T>): void {
     if (this.defs.has(def.id)) {
@@ -20,6 +24,18 @@ class WidgetRegistry {
       }
     }
     this.defs.set(def.id, def as WidgetDefinition<any>);
+  }
+
+  /**
+   * Register a widget under a legacy/alias id so existing saved layouts that
+   * still reference the old id keep resolving to the current widget — WITHOUT
+   * showing a duplicate entry in the add-widget gallery. Used for the
+   * Post-its/Anotações → Notas merge, where the removed scratchpad widget id
+   * `quick-action.note` must keep rendering the unified "Notas" widget.
+   */
+  registerHidden<T>(def: WidgetDefinition<T>): void {
+    this.hiddenIds.add(def.id);
+    this.register(def);
   }
 
   get(id: string): WidgetDefinition<any> | undefined {
@@ -49,6 +65,7 @@ class WidgetRegistry {
     if (!userSector) return [];
     const isAdmin = userSector === SECTOR_PRIVILEGES.ADMIN;
     return this.all().filter((def) => {
+      if (this.hiddenIds.has(def.id)) return false;
       if (def.blockedSectors?.includes(userSector)) return false;
       if (def.allowedSectors === "*") return true;
       if (isAdmin) return true;

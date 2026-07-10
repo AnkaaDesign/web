@@ -35,6 +35,15 @@ declare module "@tanstack/react-table" {
     exportValue?: (row: TData) => ExportCellValue;
     /** Header label used in exports + the share/column pickers (when `header` is JSX). */
     exportHeader?: string;
+    /**
+     * Additional export-only representations of this column. Each variant becomes its OWN row
+     * in the share dialog's column picker (checkbox + reorder handle), so the user can include
+     * e.g. both the exact and the floored quantity as separate columns. Every variant exports
+     * under the SAME header as this column (`exportHeader`/`headerLabel`) — only the value
+     * differs. The base column remains its own entry (the default representation). Each
+     * variant's `label` is the text shown in the picker, e.g. "Quantidade Arredondada".
+     */
+    exportVariants?: Array<{ id: string; label: string; exportValue: (row: TData) => ExportCellValue }>;
     /** Horizontal alignment of the cell + header content. */
     align?: "left" | "center" | "right";
     /** Whether the column is visible by default (defaults to true). */

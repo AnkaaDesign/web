@@ -29,6 +29,7 @@ import { invoiceService } from '@/api-client/invoice';
 import { uploadSingleFile } from '@/api-client/file';
 import { toast } from '@/components/ui/sonner';
 import type { BankSlip, Installment } from '@/types/invoice';
+import { MANUAL_PAYMENT_METHOD_OPTIONS } from '@/utils/installment-payment-method';
 import { FileUploadField } from '@/components/common/file/file-upload-field';
 import type { FileWithPreview } from '@/components/common/file/file-uploader';
 import {
@@ -39,13 +40,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-
-const PAYMENT_METHOD_OPTIONS = [
-  { value: 'PIX', label: 'PIX' },
-  { value: 'CASH', label: 'Dinheiro' },
-  { value: 'TRANSFER', label: 'Transferência' },
-  { value: 'OTHER', label: 'Outro' },
-];
 
 const RECEIPT_ACCEPTED_TYPES: Record<string, string[]> = {
   'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
@@ -650,7 +644,7 @@ export function BoletoActions({
               <Combobox
                 value={paymentMethod}
                 onValueChange={(v) => setPaymentMethod((v as string) || '')}
-                options={PAYMENT_METHOD_OPTIONS}
+                options={MANUAL_PAYMENT_METHOD_OPTIONS as { value: string; label: string }[]}
                 placeholder="Selecione o método..."
                 searchable={false}
                 clearable={false}

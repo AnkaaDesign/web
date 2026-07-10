@@ -46,6 +46,7 @@ import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
 import { getCustomers } from "@/api-client/customer";
 import { getSectors } from "@/api-client/sector";
 import { isValidTaskStatusTransition, getTaskQuoteEditRoute } from "@/utils/task";
+import { useReturnTo } from "@/hooks/common/use-return-to";
 import { getAvailableQuoteStatusTransitions, canViewQuote, canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
 import { canEditTasks, canFinishTask, canViewAirbrushingFinancials as computeCanViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
@@ -233,6 +234,9 @@ function TaskDetailContent() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  // Snapshot of this page's URL, handed to the budget/billing detail so its
+  // Save/Cancel return here instead of dropping the user on the budget list.
+  const returnTo = useReturnTo();
   const queryClient = useQueryClient();
 
   // This page serves THREE detail routes — Agenda (/producao/agenda), Cronograma (/producao/cronograma)
@@ -784,7 +788,7 @@ function TaskDetailContent() {
               // The "Faturamento" title opens the in-app quote/billing DETAIL page; the header
               // "Visualizar" action opens the PUBLIC, customer-facing quote view (by quote id) in a
               // new tab (faithful to the legacy Visualizar button).
-              onTitleClick: (t: Task) => navigate(getTaskQuoteEditRoute(t)),
+              onTitleClick: (t: Task) => navigate(getTaskQuoteEditRoute(t), { state: { returnTo } }),
               headerActions: (t: Task) => {
                 const q = t.quote;
                 if (!q) return null;
@@ -809,7 +813,7 @@ function TaskDetailContent() {
                   accessor: (t: Task) => (t.quote?.budgetNumber ? String(t.quote.budgetNumber).padStart(4, "0") : null),
                   render: (t: Task) =>
                     t.quote?.budgetNumber ? (
-                      <button type="button" className="font-medium hover:underline" onClick={() => navigate(getTaskQuoteEditRoute(t))}>
+                      <button type="button" className="font-medium hover:underline" onClick={() => navigate(getTaskQuoteEditRoute(t), { state: { returnTo } })}>
                         {String(t.quote.budgetNumber).padStart(4, "0")}
                       </button>
                     ) : (
@@ -1212,6 +1216,7 @@ function TaskDetailContent() {
     rescheduleAsync,
     loadCustomers,
     loadSectors,
+    returnTo,
   ]);
 
   const actions = useMemo<PageAction[]>(() => {
@@ -1231,10 +1236,12 @@ function TaskDetailContent() {
       icon: IconEdit,
       variant: "default",
       onClick: () =>
-        navigate(role === SECTOR_PRIVILEGES.COMMERCIAL && task.quote ? getTaskQuoteEditRoute(task) : breadcrumbConfig.editRoute(task.id)),
+        role === SECTOR_PRIVILEGES.COMMERCIAL && task.quote
+          ? navigate(getTaskQuoteEditRoute(task), { state: { returnTo } })
+          : navigate(breadcrumbConfig.editRoute(task.id)),
     });
     return list;
-  }, [task, canEdit, canFinish, role, changeStatus, navigate, breadcrumbConfig]);
+  }, [task, canEdit, canFinish, role, changeStatus, navigate, breadcrumbConfig, returnTo]);
 
   // Display-name fallback chain (faithful to the legacy getTaskDisplayName): name → customer →
   // "Série {serial}" → plate → "Sem nome". The serial is still appended to the page title when present.

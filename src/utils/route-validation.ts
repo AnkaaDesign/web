@@ -283,9 +283,9 @@ const VALID_ROUTES = [
   routes.occupationalHealth.workAccidents.details(":id"),
   routes.occupationalHealth.workAccidents.edit(":id"),
 
-  // Tools (Ferramentas) - Employee Cost & Post-its routes
+  // Tools (Ferramentas) - Employee Cost & Notas routes
   routes.tools.employeeCost.root,
-  routes.tools.postIts.root,
+  routes.tools.notes.root,
 ];
 
 /**

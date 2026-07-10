@@ -316,8 +316,8 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/ferramentas": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING"],
   "/ferramentas/*": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING"],
   "/ferramentas/custo-de-funcionario": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING"],
-  // Post-its notes board — broad availability (matches the other broad tools above)
-  "/ferramentas/post-its": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING", "TEAM_LEADER"],
+  // Notas board — broad availability (matches the other broad tools above)
+  "/ferramentas/notas": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING", "TEAM_LEADER"],
   // QR generator, color palette and waste certificate — ACCOUNTING and
   // PRODUCTION_MANAGER intentionally excluded (their navs hide these); everyone else
   // keeps the access they had via the "/ferramentas/*" wildcard.

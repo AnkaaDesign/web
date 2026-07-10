@@ -465,6 +465,9 @@ export const routes = {
       edit: (id: string) => `/pintura/producoes/editar/${id}`,
       root: "/pintura/producoes",
     },
+    availability: {
+      root: "/pintura/disponibilidade",
+    },
     palette: {
       root: "/pintura/paleta",
     },
@@ -818,8 +821,8 @@ export const routes = {
     employeeCost: {
       root: "/ferramentas/custo-de-funcionario",
     },
-    postIts: {
-      root: "/ferramentas/post-its",
+    notes: {
+      root: "/ferramentas/notas",
     },
   },
 

@@ -533,6 +533,140 @@ export class PaintFormulaComponentService {
 // Paint Production Service Class
 // =====================
 
+// =====================
+// Production Availability (multi-paint stock planner) types
+// =====================
+
+export interface ProductionAvailabilitySelection {
+  paintId: string;
+  volumeLiters: number;
+}
+
+export interface ProductionAvailabilityContribution {
+  paintId: string;
+  paintName: string;
+  hex: string;
+  grams: number;
+  units: number;
+}
+
+export interface ProductionAvailabilityComponent {
+  itemId: string;
+  itemName: string;
+  uniCode: string | null;
+  requiredGrams: number;
+  requiredUnits: number | null;
+  availableGrams: number | null;
+  availableUnits: number;
+  weightPerUnitGrams: number | null;
+  availableRatio: number | null;
+  measured: boolean;
+  isLimiting: boolean;
+  contributions: ProductionAvailabilityContribution[];
+}
+
+export interface ProductionAvailabilityPaint {
+  paintId: string;
+  paintName: string;
+  hex: string;
+  finish: string;
+  typeName: string | null;
+  brandName: string | null;
+  volumeLiters: number;
+  hasFormula: boolean;
+  canProduce: boolean;
+  limitingItemName: string | null;
+}
+
+export interface ProductionAvailabilityResult {
+  summary: {
+    canProduceAll: boolean;
+    totalRequestedLiters: number;
+    maxProducibleLiters: number | null;
+    limitingRatio: number | null;
+    limitingItemName: string | null;
+    hasUnmeasured: boolean;
+  };
+  components: ProductionAvailabilityComponent[];
+  paints: ProductionAvailabilityPaint[];
+}
+
+export interface ProductionAvailabilityResponse {
+  success: boolean;
+  message: string;
+  data: ProductionAvailabilityResult | null;
+}
+
+export interface ProductionScheduleDefaultSelection {
+  paintId: string;
+  paintName: string;
+  hex: string;
+  finish: string;
+  typeName: string | null;
+  brandName: string | null;
+  taskCount: number;
+  volumeLiters: number;
+  hasFormula: boolean;
+}
+
+export interface ProductionScheduleDefaultsResult {
+  litersPerTask: number;
+  selections: ProductionScheduleDefaultSelection[];
+}
+
+export interface ProductionScheduleDefaultsResponse {
+  success: boolean;
+  message: string;
+  data: ProductionScheduleDefaultsResult | null;
+}
+
+// Single-paint detail for the planner's "click a paint" modal.
+export interface PaintPlanDetailComponent {
+  itemId: string;
+  itemName: string;
+  uniCode: string | null;
+  ratio: number;
+  requiredGrams: number;
+  requiredUnits: number | null;
+  availableUnits: number;
+  availableGrams: number | null;
+  availableRatio: number | null;
+  measured: boolean;
+  missingGrams: number | null;
+  missingUnits: number | null;
+}
+
+export interface PaintPlanDetailTask {
+  id: string;
+  name: string;
+  serialNumber: string | null;
+  status: string;
+  forecastDate: string | null;
+  customerName: string | null;
+  plate: string | null;
+}
+
+export interface PaintPlanDetailResult {
+  paint: {
+    id: string;
+    name: string;
+    hex: string;
+    finish: string;
+    typeName: string | null;
+    brandName: string | null;
+    code: string | null;
+  };
+  volumeLiters: number;
+  formula: { id: string; density: number; components: PaintPlanDetailComponent[] } | null;
+  tasks: PaintPlanDetailTask[];
+}
+
+export interface PaintPlanDetailResponse {
+  success: boolean;
+  message: string;
+  data: PaintPlanDetailResult | null;
+}
+
 export class PaintProductionService {
   private readonly basePath = "/paints/productions";
 
@@ -587,6 +721,32 @@ export class PaintProductionService {
 
   async batchDeletePaintProductions(data: PaintProductionBatchDeleteFormData): Promise<PaintProductionBatchDeleteResponse> {
     const response = await apiClient.delete<PaintProductionBatchDeleteResponse>(`${this.basePath}/batch`, { data });
+    return response.data;
+  }
+
+  // =====================
+  // Production Availability (multi-paint stock planner)
+  // =====================
+
+  /** Default paint selections from tasks currently in the schedule (server owns the 3-gallon rule). */
+  async getProductionScheduleDefaults(forecastDate?: string): Promise<ProductionScheduleDefaultsResponse> {
+    const response = await apiClient.get<ProductionScheduleDefaultsResponse>(`${this.basePath}/schedule-defaults`, {
+      params: forecastDate ? { forecastDate } : undefined,
+    });
+    return response.data;
+  }
+
+  /** Aggregate component demand of the given paints/volumes and compare it to current stock. */
+  async calculateProductionAvailability(selections: ProductionAvailabilitySelection[]): Promise<ProductionAvailabilityResponse> {
+    const response = await apiClient.post<ProductionAvailabilityResponse>(`${this.basePath}/availability`, { selections });
+    return response.data;
+  }
+
+  /** Single-paint detail (tasks + formula + missing) for the planner modal. */
+  async getPaintPlanDetail(paintId: string, volumeLiters: number, forecastDate?: string): Promise<PaintPlanDetailResponse> {
+    const response = await apiClient.get<PaintPlanDetailResponse>(`${this.basePath}/paint-plan-detail`, {
+      params: { paintId, volumeLiters, ...(forecastDate ? { forecastDate } : {}) },
+    });
     return response.data;
   }
 }
@@ -891,6 +1051,14 @@ export const batchCreatePaintProductions = (data: PaintProductionBatchCreateForm
 export const batchUpdatePaintProductions = (data: PaintProductionBatchUpdateFormData, query?: PaintProductionQueryFormData) =>
   paintProductionService.batchUpdatePaintProductions(data, query);
 export const batchDeletePaintProductions = (data: PaintProductionBatchDeleteFormData) => paintProductionService.batchDeletePaintProductions(data);
+
+// Production availability (multi-paint stock planner)
+export const getProductionScheduleDefaults = (forecastDate?: string) =>
+  paintProductionService.getProductionScheduleDefaults(forecastDate);
+export const calculateProductionAvailability = (selections: ProductionAvailabilitySelection[]) =>
+  paintProductionService.calculateProductionAvailability(selections);
+export const getPaintPlanDetail = (paintId: string, volumeLiters: number, forecastDate?: string) =>
+  paintProductionService.getPaintPlanDetail(paintId, volumeLiters, forecastDate);
 
 // Paint Type exports
 export const getPaintTypes = (params: PaintTypeGetManyFormData = {}) => paintTypeService.getPaintTypes(params);

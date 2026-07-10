@@ -7,6 +7,7 @@ import {
   PPE_TYPE_LABELS,
   ACCOUNTING_TYPE_LABELS,
   MEASURE_UNIT_LABELS,
+  MEASURE_TYPE_ORDER,
 } from "@/constants";
 import { formatCurrency, formatDate, formatItemLocation, itemUtils } from "@/utils";
 import { StockStatusIndicator } from "../list/stock-status-indicator";
@@ -34,7 +35,11 @@ function fmtPercent(value: number | null | undefined): string {
 
 function measuresText(item: Item): string {
   if (!item.measures || item.measures.length === 0) return "";
-  return item.measures
+  // Sort by measure type (weight → volume → length → …) so the order is consistent across every
+  // row, matching the on-screen MeasureDisplayCompact (which uses the same MEASURE_TYPE_ORDER).
+  // Without this, rows render in raw DB order, so weight/volume flip between items.
+  return [...item.measures]
+    .sort((a, b) => (MEASURE_TYPE_ORDER[a.measureType] ?? 999) - (MEASURE_TYPE_ORDER[b.measureType] ?? 999))
     .map((m) => `${m.value} ${m.unit && MEASURE_UNIT_LABELS[m.unit] ? MEASURE_UNIT_LABELS[m.unit] : m.unit || ""}`)
     .join(", ");
 }
@@ -188,7 +193,13 @@ export function createItemTableColumns(): DataTableColumnDef<Item>[] {
       enableSorting: true,
       size: 120,
       minSize: 90,
-      meta: { headerLabel: "Quantidade", exportHeader: "Quantidade", exportValue: (i) => itemUtils.formatItemQuantity(i) },
+      meta: {
+        headerLabel: "Quantidade",
+        exportHeader: "Quantidade",
+        exportValue: (i) => itemUtils.formatItemQuantity(i),
+        // Extra picker row that exports the same "Quantidade" column floored to a whole number.
+        exportVariants: [{ id: "floor", label: "Quantidade Arredondada", exportValue: (i) => itemUtils.formatItemQuantity(i, { roundDown: true }) }],
+      },
       cell: ({ row }) => (
         <div className="flex">
           <StockStatusIndicator item={row.original} showQuantity />

@@ -1,5 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { IconFileTypeXls, IconFileTypePdf, IconSearch } from "@tabler/icons-react";
+import { IconFileTypeXls, IconFileTypePdf, IconSearch, IconGripVertical } from "@tabler/icons-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { notify } from "@/api-client";
 import {
   Dialog,
@@ -12,16 +29,33 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import { exportToXlsx, exportToPdf } from "./data-table-export";
 import { columnHeaderText } from "./data-table-utils";
-import type { DataTableColumnDef } from "./data-table-types";
+import type { DataTableColumnDef, ExportCellValue } from "./data-table-types";
 
 export type ShareFormat = "pdf" | "xlsx";
 
 /** Which rows to export. */
 type ExportScope = "selected" | "page" | "all";
+
+/**
+ * One row in the dialog's column picker. A plain column yields a single entry; a column that
+ * declares `meta.exportVariants` yields the base entry plus one extra entry per variant. Every
+ * entry derived from the same column exports under that column's header — only `exportValue`
+ * (and the picker `label`) differ.
+ */
+interface PickerEntry<TData> {
+  /** Unique picker/order id — the base column id, or `${colId}::${variantId}` for a variant. */
+  id: string;
+  /** Text shown in the picker (base: the column header; variant: the variant's label). */
+  label: string;
+  /** The source column (supplies the export header, accessor, etc.). */
+  col: DataTableColumnDef<TData>;
+  /** Variant-only value override; absent ⇒ the column's default `exportValue` is used. */
+  exportValue?: (row: TData) => ExportCellValue;
+}
 
 interface DataTableShareDialogProps<TData> {
   open: boolean;
@@ -57,10 +91,50 @@ interface DataTableShareDialogProps<TData> {
 }
 
 /**
+ * A single draggable + checkable column row, mirroring the column-visibility manager: a grip
+ * handle for reorder, a checkbox, and the header label.
+ */
+function ShareColumnRow({
+  id,
+  label,
+  checked,
+  onToggle,
+  dragDisabled,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  onToggle: (checked: boolean) => void;
+  dragDisabled: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled: dragDisabled });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+      className="flex items-center gap-2 rounded-md p-1.5 hover:bg-muted"
+    >
+      <span
+        {...attributes}
+        {...listeners}
+        className={cn("shrink-0", dragDisabled ? "text-muted-foreground/30" : "cursor-grab text-muted-foreground active:cursor-grabbing")}
+      >
+        <IconGripVertical className="h-4 w-4" />
+      </span>
+      <Checkbox checked={checked} onCheckedChange={(c) => onToggle(c === true)} />
+      <span onClick={() => onToggle(!checked)} className="min-w-0 flex-1 cursor-pointer truncate text-sm">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/**
  * Column-selection modal shown AFTER the user picks PDF or XLSX in the share
  * popover. The column list mirrors the column-visibility manager (search +
- * select-all/none + a checkbox list) so the two pickers feel identical.
- * Current visible columns are pre-checked; respects row selection.
+ * select-all/none + a drag-to-reorder checkbox list) so the two pickers feel
+ * identical. Current visible columns are pre-checked; respects row selection.
  */
 export function DataTableShareDialog<TData>({
   open,
@@ -78,7 +152,22 @@ export function DataTableShareDialog<TData>({
   filename,
 }: DataTableShareDialogProps<TData>) {
   const exportable = useMemo(() => columns.filter((c) => !c.meta?.excludeFromExport), [columns]);
+  // Flatten columns into picker entries: each column contributes its base entry plus one extra
+  // entry per `meta.exportVariants` item (e.g. exact vs. floored quantity).
+  const entries = useMemo(() => {
+    const out: PickerEntry<TData>[] = [];
+    for (const c of exportable) {
+      out.push({ id: c.id, label: columnHeaderText(c), col: c });
+      for (const v of c.meta?.exportVariants ?? []) {
+        out.push({ id: `${c.id}::${v.id}`, label: v.label, col: c, exportValue: v.exportValue });
+      }
+    }
+    return out;
+  }, [exportable]);
+
   const [selected, setSelected] = useState<Set<string>>(() => new Set(visibleColumnIds));
+  // Chosen export order (entry ids). Initialised to the table's current column order.
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => entries.map((e) => e.id));
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const selectedCount = selectedCountProp ?? selectedRows.length;
@@ -86,20 +175,47 @@ export function DataTableShareDialog<TData>({
   // legacy "all data" export default), else the current page.
   const [scope, setScope] = useState<ExportScope>("page");
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   useEffect(() => {
     if (open) {
       setSelected(new Set(visibleColumnIds.length ? visibleColumnIds : exportable.map((c) => c.id)));
+      setColumnOrder(entries.map((e) => e.id));
       setSearch("");
       setScope(selectedCount > 0 ? "selected" : resolveAllRows ? "all" : "page");
     }
-  }, [open, visibleColumnIds, exportable, selectedCount, resolveAllRows]);
+  }, [open, visibleColumnIds, exportable, entries, selectedCount, resolveAllRows]);
+
+  const orderedEntries = useMemo(() => {
+    const idx = new Map(columnOrder.map((id, i) => [id, i] as const));
+    return [...entries].sort((a, b) => (idx.get(a.id) ?? Infinity) - (idx.get(b.id) ?? Infinity));
+  }, [entries, columnOrder]);
 
   const filtered = useMemo(
-    () => (search ? exportable.filter((c) => columnHeaderText(c).toLowerCase().includes(search.toLowerCase())) : exportable),
-    [exportable, search],
+    () => (search ? orderedEntries.filter((e) => e.label.toLowerCase().includes(search.toLowerCase())) : orderedEntries),
+    [orderedEntries, search],
   );
-  const chosenColumns = useMemo(() => exportable.filter((c) => selected.has(c.id)), [exportable, selected]);
+  const dragDisabled = search.length > 0;
+
+  const chosenEntries = useMemo(() => orderedEntries.filter((e) => selected.has(e.id)), [orderedEntries, selected]);
   const isXlsx = format === "xlsx";
+
+  // Materialise the chosen entries into export columns (in the chosen order). A variant entry
+  // clones its source column with the variant's `exportValue`, keeping the column's export header.
+  const resolveExportColumns = (): DataTableColumnDef<TData>[] =>
+    chosenEntries.map((e) => (e.exportValue ? { ...e.col, id: e.id, meta: { ...e.col.meta, exportValue: e.exportValue } } : e.col));
+
+  const handleDragEnd = (ev: DragEndEvent) => {
+    const { active, over } = ev;
+    if (!over || active.id === over.id) return;
+    const from = columnOrder.indexOf(String(active.id));
+    const to = columnOrder.indexOf(String(over.id));
+    if (from < 0 || to < 0) return;
+    setColumnOrder(arrayMove(columnOrder, from, to));
+  };
 
   const toggle = (id: string, checked: boolean) =>
     setSelected((prev) => {
@@ -110,7 +226,7 @@ export function DataTableShareDialog<TData>({
     });
 
   const doExport = async () => {
-    if (!chosenColumns.length) return notify.error("Atenção", "Selecione ao menos uma coluna.");
+    if (!chosenEntries.length) return notify.error("Atenção", "Selecione ao menos uma coluna.");
     setBusy(true);
     try {
       // Resolve the rows for the chosen scope. "selected" and "all" may be async (server-mode
@@ -127,7 +243,7 @@ export function DataTableShareDialog<TData>({
         notify.error("Atenção", "Nenhum registro para exportar.");
         return;
       }
-      const req = { rows, columns: chosenColumns, filename, title };
+      const req = { rows, columns: resolveExportColumns(), filename, title };
       if (isXlsx) await exportToXlsx(req);
       else await exportToPdf(req);
       notify.success("Exportado", `${rows.length} registro(s) exportado(s) com sucesso.`);
@@ -194,10 +310,11 @@ export function DataTableShareDialog<TData>({
           </div>
         </div>
 
-        {/* Column picker — same layout as the column-visibility manager. */}
+        {/* Column picker — same layout as the column-visibility manager (search +
+            select-all/none + drag-to-reorder checkbox list). */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Colunas ({selected.size}/{exportable.length})</span>
+            <span className="text-sm font-medium">Colunas ({selected.size}/{entries.length})</span>
           </div>
 
           <div className="relative">
@@ -212,7 +329,7 @@ export function DataTableShareDialog<TData>({
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="h-7 flex-1 text-xs" onClick={() => setSelected(new Set(exportable.map((c) => c.id)))}>
+            <Button variant="outline" size="sm" className="h-7 flex-1 text-xs" onClick={() => setSelected(new Set(entries.map((e) => e.id)))}>
               Selecionar Todas
             </Button>
             <Button variant="outline" size="sm" className="h-7 flex-1 text-xs" onClick={() => setSelected(new Set())}>
@@ -222,15 +339,26 @@ export function DataTableShareDialog<TData>({
 
           <ScrollArea className="h-[300px] rounded-md border">
             <div className="p-2">
-              {filtered.map((c) => (
-                <Label
-                  key={c.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md p-1.5 hover:bg-muted"
-                >
-                  <Checkbox checked={selected.has(c.id)} onCheckedChange={(ck) => toggle(c.id, ck === true)} />
-                  <span className="min-w-0 flex-1 truncate text-sm">{columnHeaderText(c)}</span>
-                </Label>
-              ))}
+              {dragDisabled ? (
+                filtered.map((e) => (
+                  <ShareColumnRow key={e.id} id={e.id} label={e.label} checked={selected.has(e.id)} onToggle={(c) => toggle(e.id, c)} dragDisabled />
+                ))
+              ) : (
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={filtered.map((e) => e.id)} strategy={verticalListSortingStrategy}>
+                    {filtered.map((e) => (
+                      <ShareColumnRow
+                        key={e.id}
+                        id={e.id}
+                        label={e.label}
+                        checked={selected.has(e.id)}
+                        onToggle={(c) => toggle(e.id, c)}
+                        dragDisabled={false}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              )}
             </div>
           </ScrollArea>
         </div>

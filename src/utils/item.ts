@@ -408,25 +408,20 @@ export function getItemIssueTypeLabel(type: ITEM_ISSUE_TYPE): string {
 }
 
 /**
- * Format item quantity with measure unit
- * Properly handles null measure units and provides consistent formatting
+ * Format an item's stock quantity.
+ *
+ * The quantity is always a COUNT of stock units, so it is NEVER suffixed with a measure
+ * unit: a measure like "400 g" or size "M" is a PER-UNIT attribute of the item (an item can
+ * hold 25 units of 400 g each), so gluing "g" onto the stock count is meaningless. This
+ * matches the on-screen quantity cell, which shows the bare number as well.
+ *
+ * @param options.roundDown When true, the quantity is floored to a whole number before
+ *   formatting (e.g. 3,7 → 3).
  */
-export function formatItemQuantity(item: Item): string {
-  const quantity = item.quantity || 0;
-  const formattedQuantity = numberUtils.formatNumber(quantity);
-
-  // Check if item has measures
-  if (!item.measures || item.measures.length === 0) {
-    return formattedQuantity;
-  }
-
-  // Use the first measure's unit (could be enhanced to find most appropriate unit)
-  const measure = item.measures[0];
-  if (!measure.unit) {
-    return formattedQuantity;
-  }
-  const unitLabel = MEASURE_UNIT_LABELS[measure.unit] || measure.unit;
-  return `${formattedQuantity} ${unitLabel}`;
+export function formatItemQuantity(item: Item, options?: { roundDown?: boolean }): string {
+  const rawQuantity = item.quantity || 0;
+  const quantity = options?.roundDown ? Math.floor(rawQuantity) : rawQuantity;
+  return numberUtils.formatNumber(quantity);
 }
 
 /**

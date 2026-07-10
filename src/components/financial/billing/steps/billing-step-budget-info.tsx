@@ -4,8 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { FileUploadField } from "@/components/common/file/file-upload-field";
-import { IconCalendar, IconPhoto } from "@tabler/icons-react";
+import {
+  ApprovedLayoutPicker,
+  type LayoutOption,
+} from "@/components/financial/common/approved-layout-picker";
+import { IconCalendar } from "@tabler/icons-react";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 
 const VALIDITY_PERIOD_OPTIONS = [
@@ -31,12 +34,15 @@ interface BillingStepBudgetInfoProps {
   disabled?: boolean;
   layoutFiles: FileWithPreview[];
   onLayoutFilesChange: (files: FileWithPreview[]) => void;
+  // The task's layout files — the pool the approved layout is chosen from.
+  layouts?: LayoutOption[];
 }
 
 export function BillingStepBudgetInfo({
   disabled,
   layoutFiles,
   onLayoutFilesChange,
+  layouts,
 }: BillingStepBudgetInfoProps) {
   const { control, setValue } = useFormContext();
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
@@ -239,29 +245,12 @@ export function BillingStepBudgetInfo({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <IconPhoto className="h-4 w-4 text-muted-foreground" />
-            Layout Aprovado
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <FileUploadField
-            onFilesChange={handleLayoutFileChange}
-            existingFiles={layoutFiles}
-            maxFiles={2}
-            maxSize={10 * 1024 * 1024}
-            acceptedFileTypes={{
-              "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],
-            }}
-            disabled={disabled}
-            variant="compact"
-            placeholder="Arraste ou clique para selecionar o layout aprovado"
-            showPreview={true}
-          />
-        </CardContent>
-      </Card>
+      <ApprovedLayoutPicker
+        layouts={layouts}
+        layoutFiles={layoutFiles}
+        onChange={handleLayoutFileChange}
+        disabled={disabled}
+      />
     </div>
   );
 }

@@ -130,6 +130,7 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
                     <TableHead>Valor</TableHead>
                     <TableHead>Pago</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Forma</TableHead>
                     <TableHead>Boleto</TableHead>
                     <TableHead></TableHead>
                   </TableRow>

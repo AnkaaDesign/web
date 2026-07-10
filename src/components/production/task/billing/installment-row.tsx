@@ -1,5 +1,7 @@
 import { TableRow, TableCell } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatDate } from '@/utils';
+import { formatInstallmentPaymentForm } from '@/utils/installment-payment-method';
 import { InstallmentStatusBadge } from './installment-status-badge';
 import { BankSlipStatusBadge } from './bank-slip-status-badge';
 import { BoletoActions } from './boleto-actions';
@@ -10,6 +12,7 @@ interface InstallmentRowProps {
 }
 
 export function InstallmentRow({ installment }: InstallmentRowProps) {
+  const paymentForm = formatInstallmentPaymentForm(installment.paymentMethod, !!installment.bankSlip);
   return (
     <TableRow>
       <TableCell className="font-medium">
@@ -26,6 +29,15 @@ export function InstallmentRow({ installment }: InstallmentRowProps) {
       </TableCell>
       <TableCell>
         <InstallmentStatusBadge status={installment.status} size="sm" />
+      </TableCell>
+      <TableCell>
+        {paymentForm ? (
+          <Badge variant="secondary" size="sm" className="font-medium whitespace-nowrap">
+            {paymentForm}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
       </TableCell>
       <TableCell>
         {installment.bankSlip && (

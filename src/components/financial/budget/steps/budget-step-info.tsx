@@ -10,81 +10,15 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { useFileViewer } from "@/components/common/file/file-viewer";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
+import { IconUsers, IconCalendar } from "@tabler/icons-react";
 import {
-  IconUsers,
-  IconCalendar,
-  IconPhoto,
-  IconEye,
-  IconCheck,
-} from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
+  ApprovedLayoutPicker,
+  type LayoutOption,
+} from "@/components/financial/common/approved-layout-picker";
 import { formatCNPJ } from "@/utils";
 import { getCustomers } from "@/api-client";
-import { getApiBaseUrl } from "@/config/api";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
-
-interface LayoutOption {
-  id: string;
-  layoutId?: string;
-  filename?: string;
-  originalName?: string;
-  thumbnailUrl?: string | null;
-  // Object-URL for brand-new, not-yet-uploaded local files (no server id yet).
-  preview?: string | null;
-  status?: string;
-  mimetype?: string;
-  // Remote storage path (http URL) when available — lets the viewer serve the file.
-  path?: string | null;
-  size?: number;
-}
-
-// Map an image file extension to a real image MIME type. Used so the in-app file
-// viewer's determineFileViewAction categorizes the file as an "image" → opens the
-// MODAL. An empty/unknown mimetype would fall through to download/new-tab.
-const IMAGE_EXT_TO_MIME: Record<string, string> = {
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
-  gif: "image/gif",
-  webp: "image/webp",
-  svg: "image/svg+xml",
-  bmp: "image/bmp",
-};
-
-const mimeFromName = (name?: string | null): string | null => {
-  const ext = (name || "").toLowerCase().split(".").pop() || "";
-  return IMAGE_EXT_TO_MIME[ext] || null;
-};
-
-// A persisted File id is a UUID; a not-yet-uploaded file carries a local temp id
-// (`<timestamp>-<random>`). Used to decide whether the server thumbnail endpoint is
-// safe to hit (it 404s on temp ids) and whether to open the local blob preview.
-const isUuid = (id?: string | null): boolean =>
-  !!id &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-
-// Comparable {id, name, size} for matching a task art against a quote layout File.
-type ImageKey = { id?: string; name: string; size: number };
-const imageKeyOfArt = (a: LayoutOption): ImageKey => ({
-  id: a.id,
-  name: (a.originalName || a.filename || "").trim(),
-  size: a.size || 0,
-});
-const imageKeyOfFile = (f: FileWithPreview): ImageKey => ({
-  id: (f as any).uploadedFileId || f.id,
-  name: (f.name || "").trim(),
-  size: f.size || 0,
-});
-// Same underlying image: identical File id, OR identical filename + byte size — the
-// latter catches the duplicate-record case (a quote layout that is a separate upload
-// of the same task art) so it reads as already-selected, never as a duplicate tile.
-const sameImage = (a: ImageKey, b: ImageKey): boolean =>
-  (!!a.id && a.id === b.id) ||
-  (!!a.name && a.name === b.name && a.size === b.size);
 
 interface BudgetStepInfoProps {
   disabled?: boolean;
@@ -125,7 +59,6 @@ export function BudgetStepInfo({
   setSelectedCustomers,
 }: BudgetStepInfoProps) {
   const { setValue, getValues, control } = useFormContext();
-  const fileViewer = useFileViewer();
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
   const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
 
@@ -168,13 +101,6 @@ export function BudgetStepInfo({
     if (guaranteeYears) return guaranteeYears.toString();
     return "";
   }, [guaranteeYears, customGuaranteeText]);
-
-  // The task's image layouts — the candidates for the budget's approved layout
-  // (up to 2 chosen). Sourced live from Step 1; there is no upload in this step.
-  const layoutOptions = useMemo(() => {
-    if (!layouts || layouts.length === 0) return [];
-    return layouts.filter((a) => (a.mimetype || "").startsWith("image/"));
-  }, [layouts]);
 
   const handleGuaranteeOptionChange = useCallback(
     (value: string) => {
@@ -327,169 +253,19 @@ export function BudgetStepInfo({
   const selectedCustomerIds = customerConfigs.map((c: any) => c.customerId);
 
   // --- Layout Aprovado picker --------------------------------------------------
-  // The budget's approved layout is chosen FROM the task's layouts (layouts). There
-  // is NO upload here — new images are added to the task in Step 1. Up to 2 may be
-  // marked as the approved layout.
-  const syncLayoutIds = useCallback(
+  // The budget's approved layout is chosen FROM the task's layouts (shared
+  // ApprovedLayoutPicker). There is NO upload here — new images are added to the
+  // task in Step 1. Selecting files here syncs the `layoutFileIds` form field.
+  const handleLayoutChange = useCallback(
     (files: FileWithPreview[]) => {
+      onLayoutFilesChange(files);
       const ids = files
         .map((f) => (f as any).uploadedFileId || f.id)
         .filter(Boolean)
         .slice(0, 2);
       setValue("layoutFileIds", ids, { shouldDirty: true });
     },
-    [setValue],
-  );
-
-  // How many layout slots are filled (max 2).
-  const selectedCount = Math.min(layoutFiles.length, 2);
-
-  // Is this task art part of the approved layout? Matched by id OR same image
-  // (filename+size) so a separate-but-identical quote layout File still reads selected.
-  const isArtSelected = useCallback(
-    (art: LayoutOption) =>
-      layoutFiles.some((lf) => sameImage(imageKeyOfFile(lf), imageKeyOfArt(art))),
-    [layoutFiles],
-  );
-
-  // Toggle a task art in/out of the approved layout (selection ONLY — status is set
-  // separately via the card's status selector). Same-image files are removed even when
-  // their File id differs from the art's, so the duplicate-record case toggles cleanly.
-  const toggleArt = useCallback(
-    (art: LayoutOption) => {
-      const ak = imageKeyOfArt(art);
-      const selected = layoutFiles.some((lf) =>
-        sameImage(imageKeyOfFile(lf), ak),
-      );
-      let next: FileWithPreview[];
-      if (selected) {
-        next = layoutFiles.filter((lf) => !sameImage(imageKeyOfFile(lf), ak));
-      } else {
-        if (layoutFiles.length >= 2) return; // 2-slot cap
-        const lf = {
-          id: art.id,
-          name: art.originalName || art.filename || "layout",
-          size: art.size || 0,
-          type: art.mimetype || "image/png",
-          lastModified: Date.now(),
-          uploaded: true,
-          uploadProgress: 100,
-          uploadedFileId: art.id,
-          thumbnailUrl: art.thumbnailUrl,
-          // Carry the local object-URL preview so a not-yet-uploaded art still renders.
-          preview: art.preview ?? null,
-        } as FileWithPreview;
-        next = [...layoutFiles, lf].slice(0, 2);
-      }
-      onLayoutFilesChange(next);
-      syncLayoutIds(next);
-    },
-    [layoutFiles, onLayoutFilesChange, syncLayoutIds],
-  );
-
-  // Quote layout files that match NO current task art (the art was removed, or a legacy
-  // quote-only file). Shown as selected-but-removable tiles so the budget's layout is
-  // never silently hidden.
-  const orphanLayoutFiles = useMemo(
-    () =>
-      layoutFiles.filter(
-        (lf) =>
-          !layoutOptions.some((a) =>
-            sameImage(imageKeyOfFile(lf), imageKeyOfArt(a)),
-          ),
-      ),
-    [layoutFiles, layoutOptions],
-  );
-  const removeOrphan = useCallback(
-    (f: FileWithPreview) => {
-      const fk = imageKeyOfFile(f);
-      const next = layoutFiles.filter(
-        (lf) => !sameImage(imageKeyOfFile(lf), fk),
-      );
-      onLayoutFilesChange(next);
-      syncLayoutIds(next);
-    },
-    [layoutFiles, onLayoutFilesChange, syncLayoutIds],
-  );
-
-  // Resolve a renderable image src for an artwork option:
-  //  1. server thumbnailUrl when present,
-  //  2. object-URL preview for brand-new not-yet-uploaded local files,
-  //  3. otherwise the server thumbnail endpoint keyed by the real File id.
-  // Brand-new local files have a generated local `id` (not a real File id), so the
-  // thumbnail endpoint would 404 for them — hence the preview fallback.
-  const getLayoutThumbnailSrc = useCallback((artwork: LayoutOption): string => {
-    if (artwork.thumbnailUrl) return artwork.thumbnailUrl;
-    if (artwork.preview) return artwork.preview;
-    return `${getApiBaseUrl()}/files/thumbnail/${artwork.id}`;
-  }, []);
-
-  // Open an artwork in the in-app file-viewer MODAL (FileViewerProvider is mounted at
-  // the App root). determineFileViewAction categorizes by mimetype, then falls back to
-  // the filename extension; a missing/blank mimetype AND extension-less filename slips
-  // to download/new-tab. So we pass a COMPLETE object (like FileSuggestions does):
-  // a guaranteed image mimetype (derived from the filename ext when the option's is
-  // empty), a filename WITH extension, id, size, thumbnailUrl and path.
-  const openLayoutInViewer = useCallback(
-    (artwork: LayoutOption) => {
-      const filename =
-        artwork.filename || artwork.originalName || "layout.png";
-      const mimetype =
-        (artwork.mimetype && artwork.mimetype.startsWith("image/")
-          ? artwork.mimetype
-          : null) ||
-        mimeFromName(filename) ||
-        mimeFromName(artwork.originalName) ||
-        "image/png";
-      fileViewer.actions.viewFile({
-        id: artwork.id,
-        filename,
-        originalName: artwork.originalName || filename,
-        mimetype,
-        size: artwork.size || 0,
-        thumbnailUrl: artwork.thumbnailUrl || null,
-        path: artwork.path || null,
-      } as any);
-    },
-    [fileViewer],
-  );
-
-  // Thumbnail for an orphan layout file: local preview → server thumbnailUrl →
-  // thumbnail endpoint keyed by a real File id (a temp/local id would 404).
-  const layoutThumbSrc = useCallback((f: FileWithPreview): string | null => {
-    if (f.preview) return f.preview;
-    if (f.thumbnailUrl) return f.thumbnailUrl;
-    const realId =
-      (isUuid((f as any).uploadedFileId) && (f as any).uploadedFileId) ||
-      (isUuid(f.id) && f.id) ||
-      null;
-    return realId ? `${getApiBaseUrl()}/files/thumbnail/${realId}` : null;
-  }, []);
-
-  // Open an orphan layout file in the viewer (local blob if not yet uploaded, else by id).
-  const viewLayout = useCallback(
-    (f: FileWithPreview) => {
-      const id = (f as any).uploadedFileId || f.id;
-      if (f.preview && !isUuid(id)) {
-        window.open(f.preview, "_blank");
-        return;
-      }
-      const filename = f.name || "layout.png";
-      const mimetype =
-        (f.type && f.type.startsWith("image/") ? f.type : null) ||
-        mimeFromName(filename) ||
-        "image/png";
-      fileViewer.actions.viewFile({
-        id,
-        filename,
-        originalName: filename,
-        mimetype,
-        size: f.size || 0,
-        thumbnailUrl: (f as any).thumbnailUrl || null,
-        path: null,
-      } as any);
-    },
-    [fileViewer],
+    [onLayoutFilesChange, setValue],
   );
 
   return (
@@ -687,193 +463,14 @@ export function BudgetStepInfo({
         </CardContent>
       </Card>
 
-      {/* Layout Aprovado — pick the budget's approved layout FROM the task's layouts
-          (managed in Step 1). Tap a tile to toggle (up to 2). NO upload here. A quote
-          layout that is a separate File from its task art is matched by image so it
-          reads as already-selected ("Usado"), never as a duplicate. */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <IconPhoto className="h-4 w-4 text-muted-foreground" />
-            Layout Aprovado
-            <Badge
-              variant={selectedCount > 0 ? "secondary" : "outline"}
-              className="ml-auto text-[11px] font-normal tabular-nums"
-            >
-              {selectedCount}/2
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {layoutOptions.length > 0 || orphanLayoutFiles.length > 0 ? (
-            <div className="space-y-3">
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
-                {/* Task layouts — selectable. Click the image OR "Selecionar" to toggle;
-                    "Ver" opens the viewer. Status is managed on the task (Step 1). */}
-                {layoutOptions.map((art) => {
-                  const selected = isArtSelected(art);
-                  const blockSelect =
-                    !selected && (disabled || selectedCount >= 2);
-                  const name = art.originalName || art.filename || "Arquivo";
-                  return (
-                    <div
-                      key={art.id}
-                      className={cn(
-                        "overflow-hidden rounded-lg border-2 bg-card transition-all",
-                        selected ? "border-primary ring-2 ring-primary/30" : "border-border",
-                      )}
-                    >
-                      {/* Image preview — clicking it toggles selection */}
-                      <button
-                        type="button"
-                        disabled={blockSelect}
-                        onClick={() => toggleArt(art)}
-                        title={selected ? "Remover do layout" : "Usar no layout"}
-                        className={cn(
-                          "relative block h-52 w-full bg-muted",
-                          blockSelect
-                            ? "cursor-not-allowed opacity-50"
-                            : "cursor-pointer",
-                        )}
-                      >
-                        <img
-                          src={getLayoutThumbnailSrc(art)}
-                          alt={name}
-                          className="h-full w-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.visibility =
-                              "hidden";
-                          }}
-                        />
-                        {selected && (
-                          <div className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
-                            <IconCheck className="h-4 w-4" />
-                          </div>
-                        )}
-                      </button>
-
-                      <div className="space-y-2 p-2">
-                        <p className="truncate text-xs font-medium" title={name}>
-                          {name}
-                        </p>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 flex-1 px-2"
-                            onClick={() => openLayoutInViewer(art)}
-                          >
-                            <IconEye className="mr-1 h-3.5 w-3.5" />
-                            Ver
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={selected ? "default" : "outline"}
-                            size="sm"
-                            className="h-8 flex-1 px-2"
-                            disabled={blockSelect}
-                            onClick={() => toggleArt(art)}
-                          >
-                            {selected ? (
-                              <>
-                                <IconCheck className="mr-1 h-3.5 w-3.5" />
-                                Selecionado
-                              </>
-                            ) : (
-                              "Selecionar"
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* Quote layouts with no matching task art — selected, removable, no status */}
-                {orphanLayoutFiles.map((f) => {
-                  const id = (f as any).uploadedFileId || f.id;
-                  const src = layoutThumbSrc(f);
-                  return (
-                    <div
-                      key={id}
-                      className="overflow-hidden rounded-lg border-2 border-primary bg-card ring-2 ring-primary/30"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => viewLayout(f)}
-                        title="Ver layout"
-                        className="relative block h-52 w-full cursor-pointer bg-muted"
-                      >
-                        {src ? (
-                          <img
-                            src={src}
-                            alt={f.name || "layout"}
-                            className="h-full w-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.visibility =
-                                "hidden";
-                            }}
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center">
-                            <IconPhoto className="h-8 w-8 text-muted-foreground/50" />
-                          </div>
-                        )}
-                        <div className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
-                          <IconCheck className="h-4 w-4" />
-                        </div>
-                      </button>
-                      <div className="space-y-2 p-2">
-                        <p className="truncate text-xs font-medium" title={f.name}>
-                          {f.name || "Arquivo"}
-                        </p>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 flex-1 px-2"
-                            onClick={() => viewLayout(f)}
-                          >
-                            <IconEye className="mr-1 h-3.5 w-3.5" />
-                            Ver
-                          </Button>
-                          {!disabled && (
-                            // Same "Selecionado" toggle as a chosen task art — this
-                            // file IS the approved layout; clicking it deselects (removes).
-                            <Button
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              className="h-8 flex-1 px-2"
-                              onClick={() => removeOrphan(f)}
-                            >
-                              <IconCheck className="mr-1 h-3.5 w-3.5" />
-                              Selecionado
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center">
-              <IconPhoto className="mx-auto h-6 w-6 text-muted-foreground/50" />
-              <p className="mt-2 text-sm font-medium text-muted-foreground">
-                Nenhum layout na tarefa
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Adicione layouts na etapa "Tarefa" para usá-los como layout
-                aprovado.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Layout Aprovado — pick the budget's approved layout FROM the task's
+          layouts (managed in Step 1). Shared with the billing step. */}
+      <ApprovedLayoutPicker
+        layouts={layouts}
+        layoutFiles={layoutFiles}
+        onChange={handleLayoutChange}
+        disabled={disabled}
+      />
     </div>
   );
 }

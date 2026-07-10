@@ -1439,7 +1439,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
       { id: "ferramentas-custo-horas-extras-pm", title: "Custo de Horas Extras", icon: "calendarDollar", path: "/ferramentas/custo-horas-extras" },
       { id: "ferramentas-calculadora-de-mistura-pm", title: "Calculadora de Mistura", icon: "flask", path: "/ferramentas/calculadora-de-mistura" },
       { id: "ferramentas-calendario-pm", title: "Calendário", icon: "calendarStats", path: "/departamento-pessoal/calendario" },
-      { id: "ferramentas-post-its-pm", title: "Post-its", icon: "note", path: "/ferramentas/post-its" },
+      { id: "ferramentas-notas-pm", title: "Notas", icon: "note", path: "/ferramentas/notas" },
     ],
   },
   {
@@ -1687,10 +1687,10 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [{ id: "minhas-advertencias-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/minhas-advertencias/detalhes/:id", isDynamic: true }],
       },
       { id: "minhas-mensagens", title: "Minhas Mensagens", icon: "message", path: "/pessoal/mensagens" },
-      // Post-its for PRODUCTION lives here inside "Pessoal" (not floating at the root via
-      // post-its-flat). WAREHOUSE already gets Post-its through the Ferramentas section, so
+      // Notas for PRODUCTION lives here inside "Pessoal" (not floating at the root via
+      // notas-flat). WAREHOUSE already gets Notas through the Ferramentas section, so
       // gate this to PRODUCTION only to avoid a duplicate entry for warehouse users.
-      { id: "meus-post-its", title: "Post-its", icon: "note", path: "/ferramentas/post-its", requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION },
+      { id: "minhas-notas", title: "Notas", icon: "note", path: "/ferramentas/notas", requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION },
       {
         id: "minhas-movimentacoes",
         title: "Minhas Movimentações",
@@ -1750,6 +1750,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
         path: "/pintura/producoes",
         requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
         children: [{ id: "producoes-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/producoes/detalhes/:id", isDynamic: true }],
+      },
+      {
+        id: "disponibilidade-producao",
+        title: "Disponibilidade",
+        icon: "calculator",
+        path: "/pintura/disponibilidade",
+        requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
       },
       {
         id: "tipos-de-tinta",
@@ -2232,25 +2239,25 @@ export const NAVIGATION_MENU: MenuItem[] = [
       {
         // Gateless = inherits the section audience (WAREHOUSE/HR/ADMIN/EXTERNAL/ACCOUNTING),
         // same convention as the other broad tools above. Flat-nav roles get their own
-        // root-level Post-its entry (see "post-its-flat" below) and the PM tools group.
-        id: "ferramentas-post-its",
-        title: "Post-its",
+        // root-level Notas entry (see "notas-flat" below) and the PM tools group.
+        id: "ferramentas-notas",
+        title: "Notas",
         icon: "note",
-        path: "/ferramentas/post-its",
+        path: "/ferramentas/notas",
       },
     ],
   },
 
-  // POST-ITS - root-level entry for flat-navigation roles that don't see the
+  // NOTAS - root-level entry for flat-navigation roles that don't see the
   // hierarchical "Ferramentas" section (their navs are flat per-role item lists).
   // PRODUCTION/TEAM_LEADER are intentionally NOT here: PRODUCTION (and production team
-  // leaders, who are PRODUCTION-sector users) reach Post-its through the "Pessoal" group
-  // (see "meus-post-its" above), so they don't get a floating root-level entry.
+  // leaders, who are PRODUCTION-sector users) reach Notas through the "Pessoal" group
+  // (see "minhas-notas" above), so they don't get a floating root-level entry.
   {
-    id: "post-its-flat",
-    title: "Post-its",
+    id: "notas-flat",
+    title: "Notas",
     icon: "note",
-    path: "/ferramentas/post-its",
+    path: "/ferramentas/notas",
     requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL],
   },
 

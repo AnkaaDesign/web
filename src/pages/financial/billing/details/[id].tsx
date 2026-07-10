@@ -95,6 +95,8 @@ export const BillingDetailPage = () => {
         },
         orderBy: { position: "asc" },
       },
+      // Task layouts — the pool the billing "Layout Aprovado" picker chooses from.
+      layouts: { include: { file: true } },
       quote: {
         include: {
           services: true,
@@ -113,6 +115,28 @@ export const BillingDetailPage = () => {
 
   const task = taskResponse?.data;
   const quote = task?.quote;
+
+  // The task's image layouts — the pool the "Layout Aprovado" picker chooses from
+  // (billing edits an existing task, so the candidates are its persisted layouts).
+  const layoutImageOptions = useMemo(() => {
+    const layouts = (task as any)?.layouts || [];
+    return layouts
+      .map((layout: any) => {
+        const file = layout.file || layout;
+        return {
+          id: file.id,
+          layoutId: layout.id,
+          filename: file.filename,
+          originalName: file.originalName,
+          thumbnailUrl: file.thumbnailUrl || null,
+          status: layout.status,
+          mimetype: file.mimetype,
+          path: file.path || null,
+          size: file.size,
+        };
+      })
+      .filter((o: any) => (o.mimetype || "").startsWith("image/"));
+  }, [task]);
 
   // Fetch invoices — polls every 3s during generation
   const { data: invoicesData } = useInvoicesByTask(id!, {
@@ -264,9 +288,12 @@ export const BillingDetailPage = () => {
     }, { keepDirtyValues: true }); // preserve user edits on background refetch
 
     // Load layout files from the included layoutFiles relation (array, up to 2)
+    // originalName so a quote layout (a private CLONE of a task layout — kept
+    // originalName, generated filename) matches its task-layout twin in the picker
+    // instead of rendering as a separate "orphan" tile.
     const toLayoutFile = (file: any): FileWithPreview => ({
       id: file.id,
-      name: file.filename || "layout",
+      name: file.originalName || file.filename || "layout",
       size: file.size || 0,
       type: file.mimetype || "application/octet-stream",
       lastModified: Date.now(),
@@ -841,6 +868,7 @@ export const BillingDetailPage = () => {
                     disabled={!canEdit}
                     layoutFiles={layoutFiles}
                     onLayoutFilesChange={setLayoutFiles}
+                    layouts={layoutImageOptions}
                   />
                 )}
 

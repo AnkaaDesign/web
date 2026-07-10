@@ -12,7 +12,7 @@ export type {
 } from "./create-entity-hooks";
 export * from "./use-edit-form";
 export * from "./create-form-url-state";
-export * from "./use-postits";
+export * from "./use-notes";
 
 // Authentication
 export * from "./use-auth";

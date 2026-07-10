@@ -1173,10 +1173,10 @@ export const thirteenthKeys = createQueryKeyStore<Record<string, any>>("thirteen
 
 export const workAccidentKeys = createQueryKeyStore<Record<string, any>>("workAccidents");
 
-// Calendário/agenda + post-its (a5-calendar)
+// Calendário/agenda + notas (a5-calendar)
 export const agendaEventKeys = createQueryKeyStore<Record<string, any>>("agendaEvents");
 
-export const postitKeys = createQueryKeyStore<Record<string, any>>("postits");
+export const noteKeys = createQueryKeyStore<Record<string, any>>("notes");
 
 // Legacy keys retained until Phase-6 page rewrite. Do NOT use in new code.
 export const legacySkillKeys = {

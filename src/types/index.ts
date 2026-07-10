@@ -77,6 +77,6 @@ export * from "./dependent";
 export * from "./vacation";
 export * from "./thirteenth";
 export * from "./work-accident";
-// Calendário/agenda + post-its (a5-calendar)
+// Calendário/agenda + notas (a5-calendar)
 export * from "./agenda-event";
-export * from "./postit";
+export * from "./note";

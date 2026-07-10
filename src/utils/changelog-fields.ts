@@ -1094,7 +1094,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "user.name": "Nome do Colaborador",
     "healthPlanBenefit.benefit.name": "Nome do Plano",
   },
-  [CHANGE_LOG_ENTITY_TYPE.POSTIT]: {
+  [CHANGE_LOG_ENTITY_TYPE.NOTE]: {
+    title: "Título",
     content: "Conteúdo",
     color: "Cor",
     position: "Posição (z-index)",
@@ -1103,9 +1104,11 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     width: "Largura",
     height: "Altura",
     isArchived: "Arquivado",
-    userId: "Usuário",
+    archivedAt: "Arquivado em",
+    ownerId: "Proprietário",
     // Nested relationship fields
-    "user.name": "Nome do Usuário",
+    "owner.name": "Nome do proprietário",
+    sharedWith: "Compartilhado com",
   },
   // Add more entity-specific mappings as needed
 };
