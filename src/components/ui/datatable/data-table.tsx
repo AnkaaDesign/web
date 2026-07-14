@@ -126,6 +126,15 @@ export interface DataTableProps<TData> {
   enableExpansion?: boolean;
   /** Return a row's child rows (e.g. a name-cluster's hidden siblings). Required for expansion. */
   getSubRows?: (row: TData) => TData[] | undefined;
+  /**
+   * Search-prune hook for grouped rows. When a search is active, a parent (group) row is kept as
+   * long as ANY descendant matches — but by default the WHOLE subtree renders, so a day group leaks
+   * in its non-matching siblings. Provide this to rebuild the parent around just the matching
+   * children (`kept`): recompute any aggregates and return a new row carrying them. Only called for a
+   * group whose own cells don't match (a direct hit on the parent keeps the full subtree). Omit to
+   * keep the legacy whole-subtree behavior.
+   */
+  pruneSubRows?: (row: TData, kept: TData[]) => TData;
   /** Per-row expand gate; defaults to "has children". */
   getRowCanExpand?: (row: Row<TData>) => boolean;
   /** Initial expansion: `true` = all expanded, or a {rowId:true} map. Defaults to collapsed. */
@@ -211,6 +220,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     autoHeight = false,
     enableExpansion = false,
     getSubRows,
+    pruneSubRows,
     getRowCanExpand,
     defaultExpanded,
     persistExpansion = false,
@@ -368,21 +378,40 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     }
     let rows = data;
     if (debouncedSearch) {
-      // Match DEEPLY: a grouped/clustered parent has its members in sub-rows (getSubRows). Searching
-      // must find a match anywhere in the subtree, otherwise a child that matches (e.g. a task's
-      // serial that only exists on a grouped child) is invisible because the parent's own cells
-      // don't contain it. Keep the row when it — or any descendant — matches.
-      const matchesDeep = (r: TData): boolean => {
-        if (rowMatchesSearch(r, columns, debouncedSearch)) return true;
+      // Match DEEPLY, then PRUNE: a grouped/clustered parent holds its members as sub-rows
+      // (getSubRows). A search must find a match anywhere in the subtree — otherwise a child that
+      // matches (e.g. a serial that only exists on a grouped child) is invisible because the parent's
+      // own cells don't contain it. But keeping the parent must NOT drag in its non-matching
+      // siblings: narrow each kept group to just the descendants that match. A direct hit on the
+      // parent's own cells keeps the whole subtree (the group itself matched). `pruneSubRows` lets the
+      // caller rebuild the parent around the kept children (recomputing aggregates); without it we
+      // fall back to keeping the whole subtree.
+      const term = debouncedSearch;
+      const narrow = (r: TData): TData | null => {
         const kids = getSubRows?.(r);
-        return Array.isArray(kids) && kids.some(matchesDeep);
+        if (!Array.isArray(kids) || kids.length === 0) {
+          return rowMatchesSearch(r, columns, term) ? r : null;
+        }
+        if (rowMatchesSearch(r, columns, term)) return r; // parent itself matched → whole subtree
+        const kept: TData[] = [];
+        for (const kid of kids) {
+          const k = narrow(kid);
+          if (k !== null) kept.push(k);
+        }
+        if (kept.length === 0) return null;
+        return pruneSubRows ? pruneSubRows(r, kept) : r;
       };
-      rows = rows.filter(matchesDeep);
+      const narrowed: TData[] = [];
+      for (const r of rows) {
+        const n = narrow(r);
+        if (n !== null) narrowed.push(n);
+      }
+      rows = narrowed;
     }
     if (filterDefs.length) rows = rows.filter((r) => rowMatchesFilters(r, filterDefs, filters));
     if (viewSelectedOnly && selectedIds) rows = rows.filter((r) => selectedIds.has(getId(r)));
     return rows;
-  }, [mode, data, columns, debouncedSearch, filterDefs, filters, viewSelectedOnly, selectedIds, getId, getSubRows]);
+  }, [mode, data, columns, debouncedSearch, filterDefs, filters, viewSelectedOnly, selectedIds, getId, getSubRows, pruneSubRows]);
 
   const dt = useDataTable<TData>({
     tableId,

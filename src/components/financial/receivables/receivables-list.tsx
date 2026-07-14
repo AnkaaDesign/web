@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { DataTable, type DataTableColumnDef } from "@/components/ui/datatable";
 import { FinancialKpiCard } from "../common/financial-kpi-card";
-import { buildDateGroups, isDateGroup, GroupDateLabel, GroupProgressBar, type GroupedRow } from "@/components/financial/common/date-grouped-rows";
+import { buildDateGroups, pruneDateGroup, isDateGroup, GroupDateLabel, GroupProgressBar, type GroupedRow } from "@/components/financial/common/date-grouped-rows";
 
 // --- Per-row receipt-state badge (the ENTRADA analog of payables). ------------
 const RECEIVABLE_STATE_LABELS: Record<ReceivableState, string> = {
@@ -60,6 +60,18 @@ const RECEIVABLE_BUCKETS: Record<
 const BUCKET_ORDER: ReceivableBucketKey[] = ["AWAITING", "PARTIAL", "OVERDUE", "RECEIVED", "CONCILIADO"];
 // Default view: every open/overdue receivable; received/conciliado-this-period is opt-in.
 const DEFAULT_BUCKETS: ReceivableBucketKey[] = ["AWAITING", "PARTIAL", "OVERDUE"];
+
+// Day-grouping options — shared by buildDateGroups (initial grouping) and
+// pruneDateGroup (search-narrowed regrouping) so the recomputed day totals /
+// progress bar stay consistent. green = received on the day, red = still to receive.
+const DAY_GROUP_OPTS = {
+  // Bucket by the payment date when the parcela is paid; otherwise by its due date.
+  getDate: (r: ReceivableRow) => r.paidAt ?? r.dueDate,
+  getGreen: (r: ReceivableRow) => (r.state === "RECEIVED" ? r.amount : 0),
+  getRed: (r: ReceivableRow) => (r.state === "RECEIVED" ? 0 : r.amount),
+  getResolved: (r: ReceivableRow) => r.state === "RECEIVED",
+  direction: "desc" as const,
+};
 
 // A RECEIVED row splits across two buckets depending on Axis B (bank match) —
 // so this is a function of the row, not a static per-state lookup.
@@ -486,17 +498,7 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
   // Group the flat rows into day banners (paidAt when paid, else vencimento),
   // newest-first — the same accordion grouping the Extrato / Notas Fiscais use.
   const groupedRows = useMemo(
-    () =>
-      buildDateGroups(sortedRows, {
-        // Bucket by the payment date when the parcela is paid; otherwise by its due date.
-        getDate: (r) => r.paidAt ?? r.dueDate,
-        // green = received on the day, red = still to receive on the day. The collapsed
-        // banner shows the day's cumulative total from these.
-        getGreen: (r) => (r.state === "RECEIVED" ? r.amount : 0),
-        getRed: (r) => (r.state === "RECEIVED" ? 0 : r.amount),
-        getResolved: (r) => r.state === "RECEIVED",
-        direction: "desc",
-      }),
+    () => buildDateGroups(sortedRows, DAY_GROUP_OPTS),
     [sortedRows],
   );
 
@@ -575,6 +577,11 @@ export function ReceivablesList({ className }: ReceivablesListProps) {
           enableExpansion
           defaultExpanded
           getSubRows={(row) => (isDateGroup(row) ? row.children : undefined)}
+          pruneSubRows={(row, kept) =>
+            isDateGroup(row)
+              ? pruneDateGroup(row, kept as ReceivableRow[], DAY_GROUP_OPTS)
+              : row
+          }
           isGroupRow={isDateGroup}
           renderGroupCell={(row, columnId, { isExpanded }) => {
             if (!isDateGroup(row)) return null;

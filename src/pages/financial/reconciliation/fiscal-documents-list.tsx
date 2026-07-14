@@ -15,10 +15,11 @@ import {
 } from "@tabler/icons-react";
 import type { FiscalDocumentsFiltersUi } from "@/components/financial/reconciliation/fiscal-documents-filter-sheet";
 import { isLinked } from "@/components/financial/reconciliation/fiscal-documents-by-date-accordion";
-import { FISCAL_DOCUMENT_COLUMNS } from "@/components/financial/reconciliation/fiscal-documents-columns";
+import { FISCAL_DOCUMENT_COLUMNS, isMoneyIn } from "@/components/financial/reconciliation/fiscal-documents-columns";
 import { DataTable, type DataTableColumnDef } from "@/components/ui/datatable";
 import {
   buildDateGroups,
+  pruneDateGroup,
   isDateGroup,
   GroupDateLabel,
   GroupProgressBar,
@@ -57,6 +58,18 @@ import type {
 // a single fetch, so the whole payload feeds both the summary cards and the
 // accordion and toggling a card never refetches (mirrors the Extrato page).
 const PERIOD_PAGE_SIZE = 1000;
+
+// Day-grouping options — shared by buildDateGroups (initial grouping) and
+// pruneDateGroup (search-narrowed regrouping) so the recomputed day totals stay
+// consistent. Green/red follow the CASH direction (isMoneyIn): emitted notes
+// (money in) are green, notes against our CNPJ (money out) are red.
+const DAY_GROUP_OPTS = {
+  getDate: (d: FiscalDocument) => d.issueDate,
+  getGreen: (d: FiscalDocument) => (isMoneyIn(d) ? Number(d.totalValue) || 0 : 0),
+  getRed: (d: FiscalDocument) => (!isMoneyIn(d) ? Number(d.totalValue) || 0 : 0),
+  getResolved: (d: FiscalDocument) => isLinked(d),
+  direction: "desc" as const,
+};
 
 // --- Operation cards (Entradas / Saídas by operationType) ------------------
 // ENTRADA = purchases / incoming notes, SAIDA = our sales. Multi-select toggle
@@ -345,14 +358,15 @@ export const FiscalDocumentsListContent = () => {
     [operationRows, buckets],
   );
 
-  // Operation totals over the whole period payload (independent of the active
-  // operation/bucket selection), so the cards read as period summaries.
+  // Cash-direction totals over the whole period payload (independent of the
+  // active operation/bucket selection), so the cards read as period summaries.
+  // Entrada = money in (notes we emitted); Saída = money out (against our CNPJ).
   const totals = useMemo(() => {
     let entrada = 0;
     let saida = 0;
     for (const d of rows) {
       const v = Math.abs(Number(d.totalValue) || 0);
-      if (d.operationType === "ENTRADA") entrada += v;
+      if (isMoneyIn(d)) entrada += v;
       else saida += v;
     }
     return { entrada, saida };
@@ -389,17 +403,11 @@ export const FiscalDocumentsListContent = () => {
     [],
   );
 
-  // Day grouping — one banner per emission day (newest first), entradas green /
-  // saídas red — the same accordion the Extrato / Contas a Receber use.
+  // Day grouping — one banner per emission day (newest first), entradas (money
+  // in / emitted) green / saídas (money out / against our CNPJ) red — the same
+  // accordion the Extrato / Contas a Receber use.
   const groupedRows = useMemo(
-    () =>
-      buildDateGroups(visibleRows, {
-        getDate: (d) => d.issueDate,
-        getGreen: (d) => (d.operationType === "ENTRADA" ? Number(d.totalValue) || 0 : 0),
-        getRed: (d) => (d.operationType !== "ENTRADA" ? Number(d.totalValue) || 0 : 0),
-        getResolved: (d) => isLinked(d),
-        direction: "desc",
-      }),
+    () => buildDateGroups(visibleRows, DAY_GROUP_OPTS),
     [visibleRows],
   );
 
@@ -503,21 +511,23 @@ export const FiscalDocumentsListContent = () => {
         {/* Summary cards — Entradas/Saídas (operationType) + the 3 conciliation
             buckets. Every card is a toggle; click again to clear. */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 flex-shrink-0">
+          {/* Entradas = money in = notes we emitted (operationType SAIDA); Saídas
+              = money out = notes against our CNPJ (operationType ENTRADA). */}
           <FinancialKpiCard
             label="Entradas"
             value={isLoading ? null : formatCurrency(totals.entrada)}
             Icon={IconArrowDownLeft}
             tone="text-emerald-600 bg-emerald-500/10"
-            active={operations.includes("ENTRADA")}
-            onClick={() => toggleOperation("ENTRADA")}
+            active={operations.includes("SAIDA")}
+            onClick={() => toggleOperation("SAIDA")}
           />
           <FinancialKpiCard
             label="Saídas"
             value={isLoading ? null : formatCurrency(totals.saida)}
             Icon={IconArrowUpRight}
             tone="text-red-600 bg-red-500/10"
-            active={operations.includes("SAIDA")}
-            onClick={() => toggleOperation("SAIDA")}
+            active={operations.includes("ENTRADA")}
+            onClick={() => toggleOperation("ENTRADA")}
           />
           {ALL_NF_BUCKETS.map(key => {
             const meta = NF_BUCKET_META[key];
@@ -551,6 +561,11 @@ export const FiscalDocumentsListContent = () => {
             enableExpansion
             defaultExpanded
             getSubRows={row => (isDateGroup(row) ? row.children : undefined)}
+            pruneSubRows={(row, kept) =>
+              isDateGroup(row)
+                ? pruneDateGroup(row, kept as FiscalDocument[], DAY_GROUP_OPTS)
+                : row
+            }
             isGroupRow={isDateGroup}
             renderGroupCell={(row, columnId, { isExpanded }) => {
               if (!isDateGroup(row)) return null;

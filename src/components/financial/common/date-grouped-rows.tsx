@@ -117,6 +117,31 @@ export function buildDateGroups<T>(leaves: T[], opts: BuildDateGroupsOptions<T>)
   return groups;
 }
 
+/**
+ * Rebuild a day GROUP around just `kept` (a subset of its children), recomputing
+ * the day aggregates so the banner totals + progress bar reflect the narrowed
+ * set. Feeds DataTable's `pruneSubRows`: when a search is active, a day is kept
+ * because one of its rows matched, and this trims the day to only those rows
+ * instead of leaking in the whole day. Pass the SAME green/red/resolved options
+ * used to build the groups so the recomputed totals stay consistent.
+ */
+export function pruneDateGroup<T>(
+  group: DateGroup<T>,
+  kept: T[],
+  opts: Pick<BuildDateGroupsOptions<T>, "getGreen" | "getRed" | "getResolved">,
+): DateGroup<T> {
+  const { getGreen, getRed, getResolved } = opts;
+  let greenTotal = 0;
+  let redTotal = 0;
+  let resolvedCount = 0;
+  for (const leaf of kept) {
+    greenTotal += getGreen?.(leaf) ?? 0;
+    redTotal += getRed?.(leaf) ?? 0;
+    if (getResolved?.(leaf)) resolvedCount += 1;
+  }
+  return { ...group, count: kept.length, greenTotal, redTotal, resolvedCount, children: kept };
+}
+
 // The banner content is now rendered column-aligned via DataTable's `renderGroupCell` using the
 // exported GroupDateLabel + GroupProgressBar (see the financial list pages). The old single-blob
 // DateGroupBanner was intentionally removed.

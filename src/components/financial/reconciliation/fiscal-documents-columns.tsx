@@ -14,6 +14,16 @@ import type { FiscalDocument } from "@/types/reconciliation";
 import { OFF_BANK_RESOLUTION_LABELS } from "@/types/reconciliation";
 import { docTypeLabel, docTypeVariant } from "./fiscal-doc-badge";
 
+/**
+ * Money direction of a fiscal note in the conciliação workflow. The green/red
+ * Entrada/Saída coloring here tracks the CASH flow, not the fiscal goods flow:
+ *  - a note WE EMITTED (operationType "SAIDA" — a sale) brings money IN → Entrada
+ *  - a note issued AGAINST our CNPJ (operationType "ENTRADA" — a purchase) sends
+ *    money OUT → Saída
+ * i.e. it's the inverse of the fiscal `operationType` (mercadoria entra/sai).
+ */
+export const isMoneyIn = (d: FiscalDocument): boolean => d.operationType === "SAIDA";
+
 const STATUS_LABEL = (status: string): string =>
   status === "AUTHORIZED"
     ? "Autorizada"
@@ -62,11 +72,11 @@ export const FISCAL_DOCUMENT_COLUMNS: DataTableColumnDef<FiscalDocument>[] = [
     id: "operationType",
     header: "Operação",
     size: 110,
-    accessorFn: (d) => (d.operationType === "ENTRADA" ? "Entrada" : "Saída"),
-    meta: { align: "center", headerLabel: "Operação", exportValue: (d) => (d.operationType === "ENTRADA" ? "Entrada" : "Saída") },
+    accessorFn: (d) => (isMoneyIn(d) ? "Entrada" : "Saída"),
+    meta: { align: "center", headerLabel: "Operação", exportValue: (d) => (isMoneyIn(d) ? "Entrada" : "Saída") },
     cell: ({ row }) => (
-      <Badge size="sm" variant={row.original.operationType === "ENTRADA" ? "completed" : "cancelled"}>
-        {row.original.operationType === "ENTRADA" ? "Entrada" : "Saída"}
+      <Badge size="sm" variant={isMoneyIn(row.original) ? "completed" : "cancelled"}>
+        {isMoneyIn(row.original) ? "Entrada" : "Saída"}
       </Badge>
     ),
   },
@@ -102,10 +112,10 @@ export const FISCAL_DOCUMENT_COLUMNS: DataTableColumnDef<FiscalDocument>[] = [
     id: "entrada",
     header: "Entrada",
     size: 140,
-    accessorFn: (d) => (d.operationType === "ENTRADA" ? d.totalValue : 0),
-    meta: { align: "right", headerLabel: "Entrada", exportValue: (d) => (d.operationType === "ENTRADA" ? d.totalValue : "") },
+    accessorFn: (d) => (isMoneyIn(d) ? d.totalValue : 0),
+    meta: { align: "right", headerLabel: "Entrada", exportValue: (d) => (isMoneyIn(d) ? d.totalValue : "") },
     cell: ({ row }) =>
-      row.original.operationType === "ENTRADA" ? (
+      isMoneyIn(row.original) ? (
         <span className="font-semibold tabular-nums whitespace-nowrap text-sm text-emerald-700 dark:text-emerald-400">
           {formatCurrency(row.original.totalValue)}
         </span>
@@ -115,10 +125,10 @@ export const FISCAL_DOCUMENT_COLUMNS: DataTableColumnDef<FiscalDocument>[] = [
     id: "saida",
     header: "Saída",
     size: 110,
-    accessorFn: (d) => (d.operationType !== "ENTRADA" ? d.totalValue : 0),
-    meta: { align: "right", headerLabel: "Saída", exportValue: (d) => (d.operationType !== "ENTRADA" ? d.totalValue : "") },
+    accessorFn: (d) => (!isMoneyIn(d) ? d.totalValue : 0),
+    meta: { align: "right", headerLabel: "Saída", exportValue: (d) => (!isMoneyIn(d) ? d.totalValue : "") },
     cell: ({ row }) =>
-      row.original.operationType === "ENTRADA" ? null : (
+      isMoneyIn(row.original) ? null : (
         <span className="font-semibold tabular-nums whitespace-nowrap text-sm text-red-700 dark:text-red-400">
           {formatCurrency(row.original.totalValue)}
         </span>

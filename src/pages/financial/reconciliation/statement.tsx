@@ -24,6 +24,7 @@ import {
 import { STATEMENT_COLUMNS } from "@/components/financial/reconciliation/statement-columns";
 import {
   buildDateGroups,
+  pruneDateGroup,
   isDateGroup,
   GroupDateLabel,
   GroupProgressBar,
@@ -58,6 +59,20 @@ import type { BankTransaction, TransactionType } from "@/types/reconciliation";
 
 // Mirrors the API DTO cap; a busy month fits in one fetch.
 const PERIOD_PAGE_SIZE = 1000;
+
+// Day-grouping options — shared by buildDateGroups (initial grouping) and
+// pruneDateGroup (search-narrowed regrouping) so the recomputed day totals /
+// progress bar stay consistent with how the groups were built.
+const DAY_GROUP_OPTS = {
+  getDate: (t: BankTransaction) => t.postedAt,
+  getGreen: (t: BankTransaction) => (t.type === "CREDIT" ? Math.abs(Number(t.amount) || 0) : 0),
+  getRed: (t: BankTransaction) => (t.type !== "CREDIT" ? Math.abs(Number(t.amount) || 0) : 0),
+  getResolved: (t: BankTransaction) =>
+    t.reconciliationStatus === "RECONCILED" ||
+    t.reconciliationStatus === "PARTIAL" ||
+    t.reconciliationStatus === "IGNORED",
+  direction: "desc" as const,
+};
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -353,17 +368,7 @@ export const ReconciliationStatementPage = () => {
   // Day grouping — one banner per posted day (newest first), entradas green /
   // saídas red — the same accordion the Notas Fiscais / Contas a Receber use.
   const groupedRows = useMemo(
-    () =>
-      buildDateGroups(visibleRows, {
-        getDate: (t) => t.postedAt,
-        getGreen: (t) => (t.type === "CREDIT" ? Math.abs(Number(t.amount) || 0) : 0),
-        getRed: (t) => (t.type !== "CREDIT" ? Math.abs(Number(t.amount) || 0) : 0),
-        getResolved: (t) =>
-          t.reconciliationStatus === "RECONCILED" ||
-          t.reconciliationStatus === "PARTIAL" ||
-          t.reconciliationStatus === "IGNORED",
-        direction: "desc",
-      }),
+    () => buildDateGroups(visibleRows, DAY_GROUP_OPTS),
     [visibleRows],
   );
 
@@ -515,6 +520,11 @@ export const ReconciliationStatementPage = () => {
             enableExpansion
             defaultExpanded
             getSubRows={row => (isDateGroup(row) ? row.children : undefined)}
+            pruneSubRows={(row, kept) =>
+              isDateGroup(row)
+                ? pruneDateGroup(row, kept as BankTransaction[], DAY_GROUP_OPTS)
+                : row
+            }
             isGroupRow={isDateGroup}
             renderGroupCell={(row, columnId, { isExpanded }) => {
               if (!isDateGroup(row)) return null;
