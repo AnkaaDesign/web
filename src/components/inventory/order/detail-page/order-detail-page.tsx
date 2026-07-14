@@ -639,12 +639,27 @@ export function OrderDetailPage() {
         icon={IconShoppingCart}
         actions={actions}
         hideEmptyFields
-        breadcrumbs={[
-          { label: "Início", href: routes.home },
-          { label: "Estoque", href: routes.inventory.root },
-          { label: "Pedidos", href: routes.inventory.orders.list },
-          { label: order?.description ?? "Detalhe" },
-        ]}
+        breadcrumbs={
+          (location.state as { from?: string } | null)?.from === "payables"
+            ? [
+                // Arrived from Contas a Pagar — reflect the path actually taken
+                // instead of the Estoque/Pedidos trail (which ACCOUNTING can't open).
+                { label: "Início", href: routes.home },
+                { label: "Financeiro", href: routes.financial.root },
+                { label: "Contas a Pagar", href: routes.financial.accountsPayable.root },
+                { label: order?.description ?? "Detalhe" },
+              ]
+            : [
+                { label: "Início", href: routes.home },
+                // ACCOUNTING can open an order's detail page directly (e.g. from Contas a
+                // Pagar) but has no access to "Estoque" / the orders list — those ancestor
+                // crumbs must render as plain (non-clickable) labels for it, not links
+                // into pages it would be denied.
+                { label: "Estoque", href: canManageWarehouse ? routes.inventory.root : undefined },
+                { label: "Pedidos", href: canManageWarehouse ? routes.inventory.orders.list : undefined },
+                { label: order?.description ?? "Detalhe" },
+              ]
+        }
         navigation={{
           ids: (location.state as { ids?: string[] } | null)?.ids,
           toRoute: (rid) => routes.inventory.orders.details(rid),
