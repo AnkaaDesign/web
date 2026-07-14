@@ -216,7 +216,7 @@ export const RecurrentPayablesListPage = () => {
     {
       key: "category",
       header: "Categoria",
-      width: "180px",
+      width: "320px",
       render: (p) =>
         p.category?.name ? (
           <span className={`text-sm ${p.isActive ? "" : "opacity-50"}`}>{p.category.name}</span>
