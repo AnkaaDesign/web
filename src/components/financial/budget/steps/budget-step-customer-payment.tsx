@@ -145,6 +145,15 @@ export function BudgetStepCustomerPayment({
     setFormValue(`customerConfigs.${configIndex}.${field}`, value, { shouldDirty: true });
   }, [setFormValue, configIndex]);
 
+  // Lock the CNPJ field once the linked customer already has one on record.
+  // Typing a CNPJ here fires a Brasil-API lookup that OVERWRITES corporateName,
+  // address, city, etc. on the shared master customer at save time — so entering
+  // a different company's CNPJ silently clobbers an existing customer's registry
+  // (this turned the "Ibiporã" customer into "Sola" on 2026-07-13). The lookup is
+  // only meant to fill in a customer that has no CNPJ yet; corrections to an
+  // existing CNPJ must be made in the customer registry, not in this step.
+  const customerHasCnpj = String(customer?.cnpj ?? "").replace(/\D/g, "").length > 0;
+
   const { lookupCnpj, isLoading: isLookingUpCnpj } = useCnpjLookup({
     onSuccess: (data) => {
       if (data.corporateName) setCustomerField("corporateName", data.corporateName);
@@ -161,12 +170,14 @@ export function BudgetStepCustomerPayment({
   });
 
   const handleCnpjChange = useCallback((value: string) => {
+    // Never mutate/lookup the CNPJ of a customer that already has one on record.
+    if (customerHasCnpj) return;
     setCustomerField("cnpj", value);
     const digits = value.replace(/\D/g, "");
     if (digits.length === 14) {
       lookupCnpj(digits);
     }
-  }, [setCustomerField, lookupCnpj]);
+  }, [setCustomerField, lookupCnpj, customerHasCnpj]);
 
   const handleDocTypeChange = useCallback((newType: any) => {
     const type = typeof newType === "string" ? newType : "cnpj";
@@ -218,7 +229,7 @@ export function BudgetStepCustomerPayment({
                   value={customerData.cnpj ?? ""}
                   onChange={(value) => handleCnpjChange(String(value ?? ""))}
                   placeholder="00.000.000/0000-00"
-                  disabled={disabled}
+                  disabled={disabled || customerHasCnpj}
                   transparent
                   className="flex-1"
                 />
@@ -236,6 +247,11 @@ export function BudgetStepCustomerPayment({
             </div>
             {isLookingUpCnpj && (
               <span className="text-xs text-primary animate-pulse">Buscando dados do CNPJ...</span>
+            )}
+            {docType === "cnpj" && customerHasCnpj && !isLookingUpCnpj && (
+              <span className="text-xs text-muted-foreground">
+                CNPJ já cadastrado — para corrigi-lo, edite o cliente no cadastro.
+              </span>
             )}
           </div>
 
