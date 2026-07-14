@@ -422,7 +422,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   }, [discount]);
 
   // Mutations - use update instead of create
-  const { updateAsync, isLoading: isSubmitting } = useOrderMutations();
+  const { updateAsync, cancelPaymentRequestAsync, isLoading: isSubmitting } = useOrderMutations();
 
   // Payment status is settled through dedicated endpoints (installment cascade + paidAt
   // stamping), not a raw field write — so we track the selection separately and fire the
@@ -833,8 +833,22 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         // Settle payment status atomically with the field update — the API routes this
         // through the installment/paidAt cascade (mark paid / reabrir). Only send when the
         // user actually changed it, so an unrelated edit doesn't trigger a no-op transition.
-        ...(selectedPaymentStatus !== order.paymentStatus ? { paymentStatus: selectedPaymentStatus } : {}),
+        // PENDING is excluded here: the API only accepts that transition through the
+        // dedicated "cancelar requisição" endpoint (see cancelPaymentRequestAsync below),
+        // never the generic update — sending it here would be rejected.
+        ...(selectedPaymentStatus !== order.paymentStatus && selectedPaymentStatus !== ORDER_PAYMENT_STATUS.PENDING
+          ? { paymentStatus: selectedPaymentStatus }
+          : {}),
       };
+
+      // Rolling back to Pendente ("desfazer requisição de pagamento") goes through
+      // its own endpoint — the generic update path rejects a PENDING target by design.
+      if (
+        selectedPaymentStatus === ORDER_PAYMENT_STATUS.PENDING &&
+        order.paymentStatus !== ORDER_PAYMENT_STATUS.PENDING
+      ) {
+        await cancelPaymentRequestAsync(order.id);
+      }
 
       // Check if there are new files to upload (files without uploadedFileId)
       const newReceiptFiles = receiptFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
@@ -897,7 +911,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       }
       // Error is handled by the mutation hook
     }
-  }, [validateCurrentStep, selectedItems, quantities, prices, icmses, ipis, temporaryItems, description, supplierId, forecast, notes, receiptFiles, updateAsync, order, navigate, form, selectedPaymentStatus]);
+  }, [validateCurrentStep, selectedItems, quantities, prices, icmses, ipis, temporaryItems, description, supplierId, forecast, notes, receiptFiles, updateAsync, cancelPaymentRequestAsync, order, navigate, form, selectedPaymentStatus]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === steps.length;
@@ -1401,6 +1415,12 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   // Status drives the label directly — no method-derived "A Definir".
                                   { value: ORDER_PAYMENT_STATUS.AWAITING_PAYMENT, label: ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.AWAITING_PAYMENT] },
                                   { value: ORDER_PAYMENT_STATUS.PAID, label: ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.PAID] },
+                                  // Rollback to Pendente is only valid straight from Aguardando
+                                  // Pagamento (desfaz a requisição) — routed through the dedicated
+                                  // cancelPaymentRequest endpoint on submit, not the generic update.
+                                  ...(order.paymentStatus === ORDER_PAYMENT_STATUS.AWAITING_PAYMENT
+                                    ? [{ value: ORDER_PAYMENT_STATUS.PENDING, label: ORDER_PAYMENT_STATUS_LABELS[ORDER_PAYMENT_STATUS.PENDING] }]
+                                    : []),
                                   // Current PARTIALLY_PAID is installment-derived: shown so the value
                                   // renders, but the user only moves to Aguardando/Pago.
                                   ...(order.paymentStatus === ORDER_PAYMENT_STATUS.PARTIALLY_PAID
