@@ -41,7 +41,13 @@ import {
 import { CutOverviewSection } from "@/components/production/cut/detail/cut-overview-section";
 import { useConfirm } from "@/components/production/task/detail/use-confirm";
 
-const PAGE_PRIVILEGES = [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.ADMIN];
+const PAGE_PRIVILEGES = [
+  SECTOR_PRIVILEGES.PRODUCTION,
+  SECTOR_PRIVILEGES.DESIGNER,
+  SECTOR_PRIVILEGES.PLOTTING,
+  SECTOR_PRIVILEGES.WAREHOUSE,
+  SECTOR_PRIVILEGES.ADMIN,
+];
 
 const DETAIL_INCLUDE = {
   file: true,

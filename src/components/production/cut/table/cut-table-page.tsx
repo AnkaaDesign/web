@@ -41,7 +41,7 @@ const LIST_INCLUDE = {
 } as const;
 
 // Roles allowed to change cut status (start/finish) — mirrors canManageCutStatus / API PUT /cuts/:id.
-const CUT_STATUS_MANAGERS = [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.PLOTTING];
+const CUT_STATUS_MANAGERS = [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.WAREHOUSE];
 // Roles allowed to delete cuts — mirrors canDeleteCuts / API DELETE /cuts/:id (ADMIN always passes).
 const CUT_DELETERS = [SECTOR_PRIVILEGES.DESIGNER];
 

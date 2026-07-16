@@ -215,9 +215,9 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   [routes.production.airbrushings.create]: ["COMMERCIAL", "FINANCIAL", "ADMIN"], // WAREHOUSE read-only (API rejects writes); PRODUCTION and DESIGNER excluded
   [routes.production.airbrushings.edit(":id")]: ["COMMERCIAL", "FINANCIAL", "ADMIN"], // WAREHOUSE read-only (API rejects writes); PRODUCTION and DESIGNER excluded
 
-  // Cut-related routes - DESIGNER and PLOTTING have read-only access, WAREHOUSE removed
-  [routes.production.cutting.root]: ["PRODUCTION", "DESIGNER", "PLOTTING", "ADMIN"],
-  [routes.production.cutting.details(":id")]: ["PRODUCTION", "DESIGNER", "PLOTTING", "ADMIN"], // Cutting detail
+  // Cut-related routes - PRODUCTION/DESIGNER/PLOTTING and WAREHOUSE (execute cuts: start/finish)
+  [routes.production.cutting.root]: ["PRODUCTION", "DESIGNER", "PLOTTING", "WAREHOUSE", "ADMIN"],
+  [routes.production.cutting.details(":id")]: ["PRODUCTION", "DESIGNER", "PLOTTING", "WAREHOUSE", "ADMIN"], // Cutting detail
 
   // Observations - accessible to production-related sectors (read-only for most, edit for admin)
   // DESIGNER and LOGISTIC excluded from observations

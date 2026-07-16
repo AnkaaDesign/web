@@ -138,13 +138,14 @@ export function canLeaderManageTask(user: PermissionUser | null, taskSectorId: s
 
 /**
  * Can user edit cuts?
- * DESIGNER, PLOTTING, and ADMIN can edit cut details (matches API PUT /cuts/:id)
+ * DESIGNER, PLOTTING, WAREHOUSE, and ADMIN can edit cut details (matches API PUT /cuts/:id)
  */
 export function canEditCuts(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.DESIGNER,
     SECTOR_PRIVILEGES.PLOTTING,
+    SECTOR_PRIVILEGES.WAREHOUSE,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
@@ -163,14 +164,15 @@ export function canDeleteCuts(user: PermissionUser | null): boolean {
 
 /**
  * Can user start/finish cuts (change status)?
- * DESIGNER, PLOTTING, and ADMIN can change cut status (status changes go
- * through PUT /cuts/:id, which the API restricts to these roles)
+ * DESIGNER, PLOTTING, WAREHOUSE, and ADMIN can change cut status (status changes
+ * go through PUT /cuts/:id, which the API restricts to these roles)
  */
 export function canManageCutStatus(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.DESIGNER,
     SECTOR_PRIVILEGES.PLOTTING,
+    SECTOR_PRIVILEGES.WAREHOUSE,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
