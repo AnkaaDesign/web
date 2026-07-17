@@ -84,7 +84,7 @@ const AUTOMATIC_STATUSES = ["UPCOMING", "DUE", "PARTIAL"];
 const getStatusTriggerClass = (status: string) => {
   const map: Record<string, string> = {
     PENDING: "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600",
-    BUDGET_APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
+    BUDGET_APPROVED: "bg-blue-700 text-white hover:bg-blue-800 border-blue-800",
     BILLING_APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
     UPCOMING: "bg-amber-600 text-white hover:bg-amber-700 border-amber-700",
     DUE: "bg-red-600 text-white hover:bg-red-700 border-red-700",

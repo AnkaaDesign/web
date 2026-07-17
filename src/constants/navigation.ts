@@ -1832,7 +1832,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "observacoes-editar", title: "Editar", icon: "edit", path: "/producao/observacoes/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
         ],
       },
-      { id: "recorte", title: "Recorte", icon: "scissors", path: "/producao/recorte", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.ADMIN] },
+      { id: "recorte", title: "Recorte", icon: "scissors", path: "/producao/recorte", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN] },
     ],
   },
 
