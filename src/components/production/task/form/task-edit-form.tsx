@@ -690,18 +690,18 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const [currentLayoutStates, setCurrentLayoutStates] = useState<Record<'left' | 'right' | 'back', any>>(() => {
     const defaults = {
       left: {
-        height: 2.4,
-        sections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
+        height: 1,
+        sections: [{ width: 1, isDoor: false, doorHeight: null, position: 0 }],
         photoId: null,
       },
       right: {
-        height: 2.4,
-        sections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
+        height: 1,
+        sections: [{ width: 1, isDoor: false, doorHeight: null, position: 0 }],
         photoId: null,
       },
       back: {
-        height: 2.42,
-        sections: [{ width: 2.42, isDoor: false, doorHeight: null, position: 0 }],
+        height: 1,
+        sections: [{ width: 1, isDoor: false, doorHeight: null, position: 0 }],
         photoId: null,
       },
     };

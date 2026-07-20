@@ -413,23 +413,23 @@ export const ImplementMeasureForm = ({
   // Store state for all three sides
   const [sideStates, setSideStates] = useState<Record<'left' | 'right' | 'back', SideState>>(() => {
     const initialStates: Record<'left' | 'right' | 'back', SideState> = {
-      left: { height: 240, totalWidth: 800, doors: [] },
-      right: { height: 240, totalWidth: 800, doors: [] },
-      back: { height: 242, totalWidth: 242, doors: [] }  // Back side defaults to 2.42m x 2.42m
+      left: { height: 100, totalWidth: 100, doors: [] },
+      right: { height: 100, totalWidth: 100, doors: [] },
+      back: { height: 100, totalWidth: 100, doors: [] }  // Back side defaults to 1m x 1m
     };
 
     // Handle single layout prop (current usage pattern)
     if (layout) {
       const state: SideState = {
-        height: (layout.height || 2.4) * 100,
-        totalWidth: 800,
+        height: (layout.height || 1) * 100,
+        totalWidth: 100,
         doors: []
       };
 
       if (layout.sections && layout.sections.length > 0) {
         const sections = layout.sections;
         const total = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-        state.totalWidth = total || 800;
+        state.totalWidth = total || 100;
 
         // Extract doors from sections
         const extractedDoors: Door[] = [];
@@ -458,15 +458,15 @@ export const ImplementMeasureForm = ({
         const layoutData = layouts[side as 'left' | 'right' | 'back'];
         if (layoutData) {
           const state: SideState = {
-            height: (layoutData.height || 2.4) * 100,
-            totalWidth: 800,
+            height: (layoutData.height || 1) * 100,
+            totalWidth: 100,
             doors: []
           };
 
           if (layoutData.sections && layoutData.sections.length > 0) {
             const sections = layoutData.sections;
             const total = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-            state.totalWidth = total || 800;
+            state.totalWidth = total || 100;
 
             // Extract doors from sections
             const extractedDoors: Door[] = [];
@@ -521,14 +521,14 @@ export const ImplementMeasureForm = ({
         const layoutData = layouts[side as 'left' | 'right' | 'back'];
         if (layoutData?.sections && Array.isArray(layoutData.sections)) {
           const state: SideState = {
-            height: (layoutData.height || 2.4) * 100,
-            totalWidth: 800,
+            height: (layoutData.height || 1) * 100,
+            totalWidth: 100,
             doors: []
           };
 
           const sections = layoutData.sections;
           const total = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-          state.totalWidth = total || (side === 'back' ? 242 : 800);
+          state.totalWidth = total || 100;
 
           // Extract doors from sections
           const extractedDoors: Door[] = [];
@@ -599,15 +599,15 @@ export const ImplementMeasureForm = ({
     lastLayoutRef.current[selectedSide] = layoutKey;
 
     const state: SideState = {
-      height: (layout.height || 2.4) * 100,
-      totalWidth: 800,
+      height: (layout.height || 1) * 100,
+      totalWidth: 100,
       doors: []
     };
 
     if (layout.sections && layout.sections.length > 0) {
       const sections = layout.sections;
       const total = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-      state.totalWidth = total || 800;
+      state.totalWidth = total || 100;
 
       // Extract doors from sections
       const extractedDoors: Door[] = [];
@@ -917,8 +917,8 @@ export const ImplementMeasureForm = ({
   const maxDisplayWidth = 500;
   const maxDisplayHeight = 150;
   const scale = Math.min(
-    maxDisplayWidth / Math.max(currentState?.totalWidth || 800, 100),
-    maxDisplayHeight / Math.max(currentState?.height || 240, 100),
+    maxDisplayWidth / Math.max(currentState?.totalWidth || 100, 100),
+    maxDisplayHeight / Math.max(currentState?.height || 100, 100),
     0.8
   );
 
