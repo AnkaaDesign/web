@@ -294,7 +294,7 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
               )}
               <img
                 ref={imgRef}
-                src={getThumbnailUrl(file, "medium")}
+                src={getThumbnailUrl(file, isEpsFile(file) ? "large" : "medium")}
                 alt={file.filename}
                 className={cn(
                   "w-full h-full object-contain rounded-md transition-all duration-300",

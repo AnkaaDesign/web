@@ -979,11 +979,14 @@ export function FilePreviewModal({
                         // Always use direct file URL for SVG files
                         isSVG
                           ? getFileUrl(currentFile, baseUrl)
-                          : // Use thumbnail for EPS files if available
+                          : // EPS can't be rendered natively by the browser, so the fullscreen
+                          // preview shows a rasterized thumbnail. This viewer is fullscreen AND
+                          // zoomable, so always request the highest-res render (xxlarge/2400px)
+                          // straight from the on-demand endpoint. Do NOT use the stored
+                          // thumbnailUrl here — it points at the small (300/600px) grid thumbnail
+                          // and stretching that to fullscreen is what looked extremely blurred.
                           isEPS && currentFile.thumbnailUrl
-                          ? currentFile.thumbnailUrl.startsWith("http")
-                            ? rewriteCdnUrl(currentFile.thumbnailUrl)
-                            : `${baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || ''}/files/thumbnail/${currentFile.id}?size=large&v=2`
+                          ? `${baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || ''}/files/thumbnail/${currentFile.id}?size=xxlarge&v=3`
                           : // Use direct file URL for all other images
                             getFileUrl(currentFile, baseUrl)
                       }
