@@ -12,6 +12,7 @@ import {
   IconInfoCircle,
   IconHash,
   IconId,
+  IconSparkles,
 } from "@tabler/icons-react";
 import {
   TRUCK_CATEGORY,
@@ -38,6 +39,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { FileUploadField } from "@/components/common/file";
 import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
+import { MultiAirbrushingSelector } from "@/components/production/task/form/multi-airbrushing-selector";
 import { FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import type { ResponsibleRowData } from "@/types/responsible";
 
@@ -533,6 +535,27 @@ export function BudgetStepTask({
                       disabled={disabled}
                     />
                   </LayoutFileUploadField>
+                </CardContent>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+        )}
+
+        {/* Aerografias - COMMERCIAL/ADMIN (same audience as Layouts) */}
+        {showLayouts && (
+          <AccordionItem value="airbrushing" id="accordion-item-airbrushing" className="border border-border rounded-lg">
+            <Card className="border-0">
+              <AccordionTrigger className="px-0 hover:no-underline">
+                <CardHeader className="flex-1 py-4">
+                  <CardTitle className="flex items-center gap-2">
+                    <IconSparkles className="h-5 w-5" />
+                    Aerografias
+                  </CardTitle>
+                </CardHeader>
+              </AccordionTrigger>
+              <AccordionContent>
+                <CardContent className="pt-0">
+                  <MultiAirbrushingSelector control={control} disabled={disabled} customerId={customerIdValue || undefined} />
                 </CardContent>
               </AccordionContent>
             </Card>

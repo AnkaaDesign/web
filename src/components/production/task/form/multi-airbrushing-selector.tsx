@@ -1,14 +1,15 @@
 import { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useController } from "react-hook-form";
-import { IconPlus, IconTrash, IconPhoto, IconPaperclip, IconFileInvoice } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconPhoto } from "@tabler/icons-react";
 import { FormLabel } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { FileUploadField } from "@/components/common/file";
+import { FileSuggestions } from "@/components/common/file";
 import type { FileWithPreview } from "@/components/common/file";
+import { LayoutFileUploadField } from "./layout-file-upload-field";
 import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS, AIRBRUSHING_PAYMENT_STATUS_LABELS } from "../../../../constants";
 import { PainterSelector } from "@/components/production/airbrushing/form/painter-selector";
 
@@ -17,6 +18,9 @@ interface MultiAirbrushingSelectorProps {
   disabled?: boolean;
   isEditMode?: boolean;
   onAirbrushingsCountChange?: (count: number) => void;
+  // Customer of the task — scopes the airbrushing-layout recommendations to files that
+  // were previously used as AIRBRUSHING layouts for this customer (separate from task layouts).
+  customerId?: string;
 }
 
 interface AirbrushingItem {
@@ -30,6 +34,9 @@ interface AirbrushingItem {
   finishedAt: Date | null;
   painterId: string | null;
   painter?: { id: string; name: string; email?: string | null; status?: string | null } | null;
+  // receiptFiles / invoiceFiles are NOT rendered here anymore (the airbrushing section is
+  // layout-only per product), but they remain in the model so the edit-form reconciliation
+  // preserves any existing receipts/invoices instead of dropping them on save.
   receiptFiles: FileWithPreview[];
   invoiceFiles: FileWithPreview[];
   layouts: FileWithPreview[];
@@ -45,66 +52,71 @@ export interface MultiAirbrushingSelectorRef {
   clearAll: () => void;
 }
 
+// Helper to convert File objects (API relation rows) to FileWithPreview.
+const convertFilesToFileWithPreview = (files: any[]): FileWithPreview[] => {
+  return (files || []).map(file => {
+    const mockFile = new File([], file.filename || file.name || '', { type: file.mimetype || file.type || '' });
+    return Object.assign(mockFile, {
+      id: file.id,
+      name: file.filename || file.name,
+      size: file.size,
+      type: file.mimetype || file.type,
+      preview: file.url || '',
+      uploaded: true,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl || undefined,
+    }) as FileWithPreview;
+  });
+};
+
+// Rehydrate a layouts array from form state. Already-hydrated FileWithPreview / new File
+// instances are kept as-is; raw API rows are converted. Avoids the old double-spread that
+// duplicated every existing layout and re-marked new files as uploaded.
+const mapLayouts = (arr: any[]): FileWithPreview[] =>
+  (arr || []).map((f: any) => {
+    if (f instanceof File) return f as FileWithPreview;
+    if (f && (f.uploaded || f.uploadedFileId)) return f as FileWithPreview;
+    return convertFilesToFileWithPreview([f])[0];
+  });
+
+const mapFieldValueToItem = (airbrushing: any, index: number): AirbrushingItem => ({
+  id: airbrushing.id || `airbrushing-${Date.now()}-${index}`,
+  status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
+  paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
+  price: airbrushing.price || null,
+  startDate: airbrushing.startDate || null,
+  finishDate: airbrushing.finishDate || null,
+  startedAt: airbrushing.startedAt || null,
+  finishedAt: airbrushing.finishedAt || null,
+  painterId: airbrushing.painterId || null,
+  painter: airbrushing.painter || null,
+  receiptFiles: [
+    ...convertFilesToFileWithPreview(airbrushing.receipts || []),
+    ...(airbrushing.receiptFiles || []),
+  ],
+  invoiceFiles: [
+    ...convertFilesToFileWithPreview(airbrushing.invoices || []),
+    ...(airbrushing.invoiceFiles || []),
+  ],
+  layouts: mapLayouts(airbrushing.layouts || []),
+  receiptIds: airbrushing.receiptIds || [],
+  invoiceIds: airbrushing.invoiceIds || [],
+  layoutIds: airbrushing.layoutIds || [],
+});
+
 export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, MultiAirbrushingSelectorProps>(
-  ({ control, disabled, isEditMode = false, onAirbrushingsCountChange }, ref) => {
+  ({ control, disabled, isEditMode = false, onAirbrushingsCountChange, customerId }, ref) => {
     // Use controller to properly manage form field
     const { field } = useController({
       name: "airbrushings" as any,
       control,
     });
 
-    // Helper to convert File objects to FileWithPreview
-    const convertFilesToFileWithPreview = (files: any[]): FileWithPreview[] => {
-      return (files || []).map(file => {
-        // Create a minimal File-like object that satisfies the FileWithPreview interface
-        const mockFile = new File([], file.filename || '', { type: file.mimetype || '' });
-
-        return Object.assign(mockFile, {
-          id: file.id,
-          name: file.filename,
-          size: file.size,
-          type: file.mimetype,
-          preview: file.url || '',
-          uploaded: true,
-          uploadedFileId: file.id,
-          thumbnailUrl: file.thumbnailUrl || undefined,
-        }) as FileWithPreview;
-      });
-    };
-
     // Initialize airbrushings from form field value
     // Defaults are now set in mapDataToForm, so field.value should always have data
     const [airbrushings, setAirbrushings] = useState<AirbrushingItem[]>(() => {
-      // Always map from field.value - defaults are now provided by mapDataToForm
       const data = field.value && Array.isArray(field.value) ? field.value : [];
-      return data.map((airbrushing: any, index: number) => ({
-        id: airbrushing.id || `airbrushing-${Date.now()}-${index}`,
-        status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
-        paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
-        price: airbrushing.price || null,
-        startDate: airbrushing.startDate || null,
-        finishDate: airbrushing.finishDate || null,
-        startedAt: airbrushing.startedAt || null,
-        finishedAt: airbrushing.finishedAt || null,
-        painterId: airbrushing.painterId || null,
-        painter: airbrushing.painter || null,
-        // Merge existing uploaded files (from API as 'receipts') and newly selected files (as 'receiptFiles')
-        receiptFiles: [
-          ...convertFilesToFileWithPreview(airbrushing.receipts || []),
-          ...(airbrushing.receiptFiles || [])
-        ],
-        invoiceFiles: [
-          ...convertFilesToFileWithPreview(airbrushing.invoices || []),
-          ...(airbrushing.invoiceFiles || [])
-        ],
-        layouts: [
-          ...convertFilesToFileWithPreview(airbrushing.layouts || []),
-          ...(airbrushing.layouts || [])
-        ],
-        receiptIds: airbrushing.receiptIds || [],
-        invoiceIds: airbrushing.invoiceIds || [],
-        layoutIds: airbrushing.layoutIds || [],
-      }));
+      return data.map((a: any, index: number) => mapFieldValueToItem(a, index));
     });
 
     // Track if initial sync has been done to prevent marking form dirty on mount
@@ -132,37 +144,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
       // Always map from field.value - mapDataToForm now provides defaults
       if (field.value && Array.isArray(field.value) && field.value.length > 0) {
-        const newAirbrushings = field.value.map((airbrushing: any, index: number) => {
-          return {
-            id: airbrushing.id || `airbrushing-${Date.now()}-${index}`, // Preserve ID from form data
-            status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
-            paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
-            price: airbrushing.price || null,
-            startDate: airbrushing.startDate || null,
-            finishDate: airbrushing.finishDate || null,
-            startedAt: airbrushing.startedAt || null,
-            finishedAt: airbrushing.finishedAt || null,
-            painterId: airbrushing.painterId || null,
-            painter: airbrushing.painter || null,
-            // Merge existing uploaded files (from API as 'receipts') and newly selected files (as 'receiptFiles')
-            receiptFiles: [
-              ...convertFilesToFileWithPreview(airbrushing.receipts || []),
-              ...(airbrushing.receiptFiles || [])
-            ],
-            invoiceFiles: [
-              ...convertFilesToFileWithPreview(airbrushing.invoices || []),
-              ...(airbrushing.invoiceFiles || [])
-            ],
-            layouts: [
-              ...convertFilesToFileWithPreview(airbrushing.layouts || []),
-              ...(airbrushing.layouts || [])
-            ],
-            receiptIds: airbrushing.receiptIds || [],
-            invoiceIds: airbrushing.invoiceIds || [],
-            layoutIds: airbrushing.layoutIds || [],
-          };
-        });
-        setAirbrushings(newAirbrushings);
+        setAirbrushings(field.value.map((a: any, index: number) => mapFieldValueToItem(a, index)));
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [field.value]);
@@ -262,34 +244,12 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       });
     }, []);
 
-    const handleReceiptFilesChange = useCallback(
-      (airbrushingId: string, files: FileWithPreview[]) => {
-        // Store files without uploading - they'll be submitted with the form
-        updateAirbrushing(airbrushingId, {
-          receiptFiles: files,
-          receiptIds: files.filter(f => f.uploaded).map(f => f.uploadedFileId!).filter(Boolean),
-        });
-      },
-      [updateAirbrushing],
-    );
-
-    const handleInvoiceFilesChange = useCallback(
-      (airbrushingId: string, files: FileWithPreview[]) => {
-        // Store files without uploading - they'll be submitted with the form
-        updateAirbrushing(airbrushingId, {
-          invoiceFiles: files,
-          invoiceIds: files.filter(f => f.uploaded).map(f => f.uploadedFileId!).filter(Boolean),
-        });
-      },
-      [updateAirbrushing],
-    );
-
     const handleLayoutsChange = useCallback(
       (airbrushingId: string, files: FileWithPreview[]) => {
-        // Store files without uploading - they'll be submitted with the form
+        // Store files without uploading - they ride along as multipart on submit.
         updateAirbrushing(airbrushingId, {
           layouts: files,
-          layoutIds: files.filter(f => f.uploaded).map(f => f.uploadedFileId!).filter(Boolean),
+          layoutIds: files.filter((f) => f.uploaded).map((f) => (f as any).uploadedFileId!).filter(Boolean),
         });
       },
       [updateAirbrushing],
@@ -474,59 +434,49 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                   </div>
                 </div>
 
-                {/* File Uploads - 3 equal columns */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Receipts - aligns with Preço */}
-                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                    <FormLabel className="flex items-center gap-2">
-                      <IconPaperclip className="h-4 w-4" />
-                      Recibos
-                    </FormLabel>
-                    <FileUploadField
-                      onFilesChange={(files) => handleReceiptFilesChange(airbrushing.id, files)}
-                      existingFiles={airbrushing.receiptFiles}
-                      maxFiles={10}
-                      showPreview={true}
-                      variant="compact"
-                      placeholder="Adicione recibos"
-                      disabled={disabled || airbrushing.uploading}
-                    />
-                  </div>
-
-                  {/* Invoices - aligns with Início */}
-                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                    <FormLabel className="flex items-center gap-2">
-                      <IconFileInvoice className="h-4 w-4" />
-                      Notas Fiscais
-                    </FormLabel>
-                    <FileUploadField
-                      onFilesChange={(files) => handleInvoiceFilesChange(airbrushing.id, files)}
-                      existingFiles={airbrushing.invoiceFiles}
-                      maxFiles={10}
-                      showPreview={true}
-                      variant="compact"
-                      placeholder="Adicione NFes"
-                      disabled={disabled || airbrushing.uploading}
-                    />
-                  </div>
-
-                  {/* Layouts - aligns with Conclusão */}
-                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                    <FormLabel className="flex items-center gap-2">
-                      <IconPhoto className="h-4 w-4" />
-                      Layouts
-                    </FormLabel>
-                    <FileUploadField
-                      onFilesChange={(files) => handleLayoutsChange(airbrushing.id, files)}
-                      existingFiles={airbrushing.layouts}
-                      maxFiles={20}
-                      showPreview={true}
-                      variant="compact"
-                      placeholder="Adicione layouts"
-                      acceptedFileTypes={{ 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'] }}
-                      disabled={disabled || airbrushing.uploading}
-                    />
-                  </div>
+                {/* Layouts — same uploader as the main task layout (card look, PDF/EPS/AI
+                    accepted). Airbrushing layouts have NO status, so the picker is hidden.
+                    Receipts/NFes are intentionally omitted here. */}
+                <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                  <FormLabel className="flex items-center gap-2">
+                    <IconPhoto className="h-4 w-4" />
+                    Layouts
+                  </FormLabel>
+                  <LayoutFileUploadField
+                    onFilesChange={(files) => handleLayoutsChange(airbrushing.id, files)}
+                    showStatus={false}
+                    existingFiles={airbrushing.layouts}
+                    maxFiles={20}
+                    showPreview={true}
+                    placeholder="Adicione layouts da aerografia"
+                    variant="card"
+                    disabled={disabled || airbrushing.uploading}
+                  >
+                    {/* Recommend files previously used as AIRBRUSHING layouts for this customer
+                        (separate pool from the task-layout recommendations). */}
+                    {customerId && (
+                      <FileSuggestions
+                        customerId={customerId}
+                        fileContext="airbrushingLayouts"
+                        excludeFileIds={airbrushing.layouts.map((f) => (f as any).uploadedFileId || f.id).filter(Boolean)}
+                        onSelect={(newFile) => {
+                          const fileWithPreview = {
+                            id: newFile.id,
+                            name: newFile.filename || newFile.originalName || "layout",
+                            size: newFile.size || 0,
+                            type: newFile.mimetype || "application/octet-stream",
+                            lastModified: Date.now(),
+                            uploaded: true,
+                            uploadProgress: 100,
+                            uploadedFileId: newFile.id,
+                            thumbnailUrl: newFile.thumbnailUrl || undefined,
+                          } as FileWithPreview;
+                          handleLayoutsChange(airbrushing.id, [...airbrushing.layouts, fileWithPreview]);
+                        }}
+                        disabled={disabled || airbrushing.uploading}
+                      />
+                    )}
+                  </LayoutFileUploadField>
                 </div>
 
                 {/* Error Message */}

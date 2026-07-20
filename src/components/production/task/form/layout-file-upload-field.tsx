@@ -26,7 +26,10 @@ import { rewriteCdnUrl } from "@/utils/file";
 
 export interface LayoutFileUploadFieldProps {
   onFilesChange: (files: FileWithPreview[]) => void;
-  onStatusChange: (fileId: string, status: 'DRAFT' | 'APPROVED' | 'REPROVED') => void;
+  // Optional: some consumers (e.g. airbrushing layouts) have no per-file status workflow.
+  onStatusChange?: (fileId: string, status: 'DRAFT' | 'APPROVED' | 'REPROVED') => void;
+  // When false, the per-file status selector is hidden entirely (no DRAFT/APPROVED/REPROVED).
+  showStatus?: boolean;
   maxFiles?: number;
   maxSize?: number;
   acceptedFileTypes?: Record<string, string[]>;
@@ -94,6 +97,7 @@ const getFileIcon = (file: File | FileWithPreview) => {
 export function LayoutFileUploadField({
   onFilesChange,
   onStatusChange,
+  showStatus = true,
   maxFiles = 10,
   maxSize = 100 * 1024 * 1024,
   acceptedFileTypes = defaultAcceptedTypes,
@@ -290,7 +294,7 @@ export function LayoutFileUploadField({
           };
         }),
       );
-      onStatusChange(file.uploadedFileId || file.id, newStatus as any);
+      onStatusChange?.(file.uploadedFileId || file.id, newStatus as any);
     };
     return (
       <div
@@ -345,13 +349,15 @@ export function LayoutFileUploadField({
             <p className="text-[10px] text-muted-foreground">{formatFileSize(file.size || 0)}</p>
           </div>
           {hasError && <p className="text-[10px] text-destructive">{file.error}</p>}
-          <LayoutStatusSelector
-            value={file.status || "DRAFT"}
-            onChange={handleStatusChange}
-            disabled={disabled}
-            className="w-full"
-            triggerClassName="h-8 w-full justify-between"
-          />
+          {showStatus && (
+            <LayoutStatusSelector
+              value={file.status || "DRAFT"}
+              onChange={handleStatusChange}
+              disabled={disabled}
+              className="w-full"
+              triggerClassName="h-8 w-full justify-between"
+            />
+          )}
         </div>
       </div>
     );
@@ -383,15 +389,17 @@ export function LayoutFileUploadField({
     </div>
   );
 
-  // CARD variant — ONE horizontal-scroll strip: attached layout cards, then any
-  // `children` (e.g. FileSuggestions' inline "Recomendado" cards), then the add card.
+  // CARD variant — ONE horizontal-scroll strip. The upload/add card (the actual file
+  // picker) comes FIRST/left, then the attached layout cards NEWEST-FIRST (so a file you
+  // just added sits right next to the picker), then any `children` (e.g. FileSuggestions'
+  // inline "Recomendado" recommendation cards).
   if (variant === "card") {
     return (
       <div className={cn("w-full", className)}>
         <div ref={cardScrollRef} className="flex gap-3 overflow-x-auto pb-2">
-          {files.map((file) => renderFileCard(file))}
-          {children}
           {!isAtLimit && renderAddCard()}
+          {[...files].reverse().map((file) => renderFileCard(file))}
+          {children}
         </div>
       </div>
     );
@@ -506,7 +514,7 @@ export function LayoutFileUploadField({
                     };
                   }),
                 );
-                onStatusChange(file.uploadedFileId || file.id, newStatus as any);
+                onStatusChange?.(file.uploadedFileId || file.id, newStatus as any);
               };
 
               return (
@@ -542,13 +550,15 @@ export function LayoutFileUploadField({
                   </div>
 
                   {/* Status Selector */}
-                  <div className="shrink-0">
-                  <LayoutStatusSelector
-                    value={file.status || 'DRAFT'}
-                    onChange={handleStatusChange}
-                    disabled={disabled}
-                  />
-                  </div>
+                  {showStatus && (
+                    <div className="shrink-0">
+                      <LayoutStatusSelector
+                        value={file.status || 'DRAFT'}
+                        onChange={handleStatusChange}
+                        disabled={disabled}
+                      />
+                    </div>
+                  )}
 
                   {/* Remove button */}
                   <Button

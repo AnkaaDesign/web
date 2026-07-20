@@ -26,6 +26,12 @@ type Side = "left" | "right";
 
 export interface FlyoutHandlers {
   isItemActive: (item: any) => boolean;
+  /**
+   * Whether a row should show the "new activity" blinking red ring. `isOpenTrail` is
+   * true when this row's own submenu column is currently open, so an ancestor stops
+   * blinking once the user drills into it (the nudge hops to the deeper column).
+   */
+  shouldBlink?: (item: any, isOpenTrail: boolean) => boolean;
   /** Returns a sized icon element for a menu item's `icon` string. */
   getIcon: (iconName: string, size?: number) => React.ReactNode;
   /** Favorites render their icon differently (entity badges etc.). */
@@ -63,6 +69,7 @@ function FlyoutColumn({
   header,
   isFavoritesRoot,
   isItemActive,
+  shouldBlink,
   getIcon,
   renderFavoriteIcon,
   onNavigate,
@@ -175,6 +182,7 @@ function FlyoutColumn({
           const hasChildren = child.children && child.children.length > 0;
           const isActiveRow = isItemActive(child);
           const isOpenTrail = activeId && activeId === child.id;
+          const isBlinking = shouldBlink ? shouldBlink(child, !!isOpenTrail) : false;
           return (
             <button
               key={child.id || child.path}
@@ -197,6 +205,7 @@ function FlyoutColumn({
                   : isOpenTrail
                     ? "bg-muted"
                     : "hover:bg-muted",
+                isBlinking && "nav-activity-blink",
               )}
             >
               <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
@@ -224,6 +233,7 @@ function FlyoutColumn({
           depth={depth + 1}
           header={active.item.path ? { item: active.item, label: active.item.title } : null}
           isItemActive={isItemActive}
+          shouldBlink={shouldBlink}
           getIcon={getIcon}
           renderFavoriteIcon={renderFavoriteIcon}
           onNavigate={onNavigate}

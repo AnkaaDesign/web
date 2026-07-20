@@ -298,6 +298,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     originalAirbrushingsRef.current = (airbrushingsData as { data?: any[] } | undefined)?.data || [];
   }, [airbrushingsData]);
 
+
   // Initialize artwork files from existing task data
   // NOTE: task.layouts are now Layout entities with a nested file property
   const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>(
@@ -1023,8 +1024,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             layoutIds: a.layouts?.map((art: any) => art.fileId || art.file?.id || art.id) || [],
             receipts: a.receipts || [],
             invoices: a.invoices || [],
-            // Map Layout entities to their File representation for display
-            layouts: a.layouts?.map((art: any) => art.file || art) || [],
+            // Map Layout entities to their backing File for display. Fall back to the fileId
+            // scalar (never the Layout's own id) so thumbnails/downloads resolve the real File.
+            layouts: a.layouts?.map((art: any) => art.file || (art.fileId ? { ...art, id: art.fileId } : art)) || [],
           }))
         : [{
             // Default empty airbrushing row
@@ -3759,7 +3761,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                   </AccordionTrigger>
                   <AccordionContent>
                     <CardContent className="pt-0">
-                      <MultiAirbrushingSelector ref={multiAirbrushingSelectorRef} control={form.control} disabled={isSubmitting} onAirbrushingsCountChange={setAirbrushingsCount} />
+                      <MultiAirbrushingSelector ref={multiAirbrushingSelectorRef} control={form.control} disabled={isSubmitting} onAirbrushingsCountChange={setAirbrushingsCount} customerId={task.customerId ?? undefined} />
                     </CardContent>
                   </AccordionContent>
                 </Card>

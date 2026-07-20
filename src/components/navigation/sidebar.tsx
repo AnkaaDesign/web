@@ -19,7 +19,8 @@ import { UserAvatarDisplay } from "@/components/ui/avatar-display";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { SidebarFlyout, useFlyoutController } from "./sidebar-flyout";
-import { recordNavClick, clearNavContext, useRecordedNav, resolveActiveNav, computeExpandedFromActive } from "@/contexts/navigation-context";
+import { recordNavClick, clearNavContext, useRecordedNav, resolveActiveNav, computeExpandedFromActive, resolveNavActivityBlinkIds, collectNavActivityTargets } from "@/contexts/navigation-context";
+import { useNavActivity } from "@/hooks/common/use-nav-activity";
 
 import {
   IconDashboard,
@@ -645,6 +646,34 @@ export const Sidebar = memo(() => {
     return { ...active, ancestorIds: new Set(active.trail.map((t) => t.id)) };
   }, [menuWithContextualItems, location.pathname, recordedNav]);
 
+  // "New activity" blink: which visible menu entries currently have pending activity
+  // (see @/hooks/common/use-nav-activity). resolveNavActivityBlinkIds picks the single
+  // entry along each activity trail that should blink given the expansion state, so the
+  // red ring "leads" the user inward (domain -> subdomain -> ... -> target page).
+  // When the sidebar is collapsed, children aren't rendered, so we resolve against an
+  // empty expansion map — that blinks the outermost (top-level) domain icon.
+  const navActivity = useNavActivity();
+  const blinkingIds = useMemo(
+    () => resolveNavActivityBlinkIds(menuWithContextualItems as MenuItem[], navActivity.paths, isOpen ? expandedMenus : {}),
+    [menuWithContextualItems, navActivity.paths, isOpen, expandedMenus],
+  );
+  // Expansion-agnostic target/ancestor ids for the collapsed flyout's own blink logic.
+  const activityTargets = useMemo(
+    () => collectNavActivityTargets(menuWithContextualItems as MenuItem[], navActivity.paths),
+    [menuWithContextualItems, navActivity.paths],
+  );
+  // Flyout row blinks when it IS a target, or is an ancestor whose submenu column is
+  // not yet open (so the nudge hops inward as the user browses the cascading columns).
+  const shouldBlinkFlyoutItem = useCallback(
+    (item: any, isOpenTrail: boolean): boolean => {
+      const id = item?.id || item?.path;
+      if (!id) return false;
+      if (activityTargets.targetIds.has(id)) return true;
+      return activityTargets.trailIds.has(id) && !isOpenTrail;
+    },
+    [activityTargets],
+  );
+
   // Active check used by the collapsed-sidebar flyout: nav items highlight only when
   // they ARE the single winner; non-nav rows (favorites) fall back to exact path match.
   const isFlyoutItemActive = useCallback(
@@ -754,6 +783,8 @@ export const Sidebar = memo(() => {
     // subtle context tint (parent expansion already signals hierarchy).
     const isHighlighted = (item.id || item.path) === activeNav.id;
     const isAncestorOfActive = !isHighlighted && activeNav.ancestorIds.has(item.id);
+    // "New activity" nudge: a gentle blinking red ring guiding the user to this entry.
+    const isBlinking = !!item.id && blinkingIds.has(item.id);
 
     const handleItemClick = (e: React.MouseEvent) => {
       // Check if Ctrl (or Cmd on Mac) is pressed or if it's a middle-click
@@ -826,6 +857,7 @@ export const Sidebar = memo(() => {
             // so the parent (e.g. "Financeiro") is highlighted exactly like the active page.
             !isNavigating && (isHighlighted || isAncestorOfActive) && "bg-primary text-primary-foreground hover:bg-primary/90",
             !isNavigating && !isHighlighted && !isAncestorOfActive && "hover:bg-muted/50",
+            isBlinking && "nav-activity-blink",
           )}
           onClick={handleItemClick}
           onContextMenu={handleContextMenu}
@@ -1095,6 +1127,7 @@ export const Sidebar = memo(() => {
         <SidebarFlyout
           state={flyout.state}
           isItemActive={isFlyoutItemActive}
+          shouldBlink={shouldBlinkFlyoutItem}
           getIcon={getIconComponent}
           renderFavoriteIcon={renderFavoriteIcon}
           onNavigate={handleFlyoutNavigate}

@@ -30,6 +30,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "@/api-client/file";
+import { createAirbrushingsForTask } from "@/utils/airbrushing-submit";
 import { getCustomers } from "@/api-client";
 import { customerService } from "@/api-client/customer";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -208,6 +209,8 @@ export const FinancialBudgetCreatePage = () => {
           invoiceToCustomerId: null,
         },
       ] as any[],
+      // Managed by MultiAirbrushingSelector (rich runtime objects incl. File instances).
+      airbrushings: [] as any[],
     },
   });
 
@@ -705,6 +708,16 @@ export const FinancialBudgetCreatePage = () => {
             };
 
             await createQuoteMutation.mutateAsync(quoteData);
+
+            // Create the task's airbrushings (non-blocking; layouts have no status, and the
+            // API resolves the customer from taskId).
+            if ((data.airbrushings?.length ?? 0) > 0) {
+              try {
+                await createAirbrushingsForTask(createdTaskId, data.airbrushings);
+              } catch {
+                toast.warning("Tarefa criada, mas houve um erro ao criar as aerografias.");
+              }
+            }
           }
         } catch (error: any) {
           // Error toast is emitted by the axios error interceptor.

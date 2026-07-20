@@ -1238,10 +1238,11 @@ function TaskDetailContent() {
       onClick: () =>
         role === SECTOR_PRIVILEGES.COMMERCIAL && task.quote
           ? navigate(getTaskQuoteEditRoute(task), { state: { returnTo } })
-          : navigate(breadcrumbConfig.editRoute(task.id)),
+          : // Forward the prev/next id list into the edit page so the pager survives the edit round-trip.
+            navigate(breadcrumbConfig.editRoute(task.id), { state: { ids: (location.state as { ids?: string[] } | null)?.ids } }),
     });
     return list;
-  }, [task, canEdit, canFinish, role, changeStatus, navigate, breadcrumbConfig, returnTo]);
+  }, [task, canEdit, canFinish, role, changeStatus, navigate, breadcrumbConfig, returnTo, location.state]);
 
   // Display-name fallback chain (faithful to the legacy getTaskDisplayName): name → customer →
   // "Série {serial}" → plate → "Sem nome". The serial is still appended to the page title when present.

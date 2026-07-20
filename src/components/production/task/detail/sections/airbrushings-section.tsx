@@ -1,14 +1,13 @@
 import React, { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconBrush, IconCalendar, IconCalendarEvent, IconUser, IconCurrencyReal, IconFile, IconFileText } from "@tabler/icons-react";
+import { IconBrush, IconCalendar, IconCalendarEvent, IconUser } from "@tabler/icons-react";
 
 import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/utils/number";
 import { formatDate } from "@/utils/date";
 import { getApiBaseUrl } from "@/utils/file";
-import { routes, ENTITY_BADGE_CONFIG, AIRBRUSHING_STATUS_LABELS, AIRBRUSHING_PAYMENT_STATUS_LABELS } from "@/constants";
+import { routes, ENTITY_BADGE_CONFIG, AIRBRUSHING_STATUS_LABELS } from "@/constants";
 import type { Airbrushing, File } from "@/types";
 
 /**
@@ -17,10 +16,22 @@ import type { Airbrushing, File } from "@/types";
  */
 type LayoutLike = File & { file?: File | null };
 
-/** The backing File objects for an airbrushing's layouts, skipping entries without file data. */
+/**
+ * The backing File objects for an airbrushing's layouts. A layout row is a Layout WRAPPER
+ * whose own `id` is NOT a File id — the real File is the nested `file` relation, or, when
+ * that relation isn't included, the `fileId` scalar (always present). We must never fall back
+ * to the Layout's own id: `/files/<layoutId>/download` 404s ("Arquivo não encontrado").
+ */
 export function getAirbrushingLayouts(airbrushing: Airbrushing): File[] {
   return ((airbrushing.layouts ?? []) as LayoutLike[])
-    .map((art) => (art.file ?? art) as File)
+    .map((art) => {
+      const a = art as any;
+      if (a?.file) return a.file as File;
+      // No nested file included → synthesize a minimal File carrying the real File id so
+      // downloads/thumbnails hit /files/<fileId>, never the Layout wrapper id.
+      if (a?.fileId) return { ...a, id: a.fileId } as File;
+      return art as File;
+    })
     .filter((f): f is File => Boolean(f && typeof f === "object" && "id" in f));
 }
 
@@ -86,12 +97,13 @@ export async function downloadAllAirbrushingFiles(airbrushings: Airbrushing[], t
  */
 export function AirbrushingsSection({
   airbrushings,
-  canViewFinancials,
   canAccessDetails,
   view,
 }: {
   airbrushings: Airbrushing[];
-  canViewFinancials: boolean;
+  // Kept for call-site compatibility; the task-detail card no longer shows any financial
+  // info (price / payment status / receipts / invoices) — that lives on the airbrushing page.
+  canViewFinancials?: boolean;
   canAccessDetails: boolean;
   view: FileViewMode;
 }): React.ReactNode {
@@ -116,7 +128,6 @@ export function AirbrushingsSection({
       {airbrushings.map((airbrushing, index) => {
         const layouts = getAirbrushingLayouts(airbrushing);
         const previewFrom = handlePreview(layouts);
-        const paymentVariant = ENTITY_BADGE_CONFIG.AIRBRUSHING_PAYMENT[airbrushing.paymentStatus] || "default";
 
         return (
           <div key={airbrushing.id} className="border border-border dark:border-border/30 rounded-lg p-4 space-y-3">
@@ -132,9 +143,7 @@ export function AirbrushingsSection({
                 )}
               >
                 <IconBrush className="h-4 w-4 text-muted-foreground" />
-                <h4 className="font-semibold text-sm">
-                  {canViewFinancials && airbrushing.price ? formatCurrency(airbrushing.price) : `Aerografia #${index + 1}`}
-                </h4>
+                <h4 className="font-semibold text-sm">{`Aerografia #${index + 1}`}</h4>
               </button>
               <Badge variant={ENTITY_BADGE_CONFIG.AIRBRUSHING[airbrushing.status] || "default"} className="text-xs">
                 {AIRBRUSHING_STATUS_LABELS[airbrushing.status]}
@@ -153,41 +162,25 @@ export function AirbrushingsSection({
                 </div>
               )}
 
-              {canViewFinancials && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCurrencyReal className="h-3.5 w-3.5" />
-                    Status do Pagamento
-                  </span>
-                  <Badge variant={paymentVariant} className="text-xs">
-                    {AIRBRUSHING_PAYMENT_STATUS_LABELS[airbrushing.paymentStatus]}
-                  </Badge>
-                </div>
-              )}
-
-              {/* Dates */}
-              {(airbrushing.startDate || airbrushing.finishDate || airbrushing.createdAt) && (
-                <div className="flex flex-col gap-1 text-xs text-muted-foreground px-1">
-                  {airbrushing.startDate && (
-                    <div className="flex items-center gap-1">
-                      <IconCalendar className="h-3 w-3" />
-                      <span>Início: {formatDate(airbrushing.startDate)}</span>
-                    </div>
-                  )}
-                  {airbrushing.finishDate && (
-                    <div className="flex items-center gap-1">
-                      <IconCalendarEvent className="h-3 w-3" />
-                      <span>Finalização: {formatDate(airbrushing.finishDate)}</span>
-                    </div>
-                  )}
-                  {!airbrushing.startDate && !airbrushing.finishDate && airbrushing.createdAt && (
-                    <div className="flex items-center gap-1">
-                      <IconCalendar className="h-3 w-3" />
-                      <span>Criado: {formatDate(airbrushing.createdAt)}</span>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Dates — same label + grayish-card idiom as Pintor */}
+              {(() => {
+                const rows: { key: string; icon: typeof IconCalendar; label: string; value: Date }[] = [];
+                if (airbrushing.startDate) rows.push({ key: "startDate", icon: IconCalendar, label: "Início", value: airbrushing.startDate as unknown as Date });
+                if (airbrushing.finishDate) rows.push({ key: "finishDate", icon: IconCalendarEvent, label: "Finalização", value: airbrushing.finishDate as unknown as Date });
+                if (airbrushing.startedAt) rows.push({ key: "startedAt", icon: IconCalendar, label: "Iniciado em", value: airbrushing.startedAt as unknown as Date });
+                if (airbrushing.finishedAt) rows.push({ key: "finishedAt", icon: IconCalendarEvent, label: "Finalizado em", value: airbrushing.finishedAt as unknown as Date });
+                // Fall back to the creation date only when no planned/actual dates exist.
+                if (rows.length === 0 && airbrushing.createdAt) rows.push({ key: "createdAt", icon: IconCalendar, label: "Criado", value: airbrushing.createdAt as unknown as Date });
+                return rows.map(({ key, icon: Icon, label, value }) => (
+                  <div key={key} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
+                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                      <Icon className="h-3.5 w-3.5" />
+                      {label}
+                    </span>
+                    <span className="text-xs font-semibold text-foreground">{formatDate(value)}</span>
+                  </div>
+                ));
+              })()}
             </div>
 
             {/* Layouts — shared FileItem grid/list (no more bespoke thumbnail plumbing) */}
@@ -196,24 +189,6 @@ export function AirbrushingsSection({
                 {layouts.map((file) => (
                   <FileItem key={file.id} file={file} viewMode={view} onPreview={previewFrom} onDownload={handleDownload} showActions />
                 ))}
-              </div>
-            )}
-
-            {/* Financial file counts (gated) */}
-            {canViewFinancials && ((airbrushing.receipts?.length ?? 0) > 0 || (airbrushing.invoices?.length ?? 0) > 0) && (
-              <div className="flex gap-3 text-xs text-muted-foreground pt-2 border-t">
-                {(airbrushing.receipts?.length ?? 0) > 0 && (
-                  <div className="flex items-center gap-1">
-                    <IconFile className="h-3 w-3" />
-                    <span>{airbrushing.receipts?.length ?? 0} recibo(s)</span>
-                  </div>
-                )}
-                {(airbrushing.invoices?.length ?? 0) > 0 && (
-                  <div className="flex items-center gap-1">
-                    <IconFileText className="h-3 w-3" />
-                    <span>{airbrushing.invoices?.length ?? 0} NFe(s)</span>
-                  </div>
-                )}
               </div>
             )}
           </div>

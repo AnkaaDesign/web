@@ -13,6 +13,11 @@ interface AirbrushingFilesSectionProps {
   emptyDescription: string;
   /** Initial layout — "grid" for layouts (images), "list" for documents. */
   defaultViewMode?: FileViewMode;
+  /** Controlled view mode. When provided, the section reflects it instead of its own state. */
+  viewMode?: FileViewMode;
+  onViewModeChange?: (mode: FileViewMode) => void;
+  /** Hide the internal grid/list toolbar (e.g. when the toggle is lifted into the section header). */
+  hideToolbar?: boolean;
 }
 
 /**
@@ -21,8 +26,10 @@ interface AirbrushingFilesSectionProps {
  * app-level file viewer. Mirrors order-documents-section.tsx; reused for layouts, invoices,
  * and receipts.
  */
-export function AirbrushingFilesSection({ files, emptyIcon: EmptyIcon, emptyTitle, emptyDescription, defaultViewMode = "list" }: AirbrushingFilesSectionProps) {
-  const [viewMode, setViewMode] = useState<FileViewMode>(defaultViewMode);
+export function AirbrushingFilesSection({ files, emptyIcon: EmptyIcon, emptyTitle, emptyDescription, defaultViewMode = "list", viewMode: controlledViewMode, onViewModeChange, hideToolbar = false }: AirbrushingFilesSectionProps) {
+  const [internalViewMode, setInternalViewMode] = useState<FileViewMode>(defaultViewMode);
+  const viewMode = controlledViewMode ?? internalViewMode;
+  const setViewMode = onViewModeChange ?? setInternalViewMode;
   const { actions } = useFileViewer();
 
   const handleFileClick = (file: AnkaaFile) => {
@@ -32,14 +39,16 @@ export function AirbrushingFilesSection({ files, emptyIcon: EmptyIcon, emptyTitl
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-end gap-1">
-        <Button variant={viewMode === "list" ? "default" : "outline"} size="sm" onClick={() => setViewMode("list")} className="h-8 w-8 p-0">
-          <IconList className="h-4 w-4" />
-        </Button>
-        <Button variant={viewMode === "grid" ? "default" : "outline"} size="sm" onClick={() => setViewMode("grid")} className="h-8 w-8 p-0">
-          <IconLayoutGrid className="h-4 w-4" />
-        </Button>
-      </div>
+      {!hideToolbar && (
+        <div className="flex items-center justify-end gap-1">
+          <Button variant={viewMode === "list" ? "default" : "outline"} size="sm" onClick={() => setViewMode("list")} className="h-8 w-8 p-0">
+            <IconList className="h-4 w-4" />
+          </Button>
+          <Button variant={viewMode === "grid" ? "default" : "outline"} size="sm" onClick={() => setViewMode("grid")} className="h-8 w-8 p-0">
+            <IconLayoutGrid className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
       {files.length > 0 ? (
         <div className="max-h-[420px] overflow-y-auto">
           <div className={cn(viewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>

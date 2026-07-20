@@ -379,7 +379,23 @@ export const AdvancedBulkActionsHandler = forwardRef<
                   // Don't include quantity since it's not on Cut entity from API
                   origin: cut.origin,
                   fileId: cut.fileId,
-                  file: cut.file ? { id: cut.file.id, originalName: cut.file.originalName, url: cut.file.url } : undefined,
+                  // Build a COMPLETE FileWithPreview (mirroring the layouts/baseFiles maps above) so the
+                  // uploader shows the real name + size. Stripping to {id,originalName,url} was making the
+                  // uploader render a "0 Bytes" nameless phantom that filled the maxFiles={1} slot.
+                  file: cut.file
+                    ? {
+                        id: cut.file.id,
+                        name: cut.file.filename || cut.file.originalName || 'cut-file',
+                        originalName: cut.file.originalName,
+                        size: cut.file.size || 0,
+                        type: cut.file.mimetype || 'application/octet-stream',
+                        lastModified: cut.file.createdAt ? new Date(cut.file.createdAt).getTime() : Date.now(),
+                        uploaded: true,
+                        uploadProgress: 100,
+                        uploadedFileId: cut.file.id,
+                        thumbnailUrl: cut.file.thumbnailUrl,
+                      }
+                    : undefined,
                 }));
               }
             }
@@ -662,9 +678,30 @@ export const AdvancedBulkActionsHandler = forwardRef<
             updateData._hasNewLayouts = true;
           }
 
-          // Send artwork statuses for status changes
-          if (Object.keys(layoutStatuses).length > 0) {
-            updateData._layoutStatuses = layoutStatuses;
+          // Artwork statuses must be split into the two channels the backend expects
+          // (mirrors the single-task edit form):
+          //  - layoutStatuses:    UUID-keyed map (File ID → status) for EXISTING / suggestion files.
+          //  - newLayoutStatuses: array aligned to the uploaded `layouts` file order (new files).
+          // New files carry a local non-UUID id (`${Date.now()}-${rand}` from LayoutFileUploadField),
+          // so dumping their status into layoutStatuses makes the backend zod schema
+          // (z.record(z.string().uuid(), ...)) reject the whole batch with 400 "Invalid uuid".
+          const isLayoutFileUuid = (s: string) =>
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
+          const existingLayoutStatuses: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
+          Object.entries(layoutStatuses).forEach(([fileId, status]) => {
+            if (isLayoutFileUuid(fileId)) existingLayoutStatuses[fileId] = status;
+          });
+          if (Object.keys(existingLayoutStatuses).length > 0) {
+            updateData._layoutStatuses = existingLayoutStatuses;
+          }
+
+          // Statuses for brand-new uploads, in the same order they are appended to FormData
+          // (newLayouts preserves `layouts` order, and FormData appends newLayouts in order).
+          if (newLayouts.length > 0) {
+            updateData._newLayoutStatuses = newLayouts.map(
+              (f: any) => layoutStatuses[f.id] || f.status || 'DRAFT',
+            );
           }
           break;
 
@@ -818,6 +855,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
               } else if (cut.file && (cut.file.id || cut.file.uploadedFileId)) {
                 cutData.fileId = cut.file.id || cut.file.uploadedFileId;
               }
+
+              // A cut with no file is a blank/default row — skip it (the backend ignores fileless
+              // cuts too, but this avoids shipping empty entries).
+              if (!cutData.fileId) continue;
 
               cutsToAdd.push(cutData);
             }
@@ -1071,6 +1112,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       const hasNewBaseFiles = updateData._hasNewBaseFiles;
       const layoutPhotoFiles = updateData._layoutPhotoFiles as Array<{ side: string; file: File }> | undefined;
       const layoutStatusesMap = updateData._layoutStatuses as Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> | undefined;
+      const newLayoutStatuses = updateData._newLayoutStatuses as ('DRAFT' | 'APPROVED' | 'REPROVED')[] | undefined;
 
       delete updateData._perTaskLayoutIds;
       delete updateData._perTaskBaseFileIds;
@@ -1079,6 +1121,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       delete updateData._hasNewBaseFiles;
       delete updateData._layoutPhotoFiles;
       delete updateData._layoutStatuses;
+      delete updateData._newLayoutStatuses;
 
       const hasPerTaskData = perTaskLayoutIds || perTaskBaseFileIds || perTaskTruckUpdates;
       const hasData = Object.keys(updateData).length > 0 || hasPerTaskData || layoutStatusesMap || hasNewLayouts;
@@ -1120,6 +1163,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // Add artwork statuses for status changes
           if (layoutStatusesMap) {
             taskData.layoutStatuses = layoutStatusesMap;
+          }
+
+          // Statuses for new files being uploaded (array aligned to the uploaded `layouts` order)
+          if (newLayoutStatuses) {
+            taskData.newLayoutStatuses = newLayoutStatuses;
           }
 
           return {
@@ -1338,24 +1386,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
         return (
           <FormProvider {...form} key={currentTaskIds.join(',')}>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Planos de Corte</Label>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (multiCutSelectorRef.current) {
-                      multiCutSelectorRef.current.addCut();
-                    }
-                  }}
-                  disabled={isSubmitting || cutsCount >= 10}
-                  size="sm"
-                  className="gap-2"
-                >
-                  <IconPlus className="h-4 w-4" />
-                  Adicionar Recorte ({cutsCount}/10)
-                </Button>
-              </div>
-
+              {/* MultiCutSelector renders its OWN "Planos de Corte" header + add button, so no wrapper
+                  header here (a second one produced the duplicated "Planos de Corte / Adicionar Recorte"). */}
               <MultiCutSelector
                 ref={multiCutSelectorRef}
                 control={form.control}

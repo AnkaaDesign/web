@@ -246,6 +246,79 @@ export function computeExpandedFromActive(menu: MenuItem[], active: ActiveNav): 
 }
 
 // ---------------------------------------------------------------------------
+// "New activity" blink resolution (generic, keyed by route path)
+// ---------------------------------------------------------------------------
+//
+// Given the set of route paths that currently have pending activity, decide which
+// SINGLE menu entry along each activity trail should blink, honoring the current
+// expansion state so the blink "leads" the user inward: the shallowest COLLAPSED
+// container ancestor blinks; once it is expanded the blink moves one level deeper,
+// ending on the target entry itself. Pure + tree-shaped, so it serves any future
+// activity source, not just cuts.
+
+function addBlinkForChain(chain: MenuItem[], expanded: { [id: string]: boolean }, blink: Set<string>) {
+  for (let i = 0; i < chain.length; i++) {
+    const node = chain[i];
+    const id = node.id || node.path;
+    if (!id) continue;
+    const isTarget = i === chain.length - 1;
+    const isContainer = !!(node.children && node.children.length > 0);
+    // A collapsed container ancestor is where the trail is currently "blocked" — blink it.
+    if (!isTarget && isContainer && node.id && !expanded[node.id]) {
+      blink.add(id);
+      return;
+    }
+    // Reached the target itself (all ancestors already expanded): blink the destination.
+    if (isTarget) {
+      blink.add(id);
+      return;
+    }
+  }
+}
+
+/** Ids that should blink right now, given the visible menu + activity paths + expansion state. */
+export function resolveNavActivityBlinkIds(menu: MenuItem[], activityPaths: Set<string>, expanded: { [id: string]: boolean }): Set<string> {
+  const blink = new Set<string>();
+  if (!activityPaths || activityPaths.size === 0) return blink;
+  const visit = (items: MenuItem[], trail: MenuItem[]) => {
+    for (const it of items || []) {
+      const chain = [...trail, it];
+      if (it.path && activityPaths.has(it.path)) addBlinkForChain(chain, expanded, blink);
+      if (it.children && it.children.length > 0) visit(it.children, chain);
+    }
+  };
+  visit(menu, []);
+  return blink;
+}
+
+/**
+ * Expansion-agnostic view of the same data for the collapsed-sidebar flyout: the ids
+ * of activity target entries and the ids of every ancestor on the way to one. The
+ * flyout blinks a target row directly, and an ancestor row only while its own submenu
+ * column is not yet open (so the blink hops inward as the user browses the cascade).
+ */
+export function collectNavActivityTargets(menu: MenuItem[], activityPaths: Set<string>): { targetIds: Set<string>; trailIds: Set<string> } {
+  const targetIds = new Set<string>();
+  const trailIds = new Set<string>();
+  if (!activityPaths || activityPaths.size === 0) return { targetIds, trailIds };
+  const visit = (items: MenuItem[], trail: MenuItem[]) => {
+    for (const it of items || []) {
+      const id = it.id || it.path;
+      if (it.path && activityPaths.has(it.path)) {
+        if (id) targetIds.add(id);
+        for (const anc of trail) {
+          const aid = anc.id || anc.path;
+          if (aid) trailIds.add(aid);
+        }
+      }
+      if (it.children && it.children.length > 0) visit(it.children, [...trail, it]);
+    }
+  };
+  visit(menu, []);
+  return { targetIds, trailIds };
+}
+
+// ---------------------------------------------------------------------------
 // Breadcrumbs derived from the navigation context
 // ---------------------------------------------------------------------------
 

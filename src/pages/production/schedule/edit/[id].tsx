@@ -24,8 +24,10 @@ export const TaskEditPage = () => {
   const pathSegments = location.pathname.split('/');
   const source = pathSegments[2]; // Index 2 is the section (cronograma, agenda, historico)
 
-  // Forward taskIds from location.state for next/previous navigation continuity
-  const taskIds = (location.state as { taskIds?: string[] } | null)?.taskIds;
+  // Forward the prev/next id list from location.state for navigation continuity.
+  // Key must match the shared DetailPage contract (`location.state.ids`) so the pager
+  // survives the detail → edit → cancel/save round-trip.
+  const ids = (location.state as { ids?: string[] } | null)?.ids;
 
   // Get breadcrumb configuration based on source
   const getBreadcrumbConfig = (source: string) => {
@@ -60,17 +62,17 @@ export const TaskEditPage = () => {
     isSubmitting: formState.isSubmitting,
   });
 
-  // Wrap guardedNavigate to auto-inject taskIds state when navigating to the detail page
+  // Wrap guardedNavigate to auto-inject the id list when navigating back to the detail page
   const detailPath = id ? breadcrumbConfig.detailsRoute(id) : null;
   const guardedNavigate = React.useCallback(
     (to: string, options?: { state?: Record<string, unknown> }) => {
-      if (taskIds && detailPath && to === detailPath) {
-        rawGuardedNavigate(to, { ...options, state: { ...options?.state, taskIds } });
+      if (ids && detailPath && to === detailPath) {
+        rawGuardedNavigate(to, { ...options, state: { ...options?.state, ids } });
       } else {
         rawGuardedNavigate(to, options);
       }
     },
-    [rawGuardedNavigate, taskIds, detailPath],
+    [rawGuardedNavigate, ids, detailPath],
   );
 
   // Debug form state
@@ -120,7 +122,9 @@ export const TaskEditPage = () => {
         include: {
           receipts: true,
           invoices: true,
-          layouts: true,
+          // Need the nested File (id/filename) so the form's layout thumbnails resolve
+          // the real File id, not the Layout wrapper id (which 404s on download/thumbnail).
+          layouts: { include: { file: true } },
           painter: true,
         },
       },
@@ -243,7 +247,7 @@ export const TaskEditPage = () => {
           />
         </div>
         <div className="flex-1 overflow-y-auto pb-6">
-          <TaskEditForm task={task} onFormStateChange={setFormState} detailsRoute={breadcrumbConfig.detailsRoute} navigationState={taskIds ? { taskIds } : undefined} />
+          <TaskEditForm task={task} onFormStateChange={setFormState} detailsRoute={breadcrumbConfig.detailsRoute} navigationState={ids ? { ids } : undefined} />
         </div>
         <UnsavedChangesDialog open={showDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
       </div>

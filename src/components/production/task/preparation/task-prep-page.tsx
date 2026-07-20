@@ -69,7 +69,7 @@ import {
   IMPLEMENT_TYPE_LABELS,
 } from "@/constants";
 import type { Task } from "@/types";
-import { clusterTasks, type ClusteredTask } from "./cluster-tasks";
+import { clusterTasks, expandClusterTasks, expandClusterTaskIds, type ClusteredTask } from "./cluster-tasks";
 import { createTaskPreparationColumns, TASK_PREP_SECTOR_DEFAULTS } from "./task-prep-columns";
 
 // Trimmed include — only what the columns render (vs. the legacy 3-7 MB payload). No truck layouts
@@ -473,7 +473,7 @@ export function TaskPreparationPage() {
         onClick: (rows) => {
           if (!rows.length) return;
           if (rows.length > 1) {
-            navigate(`${routes.production.schedule.batchEdit}?ids=${rows.map((r) => r.id).join(",")}`);
+            navigate(`${routes.production.schedule.batchEdit}?ids=${expandClusterTaskIds(rows).join(",")}`);
           } else if (isCommercial && rows[0].quote) {
             navigate(getTaskQuoteEditRoute(rows[0]));
           } else {
@@ -493,7 +493,7 @@ export function TaskPreparationPage() {
         disabled: (rows) => rows.filter(inPrepOrWaiting).every((t) => t.cleared),
         onClick: (rows) =>
           void set(
-            rows.filter(inPrepOrWaiting),
+            expandClusterTasks(rows).filter(inPrepOrWaiting),
             (t) => ({ cleared: true, ...(t.forecastDate ? {} : { forecastDate: new Date() }) }),
           ),
       });
@@ -506,7 +506,7 @@ export function TaskPreparationPage() {
         hidden: (rows) => !rows.some(inPrepOrWaiting),
         onClick: (rows) =>
           void set(
-            rows.filter(inPrepOrWaiting),
+            expandClusterTasks(rows).filter(inPrepOrWaiting),
             () => ({ entryDate: new Date(), cleared: true }),
           ),
       });
@@ -522,7 +522,7 @@ export function TaskPreparationPage() {
           hidden: (rows) => !rows.some((t) => t.status === TASK_STATUS.PREPARATION && canAdvance(t)),
           onClick: (rows) =>
             void set(
-              rows.filter((t) => t.status === TASK_STATUS.PREPARATION && canAdvance(t)),
+              expandClusterTasks(rows).filter((t) => t.status === TASK_STATUS.PREPARATION && canAdvance(t)),
               () => ({ status: TASK_STATUS.WAITING_PRODUCTION }),
             ),
         },
@@ -533,7 +533,7 @@ export function TaskPreparationPage() {
           hidden: (rows) => !rows.some((t) => t.status === TASK_STATUS.WAITING_PRODUCTION && canAdvance(t)),
           onClick: (rows) =>
             void set(
-              rows.filter((t) => t.status === TASK_STATUS.WAITING_PRODUCTION && canAdvance(t)),
+              expandClusterTasks(rows).filter((t) => t.status === TASK_STATUS.WAITING_PRODUCTION && canAdvance(t)),
               () => ({ status: TASK_STATUS.IN_PRODUCTION, startedAt: new Date() }),
             ),
         },
@@ -550,7 +550,7 @@ export function TaskPreparationPage() {
         hidden: (rows) => !rows.some(finishable),
         onClick: (rows) =>
           void set(
-            rows.filter(finishable),
+            expandClusterTasks(rows).filter(finishable),
             () => ({ status: TASK_STATUS.COMPLETED, finishedAt: new Date() }),
           ),
       });
@@ -584,14 +584,14 @@ export function TaskPreparationPage() {
         label: "Definir/Alterar Setor",
         icon: <IconBuildingFactory2 className="h-4 w-4" />,
         requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
-        onClick: (rows) => setSectorModal({ open: true, taskIds: rows.map((r) => r.id) }),
+        onClick: (rows) => setSectorModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
       },
       {
         key: "definir-prazo",
         label: "Definir/Alterar Prazo",
         icon: <IconCalendarTime className="h-4 w-4" />,
         requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.COMMERCIAL],
-        onClick: (rows) => setTermModal({ open: true, taskIds: rows.map((r) => r.id) }),
+        onClick: (rows) => setTermModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
       },
       {
         key: "alterar-status",
@@ -600,7 +600,7 @@ export function TaskPreparationPage() {
         // Legacy: ADMIN only, and only when a selected task is already COMPLETED.
         requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
         hidden: (rows) => !rows.some((t) => t.status === TASK_STATUS.COMPLETED),
-        onClick: (rows) => setStatusModal({ open: true, taskIds: rows.map((r) => r.id) }),
+        onClick: (rows) => setStatusModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
       },
     );
 
@@ -620,14 +620,14 @@ export function TaskPreparationPage() {
         icon: <IconPhoto className="h-4 w-4" />,
         separatorBefore: true,
         requiredPrivilege: ARTS,
-        onClick: (rows) => advancedRef.current?.openModal("arts", rows.map((r) => r.id)),
+        onClick: (rows) => advancedRef.current?.openModal("arts", expandClusterTaskIds(rows)),
       },
       {
         key: "adv-base-files",
         label: "Arquivos Base",
         icon: <IconFileText className="h-4 w-4" />,
         requiredPrivilege: ADVANCED,
-        onClick: (rows) => advancedRef.current?.openModal("baseFiles", rows.map((r) => r.id)),
+        onClick: (rows) => advancedRef.current?.openModal("baseFiles", expandClusterTaskIds(rows)),
       },
       {
         key: "adv-paints",
@@ -640,28 +640,28 @@ export function TaskPreparationPage() {
           SECTOR_PRIVILEGES.COMMERCIAL,
           SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
         ],
-        onClick: (rows) => advancedRef.current?.openModal("paints", rows.map((r) => r.id)),
+        onClick: (rows) => advancedRef.current?.openModal("paints", expandClusterTaskIds(rows)),
       },
       {
         key: "adv-cutting-plans",
         label: "Adicionar Plano de Corte",
         icon: <IconCut className="h-4 w-4" />,
         requiredPrivilege: ARTS,
-        onClick: (rows) => advancedRef.current?.openModal("cuttingPlans", rows.map((r) => r.id)),
+        onClick: (rows) => advancedRef.current?.openModal("cuttingPlans", expandClusterTaskIds(rows)),
       },
       {
         key: "adv-service-order",
         label: "Ordem de Serviço",
         icon: <IconFileInvoice className="h-4 w-4" />,
         requiredPrivilege: ADVANCED,
-        onClick: (rows) => advancedRef.current?.openModal("serviceOrder", rows.map((r) => r.id)),
+        onClick: (rows) => advancedRef.current?.openModal("serviceOrder", expandClusterTaskIds(rows)),
       },
       {
         key: "adv-layout",
         label: "Medidas do Implemento",
         icon: <IconLayout className="h-4 w-4" />,
         requiredPrivilege: ADVANCED,
-        onClick: (rows) => advancedRef.current?.openModal("layout", rows.map((r) => r.id)),
+        onClick: (rows) => advancedRef.current?.openModal("layout", expandClusterTaskIds(rows)),
       },
       {
         // COMMERCIAL sets the quote's approved layout files (TaskQuote.layoutFiles) — distinct from the
@@ -670,7 +670,7 @@ export function TaskPreparationPage() {
         label: "Layout do Orçamento",
         icon: <IconPhoto className="h-4 w-4" />,
         requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
-        onClick: (rows) => setQuoteLayoutModal({ open: true, taskIds: rows.map((r) => r.id) }),
+        onClick: (rows) => setQuoteLayoutModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
       },
     );
 
@@ -680,7 +680,7 @@ export function TaskPreparationPage() {
       icon: <IconClipboardCopy className="h-4 w-4" />,
       // Same audience as the rest of the advanced menu (ADMIN bypasses).
       requiredPrivilege: ADVANCED,
-      onClick: (rows) => startCopyFrom(rows),
+      onClick: (rows) => startCopyFrom(expandClusterTasks(rows)),
     });
 
     if (canCancel) {
@@ -693,7 +693,7 @@ export function TaskPreparationPage() {
         hidden: (rows) => !rows.some((t) => t.status !== TASK_STATUS.CANCELLED),
         onClick: (rows) =>
           void set(
-            rows.filter((t) => t.status !== TASK_STATUS.CANCELLED),
+            expandClusterTasks(rows).filter((t) => t.status !== TASK_STATUS.CANCELLED),
             () => ({ status: TASK_STATUS.CANCELLED }),
           ),
       });
@@ -705,7 +705,7 @@ export function TaskPreparationPage() {
       variant: "destructive",
       separatorBefore: true,
       requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
-      onClick: (rows) => setDeleteModal({ open: true, taskIds: rows.map((r) => r.id) }),
+      onClick: (rows) => setDeleteModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
     });
 
     // --- per-sector placement: primary actions stay top-level; everything else gated-allowed

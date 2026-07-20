@@ -32,6 +32,12 @@ export function useScrollHideHeader({
   const lastY = useRef(0);
   const hidden = useRef(false);
   const ticking = useRef(false);
+  // Timestamp until which state toggles are suppressed. Collapsing/revealing the header
+  // reflows the scroll container (the header is a flex sibling of the scroller, so the
+  // scroller grows/shrinks by the header's height) and the browser re-clamps scrollTop,
+  // emitting SYNTHETIC scroll events mid-transition. Riding those out prevents the
+  // toggle from ping-ponging itself.
+  const settleUntil = useRef(0);
 
   useEffect(() => {
     const scroller = scrollRef.current;
@@ -46,11 +52,22 @@ export function useScrollHideHeader({
       if (next === hidden.current) return;
       hidden.current = next;
       header.dataset.hidden = next ? "true" : "false";
+      // Suppress further toggles until the collapse/reveal animation settles (the CSS
+      // grid-rows transition is 200ms); the reflow it causes must not flip us back.
+      settleUntil.current = performance.now() + 260;
     };
 
     const update = () => {
       ticking.current = false;
       const y = scroller.scrollTop;
+
+      // Inside the post-toggle settling window: track position but don't change state,
+      // so the transition's own scrollTop re-clamp can't ping-pong the header.
+      if (performance.now() < settleUntil.current) {
+        lastY.current = y;
+        return;
+      }
+
       // At the very bottom a dynamic-height virtualizer can shrink scrollHeight, and the
       // browser then clamps scrollTop UP a few px. That is NOT a user scroll-up, so don't
       // reveal the header on it — only reveal on a deliberate upward scroll away from the end.
@@ -58,7 +75,15 @@ export function useScrollHideHeader({
       if (y < threshold) {
         setHidden(false); // near the top: always shown
       } else if (y > lastY.current + delta) {
-        setHidden(true); // scrolling down past the delta
+        // Only hide if the content will STILL overflow after the header collapses. The
+        // header is currently shown, so its offsetHeight is exactly how much the scroll
+        // container grows when it collapses. If hiding would leave less than `threshold`
+        // of scroll range, the browser would clamp scrollTop back toward the top and we'd
+        // immediately re-reveal — an infinite hide/show loop on short (barely-scrollable)
+        // pages. Requiring ≥ threshold of remaining range keeps scrollTop above the reveal
+        // point after the collapse, so the header stays put.
+        const roomAfterHide = scroller.scrollHeight - scroller.clientHeight - header.offsetHeight;
+        if (roomAfterHide >= threshold) setHidden(true);
       } else if (y < lastY.current - delta && !atBottom) {
         setHidden(false); // deliberate scroll-up (ignoring the bottom-clamp bounce)
       }

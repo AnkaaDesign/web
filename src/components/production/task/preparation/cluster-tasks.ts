@@ -29,3 +29,30 @@ export function clusterTasks(tasks: Task[]): ClusteredTask[] {
   }
   return out;
 }
+
+/**
+ * Expand cluster rows to the underlying task objects they stand for. A collapsed cluster parent
+ * represents its whole `__group` (parent + children); a plain row is just itself. De-duplicated by
+ * id so an expanded cluster whose children are ALSO individually selected can't double-count.
+ *
+ * Every bulk/batch context-menu action MUST route its rows through this: `rows.map(r => r.id)`
+ * reads only a cluster parent's own id, silently dropping its siblings — so acting on a 3-task
+ * cluster would hit only the parent (the "updates just 1 of 3" bug).
+ */
+export function expandClusterTasks(rows: ClusteredTask[]): Task[] {
+  const seen = new Set<string>();
+  const out: Task[] = [];
+  for (const r of rows) {
+    for (const t of r.__group ?? [r]) {
+      if (seen.has(t.id)) continue;
+      seen.add(t.id);
+      out.push(t);
+    }
+  }
+  return out;
+}
+
+/** Ids of {@link expandClusterTasks} — for bulk actions that only need the task ids. */
+export function expandClusterTaskIds(rows: ClusteredTask[]): string[] {
+  return expandClusterTasks(rows).map((t) => t.id);
+}

@@ -16,6 +16,7 @@ import {
   IconRuler,
   IconUser,
   IconNotes,
+  IconSparkles,
 } from "@tabler/icons-react";
 import type { TaskCreateFormData } from "../../../../schemas";
 import { useTaskMutations } from "../../../../hooks";
@@ -51,6 +52,8 @@ import { ImplementMeasureForm } from "@/components/production/implement-measure/
 import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
 import { FileUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import { LayoutFileUploadField } from "./layout-file-upload-field";
+import { MultiAirbrushingSelector } from "./multi-airbrushing-selector";
+import { createAirbrushingsForTask } from "@/utils/airbrushing-submit";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole } from "@/types/responsible";
 import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
@@ -74,6 +77,8 @@ const taskCreateFormSchema = z.object({
   paintId: z.string().nullable().optional(),
   paintIds: z.array(z.string()).optional(),
   serviceOrders: z.array(z.any()).optional(),
+  // Managed entirely by MultiAirbrushingSelector (rich runtime objects incl. File instances).
+  airbrushings: z.array(z.any()).optional(),
 }).refine((data) => {
   return data.plates.length > 0 || data.serialNumbers.length > 0 || data.name || data.customerId;
 }, {
@@ -161,6 +166,7 @@ export const TaskCreateForm = () => {
           assignedToId: null,
         },
       ],
+      airbrushings: [],
     },
   });
 
@@ -522,6 +528,20 @@ export const TaskCreateForm = () => {
               // Only COMMERCIAL and ADMIN can create quotes via the API
               const createdTaskId = result.data?.id;
               const effectiveCustomerId = customerId || result.data?.customerId;
+
+              // Create the task's airbrushings (each created task gets its own copies). Failure
+              // is non-blocking — the task itself already persisted.
+              if (createdTaskId && (data.airbrushings?.length ?? 0) > 0) {
+                try {
+                  await createAirbrushingsForTask(
+                    createdTaskId,
+                    data.airbrushings,
+                    effectiveCustomerId ? { id: effectiveCustomerId, name: "" } : undefined,
+                  );
+                } catch {
+                  toast.warning("Tarefa criada, mas houve um erro ao criar as aerografias.");
+                }
+              }
               if (createdTaskId && effectiveCustomerId && (isCommercialUser || isAdminUser)) {
                 const expiresAt = new Date();
                 expiresAt.setDate(expiresAt.getDate() + 30);
@@ -1082,6 +1102,31 @@ export const TaskCreateForm = () => {
                               disabled={isSubmitting}
                             />
                           </LayoutFileUploadField>
+                        </CardContent>
+                      </AccordionContent>
+                    </Card>
+                  </AccordionItem>
+                )}
+
+                {/* Aerografias - COMMERCIAL/ADMIN (same audience as Layouts) */}
+                {showLayouts && (
+                  <AccordionItem
+                    value="airbrushing"
+                    id="accordion-item-airbrushing"
+                    className="border border-border rounded-lg"
+                  >
+                    <Card className="border-0">
+                      <AccordionTrigger className="px-0 hover:no-underline">
+                        <CardHeader className="flex-1 py-4">
+                          <CardTitle className="flex items-center gap-2">
+                            <IconSparkles className="h-5 w-5" />
+                            Aerografias
+                          </CardTitle>
+                        </CardHeader>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <CardContent className="pt-0">
+                          <MultiAirbrushingSelector control={form.control} disabled={isSubmitting} customerId={customerIdValue || undefined} />
                         </CardContent>
                       </AccordionContent>
                     </Card>

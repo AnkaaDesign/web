@@ -412,6 +412,42 @@ input[type="time"]::-moz-calendar-picker-indicator {
     animation: error-shake 0.5s ease-in-out;
   }
 
+  /*
+   * Navigation "new activity" indicator — a gentle, non-exaggerated red ring that
+   * pulses around the menu entry the user should be guided toward (see
+   * @/hooks/common/use-nav-activity + resolveNavActivityBlinkIds). It is a soft
+   * inset ring + faint outer glow rather than a harsh border toggle, so it reads as
+   * a calm "look here" rather than an alarm. The element it's applied to already
+   * carries `rounded-lg`, so the ring follows the row's corners automatically.
+   */
+  @keyframes nav-activity-pulse {
+    0%,
+    100% {
+      box-shadow:
+        inset 0 0 0 1px hsl(0 84% 60% / 0.4),
+        0 0 0 1px hsl(0 84% 60% / 0.2);
+    }
+    50% {
+      box-shadow:
+        inset 0 0 0 1.5px hsl(0 84% 60% / 0.9),
+        0 0 8px 1px hsl(0 84% 60% / 0.45);
+    }
+  }
+
+  .nav-activity-blink {
+    animation: nav-activity-pulse 1.8s ease-in-out infinite;
+  }
+
+  /* Respect reduced-motion: keep a steady, subtle ring instead of pulsing. */
+  @media (prefers-reduced-motion: reduce) {
+    .nav-activity-blink {
+      animation: none;
+      box-shadow:
+        inset 0 0 0 1.5px hsl(0 84% 60% / 0.75),
+        0 0 6px 0 hsl(0 84% 60% / 0.3);
+    }
+  }
+
   /* Ensure focus-visible works across browsers */
   input:focus-visible,
   button:focus-visible,

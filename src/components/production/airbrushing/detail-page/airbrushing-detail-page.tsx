@@ -18,11 +18,15 @@ import {
   IconBuilding,
   IconEdit,
   IconTrash,
+  IconList,
+  IconLayoutGrid,
 } from "@tabler/icons-react";
 import { DetailPage } from "@/components/ui/detailpage";
 import type { DetailSectionDef } from "@/components/ui/detailpage";
 import type { PageAction } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import type { FileViewMode } from "@/components/common/file";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import {
@@ -56,6 +60,9 @@ import {
 } from "../../../../constants";
 import type { Airbrushing } from "../../../../types";
 import { AirbrushingFilesSection } from "./airbrushing-files-section";
+// Resolve each Layout wrapper to its backing File (id/filename/path) — shared with the
+// task-detail airbrushing section so both download the real File, not the Layout id.
+import { getAirbrushingLayouts } from "@/components/production/task/detail/sections/airbrushings-section";
 
 // CANONICAL money-visibility gate for airbrushing — spread into a mutable array so it satisfies the
 // `PrivilegeGate` (SECTOR_PRIVILEGES[]) shape used by requiredPrivilege/editablePrivilege.
@@ -78,6 +85,9 @@ export function AirbrushingDetailPage() {
   const { user } = useAuth();
   const { deleteMutation, updateAsync } = useAirbrushingMutations();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  // Grid/list view for the Layouts section — lifted here so the toggle can live in the
+  // section header (next to the count), matching the task detail Layouts section.
+  const [layoutsView, setLayoutsView] = useState<FileViewMode>("grid");
 
   const canEdit = canEditAirbrushings(user);
   const canDelete = canDeleteAirbrushings(user);
@@ -104,7 +114,10 @@ export function AirbrushingDetailPage() {
     include: {
       task: { include: { customer: { include: { logo: true } }, sector: true } },
       painter: true,
-      layouts: true,
+      // Layouts are Layout wrappers; the backing File (id/path) lives on the nested
+      // `file` relation. Without this include the grid would fall back to the Layout's
+      // OWN id as a File id → /files/<layoutId>/download 404s ("Arquivo não encontrado").
+      layouts: { include: { file: true } },
       invoices: true,
       receipts: true,
     },
@@ -371,14 +384,32 @@ export function AirbrushingDetailPage() {
     if ((airbrushing?.layouts?.length || 0) > 0) {
       list.push({
         id: "layouts",
-        label: "Layouts da Aerografia",
+        // Count sits next to the title; the grid/list toggle is in headerActions (right),
+        // so the header reads: "Layouts da Aerografia [n] .......... [list][grid]".
+        label: (
+          <span className="flex items-center gap-2">
+            Layouts da Aerografia
+            <Badge variant="secondary">{airbrushing?.layouts?.length ?? 0}</Badge>
+          </span>
+        ),
         icon: IconPhoto,
         span: 1,
-        headerActions: (a) => <Badge variant="secondary">{a.layouts?.length ?? 0}</Badge>,
+        headerActions: () => (
+          <div className="flex items-center gap-1">
+            <Button variant={layoutsView === "list" ? "default" : "outline"} size="sm" onClick={() => setLayoutsView("list")} className="h-8 w-8 p-0">
+              <IconList className="h-4 w-4" />
+            </Button>
+            <Button variant={layoutsView === "grid" ? "default" : "outline"} size="sm" onClick={() => setLayoutsView("grid")} className="h-8 w-8 p-0">
+              <IconLayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
         render: (a) => (
           <AirbrushingFilesSection
-            files={a.layouts ?? []}
-            defaultViewMode="grid"
+            files={getAirbrushingLayouts(a)}
+            viewMode={layoutsView}
+            onViewModeChange={setLayoutsView}
+            hideToolbar
             emptyIcon={IconPhoto}
             emptyTitle="Nenhum layout cadastrado"
             emptyDescription="Esta aerografia não possui layouts anexados."
@@ -458,6 +489,7 @@ export function AirbrushingDetailPage() {
     confirmPaymentChange,
     loadPainters,
     navigate,
+    layoutsView,
   ]);
 
   const actions = useMemo<PageAction[]>(() => {

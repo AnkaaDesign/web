@@ -22,7 +22,7 @@ const convertToFileWithPreview = (file: any | undefined | null): FileWithPreview
   // Convert database file entity to FileWithPreview format
   return {
     id: file.id,
-    name: file.filename || file.name || 'file',
+    name: file.filename || file.name || file.originalName || 'file',
     size: file.size || 0,
     type: file.mimetype || file.type || 'application/octet-stream',
     lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
