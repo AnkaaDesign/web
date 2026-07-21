@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { FileUploadField, type FileWithPreview } from "@/components/common/file";
+import { type FileWithPreview } from "@/components/common/file";
 import { uploadSingleFile } from "@/api-client/file";
 import { taskService } from "@/api-client/task";
 import { taskQuoteService } from "@/api-client/task-quote";
@@ -112,20 +112,30 @@ const computeCommonLayouts = (quoteTasks: QuoteTask[]): LayoutOption[] => {
  */
 export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayoutModalProps) {
   const queryClient = useQueryClient();
+  // `files` = the chosen references — a mix of existing task images (picked in the
+  // grid) and brand-new uploads (added via the grid's upload card). A new upload is
+  // a raw File the API materializes as an APPROVED task layout on submit.
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [prefilledFileIds, setPrefilledFileIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [quoteTasks, setQuoteTasks] = useState<QuoteTask[]>([]);
 
+  // Append newly-picked uploads to the selection (auto-selected), capped at 2.
+  const handleUploadFiles = (picked: File[]) => {
+    const withPreview = picked.map(
+      (f) => Object.assign(f, { preview: URL.createObjectURL(f) }) as FileWithPreview,
+    );
+    setFiles((prev) => [...prev, ...withPreview].slice(0, 2));
+  };
+
   const tasksWithoutQuote = tasks.length - quoteTasks.length;
 
   const idsEqual = (a: string[], b: string[]) =>
     a.length === b.length && a.every((id, i) => id === b[i]);
 
-  // Shared pool: image layouts present in all selected tasks → picker mode.
+  // Shared pool: image layouts present in all selected tasks → offered in the grid.
   const commonLayouts = useMemo(() => computeCommonLayouts(quoteTasks), [quoteTasks]);
-  const pickerMode = commonLayouts.length > 0;
 
   // Selected quotes currently carry differing approved layouts?
   const hasMixedLayouts = useMemo(() => {
@@ -243,7 +253,8 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
     if (!canApply) return;
     setIsSubmitting(true);
     try {
-      // Resolve ordered FILE ids (up to 2), uploading any new files.
+      // Resolve ordered FILE ids (up to 2): existing picks reuse their id, brand-new
+      // uploads are uploaded first. Clamp to 2 so a stray extra selection can't 400.
       const resolvedIds: string[] = [];
       for (const f of files) {
         if (f instanceof File) {
@@ -258,6 +269,7 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
           if (existingId) resolvedIds.push(existingId);
         }
       }
+      resolvedIds.splice(2);
       // Apply SEQUENTIALLY, not in parallel: the API gives each quote its own
       // private copy of a shared layout file (so sibling quotes can't steal it),
       // which relies on seeing the previous quote's ownership. Parallel writes
@@ -299,21 +311,22 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className={pickerMode ? "sm:max-w-[640px]" : "sm:max-w-[520px]"}>
+      <DialogContent className="sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <IconPhoto className="h-5 w-5" />
-            Layout do Orçamento
+            Layout de Referência
           </DialogTitle>
           <DialogDescription>
             Aplicando para {appliedCount} tarefa{appliedCount !== 1 ? "s" : ""}.{" "}
-            {pickerMode
-              ? "Selecione o layout aprovado entre os layouts compartilhados pelas tarefas."
-              : "O layout enviado também é adicionado como layout aprovado de cada tarefa."}
+            Selecione um layout de referência entre as imagens da tarefa ou envie um
+            novo — o novo também é adicionado como layout aprovado de cada tarefa.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        {/* min-w-0: DialogContent is a CSS grid; without this the horizontal layout
+            strip (min-width:auto) expands past the modal instead of scrolling. */}
+        <div className="space-y-3 min-w-0">
           {!isLoading && quoteTasks.length === 0 && (
             <Alert variant="warning">
               <AlertDescription>
@@ -343,24 +356,17 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
               <IconLoader2 className="h-5 w-5 animate-spin mr-2" />
               Carregando layouts...
             </div>
-          ) : pickerMode ? (
+          ) : (
+            // One card grid: the leading upload card adds a NEW reference (approved
+            // on each task); the rest are the task's existing images to pick from.
             <ApprovedLayoutPicker
               layouts={commonLayouts}
               layoutFiles={files}
               onChange={setFiles}
+              onUploadFiles={handleUploadFiles}
+              uploadLabel="Selecione ou envie um layout"
               disabled={isSubmitting}
-            />
-          ) : (
-            <FileUploadField
-              onFilesChange={setFiles}
-              existingFiles={files}
-              maxFiles={2}
-              maxSize={10 * 1024 * 1024}
-              acceptedFileTypes={{ "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"] }}
-              disabled={isSubmitting}
-              variant="compact"
-              placeholder="Arraste ou clique para selecionar o layout aprovado"
-              showPreview
+              horizontal
             />
           )}
         </div>

@@ -45,7 +45,7 @@ export function DataTableContextMenu<TData>({ state, onClose, actions }: DataTab
         action.onClick(rows);
         onClose();
       }}
-      className={cn("gap-2", action.variant === "destructive" && "text-destructive focus:text-destructive")}
+      className={cn("gap-2 whitespace-nowrap", action.variant === "destructive" && "text-destructive focus:text-destructive")}
     >
       {action.icon}
       {action.label}
@@ -56,7 +56,7 @@ export function DataTableContextMenu<TData>({ state, onClose, actions }: DataTab
 
   return (
     <DropdownMenu open={open} onOpenChange={(o) => !o && onClose()}>
-      <PositionedDropdownMenuContent position={state ? { x: state.x, y: state.y } : null} isOpen={open} className="w-56">
+      <PositionedDropdownMenuContent position={state ? { x: state.x, y: state.y } : null} isOpen={open} className="w-auto min-w-56 max-w-md">
         {state?.isBulk && (
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
             {rows.length} {rows.length === 1 ? "item selecionado" : "itens selecionados"}
@@ -72,7 +72,7 @@ export function DataTableContextMenu<TData>({ state, onClose, actions }: DataTab
               <Fragment key={`group-${action.group.id}`}>
                 {action.separatorBefore && <DropdownMenuSeparator />}
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="gap-2">
+                  <DropdownMenuSubTrigger className="gap-2 whitespace-nowrap">
                     {action.group.icon}
                     {action.group.label}
                   </DropdownMenuSubTrigger>

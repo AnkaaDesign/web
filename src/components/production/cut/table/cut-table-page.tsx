@@ -1,7 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconExternalLink, IconPlayerPlay, IconCheck, IconScissors, IconTrash, IconAlertTriangle } from "@tabler/icons-react";
+import { arrayMove } from "@dnd-kit/sortable";
+import { IconExternalLink, IconPlayerPlay, IconCheck, IconScissors, IconTrash, IconAlertTriangle, IconPlus } from "@tabler/icons-react";
 import { DataTablePage } from "@/components/ui/datatable";
+import { usePrivileges } from "@/hooks/common/use-privileges";
 import type { DataTableRowAction, DataTableFilterDef, DataTableRowClickMeta, DataTableFilterValues } from "@/components/ui/datatable";
 import {
   AlertDialog,
@@ -16,7 +18,7 @@ import {
 import { useCuts, useCutMutations, useCutBatchMutations } from "../../../../hooks";
 import { getCuts } from "@/api-client";
 import { useAuth } from "@/contexts/auth-context";
-import { canRequestCut } from "@/utils/permissions/entity-permissions";
+import { canRequestCut, canCreateCuts } from "@/utils/permissions/entity-permissions";
 import type { Cut } from "../../../../types";
 import {
   routes,
@@ -63,6 +65,43 @@ function buildCutOrderBy(sorting: { id: string; desc: boolean }[]): Record<strin
   const entries = sorting.map((s) => CUT_SORT_FIELD_MAP[s.id]?.(s.desc ? "desc" : "asc")).filter((e): e is Record<string, unknown> => !!e);
   if (entries.length === 0) return { statusOrder: "asc" };
   return entries.length === 1 ? entries[0] : entries;
+}
+
+// The "queue" ordering that drag-reorder operates on: status groups first, then the user-defined
+// `priority` within each group, then createdAt, then `id` as a FULLY-UNIQUE final tiebreak. Without the
+// `id` key, cuts that tie on (statusOrder, priority, createdAt) — e.g. a fresh queue where everything
+// defaults to priority 0 and a batch-created recut shares one transaction timestamp — come back from
+// Postgres in unspecified physical order, which reshuffles run-to-run (the "messy reorder" symptom).
+// Reorder is ONLY offered while this is the active sort; an ad-hoc column sort disables the grab.
+const QUEUE_ORDER_BY: Record<string, unknown>[] = [{ statusOrder: "asc" }, { priority: "asc" }, { createdAt: "asc" }, { id: "asc" }];
+
+// Spacing used when (re)seeding priorities so there's room to drop between neighbours later.
+const PRIORITY_STEP = 1000;
+// Distinct-enough gap: below this we treat two neighbour priorities as "equal" and reseed the group.
+const PRIORITY_EPSILON = 1e-6;
+
+/** Is the current sort the default queue order (empty, or the status-asc the table starts with)? */
+function isQueueSort(sorting: { id: string; desc: boolean }[]): boolean {
+  return sorting.length === 0 || (sorting.length === 1 && sorting[0].id === "status" && !sorting[0].desc);
+}
+
+/** Nearest cuts sharing `status` immediately before/after `index` in the given order. */
+function sameStatusNeighbors(rows: Cut[], index: number, status: Cut["status"]): { prev?: Cut; next?: Cut } {
+  let prev: Cut | undefined;
+  let next: Cut | undefined;
+  for (let i = index - 1; i >= 0; i--) {
+    if (rows[i].status === status) {
+      prev = rows[i];
+      break;
+    }
+  }
+  for (let i = index + 1; i < rows.length; i++) {
+    if (rows[i].status === status) {
+      next = rows[i];
+      break;
+    }
+  }
+  return { prev, next };
 }
 
 function dateRange(v: unknown): { gte?: Date; lte?: Date } | undefined {
@@ -125,15 +164,21 @@ export function CutTablePage() {
     }
   }, [sortParam]);
 
+  // Queue order (status → priority → createdAt) when the user hasn't picked an ad-hoc column sort;
+  // otherwise honour their chosen column. Drag-reorder is only enabled in the queue-order case.
+  const queueSort = isQueueSort(sorting);
+  // Memoized so the non-queue branch (which builds a fresh object) doesn't churn the query each render.
+  const orderBy = useMemo(() => (queueSort ? QUEUE_ORDER_BY : buildCutOrderBy(sorting)), [queueSort, sorting]);
+
   const query = useMemo(
     () => ({
       ...buildCutQuery(params.filters, params.search),
       page,
       limit: pageSize,
-      orderBy: buildCutOrderBy(sorting),
+      orderBy,
       include: LIST_INCLUDE,
     }),
-    [params, page, pageSize, sorting],
+    [params, page, pageSize, orderBy],
   );
 
   const { data: response, isLoading, error } = useCuts(query as never);
@@ -146,7 +191,7 @@ export function CutTablePage() {
     const PAGE_SIZE = 100;
     const baseQuery = {
       ...buildCutQuery(params.filters, params.search),
-      orderBy: buildCutOrderBy(sorting),
+      orderBy,
       include: LIST_INCLUDE,
     };
     const all: Cut[] = [];
@@ -160,7 +205,97 @@ export function CutTablePage() {
       if (totalRecords > 0 && all.length >= totalRecords) break;
     }
     return all;
-  }, [params, sorting, totalRecords]);
+  }, [params, orderBy, totalRecords]);
+
+  // --- drag-to-reorder (priority within a status group) ---
+  const { canAccess } = usePrivileges();
+  // Only roles that can PUT /cuts (status managers) may persist a reorder — mirrors the endpoint guard.
+  const canReorder = canAccess(CUT_STATUS_MANAGERS);
+  // Optimistic order applied immediately on drop; cleared when fresh server data arrives (the refetch
+  // triggered by the mutation returns the rows already in the new priority order).
+  const [orderOverride, setOrderOverride] = useState<Cut[] | null>(null);
+  // The optimistic paint must survive UNRELATED refetches (window-focus, sibling `cutKeys.all`
+  // invalidations) but be dropped once the server reflects our own reorder write. Clearing on EVERY
+  // `response` change (the old behavior) let any stray refetch snap the queue back to the pre-write
+  // order — the "doesn't stay where I leave it" symptom. Instead, clear only on the first `response`
+  // that arrives AFTER a reorder mutation settled: by then the PUT is persisted, so the incoming server
+  // data already includes our change (and a cross-status drop correctly falls back to server truth).
+  const clearOverrideOnNextResponse = useRef(false);
+  useEffect(() => {
+    if (clearOverrideOnNextResponse.current) {
+      clearOverrideOnNextResponse.current = false;
+      setOrderOverride(null);
+    }
+  }, [response]);
+  const tableData = orderOverride ?? cuts;
+  // Read the on-screen order without re-creating the drop handler on every data change.
+  const tableDataRef = useRef(tableData);
+  tableDataRef.current = tableData;
+
+  const handleReorder = useCallback(
+    async (activeId: string, overId: string) => {
+      const current = tableDataRef.current;
+      const from = current.findIndex((c) => c.id === activeId);
+      const to = current.findIndex((c) => c.id === overId);
+      if (from < 0 || to < 0 || from === to) return;
+
+      const moved = current[from];
+      const reordered = arrayMove(current, from, to);
+
+      // Recompute the moved cut's priority from its same-status neighbours (status stays primary, so a
+      // cross-status drop self-corrects on refetch — but we still keep priority within its own group).
+      const newIndex = reordered.findIndex((c) => c.id === activeId);
+      const { prev, next } = sameStatusNeighbors(reordered, newIndex, moved.status);
+      const pPrev = prev?.priority;
+      const pNext = next?.priority;
+
+      // Only cut in its status group → the drop can't change any within-status order; bail BEFORE
+      // painting an override (otherwise it'd stick, since no mutation → no refetch to clear it).
+      if (pPrev == null && pNext == null) return;
+
+      setOrderOverride(reordered); // paint the new order instantly
+
+      let newPriority: number | null = null;
+      if (pPrev != null && pNext != null) {
+        // Midpoint — unless the neighbours are effectively equal (e.g. a fresh queue of all-0s), in
+        // which case there's no room to insert between them and we reseed the whole group below.
+        newPriority = pNext - pPrev > PRIORITY_EPSILON ? (pPrev + pNext) / 2 : null;
+      } else if (pPrev != null) {
+        newPriority = pPrev + PRIORITY_STEP;
+      } else {
+        newPriority = (pNext as number) - PRIORITY_STEP;
+      }
+
+      try {
+        if (newPriority != null) {
+          await updateAsync({ id: moved.id, data: { priority: newPriority } as never });
+        } else {
+          // Reseed: spread the status group over PRIORITY_STEP gaps in its new order, writing only the
+          // rows whose value actually changes.
+          const group = reordered.filter((c) => c.status === moved.status);
+          const updates = group
+            .map((c, i) => ({ id: c.id, priority: i * PRIORITY_STEP }))
+            .filter((u) => {
+              const existing = group.find((c) => c.id === u.id);
+              return existing && existing.priority !== u.priority;
+            });
+          if (updates.length > 0) await batchUpdateAsync({ cuts: updates as never });
+        }
+        // Write persisted — arm the override to clear on the next server response (which now reflects it).
+        clearOverrideOnNextResponse.current = true;
+      } catch {
+        // The api client already surfaced the error; drop the optimistic order so the UI reflects reality.
+        setOrderOverride(null);
+      }
+    },
+    [updateAsync, batchUpdateAsync],
+  );
+
+  // Grab is offered only in queue order and only to roles that can persist it.
+  const rowReorder = useMemo(
+    () => (queueSort && canReorder ? { onReorder: (a: string, b: string) => void handleReorder(a, b) } : undefined),
+    [queueSort, canReorder, handleReorder],
+  );
 
   const columns = useMemo(() => createCutColumns(), []);
 
@@ -332,12 +467,26 @@ export function CutTablePage() {
             { label: "Produção", href: routes.production.root },
             { label: "Cortes" },
           ]}
+          actions={
+            canCreateCuts(user)
+              ? [
+                  {
+                    key: "create",
+                    label: "Adicionar",
+                    icon: IconPlus,
+                    onClick: () => navigate(routes.production.cutting.create),
+                    variant: "default",
+                  },
+                ]
+              : []
+          }
           table={{
             tableId: "cutting-list",
-            data: cuts,
+            data: tableData,
             columns,
             filterDefs,
             rowActions,
+            rowReorder,
             getRowId: (c) => c.id,
             onRowClick,
             isLoading,

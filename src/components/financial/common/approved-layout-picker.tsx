@@ -1,9 +1,9 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFileViewer } from "@/components/common/file/file-viewer";
-import { IconPhoto, IconEye, IconCheck } from "@tabler/icons-react";
+import { IconPhoto, IconEye, IconCheck, IconUpload } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { getApiBaseUrl } from "@/config/api";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
@@ -81,18 +81,35 @@ interface ApprovedLayoutPickerProps {
   onChange: (files: FileWithPreview[]) => void;
   disabled?: boolean;
   maxFiles?: number;
+  /**
+   * When set, a leading dashed "upload" card is rendered inside the grid (like the
+   * task "Adicionar Layouts" form). Selecting files calls this with the raw Files —
+   * the caller decides what to do (e.g. the quote modal appends them to the
+   * selection as new references + uploads them as APPROVED task layouts).
+   */
+  onUploadFiles?: (files: File[]) => void;
+  /** Label for the upload card (defaults to "Selecione ou envie um layout"). */
+  uploadLabel?: string;
+  /**
+   * Lay the cards out as a single horizontal-scroll strip (fixed-width cards) instead
+   * of the wrapping grid — matches the "Adicionar Layouts" upload field so both
+   * prep-board layout modals read the same. Defaults to the wrapping grid.
+   */
+  horizontal?: boolean;
 }
 
 /**
- * The budget/quote "Layout Aprovado" picker: choose up to `maxFiles` of the
- * task's existing layout images as the quote's approved layout. There is NO
- * upload here — new images are added on the task. Shared by the budget-create,
- * budget-detail and billing steps so all quote-layout selectors stay identical.
+ * The budget/quote "Layout Referência" picker: choose up to `maxFiles` of the
+ * task's existing layout images as the quote's REFERENCE layout (the image shown
+ * on the budget/invoice PDF + public page). Approval itself lives on the task
+ * layout; this is a display reference. There is NO upload here — new images are
+ * added on the task. Shared by the budget-create, budget-detail and billing steps
+ * so all quote-layout selectors stay identical.
  *
  * A quote layout that is a separate File from its task art is matched by image
  * (filename + byte-size) so it reads as already-selected ("Selecionado"), and a
  * quote layout with no matching task art is shown as a selected-but-removable
- * "orphan" tile so the approved layout is never silently hidden.
+ * "orphan" tile so the reference layout is never silently hidden.
  */
 export function ApprovedLayoutPicker({
   layouts,
@@ -100,10 +117,34 @@ export function ApprovedLayoutPicker({
   onChange,
   disabled,
   maxFiles = 2,
+  onUploadFiles,
+  uploadLabel = "Selecione ou envie um layout",
+  horizontal = false,
 }: ApprovedLayoutPickerProps) {
+  // Fixed-width card + horizontal-scroll strip (matches LayoutFileUploadField's card
+  // variant) vs. the default wrapping grid.
+  const cardWidthClass = horizontal ? "w-[280px] shrink-0" : "w-full";
+  const gridClass = horizontal
+    ? "flex gap-3 overflow-x-auto pb-2"
+    : "grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3";
   const fileViewer = useFileViewer();
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
-  // The task's image layouts — the candidates for the approved layout.
+  const canUpload =
+    !!onUploadFiles && !disabled && layoutFiles.length < maxFiles;
+  const handleUploadPick = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const picked = Array.from(e.target.files || []);
+      if (picked.length && onUploadFiles) onUploadFiles(picked);
+      // Reset so re-selecting the same file re-fires onChange.
+      e.target.value = "";
+    },
+    [onUploadFiles],
+  );
+
+  // The task's image layouts — the candidates for the approved layout. Callers are
+  // responsible for narrowing the pool (e.g. the budget step passes only APPROVED
+  // layouts); the modal reuses this picker to pick layouts it approves on select.
   const layoutOptions = useMemo(() => {
     if (!layouts || layouts.length === 0) return [];
     return layouts.filter((a) => (a.mimetype || "").startsWith("image/"));
@@ -255,7 +296,7 @@ export function ApprovedLayoutPicker({
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <IconPhoto className="h-4 w-4 text-muted-foreground" />
-          Layout Aprovado
+          Layout Referência
           <Badge
             variant={selectedCount > 0 ? "secondary" : "outline"}
             className="ml-auto text-[11px] font-normal tabular-nums"
@@ -265,9 +306,45 @@ export function ApprovedLayoutPicker({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {layoutOptions.length > 0 || orphanLayoutFiles.length > 0 ? (
+        {layoutOptions.length > 0 || orphanLayoutFiles.length > 0 || onUploadFiles ? (
           <div className="space-y-3">
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
+            <div className={gridClass}>
+              {/* Leading dashed "upload" card (only when the caller supports upload),
+                  matching the task "Adicionar Layouts" form. Adds a NEW reference. */}
+              {onUploadFiles && (
+                <>
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleUploadPick}
+                  />
+                  <button
+                    type="button"
+                    disabled={!canUpload}
+                    onClick={() => uploadInputRef.current?.click()}
+                    className={cn(
+                      "flex h-[calc(13rem+4.25rem)] w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed bg-muted/20 p-4 text-center transition-colors",
+                      cardWidthClass,
+                      canUpload
+                        ? "cursor-pointer border-border/70 hover:border-primary/60 hover:bg-muted/40"
+                        : "cursor-not-allowed border-border/50 opacity-50",
+                    )}
+                  >
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                      <IconUpload className="h-5 w-5 text-muted-foreground" />
+                    </span>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {uploadLabel}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      .jpeg, .jpg, .png, .gif, .webp
+                    </span>
+                  </button>
+                </>
+              )}
               {/* Task layouts — selectable. Click the image OR "Selecionar" to toggle;
                   "Ver" opens the viewer. Status is managed on the task. */}
               {layoutOptions.map((art) => {
@@ -280,6 +357,7 @@ export function ApprovedLayoutPicker({
                     key={art.id}
                     className={cn(
                       "overflow-hidden rounded-lg border-2 bg-card transition-all",
+                      cardWidthClass,
                       selected ? "border-primary ring-2 ring-primary/30" : "border-border",
                     )}
                   >
@@ -356,7 +434,10 @@ export function ApprovedLayoutPicker({
                 return (
                   <div
                     key={id}
-                    className="overflow-hidden rounded-lg border-2 border-primary bg-card ring-2 ring-primary/30"
+                    className={cn(
+                      "overflow-hidden rounded-lg border-2 border-primary bg-card ring-2 ring-primary/30",
+                      cardWidthClass,
+                    )}
                   >
                     <button
                       type="button"
@@ -423,7 +504,7 @@ export function ApprovedLayoutPicker({
               Nenhum layout na tarefa
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Adicione layouts na etapa "Tarefa" para usá-los como layout aprovado.
+              Adicione layouts na etapa "Tarefa" para usá-los como layout de referência.
             </p>
           </div>
         )}

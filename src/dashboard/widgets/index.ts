@@ -20,6 +20,7 @@ import { notesBoardWidget, notesBoardLegacyWidget } from "./notes-board";
 import { hrCalendarWidget } from "./hr-calendar";
 import { productionCalendarWidget } from "./production-calendar";
 import { productivityWidget } from "./productivity";
+import { cutQueueWidget } from "./cut-queue";
 
 const allWidgets: any[] = [
   // Configurable workhorses (preferred — instantiate as many as needed)
@@ -46,6 +47,8 @@ const allWidgets: any[] = [
   productionCalendarWidget,
   // Production analytics widgets
   productivityWidget,
+  // Production queue widgets (cut executors — plotting/warehouse)
+  cutQueueWidget,
 ];
 
 let registered = false;

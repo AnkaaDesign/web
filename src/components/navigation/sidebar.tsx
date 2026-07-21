@@ -20,7 +20,7 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/compone
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { SidebarFlyout, useFlyoutController } from "./sidebar-flyout";
 import { recordNavClick, clearNavContext, useRecordedNav, resolveActiveNav, computeExpandedFromActive, resolveNavActivityBlinkIds, collectNavActivityTargets } from "@/contexts/navigation-context";
-import { useNavActivity } from "@/hooks/common/use-nav-activity";
+import { useNavActivityAlert } from "@/hooks/common/use-nav-activity-alert";
 
 import {
   IconDashboard,
@@ -652,15 +652,20 @@ export const Sidebar = memo(() => {
   // red ring "leads" the user inward (domain -> subdomain -> ... -> target page).
   // When the sidebar is collapsed, children aren't rendered, so we resolve against an
   // empty expansion map — that blinks the outermost (top-level) domain icon.
-  const navActivity = useNavActivity();
+  // useNavActivityAlert wraps the raw activity signal with the alert state machine:
+  // the paths it returns are already gated by the 30-min "user visited the cut page"
+  // snooze and the "user is on the page right now" suppression, and it drives the
+  // audible bip loop as a side effect. So the blink derived from it stops exactly when
+  // the bips do. See @/hooks/common/use-nav-activity-alert.
+  const blinkPaths = useNavActivityAlert();
   const blinkingIds = useMemo(
-    () => resolveNavActivityBlinkIds(menuWithContextualItems as MenuItem[], navActivity.paths, isOpen ? expandedMenus : {}),
-    [menuWithContextualItems, navActivity.paths, isOpen, expandedMenus],
+    () => resolveNavActivityBlinkIds(menuWithContextualItems as MenuItem[], blinkPaths as Set<string>, isOpen ? expandedMenus : {}),
+    [menuWithContextualItems, blinkPaths, isOpen, expandedMenus],
   );
   // Expansion-agnostic target/ancestor ids for the collapsed flyout's own blink logic.
   const activityTargets = useMemo(
-    () => collectNavActivityTargets(menuWithContextualItems as MenuItem[], navActivity.paths),
-    [menuWithContextualItems, navActivity.paths],
+    () => collectNavActivityTargets(menuWithContextualItems as MenuItem[], blinkPaths as Set<string>),
+    [menuWithContextualItems, blinkPaths],
   );
   // Flyout row blinks when it IS a target, or is an ancestor whose submenu column is
   // not yet open (so the nudge hops inward as the user browses the cascading columns).

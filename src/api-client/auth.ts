@@ -28,14 +28,17 @@ export const authService = {
   // Register with email or phone
   register: (data: SignUpFormData) => apiClient.post<AuthTokenResponse>("/auth/register", data).then((res) => res.data),
 
-  // Logout current user
-  logout: () => apiClient.post<AuthMessageResponse>("/auth/logout").then((res) => res.data),
+  // Logout current user — send the stored refresh token so the server revokes
+  // this device's refresh token (body is optional; needs a valid access token).
+  logout: (data?: { refreshToken?: string }) => apiClient.post<AuthMessageResponse>("/auth/logout", data).then((res) => res.data),
 
   // Get current user
   me: () => apiClient.get<AuthUserResponse>("/auth/me").then((res) => res.data),
 
-  // Refresh token
-  refreshToken: () => apiClient.post<AuthTokenResponse>("/auth/refresh").then((res) => res.data),
+  // Refresh the access token using the stored (non-rotating) refresh token.
+  // Public endpoint — works even with an already-expired access token. Returns
+  // { success, message, data: { token, user } }; the refresh token stays the same.
+  refreshToken: (refreshToken: string) => apiClient.post<AuthTokenResponse>("/auth/refresh", { refreshToken }).then((res) => res.data),
 
   // Change password
   changePassword: (data: ChangePasswordFormData) => apiClient.put<AuthMessageResponse>("/auth/change-password", data).then((res) => res.data),

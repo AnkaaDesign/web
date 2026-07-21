@@ -90,7 +90,13 @@ function DataTableToolbarInner<TData>({
   const columnOrder = table.getState().columnOrder;
   const [shareOpen, setShareOpen] = useState(false);
 
-  const baseColumns = useMemo(() => columns.map((c) => ({ id: c.id, header: columnHeaderText(c) })), [columns]);
+  // A column marked `enableHiding: false` cannot be toggled off, so it has no place in the column
+  // manager (offering a visibility toggle for it would be a no-op / a bug). This also keeps internal
+  // leading columns (e.g. a selection column that's declared as a column def) out of the picker.
+  const baseColumns = useMemo(
+    () => columns.filter((c) => c.enableHiding !== false).map((c) => ({ id: c.id, header: columnHeaderText(c) })),
+    [columns],
+  );
   const visibleSet = useMemo(
     () => new Set(columns.filter((c) => visibility[c.id] !== false).map((c) => c.id)),
     [columns, visibility],

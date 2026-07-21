@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taskQuoteService } from '@/api-client/task-quote';
+import { taskKeys } from '../common/query-keys';
 
 export const taskQuoteKeys = {
   all: ['task-quotes'] as const,
@@ -64,6 +65,8 @@ export function useCreateTaskQuote() {
     onSuccess: () => {
       // Success/error toasts are emitted by the axios interceptor (POST /task-quotes).
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      // Tasks embed quote data (budget, status) — refresh task lists + details too.
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
   });
 }
@@ -78,6 +81,8 @@ export function useUpdateTaskQuote() {
     onSuccess: () => {
       // Success/error toasts are emitted by the axios interceptor (PUT /task-quotes/:id).
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      // Tasks embed quote data (budget, status) — refresh task lists + details too.
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
   });
 }
@@ -91,6 +96,8 @@ export function useApproveQuote() {
     onSuccess: () => {
       // Success/error toasts are emitted by the axios interceptor (PUT /task-quotes/:id/budget-approve).
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      // Approving a quote flips task budget status — refresh task lists + details too.
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
   });
 }
@@ -105,6 +112,8 @@ export function useRejectQuote() {
     onSuccess: () => {
       // Success/error toasts are emitted by the axios interceptor (PUT /task-quotes/:id/status).
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      // Rejecting a quote flips task budget status — refresh task lists + details too.
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
   });
 }

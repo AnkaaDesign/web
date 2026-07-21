@@ -9,7 +9,7 @@ import {
   IconExternalLink,
 } from "@tabler/icons-react";
 import { routes } from "@/constants";
-import { useTaskDetail, useTaskMutations } from "@/hooks";
+import { useTaskDetail, useTaskMutations, taskKeys } from "@/hooks";
 import {
   useTaskQuoteByTask,
   useCreateTaskQuote,
@@ -117,6 +117,10 @@ export const FinancialBudgetDetailPage = () => {
   const [showResponsibleErrors, setShowResponsibleErrors] = useState(false);
   const [responsibleRows, setResponsibleRows] = useState<ResponsibleRowData[]>([]);
   const [layouts, setLayouts] = useState<FileWithPreview[]>([]);
+  // True once the task's layouts have been seeded from the loaded task. Gates the
+  // quote-selection reconciliation so the initial-load transient (layouts still [])
+  // can't wipe a valid persisted approved-layout selection.
+  const [layoutsInitialized, setLayoutsInitialized] = useState(false);
   const [layoutStatuses, setLayoutStatuses] = useState<Record<string, string>>({});
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
   // Snapshots of the relation sets as loaded from the task. Used at submit time to
@@ -508,6 +512,9 @@ export const FinancialBudgetDetailPage = () => {
       });
       setLayoutStatuses(statuses);
     }
+    // Task layouts are now seeded (or the task genuinely has none) — reconciliation
+    // may run. Batched with the setLayouts above, so it commits with real layouts.
+    setLayoutsInitialized(true);
 
     // Base files
     if ((task as any).baseFiles && (task as any).baseFiles.length > 0) {
@@ -537,6 +544,50 @@ export const FinancialBudgetDetailPage = () => {
     // temp id with no file left to upload, so submit sent the temp id and the API
     // rejected it ("Invalid uuid"). Mirrors the sibling effect's `[task?.id]` guard.
   }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep the quote's approved-layout selection in sync with the task's layouts.
+  // When a layout is removed or marked non-APPROVED (Reprovado/Rascunho) in Step 1,
+  // it is automatically dropped from the quote selection (layoutFiles) so Step 2
+  // never shows a removed/reproved layout as the selected approved layout. A persisted
+  // quote layout is a private clone (its own File id), so match by File id OR
+  // filename+byte-size — mirroring the ApprovedLayoutPicker matcher so what it
+  // highlights and what we keep always agree. Gated on layoutsInitialized to avoid
+  // pruning a valid selection during the initial-load transient.
+  useEffect(() => {
+    if (!layoutsInitialized) return;
+    if (layoutFiles.length === 0) return;
+    const keyOf = (f: any) => ({
+      id: f.uploadedFileId || f.id,
+      name: (f.name || f.originalName || f.filename || "").trim(),
+      size: f.size || 0,
+    });
+    const matches = (a: any, b: any) => {
+      const ka = keyOf(a);
+      const kb = keyOf(b);
+      return (
+        (!!ka.id && ka.id === kb.id) ||
+        (!!ka.name && ka.name === kb.name && ka.size === kb.size)
+      );
+    };
+    const approved = layouts.filter(
+      (f: any) =>
+        (f.type || "").startsWith("image/") &&
+        (f.status || "DRAFT") === "APPROVED",
+    );
+    const kept = layoutFiles.filter((lf) => approved.some((a) => matches(a, lf)));
+    if (kept.length !== layoutFiles.length) {
+      setLayoutFiles(kept);
+      form.setValue(
+        "layoutFileIds",
+        kept
+          .map((f) => (f as any).uploadedFileId || f.id)
+          .filter(Boolean)
+          .slice(0, 2),
+        { shouldDirty: true },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layouts, layoutFiles, layoutsInitialized]);
 
   // Dynamic steps based on customer count
   const customerConfigs = form.watch("customerConfigs");
@@ -1091,6 +1142,9 @@ export const FinancialBudgetDetailPage = () => {
       }
 
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      // Tasks embed quote data (budget value + status badges). When only the quote
+      // half changed, updateTaskAsync above is skipped, so invalidate tasks explicitly.
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
       allowNavigation();
       if (returnTo) navigate(returnTo);
       else navigate(-1);
@@ -1195,6 +1249,9 @@ export const FinancialBudgetDetailPage = () => {
     const key = file.uploadedFileId || file.id;
     const persisted = persistedLayoutByFileId.get(key);
     const pf = persisted?.file;
+    // Only offer IMAGE layouts explicitly marked "Aprovado" as the approved layout.
+    const layoutStatus = file.status || persisted?.artwork?.status;
+    if (layoutStatus !== "APPROVED") return;
     layoutsById.set(key, {
       id: key,
       layoutId: persisted?.artwork?.layoutId || persisted?.artwork?.id,

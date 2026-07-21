@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { FileTypeIcon } from "@/components/ui/file-type-icon";
 import { getApiBaseUrl } from "@/config/api";
+import { useFileViewer } from "@/components/common/file";
+import { cn } from "@/lib/utils";
 import type { DataTableColumnDef, SectorDefaults } from "@/components/ui/datatable";
 
 /**
@@ -32,12 +34,40 @@ const thumbnailUrl = (fileId: string) => `${getApiBaseUrl()}/files/thumbnail/${f
  * can't render one (e.g. EPS/vector files) the <img> errors — instead of leaving a broken image
  * showing the alt filename, we fall back to the colored file-type icon (the same vector-bezier icon
  * the detail page shows). Keyed by file id upstream so the error state resets per row.
+ *
+ * Clicking the thumbnail opens the file directly in the unified file viewer (image/PDF/video modal),
+ * matching the pre-migration table. `stopPropagation` keeps the click from also triggering the row's
+ * navigate-to-detail. The FileViewerProvider wraps the whole app (App.tsx), but we still guard with
+ * try/catch so the column stays usable if it's ever rendered outside a provider.
  */
 function CutFilePreview({ file }: { file?: AnkaaFile }) {
   const [errored, setErrored] = useState(false);
+
+  let fileViewer: ReturnType<typeof useFileViewer> | null = null;
+  try {
+    fileViewer = useFileViewer();
+  } catch {
+    // No FileViewerProvider in this tree — thumbnail stays non-clickable.
+  }
+
+  const clickable = !!file && !!fileViewer;
+
   return (
     <div className="flex items-center justify-center">
-      <div className="w-12 h-12 rounded-md overflow-hidden bg-muted/20 flex items-center justify-center">
+      <div
+        className={cn(
+          "w-12 h-12 rounded-md overflow-hidden bg-muted/20 flex items-center justify-center transition-all",
+          clickable && "cursor-pointer hover:ring-2 hover:ring-primary",
+        )}
+        onClick={
+          clickable
+            ? (e) => {
+                e.stopPropagation();
+                fileViewer!.actions.viewFile(file!);
+              }
+            : undefined
+        }
+      >
         {!file ? (
           <IconFileOff className="w-5 h-5 text-muted-foreground/50" />
         ) : errored ? (

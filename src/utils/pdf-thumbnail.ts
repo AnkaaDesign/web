@@ -1,7 +1,69 @@
 // PDF Thumbnail Generation Utilities
+import { pdfjs } from "react-pdf";
 import type { File as AnkaaFile } from "../types";
 import { getApiBaseUrl } from "@/config/api";
 import { rewriteCdnUrl } from "./file";
+
+// Reuse the locally-hosted worker already shipped for the inline PDF viewer.
+pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+
+/**
+ * Render the first page of a local PDF (a File/Blob picked in a form, BEFORE any
+ * upload) to a JPEG data URL suitable for an <img> preview thumbnail.
+ *
+ * Uses the pdfjs bundled with react-pdf, so no extra dependency is required.
+ * Returns `null` on any failure so callers can gracefully fall back to a PDF icon.
+ */
+export const generatePDFThumbnailFromBlob = async (
+  blob: Blob,
+  options: { page?: number; maxWidth?: number; quality?: number } = {}
+): Promise<string | null> => {
+  const { page = 1, maxWidth = 560, quality = 0.85 } = options;
+
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    const data = new Uint8Array(arrayBuffer);
+
+    const pdfDoc = await pdfjs.getDocument({
+      data: data.slice(0),
+      cMapUrl: "https://unpkg.com/pdfjs-dist@5.4.296/cmaps/",
+      cMapPacked: true,
+    }).promise;
+
+    const pdfPage = await pdfDoc.getPage(Math.min(page, pdfDoc.numPages));
+
+    const baseViewport = pdfPage.getViewport({ scale: 1 });
+    // Render at 2x the target width for crisp thumbnails on retina displays,
+    // capped so huge pages don't blow up canvas memory.
+    const targetWidth = Math.min(baseViewport.width, maxWidth) * 2;
+    const scale = targetWidth / baseViewport.width;
+    const viewport = pdfPage.getViewport({ scale });
+
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    // White backdrop — PDFs are transparent and would otherwise render on black.
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    await pdfPage.render({ canvasContext: context, viewport, canvas }).promise;
+
+    const dataUrl = canvas.toDataURL("image/jpeg", quality);
+
+    pdfPage.cleanup();
+    await pdfDoc.destroy();
+
+    return dataUrl;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Failed to generate client-side PDF thumbnail:", error);
+    }
+    return null;
+  }
+};
 
 /**
  * PDF thumbnail options

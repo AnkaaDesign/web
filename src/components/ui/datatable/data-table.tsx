@@ -11,6 +11,17 @@ import {
   type RefObject,
 } from "react";
 import { flexRender, type ExpandedState, type Header, type Row, type Table } from "@tanstack/react-table";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type Modifier,
+} from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useSearchParams } from "react-router-dom";
 import { notify } from "@/api-client";
 import { IconChevronUp, IconChevronDown, IconSelector, IconPin, IconPinnedOff, IconChevronRight } from "@tabler/icons-react";
@@ -52,6 +63,10 @@ const EXPAND_COL_WIDTH = 36;
 // fresh array each render (which would rebuild the TanStack row model on every scroll frame).
 const EMPTY_FILTER_DEFS: DataTableFilterDef<unknown>[] = [];
 const EMPTY_ROW_ACTIONS: DataTableRowAction<unknown>[] = [];
+// Module constant so `useSensor`'s options identity is stable (an inline object would make
+// useSensor/useSensors return a fresh array every render). Long-press: a hold starts the drag; a
+// quick tap falls through to onRowClick; tolerance lets a touch scroll cancel the grab.
+const REORDER_POINTER_OPTIONS = { activationConstraint: { delay: 220, tolerance: 8 } } as const;
 
 /** Context handed to `onRowClick`: the table's current filtered+sorted row order + this row's index in it. */
 export interface DataTableRowClickMeta {
@@ -107,6 +122,31 @@ export interface DataTableProps<TData> {
   /** Extra content rendered at the TOP of the Filtros drawer, above the declarative filter fields. */
   filterContent?: ReactNode;
   enableSelection?: boolean;
+  /**
+   * Allow selecting more than one row at a time (default `true`). Set `false` for a single-select
+   * picker: choosing a row clears any previous selection and the header "select all" checkbox is
+   * hidden (the leading cell is kept for alignment).
+   */
+  enableMultiRowSelection?: boolean;
+  /**
+   * One-shot seed for the row selection, applied on mount. Use when `syncUrl` is off (selection can't
+   * be read from the URL `sel` param) — e.g. a picker embedded in a form/wizard that must pre-select
+   * rows from a deep-link or the entity being edited. Ignored when `syncUrl` is on (the URL wins).
+   */
+  initialSelectedIds?: string[];
+  /**
+   * Fired whenever the row selection changes, with the current selected row ids (as given by
+   * `getRowId`). This is the read-out that lets a parent form/wizard mirror the table's selection
+   * into its own state without reaching into the URL. Fires once on mount if the initial selection
+   * is non-empty. The table remains the single source of truth for selection.
+   */
+  onSelectionChange?: (selectedIds: string[]) => void;
+  /**
+   * Clicking anywhere on a row toggles its selection (in addition to the checkbox cell), turning the
+   * whole row into the hit target. Intended for row-pickers — when set, a plain row click selects
+   * instead of firing a navigating `onRowClick`.
+   */
+  selectOnRowClick?: boolean;
   enableColumnReorder?: boolean;
   enableColumnResizing?: boolean;
   enableRowPinning?: boolean;
@@ -191,6 +231,17 @@ export interface DataTableProps<TData> {
   scrollContainerRef?: RefObject<HTMLDivElement | null>;
   /** Server mode: fired when search/filters change so the page can refetch. */
   onParamsChange?: (params: { search: string; filters: DataTableFilterValues }) => void;
+  /**
+   * Opt-in drag-to-reorder rows (long-press to grab, then drop where you want). When set, every
+   * leaf row becomes a sortable item: a *hold* (≈220ms) starts a drag, while a quick tap still
+   * fires `onRowClick`. On drop, `onReorder(activeId, overId)` fires with the two row ids (as given
+   * by `getRowId`) so the page can persist the new order. Entirely OPTIONAL — omit it and there is
+   * no DndContext, no pointer listeners, and existing tables are byte-for-byte unchanged. Ignored
+   * for grouped (`isGroupRow`) / expansion (`enableExpansion`) tables, which aren't flat lists.
+   * Note: reordering acts on the LOADED rows only — under server pagination you can reorder within
+   * the current page, not drag a row onto a page you can't see.
+   */
+  rowReorder?: { onReorder: (activeId: string, overId: string) => void };
 }
 
 export function DataTable<TData>(props: DataTableProps<TData>) {
@@ -212,6 +263,10 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     toolbarActions,
     filterContent,
     enableSelection = true,
+    enableMultiRowSelection = true,
+    initialSelectedIds,
+    onSelectionChange,
+    selectOnRowClick = false,
     enableColumnReorder = true,
     enableColumnResizing = true,
     enableRowPinning = true,
@@ -241,6 +296,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     className,
     scrollContainerRef,
     onParamsChange,
+    rowReorder,
   } = props;
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -367,13 +423,21 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     [writeParam],
   );
 
+  // Selection only narrows `filtered` when the "view selected only" toggle is ON. Gating the dep this
+  // way (null when the toggle is off) is essential: otherwise every row (de)selection changes
+  // `selectedIds`, recomputes this memo, and — because `filterDefs.length` makes the `.filter()` below
+  // always allocate a fresh array — hands `useDataTable` a NEW `data` reference. That rebuilds every
+  // TanStack row and remounts the rows, tearing down any open Radix tooltip mid-render (crash). With
+  // the toggle off, `selForFilter` stays a stable `null`, so selecting a row no longer touches `filtered`.
+  const selForFilter = viewSelectedOnly ? selectedIds : null;
+
   // --- client-mode narrowing (search + filters + view-selected-only) ---
   const filtered = useMemo(() => {
     if (mode !== "client") {
       // Server mode narrows search/filters/pagination server-side, but "view selected only" can
       // still filter the currently-loaded page client-side. This only sees selections on the page
       // in view (cross-page selections aren't loaded), which matches the toggle's count.
-      if (viewSelectedOnly && selectedIds) return data.filter((r) => selectedIds.has(getId(r)));
+      if (viewSelectedOnly && selForFilter) return data.filter((r) => selForFilter.has(getId(r)));
       return data;
     }
     let rows = data;
@@ -409,9 +473,9 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
       rows = narrowed;
     }
     if (filterDefs.length) rows = rows.filter((r) => rowMatchesFilters(r, filterDefs, filters));
-    if (viewSelectedOnly && selectedIds) rows = rows.filter((r) => selectedIds.has(getId(r)));
+    if (viewSelectedOnly && selForFilter) rows = rows.filter((r) => selForFilter.has(getId(r)));
     return rows;
-  }, [mode, data, columns, debouncedSearch, filterDefs, filters, viewSelectedOnly, selectedIds, getId, getSubRows, pruneSubRows]);
+  }, [mode, data, columns, debouncedSearch, filterDefs, filters, viewSelectedOnly, selForFilter, getId, getSubRows, pruneSubRows]);
 
   const dt = useDataTable<TData>({
     tableId,
@@ -420,7 +484,12 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     scrollRef,
     windowed,
     listRef,
-    getRowId: getRowId ? (r) => getRowId(r) : undefined,
+    // Pass the prop THROUGH unchanged — wrapping it in a fresh `(r) => getRowId(r)` closure every
+    // render churns `resolveRowId` → `dataIds`/`safeRowPinning`/`state.rowPinning` → `getTopRows()/
+    // getCenterRows()` → `rows`, which keeps the virtualizer + measure-ref pipeline "hot" every render
+    // and lets a selection's layout perturbation spiral into the ResizeObserver loop (see the measure
+    // ref note in DataRowInner). A stable `getRowId` prop must stay stable all the way down.
+    getRowId,
     mode,
     rowCount,
     defaultPageSize,
@@ -428,6 +497,8 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     enableColumnResizing,
     enableColumnReorder,
     enableRowSelection: enableSelection,
+    enableMultiRowSelection,
+    initialSelectedIds,
     enableRowPinning,
     enablePagination: enablePagination && !autoHeight,
     enableExpansion,
@@ -436,6 +507,9 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     defaultExpanded,
     persistExpansion,
     estimateRowHeight,
+    // When drag-reorder is on, mount every loaded row (see `reorderEnabled` in the hook) so off-screen
+    // rows are still dnd-kit droppables and their positions don't churn mid-drag under virtualization.
+    reorderEnabled: !!rowReorder,
     persist,
     syncUrl,
     sectorDefault,
@@ -467,21 +541,46 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   // prev/next through exactly the list the user sees (across pages, not just the page).
   const handleRowClick = useMemo(
     () =>
-      onRowClick
+      selectOnRowClick || onRowClick
         ? (row: Row<TData>) => {
+            // Row-picker mode: a plain row click toggles selection (the checkbox cell stops
+            // propagation, so it owns its own toggle + shift-range). The table stays the single
+            // source of truth; the parent hears about it via `onSelectionChange`.
+            if (selectOnRowClick) {
+              if (row.getCanSelect()) row.toggleSelected();
+              return;
+            }
             // Full filtered+sorted order across pages. With expansion on, use the expanded model so
             // the order matches what's on screen (top-level rows + currently-expanded children).
             const orderedIds = (enableExpansion ? table.getExpandedRowModel() : table.getSortedRowModel()).rows.map((r) => r.id);
-            onRowClick(row.original, { orderedIds, index: orderedIds.indexOf(row.id) });
+            onRowClick!(row.original, { orderedIds, index: orderedIds.indexOf(row.id) });
           }
         : undefined,
-    [onRowClick, table, enableExpansion],
+    [onRowClick, selectOnRowClick, table, enableExpansion],
   );
 
   // Keep the current VISUAL row order ([...pinned, ...center]) in a ref so the shift-click
   // handler reads exactly what's on screen, without going stale or churning the callback.
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+
+  // --- opt-in row drag-reorder (long-press) ---
+  // Only flat lists reorder — grouped/expansion tables aren't a single ordered sequence.
+  const reorderEnabled = !!rowReorder && !isGroupRow && !enableExpansion;
+  // A *hold* (delay) starts the drag; a quick tap falls through to onRowClick. Tolerance lets a
+  // touch scroll (small move before the delay elapses) cancel the drag instead of grabbing.
+  const reorderSensors = useSensors(useSensor(PointerSensor, REORDER_POINTER_OPTIONS));
+  // Keep the dragged row on the vertical axis (a priority list only moves up/down).
+  const lockYAxis = useMemo<Modifier>(() => ({ transform }) => ({ ...transform, x: 0 }), []);
+  const sortableRowIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      rowReorder?.onReorder(String(active.id), String(over.id));
+    },
+    [rowReorder],
+  );
 
   // --- effective alignment (user override > column meta > left) ---
   const alignMap = useMemo(() => {
@@ -492,15 +591,40 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   const alignKey = useMemo(() => Object.entries(alignMap).map(([k, v]) => `${k}:${v}`).join(","), [alignMap]);
 
   // --- selection / counts / export rows ---
-  const selectedRows = table.getSelectedRowModel().rows;
+  // `.flatRows`, NOT `.rows`: with sub-rows (e.g. the preparation board's name-clusters), the selected
+  // row model's `.rows` holds only TOP-LEVEL rows — a parent that is not itself selected is dropped
+  // entirely, taking its selected children with it. Selecting only a cluster's children would then read
+  // as an EMPTY selection (wrong count/export, and the context menu below degrades to a single row).
+  // `.flatRows` is every selected row at any depth; for a flat table it equals `.rows`, so no change.
+  const selectedRows = table.getSelectedRowModel().flatRows;
   const selectedCount = selectedRows.length;
 
   // Keep the selection mirror in sync (the guard makes it a no-op when nothing changed). Only the
-  // !syncUrl path reads it, but updating it always is harmless and keeps the logic simple.
+  // !syncUrl path reads it, but updating it always is harmless and keeps the logic simple. Also
+  // notify the parent (`onSelectionChange`) — guarded on the id-set so an inline callback prop can't
+  // fire it on every render, only when the selection genuinely changes.
+  // Keep the latest `onSelectionChange` in a ref so the notify effect depends ONLY on the selection,
+  // not the callback identity — a parent that passes an inline callback must never re-run this.
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
+  const lastNotifiedSelection = useRef<string | null>(null);
+  // Order-independent, DEDUPED primitive key derived from the selection. `selectedRows` is a brand-new
+  // array reference on every render (TanStack rebuilds the row model), so keying the effect on it made
+  // the body run every render. Keying on this string instead means identity === content: when the actual
+  // selection is unchanged the effect never re-runs, so it can't pump the measure/notify pipeline into a
+  // "Maximum update depth" loop. The dedupe (Set) also stops an id collision from self-perpetuating.
+  const selectionKey = useMemo(
+    () => [...new Set(selectedRows.map((r) => r.id))].sort().join(","),
+    [selectedRows],
+  );
   useEffect(() => {
-    const ids = selectedRows.map((r) => r.id);
-    setMirroredSelection((prev) => (prev.size === ids.length && ids.every((id) => prev.has(id)) ? prev : new Set(ids)));
-  }, [selectedRows]);
+    const idSet = new Set(selectionKey ? selectionKey.split(",") : []);
+    setMirroredSelection((prev) => (prev.size === idSet.size && [...idSet].every((id) => prev.has(id)) ? prev : idSet));
+    if (selectionKey !== lastNotifiedSelection.current) {
+      lastNotifiedSelection.current = selectionKey;
+      onSelectionChangeRef.current?.([...idSet]);
+    }
+  }, [selectionKey]);
   const totalItems = mode === "client" ? filtered.length : rowCount ?? filtered.length;
   // Export row sources — the share dialog lets the user pick the scope (selected / current page /
   // ALL filtered rows). "Selected" and "All" are resolved lazily on export: client mode reads the
@@ -548,7 +672,9 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
       const pageRows = rowsRef.current; // current VISUAL order ([...pinned, ...center])
       const anchorId = selectionAnchorRef.current;
       if (shiftKey) window.getSelection()?.removeAllRanges(); // clear any text highlight from the shift-click
-      if (shiftKey && anchorId) {
+      // Shift-range only makes sense for multi-select; in single-select it would bypass TanStack's
+      // `enableMultiRowSelection:false` guard (which only gates `toggleSelected`) and leave N rows checked.
+      if (shiftKey && anchorId && enableMultiRowSelection !== false) {
         const a = pageRows.findIndex((r) => r.id === anchorId);
         const b = pageRows.findIndex((r) => r.id === row.id);
         if (a !== -1 && b !== -1) {
@@ -576,7 +702,9 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   const handleRowContext = useCallback(
     (e: ReactMouseEvent, row: Row<TData>) => {
       e.preventDefault();
-      const sel = table.getSelectedRowModel().rows;
+      // `.flatRows` (not `.rows`) so a bulk right-click still sees selected sub-rows/cluster children
+      // whose parent isn't selected — otherwise `.rows` is empty and this silently acts on one row.
+      const sel = table.getSelectedRowModel().flatRows;
       if (sel.length > 0 && row.getIsSelected()) {
         setContextMenu({ x: e.clientX, y: e.clientY, rows: sel.map((r) => r.original), isBulk: true });
       } else {
@@ -771,11 +899,28 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   const headerRowEls = headerGroups.map((hg) => (
     <tr key={hg.id} className="flex w-full border-b border-border">
       {enableSelection && (
+        // Single-select mode keeps the leading cell for column alignment but hides the "select all"
+        // toggle (selecting all makes no sense when only one row can be selected).
         <th
-          className="flex h-10 w-10 min-w-10 shrink-0 cursor-pointer items-center justify-center bg-muted"
-          onClick={() => table.toggleAllPageRowsSelected()}
+          className={cn("flex h-10 w-10 min-w-10 shrink-0 items-center justify-center bg-muted", enableMultiRowSelection && "cursor-pointer")}
+          onClick={
+            enableMultiRowSelection
+              ? (e) => {
+                  // IGNORE synthetic (untrusted) clicks. Inside a <form>, the header Radix <Checkbox>
+                  // mounts a hidden BubbleInput that dispatches a bubbling `click` (a plain Event —
+                  // `detail` is `undefined`, not 0) on every `checked` change to sync native form state;
+                  // that click reaches this handler and would re-toggle → `headerCheckedState` flips →
+                  // BubbleInput re-dispatches → toggleAll → "Maximum update depth" loop. `isTrusted`
+                  // reliably tells a real/keyboard click from a programmatic dispatch (see the row cell).
+                  if (!e.nativeEvent.isTrusted) return;
+                  table.toggleAllPageRowsSelected();
+                }
+              : undefined
+          }
         >
-          <Checkbox checked={headerCheckedState} tabIndex={-1} className="pointer-events-none" aria-label="Selecionar todos" />
+          {enableMultiRowSelection && (
+            <Checkbox checked={headerCheckedState} tabIndex={-1} className="pointer-events-none" aria-label="Selecionar todos" />
+          )}
         </th>
       )}
       {enableExpansion && (
@@ -799,13 +944,17 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     </tr>
   ));
 
+  // When reorder is on, rows are wrapped by `useSortable` (SortableDataRow); otherwise the plain
+  // memoized DataRow renders exactly as before.
+  const RowComponent: (props: DataRowProps<TData>) => ReactNode = reorderEnabled ? SortableDataRow : DataRow;
+
   const bodyRowEls = (
     <>
       {virtualItems.map((vi) => {
         const row = rows[vi.index];
         if (!row) return null;
         return (
-          <DataRow
+          <RowComponent
             key={row.id}
             row={row}
             enableSelection={enableSelection}
@@ -856,6 +1005,18 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     </>
   );
 
+  // DndContext/SortableContext render NO DOM of their own (pure providers), so wrapping the row
+  // fragment inside <tbody> stays valid HTML. Off (the default) → the bare fragment, zero overhead.
+  const bodyContent = reorderEnabled ? (
+    <DndContext sensors={reorderSensors} collisionDetection={closestCenter} modifiers={[lockYAxis]} onDragEnd={handleDragEnd}>
+      <SortableContext items={sortableRowIds} strategy={verticalListSortingStrategy}>
+        {bodyRowEls}
+      </SortableContext>
+    </DndContext>
+  ) : (
+    bodyRowEls
+  );
+
   const stateOverlay = (
     <>
       {isEmpty && <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">{emptyMessage}</div>}
@@ -886,9 +1047,11 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
                 <tbody
                   ref={listRef}
                   className="relative grid overflow-clip"
-                  style={{ height: rowVirtualizer.getTotalSize(), width: rowWidth, minWidth: "100%" } as CSSProperties}
+                  // Reorder mode renders rows in flow (position:relative) → let their own height define the
+                  // tbody; the virtualizer's getTotalSize only governs the absolute-positioned layout.
+                  style={{ height: reorderEnabled ? "auto" : rowVirtualizer.getTotalSize(), width: rowWidth, minWidth: "100%" } as CSSProperties}
                 >
-                  {bodyRowEls}
+                  {bodyContent}
                 </tbody>
               </table>
               {stateOverlay}
@@ -905,9 +1068,11 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
                     <thead className={cn("z-30 m-0 grid bg-muted", !autoHeight && "sticky top-0")}>{headerRowEls}</thead>
                     <tbody
                       className="relative grid"
-                      style={{ height: rowVirtualizer.getTotalSize(), width: rowWidth, minWidth: "100%" } as CSSProperties}
+                      // Reorder mode renders rows in flow (position:relative) → let their own height define the
+                      // tbody; the virtualizer's getTotalSize only governs the absolute-positioned layout.
+                      style={{ height: reorderEnabled ? "auto" : rowVirtualizer.getTotalSize(), width: rowWidth, minWidth: "100%" } as CSSProperties}
                     >
-                      {bodyRowEls}
+                      {bodyContent}
                     </tbody>
                   </table>
                   {stateOverlay}
@@ -1079,6 +1244,17 @@ interface DataRowProps<TData> {
   onToggleExpand: (row: Row<TData>) => void;
   onContextMenu: (e: ReactMouseEvent, row: Row<TData>) => void;
   onRowClick?: (row: Row<TData>) => void;
+  // --- drag-reorder bindings (supplied ONLY by SortableDataRow; undefined for normal rows) ---
+  /** Sortable node ref, merged onto the row alongside the virtualizer's measure ref. */
+  dragRef?: (node: HTMLElement | null) => void;
+  /** `CSS.Transform.toString(transform)` from useSortable — composed after the virtualizer's translateY. */
+  dragTransform?: string;
+  /** useSortable transition (smooth settle of the non-dragged rows). */
+  dragTransition?: string;
+  /** Sortable attributes + pointer listeners spread onto the row (the whole row is the grab handle). */
+  dragHandleProps?: Record<string, unknown>;
+  /** True for the row currently being dragged — lifts it (shadow + above its neighbours). */
+  isDragging?: boolean;
 }
 
 function DataRowInner<TData>({
@@ -1103,8 +1279,28 @@ function DataRowInner<TData>({
   onToggleExpand,
   onContextMenu,
   onRowClick,
+  dragRef,
+  dragTransform,
+  dragTransition,
+  dragHandleProps,
+  isDragging,
 }: DataRowProps<TData>) {
   const cells = row.getVisibleCells();
+  // Row ref MUST be attached exactly once. React re-runs a ref whenever its identity changes, and the
+  // virtualizer's measure ref sets up a ResizeObserver on the node — so re-attaching every render
+  // re-observes the row, which fires the RO → setState → re-render → re-attach → measure → … an
+  // infinite loop ("Maximum update depth exceeded"), tripped the moment a selection perturbs layout.
+  // Non-reorder rows therefore pass `measureRef` DIRECTLY (as before the reorder feature). Reorder rows
+  // need to also feed the sortable node ref, so they use `setRowRef` — kept identity-stable via empty
+  // deps + latest-value refs (NOT [measureRef, dragRef], which would churn if either isn't stable).
+  const measureRefLatest = useRef(measureRef);
+  measureRefLatest.current = measureRef;
+  const dragRefLatest = useRef(dragRef);
+  dragRefLatest.current = dragRef;
+  const setRowRef = useCallback((el: HTMLTableRowElement | null) => {
+    measureRefLatest.current(el);
+    dragRefLatest.current?.(el);
+  }, []);
   // Continuous zebra by VISIBLE position — group banners and leaf rows alternate as one sequence, and
   // it re-stripes automatically as groups expand/collapse (the visible index shifts). Odd rows tinted.
   const zebra = absoluteIndex % 2 === 1;
@@ -1173,11 +1369,41 @@ function DataRowInner<TData>({
   }
   return (
     <tr
-      ref={measureRef}
+      // Non-reorder rows: measureRef directly (identical to pre-reorder — zero behavior change). Only
+      // reorder rows (dragRef set) use the stable merged setRowRef. See the note above setRowRef.
+      ref={dragRef ? setRowRef : measureRef}
       data-index={absoluteIndex}
       onClick={onRowClick ? () => onRowClick(row) : undefined}
       onContextMenu={(e) => onContextMenu(e, row)}
-      style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${virtualStart}px)` }}
+      // Sortable attributes + long-press pointer listeners (only when reorder is on) — the whole row
+      // is the grab handle. Spread first so the explicit handlers/ref above always win.
+      {...dragHandleProps}
+      style={
+        dragRef
+          ? {
+              // REORDER MODE — normal grid flow, NOT the virtualizer's absolute positioning. In reorder mode
+              // every row is mounted (overscan = rows.length), so virtualization buys nothing here; and
+              // composing the virtualizer's `translateY(virtualStart)` into the SAME `transform` property
+              // that dnd-kit's sortable strategy drives made the two fight over it — the dragged row and its
+              // neighbours ended up overlapped with a gap left behind (the "reorder is broken" symptom).
+              // Flow layout is exactly what verticalListSortingStrategy expects; `transform` is now dnd-kit's
+              // alone. The virtualizer still measures rows (so vi.start stays correct for the selection/pin
+              // overlays), it just no longer positions them.
+              position: "relative",
+              width: "100%",
+              transform: dragTransform,
+              transition: dragTransition,
+              // Lift the grabbed row above its neighbours while dragging.
+              zIndex: isDragging ? 30 : undefined,
+            }
+          : {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              transform: `translateY(${virtualStart}px)`,
+            }
+      }
       className={cn(
         "flex transition-colors hover:bg-muted/70",
         // Grouped tables share a row-height floor so the leaf rows line up with their day banners.
@@ -1189,6 +1415,10 @@ function DataRowInner<TData>({
         // Continuous zebra by visible position (shared with the group banners) — odd rows tinted.
         zebra && "bg-muted/50 shadow-[0_-1px_0_0_hsl(var(--muted)/0.5)]",
         onRowClick && "cursor-pointer",
+        // Reorderable rows: a lifted look for the row being dragged. (No `touch-action: none` here —
+        // the sensor's press-delay already tells a hold apart from a scroll, so touch scrolling over
+        // the rows keeps working; dnd-kit suppresses scroll itself once a drag actually starts.)
+        isDragging && "cursor-grabbing bg-card opacity-90 shadow-lg ring-1 ring-primary/40",
         // Caller-supplied per-row classes (e.g. deadline tint) — last so they can override the bg above.
         rowClassName,
       )}
@@ -1204,6 +1434,15 @@ function DataRowInner<TData>({
           }}
           onClick={(e) => {
             e.stopPropagation();
+            // IGNORE synthetic (untrusted) clicks. When the table is inside a <form>, the row's Radix
+            // <Checkbox> mounts a hidden BubbleInput that, on every `checked` change, dispatches a
+            // bubbling `click` (a plain Event, so `detail` is `undefined` — NOT 0) to sync native form
+            // state. That click reaches this handler and, without a guard, re-toggles selection →
+            // `checked` flips → BubbleInput re-dispatches → "Maximum update depth" loop. `isTrusted` is
+            // the correct discriminator: real user (and keyboard-activated) clicks are trusted;
+            // programmatic dispatches are not. Outside a form there is no BubbleInput, so ordinary
+            // selection/multiselect tables never hit this branch.
+            if (!e.nativeEvent.isTrusted) return;
             onSelectRow(row, e.shiftKey);
           }}
         >
@@ -1283,5 +1522,35 @@ const DataRow = memo(DataRowInner, (prev, next) => {
     prev.onRowClick === next.onRowClick
   );
 }) as typeof DataRowInner;
+
+// Drag-reorder wrapper: subscribes the row to dnd-kit's sortable and hands the bindings to the same
+// DataRowInner markup. Used ONLY when `rowReorder` is set (SortableContext is present); not memoized
+// because it must re-render each drag frame — cheap, since only the virtualized visible rows exist.
+//
+// `animateLayoutChanges: () => false` is LOAD-BEARING here. Our rows are absolutely positioned by the
+// virtualizer via `transform: translateY(virtualStart)`, and TanStack Virtual re-measures/re-positions
+// asynchronously after the array reorders on drop. dnd-kit's DEFAULT post-drop "layout change" animation
+// computes a transform from each row's OLD rect to its NEW rect and animates it to zero — but with the
+// virtualizer owning the base position (and re-measuring a beat later), that animation transform and the
+// new `virtualStart` disagree, leaving the dropped row STUCK near the pointer overlapping its neighbour
+// with a gap at its origin (the "reorder is totally broken" symptom). Disabling the layout animation makes
+// each row snap straight to its virtualizer position on drop; the during-drag room-making shift (driven by
+// the sorting strategy, not this flag) is unaffected, so the drag still previews correctly.
+function SortableDataRow<TData>(props: DataRowProps<TData>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.row.id,
+    animateLayoutChanges: () => false,
+  });
+  return (
+    <DataRowInner
+      {...props}
+      dragRef={setNodeRef}
+      dragTransform={transform ? CSS.Transform.toString(transform) : undefined}
+      dragTransition={transition}
+      dragHandleProps={{ ...attributes, ...listeners }}
+      isDragging={isDragging}
+    />
+  );
+}
 
 export type { Table };

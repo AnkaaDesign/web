@@ -18,6 +18,7 @@ export interface FileWithPreview extends File {
   uploadedFileId?: string;
   thumbnailUrl?: string;
   status?: 'DRAFT' | 'APPROVED' | 'REPROVED'; // Layout approval status
+  pdfPreviewLoading?: boolean; // true while a client-side PDF first-page thumbnail is being rendered
 }
 
 export interface FileUploaderProps {

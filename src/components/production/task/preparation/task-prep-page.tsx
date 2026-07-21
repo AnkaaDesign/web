@@ -15,7 +15,6 @@ import {
   IconCopy,
   IconClipboardCopy,
   IconSettings2,
-  IconReceipt,
   IconBuildingFactory2,
   IconCalendarTime,
   IconFileInvoice,
@@ -39,7 +38,6 @@ import { useTasks, useTaskMutations, useTaskBatchMutations } from "@/hooks/produ
 import { canEditTasks, canFinishTask, canManageTaskStatus, canLeaderManageTask } from "@/utils/permissions/entity-permissions";
 import { getTaskQuoteEditRoute } from "@/utils/task";
 import { areAllServiceOrdersComplete } from "@/utils/serviceOrder";
-import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
 import { TaskDuplicateModal } from "@/components/production/task/modals/task-duplicate-modal";
 import { SetSectorModal } from "@/components/production/task/schedule/set-sector-modal";
 import { SetTermModal } from "@/components/production/task/schedule/set-term-modal";
@@ -50,6 +48,7 @@ import { CopyFromTaskModal } from "@/components/production/task/schedule/copy-fr
 import { Button } from "@/components/ui/button";
 import { taskService } from "@/api-client/task";
 import type { CopyableTaskField } from "@/types/task-copy";
+import { toast } from "@/components/ui/sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -134,9 +133,9 @@ const SECTOR_PRIMARY: Partial<Record<SECTOR_PRIVILEGES, string[]>> = {
   [SECTOR_PRIVILEGES.PRODUCTION_MANAGER]: ["open-new-tab", "edit", "disponibilizar", "iniciar", "finalizar", "definir-setor", "definir-prazo", "liberar", "dar-entrada"],
   [SECTOR_PRIVILEGES.PRODUCTION]: ["open-new-tab", "disponibilizar", "iniciar", "finalizar", "liberar"],
   [SECTOR_PRIVILEGES.LOGISTIC]: ["open-new-tab", "edit", "dar-entrada", "liberar", "adv-layout", "adv-base-files"],
-  [SECTOR_PRIVILEGES.COMMERCIAL]: ["open-new-tab", "edit", "criar-copias", "orcamento", "definir-prazo"],
+  [SECTOR_PRIVILEGES.COMMERCIAL]: ["open-new-tab", "edit", "criar-copias", "definir-prazo"],
   [SECTOR_PRIVILEGES.DESIGNER]: ["open-new-tab", "edit"],
-  [SECTOR_PRIVILEGES.FINANCIAL]: ["open-new-tab", "edit", "orcamento"],
+  [SECTOR_PRIVILEGES.FINANCIAL]: ["open-new-tab", "edit"],
 };
 const DEFAULT_PRIMARY = ["open-new-tab", "edit"];
 
@@ -245,6 +244,21 @@ const EMPTY_ROW_ACTIONS: DataTableRowAction<ClusteredTask>[] = [];
 const getRowId = (t: ClusteredTask) => t.id;
 const getSubRows = (t: ClusteredTask) => t.__children;
 
+// When a global search matches only SOME tasks inside a name-cluster, the DataTable narrows the
+// cluster to those matches and calls this to rebuild the parent — otherwise it keeps the WHOLE
+// cluster (all siblings show even though only one matched, e.g. searching a single serial number).
+// The DataTable only calls this when the cluster PARENT's own row did NOT match, so `kept` is exactly
+// the matching tasks: a single match collapses to a plain standalone row; multiple matches re-form a
+// smaller cluster around the first match (so aggregates/expansion reflect only the matched tasks).
+const pruneClusterToMatches = (_parent: ClusteredTask, kept: ClusteredTask[]): ClusteredTask => {
+  const [first, ...rest] = kept;
+  if (rest.length === 0) {
+    const { __children, __group, ...task } = first;
+    return task as ClusteredTask;
+  }
+  return { ...first, __children: rest, __group: kept };
+};
+
 export function TaskPreparationPage() {
   const navigate = useNavigate();
   const { data: user } = useCurrentUser();
@@ -318,16 +332,47 @@ export function TaskPreparationPage() {
   );
   const confirmCopyFrom = useCallback(
     async (fields: CopyableTaskField[], source: Task) => {
-      // Sequential — copying the quote risks budgetNumber unique-constraint races in parallel. The api
-      // client notifies per call; we just refresh the list + reset when done.
+      // Sequential — copying the quote risks budgetNumber unique-constraint races in parallel.
+      // We suppress the api client's per-call toast and report ONE aggregate summary: a copy that
+      // touched 0 fields (source empty / field not permitted for the sector) returns HTTP 200 and
+      // would otherwise surface a misleading per-call "success" while nothing actually changed.
+      let copied = 0;
+      let unchanged = 0;
+      let failed = 0;
       for (const t of copyFrom.targetTasks) {
         try {
-          await taskService.copyFromTask(t.id, { sourceTaskId: source.id, fields });
+          const res = await taskService.copyFromTask(
+            t.id,
+            { sourceTaskId: source.id, fields },
+            undefined,
+            { suppressToast: true },
+          );
+          const applied = (res as { data?: { copiedFields?: unknown[] } } | undefined)?.data?.copiedFields?.length ?? 0;
+          if (applied > 0) copied += 1;
+          else unchanged += 1;
         } catch {
-          // api client already surfaced the error.
+          // The thrown call is a real failure (403 / validation / server error).
+          failed += 1;
         }
       }
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      if (copied > 0) await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+
+      const parts: string[] = [];
+      if (copied > 0) parts.push(`${copied} tarefa(s) atualizada(s)`);
+      if (unchanged > 0) parts.push(`${unchanged} sem alteração`);
+      if (failed > 0) parts.push(`${failed} com falha`);
+      const summary = parts.join(" · ");
+      // Failed targets already surface their OWN per-call error toast (copy-from errors are not
+      // interceptor-suppressed), so we never fire a second aggregate error — that would double up.
+      // We DO own the success/no-op summary, since a successful copy-from shows no per-call toast;
+      // on a mixed result we add a single aggregate warning so the succeeded rows aren't invisible.
+      if (failed > 0) {
+        if (copied > 0 || unchanged > 0) toast.warning(`Cópia parcial — ${summary}`);
+      } else if (copied === 0) {
+        toast.warning(summary || "Nenhum campo foi copiado (origem sem dados ou sem permissão)");
+      } else {
+        toast.success(`Cópia concluída — ${summary}`);
+      }
       resetCopyFrom();
     },
     [copyFrom.targetTasks, queryClient, resetCopyFrom],
@@ -569,17 +614,6 @@ export function TaskPreparationPage() {
         onClick: (rows) => rows[0] && setDuplicateModal({ open: true, taskIds: [rows[0].id] }),
       },
       {
-        key: "orcamento",
-        // `getTaskQuoteDisplayLabel()` → "Orçamento": this page only lists pre-completion tasks, so the
-        // quote is always in the budget phase and `getTaskQuoteEditRoute` always lands on orçamento.
-        label: getTaskQuoteDisplayLabel(),
-        icon: <IconReceipt className="h-4 w-4" />,
-        // Legacy: canViewQuote && !COMMERCIAL && single == {ADMIN, FINANCIAL}; FINANCIAL + ADMIN-bypass matches.
-        requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
-        hidden: (rows) => rows.length !== 1,
-        onClick: (rows) => rows[0] && navigate(getTaskQuoteEditRoute(rows[0])),
-      },
-      {
         key: "definir-setor",
         label: "Definir/Alterar Setor",
         icon: <IconBuildingFactory2 className="h-4 w-4" />,
@@ -633,20 +667,18 @@ export function TaskPreparationPage() {
         key: "adv-paints",
         label: "Adicionar Tintas",
         icon: <IconPalette className="h-4 w-4" />,
-        // canAccessAdvancedMenu minus DESIGNER.
-        requiredPrivilege: [
-          SECTOR_PRIVILEGES.FINANCIAL,
-          SECTOR_PRIVILEGES.LOGISTIC,
-          SECTOR_PRIVILEGES.COMMERCIAL,
-          SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
-        ],
+        // Only sectors holding the `paint` field-domain (api task.permissions.ts) can persist
+        // paints via PUT /tasks/batch; others silently 400. That domain = COMMERCIAL + DESIGNER.
+        // (Fixes both the LOGISTIC/PM false-positive AND the DESIGNER capability gap.)
+        requiredPrivilege: [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.DESIGNER],
         onClick: (rows) => advancedRef.current?.openModal("paints", expandClusterTaskIds(rows)),
       },
       {
         key: "adv-cutting-plans",
         label: "Adicionar Plano de Corte",
         icon: <IconCut className="h-4 w-4" />,
-        requiredPrivilege: ARTS,
+        // `cuts` field-domain (api task.permissions.ts) is DESIGNER-only; PM would silently 400.
+        requiredPrivilege: [SECTOR_PRIVILEGES.DESIGNER],
         onClick: (rows) => advancedRef.current?.openModal("cuttingPlans", expandClusterTaskIds(rows)),
       },
       {
@@ -660,16 +692,26 @@ export function TaskPreparationPage() {
         key: "adv-layout",
         label: "Medidas do Implemento",
         icon: <IconLayout className="h-4 w-4" />,
-        requiredPrivilege: ADVANCED,
+        // `truck` field-domain (api task.permissions.ts) = FIN/COM/LOG/PM (NOT DESIGNER, who'd 400).
+        requiredPrivilege: [
+          SECTOR_PRIVILEGES.FINANCIAL,
+          SECTOR_PRIVILEGES.LOGISTIC,
+          SECTOR_PRIVILEGES.COMMERCIAL,
+          SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+        ],
         onClick: (rows) => advancedRef.current?.openModal("layout", expandClusterTaskIds(rows)),
       },
       {
         // COMMERCIAL sets the quote's approved layout files (TaskQuote.layoutFiles) — distinct from the
         // truck "Medidas do Implemento" above. (Faithful port of the legacy COMMERCIAL-only menu item.)
         key: "adv-quote-layout",
-        label: "Layout do Orçamento",
+        label: "Adicionar Layout",
         icon: <IconPhoto className="h-4 w-4" />,
         requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+        // requiredPrivilege lets ADMIN through; the quote reference is a
+        // COMMERCIAL-only tool (admins/designers use the task layout editor), so
+        // hide it for any non-exact-COMMERCIAL privilege, ADMIN included.
+        hidden: () => priv !== SECTOR_PRIVILEGES.COMMERCIAL,
         onClick: (rows) => setQuoteLayoutModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
       },
     );
@@ -678,8 +720,14 @@ export function TaskPreparationPage() {
       key: "copiar-de-outra",
       label: "Copiar de Outra Tarefa",
       icon: <IconClipboardCopy className="h-4 w-4" />,
-      // Same audience as the rest of the advanced menu (ADMIN bypasses).
-      requiredPrivilege: ADVANCED,
+      // Must match the copy-from @Roles (api task.controller.ts), which EXCLUDES FINANCIAL, so a
+      // FINANCIAL user never sees an item that would 403 on every target. (ADMIN bypasses.)
+      requiredPrivilege: [
+        SECTOR_PRIVILEGES.COMMERCIAL,
+        SECTOR_PRIVILEGES.LOGISTIC,
+        SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+        SECTOR_PRIVILEGES.DESIGNER,
+      ],
       onClick: (rows) => startCopyFrom(expandClusterTasks(rows)),
     });
 
@@ -779,6 +827,7 @@ export function TaskPreparationPage() {
     enableExpansion: true,
     persistExpansion: true,
     getSubRows,
+    pruneSubRows: pruneClusterToMatches,
     estimateRowHeight: 44,
     // Every table flows at its natural height and windows against the ONE page scroll container below
     // (autoHeight + a shared scrollContainerRef): a single scrollbar for the whole page, yet each table

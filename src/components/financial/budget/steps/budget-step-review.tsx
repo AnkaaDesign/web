@@ -656,7 +656,7 @@ export function BudgetStepReview({
                 <img
                   key={i}
                   src={src}
-                  alt="Layout aprovado"
+                  alt="Layout referência"
                   className="w-full max-h-[420px] rounded-lg bg-background object-contain shadow-sm"
                 />
               ))}

@@ -20,6 +20,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { AirbrushingFormFields } from "./airbrushing-form-fields";
 import { TaskSelector } from "./task-selector";
+import { MultiAirbrushingSelector } from "@/components/production/task/form/multi-airbrushing-selector";
+import { SelectedTasksSummary, TaskReviewRows } from "@/components/production/task/form/selected-tasks-summary";
 import {
   IconSpray,
   IconBrush,
@@ -37,13 +39,18 @@ import {
   IconCalendar,
   IconCurrencyReal,
   IconCreditCard,
+  IconStack2,
+  IconFileTypePdf,
 } from "@tabler/icons-react";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/sonner";
-import { FileUploadField, type FileWithPreview } from "@/components/common/file";
+import { FileUploadField, FileThumbnail, type FileWithPreview } from "@/components/common/file";
+import { generatePDFThumbnailFromBlob } from "@/utils/pdf-thumbnail";
 import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
 import { createAirbrushingFormData } from "@/utils/form-data-helper";
+import { createAirbrushingsForTasks, isMeaningfulAirbrushing, type AirbrushingTaskTarget } from "@/utils/airbrushing-submit";
+import type { ClusteredTask } from "@/components/production/task/preparation/cluster-tasks";
 import { useAuth } from "@/contexts/auth-context";
 import { canViewAirbrushingFinancials } from "@/utils/permissions/entity-permissions";
 import { formatCurrency, formatDate } from "../../../../utils";
@@ -59,10 +66,98 @@ interface AirbrushingFormProps {
 
 type LayoutStatus = "DRAFT" | "APPROVED" | "REPROVED";
 
+// One empty MultiAirbrushingSelector row to seed create mode (mirrors the cut wizard seeding one
+// empty cut). Only meaningful rows are actually created, so a blank seed adds nothing until filled.
+const makeEmptyAirbrushing = () => ({
+  id: `airbrushing-${Date.now()}`,
+  status: AIRBRUSHING_STATUS.PENDING,
+  paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
+  price: null,
+  startDate: null,
+  finishDate: null,
+  startedAt: null,
+  finishedAt: null,
+  painterId: null,
+  painter: null,
+  receiptFiles: [],
+  invoiceFiles: [],
+  layouts: [],
+  receiptIds: [],
+  invoiceIds: [],
+  layoutIds: [],
+});
+
+// Review-step layout preview. Uploaded (server) files reuse FileThumbnail (server thumbnail
+// endpoints). A JUST-SELECTED local File has no server id/thumbnail, so we render it client-side:
+// images via an object URL, PDFs via pdfjs (generatePDFThumbnailFromBlob) — same as the file picker's
+// selected card. EPS/AI and loading states fall back to a typed icon.
+const LayoutThumbnail = ({ file }: { file: any }) => {
+  const name: string = file?.name || file?.filename || "layout";
+  const mimetype: string = file?.type || file?.mimetype || "";
+  const isLocal = file instanceof File && !file?.uploaded;
+  const isImage = mimetype.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp)$/i.test(name);
+  const isPdf = mimetype === "application/pdf" || /\.pdf$/i.test(name);
+  const [thumb, setThumb] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLocal) return;
+    let cancelled = false;
+    let objUrl: string | null = null;
+    if (isImage) {
+      objUrl = URL.createObjectURL(file);
+      setThumb(objUrl);
+    } else if (isPdf) {
+      generatePDFThumbnailFromBlob(file as Blob).then((url) => {
+        if (!cancelled) setThumb(url);
+      });
+    }
+    return () => {
+      cancelled = true;
+      if (objUrl) URL.revokeObjectURL(objUrl);
+    };
+  }, [file, isLocal, isImage, isPdf]);
+
+  if (isLocal && (isImage || isPdf)) {
+    return (
+      <div className="w-16">
+        <div className="w-16 h-16 rounded-lg border border-border/20 overflow-hidden bg-white flex items-center justify-center">
+          {thumb ? (
+            <img src={thumb} alt={name} className="w-full h-full object-contain" />
+          ) : isPdf ? (
+            <IconFileTypePdf className="h-6 w-6 text-red-500" />
+          ) : (
+            <IconPhoto className="h-6 w-6 text-blue-500" />
+          )}
+        </div>
+        <p className="mt-1 text-xs text-foreground leading-tight line-clamp-1" title={name}>
+          {name.length > 12 ? `${name.slice(0, 12)}...` : name}
+        </p>
+      </div>
+    );
+  }
+
+  // Uploaded (server) file, or local non-previewable (EPS/AI) → FileThumbnail (server thumb or icon).
+  return (
+    <FileThumbnail
+      file={
+        {
+          id: file?.uploadedFileId || file?.id || name,
+          filename: name,
+          mimetype,
+          size: file?.size || 0,
+          thumbnailUrl: file?.thumbnailUrl,
+        } as any
+      }
+      size="md"
+      showName
+    />
+  );
+};
+
 // Three-step wizard definition (mirrors the Order create/edit wizard).
 const STEPS = [
   { id: 1, name: "Detalhes", description: "Dados da aerografia e arquivos" },
-  { id: 2, name: "Tarefa", description: "Selecione a tarefa vinculada" },
+  { id: 2, name: "Tarefas", description: "Selecione uma ou mais tarefas" },
   { id: 3, name: "Revisão", description: "Confirme os dados da aerografia" },
 ];
 
@@ -91,8 +186,11 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
   // Wizard step state (URL-backed).
   const [currentStep, setCurrentStep] = useState<number>(() => getStepFromUrl(searchParams));
 
-  // Task selection (single task).
+  // Task selection. Create → any number of tasks (the config is copied onto each). Edit → the single
+  // task the airbrushing already belongs to (locked). `selectedTaskRows` carries the picked rows so
+  // submission has each task's customer (file-organization context) without a second fetch.
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set(initialTaskId ? [initialTaskId] : []));
+  const [selectedTaskRows, setSelectedTaskRows] = useState<ClusteredTask[]>([]);
 
   // File-upload state (kept outside RHF; uploaded IDs are mirrored into RHF fields).
   const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
@@ -124,6 +222,8 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
   const airbrushing = airbrushingResponse?.data;
 
   const selectedTaskId = Array.from(selectedTasks)[0];
+  // Stable identity for the one-shot DataTable seed (hygiene/parity with the cut wizard).
+  const selectedTaskIdList = useMemo(() => Array.from(selectedTasks), [selectedTasks]);
 
   // Selected task (create) — used for customer context on uploads + the review summary.
   const { data: selectedTaskResponse } = useTaskDetail(selectedTaskId || "", {
@@ -135,7 +235,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
   });
 
   // Mutations
-  const { createAsync: create, updateAsync: update, isCreating, isUpdating } = useAirbrushingMutations();
+  const { updateAsync: update, isCreating, isUpdating, refresh } = useAirbrushingMutations();
   const isSubmitting = isCreating || isUpdating;
 
   // Single RHF instance shared across every step.
@@ -156,7 +256,9 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       layoutIds: [],
       status: AIRBRUSHING_STATUS.PENDING,
       paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
-    },
+      // Create-mode multi-config (MultiAirbrushingSelector). Seeded with one empty row.
+      airbrushings: mode === "create" ? [makeEmptyAirbrushing()] : [],
+    } as any,
   });
 
   // Hydrate the form + local state when editing.
@@ -234,14 +336,19 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
     setLayouts(layouts);
   }, [isEdit, airbrushing, form]);
 
-  // On create, seed the task from a ?taskId= deep-link.
+  // On create, seed the task from a ?taskId= deep-link. MOUNT-ONLY + idempotent: this previously ran on
+  // every [searchParams, mode, form] change and unconditionally allocated `new Set(...)` + called
+  // form.setValue with shouldDirty/shouldTouch, so it emitted brand-new state on each pass — with the
+  // usual entry URL (…/cadastrar?taskId=X) the guard never short-circuited, feeding the render loop.
+  // Matches the working cut wizard's mount-only + prev-returning seed.
   useEffect(() => {
     const taskIdFromUrl = searchParams.get("taskId");
     if (taskIdFromUrl && mode === "create") {
-      setSelectedTasks(new Set([taskIdFromUrl]));
+      setSelectedTasks((prev) => (prev.has(taskIdFromUrl) && prev.size === 1 ? prev : new Set([taskIdFromUrl])));
       form.setValue("taskId", taskIdFromUrl, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
     }
-  }, [searchParams, mode, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Keep the local step in sync if the URL changes (back/forward).
   useEffect(() => {
@@ -268,25 +375,23 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
     }
   }, [currentStep, setSearchParams]);
 
-  // Task selection (single-select enforced here).
-  const handleTaskSelection = useCallback(
-    (taskId: string) => {
-      const isSelected = selectedTasks.has(taskId);
-      if (isSelected) {
-        setSelectedTasks(new Set());
-        form.setValue("taskId", "", { shouldValidate: true, shouldDirty: true, shouldTouch: true });
-      } else {
-        setSelectedTasks(new Set([taskId]));
-        form.setValue("taskId", taskId, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
-        form.clearErrors("taskId");
-      }
+  // Mirror the DataTable's native (multi-)selection into form state. `taskId` tracks the FIRST
+  // selected task purely to satisfy the schema; the actual create fans the config out over every id.
+  const handleTaskSelectionChange = useCallback(
+    (taskIds: string[], rows: ClusteredTask[]) => {
+      // Bail out (return the SAME Set) when the selection content is unchanged so an identical notify
+      // can never emit fresh state and re-drive a render. Order-independent to match DataTable's key.
+      setSelectedTasks((prev) => {
+        const next = new Set(taskIds);
+        if (prev.size === next.size && [...next].every((id) => prev.has(id))) return prev;
+        return next;
+      });
+      setSelectedTaskRows(rows);
+      form.setValue("taskId", taskIds[0] ?? "", { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+      if (taskIds.length > 0) form.clearErrors("taskId");
     },
-    [selectedTasks, form],
+    [form],
   );
-
-  const handleSelectAll = useCallback(() => {
-    // No-op: airbrushing links a single task.
-  }, []);
 
   // File change handlers — mirror uploaded (existing) IDs into RHF; new files ride along as FormData.
   const extractUploadedIds = (files: FileWithPreview[]) => files.filter((f) => f.uploaded && f.uploadedFileId).map((f) => f.uploadedFileId!).filter(Boolean);
@@ -333,7 +438,17 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
   const validateCurrentStep = useCallback(async (): Promise<boolean> => {
     switch (currentStep) {
       case 1: {
-        // Detalhes — all fields optional; only fail on malformed values.
+        // Create — at least one airbrushing config must carry real data (mirrors the cut wizard's
+        // "add at least one cut with a file" gate).
+        if (mode === "create") {
+          const configs = (form.getValues("airbrushings" as any) ?? []) as any[];
+          if (!configs.some(isMeaningfulAirbrushing)) {
+            toast.error("Preencha ao menos uma aerografia (pintor, preço, datas ou layouts).");
+            return false;
+          }
+          return true;
+        }
+        // Edit — all fields optional; only fail on malformed values.
         const ok = await form.trigger(["price", "startDate", "finishDate", "status", "paymentStatus", "painterId"] as any);
         if (!ok) {
           const errors = form.formState.errors as any;
@@ -417,8 +532,56 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
         }
       });
 
-      let result;
+      const layoutStatusesMap = Object.keys(existingLayoutStatusesMap).length > 0 ? existingLayoutStatusesMap : undefined;
 
+      // ---------- CREATE: fan the airbrushing config(s) out over every selected task ----------
+      // Each MEANINGFUL config × each task = one airbrushing (mirrors the cut wizard's
+      // task × plan × quantity fan-out). Config data comes from MultiAirbrushingSelector.
+      if (mode === "create") {
+        // Resolve each task's customer (file-organization context) from the picked rows, falling back
+        // to the single loaded task detail for the first id.
+        const targets: AirbrushingTaskTarget[] = Array.from(selectedTasks).map((id) => {
+          const row = selectedTaskRows.find((t) => t.id === id);
+          const customer = row?.customer ?? (id === selectedTaskId ? selectedTaskResponse?.data?.customer : undefined);
+          return { id, customer: customer ? { id: customer.id, name: customer.fantasyName || "" } : undefined };
+        });
+
+        const configs = ((data as any).airbrushings ?? []) as any[];
+        if (!configs.some(isMeaningfulAirbrushing)) {
+          toast.error("Preencha ao menos uma aerografia.");
+          setCurrentStep(1);
+          setSearchParams((prev) => setStepInUrl(prev, 1), { replace: true });
+          return;
+        }
+
+        const results = await createAirbrushingsForTasks(targets, configs);
+        const created = results.map((r) => r?.data).filter(Boolean);
+
+        refresh(); // one aggregate invalidation (per-item toasts were suppressed)
+        toast.success(`${created.length} ${created.length === 1 ? "aerografia criada" : "aerografias criadas"} com sucesso`);
+
+        // Reset the wizard.
+        form.reset();
+        setReceiptFiles([]);
+        setInvoiceFiles([]);
+        setLayouts([]);
+        setLayoutStatuses({});
+        setSelectedTasks(new Set());
+        setSelectedTaskRows([]);
+
+        const first = created[0];
+        if (onSuccess && first) {
+          onSuccess(first);
+        } else if (created.length === 1 && first?.id) {
+          navigate(routes.production.airbrushings.details(first.id));
+        } else {
+          navigate(routes.production.airbrushings.root);
+        }
+        return;
+      }
+
+      // ---------- EDIT: single task, single update ----------
+      let result;
       if (hasNewFiles) {
         const customer = airbrushing?.task?.customer ?? selectedTaskResponse?.data?.customer;
         const customerInfo = customer ? { id: customer.id, name: customer.fantasyName || "" } : undefined;
@@ -429,7 +592,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
           invoiceIds: existingInvoiceIds,
           layoutIds: existingLayoutIds,
           // Wrap in array for FormData serialization (backend preprocess unwraps).
-          layoutStatuses: Object.keys(existingLayoutStatusesMap).length > 0 ? [existingLayoutStatusesMap] : undefined,
+          layoutStatuses: layoutStatusesMap ? [layoutStatusesMap] : undefined,
         };
 
         const formData = createAirbrushingFormData(
@@ -442,27 +605,17 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
           customerInfo,
         );
 
-        result = mode === "create" ? await create(formData as any) : await update({ id: airbrushingId!, data: formData as any });
+        result = await update({ id: airbrushingId!, data: formData as any });
       } else {
         const submitData = {
           ...data,
           receiptIds: existingReceiptIds,
           invoiceIds: existingInvoiceIds,
           layoutIds: existingLayoutIds,
-          layoutStatuses: Object.keys(existingLayoutStatusesMap).length > 0 ? existingLayoutStatusesMap : undefined,
+          layoutStatuses: layoutStatusesMap,
         };
 
-        result = mode === "create" ? await create(submitData as AirbrushingCreateFormData) : await update({ id: airbrushingId!, data: submitData as AirbrushingUpdateFormData });
-      }
-
-      // Success toast handled by the API client.
-      if (mode === "create") {
-        form.reset();
-        setReceiptFiles([]);
-        setInvoiceFiles([]);
-        setLayouts([]);
-        setLayoutStatuses({});
-        setSelectedTasks(new Set());
+        result = await update({ id: airbrushingId!, data: submitData as AirbrushingUpdateFormData });
       }
 
       if (onSuccess && result?.data) {
@@ -476,11 +629,19 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       }
       // Error toast handled by the mutation hook.
     }
-  }, [validateCurrentStep, form, mode, create, update, airbrushingId, onSuccess, navigate, receiptFiles, invoiceFiles, layouts, layoutStatuses, airbrushing, selectedTaskResponse]);
+  }, [validateCurrentStep, form, mode, update, refresh, airbrushingId, onSuccess, navigate, setSearchParams, receiptFiles, invoiceFiles, layouts, layoutStatuses, airbrushing, selectedTaskResponse, selectedTasks, selectedTaskRows, selectedTaskId]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === STEPS.length;
-  const isFormReady = selectedTasks.size === 1;
+
+  // ------- Create-mode multi-config review data (mirrors the cut wizard) -------
+  const watchedAirbrushings = (form.watch("airbrushings" as any) ?? []) as any[];
+  const reviewConfigs = useMemo(() => watchedAirbrushings.filter(isMeaningfulAirbrushing), [watchedAirbrushings]);
+  const perTaskAirbrushings = reviewConfigs.length; // meaningful configs per task
+  const totalAirbrushings = perTaskAirbrushings * selectedTasks.size;
+
+  // Ready to submit: at least one task, and (create) at least one filled airbrushing config.
+  const isFormReady = isEdit ? selectedTasks.size >= 1 : selectedTasks.size >= 1 && reviewConfigs.length >= 1;
 
   // ------- Review-step derived data -------
   const reviewPainterId = form.watch("painterId");
@@ -489,6 +650,21 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
     { enabled: currentStep === 3 && !!reviewPainterId },
   );
   const reviewPainterName = airbrushing?.painter?.id === reviewPainterId ? airbrushing?.painter?.name : painterResponse?.data?.[0]?.name;
+
+  // Create-mode: resolve every config's painterId → name for the review (the selector stores only ids).
+  const reviewPainterIds = useMemo(
+    () => Array.from(new Set(reviewConfigs.map((c) => c.painterId).filter(Boolean))) as string[],
+    [reviewConfigs],
+  );
+  const { data: reviewPaintersResponse } = useUsers(
+    { where: { id: { in: reviewPainterIds } }, take: reviewPainterIds.length || 1, select: { id: true, name: true } },
+    { enabled: !isEdit && currentStep === 3 && reviewPainterIds.length > 0 },
+  );
+  const painterNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    (reviewPaintersResponse?.data ?? []).forEach((u: any) => map.set(u.id, u.name));
+    return map;
+  }, [reviewPaintersResponse]);
 
   // Unified task summary source (edit → loaded airbrushing.task; create → selected task).
   const reviewTask = useMemo(() => airbrushing?.task ?? selectedTaskResponse?.data, [airbrushing, selectedTaskResponse]);
@@ -571,8 +747,30 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
 
                 {/* Step content — step 2 (task table) takes full height. */}
                 <div className={cn("flex-1 min-h-0", currentStep === 2 ? "flex flex-col overflow-hidden" : "overflow-y-auto")}>
-                  {/* ---------- Step 1: Detalhes ---------- */}
-                  {currentStep === 1 && (
+                  {/* ---------- Step 1 (create): multi-config aerografias ---------- */}
+                  {currentStep === 1 && !isEdit && (
+                    <div className="space-y-4">
+                      <Card className="w-full">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <IconSpray className="h-5 w-5" />
+                            Aerografias
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <MultiAirbrushingSelector
+                            control={form.control}
+                            disabled={isSubmitting}
+                            customerId={selectedTaskResponse?.data?.customer?.id || undefined}
+                          />
+                        </CardContent>
+                      </Card>
+                      <p className="text-xs text-muted-foreground px-1">Cada aerografia será criada para cada tarefa selecionada.</p>
+                    </div>
+                  )}
+
+                  {/* ---------- Step 1 (edit): single airbrushing details + files ---------- */}
+                  {currentStep === 1 && isEdit && (
                     <div className="space-y-6">
                       <Card className="w-full">
                         <CardHeader>
@@ -729,15 +927,12 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                         </Card>
                       ) : (
                         <div className="flex flex-col h-full min-h-0 space-y-4">
-                          {form.formState.errors.taskId && (
-                            <div className="bg-destructive/10 border border-destructive/20 rounded-md px-4 py-3 flex-shrink-0">
-                              <p className="text-sm text-destructive">{form.formState.errors.taskId.message as string}</p>
-                            </div>
-                          )}
+                          {/* No pre-emptive "task required" banner — selecting nothing yet is not an
+                              error state; the toast on "Próximo" (validateCurrentStep) is the feedback. */}
                           <TaskSelector
-                            selectedTasks={selectedTasks}
-                            onSelectTask={handleTaskSelection}
-                            onSelectAll={handleSelectAll}
+                            selectedTaskIds={selectedTaskIdList}
+                            onSelectionChange={handleTaskSelectionChange}
+                            selectionMode="multiple"
                             className="flex-1 min-h-0"
                           />
                         </div>
@@ -745,16 +940,115 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                     </>
                   )}
 
-                  {/* ---------- Step 3: Revisão ---------- */}
-                  {currentStep === 3 && (
+                  {/* ---------- Step 3 (create): multi-config review (mirrors the cut wizard) ---------- */}
+                  {currentStep === 3 && !isEdit && (
                     <div className="space-y-6">
                       <div>
-                        <h2 className="text-xl font-semibold text-foreground">Revisão da Aerografia</h2>
-                        <p className="text-sm text-muted-foreground mt-1">Confirme os detalhes antes de {isEdit ? "salvar" : "cadastrar"}</p>
+                        <h2 className="text-xl font-semibold text-foreground">Revisão das Aerografias</h2>
+                        <p className="text-sm text-muted-foreground mt-1">Confirme os detalhes antes de cadastrar.</p>
+                      </div>
+
+                      {/* Total callout */}
+                      <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+                        <IconStack2 className="h-6 w-6 text-primary shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">
+                            {totalAirbrushings} {totalAirbrushings === 1 ? "aerografia será criada" : "aerografias serão criadas"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {perTaskAirbrushings} {perTaskAirbrushings === 1 ? "aerografia" : "aerografias"} por tarefa × {selectedTasks.size}{" "}
+                            {selectedTasks.size === 1 ? "tarefa" : "tarefas"}
+                          </p>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {/* Task card */}
+                        {/* Airbrushing configs card */}
+                        <Card className="h-full">
+                          <CardHeader className="pb-4">
+                            <CardTitle className="flex items-center gap-2">
+                              <IconSpray className="h-5 w-5" />
+                              Aerografias ({perTaskAirbrushings})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            {reviewConfigs.length > 0 ? (
+                              <div className="space-y-3">
+                                {reviewConfigs.map((c, i) => {
+                                  const layouts = (c.layouts ?? []) as any[];
+                                  const rows: Array<{ icon: JSX.Element; label: string; value: string }> = [
+                                    { icon: <IconBrush className="h-4 w-4" />, label: "Pintor", value: (c.painterId && painterNameById.get(c.painterId)) || "-" },
+                                    ...(canViewFinancials
+                                      ? [{ icon: <IconCurrencyReal className="h-4 w-4" />, label: "Preço", value: c.price != null ? formatCurrency(Number(c.price)) : "-" }]
+                                      : []),
+                                    { icon: <IconCalendar className="h-4 w-4" />, label: "Início Previsto", value: c.startDate ? formatDate(c.startDate as Date) : "-" },
+                                    { icon: <IconCalendar className="h-4 w-4" />, label: "Término Previsto", value: c.finishDate ? formatDate(c.finishDate as Date) : "-" },
+                                  ];
+                                  return (
+                                    <div key={c.id ?? i} className={reviewConfigs.length > 1 ? "rounded-lg border border-border p-3 space-y-2" : "space-y-2"}>
+                                      {reviewConfigs.length > 1 && <p className="text-xs font-semibold text-muted-foreground px-1">Aerografia {i + 1}</p>}
+                                      {rows.map((r) => (
+                                        <div key={r.label} className="flex justify-between items-center bg-muted/50 rounded-lg px-4 h-11 gap-3">
+                                          <span className="text-sm text-muted-foreground flex items-center gap-2 flex-shrink-0">
+                                            {r.icon}
+                                            {r.label}
+                                          </span>
+                                          <span className="text-sm font-semibold text-foreground truncate text-right min-w-0">{r.value}</span>
+                                        </div>
+                                      ))}
+
+                                      {/* Layouts — actual previews, not just a count */}
+                                      <div className="bg-muted/50 rounded-lg px-4 py-3 space-y-2">
+                                        <span className="text-sm text-muted-foreground flex items-center gap-2">
+                                          <IconPhoto className="h-4 w-4" />
+                                          Layouts ({layouts.length})
+                                        </span>
+                                        {layouts.length > 0 ? (
+                                          <div className="flex flex-wrap gap-2">
+                                            {layouts.map((f, li) => (
+                                              <LayoutThumbnail key={(f.uploadedFileId || f.id || f.name || li) as string} file={f} />
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-xs text-muted-foreground">Nenhum layout</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Nenhuma aerografia preenchida.</p>
+                            )}
+                          </CardContent>
+                        </Card>
+
+                        {/* Tasks card — shared summary component */}
+                        <Card className="h-full">
+                          <CardHeader className="pb-4">
+                            <CardTitle className="flex items-center gap-2">
+                              <IconClipboardList className="h-5 w-5" />
+                              Tarefas ({selectedTasks.size})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <SelectedTasksSummary tasks={selectedTaskRows} />
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ---------- Step 3 (edit): single airbrushing review ---------- */}
+                  {currentStep === 3 && isEdit && (
+                    <div className="space-y-6">
+                      <div>
+                        <h2 className="text-xl font-semibold text-foreground">Revisão da Aerografia</h2>
+                        <p className="text-sm text-muted-foreground mt-1">Confirme os detalhes antes de salvar</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Task card — the single linked task (shared review rows). */}
                         <Card className="h-full">
                           <CardHeader className="pb-4">
                             <CardTitle className="flex items-center gap-2">
@@ -762,23 +1056,8 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                               Tarefa
                             </CardTitle>
                           </CardHeader>
-                          <CardContent className="pt-0 space-y-3">
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                              <span className="text-sm text-muted-foreground">Tarefa</span>
-                              <span className="text-sm font-semibold text-foreground truncate ml-4 text-right">{reviewTask?.name || "-"}</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                              <span className="text-sm text-muted-foreground">Cliente</span>
-                              <span className="text-sm font-semibold text-foreground truncate ml-4 text-right">{reviewTask?.customer?.fantasyName || "-"}</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                              <span className="text-sm text-muted-foreground">Setor</span>
-                              <span className="text-sm font-semibold text-foreground truncate ml-4 text-right">{reviewTask?.sector?.name || "-"}</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                              <span className="text-sm text-muted-foreground">Número de Série</span>
-                              <span className="text-sm font-semibold text-foreground truncate ml-4 text-right">{reviewTask?.serialNumber || "-"}</span>
-                            </div>
+                          <CardContent className="pt-0">
+                            <TaskReviewRows task={reviewTask as any} />
                           </CardContent>
                         </Card>
 

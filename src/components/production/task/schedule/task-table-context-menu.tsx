@@ -68,7 +68,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
       <PositionedDropdownMenuContent
         position={contextMenu}
         isOpen={!!contextMenu}
-        className="w-56"
+        className="w-auto min-w-56 max-w-md"
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
         {isMultiSelection && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{tasks.length} tarefas selecionadas</div>}
@@ -137,7 +137,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         {isCommercial && (
           <DropdownMenuItem onClick={() => handleAction("quoteLayout")}>
             <IconPhoto className="mr-2 h-4 w-4" />
-            {tasks.some((t) => ((t as any).quote?.layoutFiles?.length ?? 0) > 0) ? "Alterar Layout" : "Adicionar Layout"}
+            Adicionar Layout
           </DropdownMenuItem>
         )}
 

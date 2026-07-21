@@ -420,6 +420,7 @@ const ProductionAirbrushingCreate = lazy(() => import("@/pages/production/airbru
 const ProductionAirbrushingEdit = lazy(() => import("@/pages/production/airbrushing/edit/[id]").then((module) => ({ default: module.AirbrushingEdit })));
 const ProductionAirbrushingDetails = lazy(() => import("@/pages/production/airbrushing/details/[id]").then((module) => ({ default: module.AirbrushingDetails })));
 const ProductionCutting = lazy(() => import("@/pages/production/cutting/list").then((module) => ({ default: module.default })));
+const ProductionCuttingCreate = lazy(() => import("@/pages/production/cutting/cadastrar").then((module) => ({ default: module.CutCreatePage })));
 const ProductionCuttingDetails = lazy(() => import("@/pages/production/cutting/details/[id]").then((module) => ({ default: module.CuttingDetailsPage })));
 
 // Production Tasks
@@ -816,6 +817,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ProductionCutting />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.production.cutting.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProductionCuttingCreate />
                     </Suspense>
                   }
                 />

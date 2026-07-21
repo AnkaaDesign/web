@@ -633,14 +633,14 @@ export function PublicBudgetPage() {
             {layoutImageUrls.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
-                  Layout aprovado
+                  Layout referência
                 </h3>
                 <div className="w-full space-y-4">
                   {layoutImageUrls.map((url, i) => (
                     <img
                       key={i}
                       src={url}
-                      alt="Layout aprovado"
+                      alt="Layout referência"
                       className="w-full h-auto rounded-lg shadow-md"
                     />
                   ))}

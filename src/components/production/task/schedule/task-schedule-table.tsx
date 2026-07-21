@@ -385,7 +385,7 @@ export function TaskScheduleTable({
       },
       {
         key: "quoteLayout",
-        label: menuRows.some((t) => (((t as { quote?: { layoutFiles?: unknown[] } }).quote?.layoutFiles?.length ?? 0) > 0)) ? "Alterar Layout" : "Adicionar Layout",
+        label: "Adicionar Layout",
         icon: <IconPhoto className="mr-2 h-4 w-4" />,
         hidden: () => !isCommercial,
         onClick: (rs) => handleAction("quoteLayout", rs),

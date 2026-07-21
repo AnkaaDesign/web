@@ -98,7 +98,9 @@ export function useAuth(): AuthHookReturn {
   });
 
   const logout = useMutation({
-    mutationFn: authService.logout,
+    // Wrap so the mutation stays void-variabled; authService.logout now takes an
+    // optional { refreshToken } body which this generic hook doesn't supply.
+    mutationFn: () => authService.logout(),
     onSuccess: () => {
       queryClient.clear(); // Clear all cached data on logout
     },

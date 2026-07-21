@@ -25,6 +25,25 @@ export const removeLocalStorage = (key: string): void => {
   }
 };
 
+// Refresh-token persistence
+//
+// The refresh token is a long-lived (60d) opaque string returned by /auth/login.
+// It is stored under the real key `ankaa_refresh_token` (PREFIX + "refresh_token")
+// and used by the axios 401 interceptor to obtain a fresh access token without
+// forcing the user to log in again. It is non-rotating: /auth/refresh returns a new
+// access token but keeps the same refresh token, so we never overwrite it on refresh.
+export const setRefreshToken = (token: string): void => {
+  setLocalStorage("refresh_token", token);
+};
+
+export const getRefreshToken = (): string | null => {
+  return getLocalStorage("refresh_token");
+};
+
+export const removeRefreshToken = (): void => {
+  removeLocalStorage("refresh_token");
+};
+
 export const clearLocalStorage = (): void => {
   try {
     const keys = Object.keys(localStorage);

@@ -54,12 +54,17 @@ export class AirbrushingService {
   // Mutation Operations
   // =====================
 
-  async createAirbrushing(data: AirbrushingCreateFormData | FormData, query?: AirbrushingQueryFormData): Promise<AirbrushingCreateResponse> {
+  async createAirbrushing(
+    data: AirbrushingCreateFormData | FormData,
+    query?: AirbrushingQueryFormData,
+    options?: { suppressToast?: boolean },
+  ): Promise<AirbrushingCreateResponse> {
     const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
-    const response = await apiClient.post<AirbrushingCreateResponse>(this.basePath, data, {
-      params: query,
-      headers,
-    });
+    // Suppress the per-request success toast when fanning one config out across many tasks — the
+    // caller shows a single aggregate toast instead.
+    const config: any = { params: query, headers };
+    if (options?.suppressToast) config.metadata = { suppressToast: true };
+    const response = await apiClient.post<AirbrushingCreateResponse>(this.basePath, data, config);
     return response.data;
   }
 

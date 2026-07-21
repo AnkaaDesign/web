@@ -40,7 +40,7 @@ import type { AuthUser } from "../types";
 import type { SignUpFormData } from "../schemas";
 import { detectContactMethod } from "../utils";
 import { routes } from "../constants";
-import { getLocalStorage, setLocalStorage, removeLocalStorage, getUserData, setUserData, removeUserData } from "@/lib/storage";
+import { getLocalStorage, setLocalStorage, removeLocalStorage, getUserData, setUserData, removeUserData, getRefreshToken, setRefreshToken, removeRefreshToken } from "@/lib/storage";
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -145,6 +145,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (!cachedUser) {
               // Only clear if we don't have cached data
               removeLocalStorage("token");
+              removeRefreshToken();
               removeUserData();
               setAuthToken(null);
               setUser(null);
@@ -156,6 +157,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } catch (error) {
         // Clear everything on initialization failure
         removeLocalStorage("token");
+        removeRefreshToken();
         removeUserData();
         setAuthToken(null);
         setUser(null);
@@ -182,8 +184,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // 403 (Forbidden — authenticated but lacks role/sector permission) must not,
       // or restricted widgets/endpoints would log valid users out.
       if (error.statusCode === 401) {
-        // Clear auth state immediately
+        // Clear auth state immediately (access token, refresh token, cached user).
+        // We reach here only after the axios interceptor already tried and failed
+        // to refresh, so the refresh token is dead too.
         removeLocalStorage("token");
+        removeRefreshToken();
         removeUserData();
         setAuthToken(null);
         setUser(null);
@@ -216,7 +221,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // The response structure is { success: true, message: "...", data: { token, user: {...} } }
       if (response?.success && response?.data?.token && response?.data?.user) {
-        const { token, user } = response.data;
+        const { token, refreshToken, user } = response.data;
 
         // Check if user is verified
         if (user.verified === false) {
@@ -226,6 +231,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         setLocalStorage("token", token);
+
+        // Persist the long-lived refresh token so the axios interceptor can
+        // silently renew the access token on future 401s.
+        if (refreshToken) {
+          setRefreshToken(refreshToken);
+        }
 
         setUserData(user); // Cache user data
 
@@ -299,7 +310,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await authService.register(transformedData);
 
       if (response?.success && response?.data?.token && response?.data?.user) {
-        const { token, user } = response.data;
+        const { token, refreshToken, user } = response.data;
 
         // Check if user needs verification
         if (user.verified === false) {
@@ -321,6 +332,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Auto-login after registration if already verified
         setLocalStorage("token", token);
+        // Persist the refresh token when the API issues one on register auto-login.
+        if (refreshToken) {
+          setRefreshToken(refreshToken);
+        }
         setUserData(user); // Cache user data
         setAuthToken(token);
         setUser(user);
@@ -369,7 +384,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
+    // Best-effort server-side revocation of THIS device's refresh token. Needs the
+    // still-valid access token, so fire it before we clear local state. Fire-and-forget
+    // so logout never blocks (or fails) on a network hiccup.
+    const refreshToken = getRefreshToken();
+    void authService.logout(refreshToken ? { refreshToken } : undefined).catch(() => {});
+
     removeLocalStorage("token");
+    removeRefreshToken(); // Clear stored refresh token
     removeUserData(); // Clear cached user data
     setAuthToken(null);
     setUser(null);

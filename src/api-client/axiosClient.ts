@@ -512,8 +512,14 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         try {
           const token = await tokenProvider();
 
+          // Never attach the access token to the refresh/login endpoints:
+          // /auth/refresh is public and must NOT carry the (possibly expired)
+          // access token, and /auth/login needs no auth. This also keeps them
+          // out of the 401 refresh-retry loop below (avoids infinite recursion).
+          const isTokenlessAuthPath = config.url?.includes("/auth/refresh") || config.url?.includes("/auth/login");
+
           // If we have a token, always use the fresh one
-          if (token) {
+          if (token && !isTokenlessAuthPath) {
             config.headers.Authorization = `Bearer ${token}`;
           } else if (!config.url?.includes("/auth/")) {
             // FALLBACK: If no token from provider, check localStorage directly
@@ -816,37 +822,35 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       // Process and handle the error
       const errorInfo = handleApiError(error);
 
-      // Handle 401: re-validate the session ONCE (serialized) before any logout.
-      // The previous code called /auth/refresh, but that endpoint requires a
-      // valid access token (no separate refresh token is sent), so it could
-      // never recover an expired session and a single transient 401 logged the
-      // user out. Instead we confirm with /auth/me:
-      //  - still valid  -> retry the original request, no logout
-      //  - genuine 401  -> fall through to the logout handler below
-      //  - network/5xx  -> keep the session, surface the original error for retry
-      // /auth/me is excluded so its own 401 doesn't recurse here.
+      // Handle 401: SINGLE-FLIGHT refresh the access token ONCE before any logout.
+      // On a 401 we exchange the stored refresh token for a fresh access token via
+      // POST /auth/refresh (see refreshAccessToken). Concurrent 401s share one
+      // in-flight refresh. Outcomes:
+      //  - got a new token -> retry the original request once, no logout
+      //  - refresh 401 / no refresh token -> fall through to the logout handler below
+      //  - network/5xx during refresh -> keep the session, surface the original error
+      // /auth/refresh and /auth/login are excluded so they never trigger the
+      // refresh-retry loop (avoids infinite recursion).
       if (
         errorInfo._statusCode === 401 &&
         !config.url?.includes("/auth/refresh") &&
-        !config.url?.includes("/auth/login") &&
-        !config.url?.includes("/auth/me")
+        !config.url?.includes("/auth/login")
       ) {
         if (!(config as any).__isRetryRequest) {
-          const sessionState = await revalidateSession();
+          const refreshState = await refreshAccessToken();
 
-          if (sessionState === true) {
-            // Token still works — the 401 was transient (e.g. API restart). Retry once.
+          if (refreshState === true) {
+            // Fresh access token obtained — retry the original request ONCE with it.
             (config as any).__isRetryRequest = true;
             return client.request(config);
           }
 
-          if (sessionState === null) {
-            // Re-validation failed for a non-auth reason (offline / 5xx during a
-            // restart). Do NOT log out; surface the original error so React Query
-            // can retry it.
+          if (refreshState === null) {
+            // Refresh failed for a non-auth reason (offline / 5xx during a restart).
+            // Do NOT log out; surface the original error so React Query can retry it.
             return Promise.reject(error);
           }
-          // sessionState === false -> session genuinely invalid -> fall through to logout.
+          // refreshState === false -> refresh token dead/absent -> fall through to logout.
         }
       }
 
@@ -1303,36 +1307,57 @@ let globalTokenProvider: (() => string | null | Promise<string | null>) | undefi
 // Global authentication error handler
 let globalAuthErrorHandler: ((error: { statusCode: number; message: string; category: ErrorCategory }) => void) | undefined;
 
-// Shared, serialized session re-validation used by the 401 interceptor.
+// Shared, SINGLE-FLIGHT access-token refresh used by the 401 interceptor.
 //
-// A single transient 401 — e.g. a request that lands while the API is being
-// restarted during a deploy — must NOT log a valid user out. On a 401 we
-// re-check the session ONCE via /auth/me. Because many queries can 401 at the
-// same moment (e.g. a burst of refetches on reconnect), all concurrent callers
-// share ONE in-flight check instead of each firing its own — which previously
-// caused a logout storm (the old un-serialized /auth/refresh path).
+// On a 401 we exchange the stored (long-lived, non-rotating) refresh token for a
+// fresh access token via POST /auth/refresh. Because many queries can 401 at the
+// same moment (e.g. a burst of refetches on reconnect, or right after the access
+// token expires), all concurrent callers share ONE in-flight refresh instead of
+// each firing its own — which would otherwise cause a refresh storm.
+//
+// The refresh call uses a BARE axios request (not the singleton) on purpose:
+//   - it never attaches the expired access token,
+//   - it never re-enters this response interceptor (no recursion / no logout storm),
+//   - it never fires a spurious error toast when the refresh itself fails.
+// On success the new access token is written back via setAuthToken (headers +
+// localStorage + global), so the retried request picks it up.
 //
 // Returns:
-//   true  -> token still valid; the original 401 was transient -> retry it
-//   false -> /auth/me itself returned 401; session is genuinely invalid -> logout
-//   null  -> re-validation failed for a NON-auth reason (network/5xx) -> keep session
-let sessionRevalidationPromise: Promise<boolean | null> | null = null;
-async function revalidateSession(): Promise<boolean | null> {
-  if (!sessionRevalidationPromise) {
-    sessionRevalidationPromise = (async (): Promise<boolean | null> => {
+//   true  -> got a new access token -> retry the original request
+//   false -> no stored refresh token, or /auth/refresh returned 401 (refresh token
+//            invalid/expired) -> session is genuinely dead -> logout
+//   null  -> refresh failed for a NON-auth reason (network/5xx) -> keep session
+let tokenRefreshPromise: Promise<boolean | null> | null = null;
+async function refreshAccessToken(): Promise<boolean | null> {
+  if (!tokenRefreshPromise) {
+    tokenRefreshPromise = (async (): Promise<boolean | null> => {
+      const refreshToken = safeLocalStorage.getItem("ankaa_refresh_token");
+      if (!refreshToken) {
+        return false; // nothing to refresh with -> logout
+      }
       try {
-        const { authService } = await import("./auth");
-        await authService.me();
-        return true; // token works -> the 401 was transient
+        const baseURL = getSingletonInstance().defaults.baseURL;
+        const response = await axios.post(
+          `${baseURL}/auth/refresh`,
+          { refreshToken },
+          { headers: { "Content-Type": "application/json", Accept: "application/json" } },
+        );
+        const newToken = response?.data?.data?.token;
+        if (!newToken) {
+          return false; // malformed success -> treat as invalid session
+        }
+        // Non-rotating: keep the same refresh token, only swap the access token.
+        setAuthToken(newToken);
+        return true;
       } catch (e: any) {
-        const code = e?._statusCode ?? e?.originalError?.response?.status ?? e?.statusCode;
-        return code === 401 ? false : null; // 401 -> genuine; otherwise transient
+        const code = e?.response?.status;
+        return code === 401 ? false : null; // 401 -> refresh token dead; else transient
       }
     })().finally(() => {
-      sessionRevalidationPromise = null;
+      tokenRefreshPromise = null;
     });
   }
-  return sessionRevalidationPromise;
+  return tokenRefreshPromise;
 }
 
 export const setAuthToken = (token: string | null): void => {

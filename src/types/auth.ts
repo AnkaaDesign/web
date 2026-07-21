@@ -8,6 +8,10 @@ export interface AuthTokenResponse {
   message: string;
   data: {
     token: string;
+    // Long-lived (60d) opaque refresh token. Present on /auth/login (and
+    // /auth/register auto-login); absent on /auth/refresh, which is non-rotating
+    // and returns only a new access token + user.
+    refreshToken?: string;
     user: AuthUser;
   };
 }

@@ -156,14 +156,31 @@ function TextareaEditor<TData>({ edit, row, onCommit, onCancel }: EditorProps<TD
 
 function DateEditor<TData>({ field, edit, row, onCommit, onCancel }: EditorProps<TData>) {
   const ref = useRef<HTMLDivElement>(null);
-  useOutsideDismiss(ref, onCancel, true);
   const raw = edit.get(row);
   const value = raw ? new Date(raw as string | number | Date) : null;
   const mode = field.dataType === "time" ? "time" : field.dataType === "datetime" ? "datetime" : "date";
+
+  // In `datetime` mode a single edit spans TWO picks in the same popover — first the calendar day,
+  // then the time. The date pick fires onChange, so committing on it tears the editor down before the
+  // time can be entered. So buffer the value locally (feeding it back into the picker so the calendar
+  // reflects each pick) and commit ONCE when the editor is dismissed. `date`/`time` are single-pick,
+  // so they keep the original commit-on-change behavior.
+  const isDateTime = mode === "datetime";
+  const [draft, setDraft] = useState<Date | null>(value);
+  const draftRef = useRef<Date | null>(draft);
+  draftRef.current = draft;
+  const commitDraft = useCallback(() => onCommit(draftRef.current), [onCommit]);
+
+  useOutsideDismiss(ref, isDateTime ? commitDraft : onCancel, true);
+
   return (
     // Force the inner control (a h-10 div, not a button) to h-8 so the row keeps its height.
     <div ref={ref} className="[&_.h-10]:!h-8" onKeyDown={(e) => e.key === "Escape" && onCancel()}>
-      <DateTimeInput mode={mode} value={value} onChange={(d) => onCommit(d instanceof Date ? d : (d ?? null))} hideLabel />
+      {isDateTime ? (
+        <DateTimeInput mode={mode} value={draft} onChange={(d) => setDraft(d instanceof Date ? d : (d ?? null))} hideLabel />
+      ) : (
+        <DateTimeInput mode={mode} value={value} onChange={(d) => onCommit(d instanceof Date ? d : (d ?? null))} hideLabel />
+      )}
     </div>
   );
 }

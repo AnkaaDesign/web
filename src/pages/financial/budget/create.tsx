@@ -299,11 +299,18 @@ export const FinancialBudgetCreatePage = () => {
 
   // Step-2 "Layout Aprovado" options come from the LIVE Step-1 layouts (layouts).
   // A new budget has no persisted task.layouts, so without this the selection shows
-  // "Nenhum layout na tarefa" even after a layout was added in Step 1 (image files only).
+  // "Nenhum layout na tarefa" even after a layout was added in Step 1. Only IMAGE
+  // layouts marked "Aprovado" are offered. On CREATE the per-file status lives in the
+  // `layoutStatuses` map (keyed by uploadedFileId||id) — NOT on the layouts entries —
+  // so read it from there, else the just-approved image would never appear.
   const layoutImageOptions = useMemo(
     () =>
       layouts
-        .filter((f) => (f.type || "").startsWith("image/"))
+        .filter((f) => {
+          const fid = (f as any).uploadedFileId || f.id;
+          const status = layoutStatuses[fid] ?? (f as any).status ?? "DRAFT";
+          return (f.type || "").startsWith("image/") && status === "APPROVED";
+        })
         .map((f) => {
           const id = (f as any).uploadedFileId || f.id;
           return {
@@ -312,13 +319,53 @@ export const FinancialBudgetCreatePage = () => {
             originalName: f.name,
             thumbnailUrl: f.thumbnailUrl || null,
             preview: f.preview || null,
-            status: (f as any).status,
+            status: layoutStatuses[id] ?? (f as any).status,
             mimetype: f.type,
             size: f.size,
           };
         }),
-    [layouts],
+    [layouts, layoutStatuses],
   );
+
+  // Keep the quote's approved-layout selection in sync with Step-1 layouts: a layout
+  // removed or marked non-APPROVED (Reprovado/Rascunho) in Step 1 is automatically
+  // dropped from the quote selection (layoutFiles). On CREATE the current status lives
+  // in the `layoutStatuses` map, so approval is read from there. No load gate is needed
+  // — a selection can only exist after its APPROVED image was picked in this session.
+  useEffect(() => {
+    if (layoutFiles.length === 0) return;
+    const keyOf = (f: any) => ({
+      id: f.uploadedFileId || f.id,
+      name: (f.name || f.originalName || f.filename || "").trim(),
+      size: f.size || 0,
+    });
+    const matches = (a: any, b: any) => {
+      const ka = keyOf(a);
+      const kb = keyOf(b);
+      return (
+        (!!ka.id && ka.id === kb.id) ||
+        (!!ka.name && ka.name === kb.name && ka.size === kb.size)
+      );
+    };
+    const approved = layouts.filter((f: any) => {
+      const fid = f.uploadedFileId || f.id;
+      const status = layoutStatuses[fid] ?? f.status ?? "DRAFT";
+      return (f.type || "").startsWith("image/") && status === "APPROVED";
+    });
+    const kept = layoutFiles.filter((lf) => approved.some((a) => matches(a, lf)));
+    if (kept.length !== layoutFiles.length) {
+      setLayoutFiles(kept);
+      form.setValue(
+        "layoutFileIds",
+        kept
+          .map((f) => (f as any).uploadedFileId || f.id)
+          .filter(Boolean)
+          .slice(0, 2),
+        { shouldDirty: true },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layouts, layoutFiles, layoutStatuses]);
 
   // Dynamic steps based on customer count
   const customerConfigs = form.watch("customerConfigs");

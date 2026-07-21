@@ -151,6 +151,19 @@ export function canEditCuts(user: PermissionUser | null): boolean {
 }
 
 /**
+ * Can user create PLAN cuts (the "Adicionar" flow on the cuts page)?
+ * DESIGNER and ADMIN — mirrors the API POST /cuts / POST /cuts/batch per-origin
+ * authorization for plan cuts (re-cut REQUESTs go through `canRequestCut`).
+ */
+export function canCreateCuts(user: PermissionUser | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.DESIGNER,
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+/**
  * Can user delete cuts?
  * DESIGNER and ADMIN can delete cuts (matches API DELETE /cuts/:id)
  */

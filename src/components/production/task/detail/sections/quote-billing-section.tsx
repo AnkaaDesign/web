@@ -722,14 +722,14 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
         <div className="bg-muted/30 rounded-lg p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
             <IconPhoto className="h-4 w-4 text-muted-foreground" />
-            Layout Aprovado
+            Layout Referência
           </div>
           <div className="flex flex-wrap justify-start gap-3">
             {(quote.layoutFiles || []).map((layoutFile: any) => (
               <img
                 key={layoutFile.id}
                 src={`${getApiBaseUrl()}/files/thumbnail/${layoutFile.id}`}
-                alt="Layout aprovado"
+                alt="Layout referência"
                 className="max-h-48 rounded-lg shadow-sm object-contain cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => {
                   if (fileViewerContext) {

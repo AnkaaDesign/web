@@ -734,9 +734,7 @@ export function TaskHistoryContextMenu({
                 {isCommercial && (
                   <DropdownMenuItem onClick={handleQuoteLayout} onSelect={(e) => e.preventDefault()}>
                     <IconPhoto className="mr-2 h-4 w-4" />
-                    <span className="truncate">
-                      {tasks.some((t) => ((t as any).quote?.layoutFiles?.length ?? 0) > 0) ? "Alterar Layout" : "Adicionar Layout"}
-                    </span>
+                    <span className="truncate">Adicionar Layout</span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={handleBulkBaseFiles}>

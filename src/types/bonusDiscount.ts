@@ -8,12 +8,25 @@ import type { Bonus, BonusIncludes } from "./bonus";
 // Main Entity Interface
 // =====================
 
+/** One dated occurrence inside a discount line (e.g. an absence day). */
+export interface BonusDiscountDate {
+  date: string; // ISO 'YYYY-MM-DD'
+  hours: number; // decimal hours (8.75 → displayed "8:45")
+}
+
 export interface BonusDiscount extends BaseEntity {
   bonusId: string;
   percentage: DecimalValue | number | null;
   value: DecimalValue | number | null;
   reference: string;
   calculationOrder: number;
+
+  // Live-bonus enrichments (present on computed/live bonuses; absent on persisted
+  // rows, which fall back to parsing `reference`).
+  // Stable rule key for the rule modal — label only, no tier/dates.
+  ruleReference?: string;
+  // Structured per-day breakdown so each date can be individually clickable.
+  dates?: BonusDiscountDate[];
 
   // Relations (optional, populated based on query)
   bonus?: Bonus;

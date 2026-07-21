@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { bonusService } from "../../../api-client";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
@@ -67,6 +67,18 @@ function parseDiscountReference(reference: string): { label: string; dates: stri
   return { label, dates };
 }
 
+// Formats a structured absence day { date: 'YYYY-MM-DD', hours } → "DD/MM (H:MM)".
+function formatAbsenceDate(iso: string, hours?: number): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  const ddmm = m ? `${m[3]}/${m[2]}` : iso;
+  if (hours && hours > 0) {
+    const h = Math.floor(hours);
+    const min = Math.round((hours - h) * 60);
+    return `${ddmm} (${h}:${String(min).padStart(2, "0")})`;
+  }
+  return ddmm;
+}
+
 // Info row component for consistent styling
 function InfoRow({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
@@ -103,6 +115,7 @@ function findCachedBonusFromLists(queryClient: ReturnType<typeof useQueryClient>
 export default function BonusDetailPage() {
   const { id } = useParams<BonusDetailPageParams>();
   const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [rulesModalOpen, setRulesModalOpen] = useState(false);
   const [rulesHighlightRef, setRulesHighlightRef] = useState<string | undefined>();
@@ -110,6 +123,47 @@ export default function BonusDetailPage() {
   const openRulesModal = (reference?: string) => {
     setRulesHighlightRef(reference);
     setRulesModalOpen(true);
+  };
+
+  // Deep-link an absence day into that collaborator's "Espelho de Ponto".
+  // Accepts either a structured { date: 'YYYY-MM-DD' } or a legacy "DD/MM (h:mm)"
+  // display string (persisted rows without structured dates). The espelho page
+  // reads ?userId= and ?month= (yyyy-MM-01), where `month` is the PAYROLL month
+  // (26th→25th period) that contains the date: day ≥ 26 → next calendar month.
+  const goToAbsenceDay = (opts: { iso?: string; display?: string }) => {
+    const userId = activeBonus?.userId as string | undefined;
+    if (!userId) return;
+    let day: number | undefined;
+    let cMonth: number | undefined; // 1-12
+    let cYear: number | undefined;
+    if (opts.iso) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(opts.iso);
+      if (m) {
+        cYear = parseInt(m[1], 10);
+        cMonth = parseInt(m[2], 10);
+        day = parseInt(m[3], 10);
+      }
+    } else if (opts.display) {
+      const m = /(\d{1,2})\/(\d{1,2})/.exec(opts.display);
+      if (m) {
+        day = parseInt(m[1], 10);
+        cMonth = parseInt(m[2], 10);
+        cYear = (activeBonus?.year as number | undefined) ?? new Date().getFullYear();
+      }
+    }
+    if (!day || !cMonth || !cYear) return;
+    let pMonth = cMonth;
+    let pYear = cYear;
+    if (day >= 26) {
+      pMonth += 1;
+      if (pMonth > 12) {
+        pMonth = 1;
+        pYear += 1;
+      }
+    }
+    const monthParam = `${pYear}-${String(pMonth).padStart(2, "0")}-01`;
+    const qs = new URLSearchParams({ userId, month: monthParam }).toString();
+    navigate(`${routes.personnelDepartment.timeClock.colaborador}?${qs}`);
   };
 
   // Track page access
@@ -522,7 +576,7 @@ export default function BonusDetailPage() {
                         <button
                           key={extra.id}
                           type="button"
-                          onClick={() => openRulesModal(extra.reference)}
+                          onClick={() => openRulesModal(extra.ruleReference || extra.reference)}
                           className="flex justify-between py-1 w-full text-left rounded hover:bg-muted/60 px-1 -mx-1 transition-colors group"
                           title="Ver regra"
                         >
@@ -541,57 +595,88 @@ export default function BonusDetailPage() {
                     {hasDiscounts && bonus.bonusDiscounts!.map((discount: any) => {
                       const percentageValue = Number(discount.percentage) || 0;
                       const hasPercentage = percentageValue > 0;
-                      const { label, dates } = parseDiscountReference(discount.reference || "");
+                      const valueAmount = Number(discount.value) || 0;
+                      const hasValue = valueAmount > 0;
+                      // A justified line with no discount (atestado forgiven or
+                      // below threshold): show WHY instead of a bogus "-0%".
+                      // Live rows carry an explicit note; persisted rows (no such
+                      // column) derive "sem desconto" from the atestado label.
+                      const noDiscountNote: string | undefined =
+                        !hasPercentage && !hasValue
+                          ? discount.noDiscountNote ??
+                            (String(discount.ruleReference || discount.reference || "").startsWith(
+                              "Faltas - Atestado",
+                            )
+                              ? "sem desconto"
+                              : undefined)
+                          : undefined;
+                      // Prefer the structured data (live bonuses); fall back to
+                      // parsing the reference string (persisted rows).
+                      const parsed = parseDiscountReference(discount.reference || "");
+                      const label = discount.ruleReference || parsed.label;
+                      const ruleRef = discount.ruleReference || discount.reference;
+                      const structuredDates: Array<{ date: string; hours?: number }> | undefined =
+                        Array.isArray(discount.dates) && discount.dates.length > 0
+                          ? discount.dates
+                          : undefined;
+                      // Renderable chips: { text, iso?, display? } — iso drives
+                      // navigation for structured dates, display for legacy strings.
+                      const dateChips: Array<{ text: string; iso?: string; display?: string }> =
+                        structuredDates
+                          ? structuredDates.map((d) => ({
+                              text: formatAbsenceDate(d.date, d.hours),
+                              iso: d.date,
+                            }))
+                          : parsed.dates.map((d) => ({ text: d, display: d }));
                       return (
-                        <button
-                          key={discount.id}
-                          type="button"
-                          onClick={() => openRulesModal(discount.reference)}
-                          className="w-full text-left rounded hover:bg-muted/60 px-1 -mx-1 py-1 transition-colors group"
-                          title="Ver regra"
-                        >
+                        <div key={discount.id} className="w-full py-1 px-1 -mx-1">
                           <div className="flex justify-between items-start gap-2">
-                            <span className="text-sm text-muted-foreground group-hover:text-foreground flex items-center gap-1 flex-wrap">
+                            {/* Label — the ONLY element that opens the rule modal */}
+                            <button
+                              type="button"
+                              onClick={() => openRulesModal(ruleRef)}
+                              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 text-left rounded group"
+                              title="Ver regra"
+                            >
                               {label}
-                              {dates.length === 1 && (
-                                <span className="text-xs text-muted-foreground/70">{dates[0]}</span>
-                              )}
                               <IconInfoCircle className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-50 transition-opacity" />
-                            </span>
-                            <span className="text-sm font-medium text-destructive shrink-0">
-                              -{hasPercentage
-                                ? `${percentageValue}%`
-                                : formatCurrency(Number(discount.value) || 0)}
-                            </span>
+                            </button>
+                            {noDiscountNote ? (
+                              <span className="text-xs text-emerald-700 dark:text-emerald-400 italic shrink-0">
+                                {noDiscountNote}
+                              </span>
+                            ) : (
+                              <span className="text-sm font-medium text-destructive shrink-0">
+                                -{hasPercentage ? `${percentageValue}%` : formatCurrency(valueAmount)}
+                              </span>
+                            )}
                           </div>
-                          {dates.length > 1 && (
-                            <div className="mt-0.5 pl-0.5 flex flex-col gap-0.5">
-                              {dates.map((date, i) => (
-                                <span key={i} className="text-xs text-muted-foreground/70">
-                                  {date}
-                                </span>
+                          {/* Dates — ONE card wrapping every date (all in the same
+                              period); the whole card navigates to that period's
+                              Espelho de Ponto. */}
+                          {dateChips.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                goToAbsenceDay({
+                                  iso: dateChips[0].iso,
+                                  display: dateChips[0].display,
+                                })
+                              }
+                              className="mt-1 w-full flex flex-wrap gap-x-3 gap-y-1 text-left text-sm rounded-md bg-muted/60 hover:bg-muted px-2.5 py-1.5 text-muted-foreground hover:text-primary transition-colors"
+                              title="Ver no Espelho de Ponto"
+                            >
+                              {dateChips.map((chip, i) => (
+                                <span key={i}>{chip.text}</span>
                               ))}
-                            </div>
+                            </button>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
-                    {/* Atestado forgiveness — when the user had atestado in this period but
-                        no prior atestado in the rolling 90 days, we waive the penalty.
-                        Show this as an informational row (no discount %) so the bonus is
-                        traceable in review. */}
-                    {bonus?.atestadoForgiven && (
-                      <div className="flex justify-between py-1">
-                        <span className="text-sm text-emerald-700 dark:text-emerald-400">
-                          Atestado{" "}
-                          {bonus?.secullumAnalysis?.atestadoTierLabel
-                            ? `(${bonus.secullumAnalysis.atestadoTierLabel})`
-                            : ""}{" "}
-                          — perdoado
-                        </span>
-                        <span className="text-xs text-muted-foreground italic">sem desconto</span>
-                      </div>
-                    )}
+                    {/* (Atestado forgiveness is now shown inline on the
+                        "Faltas - Atestado" line via its noDiscountNote, with the
+                        justified days listed — no separate row needed.) */}
                     <div className="flex justify-between py-2 bg-green-50 dark:bg-green-950/20 rounded-lg px-3 mt-2">
                       <span className="text-sm font-medium text-muted-foreground">Bônus Final</span>
                       <span className="text-lg font-bold text-green-600">{formatCurrency(finalBonusValue)}</span>

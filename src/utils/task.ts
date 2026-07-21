@@ -1,19 +1,23 @@
-import { routes, TASK_OBSERVATION_TYPE, TASK_STATUS } from "../constants";
+import { routes, TASK_OBSERVATION_TYPE, TASK_STATUS, TASK_QUOTE_STATUS } from "../constants";
 import { TASK_OBSERVATION_TYPE_LABELS, TASK_STATUS_LABELS } from "../constants";
-import { isTaskQuoteBillingPhase } from "../constants/enum-labels";
 import type { Task } from "../types";
 import { dateUtils } from "./date";
 import { numberUtils } from "./number";
 
 /**
  * Resolve where to send a user when they "edit" a task's quote (commercial
- * users, and the quote-section edit button). Billing (faturamento) is only
- * reachable once the task is FINISHED and the quote has moved past the budget
- * phase; otherwise the user lands on the budget (orçamento) detail page.
+ * users, and the quote-section edit button). Billing (faturamento) is reached
+ * ONLY when BOTH conditions hold: the task is FINISHED (COMPLETED) *and* its
+ * quote has been APPROVED — i.e. past PENDING (BUDGET_APPROVED or further along
+ * the billing lifecycle) and not a CANCELLED quote. Every other case (no quote,
+ * pending/cancelled quote, or an unfinished task) stays in the budget (orçamento)
+ * workflow.
  */
 export function getTaskQuoteEditRoute(task: Task): string {
+  const status = task.quote?.status;
   const isFinished = task.status === TASK_STATUS.COMPLETED;
-  return isFinished && isTaskQuoteBillingPhase(task.quote?.status)
+  const isQuoteApproved = !!status && status !== TASK_QUOTE_STATUS.PENDING && status !== TASK_QUOTE_STATUS.CANCELLED;
+  return isFinished && isQuoteApproved
     ? routes.financial.billing.details(task.id)
     : routes.financial.budget.details(task.id);
 }

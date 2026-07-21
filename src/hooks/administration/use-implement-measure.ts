@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import { implementMeasureService } from "../../api-client";
 import type { ImplementMeasureCreateFormData, ImplementMeasureUpdateFormData } from "../../schemas";
+import { taskKeys } from "../common/query-keys";
 
 // Query keys
 export const implementMeasureQueryKeys = {
@@ -105,6 +106,8 @@ export const useImplementMeasureMutations = () => {
     mutationFn: implementMeasureService.create,
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: implementMeasureQueryKeys.all });
+      // Implement measures are embedded in the task detail (truck measures) — refresh tasks too.
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
       return response;
     },
   });
@@ -116,6 +119,8 @@ export const useImplementMeasureMutations = () => {
       queryClient.invalidateQueries({
         queryKey: implementMeasureQueryKeys.detail(variables.id),
       });
+      // Implement measures are embedded in the task detail (truck measures) — refresh tasks too.
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
       return response;
     },
   });
@@ -127,6 +132,8 @@ export const useImplementMeasureMutations = () => {
       queryClient.invalidateQueries({
         queryKey: implementMeasureQueryKeys.detail(id),
       });
+      // Implement measures are embedded in the task detail (truck measures) — refresh tasks too.
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
   });
 
@@ -143,6 +150,8 @@ export const useImplementMeasureMutations = () => {
       queryClient.invalidateQueries({
         queryKey: ["trucks", "detail", variables.truckId],
       });
+      // Implement measures are embedded in the task detail (truck measures) — refresh tasks too.
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
       return response;
     },
   });

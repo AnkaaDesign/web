@@ -13,7 +13,9 @@ import { useSectors } from "../../../../hooks/administration/use-sector";
 import { usePaints } from "../../../../hooks/painting/use-paint";
 import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { IconLoader2 } from "@tabler/icons-react";
-import type { Task } from "../../../../types";
+import type { Task, BatchOperationResult } from "../../../../types";
+import { BatchOperationResultDialog } from "@/components/ui/batch-operation-result-dialog";
+import { toast } from "@/components/ui/sonner";
 
 // Schema for batch edit
 const batchEditSchema = z.object({
@@ -40,6 +42,8 @@ interface TaskBatchEditModalProps {
 
 export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: TaskBatchEditModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [batchResult, setBatchResult] = useState<BatchOperationResult<Task, Task> | null>(null);
+  const [showResultDialog, setShowResultDialog] = useState(false);
   const { batchUpdateAsync } = useTaskBatchMutations();
 
   const { data: sectors } = useSectors({
@@ -64,20 +68,29 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
     try {
       setIsSubmitting(true);
 
-      // Build update data based on flags
+      // Build update data based on flags.
+      // Guard on `!== undefined` so an explicit "Nenhum" (null) still clears the
+      // field, but a checked-but-untouched control never nulls it across all rows.
       const updateData: any = {};
 
       if (data.updateStatus && data.status) {
         updateData.status = data.status;
       }
-      if (data.updateSector) {
+      if (data.updateSector && data.sectorId !== undefined) {
         updateData.sectorId = data.sectorId;
       }
-      if (data.updatePaint) {
+      if (data.updatePaint && data.paintId !== undefined) {
         updateData.paintId = data.paintId;
       }
-      if (data.updateTerm) {
+      if (data.updateTerm && data.term !== undefined) {
         updateData.term = data.term;
+      }
+
+      // Nothing resolved to a real value → do not send an empty update that the
+      // API would report as a false success.
+      if (Object.keys(updateData).length === 0) {
+        toast.info("Nenhum campo foi preenchido para atualizar");
+        return;
       }
 
       // Prepare batch update
@@ -89,8 +102,20 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
       };
 
       const result = await batchUpdateAsync(batchData);
+      const summary = result?.data as BatchOperationResult<Task, Task> | undefined;
 
-      if (result.success) {
+      // Never gate on the always-true top-level `result.success`; inspect the
+      // per-item totals so partial failures are surfaced, not swallowed.
+      if (summary && typeof summary.totalFailed === "number") {
+        setBatchResult(summary);
+        setShowResultDialog(true);
+        // Refresh the underlying list for the rows that did change; the modal
+        // itself is closed by the result dialog only when there are no failures.
+        if (summary.totalSuccess > 0) {
+          onSuccess?.();
+        }
+      } else {
+        // No structured result available — fall back to optimistic close.
         onOpenChange(false);
         onSuccess?.();
       }
@@ -104,6 +129,19 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
     }
   };
 
+  const handleResultDialogClose = (nextOpen: boolean) => {
+    setShowResultDialog(nextOpen);
+    if (!nextOpen) {
+      const noFailures = !!batchResult && batchResult.totalFailed === 0 && batchResult.totalSuccess > 0;
+      setBatchResult(null);
+      // Only dismiss the edit modal when everything applied; otherwise keep it
+      // open so the user can retry the tasks that failed.
+      if (noFailures) {
+        onOpenChange(false);
+      }
+    }
+  };
+
   const watchUpdateStatus = form.watch("updateStatus");
   const watchUpdateSector = form.watch("updateSector");
   const watchUpdatePaint = form.watch("updatePaint");
@@ -113,6 +151,7 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
   const canEdit = tasks.every((task) => task.status !== TASK_STATUS.COMPLETED && task.status !== TASK_STATUS.CANCELLED);
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
@@ -334,5 +373,21 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
         </Form>
       </DialogContent>
     </Dialog>
+
+    <BatchOperationResultDialog
+      open={showResultDialog}
+      onOpenChange={handleResultDialogClose}
+      result={batchResult}
+      operationType="update"
+      entityName="tarefa"
+      successItemDisplay={(task: Task) => <span className="text-sm font-medium">{task.name}</span>}
+      failedItemDisplay={(error) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-medium">{error.data?.name || "Tarefa desconhecida"}</span>
+          <span className="text-xs text-destructive">{error.error}</span>
+        </div>
+      )}
+    />
+    </>
   );
 };

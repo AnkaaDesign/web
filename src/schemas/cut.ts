@@ -65,6 +65,7 @@ export const cutOrderBySchema = z
       type: orderByDirectionSchema.optional(),
       status: orderByDirectionSchema.optional(),
       statusOrder: orderByDirectionSchema.optional(),
+      priority: orderByDirectionSchema.optional(),
       taskId: orderByDirectionSchema.optional(),
       origin: orderByDirectionSchema.optional(),
       reason: orderByDirectionSchema.optional(),
@@ -74,7 +75,7 @@ export const cutOrderBySchema = z
       createdAt: orderByDirectionSchema.optional(),
       updatedAt: orderByDirectionSchema.optional(),
     }),
-    z.enum(["id", "fileId", "type", "status", "statusOrder", "taskId", "origin", "reason", "parentCutId", "startedAt", "completedAt", "createdAt", "updatedAt"]),
+    z.enum(["id", "fileId", "type", "status", "statusOrder", "priority", "taskId", "origin", "reason", "parentCutId", "startedAt", "completedAt", "createdAt", "updatedAt"]),
   ])
   .optional();
 
@@ -190,6 +191,20 @@ export const cutWhereSchema: z.ZodSchema = z.lazy(() =>
 
       // Number fields
       statusOrder: z
+        .union([
+          z.number(),
+          z.object({
+            equals: z.number().optional(),
+            not: z.number().optional(),
+            lt: z.number().optional(),
+            lte: z.number().optional(),
+            gt: z.number().optional(),
+            gte: z.number().optional(),
+          }),
+        ])
+        .optional(),
+
+      priority: z
         .union([
           z.number(),
           z.object({
@@ -476,6 +491,7 @@ export const cutCreateSchema = z
       .nullable()
       .optional(),
     parentCutId: z.string().uuid("Corte pai inválido").nullable().optional(),
+    priority: z.number().optional(),
     startedAt: z.coerce.date().nullable().optional(),
     completedAt: z.coerce.date().nullable().optional(),
   })
@@ -507,6 +523,7 @@ export const cutUpdateSchema = z
       .nullable()
       .optional(),
     parentCutId: z.string().uuid("Corte pai inválido").nullable().optional(),
+    priority: z.number().optional(),
     startedAt: z.coerce.date().nullable().optional(),
     completedAt: z.coerce.date().nullable().optional(),
   })
@@ -545,6 +562,7 @@ export const cutBatchUpdateSchema = z.object({
         .nullable()
         .optional(),
       parentCutId: z.string().uuid("Corte pai inválido").nullable().optional(),
+      priority: z.number().optional(),
       startedAt: z.date().nullable().optional(),
       completedAt: z.date().nullable().optional(),
     }),

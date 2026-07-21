@@ -23,6 +23,10 @@ import type { FileWithPreview } from "@/components/common/file";
 import { LayoutStatusSelector } from "../layout";
 import { getApiBaseUrl } from "@/config/api";
 import { rewriteCdnUrl } from "@/utils/file";
+import { generatePDFThumbnailFromBlob } from "@/utils/pdf-thumbnail";
+
+const isPdfFile = (file: File): boolean =>
+  file.type === "application/pdf" || (file.name || "").toLowerCase().endsWith(".pdf");
 
 export interface LayoutFileUploadFieldProps {
   onFilesChange: (files: FileWithPreview[]) => void;
@@ -144,9 +148,13 @@ export function LayoutFileUploadField({
       if (disabled) return;
 
       const newFiles: FileWithPreview[] = acceptedFiles.map((file) => {
+        const isImage = file.type.startsWith("image/");
+        const isPdf = isPdfFile(file);
         const fileWithId = Object.assign(file, {
           id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          preview: showPreview && file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+          preview: showPreview && isImage ? URL.createObjectURL(file) : undefined,
+          // PDFs get a rendered first-page thumbnail generated asynchronously below.
+          pdfPreviewLoading: showPreview && isPdf,
           uploadProgress: 0,
           uploaded: false,
           status: 'DRAFT' as const, // Default status for new uploads
@@ -159,6 +167,26 @@ export function LayoutFileUploadField({
 
       setFiles(finalFiles);
       onFilesChange(finalFiles);
+
+      // Generate first-page previews for freshly dropped PDFs (client-side, before
+      // upload). Each resolves independently and patches its own file's `preview`.
+      if (showPreview) {
+        finalFiles
+          .filter((f) => newFiles.some((nf) => nf.id === f.id) && isPdfFile(f))
+          .forEach((pdf) => {
+            generatePDFThumbnailFromBlob(pdf).then((dataUrl) => {
+              setFiles((prev) =>
+                prev.map((f) => {
+                  if (f.id !== pdf.id) return f;
+                  const patch = { preview: dataUrl || undefined, pdfPreviewLoading: false };
+                  return (f instanceof File
+                    ? Object.assign(f, patch)
+                    : { ...f, ...patch }) as FileWithPreview;
+                }),
+              );
+            });
+          });
+      }
     },
     [files, maxFiles, maxSize, disabled, showPreview, onFilesChange],
   );
@@ -212,6 +240,11 @@ export function LayoutFileUploadField({
         );
         const index = uploadedFiles.findIndex((f) => f.id === clicked.id);
         fileViewer.actions.viewFiles(viewerFiles, index >= 0 ? index : 0);
+      } else if (clicked instanceof File) {
+        // Open the ACTUAL local file (for PDFs `preview` is a rendered JPEG thumbnail,
+        // not the document itself), so the browser shows the real PDF/image.
+        const url = URL.createObjectURL(clicked);
+        window.open(url, "_blank");
       } else if (clicked.preview) {
         window.open(clicked.preview, "_blank");
       }
@@ -309,7 +342,7 @@ export function LayoutFileUploadField({
           title="Ver"
           className="relative block h-52 w-full bg-muted"
         >
-          {isUploading ? (
+          {isUploading || file.pdfPreviewLoading ? (
             <div className="flex h-full w-full items-center justify-center">
               <div className="h-5 w-5 animate-spin rounded-full border border-primary/30 border-t-primary" />
             </div>
@@ -317,7 +350,9 @@ export function LayoutFileUploadField({
             <img
               src={getThumbnailSrc()}
               alt={file.name}
-              className="h-full w-full object-cover"
+              // PDFs render the whole page centered (no zoom/crop) with white
+              // letterbox stripes; raster images fill the card.
+              className={cn("h-full w-full", isPdfFile(file) ? "object-contain bg-white" : "object-cover")}
               onError={() => setThumbnailErrors((prev) => ({ ...prev, [file.id]: true }))}
             />
           ) : (
@@ -527,13 +562,13 @@ export function LayoutFileUploadField({
                     )}
                     onClick={() => !isUploading && openFilePreview(file)}
                   >
-                    {isUploading ? (
+                    {isUploading || file.pdfPreviewLoading ? (
                       <div className="w-4 h-4 border border-primary/30 border-t-primary animate-spin rounded-full" />
                     ) : shouldShowThumbnail ? (
                       <img
                         src={getThumbnailSrc()}
                         alt={file.name}
-                        className="w-full h-full object-cover"
+                        className={cn("w-full h-full", isPdfFile(file) ? "object-contain bg-white" : "object-cover")}
                         onError={() => setThumbnailErrors(prev => ({ ...prev, [file.id]: true }))}
                       />
                     ) : (

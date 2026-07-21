@@ -553,7 +553,7 @@ export function TaskHistoryTablePage() {
       },
       {
         key: "adv-quote-layout",
-        label: "Layout (Orçamento)",
+        label: "Adicionar Layout",
         icon: <IconPhoto className="h-4 w-4" />,
         group: ADVANCED_GROUP,
         hidden: () => !canAccessAdvancedMenu || !isCommercial,

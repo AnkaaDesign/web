@@ -34,6 +34,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { useTaskDetail, useTaskMutations, useForecastHistory, useRescheduleForecast } from "@/hooks/production/use-task";
+import { useTaskSiblingIds } from "@/hooks/production/task/use-task-sibling-ids";
 import { useCutsByTask } from "@/hooks/production/use-cut";
 import { useAirbrushingsByTask } from "@/hooks/production/use-airbrushing";
 import { useImplementMeasuresByTruck } from "@/hooks/administration/use-implement-measure";
@@ -273,6 +274,12 @@ function TaskDetailContent() {
         };
     }
   }, [source]);
+  // Prev/next pager sibling ids. Fast-path = the ordered list handed in via location.state (arriving
+  // from a filtered/sorted list); fallback = reconstructed from the source's canonical list query so the
+  // pager ALWAYS renders even on refresh / Back / direct URL / new tab / deep-link / calendar / search.
+  const stateIds = (location.state as { ids?: string[] } | null)?.ids;
+  const siblingIds = useTaskSiblingIds(source, id ?? "", stateIds);
+
   const { data: user } = useCurrentUser();
   const { confirm, dialog } = useConfirm();
   const { ask: askReason, dialog: reasonDialog } = useReason();
@@ -857,7 +864,10 @@ function TaskDetailContent() {
                             const quoteId = t.quote?.id;
                             if (!quoteId || !v) return;
                             await taskQuoteService.update(quoteId, { customerConfigs: [{ customerId: v as string }] });
-                            await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+                            await Promise.all([
+                              queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+                              queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all }),
+                            ]);
                           },
                         }
                       : undefined,
@@ -1236,13 +1246,16 @@ function TaskDetailContent() {
       icon: IconEdit,
       variant: "default",
       onClick: () =>
-        role === SECTOR_PRIVILEGES.COMMERCIAL && task.quote
+        // Commercial users ALWAYS edit through the quote (orçamento/faturamento by quote status),
+        // even for a quote-less task — getTaskQuoteEditRoute falls back to the budget page, where the
+        // quote gets created. Prep-edit is reserved for the other sectors (admin/logistics/PM/etc.).
+        role === SECTOR_PRIVILEGES.COMMERCIAL
           ? navigate(getTaskQuoteEditRoute(task), { state: { returnTo } })
           : // Forward the prev/next id list into the edit page so the pager survives the edit round-trip.
-            navigate(breadcrumbConfig.editRoute(task.id), { state: { ids: (location.state as { ids?: string[] } | null)?.ids } }),
+            navigate(breadcrumbConfig.editRoute(task.id), { state: { ids: siblingIds } }),
     });
     return list;
-  }, [task, canEdit, canFinish, role, changeStatus, navigate, breadcrumbConfig, returnTo, location.state]);
+  }, [task, canEdit, canFinish, role, changeStatus, navigate, breadcrumbConfig, returnTo, siblingIds]);
 
   // Display-name fallback chain (faithful to the legacy getTaskDisplayName): name → customer →
   // "Série {serial}" → plate → "Sem nome". The serial is still appended to the page title when present.
@@ -1276,7 +1289,7 @@ function TaskDetailContent() {
           { label: "Detalhe" },
         ]}
         navigation={{
-          ids: (location.state as { ids?: string[] } | null)?.ids,
+          ids: siblingIds,
           toRoute: (rid) => breadcrumbConfig.detailsRoute(rid),
         }}
       />

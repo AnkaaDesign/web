@@ -101,6 +101,10 @@ export interface UseDataTableParams<TData> {
   enableColumnResizing?: boolean;
   enableColumnReorder?: boolean;
   enableRowSelection?: boolean;
+  /** Allow selecting more than one row (default true). False → single-select (picking clears others). */
+  enableMultiRowSelection?: boolean;
+  /** One-shot selection seed applied on mount when `syncUrl` is off (the URL `sel` param wins when on). */
+  initialSelectedIds?: string[];
   enableRowPinning?: boolean;
   enablePagination?: boolean;
   /** Enable native child-row expansion (TanStack sub-rows). Requires `getSubRows`. */
@@ -114,6 +118,9 @@ export interface UseDataTableParams<TData> {
   /** Persist expanded state to the saved layout (keyed by rowId). Defaults to false (transient). */
   persistExpansion?: boolean;
   estimateRowHeight?: number;
+  /** When true, disable virtualization windowing (mount all loaded rows) so drag-reorder droppables
+   * are all present and their positions don't churn mid-drag. Set by DataTable when `rowReorder` is on. */
+  reorderEnabled?: boolean;
   persist?: boolean;
   /**
    * Sync view state (sort/page/selection) to the URL query string. Turn OFF when two tables share
@@ -176,6 +183,8 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     enableColumnResizing = true,
     enableColumnReorder = true,
     enableRowSelection = true,
+    enableMultiRowSelection = true,
+    initialSelectedIds,
     enableRowPinning = true,
     enablePagination = true,
     enableExpansion = false,
@@ -184,6 +193,7 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     defaultExpanded,
     persistExpansion = false,
     estimateRowHeight = 41,
+    reorderEnabled = false,
     persist = true,
     syncUrl = true,
     sectorDefault,
@@ -210,7 +220,9 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     const pageRaw = syncUrl ? searchParams.get("page") : null;
     const pageSizeRaw = syncUrl ? searchParams.get("pageSize") : null;
     const selRaw = syncUrl ? searchParams.get("sel") : null;
-    const selIds = selRaw ? selRaw.split(",").filter(Boolean) : undefined;
+    // URL `sel` wins when syncing; otherwise fall back to the one-shot `initialSelectedIds` seed
+    // (lets a syncUrl:false picker pre-select rows from a form/wizard's state on mount).
+    const selIds = selRaw ? selRaw.split(",").filter(Boolean) : !syncUrl && initialSelectedIds?.length ? initialSelectedIds : undefined;
     // Guard against a hand-edited / malformed URL (`?page=abc`): Number("abc") is NaN, which would
     // poison pageIndex/pageSize. Fall back to undefined (→ the saved/default value) on non-finite input.
     const pageNum = pageRaw ? Number(pageRaw) : NaN;
@@ -453,18 +465,19 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     [writeUrl, defaultPageSize],
   );
 
-  const handleRowSelectionChange = useCallback(
-    (updater: Updater<RowSelectionState>) => {
-      setRowSelection((prev) => {
-        const next = applyUpdater(updater, prev);
-        const ids = Object.keys(next).filter((k) => next[k]);
-        // comma-joined to match the reader (`sel.split(",")`); row ids contain no commas.
-        writeUrl((p) => (ids.length ? p.set("sel", ids.join(",")) : p.delete("sel")));
-        return next;
-      });
-    },
-    [writeUrl],
-  );
+  // Pure reducer — NO side effects. The `sel` URL param is mirrored in a follow-up effect below, keyed
+  // on `rowSelection`. Calling `writeUrl` (a router `setSearchParams`) from inside the state updater made
+  // the reducer impure and kept the render/URL pipeline hot on every selection write (double-invoked
+  // under StrictMode/concurrent), which fed the "Maximum update depth" loop.
+  const handleRowSelectionChange = useCallback((updater: Updater<RowSelectionState>) => {
+    setRowSelection((prev) => applyUpdater(updater, prev));
+  }, []);
+  useEffect(() => {
+    const ids = Object.keys(rowSelection).filter((k) => rowSelection[k]);
+    // comma-joined to match the reader (`sel.split(",")`); row ids contain no commas.
+    writeUrl((p) => (ids.length ? p.set("sel", ids.join(",")) : p.delete("sel")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowSelection]);
 
   // --- Build the table ---
   const isClient = mode === "client";
@@ -547,7 +560,7 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     columnResizeMode: "onChange",
 
     enableRowSelection,
-    enableMultiRowSelection: true,
+    enableMultiRowSelection,
 
     enableRowPinning,
     keepPinnedRows: true,
@@ -618,12 +631,24 @@ export function useDataTable<TData>(params: UseDataTableParams<TData>): UseDataT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [windowed, scrollRef, listRef, rows.length]);
 
+  // Keep the virtualizer's option callbacks IDENTITY-STABLE. react-virtual reads them each render, and
+  // unstable closures (plus a churning `rows` array) keep the measure/ResizeObserver pipeline hot — a
+  // selection's layout perturbation can then spiral into "Maximum update depth exceeded". `getItemKey`
+  // reads the latest rows via a ref so it never needs to change identity.
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const getScrollElement = useCallback(() => scrollRef.current, [scrollRef]);
+  const estimateSize = useCallback(() => estimateRowHeight, [estimateRowHeight]);
+  const getItemKey = useCallback((index: number) => rowsRef.current[index]?.id ?? index, []);
   const rowVirtualizer = useVirtualizer<HTMLDivElement, Element>({
     count: rows.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => estimateRowHeight,
-    overscan: 10,
-    getItemKey: (index) => rows[index]?.id ?? index,
+    getScrollElement,
+    estimateSize,
+    // Reorder needs every loaded row mounted as a droppable (see `reorderEnabled`); otherwise off-screen
+    // drop targets don't exist and dnd-kit's rects go sparse, producing "messy" drops. Non-reorder
+    // tables keep the windowed overscan of 10 — zero behavior change.
+    overscan: reorderEnabled ? rows.length : 10,
+    getItemKey,
     // Windowed mode: window against the shared page scroll using this list's offset. `virtualItem.start`
     // then includes this margin (positions subtract it); `getTotalSize()` excludes it (tbody height
     // stays this list's own height). 0 in normal mode → identical to the plain inner-scroll virtualizer.

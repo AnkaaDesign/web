@@ -82,6 +82,11 @@ export function CalculationList({ className, mode = 'hr', teamScope = false, onE
   const initialMonth = (() => {
     const monthParam = searchParams.get("month");
     if (monthParam) {
+      // Parse "yyyy-MM-dd" as LOCAL midnight (same as customStart/EndDate below).
+      // A bare `new Date("2026-07-01")` is parsed as UTC, so in UTC−3 it lands on
+      // Jun 30 → getPayrollPeriod() then shows the WRONG (previous) payroll month.
+      const parts = monthParam.split("-");
+      if (parts.length === 3) return new Date(+parts[0], +parts[1] - 1, +parts[2]);
       try { return new Date(monthParam); } catch (e) { /* ignore */ }
     }
     return new Date();

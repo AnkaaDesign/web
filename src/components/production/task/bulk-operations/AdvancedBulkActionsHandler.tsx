@@ -917,7 +917,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 sections: leftLayout.sections.map((s: any, idx: number) => ({
                   width: s.width,
                   isDoor: s.isDoor || false,
-                  doorHeight: s.doorHeight,
+                  // api implementMeasureSectionSchema.doorHeight is z.number().nullable() — it
+                  // REJECTS undefined and would 400 the ENTIRE batch. Normalize to null.
+                  doorHeight: s.isDoor ? (s.doorHeight ?? null) : null,
                   position: idx,
                 })),
                 photoId: leftLayout.photoId || null,
@@ -936,7 +938,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 sections: rightLayout.sections.map((s: any, idx: number) => ({
                   width: s.width,
                   isDoor: s.isDoor || false,
-                  doorHeight: s.doorHeight,
+                  // api implementMeasureSectionSchema.doorHeight is z.number().nullable() — it
+                  // REJECTS undefined and would 400 the ENTIRE batch. Normalize to null.
+                  doorHeight: s.isDoor ? (s.doorHeight ?? null) : null,
                   position: idx,
                 })),
                 photoId: rightLayout.photoId || null,
@@ -955,7 +959,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 sections: backLayout.sections.map((s: any, idx: number) => ({
                   width: s.width,
                   isDoor: s.isDoor || false,
-                  doorHeight: s.doorHeight,
+                  // api implementMeasureSectionSchema.doorHeight is z.number().nullable() — it
+                  // REJECTS undefined and would 400 the ENTIRE batch. Normalize to null.
+                  doorHeight: s.isDoor ? (s.doorHeight ?? null) : null,
                   position: idx,
                 })),
                 photoId: backLayout.photoId || null,
@@ -1519,7 +1525,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className={`${operationType === "layout" || operationType === "serviceOrder" ? "sm:max-w-4xl" : operationType === "arts" ? "sm:max-w-3xl" : "sm:max-w-2xl"} max-h-[85vh] flex flex-col`}>
+      <DialogContent className={`${operationType === "layout" || operationType === "serviceOrder" ? "sm:max-w-4xl" : operationType === "arts" ? "sm:max-w-5xl" : "sm:max-w-2xl"} max-h-[85vh] flex flex-col`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getModalIcon()}
@@ -1530,7 +1536,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0">
+        {/* For the "arts" layout strip, force Radix's internal `display:table` viewport
+            wrapper to `block` so it's bounded to the modal width — otherwise it grows to
+            the strip's content width and the strip's own `overflow-x-auto` never scrolls. */}
+        <ScrollArea className={`flex-1 min-h-0${operationType === "arts" ? " [&_[data-radix-scroll-area-viewport]>div]:!block" : ""}`}>
           <div className="p-4">
             {isLoadingData ? (
               <div className="flex items-center justify-center py-12">

@@ -14,6 +14,10 @@ export interface BonusExtra extends BaseEntity {
   reference: string;
   calculationOrder: number;
 
+  // Stable rule key for the rule modal (present on live bonuses). Absent on
+  // persisted rows, which fall back to `reference`.
+  ruleReference?: string;
+
   // Relations (optional, populated based on query)
   bonus?: Bonus;
 }

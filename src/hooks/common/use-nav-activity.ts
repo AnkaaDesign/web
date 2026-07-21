@@ -57,8 +57,8 @@ function useWarehousePendingCutsActivity(): NavActivityHint[] {
     { status: [CUT_STATUS.PENDING], limit: 1 } as never,
     {
       enabled,
-      staleTime: 1000 * 60, // 1 min
-      refetchInterval: enabled ? 1000 * 60 * 2 : false, // keep the nudge reasonably fresh
+      staleTime: 1000 * 30, // 30s — lets an on-focus refetch actually fire inside the poll window
+      refetchInterval: enabled ? 1000 * 60 : false, // re-poll every 1 min so a new cut nags others promptly
       refetchOnWindowFocus: true,
     } as never,
   );

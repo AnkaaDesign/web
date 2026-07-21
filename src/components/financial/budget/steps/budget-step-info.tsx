@@ -252,6 +252,25 @@ export function BudgetStepInfo({
 
   const selectedCustomerIds = customerConfigs.map((c: any) => c.customerId);
 
+  // Seed the Combobox with the already-selected customers so their badges render
+  // even before the async search returns them. Without this, pre-selected customers
+  // (loaded from saved data) have no option object in the Combobox and show no chip.
+  const initialCustomerOptions = useMemo(
+    () =>
+      customerConfigs.map((config: any) => {
+        const cached = customersCache.current.get(config.customerId);
+        const data = config.customerData || {};
+        return {
+          id: config.customerId,
+          corporateName: cached?.corporateName || data.corporateName || "",
+          fantasyName: cached?.fantasyName || data.fantasyName || "",
+          cnpj: cached?.cnpj || data.cnpj || "",
+          logo: cached?.logo,
+        };
+      }),
+    [customerConfigs, customersCache],
+  );
+
   // --- Layout Aprovado picker --------------------------------------------------
   // The budget's approved layout is chosen FROM the task's layouts (shared
   // ApprovedLayoutPicker). There is NO upload here — new images are added to the
@@ -286,6 +305,7 @@ export function BudgetStepInfo({
               value={selectedCustomerIds}
               onValueChange={handleCustomerChange}
               async={true}
+              initialOptions={initialCustomerOptions}
               queryKey={["customers-budget-detail"]}
               queryFn={searchCustomers}
               minSearchLength={0}

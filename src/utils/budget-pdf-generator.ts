@@ -590,9 +590,9 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     .map(
       (url) => `
       <section class="layout-section">
-        <h2 class="section-title-green">Layout aprovado</h2>
+        <h2 class="section-title-green">Layout referência</h2>
         <div class="layout-image-container">
-          <img src="${url}" alt="Layout aprovado" class="layout-image" />
+          <img src="${url}" alt="Layout referência" class="layout-image" />
         </div>
       </section>
     `,

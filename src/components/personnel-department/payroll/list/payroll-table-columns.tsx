@@ -143,19 +143,17 @@ export const createPayrollColumns = (): PayrollColumn[] => [
         bonusAmount = typeof baseBonus === 'string' ? parseFloat(baseBonus) : (baseBonus || 0);
       }
 
-      // Calculate discounts
-      let totalDiscounts = 0;
-      if (user.bonus?.bonusDiscounts && Array.isArray(user.bonus.bonusDiscounts)) {
-        user.bonus.bonusDiscounts.forEach((discount: any) => {
-          if (discount.percentage) {
-            totalDiscounts += bonusAmount * (discount.percentage / 100);
-          } else if (discount.value) {
-            totalDiscounts += discount.value;
-          }
-        });
-      }
-
-      const netBonus = bonusAmount - totalDiscounts;
+      // Use the SERVER-computed netBonus (cascaded discounts + extras). Re-deriving
+      // it here summed discount percentages non-cascading and ignored the
+      // assiduidade extra — which showed a NEGATIVE net once atestado and
+      // sem-justificativa were both applied (now the common case).
+      const rawNet = user.bonus?.netBonus;
+      const netBonus =
+        rawNet !== undefined && rawNet !== null
+          ? typeof rawNet === 'string'
+            ? parseFloat(rawNet)
+            : Number(rawNet)
+          : bonusAmount;
 
       // If bonus amount is 0, show as "Sem bônus"
       if (bonusAmount === 0) {
@@ -229,25 +227,17 @@ export const createPayrollColumns = (): PayrollColumn[] => [
       // Get base remuneration from payroll
       const remuneration = user.baseRemuneration || 0;
 
-      // Get bonus and calculate net bonus
+      // Get bonus net — use the SERVER-computed netBonus (cascaded + extras),
+      // never re-derive (non-cascading + missing extras produced a negative net).
       let netBonus = 0;
       if (user.position?.bonifiable && user.bonus?.baseBonus !== undefined) {
-        const baseBonus = user.bonus.baseBonus;
-        let bonusAmount = typeof baseBonus === 'string' ? parseFloat(baseBonus) : (baseBonus || 0);
-
-        // Calculate discounts
-        let totalDiscounts = 0;
-        if (user.bonus?.bonusDiscounts && Array.isArray(user.bonus.bonusDiscounts)) {
-          user.bonus.bonusDiscounts.forEach((discount: any) => {
-            if (discount.percentage) {
-              totalDiscounts += bonusAmount * (discount.percentage / 100);
-            } else if (discount.value) {
-              totalDiscounts += discount.value;
-            }
-          });
+        const rawNet = user.bonus?.netBonus;
+        if (rawNet !== undefined && rawNet !== null) {
+          netBonus = typeof rawNet === 'string' ? parseFloat(rawNet) : Number(rawNet);
+        } else {
+          const baseBonus = user.bonus.baseBonus;
+          netBonus = typeof baseBonus === 'string' ? parseFloat(baseBonus) : (baseBonus || 0);
         }
-
-        netBonus = bonusAmount - totalDiscounts;
       }
 
       const totalNet = remuneration + netBonus;

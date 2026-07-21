@@ -422,10 +422,18 @@ export class TaskService {
   // Copy Operations
   // =====================
 
-  async copyFromTask(destinationTaskId: string, data: TaskCopyRequest, query?: TaskQueryFormData): Promise<TaskUpdateResponse> {
-    const response = await apiClient.put<TaskUpdateResponse>(`${this.basePath}/${destinationTaskId}/copy-from`, data, {
-      params: query,
-    });
+  async copyFromTask(
+    destinationTaskId: string,
+    data: TaskCopyRequest,
+    query?: TaskQueryFormData,
+    options?: { suppressToast?: boolean },
+  ): Promise<TaskUpdateResponse> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const config: any = { params: query };
+    // Callers doing an N-target loop suppress the per-call toast and report one aggregate
+    // summary instead (a 0-field copy returns HTTP 200 and would otherwise toast a false success).
+    if (options?.suppressToast) config.metadata = { suppressToast: true };
+    const response = await apiClient.put<TaskUpdateResponse>(`${this.basePath}/${destinationTaskId}/copy-from`, data, config);
     return response.data;
   }
 

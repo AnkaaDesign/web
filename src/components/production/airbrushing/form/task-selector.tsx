@@ -1,13 +1,20 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useTasks } from "../../../../hooks";
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import { cn } from "@/lib/utils";
-import { DataTable, type DataTableColumnDef, type DataTableFilterDef } from "@/components/ui/datatable";
-import { IconCircle, IconCircleCheckFilled } from "@tabler/icons-react";
+import { DataTable, type DataTableFilterDef } from "@/components/ui/datatable";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
 import { createTaskPreparationColumns } from "@/components/production/task/preparation/task-prep-columns";
 import type { ClusteredTask } from "@/components/production/task/preparation/cluster-tasks";
 import type { Task } from "../../../../types";
+
+/**
+ * Referentially STABLE row-id accessor. TanStack requires `getRowId` to be stable — an inline
+ * `(t) => t.id` is a new function every render, which makes the DataTable rebuild its row model and
+ * corrupts the row-selection map (selecting one row scrambles/duplicates the whole selection). Must
+ * live at module scope so it never changes identity.
+ */
+const getTaskRowId = (t: ClusteredTask) => t.id;
 
 /**
  * Rich include mirroring the task-preparation table (`task-prep-page` LIST_INCLUDE) so every reused
@@ -22,7 +29,7 @@ const LIST_INCLUDE = {
     orderBy: { createdAt: "desc" },
     take: 1,
   },
-  customer: { select: { id: true, fantasyName: true, corporateName: true } },
+  customer: { select: { id: true, fantasyName: true, corporateName: true, logo: true } },
   truck: {
     select: {
       id: true,
@@ -48,25 +55,34 @@ const LIST_INCLUDE = {
 } as const;
 
 interface TaskSelectorProps {
-  selectedTasks: Set<string>;
-  onSelectTask: (taskId: string) => void;
-  /** Unused for airbrushing (single task) — kept for interface compatibility. */
-  onSelectAll?: () => void;
+  /** Currently-selected task ids. Seeds the table's selection on mount (mirror of the parent state). */
+  selectedTaskIds: string[];
+  /**
+   * Fired when the selection changes, with the selected task ids AND the matching task rows (so a
+   * caller can read per-task context — customer, sector — without a second fetch).
+   */
+  onSelectionChange: (taskIds: string[], tasks: ClusteredTask[]) => void;
+  /** "multiple" (default) for the copy-config-per-task flow; "single" for a one-task picker. */
+  selectionMode?: "single" | "multiple";
   className?: string;
-  isSelected?: (taskId: string) => boolean;
 }
 
 /**
- * Single-select task picker for the airbrushing wizard (Step 2). Reuses the FULL task-preparation
- * column set (`createTaskPreparationColumns`) + its per-sector default layout + filters on the new
- * `DataTable` base, so it exposes exactly the same column/visibility/filter options as the Agenda /
- * task-preparation table. A leading radio column + `onRowClick` provide single selection.
+ * Reusable task picker built on the shared `DataTable` NATIVE selection (the canonical `Checkbox`
+ * column — so it matches every other table, stays out of the column manager, and supports multi- or
+ * single-select). Reuses the FULL task-preparation column set (`createTaskPreparationColumns`) + its
+ * filters, so it exposes exactly the same column/visibility/filter options as the Agenda /
+ * task-preparation table. The DataTable owns selection; the parent mirrors it via `onSelectionChange`
+ * and seeds it via `selectedTaskIds`.
+ *
+ * Used by the airbrushing wizard (copy one config across the selected tasks) and intended for reuse
+ * by any "pick N tasks, then act on each" flow.
  */
 export const TaskSelector = ({
-  selectedTasks,
-  onSelectTask,
+  selectedTaskIds,
+  onSelectionChange,
+  selectionMode = "multiple",
   className,
-  isSelected = (taskId: string) => selectedTasks.has(taskId),
 }: TaskSelectorProps) => {
   const { data: user } = useCurrentUser();
   const currentUserId = (user as { id?: string } | undefined)?.id;
@@ -82,32 +98,29 @@ export const TaskSelector = ({
     staleTime: 30_000,
   } as never);
 
-  const tasks = (((data as { data?: Task[] } | undefined)?.data ?? []) as ClusteredTask[]);
+  // Memoize so an unrelated re-render never hands DataTable a fresh `data` array — a new reference
+  // rebuilds the TanStack row model and remounts every row, which re-triggers the virtualizer's
+  // measure→notify cycle (the row-model churn behind "Maximum update depth exceeded").
+  const tasks = useMemo(
+    () => (((data as { data?: Task[] } | undefined)?.data ?? []) as ClusteredTask[]),
+    [data],
+  );
 
-  const prepColumns = useMemo(() => createTaskPreparationColumns({ currentUserId }), [currentUserId]);
+  // The preparation columns are reused verbatim — the leading selection column is the DataTable's
+  // native (canonical `Checkbox`) column, not a custom column def, so it never leaks into the
+  // column manager and always matches the rest of the app.
+  const columns = useMemo(() => createTaskPreparationColumns({ currentUserId }), [currentUserId]);
 
-  // Prepend a single-select radio indicator; the preparation columns are reused verbatim after it.
-  const columns = useMemo<DataTableColumnDef<ClusteredTask>[]>(
-    () => [
-      {
-        id: "__select",
-        header: "",
-        size: 48,
-        minSize: 48,
-        enableSorting: false,
-        enableHiding: false,
-        enableResizing: false,
-        meta: { headerLabel: "" },
-        cell: ({ row }) =>
-          isSelected(row.original.id) ? (
-            <IconCircleCheckFilled className="h-5 w-5 text-primary" />
-          ) : (
-            <IconCircle className="h-5 w-5 text-muted-foreground/40" />
-          ),
-      },
-      ...prepColumns,
-    ],
-    [prepColumns, isSelected],
+  // Map the native selection (ids) back to the task rows the parent needs (customer/sector context).
+  const handleSelectionChange = useCallback(
+    (ids: string[]) => {
+      const byId = new Map(tasks.map((t) => [t.id, t] as const));
+      onSelectionChange(
+        ids,
+        ids.map((id) => byId.get(id)).filter((t): t is ClusteredTask => !!t),
+      );
+    },
+    [tasks, onSelectionChange],
   );
 
   // Same declarative filters as the preparation table.
@@ -146,10 +159,13 @@ export const TaskSelector = ({
         data={tasks}
         columns={columns}
         filterDefs={filterDefs}
-        getRowId={(t) => t.id}
-        onRowClick={(t) => onSelectTask(t.id)}
+        getRowId={getTaskRowId}
         isLoading={isLoading}
-        enableSelection={false}
+        enableSelection
+        enableMultiRowSelection={selectionMode !== "single"}
+        selectOnRowClick
+        initialSelectedIds={selectedTaskIds}
+        onSelectionChange={handleSelectionChange}
         enableShare={false}
         syncUrl={false}
         estimateRowHeight={44}

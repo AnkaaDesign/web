@@ -26,8 +26,10 @@ interface BonusRulesModalProps {
 function detectSection(ref?: string): string | null {
   if (!ref) return null;
   const lower = ref.toLowerCase();
-  if (lower.includes("falta")) return "faltas";
+  // Check "atestado" BEFORE "falta": the label "Faltas - Atestado" contains both,
+  // and it must highlight the Atestado rule, not the generic Faltas one.
   if (lower.includes("atestado")) return "atestado";
+  if (lower.includes("falta")) return "faltas";
   if (lower.includes("assiduidade")) return "assiduidade";
   if (lower.includes("suspensa") || lower.includes("suspens")) return "suspensas";
   return null;

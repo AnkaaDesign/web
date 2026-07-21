@@ -33,10 +33,28 @@ const convertToFileWithPreview = (file: any | undefined | null): FileWithPreview
   } as FileWithPreview;
 };
 
+/**
+ * A cut row as seen by the parent — derived from the selector's OWN robust state (localFilesMap +
+ * merged watch/field values), NOT from a raw `form.watch("cuts")` in the parent. RHF strips the File
+ * object and lags `fileId` for a freshly-picked (unuploaded) file, so a parent watch reads "no file"
+ * and the review count/submit break. `hasFile` here is authoritative; `file` is the uploadable blob.
+ */
+export interface EmittedCut {
+  id: string;
+  type: CUT_TYPE;
+  quantity: number;
+  file?: FileWithPreview;
+  fileId?: string;
+  fileName?: string;
+  hasFile: boolean;
+}
+
 interface MultiCutSelectorProps {
   control: any;
   disabled?: boolean;
   onCutsCountChange?: (count: number) => void;
+  /** Emits the authoritative cut rows whenever they change (see {@link EmittedCut}). */
+  onCutsChange?: (cuts: EmittedCut[]) => void;
 }
 
 export interface MultiCutSelectorRef {
@@ -44,7 +62,7 @@ export interface MultiCutSelectorRef {
   clearAll: () => void;
 }
 
-export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelectorProps>(({ control, disabled, onCutsCountChange }, ref) => {
+export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelectorProps>(({ control, disabled, onCutsCountChange, onCutsChange }, ref) => {
   const { setValue, watch } = useFormContext();
 
   // Use React Hook Form's useFieldArray - the proper way to manage array fields
@@ -317,6 +335,40 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
 
     return cutsWithoutFiles.some((c: any) => !c.hasFile);
   }, [cutsValues, cutHasFile, fields, localFilesMap]);
+
+  // Emit the authoritative cut rows to the parent (the cut wizard's review/submit). Built from the
+  // selector's own robust file detection so a freshly-picked (unuploaded) file is reported reliably,
+  // unlike a parent-side `form.watch("cuts")` which loses the File object.
+  const emittedCuts = useMemo<EmittedCut[]>(
+    () =>
+      fields.map((field: any, index) => {
+        const cut = cutsValues[index] || field;
+        const cutId = field.id;
+        const file = getFileForCut(cut, cutId);
+        return {
+          id: cutId,
+          type: (cut?.type as CUT_TYPE) ?? CUT_TYPE.VINYL,
+          quantity: Math.max(1, Number(cut?.quantity) || 1),
+          file,
+          fileId: cut?.fileId || undefined,
+          fileName: cut?.fileName || (file as any)?.name || undefined,
+          hasFile: cutHasFile(cut, index, cutId),
+        };
+      }),
+    [fields, cutsValues, getFileForCut, cutHasFile],
+  );
+  const emittedSignature = useMemo(
+    // Exclude the File object (not serializable) — fileName/fileId/hasFile capture the change.
+    () => JSON.stringify(emittedCuts.map(({ file: _file, ...rest }) => rest)),
+    [emittedCuts],
+  );
+  const lastEmittedSignature = useRef<string>("");
+  useEffect(() => {
+    if (!onCutsChange) return;
+    if (emittedSignature === lastEmittedSignature.current) return;
+    lastEmittedSignature.current = emittedSignature;
+    onCutsChange(emittedCuts);
+  }, [emittedSignature, emittedCuts, onCutsChange]);
 
   return (
     <div className="space-y-4">
