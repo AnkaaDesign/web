@@ -519,7 +519,9 @@ export function TaskPreparationPage() {
           if (!rows.length) return;
           if (rows.length > 1) {
             navigate(`${routes.production.schedule.batchEdit}?ids=${expandClusterTaskIds(rows).join(",")}`);
-          } else if (isCommercial && rows[0].quote) {
+          } else if (isCommercial) {
+            // COMMERCIAL always edits via the budget/invoice pages, never the task form.
+            // getTaskQuoteEditRoute handles the no-quote case (falls back to the budget page).
             navigate(getTaskQuoteEditRoute(rows[0]));
           } else {
             navigate(routes.production.preparation.edit(rows[0].id));
