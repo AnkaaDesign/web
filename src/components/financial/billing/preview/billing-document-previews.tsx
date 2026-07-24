@@ -188,7 +188,11 @@ function buildCustomerDoc(
   const cd = config.customerData || {};
   const customerName = cd.corporateName || cd.fantasyName || "Cliente";
   const generateInvoice = config.generateInvoice !== false;
-  const serviceDescs = configServices.map((s) => s.description).filter(Boolean);
+  // "Outros" is a generic catch-all description; the real service text lives in the
+  // observation. Mirror the backend NFS-e emission so the preview matches the emitted NF.
+  const resolveServiceDesc = (s: any): string =>
+    s.description === "Outros" && s.observation?.trim() ? s.observation.trim() : s.description;
+  const serviceDescs = configServices.map((s) => resolveServiceDesc(s)).filter(Boolean);
   const nfseNumberForThisDoc = generateInvoice ? predictedNfseNumber : null;
 
   const servicesSubtotal = configServices.reduce((s, svc) => s + (Number(svc.amount) || 0), 0);
@@ -205,7 +209,7 @@ function buildCustomerDoc(
     const desconto = discountPct > 0 ? round2((valor * discountPct) / 100) : 0;
     totalDescontos += desconto;
     return {
-      descricao: svc.description || "",
+      descricao: resolveServiceDesc(svc) || "",
       quantidade: 1,
       valor,
       desconto,
