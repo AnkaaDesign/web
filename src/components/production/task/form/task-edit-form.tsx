@@ -3057,7 +3057,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       />
                     </div>
 
-                    {/* Serial Number, Plate, Chassis - in same row with 1/4, 1/4, 2/4 ratio */}
+                    {/* Serial Number, Plate, Chassis, Plaqueta - in same row, equal sizing */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       {/* Serial Number - 1/4 */}
                       <FormField
@@ -3159,7 +3159,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                           };
 
                           return (
-                            <FormItem className="md:col-span-2">
+                            <FormItem>
                               <FormLabel className="flex items-center gap-2">
                                 <IconId className="h-4 w-4" />
                                 Chassi
@@ -3200,7 +3200,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                               <Input
                                 ref={field.ref}
                                 value={field.value || ""}
-                                placeholder="Plaqueta"
+                                placeholder="Ex: 001234"
                                 className="bg-transparent"
                                 onChange={(value: string | number | null) => field.onChange(typeof value === "string" ? value : "")}
                                 onBlur={field.onBlur}
