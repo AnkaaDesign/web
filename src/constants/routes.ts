@@ -806,9 +806,6 @@ export const routes = {
     colorPalette: {
       root: "/ferramentas/paleta",
     },
-    timeCalculator: {
-      root: "/ferramentas/calculadora-de-horas",
-    },
     overtimeCost: {
       root: "/ferramentas/custo-horas-extras",
     },

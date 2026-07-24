@@ -62,6 +62,9 @@ export function BillingTable({ className, searchingFor, filters }: BillingTableP
       page: page + 1,
       limit: pageSize,
       shouldDisplayForFinancial: true,
+      // Task-status scope: default "finished" lists only COMPLETED tasks; "unfinished"
+      // or "all" relax that so billing can be approved for tasks not finished yet.
+      ...(filters?.taskStatus && filters.taskStatus !== "finished" && { financialTaskStatus: filters.taskStatus }),
       ...(searchingFor && { searchingFor }),
       ...(() => {
         const serverSortConfigs = sortConfigs.filter((s) => s.column !== CLIENT_SORT_COLUMN);

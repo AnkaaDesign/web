@@ -56,11 +56,15 @@ export interface MultiAirbrushingSelectorRef {
 const convertFilesToFileWithPreview = (files: any[]): FileWithPreview[] => {
   return (files || []).map(file => {
     const mockFile = new File([], file.filename || file.name || '', { type: file.mimetype || file.type || '' });
+    // name/size/type are read-only getters on File.prototype — Object.assign on them throws
+    // "Cannot set property name of #<File> which has only a getter". Shadow them with own
+    // properties via defineProperty so we can carry the real size (the empty File ctor yields 0).
+    Object.defineProperties(mockFile, {
+      size: { value: file.size ?? 0, writable: false, configurable: true, enumerable: true },
+      type: { value: file.mimetype || file.type || '', writable: false, configurable: true, enumerable: true },
+    });
     return Object.assign(mockFile, {
       id: file.id,
-      name: file.filename || file.name,
-      size: file.size,
-      type: file.mimetype || file.type,
       preview: file.url || '',
       uploaded: true,
       uploadedFileId: file.id,

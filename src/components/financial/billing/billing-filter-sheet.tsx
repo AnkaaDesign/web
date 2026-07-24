@@ -3,7 +3,7 @@ import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { IconFilter, IconCalendar, IconBuilding } from "@tabler/icons-react";
+import { IconFilter, IconCalendar, IconBuilding, IconProgressCheck } from "@tabler/icons-react";
 import { getCustomers } from "@/api-client/customer";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 
@@ -23,6 +23,12 @@ export interface BillingFilters {
   finishedTo: Date | undefined;
   quoteStatuses: string[];
   customerIds: string[];
+  // Task-status scope for the billing list:
+  //   "finished"   (default) → only finished (Concluído) tasks
+  //   "unfinished"           → not-yet-finished tasks (Em Preparação / Aguardando Produção / Em Produção)
+  //   "all"                  → both finished and unfinished
+  // Billing can be approved before a task is finished, so any scope is billable.
+  taskStatus: "finished" | "unfinished" | "all";
 }
 
 export const defaultBillingFilters: BillingFilters = {
@@ -30,7 +36,14 @@ export const defaultBillingFilters: BillingFilters = {
   finishedTo: undefined,
   quoteStatuses: [],
   customerIds: [],
+  taskStatus: "finished",
 };
+
+const TASK_STATUS_OPTIONS = [
+  { value: "finished", label: "Finalizadas" },
+  { value: "unfinished", label: "Ativas" },
+  { value: "all", label: "Ambas" },
+];
 
 interface BillingFilterSheetProps {
   open: boolean;
@@ -89,6 +102,7 @@ export function BillingFilterSheet({
     if (local.finishedTo) c++;
     if (local.quoteStatuses && local.quoteStatuses.length > 0) c++;
     if (local.customerIds && local.customerIds.length > 0) c++;
+    if (local.taskStatus && local.taskStatus !== "finished") c++;
     return c;
   }, [local]);
 
@@ -115,7 +129,28 @@ export function BillingFilterSheet({
       applyLabel="Aplicar Filtros"
       resetLabel="Limpar Filtros"
     >
-      {/* Quote Status */}
+      {/* Task status scope (default: finished only) */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm font-medium">
+              <IconProgressCheck className="h-4 w-4" />
+              Status da Tarefa
+            </Label>
+            <Combobox
+              value={local.taskStatus}
+              onValueChange={(v) =>
+                setLocal((prev) => ({
+                  ...prev,
+                  taskStatus: (typeof v === "string" && v ? v : "finished") as BillingFilters["taskStatus"],
+                }))
+              }
+              options={TASK_STATUS_OPTIONS}
+              placeholder="Selecione o status..."
+              searchable={false}
+              clearable={false}
+            />
+          </div>
+
+          {/* Quote Status */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Status Faturamento</Label>
             <Combobox

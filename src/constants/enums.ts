@@ -2703,7 +2703,6 @@ export enum FAVORITE_PAGES {
   // Ferramentas
   FERRAMENTAS_QR_CODE = "/ferramentas/qr-code",
   FERRAMENTAS_CALCULADORA_MISTURA = "/ferramentas/calculadora-de-mistura",
-  FERRAMENTAS_CALCULADORA_HORAS = "/ferramentas/calculadora-de-horas",
   FERRAMENTAS_CUSTO_HORAS_EXTRAS = "/ferramentas/custo-horas-extras",
   FERRAMENTAS_CERTIFICADO_RESIDUOS = "/ferramentas/certificado-residuos",
 

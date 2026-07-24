@@ -7,17 +7,18 @@ import { numberUtils } from "./number";
 /**
  * Resolve where to send a user when they "edit" a task's quote (commercial
  * users, and the quote-section edit button). Billing (faturamento) is reached
- * ONLY when BOTH conditions hold: the task is FINISHED (COMPLETED) *and* its
- * quote has been APPROVED — i.e. past PENDING (BUDGET_APPROVED or further along
- * the billing lifecycle) and not a CANCELLED quote. Every other case (no quote,
- * pending/cancelled quote, or an unfinished task) stays in the budget (orçamento)
+ * whenever the quote has been APPROVED — i.e. past PENDING (BUDGET_APPROVED or
+ * further along the billing lifecycle) and not a CANCELLED quote — regardless of
+ * whether the task is finished yet. Billing approval no longer requires the task
+ * to be COMPLETED (due dates anchor on the approval moment), so an approved quote
+ * on an unfinished task can still generate invoices/boletos from the billing
+ * wizard. Only pending/cancelled/no-quote cases stay in the budget (orçamento)
  * workflow.
  */
 export function getTaskQuoteEditRoute(task: Task): string {
   const status = task.quote?.status;
-  const isFinished = task.status === TASK_STATUS.COMPLETED;
   const isQuoteApproved = !!status && status !== TASK_QUOTE_STATUS.PENDING && status !== TASK_QUOTE_STATUS.CANCELLED;
-  return isFinished && isQuoteApproved
+  return isQuoteApproved
     ? routes.financial.billing.details(task.id)
     : routes.financial.budget.details(task.id);
 }

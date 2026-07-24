@@ -515,7 +515,6 @@ const ServerRateLimiting = lazy(() => import("@/pages/server/rate-limiting").the
 // Tools
 const ToolsHubPage = lazy(() => import("@/pages/tools").then((module) => ({ default: module.ToolsHubPage })));
 const QrCodeToolPage = lazy(() => import("@/pages/tools/qr-code").then((module) => ({ default: module.QrCodeToolPage })));
-const TimeCalculatorPage = lazy(() => import("@/pages/tools/time-calculator"));
 const OvertimeCostCalculatorPage = lazy(() => import("@/pages/tools/overtime-cost-calculator"));
 const EmployeeCostCalculatorPage = lazy(() => import("@/pages/tools/employee-cost-calculator"));
 const NotesPage = lazy(() => import("@/pages/tools/notes"));
@@ -3563,14 +3562,6 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ColorPalettePage />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.tools.timeCalculator.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <TimeCalculatorPage />
                     </Suspense>
                   }
                 />

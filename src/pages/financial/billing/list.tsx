@@ -66,6 +66,7 @@ export const BillingPage = () => {
     if (filters.finishedTo) c++;
     if (filters.quoteStatuses && filters.quoteStatuses.length > 0) c++;
     if (filters.customerIds && filters.customerIds.length > 0) c++;
+    if (filters.taskStatus && filters.taskStatus !== "finished") c++;
     return c;
   }, [filters]);
 

@@ -1238,6 +1238,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
       { id: "pessoal-logistic-calculos", title: "Meus Pontos", icon: "deviceIpadDollar", path: "/pessoal/meus-pontos" },
       { id: "pessoal-logistic-feriados", title: "Feriados", icon: "holiday", path: "/pessoal/feriados" },
       { id: "pessoal-logistic-mensagens", title: "Minhas Mensagens", icon: "message", path: "/pessoal/mensagens" },
+      // Notas for LOGISTIC lives here inside "Pessoal" (LOGISTIC is not part of the
+      // hierarchical Ferramentas section audience). Gateless = inherits the LOGISTIC group gate.
+      { id: "pessoal-logistic-notas", title: "Notas", icon: "note", path: "/ferramentas/notas" },
     ],
   },
 
@@ -1435,7 +1438,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     children: [
       // QR Code, Paleta de Cores and Certificado de Resíduos are intentionally
       // omitted for PRODUCTION_MANAGER (not part of its toolset).
-      { id: "ferramentas-calculadora-de-horas-pm", title: "Calculadora de Horas", icon: "clock", path: "/ferramentas/calculadora-de-horas" },
       { id: "ferramentas-custo-horas-extras-pm", title: "Custo de Horas Extras", icon: "calendarDollar", path: "/ferramentas/custo-horas-extras" },
       { id: "ferramentas-calculadora-de-mistura-pm", title: "Calculadora de Mistura", icon: "flask", path: "/ferramentas/calculadora-de-mistura" },
       { id: "ferramentas-calendario-pm", title: "Calendário", icon: "calendarStats", path: "/departamento-pessoal/calendario" },
@@ -1687,10 +1689,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [{ id: "minhas-advertencias-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/minhas-advertencias/detalhes/:id", isDynamic: true }],
       },
       { id: "minhas-mensagens", title: "Minhas Mensagens", icon: "message", path: "/pessoal/mensagens" },
-      // Notas for PRODUCTION lives here inside "Pessoal" (not floating at the root via
-      // notas-flat). WAREHOUSE already gets Notas through the Ferramentas section, so
-      // gate this to PRODUCTION only to avoid a duplicate entry for warehouse users.
-      { id: "minhas-notas", title: "Notas", icon: "note", path: "/ferramentas/notas", requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION },
       {
         id: "minhas-movimentacoes",
         title: "Minhas Movimentações",
@@ -2169,96 +2167,88 @@ export const NAVIGATION_MENU: MenuItem[] = [
   // (see api/src/schemas/sector.ts default + auth.service.ts fallback) — keeping BASIC here would
   // leak the menu to those users.
   {
+    // Section audience = UNION of its visible children below (ADMIN/COMMERCIAL/HR/ACCOUNTING).
+    // PRODUCTION_MANAGER reaches these tools via its own "ferramentas-production-manager"
+    // group above (kept out here to avoid a duplicate "Ferramentas" menu for PM).
     id: "ferramentas",
     title: "Ferramentas",
     icon: "tools",
     path: "/ferramentas",
-    requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.EXTERNAL, SECTOR_PRIVILEGES.ACCOUNTING],
+    requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING],
     children: [
       {
-        // Explicit gate = section audience MINUS ACCOUNTING (gateless children inherit
-        // section visibility, which would leak these tools to accounting users).
         id: "ferramentas-qr-code",
         title: "Gerador de QR Code",
         icon: "qrcode",
         path: "/ferramentas/qr-code",
-        requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.EXTERNAL],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
       },
       {
         id: "ferramentas-paleta",
         title: "Paleta de Cores",
         icon: "palette",
         path: "/ferramentas/paleta",
-        requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.EXTERNAL],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
       },
       {
-        // Calendário now lives under Ferramentas for the whole personnel audience
-        // (the old Departamento Pessoal placement was retired). PRODUCTION_MANAGER gets
-        // it via its own Ferramentas group below. Explicit gate so the other
-        // Ferramentas-section roles (WAREHOUSE/EXTERNAL) do NOT see it.
+        // Calendário. PRODUCTION_MANAGER gets it via its own Ferramentas group above.
         id: "ferramentas-calendario",
         title: "Calendário",
         icon: "calendarStats",
         path: "/departamento-pessoal/calendario",
-        requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING, SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING],
       },
       {
-        id: "ferramentas-calculadora-de-horas",
-        title: "Calculadora de Horas",
-        icon: "clock",
-        path: "/ferramentas/calculadora-de-horas",
-      },
-      {
+        // PRODUCTION_MANAGER gets it via its own Ferramentas group above.
         id: "ferramentas-custo-horas-extras",
         title: "Custo de Horas Extras",
         icon: "calendarDollar",
         path: "/ferramentas/custo-horas-extras",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ACCOUNTING],
       },
       {
+        // PRODUCTION_MANAGER gets it via its own Ferramentas group above.
         id: "ferramentas-calculadora-de-mistura",
         title: "Calculadora de Mistura",
         icon: "flask",
         path: "/ferramentas/calculadora-de-mistura",
-        requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.EXTERNAL],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
       },
       {
         id: "ferramentas-certificado-residuos",
         title: "Certificado de Resíduos",
         icon: "recycle",
         path: "/ferramentas/certificado-residuos",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.ACCOUNTING],
       },
       {
         id: "ferramentas-custo-de-funcionario",
         title: "Custo de Funcionário",
         icon: "calendarDollar",
         path: "/ferramentas/custo-de-funcionario",
-        // Accounting-sector tool. Gate explicitly so it does NOT inherit the broad
-        // Ferramentas audience (WAREHOUSE/HR/ADMIN/EXTERNAL).
-        requiredPrivilege: [SECTOR_PRIVILEGES.ACCOUNTING],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN],
       },
       {
-        // Gateless = inherits the section audience (WAREHOUSE/HR/ADMIN/EXTERNAL/ACCOUNTING),
-        // same convention as the other broad tools above. Flat-nav roles get their own
-        // root-level Notas entry (see "notas-flat" below) and the PM tools group.
+        // Notas hub child. PRODUCTION_MANAGER gets it via its own Ferramentas group
+        // above; FINANCIAL via "notas-flat" below; LOGISTIC via the Pessoal group.
         id: "ferramentas-notas",
         title: "Notas",
         icon: "note",
         path: "/ferramentas/notas",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ACCOUNTING],
       },
     ],
   },
 
-  // NOTAS - root-level entry for flat-navigation roles that don't see the
-  // hierarchical "Ferramentas" section (their navs are flat per-role item lists).
-  // PRODUCTION/TEAM_LEADER are intentionally NOT here: PRODUCTION (and production team
-  // leaders, who are PRODUCTION-sector users) reach Notas through the "Pessoal" group
-  // (see "minhas-notas" above), so they don't get a floating root-level entry.
+  // NOTAS - root-level entry for FINANCIAL, whose nav is a flat per-role item list and
+  // does not include the hierarchical "Ferramentas" section. COMMERCIAL now reaches Notas
+  // via the Ferramentas hub child; LOGISTIC via the "Pessoal" group.
   {
     id: "notas-flat",
     title: "Notas",
     icon: "note",
     path: "/ferramentas/notas",
-    requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL],
+    requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL],
   },
 
   // SERVIDOR

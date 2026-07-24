@@ -259,8 +259,8 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/departamento-pessoal/controle-ponto/colaborador": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "ACCOUNTING"],
   "/departamento-pessoal/controle-ponto/dia": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "ACCOUNTING"],
   "/departamento-pessoal/controle-ponto/ausencias": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL", "ACCOUNTING"],
-  // Calendário now surfaced under Ferramentas for HR/ACCOUNTING/ADMIN + PRODUCTION_MANAGER.
-  "/departamento-pessoal/calendario": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN", "PRODUCTION_MANAGER"],
+  // Calendário now surfaced under Ferramentas for HR/ACCOUNTING/ADMIN + PRODUCTION_MANAGER + COMMERCIAL.
+  "/departamento-pessoal/calendario": ["HUMAN_RESOURCES", "ACCOUNTING", "ADMIN", "PRODUCTION_MANAGER", "COMMERCIAL"],
   // Feriados moved to Departamento Pessoal — HR/ADMIN only (ACCOUNTING intentionally
   // excluded, matching the menu). Old /departamento-pessoal/feriados URL is handled by a
   // legacy redirect route and still matches the "/departamento-pessoal/*" HR/ACC/ADMIN wildcard.
@@ -312,18 +312,24 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   [routes.myTeam.movements]: "TEAM_LEADER",
   [routes.myTeam.calculations]: "TEAM_LEADER",
 
-  // Ferramentas - All authenticated users can access tools
-  "/ferramentas": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING"],
-  "/ferramentas/*": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING"],
-  "/ferramentas/custo-de-funcionario": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING"],
-  // Notas board — broad availability (matches the other broad tools above)
-  "/ferramentas/notas": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING", "TEAM_LEADER"],
-  // QR generator, color palette and waste certificate — ACCOUNTING and
-  // PRODUCTION_MANAGER intentionally excluded (their navs hide these); everyone else
-  // keeps the access they had via the "/ferramentas/*" wildcard.
-  "/ferramentas/qr-code": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
-  "/ferramentas/paleta": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
-  "/ferramentas/certificado-residuos": ["BASIC", "PRODUCTION", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL", "ACCOUNTING"],
+  // Ferramentas - realigned tool access matrix. The root/wildcard is the UNION of every
+  // tool's audience so any sector with at least one tool can open the hub (which filters
+  // its cards client-side). Each specific tool path is gated to its exact matrix audience.
+  "/ferramentas": ["ADMIN", "PRODUCTION_MANAGER", "COMMERCIAL", "HUMAN_RESOURCES", "ACCOUNTING", "FINANCIAL", "LOGISTIC"],
+  "/ferramentas/*": ["ADMIN", "PRODUCTION_MANAGER", "COMMERCIAL", "HUMAN_RESOURCES", "ACCOUNTING", "FINANCIAL", "LOGISTIC"],
+  // Custo de Horas Extras
+  "/ferramentas/custo-horas-extras": ["ADMIN", "PRODUCTION_MANAGER", "COMMERCIAL", "HUMAN_RESOURCES", "ACCOUNTING"],
+  // Calculadora de Mistura
+  "/ferramentas/calculadora-de-mistura": ["ADMIN", "PRODUCTION_MANAGER", "COMMERCIAL"],
+  // Custo de Funcionário — ADMIN only
+  "/ferramentas/custo-de-funcionario": ["ADMIN"],
+  // Notas board — hub child (ADMIN/PM/COMMERCIAL/ACCOUNTING) + FINANCIAL (flat) + LOGISTIC (Pessoal)
+  "/ferramentas/notas": ["ADMIN", "PRODUCTION_MANAGER", "COMMERCIAL", "ACCOUNTING", "FINANCIAL", "LOGISTIC"],
+  // QR generator, color palette — ADMIN only
+  "/ferramentas/qr-code": ["ADMIN"],
+  "/ferramentas/paleta": ["ADMIN"],
+  // Certificado de Resíduos — ADMIN + ACCOUNTING
+  "/ferramentas/certificado-residuos": ["ADMIN", "ACCOUNTING"],
 
   // Fallback patterns (for broader route matching)
   "/administracao/*": "ADMIN",
