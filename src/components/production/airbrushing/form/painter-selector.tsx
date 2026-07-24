@@ -50,20 +50,16 @@ export function PainterSelector({
       const response = await getUsers({
         take: pageSize,
         skip: (page - 1) * pageSize,
-        where: {
-          // Painters belong to sectors with the AIRBRUSHING privilege.
-          // Do NOT filter by status/isActive: painters are usually dismissed users.
-          sector: { is: { privileges: SECTOR_PRIVILEGES.AIRBRUSHING } },
-          ...(searchTerm
-            ? {
-                OR: [
-                  { name: { contains: searchTerm, mode: "insensitive" } },
-                  { email: { contains: searchTerm, mode: "insensitive" } },
-                  { cpf: { contains: searchTerm } },
-                ],
-              }
-            : {}),
-        },
+        // Painters belong to sectors with the AIRBRUSHING privilege.
+        // Do NOT filter by status/isActive: painters are usually dismissed users.
+        //
+        // This MUST use the `includeSectorPrivileges` convenience filter, not a nested `where`.
+        // A nested `where` is JSON-stringified by the axios paramsSerializer (axiosClient.ts:438)
+        // and the API query pipe only JSON.parses the `include` key (zod-validation.pipe.ts:137),
+        // so `where` arrives as a string, fails `userWhereSchema`, and 400s — which the catch below
+        // swallowed into an empty list ("Nenhum pintor encontrado"). An array param survives intact.
+        includeSectorPrivileges: [SECTOR_PRIVILEGES.AIRBRUSHING],
+        ...(searchTerm ? { searchingFor: searchTerm } : {}),
         orderBy: { name: "asc" },
         select: {
           id: true,

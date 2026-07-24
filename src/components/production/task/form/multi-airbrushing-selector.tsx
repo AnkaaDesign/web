@@ -4,6 +4,7 @@ import { IconPlus, IconTrash, IconPhoto } from "@tabler/icons-react";
 import { FormLabel } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DateTimeInput } from "@/components/ui/date-time-input";
@@ -28,6 +29,7 @@ interface AirbrushingItem {
   status: string;
   paymentStatus: string;
   price: number | null;
+  description: string | null;
   startDate: Date | null;
   finishDate: Date | null;
   startedAt: Date | null;
@@ -88,6 +90,7 @@ const mapFieldValueToItem = (airbrushing: any, index: number): AirbrushingItem =
   status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
   paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
   price: airbrushing.price || null,
+  description: airbrushing.description ?? null,
   startDate: airbrushing.startDate || null,
   finishDate: airbrushing.finishDate || null,
   startedAt: airbrushing.startedAt || null,
@@ -175,6 +178,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           status: airbrushing.status,
           paymentStatus: airbrushing.paymentStatus,
           price: airbrushing.price,
+          description: airbrushing.description,
           startDate: airbrushing.startDate,
           finishDate: airbrushing.finishDate,
           startedAt: airbrushing.startedAt,
@@ -206,10 +210,13 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
     const addAirbrushing = useCallback(() => {
       const newAirbrushing: AirbrushingItem = {
-        id: `airbrushing-${Date.now()}`,
+        // crypto.randomUUID, not Date.now(): two rows added within the same millisecond would share
+        // an id, and `updateAirbrushing` matches on id — editing one would silently write into both.
+        id: `airbrushing-${crypto.randomUUID()}`,
         status: AIRBRUSHING_STATUS.PENDING,
         paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
         price: null,
+        description: null,
         startDate: null,
         finishDate: null,
         startedAt: null,
@@ -436,6 +443,20 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       disabled={disabled}
                     />
                   </div>
+                </div>
+
+                {/* Row 4: Description (full width — multi-line, so it gets its own row) */}
+                <div className="space-y-2">
+                  <FormLabel>Descrição</FormLabel>
+                  <Textarea
+                    value={airbrushing.description ?? ""}
+                    onChange={(e) => updateAirbrushing(airbrushing.id, { description: e.target.value || null })}
+                    placeholder="Detalhes da aerografia..."
+                    rows={3}
+                    maxLength={500}
+                    disabled={disabled}
+                    className="bg-transparent"
+                  />
                 </div>
 
                 {/* Layouts — same uploader as the main task layout (card look, PDF/EPS/AI

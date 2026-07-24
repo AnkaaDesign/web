@@ -92,6 +92,10 @@ export const TaskSelector = ({
   // search/filter/sort (the API caps limit at 1000, matching the prep buckets).
   const { data, isLoading } = useTasks({
     shouldDisplayInPreparation: true,
+    // Only tasks that actually carry airbrushing work: >=1 PRODUCTION service order described
+    // "Aerografia *" (Lateral / Laterais / Parcial / Traseira). ANDed with the preparation scope,
+    // so cancelled and fully-closed tasks stay hidden — you shouldn't register work on those.
+    hasAirbrushingServiceOrder: true,
     include: LIST_INCLUDE as never,
     limit: 1000,
     orderBy: { forecastDate: "asc" },

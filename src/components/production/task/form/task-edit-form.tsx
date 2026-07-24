@@ -152,11 +152,14 @@ function planAirbrushingReconciliation(
   // empty row `mapDataToForm` seeds so it never counts as a change / phantom airbrushing).
   const isMeaningful = (a: any): boolean =>
     a.price != null || !!a.startDate || !!a.finishDate || !!a.startedAt || !!a.finishedAt || !!a.painterId ||
+    !!a.description?.trim() ||
     uploadedIds(a.receiptFiles).length > 0 || uploadedIds(a.invoiceFiles).length > 0 || uploadedIds(a.layouts).length > 0 ||
     newFilesOf(a.receiptFiles).length > 0 || newFilesOf(a.invoiceFiles).length > 0 || newFilesOf(a.layouts).length > 0;
 
   const rowChanged = (a: any, orig: any): boolean => {
     if ((a.price ?? null) !== (orig.price ?? null)) return true;
+    // Without this, editing ONLY the description produces no update request at all.
+    if ((a.description ?? null) !== (orig.description ?? null)) return true;
     if (a.status !== orig.status) return true;
     if ((a.paymentStatus ?? null) !== (orig.paymentStatus ?? null)) return true;
     if ((a.painterId ?? null) !== (orig.painterId ?? null)) return true;
@@ -175,6 +178,7 @@ function planAirbrushingReconciliation(
     status: a.status,
     paymentStatus: a.paymentStatus,
     price: a.price ?? null,
+    description: a.description?.trim() || null,
     startDate: a.startDate ?? null,
     finishDate: a.finishDate ?? null,
     startedAt: a.startedAt ?? null,
@@ -1016,6 +1020,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             startedAt: a.startedAt ? new Date(a.startedAt) : null,
             finishedAt: a.finishedAt ? new Date(a.finishedAt) : null,
             price: a.price,
+            description: a.description ?? null,
             status: a.status,
             paymentStatus: a.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
             painterId: a.painterId || null,
@@ -1036,6 +1041,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             status: AIRBRUSHING_STATUS.PENDING,
             paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
             price: null,
+            description: null,
             startDate: null,
             finishDate: null,
             startedAt: null,

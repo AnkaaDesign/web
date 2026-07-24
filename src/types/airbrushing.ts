@@ -16,6 +16,8 @@ export interface Airbrushing extends BaseEntity {
   startedAt: Date | null; // Actual start timestamp
   finishedAt: Date | null; // Actual finish timestamp
   price: number | null;
+  /** Free-text job spec / notes for the airbrushing. */
+  description: string | null;
   status: AIRBRUSHING_STATUS; // "Pendente", "Em Produção", "Finalizado", "Cancelado"
   statusOrder: number; // 1=Pendente, 2=Em Produção, 3=Finalizado, 4=Cancelado
   paymentStatus: AIRBRUSHING_PAYMENT_STATUS;

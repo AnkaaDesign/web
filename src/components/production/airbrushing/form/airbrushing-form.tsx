@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -41,6 +41,7 @@ import {
   IconCreditCard,
   IconStack2,
   IconFileTypePdf,
+  IconFileDescription,
 } from "@tabler/icons-react";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { cn } from "@/lib/utils";
@@ -69,10 +70,13 @@ type LayoutStatus = "DRAFT" | "APPROVED" | "REPROVED";
 // One empty MultiAirbrushingSelector row to seed create mode (mirrors the cut wizard seeding one
 // empty cut). Only meaningful rows are actually created, so a blank seed adds nothing until filled.
 const makeEmptyAirbrushing = () => ({
-  id: `airbrushing-${Date.now()}`,
+  // crypto.randomUUID, not Date.now(): two rows added within the same millisecond would share an id,
+  // and `updateAirbrushing` matches on id — so editing one row would silently write into both.
+  id: `airbrushing-${crypto.randomUUID()}`,
   status: AIRBRUSHING_STATUS.PENDING,
   paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
   price: null,
+  description: null,
   startDate: null,
   finishDate: null,
   startedAt: null,
@@ -236,7 +240,13 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
 
   // Mutations
   const { updateAsync: update, isCreating, isUpdating, refresh } = useAirbrushingMutations();
-  const isSubmitting = isCreating || isUpdating;
+  // CREATE bypasses the react-query mutation entirely (createAirbrushingsForTasks calls
+  // airbrushingService.createAirbrushing directly), so `isCreating` NEVER flips on that path and
+  // cannot gate the submit button — which is how a second click used to re-run the whole
+  // configs × tasks fan-out (3 configs × 1 task produced 6 airbrushings). Track it locally.
+  const [isSubmittingLocal, setIsSubmittingLocal] = useState(false);
+  const submitInFlight = useRef(false);
+  const isSubmitting = isCreating || isUpdating || isSubmittingLocal;
 
   // Single RHF instance shared across every step.
   const formSchema = mode === "create" ? airbrushingCreateSchema : airbrushingUpdateSchema;
@@ -249,6 +259,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       startedAt: null,
       finishedAt: null,
       price: null,
+      description: null,
       taskId: initialTaskId || "",
       painterId: null,
       receiptIds: [],
@@ -273,6 +284,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       startedAt: airbrushing.startedAt ?? null,
       finishedAt: airbrushing.finishedAt ?? null,
       price: airbrushing.price,
+      description: airbrushing.description ?? null,
       status: airbrushing.status,
       paymentStatus: airbrushing.paymentStatus ?? AIRBRUSHING_PAYMENT_STATUS.PENDING,
       taskId: airbrushing.taskId,
@@ -449,7 +461,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
           return true;
         }
         // Edit — all fields optional; only fail on malformed values.
-        const ok = await form.trigger(["price", "startDate", "finishDate", "status", "paymentStatus", "painterId"] as any);
+        const ok = await form.trigger(["price", "description", "startDate", "finishDate", "status", "paymentStatus", "painterId"] as any);
         if (!ok) {
           const errors = form.formState.errors as any;
           const firstMsg = errors.price?.message || errors.painterId?.message || errors.startDate?.message || errors.finishDate?.message || "Verifique os dados da aerografia";
@@ -475,7 +487,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
           toast.error("Uma tarefa deve ser selecionada");
           return false;
         }
-        const ok = await form.trigger(["startDate", "finishDate", "price", "taskId", "status", "paymentStatus", "painterId"] as any);
+        const ok = await form.trigger(["startDate", "finishDate", "price", "description", "taskId", "status", "paymentStatus", "painterId"] as any);
         if (!ok) {
           toast.error("Por favor, corrija os erros no formulário");
           return false;
@@ -505,9 +517,16 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
 
   // Final submission — preserves the new-vs-existing file split + layoutStatuses payload shape.
   const handleSubmit = useCallback(async () => {
-    if (!(await validateCurrentStep())) return;
+    // In-flight guard. The REF (not the state) is what actually blocks a second click: the click can
+    // land before React re-renders with the disabled button, and `validateCurrentStep` below awaits,
+    // opening a window in which a second run would fan the same configs out over the same tasks again.
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
+    setIsSubmittingLocal(true);
 
     try {
+      if (!(await validateCurrentStep())) return;
+
       const data = form.getValues();
 
       const newReceiptFiles = receiptFiles.filter((f) => !f.uploaded);
@@ -628,6 +647,11 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
         console.error("Error submitting airbrushing form:", error);
       }
       // Error toast handled by the mutation hook.
+    } finally {
+      // Every early `return` inside the try (failed validation, the empty-config bail, the create
+      // branch's own return) still runs this, so the lock can never be left stuck on.
+      submitInFlight.current = false;
+      setIsSubmittingLocal(false);
     }
   }, [validateCurrentStep, form, mode, update, refresh, airbrushingId, onSuccess, navigate, setSearchParams, receiptFiles, invoiceFiles, layouts, layoutStatuses, airbrushing, selectedTaskResponse, selectedTasks, selectedTaskRows, selectedTaskId]);
 
@@ -983,6 +1007,9 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                                       : []),
                                     { icon: <IconCalendar className="h-4 w-4" />, label: "Início Previsto", value: c.startDate ? formatDate(c.startDate as Date) : "-" },
                                     { icon: <IconCalendar className="h-4 w-4" />, label: "Término Previsto", value: c.finishDate ? formatDate(c.finishDate as Date) : "-" },
+                                    ...(c.description?.trim()
+                                      ? [{ icon: <IconFileDescription className="h-4 w-4" />, label: "Descrição", value: c.description.trim() }]
+                                      : []),
                                   ];
                                   return (
                                     <div key={c.id ?? i} className={reviewConfigs.length > 1 ? "rounded-lg border border-border p-3 space-y-2" : "space-y-2"}>
@@ -1095,6 +1122,18 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                               </span>
                               <span className="text-sm font-semibold text-foreground">{form.watch("finishDate") ? formatDate(form.watch("finishDate") as Date) : "-"}</span>
                             </div>
+                            {/* Stacked, not justify-between: free-form multi-line text. */}
+                            {form.watch("description") && (
+                              <div className="flex flex-col gap-1 bg-muted/50 rounded-lg px-4 py-3">
+                                <span className="text-sm text-muted-foreground flex items-center gap-2">
+                                  <IconFileDescription className="h-4 w-4" />
+                                  Descrição
+                                </span>
+                                <span className="text-sm font-semibold text-foreground whitespace-pre-wrap break-words">
+                                  {form.watch("description") as string}
+                                </span>
+                              </div>
+                            )}
 
                             {/* Money rows — gated behind canViewAirbrushingFinancials */}
                             {canViewFinancials && (

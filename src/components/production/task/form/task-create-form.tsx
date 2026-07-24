@@ -330,6 +330,14 @@ export const TaskCreateForm = () => {
   // Handle form submission
   const handleSubmit = useCallback(
     async (data: TaskCreateFormSchemaType) => {
+      // Re-entrancy guard. `disabled: isSubmitting` is NOT sufficient on its own: a rapid second
+      // click can land before React re-renders with the disabled button, and this handler awaits
+      // (file uploads + task create + nested airbrushing/cut fan-out), so a second pass would create
+      // a duplicate set. The REF is what blocks — state updates are async.
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
+
       try {
         // Validate responsible rows before submitting
         if (!validateResponsibleRows(responsibleRows)) {
@@ -337,9 +345,6 @@ export const TaskCreateForm = () => {
           toast.error("Preencha o nome e telefone dos responsáveis");
           return;
         }
-
-        setIsSubmitting(true);
-        isSubmittingRef.current = true;
 
         const { plates, serialNumbers, name, customerId, status, category, implementType, forecastDate, term, details, paintId, paintIds } = data;
 

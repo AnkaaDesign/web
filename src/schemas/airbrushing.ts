@@ -1,7 +1,7 @@
 // packages/schemas/src/airbrushing.ts
 
 import { z } from "zod";
-import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, nullableDate, toFormData } from "./common";
+import { createMapToFormDataHelper, orderByDirectionSchema, orderByWithNullsSchema, normalizeOrderBy, nullableDate, toFormData } from "./common";
 import type { Airbrushing } from "../types";
 import { AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS } from "../constants";
 
@@ -28,7 +28,28 @@ export const airbrushingIncludeSchema = z
               logoPaints: z.boolean().optional(),
               bonifications: z.boolean().optional(),
               services: z.boolean().optional(),
-              truck: z.boolean().optional(),
+              // `truck` is a KNOWN key, so a nested include is an invalid_type error (a 400 on the
+              // whole list), not a silent strip. The "Medidas" column needs the side measures.
+              truck: z
+                .union([
+                  z.boolean(),
+                  z.object({
+                    include: z
+                      .object({
+                        leftSideMeasure: z
+                          .union([z.boolean(), z.object({ include: z.object({ sections: z.boolean().optional() }).optional() })])
+                          .optional(),
+                        rightSideMeasure: z
+                          .union([z.boolean(), z.object({ include: z.object({ sections: z.boolean().optional() }).optional() })])
+                          .optional(),
+                        backSideMeasure: z
+                          .union([z.boolean(), z.object({ include: z.object({ sections: z.boolean().optional() }).optional() })])
+                          .optional(),
+                      })
+                      .optional(),
+                  }),
+                ])
+                .optional(),
               airbrushings: z.boolean().optional(),
             })
             .optional(),
@@ -160,6 +181,8 @@ export const airbrushingOrderBySchema = z
           .object({
             id: orderByDirectionSchema.optional(),
             name: orderByDirectionSchema.optional(),
+            // "Identificador" sorts on the serial with NULLS LAST in both directions.
+            serialNumber: orderByWithNullsSchema.optional(),
             status: orderByDirectionSchema.optional(),
             createdAt: orderByDirectionSchema.optional(),
             updatedAt: orderByDirectionSchema.optional(),
@@ -202,6 +225,7 @@ export const airbrushingOrderBySchema = z
             .object({
               id: orderByDirectionSchema.optional(),
               name: orderByDirectionSchema.optional(),
+              serialNumber: orderByWithNullsSchema.optional(),
               status: orderByDirectionSchema.optional(),
               createdAt: orderByDirectionSchema.optional(),
               updatedAt: orderByDirectionSchema.optional(),
@@ -432,6 +456,7 @@ const airbrushingFilters = {
   paymentStatuses: z.array(z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS)).optional(),
   taskIds: z.array(z.string()).optional(),
   painterIds: z.array(z.string()).optional(),
+  customerIds: z.array(z.string()).optional(),
   priceRange: z
     .object({
       min: z.number().optional(),
@@ -440,6 +465,20 @@ const airbrushingFilters = {
     .optional(),
   hasStartDate: z.boolean().optional(),
   hasFinishDate: z.boolean().optional(),
+  // "Período de Início" / "Período de Término" — de/até ranges over the PLANNED dates.
+  // Named *Range so they never collide with the `startDate`/`finishDate` where-clause fields.
+  startDateRange: z
+    .object({
+      gte: z.coerce.date().optional(),
+      lte: z.coerce.date().optional(),
+    })
+    .optional(),
+  finishDateRange: z
+    .object({
+      gte: z.coerce.date().optional(),
+      lte: z.coerce.date().optional(),
+    })
+    .optional(),
 };
 
 // =====================
@@ -601,6 +640,15 @@ export const airbrushingCreateSchema = z
       .min(0, "Preço deve ser maior ou igual a zero")
       .nullable()
       .optional(),
+    // .nullable() is required, not stylistic: the FormData helper serializes JS null as the literal
+    // string "null", which the API's ArrayFixPipe converts back to null. Without it, clearing the
+    // field in the UI 400s. The transform collapses "" to null so a blank textarea clears cleanly.
+    description: z
+      .string()
+      .max(500, "Descrição muito longa (máximo 500 caracteres)")
+      .nullable()
+      .optional()
+      .transform((v) => (typeof v === "string" ? v.trim() || null : v)),
     status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PENDING),
     paymentStatus: z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS).default(AIRBRUSHING_PAYMENT_STATUS.PENDING),
     taskId: z.string().uuid("Tarefa inválida"),
@@ -629,6 +677,12 @@ export const airbrushingUpdateSchema = z
       .min(0, "Preço deve ser maior ou igual a zero")
       .nullable()
       .optional(),
+    description: z
+      .string()
+      .max(500, "Descrição muito longa (máximo 500 caracteres)")
+      .nullable()
+      .optional()
+      .transform((v) => (typeof v === "string" ? v.trim() || null : v)),
     status: z.nativeEnum(AIRBRUSHING_STATUS).optional(),
     paymentStatus: z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS).optional(),
     taskId: z.string().uuid("Tarefa inválida").optional(),
@@ -718,6 +772,12 @@ export const airbrushingCreateNestedSchema = z
       .min(0, "Preço deve ser maior ou igual a zero")
       .nullable()
       .optional(),
+    description: z
+      .string()
+      .max(500, "Descrição muito longa (máximo 500 caracteres)")
+      .nullable()
+      .optional()
+      .transform((v) => (typeof v === "string" ? v.trim() || null : v)),
     status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PENDING),
     paymentStatus: z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS).optional(),
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
@@ -739,6 +799,7 @@ export const mapAirbrushingToFormData = createMapToFormDataHelper<Airbrushing, A
   startedAt: airbrushing.startedAt,
   finishedAt: airbrushing.finishedAt,
   price: airbrushing.price,
+  description: airbrushing.description,
   status: airbrushing.status,
   paymentStatus: airbrushing.paymentStatus,
   taskId: airbrushing.taskId,

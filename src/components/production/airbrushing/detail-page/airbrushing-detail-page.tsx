@@ -20,6 +20,7 @@ import {
   IconTrash,
   IconList,
   IconLayoutGrid,
+  IconFileDescription,
 } from "@tabler/icons-react";
 import { DetailPage } from "@/components/ui/detailpage";
 import type { DetailSectionDef } from "@/components/ui/detailpage";
@@ -144,18 +145,11 @@ export function AirbrushingDetailPage() {
     const res = await getUsers({
       take: pageSize,
       skip: (page - 1) * pageSize,
-      where: {
-        sector: { is: { privileges: SECTOR_PRIVILEGES.AIRBRUSHING } },
-        ...(search
-          ? {
-              OR: [
-                { name: { contains: search, mode: "insensitive" } },
-                { email: { contains: search, mode: "insensitive" } },
-                { cpf: { contains: search } },
-              ],
-            }
-          : {}),
-      },
+      // MUST be the `includeSectorPrivileges` convenience filter, not a nested `where`: a nested
+      // `where` is JSON-stringified by the paramsSerializer and the API pipe only JSON.parses
+      // `include`, so it arrives as a string, fails `userWhereSchema` and 400s (see PainterSelector).
+      includeSectorPrivileges: [SECTOR_PRIVILEGES.AIRBRUSHING],
+      ...(search ? { searchingFor: search } : {}),
       orderBy: { name: "asc" },
       select: { id: true, name: true, email: true },
     } as never);
@@ -219,6 +213,23 @@ export function AirbrushingDetailPage() {
                 placeholder: "Buscar pintor...",
                 onCommit: async (v, a) => {
                   await updateAsync({ id: a.id, data: { painterId: (v as string) || null } });
+                },
+              }
+            : undefined,
+        },
+        {
+          id: "description",
+          label: "Descrição",
+          icon: IconFileDescription,
+          dataType: "textarea",
+          accessor: (a) => a.description ?? null,
+          edit: canEdit
+            ? {
+                get: (a) => a.description ?? null,
+                placeholder: "Detalhes da aerografia",
+                validate: (v) => (typeof v === "string" && v.length > 500 ? "Descrição muito longa (máximo 500 caracteres)" : null),
+                onCommit: async (v, a) => {
+                  await updateAsync({ id: a.id, data: { description: (v as string)?.trim() || null } });
                 },
               }
             : undefined,

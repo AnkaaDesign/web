@@ -73,6 +73,9 @@ export const FinancialBudgetCreatePage = () => {
   // State
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Re-entrancy guard for handleSubmit — see the comment there. `disabled: isSubmitting` alone can't
+  // stop a rapid second click, because the state update hasn't re-rendered the button yet.
+  const isSubmittingRef = useRef<boolean>(false);
   const [layoutFiles, setLayoutFiles] = useState<FileWithPreview[]>([]);
   const customersCache = useRef<Map<string, any>>(new Map());
   const [selectedCustomers, setSelectedCustomers] = useState<Map<string, any>>(
@@ -457,6 +460,12 @@ export const FinancialBudgetCreatePage = () => {
 
   // Handle form submission
   const handleSubmit = useCallback(async () => {
+    // Re-entrancy guard. This handler awaits file uploads, then creates task + quote + nested
+    // airbrushings per row — a second pass would create a duplicate set. The REF is what blocks;
+    // React state updates are async, so the disabled button alone loses the race.
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+
     const data = form.getValues();
 
     setIsSubmitting(true);
@@ -788,6 +797,7 @@ export const FinancialBudgetCreatePage = () => {
       // Error toast is emitted by the axios error interceptor.
       console.error("Error in budget creation:", error);
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   }, [

@@ -14,6 +14,7 @@ const newFilesOf = (files: any[]): File[] =>
 // Skip the empty default row the selector may seed — only create rows carrying real data.
 const isMeaningful = (a: any): boolean =>
   a.price != null || !!a.startDate || !!a.finishDate || !!a.startedAt || !!a.finishedAt || !!a.painterId ||
+  !!a.description?.trim() ||
   uploadedIds(a.layouts).length > 0 || newFilesOf(a.layouts).length > 0 ||
   uploadedIds(a.receiptFiles).length > 0 || newFilesOf(a.receiptFiles).length > 0 ||
   uploadedIds(a.invoiceFiles).length > 0 || newFilesOf(a.invoiceFiles).length > 0;
@@ -39,6 +40,7 @@ export interface AirbrushingConfig {
   status?: any;
   paymentStatus?: any;
   price?: number | null;
+  description?: string | null;
   startDate?: any;
   finishDate?: any;
   startedAt?: any;
@@ -87,6 +89,9 @@ export async function createAirbrushingForTasks(
       status: config.status,
       paymentStatus: config.paymentStatus,
       price: config.price ?? null,
+      // `|| null` (not `??`): collapses "" to null so a blank textarea clears the field rather than
+      // sending an empty string through the FormData helper.
+      description: config.description?.trim() || null,
       startDate: config.startDate ?? null,
       finishDate: config.finishDate ?? null,
       startedAt: config.startedAt ?? null,
@@ -142,6 +147,7 @@ export async function createAirbrushingsForTasks(
         status: a.status,
         paymentStatus: a.paymentStatus,
         price: a.price ?? null,
+        description: a.description?.trim() || null,
         startDate: a.startDate ?? null,
         finishDate: a.finishDate ?? null,
         startedAt: a.startedAt ?? null,
@@ -184,6 +190,7 @@ export async function createAirbrushingsForTask(
       status: a.status,
       paymentStatus: a.paymentStatus,
       price: a.price ?? null,
+      description: a.description?.trim() || null,
       startDate: a.startDate ?? null,
       finishDate: a.finishDate ?? null,
       startedAt: a.startedAt ?? null,

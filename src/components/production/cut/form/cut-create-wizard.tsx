@@ -10,7 +10,7 @@
 // and THEN issue a single batch-create: for every selected task, for every cut plan, `quantity`
 // PLAN cuts. tasks × Σ(quantity) cuts in one request.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import {
@@ -117,6 +117,8 @@ export const CutCreateWizard = ({ initialTaskId, onSuccess, onCancel, className 
   const handleCutsChange = useCallback((cuts: EmittedCut[]) => setSelectorCuts(cuts), []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Re-entrancy guard for handleSubmit — see the comment there.
+  const isSubmittingRef = useRef<boolean>(false);
 
   const { batchCreateAsync } = useCutBatchMutations();
 
@@ -206,6 +208,11 @@ export const CutCreateWizard = ({ initialTaskId, onSuccess, onCancel, className 
   }, [onCancel, navigate]);
 
   const handleSubmit = useCallback(async () => {
+    // Re-entrancy guard. `disabled: isSubmitting` alone loses the race — a second click can land
+    // before React re-renders, and this handler awaits file uploads then batch-creates the
+    // cut × task fan-out, so a second pass would re-upload and duplicate every cut.
+    if (isSubmittingRef.current) return;
+
     const cuts = selectorCuts.filter((c) => c.hasFile);
     if (cuts.length === 0) {
       toast.error("Adicione ao menos um corte com arquivo.");
@@ -218,6 +225,7 @@ export const CutCreateWizard = ({ initialTaskId, onSuccess, onCancel, className 
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       // 1) Resolve a fileId for each cut plan — upload the picked file if it isn't already uploaded.
@@ -259,6 +267,7 @@ export const CutCreateWizard = ({ initialTaskId, onSuccess, onCancel, className 
       // Upload failure (the batch-create hook already toasts its own errors).
       toast.error("Erro ao criar os recortes. Tente novamente.");
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   }, [selectorCuts, taskIds, batchCreateAsync, onSuccess, navigate, goToStep]);

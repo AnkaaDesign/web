@@ -832,6 +832,11 @@ export const taskGetManySchema = z
     hasPaints: z.boolean().optional(),
     hasServiceOrders: z.boolean().optional(),
     hasAirbrushing: z.boolean().optional(),
+    // Only tasks with >=1 PRODUCTION service order whose description starts with "Aerografia".
+    // Forwarded RAW to the API (like shouldDisplayInPreparation) — deliberately NOT translated in
+    // this file's taskTransform: a web-side block would emit a nested `where`, which the API query
+    // pipe rejects (it JSON.parses only the `include` key, so `where` arrives as a string and 400s).
+    hasAirbrushingServiceOrder: z.boolean().optional(),
     // Preparation display logic filter
     shouldDisplayInPreparation: z.boolean().optional(),
     preparationExcludeLogistic: z.boolean().optional(), // When true, excludes LOGISTIC SO from preparation completion check

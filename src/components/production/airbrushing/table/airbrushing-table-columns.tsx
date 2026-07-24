@@ -10,6 +10,7 @@ import { AIRBRUSHING_FINANCE_PRIVILEGES } from "@/utils/permissions/entity-permi
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Badge } from "@/components/ui/badge";
 import type { DataTableColumnDef } from "@/components/ui/datatable";
+import { calculateTaskMeasures, formatTaskMeasures } from "@/utils/task-measures";
 
 /**
  * Sectors allowed to see monetary / payment data on an airbrushing (Aerografia).
@@ -42,6 +43,46 @@ export function createAirbrushingColumns(): DataTableColumnDef<Airbrushing>[] {
       },
     },
     {
+      // "Identificador" = the task serial number, falling back to the truck plate — the same
+      // canonical pairing the task-prep / task-history tables render. Available-but-hidden.
+      // Server sort is on the serial only (Prisma can't COALESCE), with NULLS LAST in both
+      // directions so the plate-fallback rows never jump to the top on DESC.
+      id: "taskSerialNumber",
+      header: "Identificador",
+      accessorFn: (row) => row.task?.serialNumber || row.task?.truck?.plate || "",
+      enableSorting: true,
+      size: 150,
+      minSize: 120,
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Identificador",
+        exportValue: (row) => row.task?.serialNumber || row.task?.truck?.plate || "",
+      },
+      cell: ({ getValue }) => {
+        const v = getValue() as string;
+        return v ? <TruncatedTextWithTooltip text={v} className="text-sm" /> : muted("-");
+      },
+    },
+    {
+      // Truck dimensions (largura × altura, cm) off the task's truck — same helper as task-prep.
+      // Not sortable: the value is a computed area and this table sorts server-side.
+      id: "measures",
+      header: "Medidas",
+      accessorFn: (row) => (row.task ? calculateTaskMeasures(row.task) || 0 : 0),
+      enableSorting: false,
+      size: 130,
+      minSize: 110,
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Medidas",
+        exportValue: (row) => (row.task ? formatTaskMeasures(row.task) || "" : ""),
+      },
+      cell: ({ row }) => {
+        const m = row.original.task ? formatTaskMeasures(row.original.task) : "";
+        return m && m !== "-" ? <span className="text-sm tabular-nums">{m}</span> : muted("-");
+      },
+    },
+    {
       id: "customer",
       header: "Cliente",
       accessorFn: (row) => row.task?.customer?.fantasyName || "",
@@ -62,6 +103,23 @@ export function createAirbrushingColumns(): DataTableColumnDef<Airbrushing>[] {
       size: 150,
       minSize: 120,
       meta: { headerLabel: "Pintor", exportValue: (row) => row.painter?.name || "" },
+      cell: ({ getValue }) => {
+        const v = getValue() as string;
+        return v ? <TruncatedTextWithTooltip text={v} className="text-sm" /> : muted("—");
+      },
+    },
+    {
+      id: "description",
+      header: "Descrição",
+      accessorFn: (row) => row.description || "",
+      enableSorting: true,
+      size: 240,
+      minSize: 160,
+      meta: {
+        defaultVisible: false,
+        headerLabel: "Descrição",
+        exportValue: (row) => row.description || "",
+      },
       cell: ({ getValue }) => {
         const v = getValue() as string;
         return v ? <TruncatedTextWithTooltip text={v} className="text-sm" /> : muted("—");

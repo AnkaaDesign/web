@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAirbrushings, useAirbrushingMutations, useAirbrushingBatchMutations, useTasks, useUsers } from "../../../../hooks";
+import { useAirbrushings, useAirbrushingMutations, useAirbrushingBatchMutations, useCustomers, useUsers } from "../../../../hooks";
 import { getAirbrushings } from "@/api-client";
 import type { Airbrushing } from "../../../../types";
 import {
@@ -30,11 +30,22 @@ import { useAuth } from "@/contexts/auth-context";
 import { createAirbrushingColumns, AIRBRUSHING_MONEY_VIEWERS } from "./airbrushing-table-columns";
 import { SetStatusModal } from "./set-status-modal";
 
-// Trimmed include — only what the columns render (task name + customer, painter name). NOTE: the
-// layouts count column is intentionally omitted (the API include has no `_count`, so counting would
-// require fetching every layouts File[] — a heavy payload for a single number).
+// Trimmed include — only what the columns render: task name + customer, the truck plate behind
+// "Identificador", the side measures behind "Medidas", painter name. NOTE: the layouts count column
+// is intentionally omitted (the API include has no `_count`, so counting would require fetching
+// every layouts File[] — a heavy payload for a single number).
 const LIST_INCLUDE = {
-  task: { include: { customer: true } },
+  task: {
+    include: {
+      customer: true,
+      truck: {
+        include: {
+          leftSideMeasure: { include: { sections: true } },
+          rightSideMeasure: { include: { sections: true } },
+        },
+      },
+    },
+  },
   painter: true,
 } as const;
 
@@ -51,8 +62,13 @@ const EMPTY_PARAMS: { search: string; filters: DataTableFilterValues } = { searc
 /** column id → API orderBy entry. Columns without a server-sortable field are omitted (sort ignored). */
 const AIRBRUSHING_SORT_FIELD_MAP: Record<string, (dir: "asc" | "desc") => Record<string, unknown>> = {
   taskName: (d) => ({ task: { name: d } }),
+  // Server sort can't COALESCE(serialNumber, truck.plate) the way the client-mode task-prep table
+  // does, so sort on the serial and push plate-only rows (NULL serial) to the bottom in BOTH
+  // directions — Postgres otherwise puts NULLS FIRST on DESC.
+  taskSerialNumber: (d) => ({ task: { serialNumber: { sort: d, nulls: "last" } } }),
   customer: (d) => ({ task: { customer: { fantasyName: d } } }),
   painter: (d) => ({ painter: { name: d } }),
+  description: (d) => ({ description: d }),
   status: (d) => ({ statusOrder: d }),
   paymentStatus: (d) => ({ paymentStatus: d }),
   price: (d) => ({ price: d }),
@@ -83,13 +99,6 @@ function numberRange(v: unknown): { min?: number; max?: number } | undefined {
   return { ...(min != null ? { min } : {}), ...(max != null ? { max } : {}) };
 }
 
-/** The generic `boolean` filter emits "true"/"false" (or undefined for "Todos"). */
-function boolFilter(v: unknown): boolean | undefined {
-  if (v === true || v === "true") return true;
-  if (v === false || v === "false") return false;
-  return undefined;
-}
-
 /** Map the declarative filter values + global search onto the airbrushing GET query (server mode). */
 function buildAirbrushingQuery(filters: DataTableFilterValues, search: string): Record<string, unknown> {
   const q: Record<string, unknown> = {};
@@ -97,18 +106,16 @@ function buildAirbrushingQuery(filters: DataTableFilterValues, search: string): 
   if (Array.isArray(status) && status.length > 0) q.status = status;
   const pay = filters.paymentStatus;
   if (Array.isArray(pay) && pay.length > 0) q.paymentStatuses = pay;
-  const tasks = filters.taskIds;
-  if (Array.isArray(tasks) && tasks.length > 0) q.taskIds = tasks;
+  const customers = filters.customerIds;
+  if (Array.isArray(customers) && customers.length > 0) q.customerIds = customers;
   const painters = filters.painterIds;
   if (Array.isArray(painters) && painters.length > 0) q.painterIds = painters;
   const price = numberRange(filters.priceRange);
   if (price) q.priceRange = price;
-  const hasStart = boolFilter(filters.hasStartDate);
-  if (hasStart !== undefined) q.hasStartDate = hasStart;
-  const hasFinish = boolFilter(filters.hasFinishDate);
-  if (hasFinish !== undefined) q.hasFinishDate = hasFinish;
-  const created = dateRange(filters.createdAt);
-  if (created) q.createdAt = created;
+  const start = dateRange(filters.startDateRange);
+  if (start) q.startDateRange = start;
+  const finish = dateRange(filters.finishDateRange);
+  if (finish) q.finishDateRange = finish;
   if (search) q.searchingFor = search;
   return q;
 }
@@ -184,14 +191,27 @@ export function AirbrushingTablePage() {
     return all;
   }, [params, sorting, totalRecords]);
 
-  // Filter options (loaded once; API caps limit at 100).
-  const { data: tasksData } = useTasks({ orderBy: { name: "asc" }, limit: 100 });
-  const taskOptions = useMemo(
-    () => ((tasksData as { data?: Array<{ id: string; name: string }> } | undefined)?.data ?? []).map((t) => ({ value: t.id, label: t.name })),
-    [tasksData],
+  // Filter options (loaded once; the API caps `limit` at 100 on both endpoints).
+  const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" }, limit: 100 } as never);
+  const customerOptions = useMemo(
+    () =>
+      ((customersData as { data?: Array<{ id: string; fantasyName?: string | null; corporateName?: string | null }> } | undefined)?.data ?? []).map((c) => ({
+        value: c.id,
+        label: c.fantasyName || c.corporateName || "",
+      })),
+    [customersData],
   );
 
-  const { data: usersData } = useUsers({ orderBy: { name: "asc" }, limit: 100 } as never);
+  // Pintor: painters are users whose sector holds the AIRBRUSHING privilege (same population as the
+  // form's PainterSelector). Do NOT filter by status/isActive — painters are usually dismissed /
+  // third-party workers. Uses the `includeSectorPrivileges` convenience filter rather than a nested
+  // `where`: a nested `where` is JSON-stringified by the paramsSerializer and the API query pipe
+  // JSON.parses only the `include` key, so it would arrive as a string and 400.
+  const { data: usersData } = useUsers({
+    orderBy: { name: "asc" },
+    limit: 100,
+    includeSectorPrivileges: [SECTOR_PRIVILEGES.AIRBRUSHING],
+  } as never);
   const painterOptions = useMemo(
     () => ((usersData as { data?: Array<{ id: string; name: string }> } | undefined)?.data ?? []).map((u) => ({ value: u.id, label: u.name })),
     [usersData],
@@ -302,7 +322,7 @@ export function AirbrushingTablePage() {
         requiredPrivilege: AIRBRUSHING_MONEY_VIEWERS,
         options: Object.values(AIRBRUSHING_PAYMENT_STATUS).map((s) => ({ value: s, label: AIRBRUSHING_PAYMENT_STATUS_LABELS[s] })),
       },
-      { key: "taskIds", label: "Tarefa", type: "multiselect", options: taskOptions },
+      { key: "customerIds", label: "Cliente", type: "multiselect", options: customerOptions },
       { key: "painterIds", label: "Pintor", type: "multiselect", options: painterOptions },
       {
         key: "priceRange",
@@ -311,11 +331,10 @@ export function AirbrushingTablePage() {
         currency: true,
         requiredPrivilege: AIRBRUSHING_MONEY_VIEWERS,
       },
-      { key: "hasStartDate", label: "Tem data de início", type: "boolean" },
-      { key: "hasFinishDate", label: "Tem data de término", type: "boolean" },
-      { key: "createdAt", label: "Período de criação", type: "date-range" },
+      { key: "startDateRange", label: "Período de Início", type: "date-range" },
+      { key: "finishDateRange", label: "Período de Término", type: "date-range" },
     ],
-    [taskOptions, painterOptions],
+    [customerOptions, painterOptions],
   );
 
   return (
@@ -368,7 +387,7 @@ export function AirbrushingTablePage() {
             ],
             defaultPageSize: AIRBRUSHING_DEFAULT_PAGE_SIZE,
             estimateRowHeight: 44,
-            searchPlaceholder: "Buscar por tarefa, cliente...",
+            searchPlaceholder: "Buscar por tarefa, identificador, cliente, descrição...",
             emptyMessage: "Nenhuma aerografia encontrada. Ajuste os filtros ou crie uma nova aerografia.",
             exportTitle: "Aerografias",
             exportFilename: "aerografias",

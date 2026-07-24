@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconBrush, IconCalendar, IconCalendarEvent, IconUser } from "@tabler/icons-react";
+import { IconBrush, IconCalendar, IconCalendarEvent, IconUser, IconFileDescription } from "@tabler/icons-react";
 
 import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
 import { Badge } from "@/components/ui/badge";
@@ -181,6 +181,20 @@ export function AirbrushingsSection({
                   </div>
                 ));
               })()}
+
+              {/* Description — stacked (not the justify-between idiom of the sibling rows),
+                  because the body is free-form multi-line text. */}
+              {airbrushing.description && (
+                <div className="flex flex-col gap-1 bg-muted/50 rounded-lg px-3 py-2">
+                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                    <IconFileDescription className="h-3.5 w-3.5" />
+                    Descrição
+                  </span>
+                  <span className="text-xs font-semibold text-foreground whitespace-pre-wrap break-words">
+                    {airbrushing.description}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Layouts — shared FileItem grid/list (no more bespoke thumbnail plumbing) */}

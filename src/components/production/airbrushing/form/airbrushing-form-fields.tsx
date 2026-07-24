@@ -1,6 +1,7 @@
 import { useFormContext, useWatch } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { IconInfoCircle } from "@tabler/icons-react";
@@ -152,6 +153,35 @@ export function AirbrushingFormFields({ control, disabled, initialPainter, canVi
           )}
         />
       </div>
+
+      {/* Description — full width, multi-line, so it sits outside the two-column grid. */}
+      <FormField
+        control={control}
+        name="description"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Descrição</FormLabel>
+            <FormControl>
+              <Textarea
+                value={field.value || ""}
+                onChange={(e) => field.onChange(e.target.value)}
+                onBlur={field.onBlur}
+                name={field.name}
+                ref={field.ref}
+                placeholder="Detalhes da aerografia..."
+                rows={4}
+                maxLength={500}
+                disabled={disabled}
+                className="bg-transparent"
+              />
+            </FormControl>
+            <div className="flex items-center justify-between">
+              <FormMessage />
+              {field.value && <p className="text-xs text-muted-foreground">{String(field.value).length}/500 caracteres</p>}
+            </div>
+          </FormItem>
+        )}
+      />
     </div>
   );
 }
