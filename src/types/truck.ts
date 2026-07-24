@@ -13,6 +13,7 @@ export interface Truck extends BaseEntity {
   // Identification
   plate: string | null;
   chassisNumber: string | null;
+  vinPlate: string | null;
 
   // Truck specifications
   category: TRUCK_CATEGORY | null;
@@ -67,6 +68,7 @@ export interface TruckOrderBy {
   id?: ORDER_BY_DIRECTION;
   plate?: ORDER_BY_DIRECTION;
   chassisNumber?: ORDER_BY_DIRECTION;
+  vinPlate?: ORDER_BY_DIRECTION;
   category?: ORDER_BY_DIRECTION;
   implementType?: ORDER_BY_DIRECTION;
   spot?: ORDER_BY_DIRECTION;
@@ -120,6 +122,7 @@ export interface TruckGetByIdFormData {
 export interface TruckCreateFormData {
   plate?: string | null;
   chassisNumber?: string | null;
+  vinPlate?: string | null;
   category?: TRUCK_CATEGORY | null;
   implementType?: IMPLEMENT_TYPE | null;
   spot?: TRUCK_SPOT | null;
@@ -132,6 +135,7 @@ export interface TruckCreateFormData {
 export interface TruckUpdateFormData {
   plate?: string | null;
   chassisNumber?: string | null;
+  vinPlate?: string | null;
   category?: TRUCK_CATEGORY | null;
   implementType?: IMPLEMENT_TYPE | null;
   spot?: TRUCK_SPOT | null;

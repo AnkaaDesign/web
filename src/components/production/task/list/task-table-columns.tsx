@@ -192,6 +192,19 @@ const createAllTaskColumns = (): TaskColumn[] => [
     },
   },
   {
+    id: "vinPlate",
+    header: "PLAQUETA",
+    accessorFn: (row) => row.truck?.vinPlate || "",
+    sortable: true,
+    filterable: true,
+    defaultVisible: false,
+    width: "200px",
+    formatter: (value: string | null) => {
+      if (!value) return <span className="text-muted-foreground">-</span>;
+      return <span>{value}</span>;
+    },
+  },
+  {
     id: "price",
     header: "VALOR",
     accessorKey: "price",

@@ -465,6 +465,12 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 <span className="text-sm font-medium">{formatChassis(task.truck.chassisNumber)}</span>
               </div>
             )}
+            {task.truck?.vinPlate && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm text-muted-foreground">Plaqueta</span>
+                <span className="text-sm font-medium">{task.truck.vinPlate}</span>
+              </div>
+            )}
             {task.truck?.category && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Categoria</span>

@@ -93,6 +93,7 @@ const LIST_INCLUDE = {
       plate: true,
       category: true,
       chassisNumber: true,
+      vinPlate: true,
       implementType: true,
       // Layouts power the (default-hidden) "Medidas" column — formatTaskMeasures reads
       // height + the sections' widths off the left/right side. Keep the nested select

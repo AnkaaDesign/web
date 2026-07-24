@@ -35,6 +35,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   },
   { id: "serialNumberOrPlate", label: "Nº Série/Placa", getValue: (task: Task) => task.serialNumber || task.truck?.plate || "" },
   { id: "chassisNumber", label: "Nº Chassi", getValue: (task: Task) => task.truck?.chassisNumber || "" },
+  { id: "vinPlate", label: "Plaqueta", getValue: (task: Task) => task.truck?.vinPlate || "" },
   { id: "sector.name", label: "Setor", getValue: (task: Task) => task.sector?.name || "" },
   { id: "entryDate", label: "Entrada", getValue: (task: Task) => (task.entryDate ? formatDate(task.entryDate) : "") },
   { id: "startedAt", label: "Iniciado Em", getValue: (task: Task) => (task.startedAt ? formatDate(task.startedAt) : "") },
@@ -367,6 +368,9 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
                 case "chassisNumber":
                   width = "140px";
                   break;
+                case "vinPlate":
+                  width = "140px";
+                  break;
                 case "sector.name":
                   width = "100px";
                   break;
@@ -514,6 +518,9 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
                             className = "font-mono text-left";
                             break;
                           case "chassisNumber":
+                            className = "font-mono text-left";
+                            break;
+                          case "vinPlate":
                             className = "font-mono text-left";
                             break;
                           case "sector.name":

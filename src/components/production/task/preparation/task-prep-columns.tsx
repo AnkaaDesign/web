@@ -230,7 +230,7 @@ const ALL_TASK_PREP_COLUMN_IDS = [
   "soCommercial", "soLogistic", "soArtwork", "soProduction",
   "forecastDate", "term", "total", "invoiceToCustomers", "paymentStatus", "bonification",
   "status", "pintura", "sector", "responsibles",
-  "truckCategory", "implementType", "chassisNumber", "measures",
+  "truckCategory", "implementType", "chassisNumber", "vinPlate", "measures",
   "entryDate", "startedAt", "finishedAt", "createdAt", "duration", "details",
 ] as const;
 
@@ -513,6 +513,19 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
       cell: ({ row }) =>
         row.original.truck?.chassisNumber ? (
           <span className="truncate">{formatChassis(row.original.truck.chassisNumber)}</span>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        ),
+    },
+    {
+      id: "vinPlate",
+      header: "Plaqueta",
+      accessorFn: (row) => row.truck?.vinPlate || "",
+      size: 150,
+      meta: { defaultVisible: false, headerLabel: "Plaqueta", exportValue: (row) => row.truck?.vinPlate || "" },
+      cell: ({ row }) =>
+        row.original.truck?.vinPlate ? (
+          <span className="truncate">{row.original.truck.vinPlate}</span>
         ) : (
           <span className="text-muted-foreground">-</span>
         ),

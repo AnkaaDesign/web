@@ -250,6 +250,19 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
               </div>
             )}
 
+            {/* Plaqueta */}
+            {(task.truck as any)?.vinPlate && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconBarcode className="h-4 w-4" />
+                  Plaqueta
+                </span>
+                <span className="text-sm font-semibold text-foreground">
+                  {(task.truck as any).vinPlate}
+                </span>
+              </div>
+            )}
+
             {/* Sector */}
             {(task as any).sector?.name && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">

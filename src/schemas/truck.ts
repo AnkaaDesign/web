@@ -89,6 +89,7 @@ export const truckOrderBySchema = z.union([
       id: orderByDirectionSchema.optional(),
       plate: orderByDirectionSchema.optional(),
       chassisNumber: orderByDirectionSchema.optional(),
+      vinPlate: orderByDirectionSchema.optional(),
       category: orderByDirectionSchema.optional(),
       implementType: orderByDirectionSchema.optional(),
       spot: orderByDirectionSchema.optional(),
@@ -122,6 +123,7 @@ export const truckOrderBySchema = z.union([
         id: orderByDirectionSchema.optional(),
         plate: orderByDirectionSchema.optional(),
         chassisNumber: orderByDirectionSchema.optional(),
+        vinPlate: orderByDirectionSchema.optional(),
         category: orderByDirectionSchema.optional(),
         implementType: orderByDirectionSchema.optional(),
         spot: orderByDirectionSchema.optional(),
@@ -189,6 +191,23 @@ export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
         .optional(),
 
       chassisNumber: z
+        .union([
+          z.string(),
+          z.null(),
+          z.object({
+            equals: z.union([z.string(), z.null()]).optional(),
+            not: z.union([z.string(), z.null()]).optional(),
+            in: z.array(z.string()).optional(),
+            notIn: z.array(z.string()).optional(),
+            contains: z.string().optional(),
+            startsWith: z.string().optional(),
+            endsWith: z.string().optional(),
+            mode: z.enum(["default", "insensitive"]).optional(),
+          }),
+        ])
+        .optional(),
+
+      vinPlate: z
         .union([
           z.string(),
           z.null(),
@@ -463,6 +482,11 @@ export const truckCreateSchema = z.object({
     .nullable()
     .optional()
     .transform((val) => (val === "" ? null : val)),
+  vinPlate: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((val) => (val === "" ? null : val)),
 
   // Truck specifications
   category: z.nativeEnum(TRUCK_CATEGORY).nullable().optional(),
@@ -490,6 +514,11 @@ export const truckUpdateSchema = z.object({
     .transform((val) => (val === "" ? null : val?.toUpperCase().replace(/[^A-Z0-9]/g, "")))
     .refine((val) => !val || brazilianPlateRegex.test(val), "Formato de placa inválido (ex: ABC1234 ou ABC-1234)"),
   chassisNumber: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((val) => (val === "" ? null : val)),
+  vinPlate: z
     .string()
     .nullable()
     .optional()
@@ -577,6 +606,7 @@ export type TruckBatchQueryFormData = z.infer<typeof truckBatchQuerySchema>;
 export const mapTruckToFormData = createMapToFormDataHelper<Truck, TruckUpdateFormData>((truck) => ({
   plate: truck.plate || undefined,
   chassisNumber: truck.chassisNumber || undefined,
+  vinPlate: truck.vinPlate || undefined,
   category: truck.category || undefined,
   implementType: truck.implementType || undefined,
   spot: truck.spot || undefined,

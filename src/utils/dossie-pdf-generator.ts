@@ -30,6 +30,7 @@ export interface CompleteDossiePdfOptions {
   serialNumber?: string | null;
   plate?: string | null;
   chassisNumber?: string | null;
+  vinPlate?: string | null;
   truckCategory?: string | null;
   truckImplementType?: string | null;
   finishedAt?: string | null;
@@ -276,6 +277,7 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
   if (opts.serialNumber) vehicleParts.push(`nº de série: ${opts.serialNumber}`);
   if (opts.plate) vehicleParts.push(`placa: ${opts.plate}`);
   if (opts.chassisNumber) vehicleParts.push(`chassi: ${opts.chassisNumber}`);
+  if (opts.vinPlate) vehicleParts.push(`plaqueta: ${opts.vinPlate}`);
   if (opts.truckCategory) vehicleParts.push(`categoria: ${opts.truckCategory}`);
   if (opts.truckImplementType) vehicleParts.push(`implemento: ${opts.truckImplementType}`);
   if (vehicleParts.length) introText += ` no veículo ${vehicleParts.join(', ')}`;
@@ -702,7 +704,7 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
 export async function exportDossiePdf(opts: { taskDisplayName: string; customerName?: string; serialNumber?: string | null; plate?: string | null; truckCategory?: string | null; truckImplementType?: string | null; serviceOrders: ServiceOrderFiles[] }): Promise<void> {
   await exportCompleteDossiePdf({
     documentTitle: opts.taskDisplayName, budgetNumber: '0000', corporateName: opts.customerName || '', contactName: '',
-    serialNumber: opts.serialNumber, plate: opts.plate, chassisNumber: null,
+    serialNumber: opts.serialNumber, plate: opts.plate, chassisNumber: null, vinPlate: null,
     truckCategory: opts.truckCategory ?? null, truckImplementType: opts.truckImplementType ?? null,
     finishedAt: null,
     services: [], subtotal: 0, discountAmount: 0, total: 0, hasDiscount: false,

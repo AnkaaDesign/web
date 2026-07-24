@@ -97,7 +97,7 @@ const SCHEDULE_LIST_INCLUDE = {
  *   column) would leave a large gap before the right-aligned TEMPO RESTANTE. Widening the survivors
  *   lets them comfortably fill the row on a typical viewport.
  */
-const CRONOGRAMA_HIDDEN_COLUMNS = new Set(["spot", "sectorName", "chassisNumber"]);
+const CRONOGRAMA_HIDDEN_COLUMNS = new Set(["spot", "sectorName", "chassisNumber", "vinPlate"]);
 const CRONOGRAMA_COLUMN_WIDTHS: Record<string, number> = {
   name: 210,
   customerName: 185,

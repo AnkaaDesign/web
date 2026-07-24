@@ -42,6 +42,7 @@ interface QuoteData extends TaskQuote {
     truck?: {
       plate?: string;
       chassisNumber?: string;
+      vinPlate?: string;
       category?: string | null;
       implementType?: string | null;
     };
@@ -300,6 +301,7 @@ export function PublicBudgetPage() {
         serialNumber: quote.task?.serialNumber || null,
         plate: quote.task?.truck?.plate || null,
         chassisNumber: quote.task?.truck?.chassisNumber || null,
+        vinPlate: quote.task?.truck?.vinPlate || null,
         truckCategory: quote.task?.truck?.category ? (TRUCK_CATEGORY_LABELS[quote.task.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || quote.task.truck.category) : null,
         truckImplementType: quote.task?.truck?.implementType ? (IMPLEMENT_TYPE_LABELS[quote.task.truck.implementType as keyof typeof IMPLEMENT_TYPE_LABELS] || quote.task.truck.implementType) : null,
         simultaneousTasks: quote.simultaneousTasks || null,
@@ -420,6 +422,7 @@ export function PublicBudgetPage() {
                   if (quote.task?.serialNumber) parts.push(<> nº série: <strong>{quote.task.serialNumber}</strong></>);
                   if (quote.task?.truck?.plate) parts.push(<> placa: <strong>{quote.task.truck.plate}</strong></>);
                   if (quote.task?.truck?.chassisNumber) parts.push(<> chassi: <strong>{quote.task.truck.chassisNumber}</strong></>);
+                  if (quote.task?.truck?.vinPlate) parts.push(<> plaqueta: <strong>{quote.task.truck.vinPlate}</strong></>);
                   if (truckCategoryLabel) parts.push(<> categoria: <strong>{truckCategoryLabel}</strong></>);
                   if (truckImplementLabel) parts.push(<> implemento: <strong>{truckImplementLabel}</strong></>);
                   if (!parts.length) return null;

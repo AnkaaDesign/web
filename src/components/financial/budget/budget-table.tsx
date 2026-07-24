@@ -69,6 +69,7 @@ export function BudgetTable({ className, searchingFor, filters }: BudgetTablePro
         truck: {
           select: {
             chassisNumber: true,
+            vinPlate: true,
             plate: true,
           },
         },

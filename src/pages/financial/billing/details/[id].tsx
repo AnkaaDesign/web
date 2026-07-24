@@ -172,6 +172,7 @@ export const BillingDetailPage = () => {
       plate: "" as string,
       serialNumber: "" as string,
       chassisNumber: "" as string,
+      vinPlate: "" as string,
       category: "" as string,
       implementType: IMPLEMENT_TYPE.REFRIGERATED as string,
       details: "" as string,
@@ -204,6 +205,7 @@ export const BillingDetailPage = () => {
       plate: task.truck?.plate || "",
       serialNumber: task.serialNumber || "",
       chassisNumber: task.truck?.chassisNumber || "",
+      vinPlate: task.truck?.vinPlate || "",
       category: task.truck?.category || "",
       implementType: task.truck?.implementType || IMPLEMENT_TYPE.REFRIGERATED,
       details: task.details || "",
@@ -465,6 +467,7 @@ export const BillingDetailPage = () => {
         truck: {
           plate: formData.plate || undefined,
           chassisNumber: formData.chassisNumber || undefined,
+          vinPlate: formData.vinPlate || undefined,
           category: formData.category || undefined,
           implementType: formData.implementType || undefined,
         },
@@ -936,6 +939,7 @@ export const BillingDetailPage = () => {
                 plate: form.watch("plate"),
                 serialNumber: form.watch("serialNumber"),
                 chassisNumber: form.watch("chassisNumber"),
+                vinPlate: form.watch("vinPlate"),
                 category: form.watch("category"),
                 implementType: form.watch("implementType"),
               }}

@@ -616,6 +616,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     serialNumber: "basic-information",
     "truck.plate": "basic-information",
     "truck.chassisNumber": "basic-information",
+    "truck.vinPlate": "basic-information",
     sectorId: "basic-information",
     status: "basic-information",
     bonification: "basic-information",
@@ -988,6 +989,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       truck: {
         plate: taskData.truck?.plate || null,
         chassisNumber: taskData.truck?.chassisNumber || null,
+        vinPlate: taskData.truck?.vinPlate || null,
         category: taskData.truck?.category || null,
         implementType: taskData.truck?.implementType || null,
         spot: taskData.truck?.spot || null,
@@ -3182,6 +3184,32 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                             </FormItem>
                           );
                         }}
+                      />
+
+                      {/* Plaqueta */}
+                      <FormField
+                        control={form.control}
+                        name="truck.vinPlate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconId className="h-4 w-4" />
+                              Plaqueta
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                ref={field.ref}
+                                value={field.value || ""}
+                                placeholder="Plaqueta"
+                                className="bg-transparent"
+                                onChange={(value: string | number | null) => field.onChange(typeof value === "string" ? value : "")}
+                                onBlur={field.onBlur}
+                                disabled={isSubmitting || !canEditIdentity}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
                     </div>
 

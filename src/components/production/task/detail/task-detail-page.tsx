@@ -610,6 +610,14 @@ function TaskDetailContent() {
             edit: canEdit && task?.truck ? { get: (t) => t.truck?.chassisNumber ?? "", onCommit: (v) => setTaskField({ truck: { chassisNumber: (v as string) || null } }) } : undefined,
           },
           {
+            id: "vinPlate",
+            label: "Plaqueta",
+            editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            accessor: (t) => t.truck?.vinPlate || null,
+            render: (t) => <span>{t.truck?.vinPlate || "—"}</span>,
+            edit: canEdit && task?.truck ? { get: (t) => t.truck?.vinPlate ?? "", onCommit: (v) => setTaskField({ truck: { vinPlate: (v as string) || null } }) } : undefined,
+          },
+          {
             id: "truckCategory",
             label: "Categoria",
             dataType: "enum",

@@ -128,6 +128,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   { id: "sector.name", label: "Setor", getValue: (task: Task) => task.sector?.name || "" },
   { id: "identificador", label: "Identificador", getValue: (task: Task) => task.serialNumber || task.truck?.plate || "" },
   { id: "chassisNumber", label: "Nº Chassi", getValue: (task: Task) => task.truck?.chassisNumber || "" },
+  { id: "vinPlate", label: "Plaqueta", getValue: (task: Task) => task.truck?.vinPlate || "" },
   {
     id: "truckCategory",
     label: "Categoria do Caminhão",

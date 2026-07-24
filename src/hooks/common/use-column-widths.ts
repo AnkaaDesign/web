@@ -155,6 +155,7 @@ export const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   // Identifier columns
   identificador: 140,
   chassisNumber: 140,
+  vinPlate: 140,
 
   // Date columns
   forecastDate: 120,

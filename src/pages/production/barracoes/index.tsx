@@ -116,6 +116,7 @@ export function GaragesPage() {
           spot: true,
           plate: true,
           chassisNumber: true,
+          vinPlate: true,
           leftSideMeasure: {
             select: {
               sections: {
@@ -324,6 +325,7 @@ export function GaragesPage() {
         serialNumber: (task as any).serialNumber || null,
         plate: truck?.plate || null,
         chassisNumber: truck?.chassisNumber || null,
+        vinPlate: truck?.vinPlate || null,
         paintHex: (task.generalPainting as any)?.hex || null,
         length: truckLength,
         originalLength: sectionsSum > 0 ? sectionsSum : undefined, // Original length without cabin
