@@ -21,6 +21,7 @@ import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdo
 import { SidebarFlyout, useFlyoutController } from "./sidebar-flyout";
 import { recordNavClick, clearNavContext, useRecordedNav, resolveActiveNav, computeExpandedFromActive, resolveNavActivityBlinkIds, collectNavActivityTargets } from "@/contexts/navigation-context";
 import { useNavActivityAlert } from "@/hooks/common/use-nav-activity-alert";
+import { useNavActivity } from "@/hooks/common/use-nav-activity";
 
 import {
   IconDashboard,
@@ -658,6 +659,18 @@ export const Sidebar = memo(() => {
   // audible bip loop as a side effect. So the blink derived from it stops exactly when
   // the bips do. See @/hooks/common/use-nav-activity-alert.
   const blinkPaths = useNavActivityAlert();
+  // Blink COLOR mirrors the severity of what's actually blinking (post-snooze): red if
+  // any blinking path is urgent (harsh), amber if all are routine (soft). One class for
+  // the whole trail — the cut and task blinks light disjoint nav subtrees per sector.
+  const { tones: navTones, armedPaths: navArmedPaths } = useNavActivity();
+  const navBlinkClass = useMemo(() => {
+    const paths = [...(blinkPaths as Set<string>)];
+    const harsh = paths.some((p) => navTones.get(p) === "harsh");
+    const armed = paths.some((p) => navArmedPaths.has(p));
+    // ARMED → blink (mirrors a blinking row); RESTING-only → static border (mirrors a viewed row).
+    if (armed) return harsh ? "nav-activity-blink" : "nav-activity-blink-soft";
+    return harsh ? "nav-activity-static" : "nav-activity-static-soft";
+  }, [blinkPaths, navTones, navArmedPaths]);
   const blinkingIds = useMemo(
     () => resolveNavActivityBlinkIds(menuWithContextualItems as MenuItem[], blinkPaths as Set<string>, isOpen ? expandedMenus : {}),
     [menuWithContextualItems, blinkPaths, isOpen, expandedMenus],
@@ -862,7 +875,7 @@ export const Sidebar = memo(() => {
             // so the parent (e.g. "Financeiro") is highlighted exactly like the active page.
             !isNavigating && (isHighlighted || isAncestorOfActive) && "bg-primary text-primary-foreground hover:bg-primary/90",
             !isNavigating && !isHighlighted && !isAncestorOfActive && "hover:bg-muted/50",
-            isBlinking && "nav-activity-blink",
+            isBlinking && navBlinkClass,
           )}
           onClick={handleItemClick}
           onContextMenu={handleContextMenu}
@@ -1133,6 +1146,7 @@ export const Sidebar = memo(() => {
           state={flyout.state}
           isItemActive={isFlyoutItemActive}
           shouldBlink={shouldBlinkFlyoutItem}
+          blinkClass={navBlinkClass}
           getIcon={getIconComponent}
           renderFavoriteIcon={renderFavoriteIcon}
           onNavigate={handleFlyoutNavigate}

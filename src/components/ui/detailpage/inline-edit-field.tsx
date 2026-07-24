@@ -5,7 +5,9 @@ import type { RefObject } from "react";
 import { toast } from "@/components/ui/sonner";
 import { IconArrowBackUp, IconBellPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useAttentionField, attentionRowClass, useSendWarning, type AttentionEntityType } from "@/lib/attention";
+import { useAttentionField, attentionRowClass, useSendWarning, canSendAttentionWarning, type AttentionEntityType } from "@/lib/attention";
+import { useAuth } from "@/contexts/auth-context";
+import { SECTOR_PRIVILEGES } from "@/constants";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -43,8 +45,12 @@ const UNDO_SECONDS = 5;
 // A click counts as "outside the editor" only when it is neither inside the editor container
 // NOR inside a popover/calendar portal opened by it (combobox list, date picker). Capture-phase
 // mousedown → one reliable exit on any outside click (fixes the flaky blur behavior).
+// Also excludes the "send warning" bell (data-attn-send-warning): it sits OUTSIDE the editor's
+// own ref'd container (rendered via DetailRow's `trailing` slot), so without this exclusion the
+// capture-phase mousedown on it fires `onDismiss` (cancelling the edit) BEFORE the button's own
+// click ever reaches it — the modal never opens. Same mechanism as excluding popover portals.
 const PORTAL_SELECTOR =
-  '[data-radix-popper-content-wrapper],[data-radix-popover-content],[role="listbox"],[role="dialog"],[role="menu"],[cmdk-root]';
+  '[data-radix-popper-content-wrapper],[data-radix-popover-content],[role="listbox"],[role="dialog"],[role="menu"],[cmdk-root],[data-attn-send-warning]';
 
 function useOutsideDismiss(ref: RefObject<HTMLElement | null>, onDismiss: () => void, active: boolean) {
   useEffect(() => {
@@ -310,9 +316,11 @@ interface InlineEditFieldProps<TData> {
   row: TData;
   /** Whether the user may inline-edit this field (privilege + edit def present). */
   editable: boolean;
+  /** When set, editing is LOCKED (another user is editing) — shown as a hover tooltip. */
+  lockedReason?: string;
 }
 
-function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldProps<TData>) {
+function InlineEditFieldInner<TData>({ field, row, editable, lockedReason }: InlineEditFieldProps<TData>) {
   const { dataType = "text", edit } = field;
   const canEdit = editable && !!edit;
   const [editing, setEditing] = useState(false);
@@ -323,29 +331,56 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
   const inlineRowCls = field.block ? undefined : "min-h-[2.5rem] py-1";
 
   // Attention system: blink the WHOLE row (not just the value) while a rule targets this
-  // field, and optionally show a "send warning" icon. Hooks are unconditional (no-op when
-  // `field.attention` is absent — id undefined → null state).
+  // field. Hooks are unconditional (no-op when `field.attention` is absent — id
+  // undefined → null state).
   const attnRowId = field.attention ? (row as { id?: string } | null)?.id : undefined;
   const attnState = useAttentionField((field.attention?.entityType as AttentionEntityType) ?? "TASK", attnRowId, field.id);
   const { open: openSendWarning } = useSendWarning();
   const attnRowCls = field.attention ? cn("group/attnrow", attentionRowClass(attnState)) : undefined;
+
+  // "Enviar aviso" (send a manual warning) — ADMIN/COMMERCIAL only, and never a
+  // standing icon on the row: it only appears once the field is actually opened
+  // (double-click), next to the editor for editable fields, or as the double-click
+  // action itself for read-only fields (which have no editor to sit next to).
+  const { user } = useAuth();
+  const canSendWarning = canSendAttentionWarning(user?.sector?.privileges);
+  const allowedPrivileges = field.editablePrivilege ?? field.requiredPrivilege;
+  // ADMIN can edit/see every field (privileges are inherited), so admins are always
+  // valid recipients even when they aren't in the field's literal privilege list —
+  // otherwise "send to another admin" silently returns nobody.
+  const normalizedAllowedPrivileges = allowedPrivileges
+    ? Array.from(new Set([...(Array.isArray(allowedPrivileges) ? allowedPrivileges : [allowedPrivileges]), SECTOR_PRIVILEGES.ADMIN]))
+    : undefined;
+  const openWarningForField = () => {
+    if (!attnRowId) return;
+    openSendWarning({
+      entityType: (field.attention?.entityType as AttentionEntityType) ?? "TASK",
+      entityId: attnRowId,
+      target: { level: "field", field: field.id },
+      entityLabel: (row as { name?: string } | null)?.name,
+      fieldLabel: typeof field.label === "string" ? field.label : undefined,
+      allowedPrivileges: normalizedAllowedPrivileges as string[] | undefined,
+    });
+  };
   const sendWarningBtn =
-    field.attention?.sendWarning && attnRowId ? (
+    field.attention?.sendWarning && attnRowId && canSendWarning ? (
       <button
         type="button"
         title="Enviar aviso"
+        data-attn-send-warning
+        // Blur-committing editors (Text/Textarea) commit-on-blur; outside-dismiss editors
+        // (Date/Enum/Boolean) cancel on capture-phase mousedown. Both fire on the mousedown
+        // that precedes this click, tearing the editor (and this very button) down before the
+        // click itself can land. preventDefault here stops the browser's default focus-shift
+        // so no blur fires; the `data-attn-send-warning` marker (see PORTAL_SELECTOR) keeps the
+        // outside-dismiss check from treating this button as "outside."
+        onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => {
           e.stopPropagation();
-          openSendWarning({
-            entityType: field.attention!.entityType as AttentionEntityType,
-            entityId: attnRowId,
-            target: { level: "field", field: field.id },
-            entityLabel: (row as { name?: string } | null)?.name,
-            fieldLabel: typeof field.label === "string" ? field.label : undefined,
-          });
+          openWarningForField();
         }}
         onDoubleClick={(e) => e.stopPropagation()}
-        className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/attnrow:opacity-100 hover:text-foreground"
+        className="shrink-0 text-muted-foreground hover:text-foreground"
       >
         <IconBellPlus className="h-3.5 w-3.5" />
       </button>
@@ -490,6 +525,7 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
         label={field.label}
         value={<Editor field={field} edit={edit} row={row} onCommit={commit} onCancel={cancel} />}
         block={field.block}
+        trailing={sendWarningBtn}
         className={cn(inlineRowCls, attnRowCls)}
       />
     );
@@ -549,13 +585,14 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
       : node;
 
     // The WHOLE row is the double-click target (big, easy hit area) with a neutral hover.
+    // No standing "send warning" affordance here — double-click enters edit mode, above,
+    // where the bell appears next to the editor for ADMIN/COMMERCIAL.
     return (
       <DetailRow
         icon={field.icon}
         label={field.label}
         value={valueNode}
         block={field.block}
-        trailing={sendWarningBtn}
         role="button"
         tabIndex={0}
         title="Duplo clique para editar"
@@ -577,7 +614,25 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
     );
   }
 
-  return <DetailRow icon={field.icon} label={field.label} value={node} block={field.block} trailing={sendWarningBtn} className={cn(inlineRowCls, attnRowCls)} />;
+  // Read-only fields have no double-click behavior to protect (editable fields use it to
+  // enter edit mode, above, where the bell sits next to the editor instead) — so a field
+  // opted into `attention.sendWarning` gets the whole row as a double-click target,
+  // ADMIN/COMMERCIAL only. No standing icon; the row itself is the only affordance.
+  const openWarningOnRow = field.attention?.sendWarning && attnRowId && canSendWarning ? openWarningForField : undefined;
+
+  return (
+    <DetailRow
+      icon={field.icon}
+      label={field.label}
+      value={node}
+      block={field.block}
+      // A field with an `edit` def that's read-only ONLY because of the lock gets a
+      // "someone is editing" tooltip; otherwise the send-warning hint (if any).
+      title={lockedReason && field.edit ? lockedReason : openWarningOnRow ? "Duplo clique para enviar aviso" : undefined}
+      onDoubleClick={openWarningOnRow}
+      className={cn(inlineRowCls, attnRowCls, openWarningOnRow && "cursor-pointer", lockedReason && field.edit && "opacity-70")}
+    />
+  );
 }
 
 export const InlineEditField = memo(InlineEditFieldInner) as typeof InlineEditFieldInner;

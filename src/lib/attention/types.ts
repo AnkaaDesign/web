@@ -40,14 +40,18 @@ export type PredicateNode =
 export type AttentionTarget = { level: "row" } | { level: "detail" } | { level: "field"; field: string };
 
 /**
- * Stop policy — the crux of the forecast example:
- *  - `onView`         → silence when the user opens the entity's detail page (old cut behaviour).
- *  - `onResolve`      → silence only when the predicate becomes false (forecast updated / entry given).
- *  - `cycleThenCooldown` → always play the full burst, go quiet, wait `cooldownMs`, re-fire while
- *                          still matching. Opening the detail page does NOT stop it. Composes with
- *                          `onResolve` implicitly: a resolved predicate drops the match entirely.
+ * Stop policy. In BOTH modes the target blinks CONTINUOUSLY while it matches and is
+ * un-viewed (like the nav badge) and always stops the moment the predicate resolves.
+ * They differ only in what a "view" does:
+ *  - `onView`          → opening the entity's detail page silences it until the predicate
+ *                        re-matches (used by cuts: open the cut → its row stops; a new/again-
+ *                        pending cut re-blinks). The stop fires on ENTER.
+ *  - `onExitCooldown`  → LEAVING the entity's detail page silences it for `cadence.cooldownMs`
+ *                        (e.g. 30 min), then it re-arms and blinks again while still matching.
+ *                        The stop fires on EXIT — so while you're on the page the field keeps
+ *                        blinking and you can see which one it is. (Used by tasks.)
  */
-export type AttentionAckPolicy = "onView" | "onResolve" | "cycleThenCooldown";
+export type AttentionAckPolicy = "onView" | "onExitCooldown";
 
 export type AttentionTone = "harsh" | "soft" | "none";
 
@@ -62,7 +66,8 @@ export interface AttentionCadence {
   soundEnabled: boolean;
   /** Sound character; harsh reserved for high-priority rules. */
   tone: AttentionTone;
-  /** Quiet window before a `cycleThenCooldown` rule re-fires, ms (was SNOOZE_MS = 30min). */
+  /** Quiet window an `onExitCooldown` rule waits after being viewed before it re-arms
+   * (blinks again), ms. 30min default; per-rule ("the sleep time could be different"). */
   cooldownMs: number;
 }
 

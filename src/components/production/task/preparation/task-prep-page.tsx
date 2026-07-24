@@ -5,6 +5,7 @@ import {
   IconClipboardList,
   IconPlus,
   IconExternalLink,
+  IconBellPlus,
   IconEdit,
   IconCalendarCheck,
   IconDoorEnter,
@@ -70,7 +71,7 @@ import {
 import type { Task } from "@/types";
 import { clusterTasks, expandClusterTasks, expandClusterTaskIds, type ClusteredTask } from "./cluster-tasks";
 import { cn } from "@/lib/utils";
-import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor } from "@/lib/attention";
+import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor, useSendWarning, useAnnouncePresenceForIds, hasOtherEditors } from "@/lib/attention";
 import { createTaskPreparationColumns, TASK_PREP_SECTOR_DEFAULTS } from "./task-prep-columns";
 
 // Trimmed include — only what the columns render (vs. the legacy 3-7 MB payload). No truck layouts
@@ -274,6 +275,7 @@ export function TaskPreparationPage() {
   useRegisterAttentionEntities("TASK", tasks);
   useAttentionVersion();
   usePresenceVersion();
+  const { open: openSendWarning } = useSendWarning();
   // Legacy gave WAREHOUSE no context menu and no export/share button (read-only view).
   const isWarehouse = priv === SECTOR_PRIVILEGES.WAREHOUSE;
 
@@ -471,6 +473,18 @@ export function TaskPreparationPage() {
   const [quoteLayoutModal, setQuoteLayoutModal] = useState<ModalState>(CLOSED_MODAL);
   const [deleteModal, setDeleteModal] = useState<ModalState>(CLOSED_MODAL);
 
+  // Announce "is editing" for tasks subject to any OPEN mutating action modal (set
+  // sector/term/status, quote layout, duplicate, copy-from) so other users see it.
+  const editingActionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of [duplicateModal, sectorModal, termModal, statusModal, quoteLayoutModal]) {
+      if (m.open) m.taskIds.forEach((id) => ids.add(id));
+    }
+    if (copyFrom.step !== "idle") copyFrom.targetTasks.forEach((t) => ids.add(t.id));
+    return [...ids];
+  }, [duplicateModal, sectorModal, termModal, statusModal, quoteLayoutModal, copyFrom]);
+  useAnnouncePresenceForIds("TASK", editingActionIds, editingActionIds.length > 0);
+
   // Resolve live Task objects for a set of ids: the schedule modals need `tasks` for their count and
   // initial-value computation, and TaskDuplicateModal needs the single source task.
   const rowsFor = useCallback(
@@ -523,6 +537,8 @@ export function TaskPreparationPage() {
         // straight to the quote, everyone else to the task edit form.
         label: "Editar",
         icon: <IconEdit className="h-4 w-4" />,
+        // Locked while another user is editing any targeted task (concurrent-edit guard).
+        disabled: (rows) => expandClusterTasks(rows).some((t) => hasOtherEditors("TASK", t.id)),
         onClick: (rows) => {
           if (!rows.length) return;
           if (rows.length > 1) {
@@ -741,6 +757,17 @@ export function TaskPreparationPage() {
       onClick: (rows) => startCopyFrom(expandClusterTasks(rows)),
     });
 
+    actions.push({
+      key: "enviar-aviso",
+      label: "Enviar aviso",
+      icon: <IconBellPlus className="h-4 w-4" />,
+      requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
+      onClick: (rows) => {
+        const t = rows[0];
+        if (t) openSendWarning({ entityType: "TASK", entityId: t.id, target: { level: "row" }, entityLabel: t.name });
+      },
+    });
+
     if (canCancel) {
       actions.push({
         key: "cancelar",
@@ -778,7 +805,7 @@ export function TaskPreparationPage() {
       .map((a, i) => ({ ...a, group: ADVANCED_GROUP, separatorBefore: i === 0 }));
     const destructive = actions.filter(isDestructive);
     return [...primary, ...advanced, ...destructive];
-  }, [priv, canEdit, canFinish, canManageStatus, leaderCanManage, canLiberar, canDarEntrada, canCancel, navigate, set, startCopyFrom]);
+  }, [priv, canEdit, canFinish, canManageStatus, leaderCanManage, canLiberar, canDarEntrada, canCancel, navigate, set, startCopyFrom, openSendWarning]);
 
   // --- declarative filters (client-mode; the whole active set is already loaded) ---
   const filterDefs = useMemo<DataTableFilterDef<ClusteredTask>[]>(() => {

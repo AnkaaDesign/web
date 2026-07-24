@@ -10,6 +10,10 @@
 import { useSyncExternalStore } from "react";
 
 export interface PresenceEditor {
+  /** Stable per-tab id (see ATTENTION_CLIENT_ID) — how a client recognises and
+   * excludes its OWN announcement, and tells "my other tab" (different clientId,
+   * same userId) apart. Reliable across socket reconnects, unlike socket.id. */
+  clientId: string;
   userId: string;
   userName: string;
 }

@@ -1,6 +1,6 @@
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconPlayerPlay, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconLayout, IconCalendarTime } from "@tabler/icons-react";
+import { IconPlayerPlay, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconLayout, IconCalendarTime, IconBellPlus } from "@tabler/icons-react";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
 import type { Task } from "../../../../types";
@@ -21,7 +21,7 @@ interface TaskTableContextMenuProps {
   onAction: (action: TaskAction, tasks: Task[]) => void;
 }
 
-export type TaskAction = "start" | "finish" | "duplicate" | "setSector" | "setTerm" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkBaseFiles" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask" | "bulkServiceOrder" | "bulkLayout" | "bulkDocuments" | "quote" | "quoteLayout";
+export type TaskAction = "start" | "finish" | "duplicate" | "setSector" | "setTerm" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkBaseFiles" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask" | "bulkServiceOrder" | "bulkLayout" | "bulkDocuments" | "quote" | "quoteLayout" | "enviarAviso";
 
 export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTableContextMenuProps) {
   const { user } = useAuth();
@@ -189,6 +189,15 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
               </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+        )}
+
+        {/* Enviar aviso - ADMIN, COMMERCIAL only */}
+        {(isAdmin || isCommercial) && <DropdownMenuSeparator />}
+        {(isAdmin || isCommercial) && (
+          <DropdownMenuItem onClick={() => handleAction("enviarAviso")}>
+            <IconBellPlus className="mr-2 h-4 w-4" />
+            Enviar aviso
+          </DropdownMenuItem>
         )}
 
         {/* Delete action - ADMIN only */}

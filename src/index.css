@@ -434,8 +434,38 @@ input[type="time"]::-moz-calendar-picker-indicator {
     }
   }
 
+  /* Amber variant — used when the underlying attention(s) are all "soft"/routine.
+   * The nav color mirrors the severity of what it points to: red only when at least
+   * one urgent (harsh) attention is present, amber when everything is routine. */
+  @keyframes nav-activity-pulse-soft {
+    0%,
+    100% {
+      box-shadow:
+        inset 0 0 0 1px hsl(38 92% 50% / 0.4),
+        0 0 0 1px hsl(38 92% 50% / 0.2);
+    }
+    50% {
+      box-shadow:
+        inset 0 0 0 1.5px hsl(38 92% 50% / 0.95),
+        0 0 8px 1px hsl(38 92% 50% / 0.5);
+    }
+  }
+
   .nav-activity-blink {
     animation: nav-activity-pulse 1.8s ease-in-out infinite;
+  }
+  .nav-activity-blink-soft {
+    animation: nav-activity-pulse-soft 1.8s ease-in-out infinite;
+  }
+
+  /* STATIC (resting) nav indicator — a steady border, no animation. Shown when the
+   * underlying attention is resting (viewed / in cooldown), so the nav mirrors the row's
+   * static ring instead of blinking. Red (harsh) / amber (soft) to match severity. */
+  .nav-activity-static {
+    box-shadow: inset 0 0 0 1.5px hsl(0 84% 60% / 0.7);
+  }
+  .nav-activity-static-soft {
+    box-shadow: inset 0 0 0 1.5px hsl(38 92% 50% / 0.75);
   }
 
   /* Respect reduced-motion: keep a steady, subtle ring instead of pulsing. */
@@ -446,46 +476,63 @@ input[type="time"]::-moz-calendar-picker-indicator {
         inset 0 0 0 1.5px hsl(0 84% 60% / 0.75),
         0 0 6px 0 hsl(0 84% 60% / 0.3);
     }
+    .nav-activity-blink-soft {
+      animation: none;
+      box-shadow:
+        inset 0 0 0 1.5px hsl(38 92% 50% / 0.8),
+        0 0 6px 0 hsl(38 92% 50% / 0.35);
+    }
   }
 
   /* =====================================================
    * Attention system — row / field blink (see lib/attention)
-   * Two tones: `soft` (amber, routine) and `harsh` (red, urgent). A steady ring
-   * marks "this needs attention"; the *-burst variants pulse during a burst. The
-   * engine adds/removes the burst class to bound the pulse count, so the keyframes
-   * themselves loop `infinite` and simply stop when the class is removed.
+   * Two tones: `soft` (amber, routine) and `harsh` (red, urgent).
+   *
+   * Lifecycle (owned by the engine, NOT the CSS): while a rule matches and the user
+   * hasn't "viewed" the entity, it BLINKS CONTINUOUSLY — a hard on/off blink (like the
+   * nav badge), not a static glow — and bips periodically. Viewing the task stops it
+   * (for tasks: on exit, for the rule's cooldown ~30 min, then it blinks again; for cuts:
+   * on open, until it's pending again). Resolving the cause removes it entirely. Two states:
+   *   • ARMED (blinking): the engine keeps the `-burst` class on → hard blink loops.
+   *   • RESTING (viewed / cooling): faint STATIC ring, no animation — the "it stopped" look.
+   * Hard on/off (49.9%↔50% cut) reads as a blink; ease pulsing reads as a "glow", which
+   * the user explicitly rejected.
    * ===================================================== */
-  @keyframes attention-row-pulse-soft {
-    0%, 100% { box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.4), 0 0 0 1px hsl(38 92% 50% / 0.15); }
-    50%      { box-shadow: inset 0 0 0 2px hsl(38 92% 50% / 0.95), 0 0 10px 1px hsl(38 92% 50% / 0.5); }
+  /* Smooth ring pulse — mirrors `nav-activity-pulse` (the look the user likes): a ring that
+   * grows + glows at the midpoint, ease-in-out, rather than a jarring on/off. */
+  @keyframes attention-row-blink-soft {
+    0%, 100% { box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.45), 0 0 0 1px hsl(38 92% 50% / 0.2); }
+    50%      { box-shadow: inset 0 0 0 2px hsl(38 92% 50% / 0.95), 0 0 9px 2px hsl(38 92% 50% / 0.55); }
   }
-  @keyframes attention-row-pulse-harsh {
-    0%, 100% { box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.45), 0 0 0 1px hsl(0 84% 60% / 0.2); }
-    50%      { box-shadow: inset 0 0 0 2px hsl(0 84% 60% / 1), 0 0 12px 2px hsl(0 84% 60% / 0.55); }
+  @keyframes attention-row-blink-harsh {
+    0%, 100% { box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.5), 0 0 0 1px hsl(0 84% 60% / 0.25); }
+    50%      { box-shadow: inset 0 0 0 2px hsl(0 84% 60% / 1), 0 0 11px 2px hsl(0 84% 60% / 0.6); }
   }
-  @keyframes attention-field-pulse-soft {
-    0%, 100% { background-color: hsl(38 92% 50% / 0.08); box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.35); }
-    50%      { background-color: hsl(38 92% 50% / 0.28); box-shadow: inset 0 0 0 1.5px hsl(38 92% 50% / 0.9); }
+  @keyframes attention-field-blink-soft {
+    0%, 100% { background-color: hsl(38 92% 50% / 0.1); box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.45); }
+    50%      { background-color: hsl(38 92% 50% / 0.32); box-shadow: inset 0 0 0 2px hsl(38 92% 50% / 0.95); }
   }
-  @keyframes attention-field-pulse-harsh {
-    0%, 100% { background-color: hsl(0 84% 60% / 0.08); box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.4); }
-    50%      { background-color: hsl(0 84% 60% / 0.3); box-shadow: inset 0 0 0 1.5px hsl(0 84% 60% / 0.95); }
+  @keyframes attention-field-blink-harsh {
+    0%, 100% { background-color: hsl(0 84% 60% / 0.1); box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.5); }
+    50%      { background-color: hsl(0 84% 60% / 0.34); box-shadow: inset 0 0 0 2px hsl(0 84% 60% / 1); }
   }
 
-  /* Steady ring while attention is present (not bursting). */
-  .attention-row-ring-soft  { box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.45); }
+  /* RESTING — faint STATIC ring/fill, no animation (this is what "stopped" looks like). */
+  .attention-row-ring-soft  { box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.4); }
   .attention-row-ring-harsh { box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.45); }
-  .attention-row-burst.attention-row-ring-soft  { animation: attention-row-pulse-soft 0.75s ease-in-out infinite; }
-  .attention-row-burst.attention-row-ring-harsh { animation: attention-row-pulse-harsh 0.75s ease-in-out infinite; }
+  .attention-field-soft  { padding-inline: 0.25rem; background-color: hsl(38 92% 50% / 0.08); box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.4); }
+  .attention-field-harsh { padding-inline: 0.25rem; background-color: hsl(0 84% 60% / 0.08); box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.45); }
 
-  .attention-field-soft  { background-color: hsl(38 92% 50% / 0.1); box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.35); padding-inline: 0.25rem; }
-  .attention-field-harsh { background-color: hsl(0 84% 60% / 0.1); box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.4); padding-inline: 0.25rem; }
-  .attention-field-burst.attention-field-soft  { animation: attention-field-pulse-soft 0.75s ease-in-out infinite; }
-  .attention-field-burst.attention-field-harsh { animation: attention-field-pulse-harsh 0.75s ease-in-out infinite; }
+  /* ARMED — the combined selector (two classes) outranks the resting rule; smooth pulse
+   * at 1.6s ease-in-out (same cadence/feel as the nav blink) while `-burst` is applied. */
+  .attention-row-burst.attention-row-ring-soft  { animation: attention-row-blink-soft 1.6s ease-in-out infinite; }
+  .attention-row-burst.attention-row-ring-harsh { animation: attention-row-blink-harsh 1.6s ease-in-out infinite; }
+  .attention-field-burst.attention-field-soft  { animation: attention-field-blink-soft 1.6s ease-in-out infinite; }
+  .attention-field-burst.attention-field-harsh { animation: attention-field-blink-harsh 1.6s ease-in-out infinite; }
 
-  /* Presence ("being edited by someone else") — a calm amber dashed ring, never bips. */
-  .attention-presence-row   { box-shadow: inset 0 0 0 1px hsl(43 96% 56% / 0.6); }
-  .attention-presence-field { outline: 1px dashed hsl(43 96% 56% / 0.8); outline-offset: 1px; }
+  /* Presence ("being edited by someone else") — a calm BLUE ring, never bips. Blue keeps
+   * it visually distinct from attention (amber/red) so the two are never confused. */
+  .attention-presence-row   { box-shadow: inset 0 0 0 1.5px hsl(217 91% 60% / 0.75); }
 
   @media (prefers-reduced-motion: reduce) {
     .attention-row-burst.attention-row-ring-soft,
@@ -494,8 +541,11 @@ input[type="time"]::-moz-calendar-picker-indicator {
     .attention-field-burst.attention-field-harsh {
       animation: none;
     }
-    .attention-row-burst.attention-row-ring-harsh { box-shadow: inset 0 0 0 2px hsl(0 84% 60% / 0.85); }
-    .attention-field-burst.attention-field-harsh { background-color: hsl(0 84% 60% / 0.22); }
+    /* Without motion, keep the armed state at its bright peak so it's still noticeable. */
+    .attention-row-burst.attention-row-ring-harsh { box-shadow: inset 0 0 0 2px hsl(0 84% 60% / 0.9); }
+    .attention-row-burst.attention-row-ring-soft  { box-shadow: inset 0 0 0 2px hsl(38 92% 50% / 0.9); }
+    .attention-field-burst.attention-field-harsh { background-color: hsl(0 84% 60% / 0.28); }
+    .attention-field-burst.attention-field-soft  { background-color: hsl(38 92% 50% / 0.28); }
   }
 
   /* Ensure focus-visible works across browsers */

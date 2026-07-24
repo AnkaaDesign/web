@@ -11,20 +11,25 @@
 import { createContext, useContext, useMemo, useState } from "react";
 
 import { apiClient } from "@/api-client/axiosClient";
+import { getUsers } from "@/api-client";
 import { useAuth } from "@/contexts/auth-context";
-import { useUsers } from "@/hooks/personnel-department/use-user";
+import { CONTRACT_STATUS, SECTOR_PRIVILEGES } from "@/constants";
+import { canAccessAnyPrivilege } from "@/utils/privilege";
 import { toast } from "@/components/ui/sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Combobox } from "@/components/ui/combobox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 
 import type { AttentionEntityType, AttentionTarget, AttentionTone } from "./types";
+
+/** Only these sectors may send a manual attention warning to other users. */
+const SEND_WARNING_PRIVILEGES = [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL] as const;
+
+export function canSendAttentionWarning(privilege: string | undefined): boolean {
+  return !!privilege && canAccessAnyPrivilege(privilege as never, SEND_WARNING_PRIVILEGES as never);
+}
 
 export interface SendWarningTarget {
   entityType: AttentionEntityType;
@@ -34,6 +39,10 @@ export interface SendWarningTarget {
   entityLabel?: string;
   /** Human label of the field, when target.level === 'field'. */
   fieldLabel?: string;
+  /** Field-level only: recipients are scoped to users who can see/edit this field
+   * (the field's own `editablePrivilege`/`requiredPrivilege`). Omitted (row/detail
+   * targets) = any active user is a valid recipient. */
+  allowedPrivileges?: string[];
 }
 
 interface SendWarningApi {
@@ -42,15 +51,14 @@ interface SendWarningApi {
 
 const SendWarningContext = createContext<SendWarningApi | null>(null);
 
-/** Open the send-warning modal. Safe no-op if the provider isn't mounted. */
+/** Open the send-warning modal. Safe no-op if the provider isn't mounted, or if
+ * the current user's sector isn't allowed to send warnings (ADMIN/COMMERCIAL only —
+ * enforced again server-side in AttentionService.sendWarning). */
 export function useSendWarning(): SendWarningApi {
-  return useContext(SendWarningContext) ?? { open: () => {} };
-}
-
-interface UserLite {
-  id: string;
-  name: string;
-  sector?: { name?: string } | null;
+  const { user } = useAuth();
+  const api = useContext(SendWarningContext);
+  const allowed = canSendAttentionWarning(user?.sector?.privileges);
+  return allowed && api ? api : { open: () => {} };
 }
 
 export function SendWarningProvider({ children }: { children: React.ReactNode }) {
@@ -67,26 +75,13 @@ export function SendWarningProvider({ children }: { children: React.ReactNode })
 
 function SendWarningDialog({ target, onClose }: { target: SendWarningTarget; onClose: () => void }) {
   const { user } = useAuth();
-  const { data: usersData, isLoading } = useUsers({ orderBy: { name: "asc" } } as never);
-  const users = ((usersData as { data?: UserLite[] } | undefined)?.data ?? []).filter((u) => u.id !== user?.id);
-
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [recipientIds, setRecipientIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<AttentionTone>("soft");
   const [sending, setSending] = useState(false);
 
-  const filtered = users.filter((u) => u.name.toLowerCase().includes(search.toLowerCase()));
-
-  const toggle = (id: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-
   const send = async () => {
-    if (selected.size === 0) {
+    if (recipientIds.length === 0) {
       toast.error("Selecione ao menos um destinatário");
       return;
     }
@@ -96,12 +91,12 @@ function SendWarningDialog({ target, onClose }: { target: SendWarningTarget; onC
         entityType: target.entityType,
         entityId: target.entityId,
         target: target.target,
-        recipientUserIds: [...selected],
+        recipientUserIds: recipientIds,
         message: message.trim() || undefined,
         tone,
         fromUserName: user?.name,
       });
-      toast.success(`Aviso enviado para ${selected.size} ${selected.size === 1 ? "pessoa" : "pessoas"}`);
+      toast.success(`Aviso enviado para ${recipientIds.length} ${recipientIds.length === 1 ? "pessoa" : "pessoas"}`);
       onClose();
     } catch {
       toast.error("Não foi possível enviar o aviso");
@@ -131,33 +126,44 @@ function SendWarningDialog({ target, onClose }: { target: SendWarningTarget; onC
           </p>
 
           <div className="space-y-2">
-            <Label>Destinatários {selected.size > 0 ? <Badge variant="secondary">{selected.size}</Badge> : null}</Label>
-            <Input placeholder="Buscar pessoa..." value={search} onChange={(v) => setSearch(String(v ?? ""))} />
-            <ScrollArea className="h-48 rounded-md border">
-              <div className="p-1">
-                {isLoading ? (
-                  <div className="p-3 text-sm text-muted-foreground">Carregando...</div>
-                ) : filtered.length === 0 ? (
-                  <div className="p-3 text-sm text-muted-foreground">Nenhuma pessoa encontrada.</div>
-                ) : (
-                  filtered.map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => toggle(u.id)}
-                      className={cn(
-                        "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted",
-                        selected.has(u.id) && "bg-muted",
-                      )}
-                    >
-                      <Checkbox checked={selected.has(u.id)} className="pointer-events-none" />
-                      <span className="flex-1 truncate">{u.name}</span>
-                      {u.sector?.name ? <span className="truncate text-xs text-muted-foreground">{u.sector.name}</span> : null}
-                    </button>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
+            <Label htmlFor="warning-recipients">Destinatários</Label>
+            <Combobox
+              mode="multiple"
+              async
+              value={recipientIds}
+              onValueChange={(value) => setRecipientIds(value as string[])}
+              queryKey={["users", "attention-warning", target.entityType, target.target.level, (target.allowedPrivileges ?? []).join(",")]}
+              queryFn={async (searchTerm: string, page: number = 1) => {
+                const pageSize = 50;
+                const result = await getUsers({
+                  take: pageSize,
+                  skip: (page - 1) * pageSize,
+                  ...(target.allowedPrivileges?.length ? { includeSectorPrivileges: target.allowedPrivileges } : {}),
+                  where: {
+                    currentContractStatus: CONTRACT_STATUS.ACTIVE,
+                    id: { not: user?.id },
+                    ...(searchTerm
+                      ? { OR: [{ name: { contains: searchTerm, mode: "insensitive" as const } }, { email: { contains: searchTerm, mode: "insensitive" as const } }] }
+                      : {}),
+                  },
+                  orderBy: { name: "asc" as const },
+                  include: { sector: true },
+                } as never);
+                const usersData = (result as { data?: { id: string; name: string; sector?: { name?: string } }[] }).data ?? [];
+                const total = (result as { meta?: { totalRecords?: number } }).meta?.totalRecords ?? 0;
+                return {
+                  data: usersData.map((u) => ({ value: u.id, label: u.sector?.name ? `${u.name} - ${u.sector.name}` : u.name })),
+                  hasMore: page * pageSize < total,
+                  total,
+                };
+              }}
+              pageSize={50}
+              minSearchLength={0}
+              debounceMs={300}
+              placeholder="Selecione os destinatários..."
+              searchPlaceholder="Buscar pessoa..."
+              emptyText={target.allowedPrivileges?.length ? "Nenhuma pessoa com acesso a este campo" : "Nenhuma pessoa encontrada"}
+            />
           </div>
 
           <div className="space-y-2">
@@ -187,7 +193,7 @@ function SendWarningDialog({ target, onClose }: { target: SendWarningTarget; onC
           <Button variant="outline" onClick={onClose} disabled={sending}>
             Cancelar
           </Button>
-          <Button onClick={send} disabled={sending || selected.size === 0}>
+          <Button onClick={send} disabled={sending || recipientIds.length === 0}>
             {sending ? "Enviando..." : "Enviar aviso"}
           </Button>
         </DialogFooter>

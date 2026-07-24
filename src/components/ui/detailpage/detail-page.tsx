@@ -85,6 +85,10 @@ export interface DetailPageProps<TData> {
   scrollHideHeader?: boolean;
   /** Hide fields with no value (instead of rendering a "—" row). */
   hideEmptyFields?: boolean;
+  /** Globally disable inline editing (e.g. another user is editing this record). */
+  editLocked?: boolean;
+  /** Tooltip shown on a locked field explaining why editing is disabled. */
+  editLockedReason?: string;
   pageClassName?: string;
 }
 
@@ -120,6 +124,8 @@ export function DetailPage<TData>({
   exportFilename,
   scrollHideHeader = true,
   hideEmptyFields = false,
+  editLocked = false,
+  editLockedReason,
   pageClassName,
 }: DetailPageProps<TData>) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -287,7 +293,7 @@ export function DetailPage<TData>({
     content = (
       <div className="space-y-4">
         {layout.orderedSections.map((s) => (
-          <DetailSection key={s.def.id} section={s} row={row} hideEmptyFields={hideEmptyFields} />
+          <DetailSection key={s.def.id} section={s} row={row} hideEmptyFields={hideEmptyFields} editLocked={editLocked} editLockedReason={editLockedReason} />
         ))}
       </div>
     );
@@ -318,7 +324,7 @@ export function DetailPage<TData>({
     content = (
       <div className="space-y-4">
         {normalized.map((b, i) => {
-          if (b.kind === "full") return <DetailSection key={b.section.def.id} section={b.section} row={row} hideEmptyFields={hideEmptyFields} />;
+          if (b.kind === "full") return <DetailSection key={b.section.def.id} section={b.section} row={row} hideEmptyFields={hideEmptyFields} editLocked={editLocked} editLockedReason={editLockedReason} />;
           const { left, right } = balanceColumns(b.sections);
           // A half-width section ALWAYS renders at half width — honoring the user's explicit ½←/½→
           // choice — even when it's alone in its band (the opposite column simply stays empty). Sibling
@@ -330,7 +336,7 @@ export function DetailPage<TData>({
               {[left, right].map((col, ci) => (
                 <div key={ci} className="flex min-w-0 flex-1 flex-col gap-4">
                   {col.map((s) => (
-                    <DetailSection key={s.def.id} section={s} row={row} hideEmptyFields={hideEmptyFields} />
+                    <DetailSection key={s.def.id} section={s} row={row} hideEmptyFields={hideEmptyFields} editLocked={editLocked} editLockedReason={editLockedReason} />
                   ))}
                 </div>
               ))}

@@ -10,7 +10,7 @@
 import { useEffect, useId, useSyncExternalStore } from "react";
 
 import { useAttentionRegistry } from "./attention-context";
-import { emitPresenceEnter, emitPresenceLeave } from "./attention-socket";
+import { ATTENTION_CLIENT_ID, emitPresenceEnter, emitPresenceLeave } from "./attention-socket";
 import { getAddressState, getGlobalVersion, markViewed, subscribeAddress, subscribeGlobal } from "./engine";
 import { getEntityPresence, getPresenceVersion, subscribePresenceGlobal } from "./presence";
 import type { AttentionEntityType, AttentionState } from "./types";
@@ -90,9 +90,37 @@ export function useAnnouncePresence(type: AttentionEntityType, id: string | unde
   }, [type, id, active]);
 }
 
-/** Non-hook presence row-class resolver — an amber "being edited" ring. */
+/**
+ * Announce that the current user is editing a SET of entities (a mutating right-click
+ * action on one or more table rows — "Copiar de outra tarefa", "Definir Setor", etc.).
+ * Announces for every id while `active` (e.g. the action's modal is open) and releases
+ * on close / unmount, so other users see the "is editing" indicator during the action.
+ */
+export function useAnnouncePresenceForIds(type: AttentionEntityType, ids: ReadonlyArray<string> | undefined, active = true): void {
+  const key = active && ids?.length ? ids.join(",") : "";
+  useEffect(() => {
+    if (!key) return;
+    const list = key.split(",");
+    list.forEach((id) => emitPresenceEnter(type, id));
+    const onUnload = () => list.forEach((id) => emitPresenceLeave(type, id));
+    window.addEventListener("beforeunload", onUnload);
+    return () => {
+      list.forEach((id) => emitPresenceLeave(type, id));
+      window.removeEventListener("beforeunload", onUnload);
+    };
+  }, [type, key]);
+}
+
+/** Non-hook: are there OTHER editors (not this tab) on the entity? For table row-action
+ * `disabled` predicates that lock "Editar" while someone else has it open. */
+export function hasOtherEditors(type: AttentionEntityType, id: string | undefined): boolean {
+  return getEntityPresence(type, id).some((e) => e.clientId !== ATTENTION_CLIENT_ID);
+}
+
+/** Non-hook presence row-class resolver — a blue "being edited" ring. Excludes the
+ * caller's OWN tab (stable clientId) so an editor's own row doesn't ring for themselves. */
 export function presenceRowClassFor(type: AttentionEntityType, id: string | undefined): string {
-  return getEntityPresence(type, id).length > 0 ? "attention-presence-row" : "";
+  return getEntityPresence(type, id).some((e) => e.clientId !== ATTENTION_CLIENT_ID) ? "attention-presence-row" : "";
 }
 
 /** Re-render on any presence change (pair with presenceRowClassFor in tables). */
@@ -101,13 +129,27 @@ export function usePresenceVersion(): number {
 }
 
 /**
- * Acknowledge an entity's `onView` rules when its detail page opens. Does NOT
- * silence `cycleThenCooldown`/`onResolve` rules (e.g. the forecast) — those keep
- * playing their burst and only stop when the underlying condition resolves.
+ * Quiet an entity's `onView` rules when its detail page OPENS (ack on ENTER). Used by
+ * cuts: opening a cut = "I'm handling it" → its row stops blinking. `onExitCooldown`
+ * rules ignore this (they stop on exit instead) — see useMarkAttentionViewedOnExit.
  */
 export function useMarkAttentionViewed(type: AttentionEntityType, id: string | undefined): void {
   useEffect(() => {
     if (id) markViewed(type, id);
+  }, [type, id]);
+}
+
+/**
+ * Quiet an entity's `onExitCooldown` rules when its detail page CLOSES (ack on EXIT /
+ * id change). Used by tasks: while the page is open the field keeps blinking so you can
+ * see WHICH field needs attention; on leaving it snoozes for the rule's cooldown (30 min)
+ * and re-arms afterwards. MUST be declared AFTER useRegisterAttentionEntities so its
+ * cleanup runs first (while the cycle is still alive) — React cleans effects up in reverse.
+ */
+export function useMarkAttentionViewedOnExit(type: AttentionEntityType, id: string | undefined): void {
+  useEffect(() => {
+    if (!id) return;
+    return () => markViewed(type, id);
   }, [type, id]);
 }
 

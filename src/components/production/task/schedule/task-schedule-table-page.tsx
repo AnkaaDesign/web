@@ -65,7 +65,7 @@ import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActio
 import { useTasks } from "@/hooks/production/use-task";
 import { createTaskScheduleColumns } from "./task-schedule-columns";
 import { getRowColorClass } from "./task-table-utils";
-import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor, useSendWarning } from "@/lib/attention";
+import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor, useSendWarning, useAnnouncePresenceForIds, hasOtherEditors } from "@/lib/attention";
 import { IconBellPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
@@ -263,6 +263,20 @@ export function TaskScheduleTablePage() {
   const advancedActionsRef = useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
   const [advancedTaskIds, setAdvancedTaskIds] = useState<string[]>([]);
   const [copyState, setCopyState] = useState<CopyFromTaskState>(INITIAL_COPY_STATE);
+
+  // Announce "is editing" for the task(s) subject to any OPEN mutating action modal
+  // (set sector/term/status, quote layout, duplicate, advanced bulk, copy-from) so other
+  // users see the indicator while the action is in progress — matching the edit-form flow.
+  const editingActionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of [sectorModal, termModal, statusModal, quoteLayoutModal, duplicateModal]) {
+      if (m.open) m.tasks.forEach((t) => ids.add(t.id));
+    }
+    advancedTaskIds.forEach((id) => ids.add(id));
+    if (copyState.step !== "idle") copyState.targetTasks.forEach((t) => ids.add(t.id));
+    return [...ids];
+  }, [sectorModal, termModal, statusModal, quoteLayoutModal, duplicateModal, advancedTaskIds, copyState]);
+  useAnnouncePresenceForIds("TASK", editingActionIds, editingActionIds.length > 0);
 
   const openAdvanced = useCallback((type: string, rows: Task[]) => {
     const ids = rows.map((r) => r.id);
@@ -551,6 +565,8 @@ export function TaskScheduleTablePage() {
         key: "edit",
         label: "Editar",
         icon: <IconEdit className="h-4 w-4" />,
+        // Locked while another user is editing any selected task (concurrent-edit guard).
+        disabled: (r) => r.some((t) => hasOtherEditors("TASK", t.id)),
         onClick: (r) => handleEdit(r),
       },
       {
@@ -659,6 +675,7 @@ export function TaskScheduleTablePage() {
         label: "Enviar aviso",
         icon: <IconBellPlus className="h-4 w-4" />,
         separatorBefore: true,
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
         onClick: (r) => {
           const t = r[0];
           if (t) openSendWarning({ entityType: "TASK", entityId: t.id, target: { level: "row" }, entityLabel: t.name });

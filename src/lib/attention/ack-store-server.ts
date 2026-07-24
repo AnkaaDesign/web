@@ -68,6 +68,10 @@ export function createServerBackedAckStore(): ServerAckStore {
       try {
         const res = await apiClient.get("/attention/ack");
         const rows = (((res as { data?: unknown })?.data ?? res) as AckRow[]) ?? [];
+        // The SERVER is authoritative for cross-device cooldown state, so REPLACE the local
+        // cache with it (don't just merge) — otherwise stale local acks (e.g. after the table
+        // is cleared server-side) would linger forever and keep suppressing the blink.
+        local.clearAll();
         for (const row of rows) {
           if (!row?.ruleId || !row?.entityType || !row?.entityId) continue;
           const key = matchKey({

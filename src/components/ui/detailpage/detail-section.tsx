@@ -11,6 +11,10 @@ interface DetailSectionProps<TData> {
   row: TData;
   /** Hide a field entirely when it has no value (rather than showing a "—" row). */
   hideEmptyFields?: boolean;
+  /** Globally disable inline editing for all fields (e.g. another user is editing). */
+  editLocked?: boolean;
+  /** Tooltip on a locked field explaining why it can't be edited. */
+  editLockedReason?: string;
 }
 
 /** A field counts as "empty" only when we can read its raw value (accessor or edit.get) and it's blank. */
@@ -23,10 +27,10 @@ function fieldIsEmpty<TData>(f: DetailFieldDef<TData>, row: TData): boolean {
 /** Default cap (px) for a `scroll: true` section's internal scroll area. */
 const DEFAULT_SCROLL_HEIGHT = 440;
 
-function DetailSectionInner<TData>({ section, row, hideEmptyFields }: DetailSectionProps<TData>) {
+function DetailSectionInner<TData>({ section, row, hideEmptyFields, editLocked, editLockedReason }: DetailSectionProps<TData>) {
   const { def } = section;
   const { canEdit, isAllowed } = useFieldGate();
-  const sectionEditable = isAllowed(def.editablePrivilege);
+  const sectionEditable = isAllowed(def.editablePrivilege) && !editLocked;
   // When hiding empty fields, KEEP an empty field the user can still inline-edit (forecast / notes /
   // paymentMethod / pix, etc.) so it stays reachable; only hide read-only empties. The editable
   // condition mirrors the `editable` prop passed to InlineEditField below (sectionEditable && canEdit
@@ -69,7 +73,7 @@ function DetailSectionInner<TData>({ section, row, hideEmptyFields }: DetailSect
       {fields.length ? (
         <div className="space-y-2">
           {fields.map((f) => (
-            <InlineEditField key={f.id} field={f} row={row} editable={sectionEditable && canEdit(f)} />
+            <InlineEditField key={f.id} field={f} row={row} editable={sectionEditable && canEdit(f)} lockedReason={editLocked ? editLockedReason : undefined} />
           ))}
         </div>
       ) : null}

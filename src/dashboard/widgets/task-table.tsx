@@ -45,6 +45,7 @@ import {
 } from "../../constants";
 import type { Task } from "../../types";
 import { useTasks, useTaskMutations } from "../../hooks/production/use-task";
+import { useSendWarning } from "@/lib/attention";
 import {
   TaskTableContextMenu,
   type TaskAction,
@@ -1854,6 +1855,7 @@ function TaskTableRender({
   // unprivileged sectors still see no menu at all.
   const { updateAsync, deleteAsync: deleteTaskAsync } = useTaskMutations();
   const queryClient = useQueryClient();
+  const { open: openSendWarning } = useSendWarning();
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -1997,6 +1999,16 @@ function TaskTableRender({
               sourceTask: null,
             });
             break;
+          case "enviarAviso":
+            if (actionTasks[0]) {
+              openSendWarning({
+                entityType: "TASK",
+                entityId: actionTasks[0].id,
+                target: { level: "row" },
+                entityLabel: actionTasks[0].name,
+              });
+            }
+            break;
           default:
             break;
         }
@@ -2004,7 +2016,7 @@ function TaskTableRender({
         // Mutation hooks fire toasts on failure.
       }
     },
-    [updateAsync, navigate, returnTo],
+    [updateAsync, navigate, returnTo, openSendWarning],
   );
 
   const confirmDelete = useCallback(async () => {

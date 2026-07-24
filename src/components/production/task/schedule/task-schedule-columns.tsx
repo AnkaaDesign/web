@@ -9,6 +9,7 @@ import {
 import { formatDate, isDateInPast, calculateTaskMeasures, formatTaskMeasures, formatTruckSpot } from "../../../../utils";
 import type { DataTableColumnDef } from "@/components/ui/datatable";
 import { Badge } from "@/components/ui/badge";
+import { IsEditingBadge } from "@/lib/attention";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { DeadlineCountdown } from "./deadline-countdown";
 import { ServiceOrderCell } from "../history/service-order-cell";
@@ -73,7 +74,12 @@ export function createTaskScheduleColumns(options: TaskScheduleColumnsOptions = 
       size: 180,
       minSize: 140,
       meta: { headerLabel: "Logomarca", exportValue: (row) => row.name || "" },
-      cell: ({ row }) => <span className="block truncate font-medium">{row.original.name}</span>,
+      cell: ({ row }) => (
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate font-medium">{row.original.name}</span>
+          <IsEditingBadge type="TASK" id={row.original.id} compact />
+        </span>
+      ),
     },
     {
       id: "customerName",

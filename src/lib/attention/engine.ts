@@ -170,17 +170,40 @@ export function dismissPushedAttention(id: string): void {
   if (pushed.delete(id)) scheduleReconcile();
 }
 
-/** The user opened an entity's detail page → acknowledge its `onView` cycles
- * (rule-derived AND manual/pushed), leaving cooldown/resolve rules blinking. */
+/**
+ * The user "viewed" an entity (opened its detail page). Quiets its currently-blinking
+ * cycles per each rule's ack policy:
+ *  - `onView` (cuts): acknowledge → silent until the predicate re-matches. Call this
+ *    ON ENTER (opening the cut = "I'm handling it").
+ *  - `onExitCooldown` (tasks): snooze for `cadence.cooldownMs` (30 min) → re-arm after.
+ *    Call this ON EXIT (leaving the detail = "I've seen it, remind me later"), so while
+ *    the page is open the field keeps blinking and the user can locate it.
+ * Only cycles that are actively blinking are touched, so it's a no-op mid-cooldown.
+ */
 export function markViewed(type: AttentionEntityType, id: string): void {
-  let touched = false;
-  for (const [key, cycle] of cycles) {
-    if (cycle.match.entityType !== type || cycle.match.entityId !== id) continue;
-    if (cycle.match.rule.ack !== "onView") continue;
-    ackStore.patch(key, { acknowledged: true, snoozeUntil: Date.now() + cycle.match.rule.cadence.cooldownMs });
-    touched = true;
+  const entity = entities.get(type)?.get(id);
+  const now = Date.now();
+  let changed = false;
+  // Write the ack to the STORE for every rule that currently matches this entity (or has a
+  // live cycle). We do NOT touch cycles here — reconcile is the single authority that quiets
+  // them from the store. This removes the race where the ack fired before the cycle had armed
+  // (the "I opened the cut and it didn't stop" bug).
+  for (const rule of rules) {
+    if (rule.entityType !== type || !ruleAppliesToUser(rule)) continue;
+    const key = matchKey({ ruleId: rule.id, entityType: type, entityId: id });
+    const matches = entity ? evaluatePredicate(rule.predicate, entity, now) : false;
+    if (!matches && !cycles.has(key)) continue; // never preemptively silence a non-matching rule
+    if (rule.ack === "onView") ackStore.patch(key, { acknowledged: true });
+    else ackStore.patch(key, { snoozeUntil: now + rule.cadence.cooldownMs });
+    changed = true;
   }
-  if (touched) scheduleReconcile();
+  // Manual/pushed warnings for this entity are acknowledged on view too (they're onView).
+  for (const p of pushed.values()) {
+    if (p.entityType !== type || p.entityId !== id) continue;
+    ackStore.patch(matchKey({ ruleId: `push:${p.id}`, entityType: type, entityId: id }), { acknowledged: true });
+    changed = true;
+  }
+  if (changed) scheduleReconcile();
 }
 
 /** Manual snooze (e.g. a "silenciar" affordance) for a rule×entity. */
@@ -221,17 +244,50 @@ export function getGlobalVersion(): number {
 }
 
 /**
- * Count of DISTINCT entities currently needing attention, per type (entity-level
- * addresses only, so a row with two field alerts counts once). Drives the nav-menu
- * blink. Only reflects entities currently loaded/registered — global coverage for
- * unloaded entities needs the server summary (Phase 3).
+ * Count of DISTINCT entities that are ACTIVELY BLINKING (armed), per type (entity-level
+ * addresses only, so a row with two field alerts counts once). Drives the nav-menu blink.
+ * Deliberately counts `st.bursting` (armed), NOT merely `st.active` — so the nav "follows"
+ * the row: once a row is viewed and goes to its resting/static ring, it no longer blinks,
+ * and neither does the nav. Loaded entities only; the server summary covers the rest.
  */
 export function getAttentionCountsByType(): Map<AttentionEntityType, number> {
   const m = new Map<AttentionEntityType, number>();
   for (const [addr, st] of stateByAddress) {
-    if (!st.active) continue;
+    if (!st.active) continue; // ANY attention (armed OR resting) → the nav shows an indicator
     if (addr.split(":").length !== 2) continue; // `type:id` only (skip `type:id:field`)
     m.set(st.match.entityType, (m.get(st.match.entityType) ?? 0) + 1);
+  }
+  return m;
+}
+
+/**
+ * Whether any entity of a type is currently ARMED (actively blinking) vs merely resting.
+ * Drives whether the nav BLINKS (armed) or shows a STATIC border (resting) — so the nav
+ * mirrors the row exactly: blinking row → blinking nav, resting/static row → static nav.
+ */
+export function getAttentionArmedByType(): Map<AttentionEntityType, boolean> {
+  const m = new Map<AttentionEntityType, boolean>();
+  for (const [addr, st] of stateByAddress) {
+    if (!st.bursting) continue;
+    if (addr.split(":").length !== 2) continue;
+    m.set(st.match.entityType, true);
+  }
+  return m;
+}
+
+/**
+ * Highest severity (`harsh` beats `soft`) currently active per type — drives the
+ * nav-menu blink COLOR so it mirrors what it points to: red when any urgent (harsh)
+ * rule matches, amber when everything active is routine (soft). Loaded entities only
+ * (the server summary carries the same harsh flag for the unloaded/global case).
+ */
+export function getAttentionSeverityByType(): Map<AttentionEntityType, "harsh" | "soft"> {
+  const m = new Map<AttentionEntityType, "harsh" | "soft">();
+  for (const [addr, st] of stateByAddress) {
+    if (!st.active) continue; // color reflects the whole active set (armed + resting)
+    if (addr.split(":").length !== 2) continue; // entity-level addresses only
+    const tone = st.match.rule.cadence.tone === "harsh" ? "harsh" : "soft";
+    if (tone === "harsh" || !m.has(st.match.entityType)) m.set(st.match.entityType, tone);
   }
   return m;
 }
@@ -296,100 +352,125 @@ function reconcile(): void {
     });
   }
 
-  // 2) Tear down cycles whose match disappeared (resolved / entity unloaded).
+  // 2) Tear down cycles whose match disappeared.
   for (const [key, cycle] of cycles) {
-    if (!matched.has(key)) {
-      teardownCycle(key, cycle);
-      cycles.delete(key);
-      // A resolved match clears its "acknowledged" flag so a future recurrence re-alerts.
+    if (matched.has(key)) continue;
+    const { entityType, entityId } = cycle.match;
+    // RESOLVED (entity still loaded, but predicate now false) → clear ack + snooze so a
+    // future recurrence re-alerts immediately. UNREGISTERED (entity no longer loaded, e.g.
+    // navigated to another page) → KEEP the ack/snooze so returning respects the cooldown
+    // and doesn't re-bip. (This is what stops "it bips every time I open the table".)
+    const stillLoaded = entities.get(entityType)?.has(entityId) ?? false;
+    teardownCycle(key, cycle);
+    cycles.delete(key);
+    if (stillLoaded) {
       const rec = ackStore.get(key);
-      if (rec?.acknowledged) ackStore.patch(key, { acknowledged: false });
+      if (rec && (rec.acknowledged || rec.snoozeUntil)) ackStore.patch(key, { acknowledged: false, snoozeUntil: 0 });
     }
   }
 
-  // 3) Start cycles for new matches — highest priority first so it claims the sound slot.
-  const newlyIdle: AttentionMatch[] = [];
-  for (const [key, match] of matched) {
-    if (!cycles.has(key)) {
-      cycles.set(key, { match, status: "idle", bipTimers: [], burstTimer: null, wakeTimer: null });
-      newlyIdle.push(match);
-    } else {
-      // keep the freshest entity snapshot on the cycle
-      cycles.get(key)!.match = match;
-    }
-  }
-  newlyIdle.sort((a, b) => b.rule.priority - a.rule.priority);
-
-  for (const match of newlyIdle) {
+  // 3) Drive EVERY matched cycle to its desired state (idempotent — no dependence on
+  //    "newly created", so a view/ack written to the store is always honored on the next
+  //    reconcile regardless of timing). armed ⇔ matches AND not acknowledged AND not snoozed.
+  const matchList = [...matched.values()].sort((a, b) => b.rule.priority - a.rule.priority);
+  for (const match of matchList) {
     const key = matchKey(match);
-    const cycle = cycles.get(key);
-    if (!cycle || cycle.status !== "idle") continue;
-    const rec = ackStore.get(key);
-    if (rec?.acknowledged) continue; // onView silenced
-    if (rec && rec.snoozeUntil > now) {
-      // still cooling down from a previous burst → arm a wake, stay quiet.
-      cycle.status = "cooldown";
-      cycle.wakeTimer = setTimeout(() => reEvaluate(key), rec.snoozeUntil - now + 30);
-      continue;
+    let cycle = cycles.get(key);
+    if (!cycle) {
+      cycle = { match, status: "idle", bipTimers: [], burstTimer: null, wakeTimer: null };
+      cycles.set(key, cycle);
+    } else {
+      cycle.match = match; // freshest entity snapshot
     }
-    startBurst(key);
+    const rec = ackStore.get(key);
+    const snoozed = !!rec && rec.snoozeUntil > now;
+    const acked = !!rec?.acknowledged;
+    if (!snoozed && !acked) {
+      if (cycle.status !== "bursting") armCycle(key); // start (or resume) blinking
+    } else {
+      if (cycle.status === "bursting") quietCycle(cycle);
+      else cycle.status = "cooldown";
+      // A snoozed (onExitCooldown) cycle re-arms when the snooze expires; an acknowledged
+      // (onView) cycle stays quiet until the predicate resolves (no wake).
+      if (snoozed && !acked) {
+        if (cycle.wakeTimer) clearTimeout(cycle.wakeTimer);
+        cycle.wakeTimer = setTimeout(() => reEvaluate(key), rec!.snoozeUntil - now + 30);
+      }
+    }
   }
 
   // 4) Republish per-address state and notify only changed addresses.
   publish();
 }
 
-/** A cooled-down cycle's wake fired → re-check and possibly burst again. */
+/** A cooled-down cycle's wake fired → re-arm (blink again) if still matching + un-acked. */
 function reEvaluate(key: string): void {
   const cycle = cycles.get(key);
   if (!cycle) return;
   cycle.wakeTimer = null;
-  cycle.status = "idle";
   const rec = ackStore.get(key);
   const now = Date.now();
   if (rec?.acknowledged || (rec && rec.snoozeUntil > now)) {
+    cycle.status = "cooldown";
     publish();
     return;
   }
-  startBurst(key);
+  armCycle(key);
   publish();
 }
 
-function startBurst(key: string): void {
+/** How often an armed cycle repeats its bip burst (the visual blink is continuous). */
+const BIP_REPEAT_MS = 60 * 1000;
+
+/**
+ * ARM a cycle: it BLINKS CONTINUOUSLY (the CSS `-burst` class loops while status is
+ * "bursting") and bips PERIODICALLY. The bip is gated by `lastFiredAt` so navigating
+ * away and back does NOT re-bip immediately (only the visual blink resumes) — the bip
+ * fires at most once per BIP_REPEAT_MS per entity, like the nav alert. Viewing the entity
+ * (markViewed → ack) or resolving the predicate is what stops it.
+ */
+function armCycle(key: string): void {
   const cycle = cycles.get(key);
-  if (!cycle) return;
+  if (!cycle || cycle.status === "bursting") return;
+  cycle.status = "bursting";
+  const rec = ackStore.get(key);
+  const sinceLastBip = Date.now() - (rec?.lastFiredAt ?? 0);
+  if (sinceLastBip >= BIP_REPEAT_MS) {
+    scheduleBip(key, true); // been quiet a while → bip now
+  } else {
+    scheduleBip(key, false, BIP_REPEAT_MS - sinceLastBip); // bipped recently → wait, no re-bip
+  }
+}
+
+/** Play one bip burst (if `bipNow` and it wins the shared sound slot) and schedule the next. */
+function scheduleBip(key: string, bipNow: boolean, delayMs = BIP_REPEAT_MS): void {
+  const cycle = cycles.get(key);
+  if (!cycle || cycle.status !== "bursting") return;
   const { cadence } = cycle.match.rule;
   const now = Date.now();
-  cycle.status = "bursting";
-  ackStore.patch(key, { lastFiredAt: now });
-
-  // Claim the sound slot if free; otherwise blink silently this burst.
-  const burstMs = Math.max(1, cadence.blinkCount) * cadence.pulseMs;
-  if (cadence.soundEnabled && cadence.tone !== "none" && now >= soundSlotUntil) {
+  if (bipNow && cadence.soundEnabled && cadence.tone !== "none" && now >= soundSlotUntil) {
+    const burstMs = Math.max(1, cadence.blinkCount) * cadence.intervalMs;
     soundSlotUntil = now + burstMs;
+    ackStore.patch(key, { lastFiredAt: now });
+    cycle.bipTimers.forEach(clearTimeout);
+    cycle.bipTimers = [];
     for (let i = 0; i < cadence.blinkCount; i++) {
       cycle.bipTimers.push(setTimeout(() => playAttentionBeep(cadence.tone), i * cadence.intervalMs));
     }
   }
-
-  cycle.burstTimer = setTimeout(() => endBurst(key), burstMs);
-  publish();
+  if (cycle.burstTimer) clearTimeout(cycle.burstTimer);
+  cycle.burstTimer = setTimeout(() => scheduleBip(key, true), delayMs);
 }
 
-function endBurst(key: string): void {
-  const cycle = cycles.get(key);
-  if (!cycle) return;
-  cycle.burstTimer = null;
+/** Stop an armed cycle's blink + bips (shared by markViewed's two policies). */
+function quietCycle(cycle: Cycle): void {
+  cycle.bipTimers.forEach(clearTimeout);
   cycle.bipTimers = [];
-  const { cadence } = cycle.match.rule;
-  const now = Date.now();
-  // Enter cooldown; re-fire after cooldownMs while still matching.
-  const snoozeUntil = now + cadence.cooldownMs;
-  ackStore.patch(key, { snoozeUntil });
+  if (cycle.burstTimer) {
+    clearTimeout(cycle.burstTimer);
+    cycle.burstTimer = null;
+  }
   cycle.status = "cooldown";
-  if (cycle.wakeTimer) clearTimeout(cycle.wakeTimer);
-  cycle.wakeTimer = setTimeout(() => reEvaluate(key), cadence.cooldownMs + 30);
-  publish();
 }
 
 function teardownCycle(_key: string, cycle: Cycle): void {

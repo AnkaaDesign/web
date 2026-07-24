@@ -40,6 +40,7 @@ import {
 } from "@/constants";
 import { CutOverviewSection } from "@/components/production/cut/detail/cut-overview-section";
 import { useConfirm } from "@/components/production/task/detail/use-confirm";
+import { useRegisterAttentionEntities, useMarkAttentionViewed } from "@/lib/attention";
 
 const PAGE_PRIVILEGES = [
   SECTOR_PRIVILEGES.PRODUCTION,
@@ -104,6 +105,12 @@ function CuttingDetailsContent() {
   const cut = (response?.data ?? null) as Cut | null;
 
   usePageTracker({ title: cut ? `Recorte: ${cut.file?.filename || "Sem nome"}` : "Detalhes do Recorte", icon: "cut" });
+
+  // Attention system: opening THIS cut's detail acks its row-level "cut.pending" blink
+  // (ack: onView) — the list keeps blinking every OTHER pending cut, only this one quiets.
+  const attentionCuts = useMemo(() => (cut ? [cut] : []), [cut]);
+  useRegisterAttentionEntities("CUT", attentionCuts);
+  useMarkAttentionViewed("CUT", cut?.id);
 
   // Other cuts of the same task (enabled belongs in the query OPTIONS, not the params).
   const { data: taskCutsResponse } = useCuts(

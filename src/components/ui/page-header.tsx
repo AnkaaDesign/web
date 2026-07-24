@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { IconRefresh, IconEdit, IconMenu2, IconArrowLeft, IconSearch, IconFilter, IconMaximize, IconMinimize } from "@tabler/icons-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { FavoriteButton } from "./favorite-button";
 import { FAVORITE_PAGES } from "../../constants";
@@ -28,6 +29,8 @@ export interface PageAction {
   variant?: "default" | "outline" | "secondary" | "destructive" | "ghost" | "link";
   size?: "sm" | "default" | "lg";
   disabled?: boolean;
+  /** Native tooltip (e.g. why the action is disabled). Shown on hover even when disabled. */
+  title?: string;
   loading?: boolean;
   hidden?: boolean;
   hideOnMobile?: boolean;
@@ -261,7 +264,7 @@ const ActionButton = React.memo(function ActionButton({ action }: { action: Page
     console.error('[PageHeader ActionButton] Rendering submit button with disabled:', action.disabled);
   }
 
-  return (
+  const button = (
     <Button
       key={action.key}
       variant={buttonVariant}
@@ -273,6 +276,19 @@ const ActionButton = React.memo(function ActionButton({ action }: { action: Page
       {showSpinningIcon ? <IconRefresh className="h-4 w-4 animate-spin" /> : Icon ? <Icon className="h-4 w-4" /> : null}
       {!isIconOnly && <span>{labelString}</span>}
     </Button>
+  );
+  // A disabled action with a reason → styled Tooltip popup (nicer + faster than the native
+  // browser title). A disabled <button> swallows pointer events, so the span is the hover
+  // target for the tooltip trigger.
+  return action.disabled && action.title ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex cursor-not-allowed">{button}</span>
+      </TooltipTrigger>
+      <TooltipContent>{action.title}</TooltipContent>
+    </Tooltip>
+  ) : (
+    button
   );
 });
 

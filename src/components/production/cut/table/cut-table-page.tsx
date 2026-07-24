@@ -34,6 +34,7 @@ import {
 } from "../../../../constants";
 import { CutRequestModal } from "../list/cut-request-modal";
 import { createCutColumns, CUT_SECTOR_DEFAULTS } from "./cut-table-columns";
+import { useRegisterAttentionEntities, useAttentionVersion, attentionRowClassFor } from "@/lib/attention";
 
 // Trimmed include — only what the columns render (task name, file thumbnail/name, recut parent file).
 const LIST_INCLUDE = {
@@ -184,6 +185,13 @@ export function CutTablePage() {
   const { data: response, isLoading, error } = useCuts(query as never);
   const cuts = useMemo(() => (response as { data?: Cut[] } | undefined)?.data ?? [], [response]);
   const totalRecords = (response as { meta?: { totalRecords?: number } } | undefined)?.meta?.totalRecords ?? 0;
+
+  // Attention system: blink the row of each PENDING cut (rule "cut.pending") right on this
+  // list — replaces the old page-level nag (blink+bip until you merely open the page) with a
+  // per-row signal that only stops for a cut once you open ITS detail (ack: onView, see the
+  // cut detail page) or its status moves off PENDING (predicate no longer matches).
+  useRegisterAttentionEntities("CUT", cuts);
+  useAttentionVersion();
 
   // Export "all": page through every cut matching the current search/filters/sort (the table only
   // holds the current page). The API caps `limit` at 100, so page through the full set.
@@ -489,6 +497,7 @@ export function CutTablePage() {
             rowReorder,
             getRowId: (c) => c.id,
             onRowClick,
+            getRowClassName: (c) => attentionRowClassFor("CUT", c.id),
             isLoading,
             mode: "server",
             rowCount: totalRecords,

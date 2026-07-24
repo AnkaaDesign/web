@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconExternalLink, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter, IconReceipt, IconCalendarTime } from "@tabler/icons-react";
+import { IconExternalLink, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter, IconReceipt, IconCalendarTime, IconBellPlus } from "@tabler/icons-react";
+import { useSendWarning } from "@/lib/attention";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
@@ -56,6 +57,7 @@ export function TaskHistoryContextMenu({
   const returnTo = useReturnTo();
   const { update, updateAsync, delete: deleteTask } = useTaskMutations();
   const { batchUpdate, batchDeleteAsync } = useTaskBatchMutations();
+  const { open: openSendWarning } = useSendWarning();
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
   const [setTermModalOpen, setSetTermModalOpen] = useState(false);
@@ -768,6 +770,20 @@ export function TaskHistoryContextMenu({
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
+          )}
+
+          {/* Enviar aviso - ADMIN, COMMERCIAL only */}
+          {(isAdmin || isCommercial) && <DropdownMenuSeparator />}
+          {(isAdmin || isCommercial) && (
+            <DropdownMenuItem
+              onClick={() => {
+                if (task) openSendWarning({ entityType: "TASK", entityId: task.id, target: { level: "row" }, entityLabel: task.name });
+                onClose();
+              }}
+            >
+              <IconBellPlus className="mr-2 h-4 w-4" />
+              <span className="truncate">Enviar aviso</span>
+            </DropdownMenuItem>
           )}
 
           {/* Cancel action - ADMIN, LOGISTIC, FINANCIAL, COMMERCIAL */}

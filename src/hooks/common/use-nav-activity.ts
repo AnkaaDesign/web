@@ -19,12 +19,14 @@
 // producao vs producao-production-manager). Path is the stable, role-agnostic key.
 
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { routes, SECTOR_PRIVILEGES, CUT_STATUS } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
 import { canAccessAnyPrivilege } from "@/utils/privilege";
 import { useCuts } from "@/hooks/production/use-cut";
-import { useAttentionVersion, getAttentionCountsByType } from "@/lib/attention";
+import { useAttentionVersion, getAttentionCountsByType, getAttentionSeverityByType, getAttentionArmedByType } from "@/lib/attention";
+import { apiClient } from "@/api-client/axiosClient";
 
 /** A single "this nav entry needs attention" signal. */
 export interface NavActivityHint {
@@ -32,6 +34,12 @@ export interface NavActivityHint {
   path: string;
   /** How many pending items (optional; reserved for future count badges). */
   count?: number;
+  /** Severity of the underlying attention(s) — drives the nav blink COLOR (red for
+   * `harsh`/urgent, amber for `soft`/routine). Defaults to `harsh` when omitted. */
+  tone?: "harsh" | "soft";
+  /** Is anything ACTIVELY blinking (armed) vs merely resting? Armed → the nav BLINKS;
+   * resting-only → the nav shows a STATIC border (mirrors the row). Defaults to `true`. */
+  armed?: boolean;
 }
 
 /**
@@ -66,25 +74,64 @@ function useWarehousePendingCutsActivity(): NavActivityHint[] {
 
   const count = (data as { meta?: { totalRecords?: number } } | undefined)?.meta?.totalRecords ?? 0;
   if (!enabled || count <= 0) return [];
-  return [{ path: routes.production.cutting.root, count }];
+  // Pending cuts are urgent → red, and always "armed" (a pending cut is actionable).
+  return [{ path: routes.production.cutting.root, count, tone: "harsh", armed: true }];
 }
 
 /**
- * Attention engine → nav blink. When any loaded TASK matches an attention rule for
- * the current user, blink the Agenda (schedule) nav trail toward it. Reflects only
- * currently-loaded tasks (full global coverage needs the Phase-3 server summary), so
- * it lights while the user is anywhere the task is on screen (detail, lists).
+ * Server-side attention summary (GET /attention/summary) — the global count, not
+ * just what this tab happens to have loaded. Polled independently of any task list
+ * (same lightweight pattern as `useWarehousePendingCutsActivity`'s count-only cut
+ * query) so the Agenda/Cronograma nav entries can blink from ANYWHERE, including
+ * pages — like the Produção dashboard — that never register a single task with the
+ * local engine. See api/docs/attention-server-side.md §6.
+ */
+function useAttentionSummary(): { count: number; armed: boolean; harsh: boolean } {
+  const { user } = useAuth();
+  const userPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
+  const enabled = !!userPrivilege && canAccessAnyPrivilege(userPrivilege, [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]);
+
+  const { data } = useQuery({
+    queryKey: ["attention-summary"],
+    queryFn: async () => {
+      const res = await apiClient.get("/attention/summary");
+      return ((res as { data?: { counts?: { TASK?: number }; armed?: { TASK?: boolean }; harsh?: { TASK?: boolean } } })?.data ?? res) as {
+        counts?: { TASK?: number };
+        armed?: { TASK?: boolean };
+        harsh?: { TASK?: boolean };
+      };
+    },
+    enabled,
+    staleTime: 1000 * 30,
+    refetchInterval: enabled ? 1000 * 60 : false,
+    refetchOnWindowFocus: true,
+  });
+
+  if (!enabled) return { count: 0, armed: false, harsh: false };
+  return { count: data?.counts?.TASK ?? 0, armed: !!data?.armed?.TASK, harsh: !!data?.harsh?.TASK };
+}
+
+/**
+ * Attention engine → nav indicator. Lights the Agenda + Cronograma nav trail whenever a
+ * TASK matches an attention rule for the current user (loaded rows via the local engine +
+ * the server summary for the global/dashboard case). It BLINKS when anything is armed
+ * (actively blinking on a row) and shows a STATIC border when everything is resting
+ * (viewed / in cooldown) — so the nav mirrors the row exactly. Color = highest severity.
  */
 function useAttentionNavActivity(): NavActivityHint[] {
-  useAttentionVersion(); // re-render whenever attention state flips
-  const counts = getAttentionCountsByType();
-  const taskCount = counts.get("TASK") ?? 0;
+  useAttentionVersion(); // re-render whenever local attention state flips
+  const localCount = getAttentionCountsByType().get("TASK") ?? 0;
+  const localArmed = getAttentionArmedByType().get("TASK") === true;
+  const localHarsh = getAttentionSeverityByType().get("TASK") === "harsh";
+  const { count: serverCount, armed: serverArmed, harsh: serverHarsh } = useAttentionSummary();
+  const taskCount = Math.max(localCount, serverCount);
   if (taskCount <= 0) return [];
-  // Tasks live on both Agenda (preparation) and Cronograma (schedule); blink whichever
-  // the user has — the trail resolver lights the domain (Produção) then the sub-item.
+  const tone: "harsh" | "soft" = localHarsh || serverHarsh ? "harsh" : "soft";
+  const armed = localArmed || serverArmed;
+  // Tasks live on both Agenda (preparation) and Cronograma (schedule).
   return [
-    { path: routes.production.preparation.root, count: taskCount }, // /producao/agenda
-    { path: routes.production.schedule.root, count: taskCount }, // /producao/cronograma
+    { path: routes.production.preparation.root, count: taskCount, tone, armed }, // /producao/agenda
+    { path: routes.production.schedule.root, count: taskCount, tone, armed }, // /producao/cronograma
   ];
 }
 
@@ -99,6 +146,11 @@ export interface NavActivity {
   paths: Set<string>;
   /** Pending count per path (0 when a source didn't report one). */
   counts: Map<string, number>;
+  /** Severity per path (harsh wins if a path has mixed sources) — drives blink color. */
+  tones: Map<string, "harsh" | "soft">;
+  /** Paths that are ARMED (blinking) vs resting — a path here blinks; a path in `paths`
+   * but NOT here shows a static border (mirrors a viewed/resting row). */
+  armedPaths: Set<string>;
 }
 
 /**
@@ -112,18 +164,23 @@ export function useNavActivity(): NavActivity {
   // Stable dependency key so the memo only recomputes when a signal actually changes.
   const signature = hints
     .flat()
-    .map((h) => `${h.path}:${h.count ?? 0}`)
+    .map((h) => `${h.path}:${h.count ?? 0}:${h.tone ?? "harsh"}:${h.armed !== false ? 1 : 0}`)
     .sort()
     .join("|");
 
   return useMemo(() => {
     const paths = new Set<string>();
     const counts = new Map<string, number>();
+    const tones = new Map<string, "harsh" | "soft">();
+    const armedPaths = new Set<string>();
     for (const hint of hints.flat()) {
       paths.add(hint.path);
       counts.set(hint.path, (counts.get(hint.path) ?? 0) + (hint.count ?? 0));
+      const tone = hint.tone ?? "harsh";
+      if (tone === "harsh" || !tones.has(hint.path)) tones.set(hint.path, tone);
+      if (hint.armed !== false) armedPaths.add(hint.path);
     }
-    return { paths, counts };
+    return { paths, counts, tones, armedPaths };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 }

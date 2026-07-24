@@ -13,10 +13,24 @@
 // (truck.chassisNumber / truck.vinPlate). Field targets name the DetailFieldDef
 // id / DataTable column id so the exact field blinks.
 
-import { SECTOR_PRIVILEGES, CUT_STATUS } from "@/constants";
+import { SECTOR_PRIVILEGES, CUT_STATUS, TASK_STATUS } from "@/constants";
 
-import type { AttentionCadence, AttentionRule } from "./types";
+import type { AttentionCadence, AttentionRule, PredicateNode } from "./types";
 import { NOW_SENTINEL } from "./types";
+
+/**
+ * Every TASK rule below implicitly means "...and this is still in flight" — a
+ * COMPLETED or CANCELLED task's missing chassis/plate or overdue forecast is
+ * history, not something to act on. Wrap each rule's real predicate with this so
+ * a finished task can never light up (verified against prod data: without this
+ * guard R2/R3a/R3b matched ~1900 already-COMPLETED tasks each).
+ */
+function whileInFlight(node: PredicateNode): PredicateNode {
+  return {
+    op: "and",
+    nodes: [{ op: "ne", field: "status", value: TASK_STATUS.COMPLETED }, { op: "ne", field: "status", value: TASK_STATUS.CANCELLED }, node],
+  };
+}
 
 /** Sensible cadence defaults; individual rules override what they need. */
 function cadence(overrides: Partial<AttentionCadence> = {}): AttentionCadence {
@@ -44,15 +58,15 @@ export const ATTENTION_RULES: AttentionRule[] = [
     enabled: true,
     priority: 10,
     targetSectors: [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
-    predicate: {
+    predicate: whileInFlight({
       op: "and",
       nodes: [
         { op: "isTrue", field: "cleared" },
         { op: "isNull", field: "entryDate" },
       ],
-    },
+    }),
     target: { level: "field", field: "forecastDate" },
-    ack: "cycleThenCooldown",
+    ack: "onExitCooldown",
     cadence: cadence({ tone: "soft" }),
   },
 
@@ -64,15 +78,15 @@ export const ATTENTION_RULES: AttentionRule[] = [
     enabled: true,
     priority: 30,
     targetSectors: [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
-    predicate: {
+    predicate: whileInFlight({
       op: "and",
       nodes: [
         { op: "lt", field: "forecastDate", value: NOW_SENTINEL },
         { op: "isFalse", field: "cleared" },
       ],
-    },
+    }),
     target: { level: "field", field: "forecastDate" },
-    ack: "cycleThenCooldown",
+    ack: "onExitCooldown",
     cadence: cadence({ tone: "harsh" }),
   },
 
@@ -86,15 +100,15 @@ export const ATTENTION_RULES: AttentionRule[] = [
     enabled: true,
     priority: 20,
     targetSectors: [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
-    predicate: {
+    predicate: whileInFlight({
       op: "and",
       nodes: [
         { op: "notNull", field: "entryDate" },
         { op: "isNull", field: "truck.chassisNumber" },
       ],
-    },
+    }),
     target: { level: "field", field: "chassisNumber" },
-    ack: "cycleThenCooldown",
+    ack: "onExitCooldown",
     cadence: cadence({ tone: "soft" }),
   },
 
@@ -106,15 +120,15 @@ export const ATTENTION_RULES: AttentionRule[] = [
     enabled: true,
     priority: 20,
     targetSectors: [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
-    predicate: {
+    predicate: whileInFlight({
       op: "and",
       nodes: [
         { op: "notNull", field: "entryDate" },
         { op: "isNull", field: "truck.vinPlate" },
       ],
-    },
+    }),
     target: { level: "field", field: "vinPlate" },
-    ack: "cycleThenCooldown",
+    ack: "onExitCooldown",
     cadence: cadence({ tone: "soft" }),
   },
 

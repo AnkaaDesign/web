@@ -34,7 +34,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { useTaskDetail, useTaskMutations, useForecastHistory, useRescheduleForecast } from "@/hooks/production/use-task";
-import { useRegisterAttentionEntities, useMarkAttentionViewed } from "@/lib/attention";
+import { useRegisterAttentionEntities, useMarkAttentionViewedOnExit, useOtherEditors } from "@/lib/attention";
 import { useTaskSiblingIds } from "@/hooks/production/task/use-task-sibling-ids";
 import { useCutsByTask } from "@/hooks/production/use-cut";
 import { useAirbrushingsByTask } from "@/hooks/production/use-airbrushing";
@@ -290,12 +290,18 @@ function TaskDetailContent() {
   const task = (data as { data?: Task } | undefined)?.data ?? null;
   usePageTracker({ title: task ? `Tarefa: ${task.name}` : "Tarefa", icon: breadcrumbConfig.icon });
 
-  // Attention system: register this task so rules (forecast/chassis/…) can evaluate it,
-  // and acknowledge any `onView` alerts on open. Rules that persist through viewing
-  // (forecast) keep blinking their full cycle — see lib/attention.
+  // Attention system: register this task so rules (forecast/chassis/…) can evaluate it.
+  // Task rules are `onExitCooldown`: the field blinks the whole time you're on the page
+  // (so you can see WHICH one), and quiets for the cooldown when you LEAVE — hence the
+  // on-EXIT hook, declared AFTER register so its cleanup runs while the cycle is alive.
   const attentionTasks = useMemo(() => (task ? [task] : []), [task]);
   useRegisterAttentionEntities("TASK", attentionTasks);
-  useMarkAttentionViewed("TASK", task?.id);
+  useMarkAttentionViewedOnExit("TASK", task?.id);
+
+  // Presence: is another user editing this task right now? If so, lock editing here
+  // (an editor open elsewhere; concurrent edits would clobber each other).
+  const otherEditors = useOtherEditors("TASK", task?.id);
+  const editLockedBy = otherEditors.length > 0 ? otherEditors.map((e) => e.userName).join(", ") : null;
 
   const { data: cutsResponse } = useCutsByTask(
     { taskId: id!, filters: { include: { file: true }, orderBy: { createdAt: "desc" } } } as never,
@@ -473,6 +479,7 @@ function TaskDetailContent() {
             id: "name",
             label: "Logomarca",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.name,
             edit: canEdit ? { get: (t) => t.name, onCommit: (v) => setTaskField({ name: (v as string) ?? "" }) } : undefined,
           },
@@ -481,6 +488,7 @@ function TaskDetailContent() {
             label: "Razão Social",
             dataType: "relation",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.customer?.corporateName || t.customer?.fantasyName || null,
             // Plain text so the row's double-click-to-edit works; a small icon (not the name) navigates.
             render: (t) =>
@@ -527,6 +535,7 @@ function TaskDetailContent() {
             label: "Setor",
             dataType: "relation",
             editablePrivilege: SECTOR_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.sector?.name || null,
             render: (t) => <span>{t.sector?.name || "Indefinido"}</span>,
             edit: canEdit
@@ -543,6 +552,7 @@ function TaskDetailContent() {
             id: "status",
             label: "Status",
             dataType: "enum",
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.status,
             edit: canEdit
               ? {
@@ -585,6 +595,7 @@ function TaskDetailContent() {
             dataType: "enum",
             requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.PRODUCTION],
             editablePrivilege: BONIFICATION_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.bonification,
             edit: canEdit
               ? {
@@ -598,6 +609,7 @@ function TaskDetailContent() {
             id: "serialNumber",
             label: "Número de Série",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.serialNumber,
             edit: canEdit ? { get: (t) => t.serialNumber, onCommit: (v) => setTaskField({ serialNumber: (v as string) || null }) } : undefined,
           },
@@ -605,6 +617,7 @@ function TaskDetailContent() {
             id: "plate",
             label: "Placa",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.truck?.plate || null,
             render: (t) => <span>{t.truck?.plate?.toUpperCase() || "—"}</span>,
             edit: canEdit && task?.truck ? { get: (t) => t.truck?.plate ?? "", onCommit: (v) => setTaskField({ truck: { plate: (v as string) || null } }) } : undefined,
@@ -632,6 +645,7 @@ function TaskDetailContent() {
             label: "Categoria",
             dataType: "enum",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.truck?.category || null,
             render: (t) => (t.truck?.category ? <span>{TRUCK_CATEGORY_LABELS[t.truck.category]}</span> : <span className="text-muted-foreground">—</span>),
             edit:
@@ -648,6 +662,7 @@ function TaskDetailContent() {
             label: "Tipo de Implemento",
             dataType: "enum",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.truck?.implementType || null,
             render: (t) => (t.truck?.implementType ? <span>{IMPLEMENT_TYPE_LABELS[t.truck.implementType]}</span> : <span className="text-muted-foreground">—</span>),
             edit:
@@ -664,11 +679,13 @@ function TaskDetailContent() {
             label: "Caminhão",
             // Read-only vehicle size (cm) from the truck's layout — available even to sectors that
             // can't open the gated layout section.
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: () => (truckDimensions ? `${truckDimensions.width}cm × ${truckDimensions.height}cm` : null),
           },
           {
             id: "truckSpot",
             label: "Local",
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => (t.truck as { spot?: string } | undefined)?.spot || null,
             render: (t) => {
               const spot = (t.truck as { spot?: string } | undefined)?.spot;
@@ -680,6 +697,7 @@ function TaskDetailContent() {
             label: "Detalhes",
             dataType: "textarea",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.details,
             edit: canEdit ? { get: (t) => t.details, onCommit: (v) => setTaskField({ details: (v as string) || null }) } : undefined,
           },
@@ -705,6 +723,7 @@ function TaskDetailContent() {
             id: "createdAt",
             label: "Criado",
             dataType: "datetime",
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.createdAt,
             render: (t) => (
               <span className="text-right">
@@ -772,6 +791,7 @@ function TaskDetailContent() {
             label: "Entrada",
             dataType: "datetime",
             editablePrivilege: DATE_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.entryDate,
             edit: canEdit ? { get: (t) => t.entryDate, onCommit: (v) => setTaskField({ entryDate: (v as Date) ?? null }) } : undefined,
           },
@@ -780,6 +800,7 @@ function TaskDetailContent() {
             label: "Prazo",
             dataType: "datetime",
             editablePrivilege: DATE_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.term,
             // Overdue terms (past due and not completed/cancelled) render red with "(Atrasado)".
             render: (t) => {
@@ -795,8 +816,20 @@ function TaskDetailContent() {
             },
             edit: canEdit ? { get: (t) => t.term, onCommit: (v) => setTaskField({ term: (v as Date) ?? null }) } : undefined,
           },
-          { id: "startedAt", label: "Iniciado", dataType: "datetime", accessor: (t) => t.startedAt },
-          { id: "finishedAt", label: "Finalizado", dataType: "datetime", accessor: (t) => t.finishedAt },
+          {
+            id: "startedAt",
+            label: "Iniciado",
+            dataType: "datetime",
+            attention: { entityType: "TASK", sendWarning: true },
+            accessor: (t) => t.startedAt,
+          },
+          {
+            id: "finishedAt",
+            label: "Finalizado",
+            dataType: "datetime",
+            attention: { entityType: "TASK", sendWarning: true },
+            accessor: (t) => t.finishedAt,
+          },
         ],
         // Reschedule history sits with the dates (just below the forecast/date rows).
         render: (t: Task) => <ForecastHistoryCollapsible taskId={t.id} />,
@@ -1249,8 +1282,9 @@ function TaskDetailContent() {
   ]);
 
   const actions = useMemo<PageAction[]>(() => {
-    if (!task || !canEdit) return [];
+    if (!task) return [];
     const list: PageAction[] = [];
+    if (!canEdit) return list;
     if (task.status === TASK_STATUS.PREPARATION && role !== SECTOR_PRIVILEGES.COMMERCIAL) {
       list.push({ key: "disponibilizar", label: "Disponibilizar para Produção", icon: IconPlayerPlay, variant: "default", onClick: () => void changeStatus(TASK_STATUS.WAITING_PRODUCTION) });
     } else if (task.status === TASK_STATUS.WAITING_PRODUCTION) {
@@ -1264,6 +1298,10 @@ function TaskDetailContent() {
       label: "Editar",
       icon: IconEdit,
       variant: "default",
+      // Locked out while someone else has this task's editor open — hovering the disabled
+      // button explains why (title). Prevents two people clobbering each other's edits.
+      disabled: !!editLockedBy,
+      title: editLockedBy ? `${editLockedBy} está editando esta tarefa` : undefined,
       onClick: () =>
         // Commercial users ALWAYS edit through the quote (orçamento/faturamento by quote status),
         // even for a quote-less task — getTaskQuoteEditRoute falls back to the budget page, where the
@@ -1274,7 +1312,7 @@ function TaskDetailContent() {
             navigate(breadcrumbConfig.editRoute(task.id), { state: { ids: siblingIds } }),
     });
     return list;
-  }, [task, canEdit, canFinish, role, changeStatus, navigate, breadcrumbConfig, returnTo, siblingIds]);
+  }, [task, canEdit, canFinish, role, changeStatus, navigate, breadcrumbConfig, returnTo, siblingIds, editLockedBy]);
 
   // Display-name fallback chain (faithful to the legacy getTaskDisplayName): name → customer →
   // "Série {serial}" → plate → "Sem nome". The serial is still appended to the page title when present.
@@ -1299,6 +1337,8 @@ function TaskDetailContent() {
         title={taskName}
         icon={IconClipboardList}
         actions={actions}
+        editLocked={!!editLockedBy}
+        editLockedReason={editLockedBy ? `${editLockedBy} está editando esta tarefa` : undefined}
         favoritePage={undefined}
         hideEmptyFields
         breadcrumbs={[

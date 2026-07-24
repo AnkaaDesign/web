@@ -1,5 +1,6 @@
 import type { Row } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
+import { IsEditingBadge } from "@/lib/attention";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
@@ -281,6 +282,7 @@ export function createTaskPreparationColumns(ctx: TaskPreparationColumnContext =
         return (
           <span className="flex min-w-0 items-center gap-2">
             <TruncatedTextWithTooltip text={(getValue() as string) || "-"} className="truncate font-medium" />
+            <IsEditingBadge type="TASK" id={row.original.id} compact />
             {hidden > 0 && !row.getIsExpanded() ? (
               <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
                 +{hidden} {hidden === 1 ? "tarefa" : "tarefas"}

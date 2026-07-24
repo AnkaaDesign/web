@@ -5,14 +5,16 @@
 // manual/server-pushed warnings. See ATTENTION_SYSTEM_PLAN.md.
 
 export { AttentionProvider } from "./attention-context";
-export { AttentionField } from "./attention-field";
 export {
   useAttention,
   useAttentionField,
   useAttentionVersion,
   useMarkAttentionViewed,
+  useMarkAttentionViewedOnExit,
   useRegisterAttentionEntities,
   useAnnouncePresence,
+  useAnnouncePresenceForIds,
+  hasOtherEditors,
   usePresenceVersion,
   attentionRowClass,
   attentionRowClassFor,
@@ -21,7 +23,8 @@ export {
 } from "./use-attention";
 export { useEntityPresence, getEntityPresence } from "./presence";
 export type { PresenceEditor } from "./presence";
-export { useSendWarning } from "./send-warning";
+export { IsEditingBadge, useOtherEditors } from "./presence-badge";
+export { useSendWarning, canSendAttentionWarning } from "./send-warning";
 export type { SendWarningTarget } from "./send-warning";
 export { emitEntityChanged as notifyAttentionEntityChanged } from "./attention-socket";
 export {
@@ -32,6 +35,8 @@ export {
   configureAckStore,
   setRules,
   getAttentionCountsByType,
+  getAttentionSeverityByType,
+  getAttentionArmedByType,
 } from "./engine";
 export type { PushedAttention } from "./engine";
 export { ATTENTION_RULES, ATTENTION_RULES_BY_ID } from "./rules";
