@@ -9,8 +9,19 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
 import type { Airbrushing } from "../../../../types";
 
+// Settable from this modal: the whole lifecycle except CANCELLED, which stays a
+// deliberate one-off (the detail page's inline editor still offers it).
+const SETTABLE_STATUSES = [
+  AIRBRUSHING_STATUS.PREPARATION,
+  AIRBRUSHING_STATUS.WAITING_PRODUCTION,
+  AIRBRUSHING_STATUS.IN_PRODUCTION,
+  AIRBRUSHING_STATUS.COMPLETED,
+] as const;
+
+type SettableStatus = (typeof SETTABLE_STATUSES)[number];
+
 const setStatusSchema = z.object({
-  status: z.enum([AIRBRUSHING_STATUS.PENDING, AIRBRUSHING_STATUS.IN_PRODUCTION, AIRBRUSHING_STATUS.COMPLETED], {
+  status: z.enum(SETTABLE_STATUSES, {
     required_error: "Selecione um status",
   }),
 });
@@ -21,7 +32,7 @@ interface SetStatusModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   airbrushings: Airbrushing[];
-  onConfirm: (status: typeof AIRBRUSHING_STATUS.PENDING | typeof AIRBRUSHING_STATUS.IN_PRODUCTION | typeof AIRBRUSHING_STATUS.COMPLETED) => void;
+  onConfirm: (status: SettableStatus) => void;
 }
 
 export function SetStatusModal({ open, onOpenChange, airbrushings, onConfirm }: SetStatusModalProps) {
@@ -32,9 +43,9 @@ export function SetStatusModal({ open, onOpenChange, airbrushings, onConfirm }: 
     const firstStatus = airbrushings[0].status;
     const allSameStatus = airbrushings.every((a) => a.status === firstStatus);
     // Only seed a value the combobox can actually represent. CANCELLED (and any status
-    // outside the three settable options) must fall back to empty so the field isn't
+    // outside the settable options) must fall back to empty so the field isn't
     // stuck on an out-of-enum value that fails validation silently on submit.
-    const settable: string[] = [AIRBRUSHING_STATUS.PENDING, AIRBRUSHING_STATUS.IN_PRODUCTION, AIRBRUSHING_STATUS.COMPLETED];
+    const settable: string[] = [...SETTABLE_STATUSES];
     return allSameStatus && settable.includes(firstStatus) ? firstStatus : undefined;
   }, [airbrushings]);
 
@@ -58,11 +69,7 @@ export function SetStatusModal({ open, onOpenChange, airbrushings, onConfirm }: 
     form.reset();
   };
 
-  const statusOptions: ComboboxOption[] = [
-    { value: AIRBRUSHING_STATUS.PENDING, label: AIRBRUSHING_STATUS_LABELS.PENDING },
-    { value: AIRBRUSHING_STATUS.IN_PRODUCTION, label: AIRBRUSHING_STATUS_LABELS.IN_PRODUCTION },
-    { value: AIRBRUSHING_STATUS.COMPLETED, label: AIRBRUSHING_STATUS_LABELS.COMPLETED },
-  ];
+  const statusOptions: ComboboxOption[] = SETTABLE_STATUSES.map((s) => ({ value: s, label: AIRBRUSHING_STATUS_LABELS[s] }));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

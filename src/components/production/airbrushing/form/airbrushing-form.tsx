@@ -73,7 +73,7 @@ const makeEmptyAirbrushing = () => ({
   // crypto.randomUUID, not Date.now(): two rows added within the same millisecond would share an id,
   // and `updateAirbrushing` matches on id — so editing one row would silently write into both.
   id: `airbrushing-${crypto.randomUUID()}`,
-  status: AIRBRUSHING_STATUS.PENDING,
+  status: AIRBRUSHING_STATUS.PREPARATION,
   paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
   price: null,
   description: null,
@@ -265,7 +265,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       receiptIds: [],
       invoiceIds: [],
       layoutIds: [],
-      status: AIRBRUSHING_STATUS.PENDING,
+      status: AIRBRUSHING_STATUS.PREPARATION,
       paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
       // Create-mode multi-config (MultiAirbrushingSelector). Seeded with one empty row.
       airbrushings: mode === "create" ? [makeEmptyAirbrushing()] : [],
@@ -1104,7 +1104,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                             <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                               <span className="text-sm text-muted-foreground">Status</span>
                               <span className="text-sm font-semibold text-foreground">
-                                {AIRBRUSHING_STATUS_LABELS[(form.watch("status") as AIRBRUSHING_STATUS) ?? AIRBRUSHING_STATUS.PENDING] || "-"}
+                                {AIRBRUSHING_STATUS_LABELS[(form.watch("status") as AIRBRUSHING_STATUS) ?? AIRBRUSHING_STATUS.PREPARATION] || "-"}
                               </span>
                             </div>
 

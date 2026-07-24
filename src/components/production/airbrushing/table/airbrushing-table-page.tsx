@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconPlus, IconExternalLink, IconEdit, IconProgressCheck, IconTrash, IconAlertTriangle } from "@tabler/icons-react";
+import { IconPlus, IconExternalLink, IconEdit, IconProgressCheck, IconTrash, IconAlertTriangle, IconPlayerPlay, IconCheck } from "@tabler/icons-react";
 import { DataTablePage } from "@/components/ui/datatable";
 import type { DataTableRowAction, DataTableFilterDef, DataTableRowClickMeta, DataTableFilterValues } from "@/components/ui/datatable";
 import {
@@ -52,6 +52,11 @@ const LIST_INCLUDE = {
 // Sectors allowed to create/edit/delete/change-status of an airbrushing — mirrors
 // canEdit/canDelete/canCreateAirbrushings (ADMIN, COMMERCIAL, FINANCIAL). ADMIN always passes the gate.
 const AIRBRUSHING_MANAGE_PRIVILEGES = [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL];
+
+// Releasing a job to the floor ("Disponibilizar para Produção") is a scheduling call —
+// narrower than the manage set: ADMIN + COMMERCIAL only (ADMIN passes any gate implicitly).
+// Mirrors canReleaseAirbrushings and the API guard that refuses the transition for painters.
+const AIRBRUSHING_RELEASE_PRIVILEGES = [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL];
 
 // The API caps `limit` at 100, so the list is server-paginated (page/limit/sort/filters all go to the
 // server). Page + sort ride the URL the DataTable writes in server mode; search + filters arrive via
@@ -244,14 +249,11 @@ export function AirbrushingTablePage() {
     }
   }, [deleteDialog, batchDeleteAsync, deleteAsync]);
 
-  // Apply one status to N selected airbrushings: batch endpoint when several, single endpoint when one.
-  const confirmStatus = useCallback(
-    async (status: AIRBRUSHING_STATUS) => {
-      const rows = statusDialog;
-      if (!rows?.length) {
-        setStatusDialog(null);
-        return;
-      }
+  // Apply one status to N airbrushings: batch endpoint when several, single endpoint when one.
+  // startedAt/finishedAt are stamped server-side from the transition — never sent from here.
+  const applyStatus = useCallback(
+    async (rows: Airbrushing[], status: AIRBRUSHING_STATUS) => {
+      if (!rows.length) return;
       try {
         if (rows.length > 1) {
           await batchUpdateAsync({ airbrushings: rows.map((a) => ({ id: a.id, data: { status } })) } as never);
@@ -260,11 +262,18 @@ export function AirbrushingTablePage() {
         }
       } catch {
         // The api client already surfaced the error notification.
-      } finally {
-        setStatusDialog(null);
       }
     },
-    [statusDialog, batchUpdateAsync, updateAsync],
+    [batchUpdateAsync, updateAsync],
+  );
+
+  const confirmStatus = useCallback(
+    async (status: AIRBRUSHING_STATUS) => {
+      const rows = statusDialog;
+      if (rows?.length) await applyStatus(rows, status);
+      setStatusDialog(null);
+    },
+    [statusDialog, applyStatus],
   );
 
   const rowActions = useMemo<DataTableRowAction<Airbrushing>[]>(
@@ -283,6 +292,34 @@ export function AirbrushingTablePage() {
         requiredPrivilege: AIRBRUSHING_MANAGE_PRIVILEGES,
         hidden: (rows) => rows.length !== 1,
         onClick: (rows) => rows[0] && navigate(routes.production.airbrushings.edit(rows[0].id)),
+      },
+      // --- lifecycle shortcuts (mirror the task prep table: Disponibilizar / Iniciar / Finalizar).
+      // Each one only touches the rows actually in the source status, so a mixed selection
+      // advances exactly the rows it can and leaves the rest alone.
+      {
+        key: "disponibilizar",
+        label: "Disponibilizar para Produção",
+        icon: <IconPlayerPlay className="h-4 w-4" />,
+        separatorBefore: true,
+        requiredPrivilege: AIRBRUSHING_RELEASE_PRIVILEGES,
+        hidden: (rows) => !rows.some((a) => a.status === AIRBRUSHING_STATUS.PREPARATION),
+        onClick: (rows) => void applyStatus(rows.filter((a) => a.status === AIRBRUSHING_STATUS.PREPARATION), AIRBRUSHING_STATUS.WAITING_PRODUCTION),
+      },
+      {
+        key: "iniciar",
+        label: "Iniciar Produção",
+        icon: <IconPlayerPlay className="h-4 w-4" />,
+        requiredPrivilege: AIRBRUSHING_MANAGE_PRIVILEGES,
+        hidden: (rows) => !rows.some((a) => a.status === AIRBRUSHING_STATUS.WAITING_PRODUCTION),
+        onClick: (rows) => void applyStatus(rows.filter((a) => a.status === AIRBRUSHING_STATUS.WAITING_PRODUCTION), AIRBRUSHING_STATUS.IN_PRODUCTION),
+      },
+      {
+        key: "finalizar",
+        label: "Finalizar",
+        icon: <IconCheck className="h-4 w-4" />,
+        requiredPrivilege: AIRBRUSHING_MANAGE_PRIVILEGES,
+        hidden: (rows) => !rows.some((a) => a.status === AIRBRUSHING_STATUS.IN_PRODUCTION),
+        onClick: (rows) => void applyStatus(rows.filter((a) => a.status === AIRBRUSHING_STATUS.IN_PRODUCTION), AIRBRUSHING_STATUS.COMPLETED),
       },
       {
         key: "set-status",
@@ -303,7 +340,7 @@ export function AirbrushingTablePage() {
         onClick: (rows) => setDeleteDialog(rows),
       },
     ],
-    [navigate],
+    [navigate, applyStatus],
   );
 
   // --- declarative filters (server mode: values are mapped by buildAirbrushingQuery) ---

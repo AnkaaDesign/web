@@ -649,7 +649,7 @@ export const airbrushingCreateSchema = z
       .nullable()
       .optional()
       .transform((v) => (typeof v === "string" ? v.trim() || null : v)),
-    status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PENDING),
+    status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PREPARATION),
     paymentStatus: z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS).default(AIRBRUSHING_PAYMENT_STATUS.PENDING),
     taskId: z.string().uuid("Tarefa inválida"),
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
@@ -778,7 +778,7 @@ export const airbrushingCreateNestedSchema = z
       .nullable()
       .optional()
       .transform((v) => (typeof v === "string" ? v.trim() || null : v)),
-    status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PENDING),
+    status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PREPARATION),
     paymentStatus: z.nativeEnum(AIRBRUSHING_PAYMENT_STATUS).optional(),
     painterId: z.string().uuid("Pintor inválido").nullable().optional(),
     receiptIds: z.array(z.string().uuid()).optional(),

@@ -27,12 +27,11 @@ export function AirbrushingFormFields({ control, disabled, initialPainter, canVi
   const status = useWatch({ control, name: "status" });
   const isCompleted = status === AIRBRUSHING_STATUS.COMPLETED;
 
-  const statusOptions: ComboboxOption[] = [
-    { value: AIRBRUSHING_STATUS.PENDING, label: AIRBRUSHING_STATUS_LABELS.PENDING },
-    { value: AIRBRUSHING_STATUS.IN_PRODUCTION, label: AIRBRUSHING_STATUS_LABELS.IN_PRODUCTION },
-    { value: AIRBRUSHING_STATUS.COMPLETED, label: AIRBRUSHING_STATUS_LABELS.COMPLETED },
-    { value: AIRBRUSHING_STATUS.CANCELLED, label: AIRBRUSHING_STATUS_LABELS.CANCELLED },
-  ];
+  // Full lifecycle, in order — "Aguardando Produção" is how the form disponibiliza a job.
+  const statusOptions: ComboboxOption[] = Object.values(AIRBRUSHING_STATUS).map((value) => ({
+    value,
+    label: AIRBRUSHING_STATUS_LABELS[value],
+  }));
 
   const paymentStatusOptions: ComboboxOption[] = Object.values(AIRBRUSHING_PAYMENT_STATUS).map((value) => ({
     value,

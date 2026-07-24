@@ -230,6 +230,20 @@ export function canEditAirbrushings(user: PermissionUser | null): boolean {
   ]);
 }
 
+/**
+ * Can user release an airbrushing to the production floor
+ * ("Disponibilizar para Produção": Em Preparação → Aguardando Produção)?
+ *
+ * Deliberately narrower than canEditAirbrushings: releasing is a scheduling
+ * decision owned by ADMIN/COMMERCIAL, and the API refuses the transition for
+ * painters (AIRBRUSHING) outright. FINANCIAL can still correct a status through
+ * the generic "Alterar status" editor — it just doesn't get the shortcut.
+ */
+export function canReleaseAirbrushings(user: PermissionUser | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL]);
+}
+
 export function canDeleteAirbrushings(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [

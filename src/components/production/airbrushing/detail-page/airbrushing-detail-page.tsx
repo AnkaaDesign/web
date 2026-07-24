@@ -18,6 +18,8 @@ import {
   IconBuilding,
   IconEdit,
   IconTrash,
+  IconPlayerPlay,
+  IconCheck,
   IconList,
   IconLayoutGrid,
   IconFileDescription,
@@ -44,6 +46,7 @@ import { useAuth } from "@/contexts/auth-context";
 import {
   canEditAirbrushings,
   canDeleteAirbrushings,
+  canReleaseAirbrushings,
   AIRBRUSHING_FINANCE_PRIVILEGES,
 } from "@/utils/permissions/entity-permissions";
 import { getUsers } from "@/api-client";
@@ -69,12 +72,15 @@ import { getAirbrushingLayouts } from "@/components/production/task/detail/secti
 // `PrivilegeGate` (SECTOR_PRIVILEGES[]) shape used by requiredPrivilege/editablePrivilege.
 const MONEY_GATE: SECTOR_PRIVILEGES[] = [...AIRBRUSHING_FINANCE_PRIVILEGES];
 
-// Valid forward transitions for inline status edits (the current value is always kept by the editor).
+// Valid transitions for inline status edits (the current value is always kept by the editor).
+// Mirrors the task lifecycle: Em Preparação → Aguardando Produção → Em Produção → Concluído,
+// with a step back at every stage and Cancelado reachable until the job is concluded.
 const AIRBRUSHING_STATUS_TRANSITIONS: Record<string, AIRBRUSHING_STATUS[]> = {
-  [AIRBRUSHING_STATUS.PENDING]: [AIRBRUSHING_STATUS.IN_PRODUCTION, AIRBRUSHING_STATUS.COMPLETED, AIRBRUSHING_STATUS.CANCELLED],
-  [AIRBRUSHING_STATUS.IN_PRODUCTION]: [AIRBRUSHING_STATUS.PENDING, AIRBRUSHING_STATUS.COMPLETED, AIRBRUSHING_STATUS.CANCELLED],
+  [AIRBRUSHING_STATUS.PREPARATION]: [AIRBRUSHING_STATUS.WAITING_PRODUCTION, AIRBRUSHING_STATUS.IN_PRODUCTION, AIRBRUSHING_STATUS.CANCELLED],
+  [AIRBRUSHING_STATUS.WAITING_PRODUCTION]: [AIRBRUSHING_STATUS.PREPARATION, AIRBRUSHING_STATUS.IN_PRODUCTION, AIRBRUSHING_STATUS.CANCELLED],
+  [AIRBRUSHING_STATUS.IN_PRODUCTION]: [AIRBRUSHING_STATUS.WAITING_PRODUCTION, AIRBRUSHING_STATUS.COMPLETED, AIRBRUSHING_STATUS.CANCELLED],
   [AIRBRUSHING_STATUS.COMPLETED]: [AIRBRUSHING_STATUS.IN_PRODUCTION, AIRBRUSHING_STATUS.CANCELLED],
-  [AIRBRUSHING_STATUS.CANCELLED]: [AIRBRUSHING_STATUS.PENDING],
+  [AIRBRUSHING_STATUS.CANCELLED]: [AIRBRUSHING_STATUS.PREPARATION],
 };
 
 const muted = <span className="text-muted-foreground">—</span>;
@@ -92,6 +98,7 @@ export function AirbrushingDetailPage() {
 
   const canEdit = canEditAirbrushings(user);
   const canDelete = canDeleteAirbrushings(user);
+  const canRelease = canReleaseAirbrushings(user);
 
   // Promise-based confirm for the inline "Status de Pagamento" edit. Settling / un-settling money
   // must be confirmed first; `beforeCommit` awaits this before the status actually changes.
@@ -506,11 +513,40 @@ export function AirbrushingDetailPage() {
   const actions = useMemo<PageAction[]>(() => {
     if (!airbrushing) return [];
     const list: PageAction[] = [];
+
+    // Lifecycle shortcuts, mirroring the task detail page. startedAt/finishedAt are
+    // stamped server-side from the transition, so they are deliberately not sent here.
+    if (canRelease && airbrushing.status === AIRBRUSHING_STATUS.PREPARATION) {
+      list.push({
+        key: "disponibilizar",
+        label: "Disponibilizar para Produção",
+        icon: IconPlayerPlay,
+        variant: "default",
+        onClick: () => void updateAsync({ id: airbrushing.id, data: { status: AIRBRUSHING_STATUS.WAITING_PRODUCTION } }),
+      });
+    } else if (canEdit && airbrushing.status === AIRBRUSHING_STATUS.WAITING_PRODUCTION) {
+      list.push({
+        key: "iniciar",
+        label: "Iniciar Produção",
+        icon: IconPlayerPlay,
+        variant: "default",
+        onClick: () => void updateAsync({ id: airbrushing.id, data: { status: AIRBRUSHING_STATUS.IN_PRODUCTION } }),
+      });
+    } else if (canEdit && airbrushing.status === AIRBRUSHING_STATUS.IN_PRODUCTION) {
+      list.push({
+        key: "finalizar",
+        label: "Finalizar",
+        icon: IconCheck,
+        variant: "default",
+        onClick: () => void updateAsync({ id: airbrushing.id, data: { status: AIRBRUSHING_STATUS.COMPLETED } }),
+      });
+    }
+
     if (canEdit) list.push({ key: "edit", label: "Editar", icon: IconEdit, variant: "default", onClick: () => navigate(routes.production.airbrushings.edit(airbrushing.id)) });
     if (canDelete) list.push({ key: "delete", label: "Excluir", icon: IconTrash, onClick: () => setShowDeleteDialog(true) });
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [airbrushing, canEdit, canDelete, navigate]);
+  }, [airbrushing, canEdit, canDelete, canRelease, updateAsync, navigate]);
 
   return (
     <>

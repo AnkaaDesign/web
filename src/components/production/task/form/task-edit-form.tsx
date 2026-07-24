@@ -72,6 +72,8 @@ import { ImplementMeasureForm } from "@/components/production/implement-measure/
 import { SpotSelector } from "./spot-selector";
 import { useImplementMeasuresByTruck, useImplementMeasureMutations } from "../../../../hooks";
 import { TRUCK_SPOT } from "../../../../constants";
+import { useOtherEditors } from "@/lib/attention";
+import { IconEdit } from "@tabler/icons-react";
 
 interface TaskEditFormProps {
   task: Task;
@@ -225,6 +227,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const [showResponsibleErrors, setShowResponsibleErrors] = useState(false);
   const [showForecastReason, setShowForecastReason] = useState(false);
   const [forecastReason, setForecastReason] = useState<string>("");
+
+  // Attention system: warn if someone else already has this task open for editing
+  // (this form only ANNOUNCES presence at the route level — see the edit page wrapper;
+  // this is the READ side that was missing).
+  const otherEditors = useOtherEditors("TASK", task.id);
 
   // Wrap updateAsync for debugging/logging
   const updateAsync = async (params: any) => {
@@ -1038,7 +1045,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         : [{
             // Default empty airbrushing row
             id: `airbrushing-initial`,
-            status: AIRBRUSHING_STATUS.PENDING,
+            status: AIRBRUSHING_STATUS.PREPARATION,
             paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
             price: null,
             description: null,
@@ -2938,6 +2945,21 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         >
           Submit
         </button>
+
+        {otherEditors.length > 0 ? (
+          // Single clean icon (the same blue "is editing" pencil as the badge). NOT the
+          // <Alert> component — that renders its OWN variant icon, which stacked with a
+          // second icon here into the "two icons" the user reported.
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-blue-300/70 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-500/40 dark:bg-blue-900/20 dark:text-blue-300">
+            <IconEdit className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="leading-relaxed">
+              {otherEditors.length === 1
+                ? `${otherEditors[0].userName} também está editando esta tarefa agora.`
+                : `${otherEditors.map((e) => e.userName).join(", ")} também estão editando esta tarefa agora.`}{" "}
+              Suas alterações podem sobrescrever as de outra pessoa (ou vice-versa).
+            </p>
+          </div>
+        ) : null}
 
         <div className={openAccordion === 'base-files' || openAccordion === 'layouts' || openAccordion === 'project-files' || openAccordion === 'checkin-files' || openAccordion === 'checkout-files' ? 'pb-64' : ''}>
           <Accordion

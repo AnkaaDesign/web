@@ -87,7 +87,7 @@ const mapLayouts = (arr: any[]): FileWithPreview[] =>
 
 const mapFieldValueToItem = (airbrushing: any, index: number): AirbrushingItem => ({
   id: airbrushing.id || `airbrushing-${Date.now()}-${index}`,
-  status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
+  status: airbrushing.status || AIRBRUSHING_STATUS.PREPARATION,
   paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
   price: airbrushing.price || null,
   description: airbrushing.description ?? null,
@@ -213,7 +213,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         // crypto.randomUUID, not Date.now(): two rows added within the same millisecond would share
         // an id, and `updateAirbrushing` matches on id — editing one would silently write into both.
         id: `airbrushing-${crypto.randomUUID()}`,
-        status: AIRBRUSHING_STATUS.PENDING,
+        status: AIRBRUSHING_STATUS.PREPARATION,
         paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PENDING,
         price: null,
         description: null,
