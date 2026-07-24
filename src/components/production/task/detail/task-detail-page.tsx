@@ -34,6 +34,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { useTaskDetail, useTaskMutations, useForecastHistory, useRescheduleForecast } from "@/hooks/production/use-task";
+import { AttentionField, useRegisterAttentionEntities, useMarkAttentionViewed } from "@/lib/attention";
 import { useTaskSiblingIds } from "@/hooks/production/task/use-task-sibling-ids";
 import { useCutsByTask } from "@/hooks/production/use-cut";
 import { useAirbrushingsByTask } from "@/hooks/production/use-airbrushing";
@@ -288,6 +289,13 @@ function TaskDetailContent() {
   const { data, isLoading, error } = useTaskDetail(id!, { include: DETAIL_INCLUDE as never });
   const task = (data as { data?: Task } | undefined)?.data ?? null;
   usePageTracker({ title: task ? `Tarefa: ${task.name}` : "Tarefa", icon: breadcrumbConfig.icon });
+
+  // Attention system: register this task so rules (forecast/chassis/…) can evaluate it,
+  // and acknowledge any `onView` alerts on open. Rules that persist through viewing
+  // (forecast) keep blinking their full cycle — see lib/attention.
+  const attentionTasks = useMemo(() => (task ? [task] : []), [task]);
+  useRegisterAttentionEntities("TASK", attentionTasks);
+  useMarkAttentionViewed("TASK", task?.id);
 
   const { data: cutsResponse } = useCutsByTask(
     { taskId: id!, filters: { include: { file: true }, orderBy: { createdAt: "desc" } } } as never,
@@ -606,7 +614,11 @@ function TaskDetailContent() {
             label: "Nº Chassi",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
             accessor: (t) => t.truck?.chassisNumber || null,
-            render: (t) => <span>{t.truck?.chassisNumber ? formatChassis(t.truck.chassisNumber) : "—"}</span>,
+            render: (t) => (
+              <AttentionField type="TASK" id={t.id} field="chassisNumber" sendWarning={{ entityLabel: t.name, fieldLabel: "Nº Chassi" }}>
+                {t.truck?.chassisNumber ? formatChassis(t.truck.chassisNumber) : "—"}
+              </AttentionField>
+            ),
             edit: canEdit && task?.truck ? { get: (t) => t.truck?.chassisNumber ?? "", onCommit: (v) => setTaskField({ truck: { chassisNumber: (v as string) || null } }) } : undefined,
           },
           {
@@ -714,19 +726,22 @@ function TaskDetailContent() {
             accessor: (t) => t.forecastDate,
             // Inline (value right) like every other field; the reschedule history renders below the
             // date rows via the section's render body.
-            render: (t) =>
-              t.forecastDate ? (
-                <span className="inline-flex items-center justify-end gap-2">
-                  {t.cleared ? (
-                    <Badge variant="processing" className="shrink-0">
-                      Liberado
-                    </Badge>
-                  ) : null}
-                  <span>{new Date(t.forecastDate).toLocaleString("pt-BR")}</span>
-                </span>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              ),
+            render: (t) => (
+              <AttentionField type="TASK" id={t.id} field="forecastDate" sendWarning={{ entityLabel: t.name, fieldLabel: "Previsão de Liberação" }}>
+                {t.forecastDate ? (
+                  <span className="inline-flex items-center justify-end gap-2">
+                    {t.cleared ? (
+                      <Badge variant="processing" className="shrink-0">
+                        Liberado
+                      </Badge>
+                    ) : null}
+                    <span>{new Date(t.forecastDate).toLocaleString("pt-BR")}</span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </AttentionField>
+            ),
             // Changing the forecast prompts for an optional reschedule reason; with a reason it records
             // a reschedule (forecast history), otherwise it just updates the date.
             edit: canEdit

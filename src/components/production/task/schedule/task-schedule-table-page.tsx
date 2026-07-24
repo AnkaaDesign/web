@@ -65,6 +65,9 @@ import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActio
 import { useTasks } from "@/hooks/production/use-task";
 import { createTaskScheduleColumns } from "./task-schedule-columns";
 import { getRowColorClass } from "./task-table-utils";
+import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor, useSendWarning } from "@/lib/attention";
+import { IconBellPlus } from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
 
 const ADVANCED_GROUP = { id: "advanced", label: "Avançados", icon: <IconSettings2 className="h-4 w-4" /> };
 const getRowId = (t: Task) => t.id;
@@ -188,6 +191,13 @@ export function TaskScheduleTablePage() {
     refetchOnWindowFocus: false,
   } as never);
   const tasks = useMemo(() => (response?.data ?? []) as Task[], [response]);
+
+  // Attention system: register loaded tasks so rules evaluate them, and re-render
+  // when any attention state flips so getRowClassName reflects the live blink phase.
+  useRegisterAttentionEntities("TASK", tasks);
+  useAttentionVersion();
+  usePresenceVersion();
+  const { open: openSendWarning } = useSendWarning();
 
   // Partition into one group per sector (+ "Setor Indefinido" last); production sectors ordered first.
   const groups = useMemo<SectorGroup[]>(() => {
@@ -644,6 +654,16 @@ export function TaskScheduleTablePage() {
         hidden: () => !canAccessAdvancedMenu,
         onClick: (r) => handleStartCopyFromTask(r),
       },
+      {
+        key: "enviar-aviso",
+        label: "Enviar aviso",
+        icon: <IconBellPlus className="h-4 w-4" />,
+        separatorBefore: true,
+        onClick: (r) => {
+          const t = r[0];
+          if (t) openSendWarning({ entityType: "TASK", entityId: t.id, target: { level: "row" }, entityLabel: t.name });
+        },
+      },
       // --- destructive ---
       {
         key: "cancel",
@@ -665,6 +685,7 @@ export function TaskScheduleTablePage() {
     ];
   }, [
     isWarehouse,
+    openSendWarning,
     isAdmin,
     isCommercial,
     isProductionManager,
@@ -711,7 +732,7 @@ export function TaskScheduleTablePage() {
       data: group.tasks,
       columns,
       getRowId,
-      getRowClassName: (t: Task) => getRowColorClass(t),
+      getRowClassName: (t: Task) => cn(getRowColorClass(t), attentionRowClassFor("TASK", t.id), presenceRowClassFor("TASK", t.id)),
       filterDefs,
       rowActions,
       onRowClick,

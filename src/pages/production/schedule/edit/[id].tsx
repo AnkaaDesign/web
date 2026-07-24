@@ -8,6 +8,7 @@ import { TaskEditSkeleton } from "@/components/production/task/skeleton/task-edi
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconCheck } from "@tabler/icons-react";
+import { useAnnouncePresence } from "@/lib/attention";
 import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import React from "react";
@@ -15,6 +16,9 @@ import React from "react";
 export const TaskEditPage = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  // Announce "is editing" presence while this form is open — others viewing the task
+  // (tables/detail) see a "being edited" ring; auto-released on navigate / tab close.
+  useAnnouncePresence("TASK", id);
   const [formState, setFormState] = React.useState({ isValid: false, isDirty: false, isSubmitting: false });
 
   // Determine the source section from the URL path

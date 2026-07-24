@@ -11,6 +11,7 @@ import { AuthProvider } from "@/contexts/auth-context";
 import { SidebarProvider } from "@/contexts/sidebar-context";
 import { PricingProvider, PricingVisibilityBoundary } from "@/contexts/pricing-context";
 import { FavoritesProvider } from "@/contexts/favorites-context";
+import { AttentionProvider } from "@/lib/attention";
 import { FileViewerProvider } from "@/components/common/file/file-viewer";
 import { MessageModalProvider } from "@/components/common/message-modal";
 import { AutoPrivilegeRoute } from "@/components/navigation/auto-privilege-route";
@@ -604,6 +605,7 @@ function App() {
                 <AuthProvider>
                   <SidebarProvider>
                     <PricingProvider>
+                    <AttentionProvider>
                     <SocketNotificationsListener />
                     <SocketReconnectHandler />
                     <AppVersionChecker />
@@ -3631,6 +3633,7 @@ function App() {
                         </MessageModalProvider>
                       </FileViewerProvider>
                     </FavoritesProvider>
+                    </AttentionProvider>
                     </PricingProvider>
                   </SidebarProvider>
                 </AuthProvider>

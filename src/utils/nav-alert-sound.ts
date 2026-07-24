@@ -135,3 +135,57 @@ export function playAnnoyingBeep(): void {
     // A transient Web Audio failure must never break navigation — swallow it.
   }
 }
+
+// ---------------------------------------------------------------------------
+// Attention system tones — the generalized blink/bip engine reuses this same
+// AudioContext + mute plumbing. `harsh` is the smoke-alarm buzzer above (kept
+// for high-priority rules); `soft` is a gentler two-note chime for routine
+// attention so low-stakes alerts don't nag like a fire drill.
+// ---------------------------------------------------------------------------
+
+/** A calmer, non-grating two-partial "ding" for routine attention. */
+function synthesizeSoft(c: AudioCtx): void {
+  const now = c.currentTime;
+  const dur = 0.28;
+
+  const master = c.createGain();
+  master.gain.setValueAtTime(0.0001, now);
+  master.gain.exponentialRampToValueAtTime(0.14, now + 0.02);
+  master.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  master.connect(c.destination);
+
+  // Two consonant sine partials (a soft fifth) with a gentle upward glide.
+  const partials: Array<[number, number]> = [
+    [660, 0.6],
+    [990, 0.4],
+  ];
+  for (const [base, gain] of partials) {
+    const osc = c.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(base, now);
+    osc.frequency.linearRampToValueAtTime(base * 1.05, now + dur);
+    const g = c.createGain();
+    g.gain.value = gain;
+    osc.connect(g);
+    g.connect(master);
+    osc.start(now);
+    osc.stop(now + dur);
+  }
+}
+
+export type AttentionSoundTone = "harsh" | "soft" | "none";
+
+/** Play one attention bip in the requested tone. `none` is a silent no-op. */
+export function playAttentionBeep(tone: AttentionSoundTone): void {
+  if (tone === "none") return;
+  if (isMuted()) return;
+  const c = getContext();
+  if (!c) return;
+  if (c.state === "suspended") c.resume().catch(() => {});
+  try {
+    if (tone === "harsh") synthesize(c);
+    else synthesizeSoft(c);
+  } catch {
+    // Never let a Web Audio hiccup break the UI.
+  }
+}

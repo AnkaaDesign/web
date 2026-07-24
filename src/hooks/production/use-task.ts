@@ -2,6 +2,7 @@
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { notifyAttentionEntityChanged } from "@/lib/attention";
 import { getTasks, getTaskById, createTask, updateTask, deleteTask, batchCreateTasks, batchUpdateTasks, batchDeleteTasks, duplicateTask, rescheduleForecast, getForecastHistory } from "../../api-client";
 import type {
   TaskGetManyFormData,
@@ -192,6 +193,10 @@ export function useTaskMutations() {
     queryClient.invalidateQueries({
       queryKey: changeLogKeys.all,
     });
+
+    // Tell OTHER connected clients to reload + re-evaluate attention. "*" = any task
+    // (mutations vary in shape); the attention listener invalidates by entity type.
+    notifyAttentionEntityChanged("TASK", "*");
   };
 
   // CREATE
