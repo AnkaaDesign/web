@@ -24,6 +24,7 @@ import { routes, SECTOR_PRIVILEGES, CUT_STATUS } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
 import { canAccessAnyPrivilege } from "@/utils/privilege";
 import { useCuts } from "@/hooks/production/use-cut";
+import { useAttentionVersion, getAttentionCountsByType } from "@/lib/attention";
 
 /** A single "this nav entry needs attention" signal. */
 export interface NavActivityHint {
@@ -69,10 +70,29 @@ function useWarehousePendingCutsActivity(): NavActivityHint[] {
 }
 
 /**
+ * Attention engine → nav blink. When any loaded TASK matches an attention rule for
+ * the current user, blink the Agenda (schedule) nav trail toward it. Reflects only
+ * currently-loaded tasks (full global coverage needs the Phase-3 server summary), so
+ * it lights while the user is anywhere the task is on screen (detail, lists).
+ */
+function useAttentionNavActivity(): NavActivityHint[] {
+  useAttentionVersion(); // re-render whenever attention state flips
+  const counts = getAttentionCountsByType();
+  const taskCount = counts.get("TASK") ?? 0;
+  if (taskCount <= 0) return [];
+  // Tasks live on both Agenda (preparation) and Cronograma (schedule); blink whichever
+  // the user has — the trail resolver lights the domain (Produção) then the sub-item.
+  return [
+    { path: routes.production.preparation.root, count: taskCount }, // /producao/agenda
+    { path: routes.production.schedule.root, count: taskCount }, // /producao/cronograma
+  ];
+}
+
+/**
  * Registry of activity sources. Add a new blinking indicator by appending its hook
  * here — nothing else in the sidebar needs to change. Order is fixed (hook rules).
  */
-const NAV_ACTIVITY_SOURCES: NavActivitySource[] = [useWarehousePendingCutsActivity];
+const NAV_ACTIVITY_SOURCES: NavActivitySource[] = [useWarehousePendingCutsActivity, useAttentionNavActivity];
 
 export interface NavActivity {
   /** Route paths that currently have pending activity. */

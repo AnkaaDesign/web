@@ -99,7 +99,7 @@ interface ApprovedLayoutPickerProps {
 }
 
 /**
- * The budget/quote "Layout Referência" picker: choose up to `maxFiles` of the
+ * The budget/quote "Layout Aprovados" picker: choose up to `maxFiles` of the
  * task's existing layout images as the quote's REFERENCE layout (the image shown
  * on the budget/invoice PDF + public page). Approval itself lives on the task
  * layout; this is a display reference. There is NO upload here — new images are
@@ -296,7 +296,7 @@ export function ApprovedLayoutPicker({
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <IconPhoto className="h-4 w-4 text-muted-foreground" />
-          Layout Referência
+          Layout Aprovados
           <Badge
             variant={selectedCount > 0 ? "secondary" : "outline"}
             className="ml-auto text-[11px] font-normal tabular-nums"

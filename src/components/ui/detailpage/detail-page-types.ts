@@ -138,6 +138,13 @@ export interface DetailFieldDef<TData = any> {
   /** Export value override; defaults to the accessor value. */
   exportValue?: (row: TData) => ExportCellValue;
   excludeFromExport?: boolean;
+  /**
+   * Attention system: when set, this field's WHOLE ROW blinks (not just the value)
+   * while an attention rule targets `entityType:row.id:field.id`, and — with
+   * `sendWarning` — shows a "send a warning" icon. `entityType` is the attention
+   * entity kind ("TASK", …). Additive: no effect when omitted.
+   */
+  attention?: { entityType: string; sendWarning?: boolean };
 }
 
 /** A group of fields (and/or arbitrary content) rendered as a Card in the detail grid. */

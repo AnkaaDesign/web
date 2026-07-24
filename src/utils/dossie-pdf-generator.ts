@@ -505,7 +505,7 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
     if (layoutBytes) {
       const layoutImg = await embedImage(doc, layoutBytes);
       if (layoutImg) {
-        p1.drawText('Layout Referência', { x: ML, y, size: 12, font: fontBold, color: GREEN });
+        p1.drawText('Layout Aprovados', { x: ML, y, size: 12, font: fontBold, color: GREEN });
         y -= 16;
         const availableImgH = y - FOOTER_TOP_Y;
         const naturalRatio = layoutImg.width / layoutImg.height;
@@ -531,7 +531,7 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
     const layoutPage = doc.addPage([W, H]);
     let ly = await drawHeader(layoutPage, doc, font, fontBold, opts.budgetNumber);
     drawFooter(layoutPage, font, fontBold);
-    layoutPage.drawText('Layout Referência', { x: ML, y: ly, size: 12, font: fontBold, color: GREEN });
+    layoutPage.drawText('Layout Aprovados', { x: ML, y: ly, size: 12, font: fontBold, color: GREEN });
     ly -= 16;
     const availableImgH = ly - FOOTER_TOP_Y;
     const naturalRatio = extraImg.width / extraImg.height;

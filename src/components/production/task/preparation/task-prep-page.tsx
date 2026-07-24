@@ -69,6 +69,8 @@ import {
 } from "@/constants";
 import type { Task } from "@/types";
 import { clusterTasks, expandClusterTasks, expandClusterTaskIds, type ClusteredTask } from "./cluster-tasks";
+import { cn } from "@/lib/utils";
+import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor } from "@/lib/attention";
 import { createTaskPreparationColumns, TASK_PREP_SECTOR_DEFAULTS } from "./task-prep-columns";
 
 // Trimmed include — only what the columns render (vs. the legacy 3-7 MB payload). No truck layouts
@@ -267,6 +269,11 @@ export function TaskPreparationPage() {
   const { deleteAsync } = useTaskMutations();
   const { batchDeleteAsync } = useTaskBatchMutations();
   const { tables, tasks, isLoading, error } = useSplitClusters(true, priv);
+  // Attention system: register loaded tasks so rules evaluate them, and re-render on any
+  // attention/presence change so getRowClassName reflects the live blink phase.
+  useRegisterAttentionEntities("TASK", tasks);
+  useAttentionVersion();
+  usePresenceVersion();
   // Legacy gave WAREHOUSE no context menu and no export/share button (read-only view).
   const isWarehouse = priv === SECTOR_PRIVILEGES.WAREHOUSE;
 
@@ -653,7 +660,7 @@ export function TaskPreparationPage() {
     actions.push(
       {
         key: "adv-arts",
-        label: "Adicionar Layouts",
+        label: "Adicionar Layout Referência",
         icon: <IconPhoto className="h-4 w-4" />,
         separatorBefore: true,
         requiredPrivilege: ARTS,
@@ -708,7 +715,7 @@ export function TaskPreparationPage() {
         // COMMERCIAL sets the quote's approved layout files (TaskQuote.layoutFiles) — distinct from the
         // truck "Medidas do Implemento" above. (Faithful port of the legacy COMMERCIAL-only menu item.)
         key: "adv-quote-layout",
-        label: "Adicionar Layout",
+        label: "Adicionar Layout Aprovados",
         icon: <IconPhoto className="h-4 w-4" />,
         requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
         // requiredPrivilege lets ADMIN through; the quote reference is a
@@ -819,6 +826,7 @@ export function TaskPreparationPage() {
     tableId,
     data,
     columns,
+    getRowClassName: (t: ClusteredTask) => cn(attentionRowClassFor("TASK", t.id), presenceRowClassFor("TASK", t.id)),
     filterDefs,
     rowActions: isWarehouse ? EMPTY_ROW_ACTIONS : rowActions,
     enableShare: !isWarehouse,

@@ -385,7 +385,7 @@ export function TaskScheduleTable({
       },
       {
         key: "quoteLayout",
-        label: "Adicionar Layout",
+        label: "Adicionar Layout Aprovados",
         icon: <IconPhoto className="mr-2 h-4 w-4" />,
         hidden: () => !isCommercial,
         onClick: (rs) => handleAction("quoteLayout", rs),
@@ -400,7 +400,7 @@ export function TaskScheduleTable({
       // --- "Avançados" submenu (ADMIN only) ---
       {
         key: "bulkArts",
-        label: "Adicionar Layouts",
+        label: "Adicionar Layout Referência",
         icon: <IconPhoto className="mr-2 h-4 w-4" />,
         separatorBefore: true,
         group: advancedGroup,

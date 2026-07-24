@@ -545,7 +545,7 @@ export function TaskHistoryTablePage() {
       // --- Avançados submenu ---
       {
         key: "adv-arts",
-        label: "Adicionar Layouts",
+        label: "Adicionar Layout Referência",
         icon: <IconPhoto className="h-4 w-4" />,
         group: ADVANCED_GROUP,
         hidden: () => !canAccessAdvancedMenu || !canAccessLayouts,
@@ -553,7 +553,7 @@ export function TaskHistoryTablePage() {
       },
       {
         key: "adv-quote-layout",
-        label: "Adicionar Layout",
+        label: "Adicionar Layout Aprovados",
         icon: <IconPhoto className="h-4 w-4" />,
         group: ADVANCED_GROUP,
         hidden: () => !canAccessAdvancedMenu || !isCommercial,

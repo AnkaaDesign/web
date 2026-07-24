@@ -76,28 +76,44 @@ export const ATTENTION_RULES: AttentionRule[] = [
     cadence: cadence({ tone: "harsh" }),
   },
 
-  // R3 — truck is physically here (entry given) but chassis/plate not captured yet.
+  // R3a — truck is here (entry given) but the CHASSIS is missing → blink the chassis field.
+  // Split from vinPlate so each blinks the field that is ACTUALLY empty (blinking a filled
+  // chassis just because the plate is missing is misleading).
   {
-    id: "task.entry-without-chassis-or-plate",
-    name: "Entrada sem chassi/placa",
+    id: "task.entry-without-chassis",
+    name: "Entrada sem chassi",
     entityType: "TASK",
     enabled: true,
     priority: 20,
-    targetSectors: [SECTOR_PRIVILEGES.LOGISTIC],
+    targetSectors: [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
     predicate: {
       op: "and",
       nodes: [
         { op: "notNull", field: "entryDate" },
-        {
-          op: "or",
-          nodes: [
-            { op: "isNull", field: "truck.chassisNumber" },
-            { op: "isNull", field: "truck.vinPlate" },
-          ],
-        },
+        { op: "isNull", field: "truck.chassisNumber" },
       ],
     },
     target: { level: "field", field: "chassisNumber" },
+    ack: "cycleThenCooldown",
+    cadence: cadence({ tone: "soft" }),
+  },
+
+  // R3b — truck is here but the PLATE (Plaqueta / vinPlate) is missing → blink the plate field.
+  {
+    id: "task.entry-without-plate",
+    name: "Entrada sem plaqueta",
+    entityType: "TASK",
+    enabled: true,
+    priority: 20,
+    targetSectors: [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
+    predicate: {
+      op: "and",
+      nodes: [
+        { op: "notNull", field: "entryDate" },
+        { op: "isNull", field: "truck.vinPlate" },
+      ],
+    },
+    target: { level: "field", field: "vinPlate" },
     ack: "cycleThenCooldown",
     cadence: cadence({ tone: "soft" }),
   },

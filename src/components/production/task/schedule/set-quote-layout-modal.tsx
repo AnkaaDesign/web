@@ -315,12 +315,12 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <IconPhoto className="h-5 w-5" />
-            Layout de Referência
+            Layout Aprovados
           </DialogTitle>
           <DialogDescription>
             Aplicando para {appliedCount} tarefa{appliedCount !== 1 ? "s" : ""}.{" "}
-            Selecione um layout de referência entre as imagens da tarefa ou envie um
-            novo — o novo também é adicionado como layout aprovado de cada tarefa.
+            Selecione o layout aprovado entre as imagens da tarefa ou envie um
+            novo — o novo também é adicionado como layout referência de cada tarefa.
           </DialogDescription>
         </DialogHeader>
 

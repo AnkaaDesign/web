@@ -4100,7 +4100,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
                         <IconPhoto className="h-5 w-5" />
-                        Layouts
+                        Layout Referência
                       </CardTitle>
                     </CardHeader>
                   </AccordionTrigger>
@@ -4125,8 +4125,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                         disabled={isSubmitting}
                         showPreview={true}
                         existingFiles={uploadedFiles}
-                        placeholder="Adicione layouts relacionados à tarefa"
-                        label="Layouts anexados"
+                        placeholder="Adicione o layout referência relacionado à tarefa"
+                        label="Layout Referência anexado"
                         variant="card"
                       >
                         <FileSuggestions

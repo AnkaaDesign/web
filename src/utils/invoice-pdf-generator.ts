@@ -98,7 +98,7 @@ export function exportInvoicePdf(options: ServiceReportPdfOptions): void {
     <div class="page">
       ${buildHeader(formattedBudgetNumber, false)}
       <div class="page-content layout-page">
-        <div class="section-title" style="margin-bottom:4mm">Layout Referência</div>
+        <div class="section-title" style="margin-bottom:4mm">Layout Aprovados</div>
         <div class="layout-container">
           <img src="${apiUrl}/files/serve/${id}" alt="Layout" class="layout-img" />
         </div>

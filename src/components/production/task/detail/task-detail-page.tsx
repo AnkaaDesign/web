@@ -34,7 +34,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { useTaskDetail, useTaskMutations, useForecastHistory, useRescheduleForecast } from "@/hooks/production/use-task";
-import { AttentionField, useRegisterAttentionEntities, useMarkAttentionViewed } from "@/lib/attention";
+import { useRegisterAttentionEntities, useMarkAttentionViewed } from "@/lib/attention";
 import { useTaskSiblingIds } from "@/hooks/production/task/use-task-sibling-ids";
 import { useCutsByTask } from "@/hooks/production/use-cut";
 import { useAirbrushingsByTask } from "@/hooks/production/use-airbrushing";
@@ -485,7 +485,7 @@ function TaskDetailContent() {
             // Plain text so the row's double-click-to-edit works; a small icon (not the name) navigates.
             render: (t) =>
               t.customer ? (
-                <span className="inline-flex min-w-0 items-center gap-1.5">
+                <span className="flex min-w-0 max-w-full items-center gap-1.5">
                   <CustomerLogoDisplay
                     logo={t.customer.logo ?? null}
                     customerName={t.customer.corporateName || t.customer.fantasyName}
@@ -493,7 +493,7 @@ function TaskDetailContent() {
                     shape="rounded"
                     className="shrink-0"
                   />
-                  <span className="truncate">{t.customer.corporateName || t.customer.fantasyName}</span>
+                  <span className="min-w-0 truncate">{t.customer.corporateName || t.customer.fantasyName}</span>
                   {canAccessCustomerPages ? (
                     <button
                       type="button"
@@ -613,18 +613,16 @@ function TaskDetailContent() {
             id: "chassisNumber",
             label: "Nº Chassi",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.truck?.chassisNumber || null,
-            render: (t) => (
-              <AttentionField type="TASK" id={t.id} field="chassisNumber" sendWarning={{ entityLabel: t.name, fieldLabel: "Nº Chassi" }}>
-                {t.truck?.chassisNumber ? formatChassis(t.truck.chassisNumber) : "—"}
-              </AttentionField>
-            ),
+            render: (t) => <span>{t.truck?.chassisNumber ? formatChassis(t.truck.chassisNumber) : "—"}</span>,
             edit: canEdit && task?.truck ? { get: (t) => t.truck?.chassisNumber ?? "", onCommit: (v) => setTaskField({ truck: { chassisNumber: (v as string) || null } }) } : undefined,
           },
           {
             id: "vinPlate",
             label: "Plaqueta",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.truck?.vinPlate || null,
             render: (t) => <span>{t.truck?.vinPlate || "—"}</span>,
             edit: canEdit && task?.truck ? { get: (t) => t.truck?.vinPlate ?? "", onCommit: (v) => setTaskField({ truck: { vinPlate: (v as string) || null } }) } : undefined,
@@ -723,25 +721,23 @@ function TaskDetailContent() {
             dataType: "datetime",
             requiredPrivilege: canViewRestricted ? undefined : [SECTOR_PRIVILEGES.ADMIN],
             editablePrivilege: DATE_EDIT_PRIVILEGES,
+            attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.forecastDate,
             // Inline (value right) like every other field; the reschedule history renders below the
             // date rows via the section's render body.
-            render: (t) => (
-              <AttentionField type="TASK" id={t.id} field="forecastDate" sendWarning={{ entityLabel: t.name, fieldLabel: "Previsão de Liberação" }}>
-                {t.forecastDate ? (
-                  <span className="inline-flex items-center justify-end gap-2">
-                    {t.cleared ? (
-                      <Badge variant="processing" className="shrink-0">
-                        Liberado
-                      </Badge>
-                    ) : null}
-                    <span>{new Date(t.forecastDate).toLocaleString("pt-BR")}</span>
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </AttentionField>
-            ),
+            render: (t) =>
+              t.forecastDate ? (
+                <span className="inline-flex items-center justify-end gap-2">
+                  {t.cleared ? (
+                    <Badge variant="processing" className="shrink-0">
+                      Liberado
+                    </Badge>
+                  ) : null}
+                  <span>{new Date(t.forecastDate).toLocaleString("pt-BR")}</span>
+                </span>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              ),
             // Changing the forecast prompts for an optional reschedule reason; with a reason it records
             // a reschedule (forecast history), otherwise it just updates the date.
             edit: canEdit
@@ -1007,7 +1003,7 @@ function TaskDetailContent() {
         ? [
             {
               id: "layouts",
-              label: titleWithCount("Layouts", filteredLayouts.length),
+              label: titleWithCount("Layout Referência", filteredLayouts.length),
               icon: IconPhoto,
               span: 2 as const,
               headerActions: (t: Task) => {

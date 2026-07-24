@@ -1251,7 +1251,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
   const getModalTitle = () => {
     if (!operationType) return "";
     const titles: Record<BulkOperationType, string> = {
-      arts: "Adicionar Layouts",
+      arts: "Adicionar Layout Referência",
       baseFiles: "Arquivos Base",
       paints: "Adicionar Tintas",
       cuttingPlans: "Adicionar Plano de Corte",
@@ -1297,7 +1297,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
               showPreview={true}
               existingFiles={layouts}
               placeholder="Selecione layouts para as tarefas"
-              label="Layouts"
+              label="Layout Referência"
               variant="card"
             >
               <FileSuggestions

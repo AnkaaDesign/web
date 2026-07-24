@@ -576,7 +576,11 @@ export const FinancialBudgetDetailPage = () => {
         (f.type || "").startsWith("image/") &&
         (f.status || "DRAFT") === "APPROVED",
     );
-    const kept = layoutFiles.filter((lf) => approved.some((a) => matches(a, lf)));
+    // Keep a raw File (a brand-new Step-2 upload not yet persisted) — it becomes
+    // an APPROVED task layout on Save, so it must survive this reconcile.
+    const kept = layoutFiles.filter(
+      (lf) => lf instanceof File || approved.some((a) => matches(a, lf)),
+    );
     if (kept.length !== layoutFiles.length) {
       setLayoutFiles(kept);
       form.setValue(

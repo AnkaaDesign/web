@@ -418,7 +418,7 @@ export function LayoutFileUploadField({
         />
       </div>
       <p className="text-xs font-medium text-foreground">
-        {isDragActive ? "Solte aqui..." : placeholder || "Adicionar layout"}
+        {isDragActive ? "Solte aqui..." : placeholder || "Adicionar layout referência"}
       </p>
       <p className="text-[10px] text-muted-foreground">{acceptedFilesList}</p>
     </div>

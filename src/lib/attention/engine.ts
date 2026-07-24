@@ -220,6 +220,22 @@ export function getGlobalVersion(): number {
   return globalVersion;
 }
 
+/**
+ * Count of DISTINCT entities currently needing attention, per type (entity-level
+ * addresses only, so a row with two field alerts counts once). Drives the nav-menu
+ * blink. Only reflects entities currently loaded/registered — global coverage for
+ * unloaded entities needs the server summary (Phase 3).
+ */
+export function getAttentionCountsByType(): Map<AttentionEntityType, number> {
+  const m = new Map<AttentionEntityType, number>();
+  for (const [addr, st] of stateByAddress) {
+    if (!st.active) continue;
+    if (addr.split(":").length !== 2) continue; // `type:id` only (skip `type:id:field`)
+    m.set(st.match.entityType, (m.get(st.match.entityType) ?? 0) + 1);
+  }
+  return m;
+}
+
 // ---------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------

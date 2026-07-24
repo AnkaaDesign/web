@@ -3,8 +3,9 @@ import type { RefObject } from "react";
 // The app mounts the custom Toaster (@/components/ui/sonner) which strips background/padding from
 // raw sonner toasts — use the wrapper so the validation-error toast renders styled.
 import { toast } from "@/components/ui/sonner";
-import { IconArrowBackUp } from "@tabler/icons-react";
+import { IconArrowBackUp, IconBellPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { useAttentionField, attentionRowClass, useSendWarning, type AttentionEntityType } from "@/lib/attention";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -321,6 +322,35 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
   // Inline rows keep a constant height whether showing text or an h-8 editor (no jump on edit).
   const inlineRowCls = field.block ? undefined : "min-h-[2.5rem] py-1";
 
+  // Attention system: blink the WHOLE row (not just the value) while a rule targets this
+  // field, and optionally show a "send warning" icon. Hooks are unconditional (no-op when
+  // `field.attention` is absent — id undefined → null state).
+  const attnRowId = field.attention ? (row as { id?: string } | null)?.id : undefined;
+  const attnState = useAttentionField((field.attention?.entityType as AttentionEntityType) ?? "TASK", attnRowId, field.id);
+  const { open: openSendWarning } = useSendWarning();
+  const attnRowCls = field.attention ? cn("group/attnrow", attentionRowClass(attnState)) : undefined;
+  const sendWarningBtn =
+    field.attention?.sendWarning && attnRowId ? (
+      <button
+        type="button"
+        title="Enviar aviso"
+        onClick={(e) => {
+          e.stopPropagation();
+          openSendWarning({
+            entityType: field.attention!.entityType as AttentionEntityType,
+            entityId: attnRowId,
+            target: { level: "field", field: field.id },
+            entityLabel: (row as { name?: string } | null)?.name,
+            fieldLabel: typeof field.label === "string" ? field.label : undefined,
+          });
+        }}
+        onDoubleClick={(e) => e.stopPropagation()}
+        className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/attnrow:opacity-100 hover:text-foreground"
+      >
+        <IconBellPlus className="h-3.5 w-3.5" />
+      </button>
+    ) : null;
+
   // Inline "Desfazer" affordance: after a successful edit we park the previous value and a live
   // countdown right ON the field (not a corner toast), so the undo sits next to what changed and
   // disappears after UNDO_SECONDS.
@@ -460,7 +490,7 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
         label={field.label}
         value={<Editor field={field} edit={edit} row={row} onCommit={commit} onCancel={cancel} />}
         block={field.block}
-        className={inlineRowCls}
+        className={cn(inlineRowCls, attnRowCls)}
       />
     );
   }
@@ -525,6 +555,7 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
         label={field.label}
         value={valueNode}
         block={field.block}
+        trailing={sendWarningBtn}
         role="button"
         tabIndex={0}
         title="Duplo clique para editar"
@@ -537,6 +568,7 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
         }}
         className={cn(
           inlineRowCls,
+          attnRowCls,
           // select-none so the double-click that enters edit mode doesn't select/copy the text.
           "cursor-pointer select-none outline-none transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-border",
           pending && "pointer-events-none opacity-60",
@@ -545,7 +577,7 @@ function InlineEditFieldInner<TData>({ field, row, editable }: InlineEditFieldPr
     );
   }
 
-  return <DetailRow icon={field.icon} label={field.label} value={node} block={field.block} className={inlineRowCls} />;
+  return <DetailRow icon={field.icon} label={field.label} value={node} block={field.block} trailing={sendWarningBtn} className={cn(inlineRowCls, attnRowCls)} />;
 }
 
 export const InlineEditField = memo(InlineEditFieldInner) as typeof InlineEditFieldInner;

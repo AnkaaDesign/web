@@ -271,20 +271,37 @@ export function BudgetStepInfo({
     [customerConfigs, customersCache],
   );
 
-  // --- Layout Aprovado picker --------------------------------------------------
+  // --- Layout Aprovados picker -------------------------------------------------
   // The budget's approved layout is chosen FROM the task's layouts (shared
-  // ApprovedLayoutPicker). There is NO upload here — new images are added to the
-  // task in Step 1. Selecting files here syncs the `layoutFileIds` form field.
+  // ApprovedLayoutPicker). Selecting files here syncs the `layoutFileIds` form
+  // field. Raw File uploads (added via the picker's upload card) carry no id yet;
+  // they are resolved to APPROVED task layouts on Save (parent uploads them +
+  // backend syncTaskLayoutsFromQuote), so they must NOT be turned into ids here.
   const handleLayoutChange = useCallback(
     (files: FileWithPreview[]) => {
       onLayoutFilesChange(files);
       const ids = files
+        .filter((f) => !(f instanceof File))
         .map((f) => (f as any).uploadedFileId || f.id)
         .filter(Boolean)
         .slice(0, 2);
       setValue("layoutFileIds", ids, { shouldDirty: true });
     },
     [onLayoutFilesChange, setValue],
+  );
+
+  // Upload a NEW reference image directly in Step 2 (mirrors the right-click
+  // "Layout do Orçamento" modal). The raw File is appended to the selection and
+  // resolved to an APPROVED task layout on Save; the authoritative reprove then
+  // reproves every non-selected task layout. Capped at 2.
+  const handleUploadFiles = useCallback(
+    (picked: File[]) => {
+      const withPreview = picked.map(
+        (f) => Object.assign(f, { preview: URL.createObjectURL(f) }) as FileWithPreview,
+      );
+      handleLayoutChange([...layoutFiles, ...withPreview].slice(0, 2));
+    },
+    [layoutFiles, handleLayoutChange],
   );
 
   return (
@@ -483,12 +500,15 @@ export function BudgetStepInfo({
         </CardContent>
       </Card>
 
-      {/* Layout Aprovado — pick the budget's approved layout FROM the task's
-          layouts (managed in Step 1). Shared with the billing step. */}
+      {/* Layout Aprovados — pick the budget's approved layout FROM the task's
+          layouts, or upload a NEW one (auto-approved). Selection is authoritative:
+          on Save every non-selected task layout is reproved. Shared with billing. */}
       <ApprovedLayoutPicker
         layouts={layouts}
         layoutFiles={layoutFiles}
         onChange={handleLayoutChange}
+        onUploadFiles={handleUploadFiles}
+        uploadLabel="Selecione ou envie um layout"
         disabled={disabled}
       />
     </div>

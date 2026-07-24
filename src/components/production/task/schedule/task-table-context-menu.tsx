@@ -137,7 +137,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         {isCommercial && (
           <DropdownMenuItem onClick={() => handleAction("quoteLayout")}>
             <IconPhoto className="mr-2 h-4 w-4" />
-            Adicionar Layout
+            Adicionar Layout Aprovados
           </DropdownMenuItem>
         )}
 
@@ -160,7 +160,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
             <DropdownMenuSubContent>
               <DropdownMenuItem onClick={() => handleAction("bulkArts")}>
                 <IconPhoto className="mr-2 h-4 w-4" />
-                Adicionar Layouts
+                Adicionar Layout Referência
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleAction("bulkBaseFiles")}>
                 <IconFileText className="mr-2 h-4 w-4" />

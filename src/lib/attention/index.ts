@@ -24,7 +24,15 @@ export type { PresenceEditor } from "./presence";
 export { useSendWarning } from "./send-warning";
 export type { SendWarningTarget } from "./send-warning";
 export { emitEntityChanged as notifyAttentionEntityChanged } from "./attention-socket";
-export { addPushedAttention, setPushedAttentions, dismissPushedAttention, snooze as snoozeAttention, configureAckStore, setRules } from "./engine";
+export {
+  addPushedAttention,
+  setPushedAttentions,
+  dismissPushedAttention,
+  snooze as snoozeAttention,
+  configureAckStore,
+  setRules,
+  getAttentionCountsByType,
+} from "./engine";
 export type { PushedAttention } from "./engine";
 export { ATTENTION_RULES, ATTENTION_RULES_BY_ID } from "./rules";
 export type {

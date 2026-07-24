@@ -80,6 +80,10 @@ export function BudgetStepTask({
   const showResponsibles = isAdminUser || isCommercialUser;
   const showPaint = isAdminUser || isCommercialUser;
   const showLayouts = isAdminUser || isCommercialUser;
+  // Raw task-layout upload + status management (Step 1) is ADMIN-only: commercial
+  // does NOT upload task layouts or change their status here — they only pick (or
+  // upload a new, auto-approved) approved layout in Step 2 (Layout Aprovados).
+  const canManageTaskLayouts = isAdminUser;
 
   // Watch form values
   const plates = useWatch({ control, name: "plates" }) || [];
@@ -498,8 +502,9 @@ export function BudgetStepTask({
           </Card>
         </AccordionItem>
 
-        {/* 6. Layouts - COMMERCIAL/ADMIN */}
-        {showLayouts && (
+        {/* 6. Layout Referência (task layouts) - ADMIN only. Commercial manages
+             the approved layout in Step 2, not the raw task layouts here. */}
+        {canManageTaskLayouts && (
           <AccordionItem
             value="layouts"
             id="accordion-item-layouts"
@@ -510,7 +515,7 @@ export function BudgetStepTask({
                 <CardHeader className="flex-1 py-4">
                   <CardTitle className="flex items-center gap-2">
                     <IconPhoto className="h-5 w-5" />
-                    Layouts
+                    Layout Referência
                     {layouts.length > 0 && (
                       <Badge variant="secondary" className="ml-1">
                         {layouts.length}
@@ -528,8 +533,8 @@ export function BudgetStepTask({
                     disabled={disabled}
                     showPreview={true}
                     existingFiles={layouts}
-                    placeholder="Adicione layouts relacionados à tarefa"
-                    label="Layouts anexados"
+                    placeholder="Adicione o layout referência relacionado à tarefa"
+                    label="Layout Referência anexado"
                     variant="card"
                   >
                     {/* Reuse a layout already used for this customer (no re-upload). */}

@@ -728,13 +728,13 @@ export function TaskHistoryContextMenu({
                 {canAccessLayouts && (
                   <DropdownMenuItem onClick={handleBulkArts}>
                     <IconPhoto className="mr-2 h-4 w-4" />
-                    <span className="truncate">Adicionar Layouts</span>
+                    <span className="truncate">Adicionar Layout Referência</span>
                   </DropdownMenuItem>
                 )}
                 {isCommercial && (
                   <DropdownMenuItem onClick={handleQuoteLayout} onSelect={(e) => e.preventDefault()}>
                     <IconPhoto className="mr-2 h-4 w-4" />
-                    <span className="truncate">Adicionar Layout</span>
+                    <span className="truncate">Adicionar Layout Aprovados</span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={handleBulkBaseFiles}>
