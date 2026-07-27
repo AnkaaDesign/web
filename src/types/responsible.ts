@@ -20,7 +20,8 @@ export interface Responsible {
   name: string;
   password?: string | null;
   companyId?: string | null;
-  role: ResponsibleRole;
+  /** Non-empty. A contact may handle several areas at once. */
+  roles: ResponsibleRole[];
   isActive: boolean;
   lastLogin?: Date | null;
   createdAt: Date;
@@ -36,7 +37,7 @@ export interface ResponsibleCreateFormData {
   name: string;
   password?: string | null;
   companyId?: string | null;
-  role: ResponsibleRole;
+  roles: ResponsibleRole[];
   isActive?: boolean;
 }
 
@@ -45,7 +46,7 @@ export interface ResponsibleUpdateFormData {
   phone?: string;
   name?: string;
   password?: string | null;
-  role?: ResponsibleRole;
+  roles?: ResponsibleRole[];
   isActive?: boolean;
 }
 
@@ -54,7 +55,7 @@ export interface ResponsibleCreateInline {
   phone: string;
   name: string;
   password?: string | null;
-  role: ResponsibleRole;
+  roles: ResponsibleRole[];
   isActive?: boolean;
 }
 
@@ -63,7 +64,15 @@ export interface ResponsibleRowData {
   email?: string | null;
   phone: string;
   name: string;
-  role: ResponsibleRole;
+  roles: ResponsibleRole[];
+  /**
+   * The roles this contact had when it was loaded from the API.
+   *
+   * Only set for already-registered contacts, and only so the form can tell an
+   * inline role edit apart from an untouched row -- without it every save would
+   * PUT every contact and write a changelog entry for each.
+   */
+  originalRoles?: ResponsibleRole[];
   isActive: boolean;
   isEditing?: boolean;
   isNew?: boolean;
@@ -77,7 +86,7 @@ export interface ResponsibleGetManyFormData {
   pageSize?: number;
   search?: string;
   companyId?: string;
-  role?: ResponsibleRole;
+  roles?: ResponsibleRole[];
   isActive?: boolean;
   include?: string[];
 }
@@ -106,8 +115,8 @@ export interface AuthResponse {
 export interface ResponsibleDisplay {
   id: string;
   name: string;
-  role: string;
-  roleLabel: string;
+  roles: string[];
+  rolesLabel: string;
   phone: string;
   email?: string;
   companyName: string;
@@ -140,3 +149,12 @@ export const RESPONSIBLE_ROLE_COLORS: Record<ResponsibleRole, string> = {
   [ResponsibleRole.FLEET_MANAGER]: 'gray',
   [ResponsibleRole.DRIVER]: 'yellow',
 };
+
+/**
+ * Human-readable label for a contact's set of roles, e.g. "Comercial, Financeiro".
+ *
+ * Use this everywhere a single string is needed (exports, PDFs, filter chips,
+ * tooltips); render badges directly from `roles` where the UI has room.
+ */
+export const formatResponsibleRoles = (roles: readonly ResponsibleRole[] | undefined | null): string =>
+  (roles ?? []).map(role => RESPONSIBLE_ROLE_LABELS[role] ?? role).join(', ');

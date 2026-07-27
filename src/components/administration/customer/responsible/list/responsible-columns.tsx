@@ -1,10 +1,7 @@
 import React from "react";
 import type { Responsible } from "@/types/responsible";
-import {
-  RESPONSIBLE_ROLE_LABELS,
-  RESPONSIBLE_ROLE_COLORS,
-} from "@/types/responsible";
 import { Badge } from "@/components/ui/badge";
+import { ResponsibleRoleBadges } from "../responsible-role-badges";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { formatBrazilianPhone, formatDateTime } from "@/utils";
 
@@ -30,18 +27,13 @@ export function createResponsibleColumns(): ResponsibleColumn[] {
       align: "left",
     },
     {
-      key: "role",
-      header: "FUNÇÃO",
-      accessor: (responsible) => (
-        <Badge
-          variant={RESPONSIBLE_ROLE_COLORS[responsible.role] as any}
-          className="text-xs"
-        >
-          {RESPONSIBLE_ROLE_LABELS[responsible.role]}
-        </Badge>
-      ),
+      key: "roles",
+      header: "FUNÇÕES",
+      // Not sortable, and it never can be: `roles` is a Postgres scalar list,
+      // which Prisma cannot order by.
+      accessor: (responsible) => <ResponsibleRoleBadges roles={responsible.roles} maxVisible={2} />,
       sortable: false,
-      className: "min-w-[120px]",
+      className: "min-w-[180px]",
       align: "left",
     },
     {
@@ -161,4 +153,4 @@ export function createResponsibleColumns(): ResponsibleColumn[] {
 }
 
 // Export the default visible columns
-export const DEFAULT_VISIBLE_COLUMNS = new Set(["name", "role", "company", "phone", "email", "isActive"]);
+export const DEFAULT_VISIBLE_COLUMNS = new Set(["name", "roles", "company", "phone", "email", "isActive"]);

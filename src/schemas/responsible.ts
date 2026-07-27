@@ -18,6 +18,21 @@ const passwordSchema = z
   .optional()
   .or(z.literal(''));
 
+/**
+ * A contact's roles: at least one, de-duplicated, in enum declaration order.
+ *
+ * The canonical ordering matters beyond cosmetics -- the API records changelog
+ * diffs by comparing serialized values, so an unordered array would log a
+ * change every time the user toggles the same set in a different sequence.
+ */
+export const responsibleRolesSchema = z
+  .array(z.nativeEnum(ResponsibleRole, { errorMap: () => ({ message: 'Função inválida' }) }))
+  .min(1, 'Selecione ao menos uma função')
+  .transform(roles => {
+    const order = Object.values(ResponsibleRole);
+    return [...new Set(roles)].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  });
+
 // Responsible create schema
 export const responsibleCreateSchema = z.object({
   email: emailSchema,
@@ -36,9 +51,7 @@ export const responsibleCreateSchema = z.object({
     .uuid('ID da empresa inválido')
     .optional()
     .nullable(),
-  role: z.nativeEnum(ResponsibleRole, {
-    errorMap: () => ({ message: 'Função inválida' }),
-  }),
+  roles: responsibleRolesSchema,
   isActive: z
     .boolean()
     .optional()
@@ -74,9 +87,7 @@ export const responsibleCreateInlineSchema = z.object({
     .uuid('ID da empresa inválido')
     .optional()
     .nullable(),
-  role: z.nativeEnum(ResponsibleRole, {
-    errorMap: () => ({ message: 'Função inválida' }),
-  }),
+  roles: responsibleRolesSchema,
   isActive: z
     .boolean()
     .optional()
@@ -96,11 +107,7 @@ export const responsibleUpdateSchema = z.object({
     .max(100, 'Nome deve ter no máximo 100 caracteres')
     .optional(),
   password: passwordSchema,
-  role: z
-    .nativeEnum(ResponsibleRole, {
-      errorMap: () => ({ message: 'Função inválida' }),
-    })
-    .optional(),
+  roles: responsibleRolesSchema.optional(),
   isActive: z
     .boolean()
     .optional(),
@@ -126,8 +133,10 @@ export const responsibleGetManySchema = z.object({
     .string()
     .uuid('ID da empresa inválido')
     .optional(),
-  role: z
-    .nativeEnum(ResponsibleRole)
+  // Any-of filter: selecting FINANCIAL + FLEET_MANAGER lists every contact
+  // holding either (Prisma `hasSome` on the server).
+  roles: z
+    .array(z.nativeEnum(ResponsibleRole))
     .optional(),
   isActive: z
     .boolean()
@@ -188,7 +197,7 @@ export const responsibleRowDataSchema = z.object({
   email: z.string().nullable().optional(),
   phone: z.string(),
   name: z.string(),
-  role: z.nativeEnum(ResponsibleRole),
+  roles: z.array(z.nativeEnum(ResponsibleRole)),
   isActive: z.boolean(),
   isEditing: z.boolean().optional(),
   isNew: z.boolean().optional(),

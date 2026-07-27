@@ -17,18 +17,20 @@ import {
   taskQuoteKeys,
 } from "@/hooks/production/use-task-quote";
 import { taskQuoteService } from "@/api-client/task-quote";
+import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
 import {
   canViewQuote,
   canEditQuote,
   getQuoteStatusPath,
 } from "@/utils/permissions/quote-permissions";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
-import { validateResponsibleRows } from "@/components/administration/customer/responsible";
+import { validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
 import { useAuth } from "@/contexts/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "@/api-client/file";
@@ -112,6 +114,9 @@ export const FinancialBudgetDetailPage = () => {
   const [selectedCustomers, setSelectedCustomers] = useState<Map<string, any>>(
     new Map(),
   );
+  // Which customer the header's public "Ver Orçamento" link points at.
+  // "all" = Completo (no customer segment) — the default.
+  const [budgetLinkSelection, setBudgetLinkSelection] = useState<string>("all");
 
   // Task-specific state
   const [showResponsibleErrors, setShowResponsibleErrors] = useState(false);
@@ -462,7 +467,8 @@ export const FinancialBudgetDetailPage = () => {
           name: r.name || "",
           phone: r.phone || "",
           email: r.email || "",
-          role: (r.role || "COMMERCIAL") as ResponsibleRole,
+          roles: (r.roles?.length ? r.roles : ["COMMERCIAL"]) as ResponsibleRole[],
+          originalRoles: (r.roles ?? []) as ResponsibleRole[],
           isActive: r.isActive ?? true,
           isNew: false,
           isEditing: false,
@@ -689,6 +695,13 @@ export const FinancialBudgetDetailPage = () => {
 
     setIsSubmitting(true);
     try {
+      // Persist inline role edits on already-registered contacts. These rows are
+      // not part of the task payload (only `newResponsibles` is), so the change
+      // has to be written onto the Responsible itself -- that is what makes it
+      // appear on this task, on its quote, and on every other task sharing the
+      // contact. Runs before the task save so a failure aborts cleanly.
+      await syncResponsibleRoles(responsibleRows);
+
       // 1. Upload new artwork files
       // Maps a freshly-uploaded file's LOCAL id -> its real server File id, so a
       // layout the user selected from a brand-new Step-1 artwork (still a local id
@@ -848,7 +861,7 @@ export const FinancialBudgetDetailPage = () => {
           name: row.name.trim(),
           phone: row.phone.trim(),
           email: row.email?.trim() || undefined,
-          role: row.role,
+          roles: row.roles,
           isActive: row.isActive,
           customerId: data.customerId || undefined,
         }));
@@ -1280,12 +1293,29 @@ export const FinancialBudgetDetailPage = () => {
   const layoutImageOptions = Array.from(layoutsById.values());
 
   // Public "Ver Orçamento" link — lives in the page header (mirrors the invoice
-  // page's "Ver Dossiê"), not in a body card.
-  const budgetCustomerId = task?.customer?.id || task?.customerId;
-  const publicBudgetUrl =
-    existingQuote?.id && budgetCustomerId
-      ? routes.customer.budget(budgetCustomerId, existingQuote.id)
-      : null;
+  // page's "Ver Dossiê" + its Completo/cliente picker), not in a body card.
+  //
+  // "Completo" means NO customer segment: the whole budget. Picking a customer
+  // links to that customer's slice only. The task's own customer is NOT
+  // necessarily a customer a service bills to, so it must never stand in here.
+  const budgetLinkConfigs: any[] = Array.isArray(customerConfigs)
+    ? customerConfigs.filter((c: any) => c?.customerId)
+    : [];
+  // A selection can go stale mid-edit (customer swapped or removed) — anything
+  // that no longer matches a config falls back to Completo rather than linking
+  // to a customer who isn't on the quote.
+  const budgetLinkCustomerId = budgetLinkConfigs.some(
+    (c: any) => c.customerId === budgetLinkSelection,
+  )
+    ? budgetLinkSelection
+    : null;
+  const budgetLinkCustomerName = (customerId: string, index: number): string => {
+    const customer = selectedCustomers.get(customerId) || customersCache.current.get(customerId);
+    return customer?.fantasyName || customer?.corporateName || `Cliente ${index + 1}`;
+  };
+  const publicBudgetUrl = existingQuote?.id
+    ? routes.customer.budget(budgetLinkCustomerId, existingQuote.id)
+    : null;
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
@@ -1301,15 +1331,34 @@ export const FinancialBudgetDetailPage = () => {
         onBreadcrumbNavigate={(path) => guardedNavigate(path)}
         headerExtra={
           publicBudgetUrl ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 whitespace-nowrap"
-              onClick={() => window.open(publicBudgetUrl, "_blank")}
-            >
-              <IconExternalLink className="h-4 w-4" />
-              Ver Orçamento
-            </Button>
+            <>
+              {budgetLinkConfigs.length > 1 && (
+                <Combobox
+                  value={budgetLinkCustomerId ?? "all"}
+                  onValueChange={(v) => setBudgetLinkSelection((v as string) || "all")}
+                  options={[
+                    { value: "all", label: "Completo" },
+                    ...budgetLinkConfigs.map((config: any, i: number) => ({
+                      value: config.customerId as string,
+                      label: budgetLinkCustomerName(config.customerId, i),
+                    })),
+                  ]}
+                  searchable={false}
+                  clearable={false}
+                  className="w-[260px]"
+                  triggerClassName="h-8 text-sm"
+                />
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 whitespace-nowrap"
+                onClick={() => window.open(publicBudgetUrl, "_blank")}
+              >
+                <IconExternalLink className="h-4 w-4" />
+                Ver Orçamento
+              </Button>
+            </>
           ) : undefined
         }
         actions={[
@@ -1416,14 +1465,25 @@ export const FinancialBudgetDetailPage = () => {
           })}
 
           {currentStep === totalSteps && (
-            <BudgetStepReview
-              task={task}
-              disabled={isSubmitting || !canEdit}
-              existingQuote={existingQuote}
-              userRole={userRole}
-              selectedCustomers={selectedCustomers}
-              layoutFiles={layoutFiles}
-            />
+            <>
+              <BudgetStepReview
+                task={task}
+                disabled={isSubmitting || !canEdit}
+                existingQuote={existingQuote}
+                userRole={userRole}
+                selectedCustomers={selectedCustomers}
+                layoutFiles={layoutFiles}
+              />
+
+              {/* Assinatura eletrônica: fica na revisão porque é o passo em que o
+                  orçamento está fechado e pronto para ir ao cliente. Só aparece
+                  depois que a quote existe — não há o que congelar antes disso. */}
+              {existingQuote?.id && (
+                <div className="mt-6">
+                  <SignatureEnvelopeCard quoteId={existingQuote.id} canManage={canEdit} />
+                </div>
+              )}
+            </>
           )}
         </FormProvider>
       </div>

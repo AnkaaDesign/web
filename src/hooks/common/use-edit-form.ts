@@ -1,5 +1,5 @@
 // hooks/useEditForm.tsx
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { UseFormProps, UseFormReturn, FieldValues, Resolver, DefaultValues } from "react-hook-form";
 import _ from "lodash";
@@ -19,6 +19,15 @@ interface UseEditFormReturn<TFieldValues extends FieldValues = FieldValues> exte
   handleSubmitChanges: (onValid?: (data: Partial<TFieldValues>) => unknown, onInvalid?: (errors: any) => unknown) => (e?: React.BaseSyntheticEvent) => Promise<void>;
   reset: UseFormReturn<TFieldValues>["reset"];
   getChangedFields: () => Partial<TFieldValues>;
+  /**
+   * True when the record changed on the server while this form has unsaved edits.
+   * The form was NOT reset — the user's work is intact and the incoming version is
+   * held aside. Surface this (banner / "recarregar") and call `applyUpstreamChanges`
+   * to take the server version, discarding local edits.
+   */
+  hasUpstreamChanges: boolean;
+  /** Adopt the pending server version, discarding the user's unsaved edits. */
+  applyUpstreamChanges: () => void;
 }
 
 /**
@@ -223,6 +232,9 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
 }: UseEditFormProps<TFieldValues, TContext, TApiData>): UseEditFormReturn<TFieldValues> {
   const originalRef = useRef<TFieldValues | undefined>(undefined);
   const lastResetData = useRef<TFieldValues | undefined>(undefined);
+  /** A server version that arrived while the form was dirty — held, not applied. */
+  const pendingUpstreamRef = useRef<TFieldValues | null>(null);
+  const [hasUpstreamChanges, setHasUpstreamChanges] = useState(false);
 
   const form = useForm<TFieldValues>({
     resolver,
@@ -237,13 +249,40 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
 
       // Only reset if the data has actually changed (deep comparison)
       if (!_.isEqual(originalRef.current, formData)) {
+        // NEVER blow away work in progress. `originalData` refetches for reasons that
+        // have nothing to do with the user — a background invalidation, a window focus,
+        // and above all the attention system's `entity:changed` broadcast, which fires
+        // precisely when SOMEONE ELSE saved this record. Resetting here silently replaced
+        // every field the user had typed AND cleared `isDirty`, so the unsaved-changes
+        // guard did not even warn: the edit just evaporated.
+        //
+        // Hold the incoming version aside instead and let the UI offer the choice.
+        if (form.formState.isDirty || form.formState.isSubmitting) {
+          pendingUpstreamRef.current = formData;
+          setHasUpstreamChanges(true);
+          return;
+        }
+
         // Reset form with new data
+        pendingUpstreamRef.current = null;
+        setHasUpstreamChanges(false);
         originalRef.current = formData;
         lastResetData.current = formData;
         form.reset(formData as DefaultValues<TFieldValues>);
       }
     }
   }, [originalData, mapDataToForm]); // Removed 'form' from dependencies to avoid circular updates
+
+  /** Take the server version that arrived while this form was dirty, discarding local edits. */
+  const applyUpstreamChanges = useCallback(() => {
+    const pending = pendingUpstreamRef.current;
+    if (!pending) return;
+    pendingUpstreamRef.current = null;
+    setHasUpstreamChanges(false);
+    originalRef.current = pending;
+    lastResetData.current = pending;
+    form.reset(pending as DefaultValues<TFieldValues>);
+  }, [form]);
 
   // Fields that should have empty items filtered and auto-generated ids stripped
   const arrayFieldsWithEmptyFiltering = ['serviceOrders', 'cuts', 'airbrushings'];
@@ -365,5 +404,7 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
     handleSubmit: form.handleSubmit,
     handleSubmitChanges,
     getChangedFields,
+    hasUpstreamChanges,
+    applyUpstreamChanges,
   };
 }

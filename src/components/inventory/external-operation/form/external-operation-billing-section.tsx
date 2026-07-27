@@ -105,7 +105,20 @@ export function ExternalOperationBillingSection({
             </div>
 
             {/* Payment condition */}
-            <PaymentConfigField paymentConfig={paymentConfig} onChange={onPaymentConfigChange} disabled={disabled} />
+            <PaymentConfigField
+              paymentConfig={paymentConfig}
+              onChange={(config) => {
+                onPaymentConfigChange(config);
+                // Pix settles directly (no boleto to emit); Boleto/Parcelado flip
+                // generation back on — every direction stays in sync with the method.
+                if (config?.type === "CASH") {
+                  onGenerateBankSlipChange(config.method !== "PIX");
+                } else if (config?.type === "INSTALLMENTS") {
+                  onGenerateBankSlipChange(true);
+                }
+              }}
+              disabled={disabled}
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

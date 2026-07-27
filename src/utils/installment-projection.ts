@@ -1,4 +1,7 @@
 import type { PaymentConfig } from "@/types/task-quote";
+// Legacy-enum → structured-config mapping lives with the payment WORDING so the
+// projected dates and the sentence describing them can never drift apart.
+import { conditionToConfig } from "./quote-text-generators";
 
 /**
  * Client-side projection of the installments (parcelas) that the API will
@@ -31,34 +34,6 @@ const nextWeekday = (d: Date): Date => {
   if (day === 0) return addDays(d, 1);
   return d;
 };
-
-/**
- * Map the legacy `paymentCondition` string enum to a structured config, matching
- * `quote-text-generators.ts` semantics (entry in 5 days, others every 20 days).
- */
-function conditionToConfig(condition: string): PaymentConfig | null {
-  if (!condition || condition === "CUSTOM") return null;
-  const cashDaysMap: Record<string, number> = {
-    CASH_5: 5,
-    CASH_10: 10,
-    CASH_20: 20,
-    CASH_40: 40,
-  };
-  if (condition in cashDaysMap) {
-    return { type: "CASH", cashDays: cashDaysMap[condition] };
-  }
-  const countMap: Record<string, number> = {
-    INSTALLMENTS_2: 2,
-    INSTALLMENTS_3: 3,
-    INSTALLMENTS_4: 4,
-    INSTALLMENTS_5: 5,
-    INSTALLMENTS_6: 6,
-    INSTALLMENTS_7: 7,
-  };
-  const installmentCount = countMap[condition];
-  if (!installmentCount) return null;
-  return { type: "INSTALLMENTS", installmentCount, installmentStep: 20, entryDays: 5 };
-}
 
 export function projectInstallments(
   total: number,

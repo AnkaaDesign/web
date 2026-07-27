@@ -87,19 +87,40 @@ function SendWarningDialog({ target, onClose }: { target: SendWarningTarget; onC
     }
     setSending(true);
     try {
-      await apiClient.post("/attention/warnings", {
+      // `fromUserName` is deliberately NOT sent — the server resolves the sender's name
+      // from the authenticated user, so a warning can't be attributed to someone else.
+      const res = await apiClient.post("/attention/warnings", {
         entityType: target.entityType,
         entityId: target.entityId,
         target: target.target,
         recipientUserIds: recipientIds,
         message: message.trim() || undefined,
         tone,
-        fromUserName: user?.name,
       });
-      toast.success(`Aviso enviado para ${recipientIds.length} ${recipientIds.length === 1 ? "pessoa" : "pessoas"}`);
+
+      // A pushed warning is ephemeral: an offline recipient's socket room is empty and
+      // the emit is dropped. Report what actually landed instead of claiming success for
+      // everyone — the sender needs to know to follow up another way.
+      const payload = (res as { data?: { delivered?: number; offline?: number } })?.data ?? (res as { delivered?: number; offline?: number });
+      const delivered = payload?.delivered ?? recipientIds.length;
+      const offline = payload?.offline ?? 0;
+
+      if (offline > 0 && delivered === 0) {
+        toast.warning(
+          `Ninguém recebeu o aviso`,
+          `${offline === 1 ? "O destinatário está" : "Os destinatários estão"} offline. O aviso não fica guardado.`,
+        );
+      } else if (offline > 0) {
+        toast.warning(`Aviso entregue a ${delivered} de ${delivered + offline}`, `${offline} offline no momento — não receberão este aviso.`);
+      } else {
+        toast.success(`Aviso enviado para ${delivered} ${delivered === 1 ? "pessoa" : "pessoas"}`);
+      }
       onClose();
-    } catch {
-      toast.error("Não foi possível enviar o aviso");
+    } catch (err) {
+      // Surface the server's reason (403 "Apenas ADMIN e COMERCIAL…", validation errors)
+      // instead of a generic network message.
+      const detail = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error("Não foi possível enviar o aviso", detail);
     } finally {
       setSending(false);
     }

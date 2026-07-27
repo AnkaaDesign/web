@@ -15,9 +15,15 @@ import { ResponsibleRow } from './responsible-row';
  */
 export function validateResponsibleRows(rows: ResponsibleRowData[]): boolean {
   return rows.every(row => {
-    // Only validate rows in create mode (isNew + temp id)
-    if (!row.isNew || !row.isEditing || !row.id?.startsWith('temp-')) return true;
-    return !!row.name?.trim() && !!row.phone?.trim();
+    const isInlineCreate = row.isNew && row.isEditing && row.id?.startsWith('temp-');
+    // `roles` must be non-empty: the API rejects a contact with no roles. This
+    // applies to already-registered contacts too, whose roles are editable
+    // inline -- otherwise clearing every role would silently save nothing.
+    if (isInlineCreate) {
+      return !!row.name?.trim() && !!row.phone?.trim() && (row.roles?.length ?? 0) > 0;
+    }
+    const isExisting = !!row.id && !row.id.startsWith('temp-');
+    return isExisting ? (row.roles?.length ?? 0) > 0 : true;
   });
 }
 
@@ -64,7 +70,7 @@ export const ResponsibleManager: React.FC<ResponsibleManagerProps> = ({
           name: '',
           phone: '',
           email: '',
-          role: allowedRoles?.[0] || ('COMMERCIAL' as ResponsibleRole),
+          roles: [allowedRoles?.[0] || ('COMMERCIAL' as ResponsibleRole)],
           isActive: true,
           isNew: true,
           isEditing: false, // Start with combobox visible, not edit mode
@@ -96,7 +102,7 @@ export const ResponsibleManager: React.FC<ResponsibleManagerProps> = ({
       name: '',
       phone: '',
       email: '',
-      role: allowedRoles?.[0] || ('COMMERCIAL' as ResponsibleRole),
+      roles: [allowedRoles?.[0] || ('COMMERCIAL' as ResponsibleRole)],
       isActive: true,
       isNew: true,
       isEditing: false, // Start with combobox visible, not edit mode

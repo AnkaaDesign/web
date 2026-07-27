@@ -16,8 +16,37 @@
 // detail page, then re-fire after a cooldown". Components only SUBSCRIBE to the
 // shared phase (see `engine.ts` / `use-attention.ts`).
 
-/** Entity kinds the attention system understands. Extend as rules are added. */
-export type AttentionEntityType = "TASK" | "CUT";
+/**
+ * Entity kinds the attention + presence system can address.
+ *
+ * MIRRORS `api/src/schemas/attention.ts` `ATTENTION_ENTITY_TYPES` (same values, same
+ * order) per this repo's api↔web duplication convention. The server validates every
+ * socket payload against its copy, so a value missing there is silently rejected at
+ * runtime — keep the two lists identical.
+ *
+ * Presence works for ANY of these the moment a surface announces it; only the blink
+ * RULES (see `rules.ts`) are per-entity opt-in.
+ */
+export const ATTENTION_ENTITY_TYPES = [
+  "TASK",
+  "CUT",
+  "ORDER",
+  "ITEM",
+  "AIRBRUSHING",
+  "OBSERVATION",
+  "SERVICE_ORDER",
+  "TASK_QUOTE",
+  "TRUCK",
+  "CUSTOMER",
+  "SUPPLIER",
+  "PAINT",
+  "USER",
+  "BORROW",
+  "EXTERNAL_WITHDRAWAL",
+  "PPE_DELIVERY",
+] as const;
+
+export type AttentionEntityType = (typeof ATTENTION_ENTITY_TYPES)[number];
 
 export type PredicatePrimitive = string | number | boolean | null;
 

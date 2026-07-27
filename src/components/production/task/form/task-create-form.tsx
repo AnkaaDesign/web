@@ -49,7 +49,7 @@ import { ServiceSelectorAutoGrouped } from "./service-selector-auto-grouped";
 import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
-import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
+import { ResponsibleManager, validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
 import { FileUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import { LayoutFileUploadField } from "./layout-file-upload-field";
 import { MultiAirbrushingSelector } from "./multi-airbrushing-selector";
@@ -98,6 +98,11 @@ export const TaskCreateForm = () => {
   const isLogisticUser = user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC;
   const isAdminUser = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
   const isProductionManagerUser = user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
+
+  // Prazo de Entrega — COMMERCIAL/ADMIN only (mirrors the API `term` field domain
+  // and `useTaskPermissions().canEditTerm`). LOGISTIC/PRODUCTION_MANAGER create the
+  // task without a deadline; the commercial desk sets it afterwards.
+  const canEditTerm = isAdminUser || isCommercialUser;
 
   const showResponsibles = isAdminUser || isCommercialUser;
   const showPaint = isAdminUser || isCommercialUser;
@@ -197,7 +202,7 @@ export const TaskCreateForm = () => {
     name: '',
     phone: '',
     email: '',
-    role: 'COMMERCIAL' as ResponsibleRole,
+    roles: ['COMMERCIAL' as ResponsibleRole],
     isActive: true,
     isNew: true,
     isEditing: false,
@@ -339,10 +344,17 @@ export const TaskCreateForm = () => {
       setIsSubmitting(true);
 
       try {
+      // Persist inline role edits on already-registered contacts. These rows are
+      // not part of the task payload (only `newResponsibles` is), so the change
+      // has to be written onto the Responsible itself -- that is what makes it
+      // appear on this task, on its quote, and on every other task sharing the
+      // contact. Runs before the task save so a failure aborts cleanly.
+      await syncResponsibleRoles(responsibleRows);
+
         // Validate responsible rows before submitting
         if (!validateResponsibleRows(responsibleRows)) {
           setShowResponsibleErrors(true);
-          toast.error("Preencha o nome e telefone dos responsáveis");
+          toast.error("Preencha o nome, telefone e ao menos uma função dos responsáveis");
           return;
         }
 
@@ -404,7 +416,7 @@ export const TaskCreateForm = () => {
             name: row.name.trim(),
             phone: row.phone.trim(),
             email: row.email?.trim() || undefined,
-            role: row.role,
+            roles: row.roles,
             isActive: row.isActive,
             customerId: customerIdValue || undefined,
           }));
@@ -770,8 +782,9 @@ export const TaskCreateForm = () => {
                           </div>
                         )}
 
-                        {/* Forecast Date + Term in same row */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Forecast Date + Term in same row. The Prazo field only renders for
+                            COMMERCIAL/ADMIN — the API rejects `term` from every other sector. */}
+                        <div className={`grid grid-cols-1 gap-4 ${canEditTerm ? "md:grid-cols-2" : ""}`}>
                           <FormField
                             control={form.control}
                             name="forecastDate"
@@ -784,18 +797,20 @@ export const TaskCreateForm = () => {
                               />
                             )}
                           />
-                          <FormField
-                            control={form.control}
-                            name="term"
-                            render={({ field }) => (
-                              <DateTimeInput
-                                {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
-                                mode="datetime"
-                                label="Prazo de Entrega"
-                                disabled={isSubmitting}
-                              />
-                            )}
-                          />
+                          {canEditTerm && (
+                            <FormField
+                              control={form.control}
+                              name="term"
+                              render={({ field }) => (
+                                <DateTimeInput
+                                  {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
+                                  mode="datetime"
+                                  label="Prazo de Entrega"
+                                  disabled={isSubmitting}
+                                />
+                              )}
+                            />
+                          )}
                         </div>
 
                         {/* Details - last field */}

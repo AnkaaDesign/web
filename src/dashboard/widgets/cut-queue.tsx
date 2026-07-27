@@ -39,7 +39,7 @@ import {
 import type { Cut } from "../../types";
 import { useCuts, useCutMutations } from "../../hooks/production/use-cut";
 import { usePrivileges } from "../../hooks/common/use-privileges";
-import { useCutQueueAlertPresence } from "../../hooks/common/use-nav-activity-alert";
+import { useAttentionSurface } from "@/lib/attention";
 import { useFileViewer } from "../../components/common/file";
 import { getApiBaseUrl } from "../../config/api";
 
@@ -221,9 +221,11 @@ function CutQueueRender({ config }: WidgetRenderProps<CutQueueConfig>) {
   const { updateAsync } = useCutMutations();
   const fileViewer = useFileViewer();
 
-  // Viewing this widget counts as "entering" the cut queue: it silences the sidebar
-  // blink + bip for 30 min, shared with the Recorte page (entering either mutes both).
-  useCutQueueAlertPresence();
+  // This widget IS a cut-queue surface: while it's on screen the sidebar's Recorte entry
+  // drops from blinking to a static border, exactly as if the user were on the Recorte page.
+  // It stays visible — the cuts are still pending — it just stops nagging toward a queue the
+  // user is already looking at.
+  useAttentionSurface("CUT");
 
   const display = config.display;
   const dens = densityClasses(display.density as Density);

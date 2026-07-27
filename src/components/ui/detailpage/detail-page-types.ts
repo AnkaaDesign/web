@@ -143,8 +143,15 @@ export interface DetailFieldDef<TData = any> {
    * while an attention rule targets `entityType:row.id:field.id`, and — with
    * `sendWarning` — shows a "send a warning" icon. `entityType` is the attention
    * entity kind ("TASK", …). Additive: no effect when omitted.
+   *
+   * `warnPrivileges` scopes the warning's RECIPIENT list ("who can act on this
+   * field"). By default that is read off the field's own gate
+   * (`editablePrivilege ?? requiredPrivilege`) — set this only when the field's real
+   * edit gate is a CAPABILITY the descriptor can't express (team leadership, state
+   * machine, per-row ownership), which would otherwise leave the audience undeclared
+   * and widen the picker to every active user. ADMIN is always added downstream.
    */
-  attention?: { entityType: string; sendWarning?: boolean };
+  attention?: { entityType: string; sendWarning?: boolean; warnPrivileges?: PrivilegeGate };
 }
 
 /** A group of fields (and/or arbitrary content) rendered as a Card in the detail grid. */

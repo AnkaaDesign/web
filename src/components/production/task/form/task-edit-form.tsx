@@ -36,7 +36,8 @@ import { cutService } from "../../../../api-client/cut";
 import { airbrushingService } from "../../../../api-client/airbrushing";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole } from "@/types/responsible";
-import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
+import { ResponsibleManager, validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
+import { resolveVisibleRoles } from "../detail/sections/responsibles-section";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, BONIFICATION_STATUS, BONIFICATION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS } from "../../../../constants";
 import { createFormDataWithContext, createAirbrushingFormData } from "@/utils/form-data-helper";
 import { areAllProductionServiceOrdersComplete } from "@/utils/serviceOrder";
@@ -72,7 +73,7 @@ import { ImplementMeasureForm } from "@/components/production/implement-measure/
 import { SpotSelector } from "./spot-selector";
 import { useImplementMeasuresByTruck, useImplementMeasureMutations } from "../../../../hooks";
 import { TRUCK_SPOT } from "../../../../constants";
-import { useOtherEditors } from "@/lib/attention";
+import { formatEditingSince, useOtherEditors, useSaveConflictGuard } from "@/lib/attention";
 import { IconEdit } from "@tabler/icons-react";
 
 interface TaskEditFormProps {
@@ -232,6 +233,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   // (this form only ANNOUNCES presence at the route level — see the edit page wrapper;
   // this is the READ side that was missing).
   const otherEditors = useOtherEditors("TASK", task.id);
+  // Save-time re-check (see handleFormSubmit). Separate from the banner above: the
+  // banner is passive awareness, this is the blocking decision point.
+  const { guardSave, conflictDialog } = useSaveConflictGuard();
 
   // Wrap updateAsync for debugging/logging
   const updateAsync = async (params: any) => {
@@ -253,14 +257,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     canViewCheckinCheckout, canViewReimbursement, canViewObservation,
     canEditObservation,
     canEditIdentity, canEditSector, canEditBonification,
-    canEditDates, canEditResponsibles, canEditServices,
+    canEditDates, canEditEntryDate, canEditTerm, canEditResponsibles, canEditServices,
     canEditLayout, canEditPaint, canEditCuts,
   } = useTaskPermissions();
 
   // Sector-specific business logic (not permission checks)
   const isFinancialUser = privilege === SECTOR_PRIVILEGES.FINANCIAL;
   const isCommercialUser = privilege === SECTOR_PRIVILEGES.COMMERCIAL;
-  const isDesignerUser = privilege === SECTOR_PRIVILEGES.DESIGNER;
 
   // Fetch cuts separately using useCutsByTask hook (same approach as detail page).
   // Scope to PLAN cuts ONLY: the task-edit "Plano de Corte" section must never touch
@@ -584,7 +587,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         name: rep.name,
         phone: rep.phone,
         email: rep.email || '',
-        role: rep.role,
+        roles: rep.roles,
+        originalRoles: rep.roles,
         isActive: rep.isActive,
         isNew: false,
         isEditing: false,
@@ -598,7 +602,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       name: '',
       phone: '',
       email: '',
-      role: 'COMMERCIAL' as ResponsibleRole,
+      roles: ['COMMERCIAL' as ResponsibleRole],
       isActive: true,
       isNew: true,
       isEditing: false,
@@ -606,6 +610,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       error: null,
     }];
   });
+
+  // Restricted sectors only manage the contacts whose roles they own -- the
+  // same rule the read-only detail section applies, imported rather than
+  // re-derived so the two surfaces cannot drift apart.
+  const visibleResponsibleRows = useMemo(() => {
+    const visibleRoles = resolveVisibleRoles(privilege ?? "", responsibleRows);
+    return responsibleRows.filter(row => row.roles?.some(r => visibleRoles.includes(r)));
+  }, [privilege, responsibleRows]);
 
   const handleResponsibleRowsChange = useCallback((rows: ResponsibleRowData[]) => {
     setResponsibleRows(rows);
@@ -1075,6 +1087,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       console.log('[TaskEditForm] handleFormSubmit called');
       console.log('[TaskEditForm] changedData:', JSON.stringify(changedData, null, 2));
 
+      // OVERRIDE GUARD — ask the server who holds this task RIGHT NOW, not what our
+      // socket last heard. The banner above only warns about editors who were already
+      // present when the form opened; this catches the case that actually loses work:
+      // two people who both opened it while it was free and now both press Salvar.
+      // Fails open (see useSaveConflictGuard) so an attention outage can't block saves.
+      if (!(await guardSave("TASK", task.id))) {
+        console.log('[TaskEditForm] submit cancelled — concurrent editor conflict');
+        return;
+      }
+
       // CRITICAL FIX: Set submission flag immediately to prevent sync interference
       // This must happen BEFORE any async operations to prevent race conditions
       isSubmittingRef.current = true;
@@ -1099,11 +1121,18 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         // Validate responsible rows before submitting
         if (!validateResponsibleRows(responsibleRows)) {
           setShowResponsibleErrors(true);
-          toast.error("Preencha o nome e telefone dos responsáveis");
+          toast.error("Preencha o nome, telefone e ao menos uma função dos responsáveis");
           return;
         }
 
         setIsSubmitting(true);
+
+        // Persist inline role edits on already-registered contacts. These rows are
+        // not part of the task payload (only `newResponsibles` is), so the change
+        // has to be written onto the Responsible itself -- that is what makes it
+        // appear on this task, on its quote, and on every other task sharing the
+        // contact.
+        await syncResponsibleRoles(responsibleRows);
 
         console.log('[TaskEditForm] 📋 ========== FORM SUBMISSION START ==========');
         console.log('[TaskEditForm] Raw changedData.quote BEFORE any processing:', JSON.stringify(changedData.quote, null, 2));
@@ -1815,7 +1844,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
               name: row.name.trim(),
               phone: row.phone.trim(),
               email: row.email?.trim() || undefined,
-              role: row.role,
+              roles: row.roles,
               isActive: row.isActive !== undefined ? row.isActive : true,
               companyId: row.companyId || defaultCompanyId,
             }));
@@ -1878,6 +1907,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             if (key === 'layoutIds' || key.startsWith('layoutIds[') || key === 'layoutStatuses') {
               console.log(`  ${key}: ${value}`);
             }
+          }
+
+          // Optimistic-concurrency precondition (see the JSON path below). Sent as
+          // an ISO string; the API's `z.coerce.date()` parses it back.
+          if (task.updatedAt) {
+            formData.append("expectedUpdatedAt", new Date(task.updatedAt).toISOString());
           }
 
           result = await updateAsync({
@@ -2135,7 +2170,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
               name: row.name.trim(),
               phone: row.phone.trim(),
               email: row.email?.trim() || undefined,
-              role: row.role,
+              roles: row.roles,
               isActive: row.isActive,
               companyId: row.companyId || defaultCompanyIdForJson,
             }));
@@ -2182,6 +2217,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           }, 2));
           console.log('[TaskEditForm] JSON path - submitData keys:', Object.keys(submitData));
           console.log('[TaskEditForm] JSON path - submitData.forecastDate:', submitData.forecastDate, 'isNull:', submitData.forecastDate === null);
+
+          // Optimistic-concurrency precondition: the version this form was loaded
+          // from. If the task moved since, the API answers 409 instead of silently
+          // overwriting whoever saved in between. This is the backstop UNDER the
+          // presence guard — presence only protects writers who announce, and an
+          // offline mobile replay or a cron never does.
+          if (task.updatedAt) {
+            (submitData as Record<string, unknown>).expectedUpdatedAt = new Date(task.updatedAt).toISOString();
+          }
 
           result = await updateAsync({
             id: task.id,
@@ -2471,7 +2515,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         }, 100);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasLayoutStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, uploadedFiles, baseFiles, projectFiles, observationFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, guardSave, hasLayoutChanges, hasFileChanges, hasLayoutStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, uploadedFiles, baseFiles, projectFiles, observationFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -2946,6 +2990,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           Submit
         </button>
 
+        {conflictDialog}
+
         {otherEditors.length > 0 ? (
           // Single clean icon (the same blue "is editing" pencil as the badge). NOT the
           // <Alert> component — that renders its OWN variant icon, which stacked with a
@@ -2954,9 +3000,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
             <IconEdit className="mt-0.5 h-4 w-4 shrink-0" />
             <p className="leading-relaxed">
               {otherEditors.length === 1
-                ? `${otherEditors[0].userName} também está editando esta tarefa agora.`
-                : `${otherEditors.map((e) => e.userName).join(", ")} também estão editando esta tarefa agora.`}{" "}
-              Suas alterações podem sobrescrever as de outra pessoa (ou vice-versa).
+                ? `${otherEditors[0].userName} também está editando esta tarefa (${formatEditingSince(otherEditors[0].since)}).`
+                : `${otherEditors.map((e) => `${e.userName} (${formatEditingSince(e.since)})`).join(", ")} também estão editando esta tarefa.`}{" "}
+              Ao salvar, confirmaremos se ainda há alguém editando.
             </p>
           </div>
         ) : null}
@@ -3358,12 +3404,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                   <CardContent className="pt-0">
                     <ResponsibleManager
                       companyId={customerIdValue || undefined}
-                      value={isDesignerUser
-                        ? (() => {
-                            const marketing = responsibleRows.filter(r => r.role === ResponsibleRole.MARKETING);
-                            return marketing.length > 0 ? marketing : responsibleRows.filter(r => r.role === ResponsibleRole.COMMERCIAL);
-                          })()
-                        : responsibleRows}
+                      value={visibleResponsibleRows}
                       onChange={handleResponsibleRowsChange}
                       disabled={isSubmitting || !canEditResponsibles}
                       readOnly={!canEditResponsibles}
@@ -3441,19 +3482,19 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
                     {/* Second Row: Entry Date and Deadline */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Entry Date - Date only - DISABLED for Financial and Designer users */}
+                      {/* Entry Date — LOGISTIC / PRODUCTION_MANAGER / ADMIN only (commercial cannot record arrival) */}
                       <FormField
                         control={form.control}
                         name="entryDate"
-                        render={({ field }) => <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "date", context: "start", label: "Data de Entrada", disabled: isSubmitting || !canEditDates, allowManualInput: true } as any} />}
+                        render={({ field }) => <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "date", context: "start", label: "Data de Entrada", disabled: isSubmitting || !canEditEntryDate, allowManualInput: true } as any} />}
                       />
 
-                      {/* Deadline - DateTime - DISABLED for Financial and Designer users */}
+                      {/* Deadline — COMMERCIAL / ADMIN only (PM and logistics cannot change the customer deadline) */}
                       <FormField
                         control={form.control}
                         name="term"
                         render={({ field }) => (
-                          <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "datetime", context: "due", label: "Prazo de Entrega", disabled: isSubmitting || !canEditDates, allowManualInput: true } as any} />
+                          <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "datetime", context: "due", label: "Prazo de Entrega", disabled: isSubmitting || !canEditTerm, allowManualInput: true } as any} />
                         )}
                       />
                     </div>

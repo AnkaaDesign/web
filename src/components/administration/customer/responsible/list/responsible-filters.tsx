@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FilterDrawer } from "@/components/common/filters/ui/FilterDrawer";
+import { Combobox } from "@/components/ui/combobox";
 import type { ResponsibleGetManyFormData } from "@/types/responsible";
 import {
   ResponsibleRole,
@@ -29,12 +30,16 @@ export function ResponsibleFilters({
   onFiltersChange,
   onClearFilters,
 }: ResponsibleFiltersProps) {
-  const handleRoleChange = (value: string) => {
-    if (value === "all") {
-      const { role, ...rest } = filters;
+  // Any-of semantics: picking Financeiro + Gestor de Frota lists every contact
+  // holding either. Clearing the selection drops the key entirely so it never
+  // reaches the API as an empty array.
+  const handleRolesChange = (value: string | string[] | null | undefined) => {
+    const selected = (Array.isArray(value) ? value : value ? [value] : []) as ResponsibleRole[];
+    if (selected.length === 0) {
+      const { roles: _roles, ...rest } = filters;
       onFiltersChange(rest);
     } else {
-      onFiltersChange({ ...filters, role: value as ResponsibleRole });
+      onFiltersChange({ ...filters, roles: selected });
     }
   };
 
@@ -63,25 +68,27 @@ export function ResponsibleFilters({
       applyLabel="Aplicar"
       resetLabel="Limpar filtros"
     >
-          {/* Role Filter */}
+          {/* Roles Filter */}
           <div className="space-y-2">
-            <Label htmlFor="role">Função</Label>
-            <Select
-              value={filters.role || "all"}
-              onValueChange={handleRoleChange}
-            >
-              <SelectTrigger id="role">
-                <SelectValue placeholder="Todas as funções" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as funções</SelectItem>
-                {Object.entries(ResponsibleRole).map(([key, value]) => (
-                  <SelectItem key={key} value={value}>
-                    {RESPONSIBLE_ROLE_LABELS[value]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="roles">Funções</Label>
+            <Combobox
+              mode="multiple"
+              value={filters.roles ?? []}
+              onValueChange={handleRolesChange}
+              options={Object.values(ResponsibleRole).map((value) => ({
+                value,
+                label: RESPONSIBLE_ROLE_LABELS[value],
+              }))}
+              placeholder="Todas as funções"
+              searchPlaceholder="Buscar função..."
+              emptyText="Nenhuma função encontrada"
+              minSearchLength={0}
+            />
+            {(filters.roles?.length ?? 0) > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {filters.roles!.length} selecionada{filters.roles!.length === 1 ? "" : "s"}
+              </p>
+            )}
           </div>
 
           {/* Status Filter */}

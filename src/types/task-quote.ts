@@ -7,6 +7,8 @@ export type DISCOUNT_TYPE = 'NONE' | 'PERCENTAGE' | 'FIXED_VALUE';
 
 export interface PaymentConfig {
   type: 'CASH' | 'INSTALLMENTS';
+  /** Settlement method stamped onto every Installment this config generates. */
+  method?: 'PIX' | 'BANK_SLIP';
   cashDays?: number;
   installmentCount?: number;
   installmentStep?: number;

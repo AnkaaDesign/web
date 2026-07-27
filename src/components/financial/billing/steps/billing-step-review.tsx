@@ -47,7 +47,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { routes } from "@/constants";
-import { exportDossiePdf } from "@/utils/dossie-pdf-generator";
+import { exportTaskDossiePdf } from "@/components/production/task/detail/sections/dossie-section";
 
 const STATUSES_REQUIRING_COMPLETE_DATA = ["BILLING_APPROVED"];
 
@@ -867,20 +867,10 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                   variant="outline"
                   size="sm"
                   className="h-7 text-xs gap-1.5"
-                  onClick={() => {
-                    try {
-                      const taskDisplayName = [task.name, task.serialNumber || task.truck?.plate].filter(Boolean).join(" - ");
-                      exportDossiePdf({
-                        taskDisplayName,
-                        customerName: task.customer?.fantasyName || task.customer?.corporateName,
-                        serialNumber: task.serialNumber,
-                        plate: task.truck?.plate,
-                        serviceOrders: serviceOrdersWithFiles,
-                      });
-                    } catch (err: any) {
-                      toast.error(err?.message || "Erro ao gerar dossiê");
-                    }
-                  }}
+                  // Mesmo dossiê do servidor usado na página da tarefa: páginas do
+                  // orçamento ASSINADO + fotos + notas + boletos. Ver
+                  // `exportTaskDossiePdf`.
+                  onClick={() => void exportTaskDossiePdf(task)}
                 >
                   <IconDownload className="h-3.5 w-3.5" />
                   Baixar PDF

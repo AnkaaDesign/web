@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { taskQuoteService } from "@/api-client/task-quote";
-import { formatCurrency, formatDate, toTitleCase } from "@/utils";
+import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "@/utils";
 import { getApiBaseUrl } from "@/utils/file";
+import { setPricingVisible } from "@/utils/pricing-visibility";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
+import { projectInstallments } from "@/utils/installment-projection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -11,7 +13,6 @@ import { toast } from "@/components/ui/sonner";
 import { IconLoader2, IconAlertCircle, IconBrandWhatsapp, IconCopy, IconPhoto, IconFileTypePdf, IconDownload, IconChevronDown, IconShare } from "@tabler/icons-react";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
-import { exportCompleteDossiePdf } from "@/utils/dossie-pdf-generator";
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
 
 const COMPANY = { ...COMPANY_INFO, ...BRAND_COLORS };
@@ -19,15 +20,30 @@ const COMPANY = { ...COMPANY_INFO, ...BRAND_COLORS };
 export function PublicServiceReportPage() {
   const { id, customerId } = useParams<{ id: string; customerId: string }>();
   const [quote, setQuote] = useState<any>(null);
+
+  // This is a customer-facing public page (unauthenticated, no eye-toggle in
+  // reach) — it must always show real currency values regardless of the
+  // internal staff eye-toggle's hidden-by-default state (that toggle only
+  // makes sense inside the authenticated app, where the button to reveal
+  // values actually exists).
+  useEffect(() => {
+    setPricingVisible(true);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   // Validated layout image URLs (the layoutFiles array, those that load OK)
   const [layoutImageUrls, setLayoutImageUrls] = useState<string[]>([]);
 
+  // A config's customer: the FK when the payload carries it, else the nested
+  // customer's id. Both are matched because the public select has shipped
+  // without the FK before — and when nothing matches, the page silently falls
+  // back to the Completo view instead of the one customer that was asked for.
+  const configCustomerId = (config: any): string | undefined => config?.customerId || config?.customer?.id;
+
   const selectedCustomerId = useMemo(() => {
     if (!customerId || !quote?.customerConfigs) return null;
-    const isConfigCustomer = quote.customerConfigs.some((c: any) => c.customerId === customerId);
+    const isConfigCustomer = quote.customerConfigs.some((c: any) => configCustomerId(c) === customerId);
     return isConfigCustomer ? customerId : null;
   }, [customerId, quote?.customerConfigs]);
 
@@ -106,41 +122,144 @@ export function PublicServiceReportPage() {
 
   // Derived data
   const corporateName = quote.task?.customer?.corporateName || quote.task?.customer?.fantasyName || "Cliente";
-  const activeConfig = quote.customerConfigs?.find((c: any) => c.customerId === selectedCustomerId) || quote.customerConfigs?.[0];
+  const activeConfig = quote.customerConfigs?.find((c: any) => configCustomerId(c) === selectedCustomerId) || quote.customerConfigs?.[0];
   const budgetNumber = quote.budgetNumber ? String(quote.budgetNumber).padStart(4, "0") : "0000";
-  const ownerResponsible = quote.task?.responsibles?.find((r: any) => r.role === 'OWNER');
+  const ownerResponsible = quote.task?.responsibles?.find((r: any) => r.roles?.includes('OWNER'));
   const contactName = activeConfig?.responsible?.name || ownerResponsible?.name || quote.task?.responsibles?.[0]?.name || "";
-  const paymentText = generatePaymentText({
-    customPaymentText: activeConfig?.customPaymentText || null,
-    paymentCondition: activeConfig?.paymentCondition,
-    total: activeConfig?.total ?? quote.total,
-  });
   const guaranteeText = generateGuaranteeText(quote);
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
 
-  // Filter services by customer
-  const services = (quote.services || []).filter((s: any) =>
-    !selectedCustomerId || s.invoiceToCustomerId === selectedCustomerId || !s.invoiceToCustomerId
-  );
-  const subtotal = services.reduce((sum: number, s: any) => sum + (Number(s.amount) || 0), 0);
-  // Discount from customer config (global customer discount)
-  const configDiscountType = activeConfig?.discountType;
-  const configDiscountValue = activeConfig?.discountValue != null ? Number(activeConfig.discountValue) : 0;
-  let discountAmount = 0;
-  if (configDiscountType === "PERCENTAGE" && configDiscountValue) {
-    discountAmount = Math.round((subtotal * configDiscountValue / 100) * 100) / 100;
-  } else if (configDiscountType === "FIXED_VALUE" && configDiscountValue) {
-    discountAmount = Math.min(configDiscountValue, subtotal);
-  }
-  const total = Math.max(0, subtotal - discountAmount);
-  const hasDiscount = discountAmount > 0.01;
-
-  // Installments & bank slips from relevant configs
   const allConfigs = quote.customerConfigs || [];
   const relevantConfigs = selectedCustomerId ? [activeConfig].filter(Boolean) : allConfigs;
+  // "Completo": no customer filter on a quote billed to more than one customer.
+  // Same split the budget page makes — services gain a "faturar para" column and
+  // every customer gets its own subtotal and payment terms.
+  const isCompleteView = !selectedCustomerId && allConfigs.length >= 2;
+
+  // Filter services by customer — same FK-or-nested-id fallback as the configs.
+  //
+  // A service with no invoice-to customer belongs to every view on a
+  // single-customer quote (the API's own per-config totals count all services
+  // there). On a MULTI-customer quote it belongs to no config and is counted in
+  // no config total, so listing it under one customer would show a line the
+  // Total below doesn't include — it stays out of the filtered view and is
+  // reunited with the rest in Completo.
+  const serviceCustomerId = (svc: any): string | undefined => svc?.invoiceToCustomerId || svc?.invoiceToCustomer?.id;
+  const isMultiCustomerQuote = (quote.customerConfigs?.length ?? 0) >= 2;
+  const services = (quote.services || []).filter((s: any) => {
+    if (!selectedCustomerId) return true;
+    const svcCustomer = serviceCustomerId(s);
+    if (svcCustomer) return svcCustomer === selectedCustomerId;
+    return !isMultiCustomerQuote;
+  });
+  const configName = (config: any): string =>
+    config?.customer?.corporateName || config?.customer?.fantasyName || "Cliente";
+  // Who the services are billed to, with their document — the same identification
+  // the budget page weaves into its intro. In Completo that's every customer.
+  const customerDoc = (customer: any): string =>
+    customer?.cnpj ? `CNPJ ${formatCNPJ(customer.cnpj)}` : customer?.cpf ? `CPF ${customer.cpf}` : "";
+  const invoiceCustomers = (relevantConfigs.length > 0
+    ? relevantConfigs.map((c: any) => ({ name: configName(c), doc: customerDoc(c?.customer) }))
+    : [{
+        name: quote.task?.customer?.corporateName || quote.task?.customer?.fantasyName || "",
+        doc: customerDoc(quote.task?.customer),
+      }]
+  ).filter((c: { name: string }) => !!c.name);
+  const servicesSum = services.reduce((sum: number, s: any) => sum + (Number(s.amount) || 0), 0);
+  // The config's own subtotal/total are what the API computed and what billing
+  // actually charges (discount applied there) — prefer them over re-deriving the
+  // discount here, and fall back to the service lines only when absent.
+  const configSubtotal = activeConfig?.subtotal != null ? Number(activeConfig.subtotal) : null;
+  const configTotal = activeConfig?.total != null ? Number(activeConfig.total) : null;
+  const subtotal = configSubtotal ?? servicesSum;
+  const configDiscountType = activeConfig?.discountType;
+  const configDiscountValue = activeConfig?.discountValue != null ? Number(activeConfig.discountValue) : 0;
+  const discountAmount = configTotal != null
+    ? Math.max(0, Math.round((subtotal - configTotal) * 100) / 100)
+    : configDiscountType === "PERCENTAGE" && configDiscountValue
+      ? Math.round((subtotal * configDiscountValue / 100) * 100) / 100
+      : configDiscountType === "FIXED_VALUE" && configDiscountValue
+        ? Math.min(configDiscountValue, subtotal)
+        : 0;
+  // In Completo the totals come from the configs themselves (each already net of
+  // its own discount), never from re-summing the service lines.
+  const customerTotals = isCompleteView
+    ? allConfigs.map((c: any) => ({ name: configName(c), total: Number(c.total) || 0 }))
+    : [];
+  // Services assigned to no customer are in no config total — add them to the
+  // Completo total so the sum of the lines above still adds up.
+  const unassignedSum = isCompleteView
+    ? services
+        .filter((s: any) => !serviceCustomerId(s))
+        .reduce((sum: number, s: any) => sum + (Number(s.amount) || 0), 0)
+    : 0;
+  const total = isCompleteView
+    ? customerTotals.reduce((sum: number, c: { total: number }) => sum + c.total, 0) + unassignedSum
+    : configTotal ?? Math.max(0, subtotal - discountAmount);
+  const hasDiscount = !isCompleteView && discountAmount > 0.01;
+
+  // Installments & bank slips from relevant configs
   const installments = relevantConfigs
     .flatMap((c: any) => c.installments || [])
     .sort((a: any, b: any) => a.number - b.number);
+
+  // One payment clause per config on show — a single block normally, one per
+  // customer in Completo (mirroring the budget page).
+  const paymentBlocks = relevantConfigs
+    .map((config: any) => {
+      const configInstallments = (config?.installments || [])
+        .slice()
+        .sort((a: any, b: any) => a.number - b.number);
+
+      // The settlement method named in the clause. Real installments win when
+      // they exist and all agree — they carry what was actually stamped at
+      // billing; otherwise `generatePaymentText` falls back to the configured
+      // method (and to BANK_SLIP, mirroring the API's
+      // `resolveInstallmentPaymentMethod`).
+      const stamped = Array.from(
+        new Set(configInstallments.map((inst: any) => inst.paymentMethod).filter(Boolean)),
+      ) as string[];
+      const paymentMethod = stamped.length === 1 ? stamped[0] : null;
+
+      // On a dossiê the service is already finished, so "para 5 dias a partir da
+      // finalização do serviço" counts down from a date in the past — name the
+      // actual vencimento instead. Real installments carry it once billing is
+      // approved; before that, project it from finishedAt as the API will.
+      const hasStructuredPaymentConfig =
+        !!config?.paymentConfig?.type || !!(config?.paymentCondition && config.paymentCondition !== "CUSTOM");
+      const configTotal = config?.total ?? quote.total;
+      const firstDueDate: Date | string | null =
+        configInstallments[0]?.dueDate
+        ?? (quote.task?.finishedAt && hasStructuredPaymentConfig
+          ? projectInstallments(
+              configTotal,
+              config?.paymentConfig,
+              config?.paymentCondition,
+              new Date(quote.task.finishedAt),
+            )[0]?.dueDate ?? null
+          : null);
+
+      return {
+        id: config?.id,
+        // Only Completo needs to say whose terms these are.
+        customerName: isCompleteView ? configName(config) : null,
+        // Same source of truth as the budget page (custom text → structured
+        // paymentConfig → legacy paymentCondition), with the method woven into
+        // the sentence and the relative deadline resolved to a real date.
+        paymentText: generatePaymentText({
+          customPaymentText: config?.customPaymentText || null,
+          paymentConfig: config?.paymentConfig || null,
+          paymentCondition: config?.paymentCondition,
+          total: configTotal,
+          paymentMethod,
+          firstDueDate,
+        }),
+        // Customer's purchase-order number, shown with the payment terms
+        // exactly as the budget page does.
+        orderNumber: (config?.orderNumber as string | null) || null,
+      };
+    })
+    .filter((block: { paymentText: string; orderNumber: string | null }) => block.paymentText || block.orderNumber);
 
   // All installments that have a bank slip
   const bankSlipInstallments = installments
@@ -171,40 +290,36 @@ export function PublicServiceReportPage() {
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
+  /**
+   * O dossiê vem PRONTO do servidor.
+   *
+   * Antes era montado aqui no browser, o que obrigava a re-renderizar o
+   * orçamento a partir dos dados — ou seja, o cliente recebia uma reconstrução,
+   * não o documento que ele assinou. Agora o servidor entrega as páginas do
+   * PDF ASSINADO, seguidas do dossiê fotográfico, das notas e dos boletos.
+   */
   const handleExportPdf = async () => {
     try {
       toast.info("Gerando PDF...");
-      await exportCompleteDossiePdf({
-        documentTitle: `${corporateName} - ${quote.task?.serialNumber || budgetNumber}`,
-        budgetNumber,
-        corporateName,
-        contactName,
-        serialNumber: quote.task?.serialNumber || null,
-        plate: quote.task?.truck?.plate || null,
-        chassisNumber: quote.task?.truck?.chassisNumber || null,
-        vinPlate: quote.task?.truck?.vinPlate || null,
-        truckCategory: quote.task?.truck?.category ? (TRUCK_CATEGORY_LABELS[quote.task.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || quote.task.truck.category) : null,
-        truckImplementType: quote.task?.truck?.implementType ? (IMPLEMENT_TYPE_LABELS[quote.task.truck.implementType as keyof typeof IMPLEMENT_TYPE_LABELS] || quote.task.truck.implementType) : null,
-        finishedAt: quote.task?.finishedAt || null,
-        services,
-        subtotal,
-        discountAmount,
-        total,
-        hasDiscount,
-        discountType: configDiscountType || null,
-        discountValue: configDiscountValue || null,
-        discountReference: activeConfig?.discountReference || null,
-        paymentText,
-        guaranteeText,
-        layoutImageUrls,
-        serviceOrders,
-        bankSlipPdfUrls: bankSlipInstallments.map((s: any) => s.pdfUrl),
-        nfsePdfUrls: nfseDocuments.map((doc: any) => `${apiUrl}/nfse/public/${doc.elotechNfseId}/pdf`),
-      });
-      toast.success("PDF baixado!");
-    } catch (err) {
-      console.error("PDF generation error:", err);
-      toast.error(err instanceof Error ? err.message : "Erro ao gerar PDF.");
+      const url = `${apiUrl}/assinatura/publico/orcamento/${quote.id}/dossie.pdf`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        // 400 = ainda não há envelope concluído para este orçamento.
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.message ?? "Não foi possível gerar o dossiê.");
+      }
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `${corporateName} - ${quote.task?.serialNumber || budgetNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(href);
+      toast.success("Dossiê baixado.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Erro ao gerar o PDF.");
     }
   };
 
@@ -365,6 +480,18 @@ export function PublicServiceReportPage() {
               )}
               <p className="text-gray-700">
                 Prezado(a) cliente, segue o dossiê referente aos serviços realizados
+                {invoiceCustomers.length > 0 && (
+                  <>
+                    {" "}para a{" "}
+                    {invoiceCustomers.map((c: { name: string; doc: string }, i: number) => (
+                      <span key={i}>
+                        {i > 0 && (i === invoiceCustomers.length - 1 ? " e " : ", ")}
+                        <strong>{c.name}</strong>
+                        {c.doc ? ` (${c.doc})` : ""}
+                      </span>
+                    ))}
+                  </>
+                )}
                 {(() => {
                   const truckCategoryLabel = quote.task?.truck?.category
                     ? (TRUCK_CATEGORY_LABELS[quote.task.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || quote.task.truck.category)
@@ -397,66 +524,116 @@ export function PublicServiceReportPage() {
               <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
                 Serviços Realizados
               </h3>
-              <table className="w-full ml-4" style={{ borderCollapse: 'collapse' }}>
-                <tbody>
-                  {services.map((svc: any, i: number) => {
-                    const amount = Number(svc.amount) || 0;
-                    const desc = toTitleCase(svc.description || "");
-                    const obs = svc.observation || "";
-                    const isOutros = svc.description?.trim().toLowerCase() === "outros";
-                    const displayDesc = isOutros && obs ? obs : obs ? `${desc} ${obs}` : desc;
+              {/* pl-4 (not ml-4) so the price column's right edge lines up EXACTLY with
+                  the Subtotal/Total column below (also pl-4) — a margin here would push
+                  this table's full-width box 1rem further right than the totals div,
+                  which only insets its content via padding. */}
+              <div className="pl-4">
+                <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                  <tbody>
+                    {services.map((svc: any, i: number) => {
+                      const amount = Number(svc.amount) || 0;
+                      const desc = toTitleCase(svc.description || "");
+                      const obs = svc.observation || "";
+                      const isOutros = svc.description?.trim().toLowerCase() === "outros";
+                      const displayDesc = isOutros && obs ? obs : obs ? `${desc} ${obs}` : desc;
 
-                    return (
-                      <tr key={svc.id || i} className="align-top">
-                        <td className="text-gray-800 py-1 pr-2">
-                          {i + 1} - {displayDesc}
-                        </td>
-                        <td className="text-gray-800 font-normal whitespace-nowrap text-right py-1 pl-2">
-                          {formatCurrency(amount)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      const invoiceToName =
+                        svc.invoiceToCustomer?.corporateName || svc.invoiceToCustomer?.fantasyName;
+
+                      return (
+                        <tr key={svc.id || i} className="align-top">
+                          <td className="text-gray-800 py-1 pr-2">
+                            {i + 1} - {displayDesc}
+                          </td>
+                          {isCompleteView && (
+                            <td className="text-xs text-gray-500 whitespace-nowrap py-1 px-2">
+                              {invoiceToName || '-'}
+                            </td>
+                          )}
+                          <td className="text-gray-800 font-normal whitespace-nowrap text-right py-1">
+                            {formatCurrency(amount)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
               {/* Totals */}
-              <div className="mt-6 pl-4 space-y-1">
-                {hasDiscount && (
-                  <>
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-gray-700">Subtotal</span>
-                      <span className="text-gray-800">{formatCurrency(subtotal)}</span>
+              {isCompleteView ? (
+                // Completo: one subtotal per customer, then the combined total
+                <div className="mt-6 pl-4 space-y-3">
+                  {customerTotals.map((c: { name: string; total: number }, i: number) => (
+                    <div key={i} className="flex justify-between items-baseline">
+                      <span className="text-gray-700 text-sm">{c.name}</span>
+                      <span className="text-gray-800 font-medium">{formatCurrency(c.total)}</span>
                     </div>
-                    <div className="flex justify-between items-baseline text-red-600">
-                      <span>
-                        {configDiscountType === 'PERCENTAGE' && configDiscountValue
-                          ? `Desconto (${configDiscountValue}%)`
-                          : 'Desconto'}
-                        {activeConfig?.discountReference && (
-                          <span className="text-gray-500 text-sm"> — {activeConfig.discountReference}</span>
-                        )}
-                      </span>
-                      <span>- {formatCurrency(discountAmount)}</span>
-                    </div>
-                  </>
-                )}
-                <div className={`flex justify-between items-baseline ${hasDiscount ? 'pt-2 border-t border-gray-200' : ''}`}>
-                  <span className="font-bold text-gray-900">Total</span>
-                  <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
-                    {formatCurrency(total)}
-                  </span>
+                  ))}
+                  <div className="flex justify-between items-baseline pt-2 border-t border-gray-200">
+                    <span className="font-bold text-gray-900">Total</span>
+                    <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
+                      {formatCurrency(total)}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="mt-6 pl-4 space-y-1">
+                  {hasDiscount && (
+                    <>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-gray-700">Subtotal</span>
+                        <span className="text-gray-800">{formatCurrency(subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between items-baseline text-red-600">
+                        <span>
+                          {configDiscountType === 'PERCENTAGE' && configDiscountValue
+                            ? `Desconto (${configDiscountValue}%)`
+                            : 'Desconto'}
+                          {activeConfig?.discountReference && (
+                            <span className="text-gray-500 text-sm"> — {activeConfig.discountReference}</span>
+                          )}
+                        </span>
+                        <span>- {formatCurrency(discountAmount)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className={`flex justify-between items-baseline ${hasDiscount ? 'pt-2 border-t border-gray-200' : ''}`}>
+                    <span className="font-bold text-gray-900">Total</span>
+                    <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
+                      {formatCurrency(total)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Payment Conditions */}
-            {paymentText && (
+            {/* Payment conditions — the same prose the budget page shows (custom
+                text → structured config → legacy condition), with the settlement
+                method woven in. One block per customer in Completo. No
+                parcela-by-parcela table: the boletos themselves are appended
+                further down and carry the real dates. */}
+            {paymentBlocks.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
                   Condições de pagamento
                 </h3>
-                <p className="text-gray-700">{paymentText}</p>
+                <div className="space-y-3">
+                  {paymentBlocks.map((block: { id?: string; customerName: string | null; paymentText: string; orderNumber: string | null }, i: number) => (
+                    <div key={block.id || i}>
+                      {block.customerName && (
+                        <p className="text-sm font-semibold text-gray-800">{block.customerName}</p>
+                      )}
+                      {block.paymentText && <p className="text-gray-700">{block.paymentText}</p>}
+                      {block.orderNumber && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          <span className="font-semibold">N° do Pedido:</span> {block.orderNumber}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconUser, IconBuilding } from "@tabler/icons-react";
 import type { Responsible } from "@/types/responsible";
-import { RESPONSIBLE_ROLE_LABELS, RESPONSIBLE_ROLE_COLORS } from "@/types/responsible";
+import { ResponsibleRoleBadges } from "../responsible-role-badges";
 import { cn } from "@/lib/utils";
 
 interface BasicInfoCardProps {
@@ -37,14 +37,9 @@ export function BasicInfoCard({ responsible, className }: BasicInfoCardProps) {
                 <span className="text-sm font-semibold text-foreground">{responsible.name}</span>
               </div>
 
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground">Função</span>
-                <Badge
-                  variant={RESPONSIBLE_ROLE_COLORS[responsible.role] as any}
-                  className="text-xs"
-                >
-                  {RESPONSIBLE_ROLE_LABELS[responsible.role]}
-                </Badge>
+              <div className="flex justify-between items-start bg-muted/50 rounded-lg px-4 py-3 gap-3">
+                <span className="text-sm font-medium text-muted-foreground shrink-0">Funções</span>
+                <ResponsibleRoleBadges roles={responsible.roles} className="justify-end" />
               </div>
 
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">

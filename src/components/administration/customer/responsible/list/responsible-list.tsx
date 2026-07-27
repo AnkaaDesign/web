@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { RESPONSIBLE_ROLE_LABELS } from "@/types/responsible";
+import { formatResponsibleRoles, type ResponsibleRole } from "@/types/responsible";
 
 interface ResponsibleListProps {
   className?: string;
@@ -69,7 +69,9 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
 
   // Visible columns state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
-    "responsible-list-visible-columns",
+    // -v2: the column id changed from "role" to "roles"; a stored set from
+    // before the migration would leave the column permanently hidden.
+    "responsible-list-visible-columns-v2",
     DEFAULT_VISIBLE_COLUMNS
   );
 
@@ -80,9 +82,20 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
   const deserializeResponsibleFilters = useCallback((params: URLSearchParams): Partial<ResponsibleGetManyFormData> => {
     const filters: Partial<ResponsibleGetManyFormData> = {};
 
-    // Parse role filter
-    const role = params.get("role");
-    if (role) filters.role = role as any;
+    // Parse roles filter. Accepts the legacy single-value `?role=OWNER` from
+    // pre-migration bookmarks and share links so they keep working.
+    const rolesParam = params.get("roles");
+    if (rolesParam) {
+      try {
+        const parsed = JSON.parse(rolesParam);
+        if (Array.isArray(parsed) && parsed.length > 0) filters.roles = parsed as ResponsibleRole[];
+      } catch {
+        filters.roles = [rolesParam as ResponsibleRole];
+      }
+    } else {
+      const legacyRole = params.get("role");
+      if (legacyRole) filters.roles = [legacyRole as ResponsibleRole];
+    }
 
     // Parse status filter
     const isActive = params.get("isActive");
@@ -102,7 +115,7 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
   const serializeResponsibleFilters = useCallback((filters: Partial<ResponsibleGetManyFormData>): Record<string, string> => {
     const params: Record<string, string> = {};
 
-    if (filters.role) params.role = filters.role;
+    if (filters.roles?.length) params.roles = JSON.stringify(filters.roles);
     if (filters.isActive !== undefined) params.isActive = String(filters.isActive);
 
     return params;
@@ -195,8 +208,8 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
   const onRemoveFilter = useCallback((key: string, _value?: any) => {
     if (key === "searchingFor") {
       setSearch("");
-    } else if (key === "role") {
-      const { role, ...rest } = filters;
+    } else if (key === "roles") {
+      const { roles: _roles, ...rest } = filters;
       updateFilters(rest);
     } else if (key === "isActive") {
       const { isActive, ...rest } = filters;
@@ -225,13 +238,13 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
       });
     }
 
-    // Add role filter
-    if (filters.role) {
+    // Add roles filter (one chip listing every selected role)
+    if (filters.roles?.length) {
       items.push({
-        id: "role",
-        label: "Função",
-        value: RESPONSIBLE_ROLE_LABELS[filters.role],
-        onRemove: () => onRemoveFilter("role"),
+        id: "roles",
+        label: filters.roles.length === 1 ? "Função" : "Funções",
+        value: formatResponsibleRoles(filters.roles),
+        onRemove: () => onRemoveFilter("roles"),
       });
     }
 
@@ -251,7 +264,7 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
   // Count active filters (excluding search)
   const activeFilterCountWithoutSearch = useMemo(() => {
     let count = 0;
-    if (filters.role) count++;
+    if (filters.roles?.length) count++;
     if (filters.isActive !== undefined) count++;
     return count;
   }, [filters]);

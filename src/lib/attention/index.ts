@@ -7,23 +7,28 @@
 export { AttentionProvider } from "./attention-context";
 export {
   useAttention,
+  useAttentionEntity,
   useAttentionField,
   useAttentionVersion,
-  useMarkAttentionViewed,
-  useMarkAttentionViewedOnExit,
   useRegisterAttentionEntities,
   useAnnouncePresence,
   useAnnouncePresenceForIds,
   hasOtherEditors,
+  editLockReasonFor,
+  useEditLock,
   usePresenceVersion,
   attentionRowClass,
   attentionRowClassFor,
   attentionFieldClass,
   presenceRowClassFor,
 } from "./use-attention";
-export { useEntityPresence, getEntityPresence } from "./presence";
+export { useEntityPresence, getEntityPresence, getOtherEditors, formatEditingSince } from "./presence";
 export type { PresenceEditor } from "./presence";
 export { IsEditingBadge, useOtherEditors } from "./presence-badge";
+export { checkOtherEditors, describeEditors } from "./presence-guard";
+export type { PresenceGuardResult } from "./presence-guard";
+export { useSaveConflictGuard } from "./save-conflict-dialog";
+export type { SaveConflictGuard } from "./save-conflict-dialog";
 export { useSendWarning, canSendAttentionWarning } from "./send-warning";
 export type { SendWarningTarget } from "./send-warning";
 export { emitEntityChanged as notifyAttentionEntityChanged } from "./attention-socket";
@@ -34,11 +39,12 @@ export {
   snooze as snoozeAttention,
   configureAckStore,
   setRules,
-  getAttentionCountsByType,
-  getAttentionSeverityByType,
-  getAttentionArmedByType,
+  getAttentionSnapshot,
 } from "./engine";
-export type { PushedAttention } from "./engine";
+export type { PushedAttention, AttentionTypeSnapshot } from "./engine";
+export { useAttentionSurface, useAttentionSurfaceTypes } from "./surface";
+export { ATTENTION_ENTITIES, ATTENTION_ACTIVE_TYPES, attentionEntityDescriptor, attentionAudience } from "./entities";
+export type { AttentionEntityDescriptor } from "./entities";
 export { ATTENTION_RULES, ATTENTION_RULES_BY_ID } from "./rules";
 export type {
   AttentionRule,

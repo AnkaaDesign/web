@@ -1,5 +1,5 @@
 import { formatCurrency, formatDate } from './index';
-import type { TaskQuote } from '../types/task-quote';
+import type { PaymentConfig, TaskQuote } from '../types/task-quote';
 
 /**
  * Convert number to written form in Portuguese
@@ -18,35 +18,75 @@ function numberToWord(n: number): string {
 }
 
 /**
- * PaymentConfig shape — mirrors the API/schema definition.
- * Kept local here to avoid a circular import on the schema package.
+ * "1 dia" / "20 dias" — the clause reads broken without the singular form.
  */
-interface PaymentConfig {
-  type: 'CASH' | 'INSTALLMENTS';
-  cashDays?: number;
-  installmentCount?: number;
-  installmentStep?: number;
-  entryDays?: number;
-  specificDate?: string; // YYYY-MM-DD
+function formatDays(n: number): string {
+  return `${n} ${n === 1 ? 'dia' : 'dias'}`;
+}
+
+/**
+ * Customer-facing wording for the settlement method, woven INTO the payment
+ * clause ("...parcelas de R$ 1.499,67 via boleto, com entrada...") rather than
+ * appended as a separate line. MANUAL/OTHER map to nothing — there's no
+ * sentence-worthy wording for them, so the clause simply omits the method.
+ */
+const PAYMENT_METHOD_PHRASES: Record<string, string> = {
+  BANK_SLIP: 'via boleto',
+  PIX: 'via Pix',
+  CASH: 'em dinheiro',
+  TRANSFER: 'via transferência bancária',
+  ACCOUNT_GENIVALDO: 'via depósito em conta',
+  ACCOUNT_SERGIO: 'via depósito em conta',
+};
+
+/** Parse a `YYYY-MM-DD` config date as a LOCAL date (no timezone shift). */
+function parseSpecificDate(iso?: string): Date | null {
+  if (!iso) return null;
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Map the legacy `paymentCondition` string enum onto the structured config, so
+ * both shapes produce the exact same sentence (entry in 5 days, others every
+ * 20 days — the wording the legacy enum always carried).
+ */
+export function conditionToConfig(condition?: string | null): PaymentConfig | null {
+  if (!condition || condition === 'CUSTOM') return null;
+  const cashDays: Record<string, number> = { CASH_5: 5, CASH_10: 10, CASH_20: 20, CASH_40: 40 };
+  if (condition in cashDays) return { type: 'CASH', cashDays: cashDays[condition] };
+  const counts: Record<string, number> = {
+    INSTALLMENTS_2: 2, INSTALLMENTS_3: 3, INSTALLMENTS_4: 4,
+    INSTALLMENTS_5: 5, INSTALLMENTS_6: 6, INSTALLMENTS_7: 7,
+  };
+  const installmentCount = counts[condition];
+  if (!installmentCount) return null;
+  return { type: 'INSTALLMENTS', installmentCount, installmentStep: 20, entryDays: 5 };
 }
 
 /**
  * Generate human-readable payment text from a structured PaymentConfig.
+ * [methodPhrase] is pre-spaced (" via boleto") or empty; [firstDueDate] is the
+ * concrete vencimento of the first payment when it's already known.
  */
-function generatePaymentTextFromConfig(pc: PaymentConfig, total: number): string {
+function generatePaymentTextFromConfig(
+  pc: PaymentConfig,
+  total: number,
+  methodPhrase: string,
+  firstDueDate: Date | null,
+): string {
+  // A known vencimento always beats the relative "a partir da finalização do
+  // serviço" wording — on a dossiê the service IS finished, so the customer
+  // should read the actual date, not a countdown from an event in the past.
+  const dueDate = firstDueDate ?? parseSpecificDate(pc.specificDate);
+
   if (pc.type === 'CASH') {
-    if (pc.specificDate) {
-      // Parse as local date to avoid timezone shifts. Defensively slice to
-      // the YYYY-MM-DD portion in case a full ISO string slips through.
-      const [y, m, d] = pc.specificDate.slice(0, 10).split('-').map(Number);
-      const date = new Date(y, m - 1, d);
-      if (y && m && d && !isNaN(date.getTime())) {
-        return `Pagamento à vista no valor de ${formatCurrency(total)}, com vencimento em ${formatDate(date)}.`;
-      }
-      // Fall through to the days-based wording when the date is invalid/missing.
-    }
-    const days = pc.cashDays ?? 5;
-    return `Pagamento à vista no valor de ${formatCurrency(total)}, para ${days} dias a partir da finalização do serviço.`;
+    const head = `Pagamento à vista no valor de ${formatCurrency(total)}${methodPhrase}`;
+    return dueDate
+      ? `${head}, com vencimento em ${formatDate(dueDate)}.`
+      : `${head}, para ${formatDays(pc.cashDays ?? 5)} a partir da finalização do serviço.`;
   }
 
   if (pc.type === 'INSTALLMENTS') {
@@ -55,18 +95,11 @@ function generatePaymentTextFromConfig(pc: PaymentConfig, total: number): string
     const entryDays = pc.entryDays ?? 5;
     const installmentValue = Math.round((total / count) * 100) / 100;
     const word = numberToWord(count);
+    const entryText = dueDate
+      ? `com entrada em ${formatDate(dueDate)}`
+      : `com entrada para ${formatDays(entryDays)} a partir da finalização do serviço`;
 
-    let entryText = `com entrada para ${entryDays} dias a partir da finalização do serviço`;
-    if (pc.specificDate) {
-      const [y, m, d] = pc.specificDate.slice(0, 10).split('-').map(Number);
-      const date = new Date(y, m - 1, d);
-      if (y && m && d && !isNaN(date.getTime())) {
-        entryText = `com entrada em ${formatDate(date)}`;
-      }
-      // Otherwise keep the days-based wording above.
-    }
-
-    return `Fica acertado o pagamento em ${count} (${word}) parcelas de ${formatCurrency(installmentValue)}, ${entryText} e as demais a cada ${step} dias.`;
+    return `Fica acertado o pagamento em ${count} (${word}) parcelas de ${formatCurrency(installmentValue)}${methodPhrase}, ${entryText} e as demais a cada ${formatDays(step)}.`;
   }
 
   return '';
@@ -82,6 +115,16 @@ interface PaymentTextData {
   /** Legacy string enum — used as fallback */
   paymentCondition?: string | null;
   total: number;
+  /**
+   * InstallmentPaymentMethod wire value. Overrides `paymentConfig.method` —
+   * the dossiê passes what the real Installments actually carry.
+   */
+  paymentMethod?: string | null;
+  /**
+   * Concrete vencimento of the first payment (real installment, or projected
+   * from the task's finishedAt). Replaces the relative days-based wording.
+   */
+  firstDueDate?: Date | string | null;
 }
 
 /**
@@ -89,37 +132,27 @@ interface PaymentTextData {
  * Priority: customPaymentText → paymentConfig (new) → paymentCondition (legacy)
  */
 export function generatePaymentText(quote: PaymentTextData): string {
-  // Custom free-text always wins
+  // Custom free-text always wins — it's the user's own wording, verbatim.
   if (quote.customPaymentText) {
     return quote.customPaymentText;
   }
 
-  // New structured config
-  if (quote.paymentConfig?.type) {
-    return generatePaymentTextFromConfig(quote.paymentConfig, quote.total);
-  }
+  const config = quote.paymentConfig?.type
+    ? quote.paymentConfig
+    : conditionToConfig(quote.paymentCondition);
+  if (!config) return '';
 
-  // Legacy string enum fallback
-  const condition = quote.paymentCondition;
-  if (!condition || condition === 'CUSTOM') return '';
+  // Anything that isn't explicitly Pix settles as boleto — mirrors the API's
+  // `resolveInstallmentPaymentMethod`, so the prose names the same method the
+  // generated Installments carry.
+  const method = quote.paymentMethod || quote.paymentConfig?.method || 'BANK_SLIP';
+  const phrase = PAYMENT_METHOD_PHRASES[method];
+  const methodPhrase = phrase ? ` ${phrase}` : '';
 
-  const total = quote.total;
+  const parsedDue = quote.firstDueDate ? new Date(quote.firstDueDate) : null;
+  const firstDueDate = parsedDue && !isNaN(parsedDue.getTime()) ? parsedDue : null;
 
-  if (condition === 'CASH_5')  return `Pagamento à vista no valor de ${formatCurrency(total)}, para 5 dias a partir da finalização do serviço.`;
-  if (condition === 'CASH_10') return `Pagamento à vista no valor de ${formatCurrency(total)}, para 10 dias a partir da finalização do serviço.`;
-  if (condition === 'CASH_20') return `Pagamento à vista no valor de ${formatCurrency(total)}, para 20 dias a partir da finalização do serviço.`;
-  if (condition === 'CASH_40') return `Pagamento à vista no valor de ${formatCurrency(total)}, para 40 dias a partir da finalização do serviço.`;
-
-  const countMap: Record<string, number> = {
-    INSTALLMENTS_2: 2, INSTALLMENTS_3: 3, INSTALLMENTS_4: 4,
-    INSTALLMENTS_5: 5, INSTALLMENTS_6: 6, INSTALLMENTS_7: 7,
-  };
-  const installmentCount = countMap[condition];
-  if (!installmentCount) return '';
-
-  const installmentValue = Math.round((total / installmentCount) * 100) / 100;
-  const word = numberToWord(installmentCount);
-  return `Fica acertado o pagamento em ${installmentCount} (${word}) parcelas de ${formatCurrency(installmentValue)}, com entrada para 5 dias a partir da finalização do serviço e as demais a cada 20 dias.`;
+  return generatePaymentTextFromConfig(config, quote.total, methodPhrase, firstDueDate);
 }
 
 /**

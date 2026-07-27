@@ -77,27 +77,23 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     // Provide the currently selected rep as initial option so the Combobox can display it
     const initialOptions = useMemo(() => {
       if (value.id && !value.id.startsWith('temp-') && value.name) {
-        const rep = { id: value.id, name: value.name, phone: value.phone || '', email: value.email || '', role: value.role, isActive: true } as Responsible;
+        const rep = { id: value.id, name: value.name, phone: value.phone || '', email: value.email || '', roles: value.roles, isActive: true } as Responsible;
         responsibleCache.set(rep.id, rep);
         return [rep];
       }
       return [];
-    }, [value.id, value.name, value.phone, value.email, value.role]);
+    }, [value.id, value.name, value.phone, value.email, value.roles]);
 
-    // Handle role selection
-    const handleRoleChange = useCallback((role: string | string[] | null | undefined) => {
-      if (!role || Array.isArray(role)) return;
-      const roleValue = role as ResponsibleRole;
-      onChange({
-        role: roleValue,
-        id: `temp-${Date.now()}`,
-        name: '',
-        phone: '',
-        email: '',
-        isNew: true,
-        isEditing: value.isEditing,
-      });
-    }, [onChange, value.isEditing]);
+    // Handle role selection.
+    //
+    // Only `roles` is touched. The previous single-select handler also reset
+    // name/phone/email and minted a fresh temp id on every change; with a
+    // multi-select that fires on each checkbox toggle, which would wipe
+    // whatever the user had already typed into the row.
+    const handleRolesChange = useCallback((roles: string | string[] | null | undefined) => {
+      const selected = (Array.isArray(roles) ? roles : roles ? [roles] : []) as ResponsibleRole[];
+      onChange({ ...value, roles: selected });
+    }, [onChange, value]);
 
     // Handle responsible selection
     const handleResponsibleChange = useCallback((selectedValue: string | string[] | null | undefined, searchTerm?: string) => {
@@ -137,7 +133,10 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
             name: rep.name,
             phone: rep.phone,
             email: rep.email || '',
-            // Keep user's role selection instead of overwriting with DB role
+            // Load the contact's real roles so the inline editor starts from
+            // what is actually stored, and keep a pristine copy to diff against.
+            roles: rep.roles ?? [],
+            originalRoles: rep.roles ?? [],
             isActive: rep.isActive,
             isNew: false,
             isEditing: false,
@@ -200,22 +199,24 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
       <div ref={ref} className={cn("space-y-3", (nameError || phoneError) && "pb-4")}>
         <div className={cn(
           "grid grid-cols-1 gap-2 items-end",
-          showCreateInputs ? "sm:grid-cols-[3fr_3fr_2fr_3fr_auto]" : "sm:grid-cols-[1fr_auto]"
+          showCreateInputs ? "sm:grid-cols-[2fr_3fr_2fr_3fr_3fr_auto]" : "sm:grid-cols-[2fr_2fr_auto]"
         )}>
           {showCreateInputs ? (
-            /* Inline Create Mode: Role + Name + Phone + Company + Remove */
+            /* Inline Create Mode: Roles + Name + Phone + E-mail + Company + Remove */
             <>
-              {/* Role Selection */}
+              {/* Roles Selection */}
               <div className="space-y-2">
-                {isFirstRow && <FormLabel>Função</FormLabel>}
+                {isFirstRow && <FormLabel>Funções</FormLabel>}
                 <Combobox
-                  value={value.role || ''}
-                  onValueChange={handleRoleChange}
+                  mode="multiple"
+                  value={value.roles ?? []}
+                  onValueChange={handleRolesChange}
                   options={roleOptions}
-                  placeholder="Selecione uma função"
+                  placeholder="Selecione as funções"
                   emptyText="Nenhuma função encontrada"
                   disabled={disabled || readOnly}
                   searchable={false}
+                  hideDefaultBadges
                 />
               </div>
 
@@ -268,6 +269,27 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                 {phoneError && <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">Telefone é obrigatório</p>}
               </div>
 
+              {/* E-mail - optional, same as the standalone responsible form.
+                  The create payload has always carried this field; the inline
+                  row just had no way to fill it in. */}
+              <div className="space-y-2">
+                {isFirstRow && <FormLabel>E-mail</FormLabel>}
+                <Input
+                  type="email"
+                  value={value.email || ''}
+                  onChange={(newValue) => {
+                    const finalValue = typeof newValue === 'string' ? newValue : '';
+                    onChange({
+                      ...value,
+                      email: finalValue,
+                    });
+                  }}
+                  placeholder="email@exemplo.com (opcional)"
+                  disabled={disabled || readOnly}
+                  className="bg-transparent"
+                />
+              </div>
+
               {/* Company */}
               <div className="space-y-2">
                 {isFirstRow && <FormLabel>Empresa</FormLabel>}
@@ -304,6 +326,27 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                 disabled={disabled || readOnly}
                 searchable={true}
                 fixedTopContent={fixedTopContent}
+              />
+            </div>
+          )}
+
+          {/* Roles - inline editor for an already-registered contact. Saving the
+              form persists any change back onto the Responsible itself, so the
+              task, the quote and every other task sharing this contact all see
+              the new roles. */}
+          {!showCreateInputs && (
+            <div className="space-y-2">
+              {isFirstRow && <FormLabel>Funções</FormLabel>}
+              <Combobox
+                mode="multiple"
+                value={value.roles ?? []}
+                onValueChange={handleRolesChange}
+                options={roleOptions}
+                placeholder={currentResponsibleValue ? 'Selecione as funções' : 'Selecione um responsável'}
+                emptyText="Nenhuma função encontrada"
+                disabled={disabled || readOnly || !currentResponsibleValue}
+                searchable={false}
+                hideDefaultBadges
               />
             </div>
           )}
