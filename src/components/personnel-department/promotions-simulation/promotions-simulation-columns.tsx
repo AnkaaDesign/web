@@ -187,12 +187,22 @@ export function createPromotionsSimulationColumns({
         ),
     },
     {
+      id: "currentPositionName",
+      header: "Cargo Atual",
+      accessorFn: (row) => row.originalPositionName,
+      enableSorting: true,
+      size: 200,
+      minSize: 150,
+      meta: { align: "left", exportValue: (row) => row.originalPositionName },
+      cell: ({ row }) => <TruncatedTextWithTooltip text={row.original.originalPositionName} className="text-sm text-muted-foreground" />,
+    },
+    {
       id: "positionName",
-      header: "Cargo",
+      header: "Cargo Previsto",
       accessorFn: (row) => row.positionName,
       enableSorting: true,
-      size: 300,
-      minSize: 200,
+      size: 230,
+      minSize: 170,
       meta: { align: "left", exportValue: (row) => row.positionName },
       cell: ({ row }) => {
         const u = row.original;
@@ -215,8 +225,18 @@ export function createPromotionsSimulationColumns({
       },
     },
     {
+      id: "currentPerformanceLevel",
+      header: "Perf. Atual",
+      accessorFn: (row) => row.originalPerformanceLevel,
+      enableSorting: true,
+      size: 110,
+      minSize: 90,
+      meta: { align: "center", exportValue: (row) => row.originalPerformanceLevel },
+      cell: ({ row }) => <span className="text-sm font-medium text-muted-foreground tabular-nums">{row.original.originalPerformanceLevel}</span>,
+    },
+    {
       id: "performanceLevel",
-      header: "Performance",
+      header: "Perf. Prevista",
       accessorFn: (row) => row.performanceLevel,
       enableSorting: true,
       size: 160,
@@ -242,7 +262,7 @@ export function createPromotionsSimulationColumns({
       enableSorting: true,
       size: 130,
       minSize: 110,
-      meta: { align: "right", exportValue: (row) => row.originalRemuneration },
+      meta: { align: "right", exportValue: (row) => formatCurrency(row.originalRemuneration) },
       cell: ({ row }) => <span className="text-sm text-muted-foreground tabular-nums">{formatCurrency(row.original.originalRemuneration)}</span>,
     },
     {
@@ -252,7 +272,7 @@ export function createPromotionsSimulationColumns({
       enableSorting: true,
       size: 140,
       minSize: 120,
-      meta: { align: "right", exportValue: (row) => row.expectedRemuneration },
+      meta: { align: "right", exportValue: (row) => formatCurrency(row.expectedRemuneration) },
       cell: ({ row }) => {
         const u = row.original;
         const changed = u.positionId !== u.originalPositionId;
@@ -266,7 +286,7 @@ export function createPromotionsSimulationColumns({
       enableSorting: true,
       size: 130,
       minSize: 110,
-      meta: { align: "right", exportValue: (row) => row.expectedRemuneration - row.originalRemuneration },
+      meta: { align: "right", exportValue: (row) => (row.expectedRemuneration === row.originalRemuneration ? "—" : formatSignedCurrency(row.expectedRemuneration - row.originalRemuneration)) },
       cell: ({ row }) => <DeltaCell value={row.original.expectedRemuneration - row.original.originalRemuneration} />,
     },
     {
@@ -276,7 +296,7 @@ export function createPromotionsSimulationColumns({
       enableSorting: true,
       size: 120,
       minSize: 110,
-      meta: { align: "right", exportValue: (row) => row.bonusAtual },
+      meta: { align: "right", exportValue: (row) => formatCurrency(row.bonusAtual) },
       cell: ({ row }) => <span className="text-sm text-muted-foreground tabular-nums">{formatCurrency(row.original.bonusAtual)}</span>,
     },
     {
@@ -286,7 +306,7 @@ export function createPromotionsSimulationColumns({
       enableSorting: true,
       size: 140,
       minSize: 120,
-      meta: { align: "right", exportValue: (row) => row.bonusPrevisto },
+      meta: { align: "right", exportValue: (row) => formatCurrency(row.bonusPrevisto) },
       cell: ({ row }) => (
         <span className={cn("font-bold tabular-nums", row.original.bonusPrevisto > 0 ? "text-green-600" : "text-muted-foreground")}>
           {formatCurrency(row.original.bonusPrevisto)}
@@ -300,7 +320,7 @@ export function createPromotionsSimulationColumns({
       enableSorting: true,
       size: 130,
       minSize: 110,
-      meta: { align: "right", exportValue: (row) => row.bonusPrevisto - row.bonusAtual },
+      meta: { align: "right", exportValue: (row) => (Math.abs(row.bonusPrevisto - row.bonusAtual) <= 0.005 ? "—" : formatSignedCurrency(row.bonusPrevisto - row.bonusAtual)) },
       cell: ({ row }) => <DeltaCell value={row.original.bonusPrevisto - row.original.bonusAtual} zeroThreshold={0.005} />,
     },
   ];
