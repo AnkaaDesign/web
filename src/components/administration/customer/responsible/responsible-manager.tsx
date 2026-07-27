@@ -70,7 +70,9 @@ export const ResponsibleManager: React.FC<ResponsibleManagerProps> = ({
           name: '',
           phone: '',
           email: '',
-          roles: [allowedRoles?.[0] || ('COMMERCIAL' as ResponsibleRole)],
+          // Sem função pré-selecionada: marcar "Comercial" sozinho fazia o
+      // formulário afirmar um papel que ninguém escolheu.
+      roles: [],
           isActive: true,
           isNew: true,
           isEditing: false, // Start with combobox visible, not edit mode
@@ -102,7 +104,9 @@ export const ResponsibleManager: React.FC<ResponsibleManagerProps> = ({
       name: '',
       phone: '',
       email: '',
-      roles: [allowedRoles?.[0] || ('COMMERCIAL' as ResponsibleRole)],
+      // Sem função pré-selecionada: marcar "Comercial" sozinho fazia o
+      // formulário afirmar um papel que ninguém escolheu.
+      roles: [],
       isActive: true,
       isNew: true,
       isEditing: false, // Start with combobox visible, not edit mode

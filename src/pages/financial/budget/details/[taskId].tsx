@@ -47,6 +47,7 @@ import { BudgetStepInfo } from "@/components/financial/budget/steps/budget-step-
 import { BudgetStepServices } from "@/components/financial/budget/steps/budget-step-services";
 import { BudgetStepCustomerPayment } from "@/components/financial/budget/steps/budget-step-customer-payment";
 import { BudgetStepReview } from "@/components/financial/budget/steps/budget-step-review";
+import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -1416,14 +1417,25 @@ export const FinancialBudgetDetailPage = () => {
           })}
 
           {currentStep === totalSteps && (
-            <BudgetStepReview
-              task={task}
-              disabled={isSubmitting || !canEdit}
-              existingQuote={existingQuote}
-              userRole={userRole}
-              selectedCustomers={selectedCustomers}
-              layoutFiles={layoutFiles}
-            />
+            <>
+              <BudgetStepReview
+                task={task}
+                disabled={isSubmitting || !canEdit}
+                existingQuote={existingQuote}
+                userRole={userRole}
+                selectedCustomers={selectedCustomers}
+                layoutFiles={layoutFiles}
+              />
+
+              {/* Assinatura eletrônica: fica na revisão porque é o passo em que o
+                  orçamento está fechado e pronto para ir ao cliente. Só aparece
+                  depois que a quote existe — não há o que congelar antes disso. */}
+              {existingQuote?.id && (
+                <div className="mt-6">
+                  <SignatureEnvelopeCard quoteId={existingQuote.id} canManage={canEdit} />
+                </div>
+              )}
+            </>
           )}
         </FormProvider>
       </div>

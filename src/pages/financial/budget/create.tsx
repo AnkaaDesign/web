@@ -39,7 +39,6 @@ import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import type { FileWithPreview } from "@/components/common/file";
 import type { TaskCreateFormData } from "@/schemas";
 import type { ResponsibleRowData } from "@/types/responsible";
-import { ResponsibleRole } from "@/types/responsible";
 
 // Step components
 import { BudgetStepTask } from "@/components/financial/budget/steps/budget-step-task";
@@ -89,7 +88,8 @@ export const FinancialBudgetCreatePage = () => {
     name: '',
     phone: '',
     email: '',
-    roles: ['COMMERCIAL' as ResponsibleRole],
+    // Sem função pré-selecionada — quem cadastra escolhe.
+    roles: [],
     isActive: true,
     isNew: true,
     isEditing: false,

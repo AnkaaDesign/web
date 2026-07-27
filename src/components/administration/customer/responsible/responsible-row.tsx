@@ -207,26 +207,12 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
             it. Each cell carries its own label, so the tops line up. */}
         <div className={cn(
           "grid grid-cols-1 gap-2 items-start",
-          showCreateInputs ? "sm:grid-cols-[3fr_3fr_2fr_3fr_auto]" : "sm:grid-cols-[2fr_3fr_auto]"
+          // Nome primeiro: a linha se identifica por QUEM e, nao pela funcao.
+          showCreateInputs ? "sm:grid-cols-[3fr_2fr_3fr_3fr_auto]" : "sm:grid-cols-[3fr_2fr_auto]"
         )}>
           {showCreateInputs ? (
-            /* Inline Create Mode: Role + Name + Phone + Company + Remove */
+            /* Cadastro inline: Nome + Telefone + Função + Empresa + Remover */
             <>
-              {/* Role Selection */}
-              <div className="space-y-2">
-                {isFirstRow && <FormLabel>Função</FormLabel>}
-                <Combobox
-                  mode="multiple"
-                  value={value.roles ?? []}
-                  onValueChange={handleRoleChange}
-                  options={roleOptions}
-                  placeholder="Selecione as funções"
-                  emptyText="Nenhuma função encontrada"
-                  disabled={disabled || readOnly}
-                  searchable={false}
-                />
-              </div>
-
               {/* Name */}
               <div className="relative space-y-2">
                 {isFirstRow && <FormLabel>Nome <span className="text-destructive">*</span></FormLabel>}
@@ -276,23 +262,7 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                 {phoneError && <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">Telefone é obrigatório</p>}
               </div>
 
-              {/* Company */}
-              <div className="space-y-2">
-                {isFirstRow && <FormLabel>Empresa</FormLabel>}
-                <CustomerCombobox
-                  value={value.companyId || null}
-                  onValueChange={handleCustomerChange}
-                  disabled={disabled || readOnly}
-                  placeholder="Selecione a empresa"
-                />
-              </div>
-            </>
-          ) : (
-            /* Selection Mode: Função + Responsible combobox */
-            <>
-              {/* Role editor — mirrors the detail page, which shows each contact
-                  as "Responsável <funções>". Without it the row could only pick
-                  a contact and never see or correct the roles being recorded. */}
+              {/* Role Selection */}
               <div className="space-y-2">
                 {isFirstRow && <FormLabel>Função</FormLabel>}
                 <Combobox
@@ -307,6 +277,20 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                 />
               </div>
 
+              {/* Company */}
+              <div className="space-y-2">
+                {isFirstRow && <FormLabel>Empresa</FormLabel>}
+                <CustomerCombobox
+                  value={value.companyId || null}
+                  onValueChange={handleCustomerChange}
+                  disabled={disabled || readOnly}
+                  placeholder="Selecione a empresa"
+                />
+              </div>
+            </>
+          ) : (
+            /* Selecao: Responsavel + Funcao */
+            <>
               <div className="space-y-2">
               {isFirstRow && <FormLabel>Responsável</FormLabel>}
               <Combobox<Responsible>
@@ -331,6 +315,23 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                 searchable={true}
                 fixedTopContent={fixedTopContent}
               />
+              </div>
+
+              {/* Role editor — mirrors the detail page, which shows each contact
+                  as "Responsável <funções>". Without it the row could only pick
+                  a contact and never see or correct the roles being recorded. */}
+              <div className="space-y-2">
+                {isFirstRow && <FormLabel>Função</FormLabel>}
+                <Combobox
+                  mode="multiple"
+                  value={value.roles ?? []}
+                  onValueChange={handleRoleChange}
+                  options={roleOptions}
+                  placeholder="Selecione as funções"
+                  emptyText="Nenhuma função encontrada"
+                  disabled={disabled || readOnly}
+                  searchable={false}
+                />
               </div>
             </>
           )}
