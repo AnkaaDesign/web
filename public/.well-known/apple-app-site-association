@@ -7,6 +7,10 @@
         ],
         "components": [
           {
+            "/": "/cliente/assinar/*",
+            "comment": "Signature ceremony - handled in-app by SignatureScreen. Scoped to /assinar/ only: the sibling /cliente/{id}/orcamento and /cliente/{id}/dossie public pages have no in-app equivalent and must open in Safari."
+          },
+          {
             "/": "/app/*",
             "comment": "Match universal link paths starting with /app/"
           },
