@@ -38,6 +38,20 @@ export enum PAYMENT_METHOD {
   CREDIT_CARD = "CREDIT_CARD",
 }
 
+// How an Installment was actually settled — distinct from PAYMENT_METHOD (which
+// describes how an Order/Payable is billed). Mirrors the API
+// `InstallmentPaymentMethod` enum (prisma/schema.prisma).
+export enum INSTALLMENT_PAYMENT_METHOD {
+  PIX = "PIX",
+  BANK_SLIP = "BANK_SLIP",
+  CASH = "CASH",
+  TRANSFER = "TRANSFER",
+  ACCOUNT_GENIVALDO = "ACCOUNT_GENIVALDO",
+  ACCOUNT_SERGIO = "ACCOUNT_SERGIO",
+  MANUAL = "MANUAL",
+  OTHER = "OTHER",
+}
+
 export const BANK_SLIP_DUE_DAYS_OPTIONS = [30, 60, 90, 120] as const;
 
 export enum SECTOR_PRIVILEGES {

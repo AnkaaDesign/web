@@ -146,8 +146,8 @@ export function BillingStepTask({
             />
           </div>
 
-          {/* Serial Number + Plate + Chassi */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Serial Number + Plate + Chassi + Plaqueta */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <FormField
               control={control}
               name="serialNumber"

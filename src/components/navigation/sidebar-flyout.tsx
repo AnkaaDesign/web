@@ -32,8 +32,9 @@ export interface FlyoutHandlers {
    * blinking once the user drills into it (the nudge hops to the deeper column).
    */
   shouldBlink?: (item: any, isOpenTrail: boolean) => boolean;
-  /** CSS class for the blink (color follows attention severity). Defaults to red. */
-  blinkClass?: string;
+  /** CSS class for a row's indicator, resolved PER ITEM (severity + armed/resting differ per
+   * entity, so a single shared class made a resting signal impersonate an armed one). */
+  blinkClass?: (item: any) => string;
   /** Returns a sized icon element for a menu item's `icon` string. */
   getIcon: (iconName: string, size?: number) => React.ReactNode;
   /** Favorites render their icon differently (entity badges etc.). */
@@ -208,7 +209,7 @@ function FlyoutColumn({
                   : isOpenTrail
                     ? "bg-muted"
                     : "hover:bg-muted",
-                isBlinking && (blinkClass ?? "nav-activity-blink"),
+                isBlinking && (blinkClass?.(child) || "nav-activity-blink"),
               )}
             >
               <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center">

@@ -256,7 +256,36 @@ export function computeExpandedFromActive(menu: MenuItem[], active: ActiveNav): 
 // ending on the target entry itself. Pure + tree-shaped, so it serves any future
 // activity source, not just cuts.
 
-function addBlinkForChain(chain: MenuItem[], expanded: { [id: string]: boolean }, blink: Set<string>) {
+/**
+ * How one nav entry should render its indicator. Resolved PER ENTRY, not once for the whole
+ * sidebar: a resting cut and an overdue task can be signalling at the same time, and a
+ * single shared class made the calmer of the two impersonate the louder one (a cut whose row
+ * showed a static border rendered as a blinking nav entry because some task was armed).
+ */
+export interface NavActivityStyle {
+  /** Any contributing path is urgent → red rather than amber. */
+  harsh: boolean;
+  /** Any contributing path is actively blinking → animate rather than a static border. */
+  armed: boolean;
+}
+
+/** Per-path style inputs, as produced by `useNavActivity`. */
+export interface NavActivityStyleSource {
+  tones: Map<string, "harsh" | "soft">;
+  armedPaths: Set<string>;
+}
+
+function styleForPath(path: string, src: NavActivityStyleSource): NavActivityStyle {
+  return { harsh: src.tones.get(path) !== "soft", armed: src.armedPaths.has(path) };
+}
+
+/** Merge two styles: the louder wins on each axis independently. */
+function mergeStyle(a: NavActivityStyle | undefined, b: NavActivityStyle): NavActivityStyle {
+  if (!a) return b;
+  return { harsh: a.harsh || b.harsh, armed: a.armed || b.armed };
+}
+
+function addBlinkForChain(chain: MenuItem[], expanded: { [id: string]: boolean }, out: Map<string, NavActivityStyle>, style: NavActivityStyle) {
   for (let i = 0; i < chain.length; i++) {
     const node = chain[i];
     const id = node.id || node.path;
@@ -264,31 +293,40 @@ function addBlinkForChain(chain: MenuItem[], expanded: { [id: string]: boolean }
     const isTarget = i === chain.length - 1;
     const isContainer = !!(node.children && node.children.length > 0);
     // A collapsed container ancestor is where the trail is currently "blocked" — blink it.
+    // It stands in for possibly SEVERAL activity paths, so styles merge rather than replace.
     if (!isTarget && isContainer && node.id && !expanded[node.id]) {
-      blink.add(id);
+      out.set(id, mergeStyle(out.get(id), style));
       return;
     }
     // Reached the target itself (all ancestors already expanded): blink the destination.
     if (isTarget) {
-      blink.add(id);
+      out.set(id, mergeStyle(out.get(id), style));
       return;
     }
   }
 }
 
-/** Ids that should blink right now, given the visible menu + activity paths + expansion state. */
-export function resolveNavActivityBlinkIds(menu: MenuItem[], activityPaths: Set<string>, expanded: { [id: string]: boolean }): Set<string> {
-  const blink = new Set<string>();
-  if (!activityPaths || activityPaths.size === 0) return blink;
+/**
+ * Entry id → how it should render, given the visible menu + activity paths + expansion
+ * state. An id absent from the map shows no indicator.
+ */
+export function resolveNavActivityBlinkIds(
+  menu: MenuItem[],
+  activityPaths: Set<string>,
+  expanded: { [id: string]: boolean },
+  styles: NavActivityStyleSource,
+): Map<string, NavActivityStyle> {
+  const out = new Map<string, NavActivityStyle>();
+  if (!activityPaths || activityPaths.size === 0) return out;
   const visit = (items: MenuItem[], trail: MenuItem[]) => {
     for (const it of items || []) {
       const chain = [...trail, it];
-      if (it.path && activityPaths.has(it.path)) addBlinkForChain(chain, expanded, blink);
+      if (it.path && activityPaths.has(it.path)) addBlinkForChain(chain, expanded, out, styleForPath(it.path, styles));
       if (it.children && it.children.length > 0) visit(it.children, chain);
     }
   };
   visit(menu, []);
-  return blink;
+  return out;
 }
 
 /**
@@ -297,25 +335,37 @@ export function resolveNavActivityBlinkIds(menu: MenuItem[], activityPaths: Set<
  * flyout blinks a target row directly, and an ancestor row only while its own submenu
  * column is not yet open (so the blink hops inward as the user browses the cascade).
  */
-export function collectNavActivityTargets(menu: MenuItem[], activityPaths: Set<string>): { targetIds: Set<string>; trailIds: Set<string> } {
+export function collectNavActivityTargets(
+  menu: MenuItem[],
+  activityPaths: Set<string>,
+  styles: NavActivityStyleSource,
+): { targetIds: Set<string>; trailIds: Set<string>; styleById: Map<string, NavActivityStyle> } {
   const targetIds = new Set<string>();
   const trailIds = new Set<string>();
-  if (!activityPaths || activityPaths.size === 0) return { targetIds, trailIds };
+  const styleById = new Map<string, NavActivityStyle>();
+  if (!activityPaths || activityPaths.size === 0) return { targetIds, trailIds, styleById };
   const visit = (items: MenuItem[], trail: MenuItem[]) => {
     for (const it of items || []) {
       const id = it.id || it.path;
       if (it.path && activityPaths.has(it.path)) {
-        if (id) targetIds.add(id);
+        const style = styleForPath(it.path, styles);
+        if (id) {
+          targetIds.add(id);
+          styleById.set(id, mergeStyle(styleById.get(id), style));
+        }
         for (const anc of trail) {
           const aid = anc.id || anc.path;
-          if (aid) trailIds.add(aid);
+          if (aid) {
+            trailIds.add(aid);
+            styleById.set(aid, mergeStyle(styleById.get(aid), style));
+          }
         }
       }
       if (it.children && it.children.length > 0) visit(it.children, [...trail, it]);
     }
   };
   visit(menu, []);
-  return { targetIds, trailIds };
+  return { targetIds, trailIds, styleById };
 }
 
 // ---------------------------------------------------------------------------

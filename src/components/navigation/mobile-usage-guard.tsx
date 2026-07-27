@@ -26,6 +26,9 @@ const MOBILE_ALLOWED_PREFIXES = [
   routes.install, // "/install"
   "/autenticacao",
   "/cliente",
+  // Verificação pública de assinatura. Código curto e ditável, impresso no
+  // rodapé do PDF assinado — precisa abrir no celular de quem recebeu o arquivo.
+  "/v",
   "/certificado-residuos",
   routes.privacyPolicy, // "/politica-de-privacidade"
 ];

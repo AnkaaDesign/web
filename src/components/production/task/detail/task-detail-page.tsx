@@ -34,7 +34,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { useTaskDetail, useTaskMutations, useForecastHistory, useRescheduleForecast } from "@/hooks/production/use-task";
-import { useRegisterAttentionEntities, useMarkAttentionViewedOnExit, useOtherEditors } from "@/lib/attention";
+import { useEditLock } from "@/lib/attention";
 import { useTaskSiblingIds } from "@/hooks/production/task/use-task-sibling-ids";
 import { useCutsByTask } from "@/hooks/production/use-cut";
 import { useAirbrushingsByTask } from "@/hooks/production/use-airbrushing";
@@ -109,8 +109,22 @@ const IDENTITY_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGE
 const SECTOR_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER];
 //   BONIFICATION (canEditBonification excludes FINANCIAL, DESIGNER, LOGISTIC, PM, WAREHOUSE)
 const BONIFICATION_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.COMMERCIAL];
-//   DATES (canEditDates excludes WAREHOUSE, FINANCIAL, DESIGNER)
+//   DATES (canEditDates excludes WAREHOUSE, FINANCIAL, DESIGNER) — Previsão / Iniciado / Finalizado
 const DATE_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER];
+//   ENTRY DATE (canEditEntryDate = canEditDates minus COMMERCIAL) — only the desks that
+//   physically receive the vehicle record its arrival. Mirrors the API `entryDate` domain.
+const ENTRY_DATE_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER];
+//   TERM (canEditTerm = COMMERCIAL + ADMIN) — the customer deadline is negotiated by the
+//   commercial desk; PRODUCTION_MANAGER and LOGISTIC must not change it. Mirrors the API `term` domain.
+const TERM_EDIT_PRIVILEGES = [SECTOR_PRIVILEGES.COMMERCIAL];
+//   STATUS — deliberately NOT an `editablePrivilege`: the status editor's real gate is a CAPABILITY
+//   (`canManageStatus` = admin/team-leader, `canFinish` = ADMIN/PM/LOGISTIC) plus the transition state
+//   machine, which a privilege list can't express — COMMERCIAL/DESIGNER/FINANCIAL may open the editor
+//   but are offered only the current status. This list therefore declares the ATTENTION AUDIENCE only:
+//   the desks that can actually move a task through production. Without it the send-warning picker had
+//   no gate to read and fell back to every active user, offering PRODUCTION — who can't even open the
+//   editor (`canEditTasks` excludes them). ADMIN is added downstream, so it isn't listed.
+const STATUS_WARN_PRIVILEGES = [SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.LOGISTIC];
 
 // Per-status colors for the quote/faturamento status (TASK_QUOTE isn't in ENTITY_BADGE_CONFIG, so we
 // map values → badge variants here — same palette as QuoteStatusBadge).
@@ -290,17 +304,14 @@ function TaskDetailContent() {
   const task = (data as { data?: Task } | undefined)?.data ?? null;
   usePageTracker({ title: task ? `Tarefa: ${task.name}` : "Tarefa", icon: breadcrumbConfig.icon });
 
-  // Attention system: register this task so rules (forecast/chassis/…) can evaluate it.
-  // Task rules are `onExitCooldown`: the field blinks the whole time you're on the page
-  // (so you can see WHICH one), and quiets for the cooldown when you LEAVE — hence the
-  // on-EXIT hook, declared AFTER register so its cleanup runs while the cycle is alive.
-  const attentionTasks = useMemo(() => (task ? [task] : []), [task]);
-  useRegisterAttentionEntities("TASK", attentionTasks);
-  useMarkAttentionViewedOnExit("TASK", task?.id);
+  // Attention system: handled entirely by `<DetailPage attention={{ entityType: "TASK" }}>`
+  // below — it registers the record, applies each matching rule's ack policy and rings the
+  // header. Nothing to wire per page (that is what let this page and the cut detail drift).
 
   // Presence: is another user editing this task right now? If so, lock editing here
-  // (an editor open elsewhere; concurrent edits would clobber each other).
-  const otherEditors = useOtherEditors("TASK", task?.id);
+  // (an editor open elsewhere; concurrent edits would clobber each other). `reason`
+  // carries who AND for how long, so the disabled controls can explain themselves.
+  const { editors: otherEditors, reason: editLockReason } = useEditLock("TASK", task?.id);
   const editLockedBy = otherEditors.length > 0 ? otherEditors.map((e) => e.userName).join(", ") : null;
 
   const { data: cutsResponse } = useCutsByTask(
@@ -552,7 +563,7 @@ function TaskDetailContent() {
             id: "status",
             label: "Status",
             dataType: "enum",
-            attention: { entityType: "TASK", sendWarning: true },
+            attention: { entityType: "TASK", sendWarning: true, warnPrivileges: STATUS_WARN_PRIVILEGES },
             accessor: (t) => t.status,
             edit: canEdit
               ? {
@@ -790,7 +801,7 @@ function TaskDetailContent() {
             id: "entryDate",
             label: "Entrada",
             dataType: "datetime",
-            editablePrivilege: DATE_EDIT_PRIVILEGES,
+            editablePrivilege: ENTRY_DATE_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.entryDate,
             edit: canEdit ? { get: (t) => t.entryDate, onCommit: (v) => setTaskField({ entryDate: (v as Date) ?? null }) } : undefined,
@@ -799,7 +810,7 @@ function TaskDetailContent() {
             id: "term",
             label: "Prazo",
             dataType: "datetime",
-            editablePrivilege: DATE_EDIT_PRIVILEGES,
+            editablePrivilege: TERM_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
             accessor: (t) => t.term,
             // Overdue terms (past due and not completed/cancelled) render red with "(Atrasado)".
@@ -851,13 +862,15 @@ function TaskDetailContent() {
               headerActions: (t: Task) => {
                 const q = t.quote;
                 if (!q) return null;
-                const custId = q.customerConfigs?.[0]?.customerId || "all";
                 return (
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-7 gap-1.5 text-xs"
-                    onClick={() => window.open(routes.customer.budget(custId, q.id), "_blank")}
+                    // No customer segment: this opens the COMPLETE budget. There's
+                    // no per-customer picker here, and picking one arbitrarily
+                    // would hide the other customers' services.
+                    onClick={() => window.open(routes.customer.budget(null, q.id), "_blank")}
                   >
                     <IconEye className="h-3.5 w-3.5" />
                     Visualizar
@@ -1188,7 +1201,7 @@ function TaskDetailContent() {
                         Baixar Todos
                       </Button>
                     ) : null}
-                    <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => exportTaskDossiePdf(t, sos)}>
+                    <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => void exportTaskDossiePdf(t)}>
                       <IconDownload className="h-3.5 w-3.5" />
                       PDF
                     </Button>
@@ -1301,7 +1314,7 @@ function TaskDetailContent() {
       // Locked out while someone else has this task's editor open — hovering the disabled
       // button explains why (title). Prevents two people clobbering each other's edits.
       disabled: !!editLockedBy,
-      title: editLockedBy ? `${editLockedBy} está editando esta tarefa` : undefined,
+      title: editLockReason || undefined,
       onClick: () =>
         // Commercial users ALWAYS edit through the quote (orçamento/faturamento by quote status),
         // even for a quote-less task — getTaskQuoteEditRoute falls back to the budget page, where the
@@ -1312,7 +1325,7 @@ function TaskDetailContent() {
             navigate(breadcrumbConfig.editRoute(task.id), { state: { ids: siblingIds } }),
     });
     return list;
-  }, [task, canEdit, canFinish, role, changeStatus, navigate, breadcrumbConfig, returnTo, siblingIds, editLockedBy]);
+  }, [task, canEdit, canFinish, role, changeStatus, navigate, breadcrumbConfig, returnTo, siblingIds, editLockedBy, editLockReason]);
 
   // Display-name fallback chain (faithful to the legacy getTaskDisplayName): name → customer →
   // "Série {serial}" → plate → "Sem nome". The serial is still appended to the page title when present.
@@ -1334,11 +1347,12 @@ function TaskDetailContent() {
         error={error ? "Erro ao carregar a tarefa." : undefined}
         sections={sections}
         sectorDefaults={TASK_DETAIL_SECTOR_DEFAULTS}
+        attention={{ entityType: "TASK" }}
         title={taskName}
         icon={IconClipboardList}
         actions={actions}
         editLocked={!!editLockedBy}
-        editLockedReason={editLockedBy ? `${editLockedBy} está editando esta tarefa` : undefined}
+        editLockedReason={editLockReason || undefined}
         favoritePage={undefined}
         hideEmptyFields
         breadcrumbs={[

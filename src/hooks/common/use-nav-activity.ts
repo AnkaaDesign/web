@@ -8,24 +8,48 @@
 // the domain blinks first, and once it is opened the blink hops to the relevant
 // subdomain, and so on until the target page itself.
 //
-// Adding a new blinking indicator later is a one-liner: write a small hook that
-// returns the target route path(s) when there is something to act on, then register
-// it in NAV_ACTIVITY_SOURCES below. Everything downstream (trail resolution, the
-// blink animation, the collapsed flyout) is generic and keyed by route path, so it
-// works for any role/section without touching the sidebar.
-//
 // Keying is by ROUTE PATH (e.g. "/producao/recorte"), not menu id, because the same
 // logical domain is duplicated per role in the menu tree (recorte vs recorte-plotting,
 // producao vs producao-production-manager). Path is the stable, role-agnostic key.
+//
+// ---------------------------------------------------------------------------
+// THE NAV IS A PROJECTION OF THE ATTENTION ENGINE — NOTHING ELSE.
+// ---------------------------------------------------------------------------
+// There is exactly ONE source here, and it iterates `ATTENTION_ACTIVE_TYPES`. Adding a
+// blinking indicator for a new entity means declaring a descriptor in
+// `lib/attention/entities.ts` and writing a rule — this file does not change.
+//
+// It used to be two hooks: the attention engine for TASK, plus a bespoke
+// `useWarehousePendingCutsActivity` that ran its own `count(status=PENDING)` poll with
+// `armed: true` hardcoded and was then gated by a second blink state machine
+// (`use-nav-activity-alert.ts`, now deleted) that removed the cut path from the blink set
+// entirely whenever the user was anywhere under /producao/recorte. So the cut nav and the
+// cut rows were driven by different clocks with different vocabularies, and opening one
+// cut silenced the nav for every other pending cut. The engine already computed correct
+// per-type counts; nobody consumed them.
+//
+// The vocabulary every surface now shares:
+//   armed   → BLINK   (a row is actively blinking somewhere)
+//   resting → STATIC  (viewed / in cooldown, still unresolved)
+//   absent  → nothing (no rule matches)
+// A resting entity is never hidden — that is what let the nav contradict the rows.
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { routes, SECTOR_PRIVILEGES, CUT_STATUS } from "@/constants";
+import { SECTOR_PRIVILEGES } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
 import { canAccessAnyPrivilege } from "@/utils/privilege";
-import { useCuts } from "@/hooks/production/use-cut";
-import { useAttentionVersion, getAttentionCountsByType, getAttentionSeverityByType, getAttentionArmedByType } from "@/lib/attention";
+import {
+  useAttentionVersion,
+  getAttentionSnapshot,
+  useAttentionSurfaceTypes,
+  attentionEntityDescriptor,
+  attentionAudience,
+  ATTENTION_ACTIVE_TYPES,
+  type AttentionEntityType,
+  type AttentionTypeSnapshot,
+} from "@/lib/attention";
 import { apiClient } from "@/api-client/axiosClient";
 
 /** A single "this nav entry needs attention" signal. */
@@ -42,64 +66,36 @@ export interface NavActivityHint {
   armed?: boolean;
 }
 
-/**
- * An activity source is a hook returning zero or more hints. It owns its own gating
- * (role checks, feature flags) and its own data fetching, returning `[]` when there
- * is nothing to signal (including when the current user shouldn't see it at all).
- * Sources MUST be unconditional hooks — they are called in a fixed order every render.
- */
-export type NavActivitySource = () => NavActivityHint[];
+/** Per-entity-type counts as the server sees them (global, not just what's loaded). */
+type SummaryByType = Partial<Record<AttentionEntityType, AttentionTypeSnapshot>>;
 
 /**
- * Warehouse: a cut exists that has not started yet (status PENDING). Blinks the path
- * to the "Recorte" (cuts) page so the warehouse operator is guided there to start it.
- * Gated to WAREHOUSE (ADMIN inherits access), and only fetches for those users.
+ * Server-side attention summary (GET /attention/summary) — the global picture, not just
+ * what this tab happens to have loaded. Polled independently of any list query so the nav
+ * can blink from ANYWHERE, including pages (the Produção dashboard) that never register a
+ * single entity with the local engine. Returns the same `{count, armed, harsh}` triple the
+ * engine produces, per entity type, so the two merge without translation.
+ *
+ * Gated on the union of every active type's audience: a user who can see no rule at all
+ * never issues the request.
  */
-function useWarehousePendingCutsActivity(): NavActivityHint[] {
-  const { user } = useAuth();
-
-  const userPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
-  const enabled = !!userPrivilege && canAccessAnyPrivilege(userPrivilege, [SECTOR_PRIVILEGES.WAREHOUSE]);
-
-  // Minimal payload: we only need the total count of PENDING cuts, not the rows.
-  const { data } = useCuts(
-    { status: [CUT_STATUS.PENDING], limit: 1 } as never,
-    {
-      enabled,
-      staleTime: 1000 * 30, // 30s — lets an on-focus refetch actually fire inside the poll window
-      refetchInterval: enabled ? 1000 * 60 : false, // re-poll every 1 min so a new cut nags others promptly
-      refetchOnWindowFocus: true,
-    } as never,
-  );
-
-  const count = (data as { meta?: { totalRecords?: number } } | undefined)?.meta?.totalRecords ?? 0;
-  if (!enabled || count <= 0) return [];
-  // Pending cuts are urgent → red, and always "armed" (a pending cut is actionable).
-  return [{ path: routes.production.cutting.root, count, tone: "harsh", armed: true }];
-}
-
-/**
- * Server-side attention summary (GET /attention/summary) — the global count, not
- * just what this tab happens to have loaded. Polled independently of any task list
- * (same lightweight pattern as `useWarehousePendingCutsActivity`'s count-only cut
- * query) so the Agenda/Cronograma nav entries can blink from ANYWHERE, including
- * pages — like the Produção dashboard — that never register a single task with the
- * local engine. See api/docs/attention-server-side.md §6.
- */
-function useAttentionSummary(): { count: number; armed: boolean; harsh: boolean } {
+function useAttentionSummary(): SummaryByType {
   const { user } = useAuth();
   const userPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
-  const enabled = !!userPrivilege && canAccessAnyPrivilege(userPrivilege, [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]);
+
+  const enabled = useMemo(() => {
+    if (!userPrivilege) return false;
+    return ATTENTION_ACTIVE_TYPES.some((type) => {
+      const audience = attentionAudience(type);
+      return audience === null || canAccessAnyPrivilege(userPrivilege, audience as never);
+    });
+  }, [userPrivilege]);
 
   const { data } = useQuery({
     queryKey: ["attention-summary"],
     queryFn: async () => {
       const res = await apiClient.get("/attention/summary");
-      return ((res as { data?: { counts?: { TASK?: number }; armed?: { TASK?: boolean }; harsh?: { TASK?: boolean } } })?.data ?? res) as {
-        counts?: { TASK?: number };
-        armed?: { TASK?: boolean };
-        harsh?: { TASK?: boolean };
-      };
+      return ((res as { data?: SummaryByType })?.data ?? res) as SummaryByType;
     },
     enabled,
     staleTime: 1000 * 30,
@@ -107,39 +103,62 @@ function useAttentionSummary(): { count: number; armed: boolean; harsh: boolean 
     refetchOnWindowFocus: true,
   });
 
-  if (!enabled) return { count: 0, armed: false, harsh: false };
-  return { count: data?.counts?.TASK ?? 0, armed: !!data?.armed?.TASK, harsh: !!data?.harsh?.TASK };
+  return enabled ? (data ?? {}) : {};
 }
 
 /**
- * Attention engine → nav indicator. Lights the Agenda + Cronograma nav trail whenever a
- * TASK matches an attention rule for the current user (loaded rows via the local engine +
- * the server summary for the global/dashboard case). It BLINKS when anything is armed
- * (actively blinking on a row) and shows a STATIC border when everything is resting
- * (viewed / in cooldown) — so the nav mirrors the row exactly. Color = highest severity.
+ * Attention engine → nav indicators, for every entity type that has rules.
+ *
+ * Local engine state (loaded rows) is merged with the server summary (everything else) by
+ * taking the strongest signal of the two: the engine is authoritative the instant a row
+ * changes, the server covers what isn't on screen.
+ *
+ * An entity whose records are ON SCREEN contributes NOTHING. Not a dimmed indicator — none.
+ * The rows themselves are the signal at full fidelity, and an indicator pointing at the page
+ * you are on is noise. It is also unrenderable in the common case: that path is the ACTIVE
+ * nav entry, whose highlight covers the ring — which is why the Recorte entry appeared dead
+ * on the Recorte page while, on the Agenda page, the very same rule lit up Cronograma
+ * (tasks have two nav paths, so the non-active sibling stayed visible). One rule, two
+ * different-looking bugs. Off the surface, the indicator returns exactly as it was — there
+ * is no lingering snooze.
  */
 function useAttentionNavActivity(): NavActivityHint[] {
   useAttentionVersion(); // re-render whenever local attention state flips
-  const localCount = getAttentionCountsByType().get("TASK") ?? 0;
-  const localArmed = getAttentionArmedByType().get("TASK") === true;
-  const localHarsh = getAttentionSeverityByType().get("TASK") === "harsh";
-  const { count: serverCount, armed: serverArmed, harsh: serverHarsh } = useAttentionSummary();
-  const taskCount = Math.max(localCount, serverCount);
-  if (taskCount <= 0) return [];
-  const tone: "harsh" | "soft" = localHarsh || serverHarsh ? "harsh" : "soft";
-  const armed = localArmed || serverArmed;
-  // Tasks live on both Agenda (preparation) and Cronograma (schedule).
-  return [
-    { path: routes.production.preparation.root, count: taskCount, tone, armed }, // /producao/agenda
-    { path: routes.production.schedule.root, count: taskCount, tone, armed }, // /producao/cronograma
-  ];
+  const local = getAttentionSnapshot();
+  const server = useAttentionSummary();
+  const surfaces = useAttentionSurfaceTypes();
+
+  const hints: NavActivityHint[] = [];
+  for (const type of ATTENTION_ACTIVE_TYPES) {
+    if (surfaces.has(type)) continue; // already looking at them
+    const descriptor = attentionEntityDescriptor(type);
+    if (!descriptor || descriptor.navPaths.length === 0) continue;
+
+    const l = local.get(type);
+    const s = server[type];
+    const count = Math.max(l?.count ?? 0, s?.count ?? 0);
+    if (count <= 0) continue;
+
+    const armed = (l?.armed ?? false) || (s?.armed ?? false);
+    const tone: "harsh" | "soft" = (l?.harsh ?? false) || (s?.harsh ?? false) ? "harsh" : "soft";
+
+    for (const path of descriptor.navPaths) hints.push({ path, count, tone, armed });
+  }
+  return hints;
 }
 
 /**
- * Registry of activity sources. Add a new blinking indicator by appending its hook
- * here — nothing else in the sidebar needs to change. Order is fixed (hook rules).
+ * An activity source is a hook returning zero or more hints. It owns its own gating
+ * (role checks, feature flags) and its own data fetching, returning `[]` when there
+ * is nothing to signal (including when the current user shouldn't see it at all).
+ * Sources MUST be unconditional hooks — they are called in a fixed order every render.
+ *
+ * Kept as a registry so a future signal that genuinely ISN'T attention-rule-shaped can be
+ * added here. Anything that IS should become a rule + descriptor instead.
  */
-const NAV_ACTIVITY_SOURCES: NavActivitySource[] = [useWarehousePendingCutsActivity, useAttentionNavActivity];
+export type NavActivitySource = () => NavActivityHint[];
+
+const NAV_ACTIVITY_SOURCES: NavActivitySource[] = [useAttentionNavActivity];
 
 export interface NavActivity {
   /** Route paths that currently have pending activity. */

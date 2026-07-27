@@ -94,6 +94,11 @@ export function ResponsibleTable({
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
+    // Self-heals stale URLs and saved layouts. Notably `roles` is absent and
+    // must stay absent: it is a Postgres scalar list, which Prisma cannot
+    // orderBy, so letting an old `?sort=[{"column":"role"}]` through would
+    // surface as a 500 rather than an ignored sort.
+    allowedSortColumns: ["name", "email", "createdAt"],
   });
 
   // Define all available columns

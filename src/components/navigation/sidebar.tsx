@@ -19,8 +19,7 @@ import { UserAvatarDisplay } from "@/components/ui/avatar-display";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { SidebarFlyout, useFlyoutController } from "./sidebar-flyout";
-import { recordNavClick, clearNavContext, useRecordedNav, resolveActiveNav, computeExpandedFromActive, resolveNavActivityBlinkIds, collectNavActivityTargets } from "@/contexts/navigation-context";
-import { useNavActivityAlert } from "@/hooks/common/use-nav-activity-alert";
+import { recordNavClick, clearNavContext, useRecordedNav, resolveActiveNav, computeExpandedFromActive, resolveNavActivityBlinkIds, collectNavActivityTargets, type NavActivityStyle } from "@/contexts/navigation-context";
 import { useNavActivity } from "@/hooks/common/use-nav-activity";
 
 import {
@@ -653,32 +652,33 @@ export const Sidebar = memo(() => {
   // red ring "leads" the user inward (domain -> subdomain -> ... -> target page).
   // When the sidebar is collapsed, children aren't rendered, so we resolve against an
   // empty expansion map — that blinks the outermost (top-level) domain icon.
-  // useNavActivityAlert wraps the raw activity signal with the alert state machine:
-  // the paths it returns are already gated by the 30-min "user visited the cut page"
-  // snooze and the "user is on the page right now" suppression, and it drives the
-  // audible bip loop as a side effect. So the blink derived from it stops exactly when
-  // the bips do. See @/hooks/common/use-nav-activity-alert.
-  const blinkPaths = useNavActivityAlert();
-  // Blink COLOR mirrors the severity of what's actually blinking (post-snooze): red if
-  // any blinking path is urgent (harsh), amber if all are routine (soft). One class for
-  // the whole trail — the cut and task blinks light disjoint nav subtrees per sector.
-  const { tones: navTones, armedPaths: navArmedPaths } = useNavActivity();
-  const navBlinkClass = useMemo(() => {
-    const paths = [...(blinkPaths as Set<string>)];
-    const harsh = paths.some((p) => navTones.get(p) === "harsh");
-    const armed = paths.some((p) => navArmedPaths.has(p));
-    // ARMED → blink (mirrors a blinking row); RESTING-only → static border (mirrors a viewed row).
-    if (armed) return harsh ? "nav-activity-blink" : "nav-activity-blink-soft";
-    return harsh ? "nav-activity-static" : "nav-activity-static-soft";
-  }, [blinkPaths, navTones, navArmedPaths]);
+  // `useNavActivity` is a pure projection of the attention engine (+ its server summary):
+  // every path it reports has an unresolved rule match, and `armedPaths` says whether that
+  // match is actively blinking or merely resting. Cooldowns, "already on the page"
+  // suppression and the bip loop all live in the engine, so the sidebar never needs its own
+  // state machine — it just paints what the rows are already showing.
+  const { paths: blinkPaths, tones: navTones, armedPaths: navArmedPaths } = useNavActivity();
+  const navStyleSource = useMemo(() => ({ tones: navTones, armedPaths: navArmedPaths }), [navTones, navArmedPaths]);
+  // ARMED → blink (mirrors a blinking row); RESTING → static border (mirrors a viewed row).
+  // Resolved PER ENTRY: with one shared class, a resting cut rendered as a blinking nav entry
+  // whenever any task happened to be armed.
+  const classForStyle = useCallback((style: NavActivityStyle | undefined): string => {
+    if (!style) return "";
+    if (style.armed) return style.harsh ? "nav-activity-blink" : "nav-activity-blink-soft";
+    return style.harsh ? "nav-activity-static" : "nav-activity-static-soft";
+  }, []);
   const blinkingIds = useMemo(
-    () => resolveNavActivityBlinkIds(menuWithContextualItems as MenuItem[], blinkPaths as Set<string>, isOpen ? expandedMenus : {}),
-    [menuWithContextualItems, blinkPaths, isOpen, expandedMenus],
+    () => resolveNavActivityBlinkIds(menuWithContextualItems as MenuItem[], blinkPaths as Set<string>, isOpen ? expandedMenus : {}, navStyleSource),
+    [menuWithContextualItems, blinkPaths, isOpen, expandedMenus, navStyleSource],
   );
   // Expansion-agnostic target/ancestor ids for the collapsed flyout's own blink logic.
   const activityTargets = useMemo(
-    () => collectNavActivityTargets(menuWithContextualItems as MenuItem[], blinkPaths as Set<string>),
-    [menuWithContextualItems, blinkPaths],
+    () => collectNavActivityTargets(menuWithContextualItems as MenuItem[], blinkPaths as Set<string>, navStyleSource),
+    [menuWithContextualItems, blinkPaths, navStyleSource],
+  );
+  const flyoutBlinkClass = useCallback(
+    (item: any) => classForStyle(activityTargets.styleById.get(item?.id || item?.path)),
+    [activityTargets, classForStyle],
   );
   // Flyout row blinks when it IS a target, or is an ancestor whose submenu column is
   // not yet open (so the nudge hops inward as the user browses the cascading columns).
@@ -802,7 +802,11 @@ export const Sidebar = memo(() => {
     const isHighlighted = (item.id || item.path) === activeNav.id;
     const isAncestorOfActive = !isHighlighted && activeNav.ancestorIds.has(item.id);
     // "New activity" nudge: a gentle blinking red ring guiding the user to this entry.
-    const isBlinking = !!item.id && blinkingIds.has(item.id);
+    // Armed → animated; resting → a static ring. Per entry, so two entities signalling at
+    // different intensities render differently.
+    const activityStyle = item.id ? blinkingIds.get(item.id) : undefined;
+    const isBlinking = !!activityStyle;
+    const navBlinkClass = classForStyle(activityStyle);
 
     const handleItemClick = (e: React.MouseEvent) => {
       // Check if Ctrl (or Cmd on Mac) is pressed or if it's a middle-click
@@ -1146,7 +1150,7 @@ export const Sidebar = memo(() => {
           state={flyout.state}
           isItemActive={isFlyoutItemActive}
           shouldBlink={shouldBlinkFlyoutItem}
-          blinkClass={navBlinkClass}
+          blinkClass={flyoutBlinkClass}
           getIcon={getIconComponent}
           renderFavoriteIcon={renderFavoriteIcon}
           onNavigate={handleFlyoutNavigate}

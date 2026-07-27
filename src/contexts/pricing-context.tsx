@@ -1,6 +1,7 @@
-import { createContext, useContext, useCallback, useMemo, useSyncExternalStore, cloneElement, isValidElement } from "react";
+import { createContext, useContext, useCallback, useEffect, useMemo, useSyncExternalStore, cloneElement, isValidElement } from "react";
 import type { ReactNode } from "react";
-import { getPricingVisible, subscribePricingVisible, togglePricingVisible } from "@/utils/pricing-visibility";
+import { useLocation } from "react-router-dom";
+import { getPricingVisible, setPricingVisible, subscribePricingVisible, togglePricingVisible } from "@/utils/pricing-visibility";
 
 interface PricingContextType {
   pricingVisible: boolean;
@@ -13,6 +14,15 @@ export function PricingProvider({ children }: { children: ReactNode }) {
   // Subscribe to the external store so the provider (and thus consumers) re-render
   // the instant the value toggles — no page reload required.
   const pricingVisible = useSyncExternalStore(subscribePricingVisible, getPricingVisible, getPricingVisible);
+
+  // Re-hide on every navigation (sidebar/breadcrumb/link — anything that changes the
+  // route), not just a hard reload: landing on a new page should never carry over a
+  // reveal from wherever the user was before. Keyed on pathname only (not search/hash)
+  // so in-page filters/pagination don't re-hide values the user just revealed.
+  const { pathname } = useLocation();
+  useEffect(() => {
+    setPricingVisible(false);
+  }, [pathname]);
 
   const togglePricing = useCallback(() => {
     togglePricingVisible();

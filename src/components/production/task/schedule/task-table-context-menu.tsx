@@ -124,8 +124,9 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           </DropdownMenuItem>
         )}
 
-        {/* Set Term action - Production Manager, Commercial (and Admin) */}
-        {(isAdmin || isProductionManager || isCommercial) && (
+        {/* Set Term action — COMMERCIAL + ADMIN only (the API `term` field domain;
+            PRODUCTION_MANAGER and LOGISTIC may not change the customer deadline). */}
+        {(isAdmin || isCommercial) && (
           <DropdownMenuItem onClick={() => handleAction("setTerm")}>
             <IconCalendarTime className="mr-2 h-4 w-4" />
             {tasks.some((t) => t.term) ? "Alterar Prazo" : "Definir Prazo"}

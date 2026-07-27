@@ -9,6 +9,7 @@ import { useScrollHideHeader, exportToPdf, exportToXlsx, copyShareLink } from "@
 import type { DataTableColumnDef, ExportCellValue } from "@/components/ui/datatable";
 import type { FAVORITE_PAGES, SECTOR_PRIVILEGES } from "@/constants";
 import { usePrivileges } from "@/hooks/common/use-privileges";
+import { useAttentionEntity, type AttentionEntityType } from "@/lib/attention";
 import { cn } from "@/lib/utils";
 import { useDetailLayout } from "./use-detail-layout";
 import { useRecordNavigation } from "./use-record-navigation";
@@ -90,6 +91,20 @@ export interface DetailPageProps<TData> {
   /** Tooltip shown on a locked field explaining why editing is disabled. */
   editLockedReason?: string;
   pageClassName?: string;
+  /**
+   * Attention system: opt this detail page in by naming the record's entity kind. The page
+   * then registers the record with the engine, honours every matching rule's ack policy
+   * (`onView` acked on enter, `onExitCooldown` on exit) and counts as a surface for that
+   * entity so the nav stops nudging you toward a record you already opened.
+   *
+   * The visible indicator lives on the FIELD the rule targets, not on the header — see
+   * `DetailFieldDef.attention`.
+   *
+   * This is the ONLY thing a detail page has to do. Pages used to call the registration and
+   * ack hooks themselves and each picked its own semantics, which is how the task detail and
+   * the cut detail ended up behaving in opposite ways.
+   */
+  attention?: { entityType: AttentionEntityType };
 }
 
 /**
@@ -127,6 +142,7 @@ export function DetailPage<TData>({
   editLocked = false,
   editLockedReason,
   pageClassName,
+  attention,
 }: DetailPageProps<TData>) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLDivElement | null>(null);
@@ -140,6 +156,16 @@ export function DetailPage<TData>({
   const isLgUp = useIsLgUp();
 
   const recordId = data ? (getRecordId ? getRecordId(data) : String((data as { id?: unknown }).id ?? "")) : "";
+
+  // Attention: register the record + ack per rule policy. The hook is unconditional — it
+  // no-ops when `attention` is absent or the record hasn't loaded.
+  //
+  // The PAGE HEADER deliberately shows NO indicator. The rules that reach a detail page are
+  // field-targeted, so the field itself rings and explains (see `inline-edit-field`); a ring
+  // around the header only repeated that one level up, and the plain `title` attribute it
+  // carried rendered as a native browser tooltip that fought with the styled one on "Editar".
+  useAttentionEntity(attention?.entityType, recordId || undefined, data);
+
   const nav = useRecordNavigation({
     ids: navigation?.ids,
     currentId: recordId,

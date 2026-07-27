@@ -139,6 +139,9 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
             // in place would display something the contact does not actually
             // hold; the user can still edit them afterwards.
             roles: getResponsibleRoles(rep),
+            // Retrato do que veio do cadastro — é contra ele que
+            // `syncResponsibleRoles` decide se houve edição.
+            originalRoles: getResponsibleRoles(rep),
             isActive: rep.isActive,
             isNew: false,
             isEditing: false,

@@ -23,7 +23,7 @@ import {
 import {
   canEditQuote,
 } from "@/utils/permissions/quote-permissions";
-import { validateResponsibleRows } from "@/components/administration/customer/responsible";
+import { validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
 import { useAuth } from "@/contexts/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/page-header";
@@ -470,10 +470,17 @@ export const FinancialBudgetCreatePage = () => {
 
     setIsSubmitting(true);
     try {
+      // Persist inline role edits on already-registered contacts. These rows are
+      // not part of the task payload (only `newResponsibles` is), so the change
+      // has to be written onto the Responsible itself -- that is what makes it
+      // appear on this task, on its quote, and on every other task sharing the
+      // contact. Runs before the task save so a failure aborts cleanly.
+      await syncResponsibleRoles(responsibleRows);
+
       // Validate responsibles
       if (!validateResponsibleRows(responsibleRows)) {
         setShowResponsibleErrors(true);
-        toast.error("Preencha o nome e telefone dos responsáveis.");
+        toast.error("Preencha o nome, telefone e ao menos uma função dos responsáveis.");
         setIsSubmitting(false);
         return;
       }

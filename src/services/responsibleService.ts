@@ -7,6 +7,7 @@ import type {
   ResponsibleGetManyResponse,
   ResponsibleLoginFormData,
   AuthResponse,
+  ResponsibleRole,
 } from '@/types/responsible';
 
 class ResponsibleService {
@@ -37,13 +38,16 @@ class ResponsibleService {
   }
 
   /**
-   * Get responsible by company and role
+   * Every contact of a company that holds the given role.
+   *
+   * Returns a list: a contact can hold several roles, so "the COMMERCIAL
+   * responsible" is no longer unique.
    */
-  async getByCompanyAndRole(companyId: string, role: string): Promise<Responsible | null> {
+  async getByCompanyAndRole(companyId: string, role: ResponsibleRole): Promise<Responsible[]> {
     const response = await apiClient.get('/responsibles', {
-      params: { companyId, role }
+      params: { companyId, roles: [role] }
     });
-    return response.data.data[0] || null;
+    return response.data.data;
   }
 
   /**

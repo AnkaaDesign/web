@@ -831,11 +831,11 @@ export const BillingDetailPage = () => {
                   size="sm"
                   className="gap-1.5 whitespace-nowrap"
                   onClick={() => {
-                    const custId =
-                      dossieCustomerId === "all"
-                        ? customerConfigs[0]?.customerId
-                        : dossieCustomerId;
-                    if (custId && quote?.id) {
+                    // "Completo" = no customer segment. Substituting the first
+                    // config here (as this once did) opens ONE customer's dossiê
+                    // while the picker still reads "Completo".
+                    const custId = dossieCustomerId === "all" ? null : dossieCustomerId;
+                    if (quote?.id) {
                       window.open(
                         routes.customer.serviceReport(custId, quote.id),
                         "_blank",

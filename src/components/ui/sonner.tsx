@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useTheme } from "@/contexts/theme-context";
-import { useSidebar } from "@/contexts/sidebar-context";
+import { useSidebarOptional } from "@/contexts/sidebar-context";
 import { Toaster as Sonner, toast as sonnerToast } from "sonner";
 import { IconCircleCheck, IconCircleX, IconAlertCircle, IconInfoCircle, IconX, IconLoader } from "@tabler/icons-react";
 
@@ -113,10 +113,14 @@ if (typeof window !== "undefined") {
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
-  const { isOpen: isSidebarOpen } = useSidebar();
+  // Opcional: nas rotas públicas não há SidebarProvider, e o toast precisa
+  // funcionar do mesmo jeito.
+  const sidebar = useSidebarOptional();
+  const isSidebarOpen = sidebar?.isOpen ?? false;
+  const hasSidebar = sidebar !== null;
 
   // Sidebar widths: 288px (w-72) when open, 64px (w-16) when minimized
-  const sidebarWidth = isSidebarOpen ? 288 : 64;
+  const sidebarWidth = hasSidebar ? (isSidebarOpen ? 288 : 64) : 0;
 
   return (
     <Sonner

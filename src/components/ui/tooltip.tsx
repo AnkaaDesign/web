@@ -28,7 +28,10 @@ const TooltipContent = React.forwardRef<React.ElementRef<typeof TooltipPrimitive
       sideOffset={sideOffset}
       className={cn(
         // z-[10020] so tooltips shown inside z-[10010] sheets stay on top.
-        "z-[10020] overflow-hidden rounded-md border border-border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-sm",
+        // text-sm, not text-xs: at 80% browser zoom the xs size was unreadable, and this is the
+        // one tooltip component the whole app shares (rows, action buttons, disabled controls),
+        // so the size has to work for real sentences and not just one-word labels.
+        "z-[10020] overflow-hidden rounded-md border border-border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-sm",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",

@@ -836,10 +836,26 @@ export const routes = {
   profile: "/perfil",
   profileNotifications: "/perfil/notificacoes",
 
-  // Customer routes (public, no authentication required)
+  // Customer routes (public, no authentication required).
+  //
+  // The customer segment is OPTIONAL and means "render only this customer's
+  // slice of the quote". Omit it (pass null) for the complete view — every
+  // customer of a multi-customer quote. Never substitute an arbitrary customer
+  // (e.g. the first config) to satisfy the signature: that silently turns a
+  // "Completo" share link into one customer's view.
   customer: {
-    budget: (customerId: string, budgetId: string) => `/cliente/${customerId}/orcamento/${budgetId}`,
-    serviceReport: (customerId: string, quoteId: string) => `/cliente/${customerId}/dossie/${quoteId}`,
+    budget: (customerId: string | null | undefined, budgetId: string) =>
+      customerId ? `/cliente/${customerId}/orcamento/${budgetId}` : `/cliente/orcamento/${budgetId}`,
+    serviceReport: (customerId: string | null | undefined, quoteId: string) =>
+      customerId ? `/cliente/${customerId}/dossie/${quoteId}` : `/cliente/dossie/${quoteId}`,
+    /** Assinatura eletrônica do orçamento. Precisa ficar sob /cliente: o
+        MobileUsageGuard redireciona para /install qualquer rota móvel fora da
+        allowlist, e é no celular que o cliente assina. */
+    signature: (token: string) => `/cliente/assinar/${token}`,
+    /** Portal público de verificação. O código é impresso no rodapé de todas as
+        páginas do PDF assinado. Fica fora de /cliente porque precisa ser curto e
+        ditável — por isso o MobileUsageGuard também o allowlista. */
+    signatureVerify: (code: string) => `/v/${code}`,
     root: "/cliente",
   },
 

@@ -46,6 +46,20 @@ export const useSidebar = () => {
   return context;
 };
 
+/**
+ * Variante que NÃO lança quando não há SidebarProvider.
+ *
+ * Existe para UI global que precisa funcionar dentro e fora da árvore
+ * autenticada — o `<Toaster />` é o caso: ele lê a sidebar só para calcular um
+ * deslocamento horizontal, e nas rotas públicas (`/cliente/...`, `/v/...`) não
+ * existe sidebar alguma. Usar `useSidebar` ali derrubava a página inteira com
+ * "useSidebar must be used within a SidebarProvider".
+ *
+ * Continue usando `useSidebar` em componentes que de fato exigem a sidebar — lá
+ * a exceção é o comportamento certo.
+ */
+export const useSidebarOptional = () => useContext(SidebarContext) ?? null;
+
 // Performance tracking hook for development
 export const useSidebarPerformance = () => {
   const context = useContext(SidebarContext);

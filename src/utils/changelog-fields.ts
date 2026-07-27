@@ -1306,12 +1306,16 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
             FLEET_MANAGER: "Gestor de Frota",
             DRIVER: "Motorista",
           };
-          return value.map((rep: { name?: string; phone?: string; role?: string }) => {
+          const labelFor = (role: string) => ROLE_LABELS[role] || role;
+          return value.map((rep: { name?: string; phone?: string; roles?: string[]; role?: string }) => {
             const name = rep.name || "Responsável";
-            const role = rep.role ? ROLE_LABELS[rep.role] || rep.role : "";
+            // `rep.role` (singular) still appears in changelog rows written
+            // before the roles-array migration -- keep reading both.
+            const roleList = rep.roles?.length ? rep.roles : rep.role ? [rep.role] : [];
+            const roles = roleList.map(labelFor).join(", ");
             const phone = rep.phone ? formatBrazilianPhone(rep.phone) : "";
             const parts = [name];
-            if (role) parts.push(`(${role})`);
+            if (roles) parts.push(`(${roles})`);
             if (phone) parts.push(`- ${phone}`);
             return parts.join(" ");
           });

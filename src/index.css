@@ -983,3 +983,51 @@ input[type="time"]::-moz-calendar-picker-indicator {
   user-select: none;
   pointer-events: none;
 }
+
+/* =============================================================================
+   PÁGINAS PÚBLICAS — SEMPRE TEMA CLARO
+   -----------------------------------------------------------------------------
+   As páginas voltadas ao cliente (orçamento, dossiê, assinatura, verificação)
+   são "papel": representam um documento, não a aplicação. Elas precisam parecer
+   iguais para todo mundo, independentemente de o visitante ter o tema escuro
+   salvo — e um funcionário abrindo o próprio link de assinatura via tema escuro
+   não pode ver algo diferente do que o cliente vê.
+
+   Redeclarar os tokens aqui (em vez de fixar cores em cada componente) é o que
+   faz Card, Input, Button e Badge — todos token-driven — renderizarem claros
+   dentro deste escopo, mesmo com .dark no <html>.
+   ========================================================================== */
+.force-light,
+.force-light * {
+  color-scheme: light;
+}
+
+.force-light {
+  --background: 0 0% 96%;
+  --foreground: 0 0% 25%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 25%;
+  --card-nested: 0 0% 98%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 25%;
+  --primary: 142 72% 29%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 0 0% 91%;
+  --secondary-foreground: 0 0% 30%;
+  --muted: 0 0% 89%;
+  --muted-foreground: 0 0% 45%;
+  --accent: 142 72% 29%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 50% 50%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 83%;
+  --input: 0 0% 100%;
+  --ring: 142 72% 29%;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Componentes com variantes dark: explícitas (Badge outline, por exemplo) não
+   respondem aos tokens; neutraliza-se o .dark dentro deste escopo. */
+.dark .force-light .dark\:text-neutral-100 { color: hsl(0 0% 25%); }
+.dark .force-light .dark\:text-neutral-400 { color: hsl(0 0% 45%); }

@@ -205,6 +205,8 @@ const UnderConstruction = lazy(() => import("@/pages/under-construction"));
 
 // Public Pages (no authentication required)
 const PublicBudgetPage = lazy(() => import("@/pages/public/budget/[id]").then((module) => ({ default: module.PublicBudgetPage })));
+const PublicSignaturePage = lazy(() => import("@/pages/public/signature/[token]"));
+const PublicSignatureVerifyPage = lazy(() => import("@/pages/public/signature/verify"));
 
 // Public app-install landing page (no auth, no providers)
 const InstallPage = lazy(() => import("@/pages/install").then((module) => ({ default: module.InstallPage })));
@@ -538,12 +540,54 @@ function App() {
         <TooltipProvider skipDelayDuration={0}>
           <ErrorBoundary>
           <Routes>
-            {/* Customer routes (no authentication, no notifications) - MUST be first */}
+            {/* Customer routes (no authentication, no notifications) - MUST be first.
+                Each public document has two shapes: with a customer segment (that
+                customer's slice only) and without (the complete view). */}
+            <Route
+              path={routes.customer.signatureVerify(":code")}
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PublicSignatureVerifyPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/v"
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PublicSignatureVerifyPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path={routes.customer.signature(":token")}
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PublicSignaturePage />
+                </Suspense>
+              }
+            />
+            <Route
+              path={routes.customer.budget(null, ":id")}
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PublicBudgetPage />
+                </Suspense>
+              }
+            />
             <Route
               path={routes.customer.budget(":customerId", ":id")}
               element={
                 <Suspense fallback={<PageLoader />}>
                   <PublicBudgetPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path={routes.customer.serviceReport(null, ":id")}
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PublicServiceReportPage />
                 </Suspense>
               }
             />

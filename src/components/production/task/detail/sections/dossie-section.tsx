@@ -3,8 +3,9 @@ import { IconCameraBolt, IconCameraCheck, IconNote } from "@tabler/icons-react";
 import { useFileViewer } from "@/components/common/file";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { SERVICE_ORDER_TYPE } from "@/constants";
-import { exportDossiePdf } from "@/utils/dossie-pdf-generator";
 import { getApiBaseUrl } from "@/utils/file";
+import { signatureService } from "@/api-client/signature";
+import { toast } from "@/components/ui/sonner";
 import type { Task } from "@/types";
 
 type DossieServiceOrder = NonNullable<Task["serviceOrders"]>[number];
@@ -44,24 +45,52 @@ export async function downloadAllDossieFiles(serviceOrders: DossieServiceOrder[]
   }
 }
 
-/** Build + download the dossiê PDF (faithful to the legacy export). */
-export function exportTaskDossiePdf(task: Task, serviceOrders: DossieServiceOrder[]): void {
-  exportDossiePdf({
-    taskDisplayName: getTaskDisplayName(task),
-    customerName: task.customer?.corporateName || task.customer?.fantasyName || undefined,
-    serialNumber: task.serialNumber,
-    plate: task.truck?.plate,
-    serviceOrders: serviceOrders.map((so) => ({
-      id: so.id,
-      description: so.description,
-      observation: so.observation,
-      position: so.position,
-      checkinFiles: so.checkinFiles || [],
-      checkoutFiles: so.checkoutFiles || [],
-    })),
-  }).catch((err) => {
-    console.error("[Dossiê PDF] Error:", err);
-  });
+/**
+ * Baixa o dossiê montado no SERVIDOR.
+ *
+ * Antes isto era `exportDossiePdf`, que montava o PDF aqui no browser a partir
+ * dos dados da tarefa — ou seja, reconstruía o orçamento em vez de usar o
+ * documento que o cliente assinou. O servidor entrega as páginas do PDF
+ * ASSINADO, seguidas do dossiê fotográfico, das notas e dos boletos, com o
+ * assinado anexado (selo A1 intacto).
+ *
+ * Depende de haver coleta de assinaturas CONCLUÍDA: sem ela não existe
+ * documento assinado, e o servidor responde 400 com essa explicação — que é
+ * repassada ao usuário em vez de virar um PDF reconstruído em silêncio.
+ */
+export async function exportTaskDossiePdf(task: Task): Promise<void> {
+  if (!task.quoteId) {
+    toast.error("Esta tarefa não tem orçamento vinculado.");
+    return;
+  }
+  try {
+    toast.info("Montando o dossiê…");
+    const res = await signatureService.downloadDossier(task.quoteId);
+    const blob = res.data as Blob;
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `${getTaskDisplayName(task)} - dossie.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(href);
+    toast.success("Dossiê baixado.");
+  } catch (error: any) {
+    // O corpo do erro chega como Blob por causa do responseType.
+    let message = "Não foi possível montar o dossiê.";
+    const data = error?.response?.data;
+    if (data instanceof Blob) {
+      try {
+        message = JSON.parse(await data.text())?.message ?? message;
+      } catch {
+        /* mantém a mensagem padrão */
+      }
+    } else if (data?.message) {
+      message = data.message;
+    }
+    toast.error(message);
+  }
 }
 
 /** Resolves a file's thumbnail URL exactly as the legacy card did. */

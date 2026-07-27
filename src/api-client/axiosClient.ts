@@ -772,10 +772,15 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         // Skip notifications for preferences - these are background auto-saves (dashboard
         // layout, DataTable column/sort/filter layout) that would spam a toast on every tweak.
         const isPreferences = config.url?.includes("/preferences");
+        // Skip notifications for the attention system - PUT /attention/ack is written on
+        // EVERY blink burst (~1/min per armed entity) as background cooldown bookkeeping
+        // the user never initiated. Toasting it produces a "Sucesso" popup once a minute,
+        // in lockstep with the beep.
+        const isAttention = config.url?.includes("/attention");
         // Only show success if the response indicates success
         const isSuccess = (response.data?.success as boolean | undefined) !== false; // Show success unless explicitly false
 
-        if (!isBatchOperation && !isMarkViewed && !isNotificationEndpoint && !isCopyFromOperation && !isPreferences && isSuccess && !metadata?.suppressToast) {
+        if (!isBatchOperation && !isMarkViewed && !isNotificationEndpoint && !isCopyFromOperation && !isPreferences && !isAttention && isSuccess && !metadata?.suppressToast) {
           const message = response.data?.message || getSuccessMessage(config.method);
           notify.success("Sucesso", message);
         }
@@ -897,11 +902,16 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         // Preferences are background auto-saves; their failures are retried silently by
         // useTablePreferences, so don't spam an error toast on a transient outage.
         const isPreferences = config?.url?.includes("/preferences");
+        // Attention is background bookkeeping the user never initiated, and it degrades
+        // gracefully on its own (ack falls back to localStorage). Its failures must stay
+        // silent: PUT /attention/ack fires ~1/min per armed entity, so an unmigrated or
+        // briefly-down API would otherwise paint the screen red every couple of seconds.
+        const isAttention = config?.url?.includes("/attention");
 
         // Check if we should show this toast (deduplication check)
         const shouldShow = retryTracker.shouldShowToast(metadata.url, metadata.method, errorInfo.message);
 
-        if (!isBatchOperation && !isFileUpload && !isNotificationEndpoint && !isPreferences && shouldShow) {
+        if (!isBatchOperation && !isFileUpload && !isNotificationEndpoint && !isPreferences && !isAttention && shouldShow) {
           // For rate limit errors, show specialized message
           if (errorInfo.category === ErrorCategory.RATE_LIMIT) {
             notify.error("Limite de Requisições", errorInfo.message, {

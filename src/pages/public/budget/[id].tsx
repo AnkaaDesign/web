@@ -3,13 +3,15 @@ import { useParams } from "react-router-dom";
 import { taskQuoteService } from "@/api-client/task-quote";
 import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "@/utils";
 import { getApiBaseUrl } from "@/utils/file";
+import { setPricingVisible } from "@/utils/pricing-visibility";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
-import { exportBudgetPdfFromData } from "@/utils/budget-pdf-generator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/components/ui/sonner";
-import { IconUpload, IconCheck, IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconCopy, IconFileTypePdf, IconChevronDown, IconShare } from "@tabler/icons-react";
+import { BudgetSignaturePanel } from "@/components/public/budget-signature-panel";
+import { signatureService } from "@/api-client/signature";
+import { IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconCopy, IconFileTypePdf, IconChevronDown, IconShare, IconShieldCheck } from "@tabler/icons-react";
 import type { TaskQuote } from "@/types/task-quote";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
@@ -54,16 +56,37 @@ export function PublicBudgetPage() {
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [signatureFile, setSignatureFile] = useState<File | null>(null);
-  const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** Código do envelope, reportado pelo painel de assinaturas (ver onEnvelope). */
+  const [verificationCode, setVerificationCode] = useState<string | null>(null);
+  // useCallback: o painel tem `onEnvelope` nas dependências do efeito que busca o
+  // resumo — uma função nova a cada render dispararia a busca em laço.
+  const handleEnvelope = useCallback(
+    (summary: { verificationCode?: string }) => setVerificationCode(summary.verificationCode ?? null),
+    [],
+  );
+
+  // This is a customer-facing public page (unauthenticated, no eye-toggle in
+  // reach) — it must always show real currency values regardless of the
+  // internal staff eye-toggle's hidden-by-default state (that toggle only
+  // makes sense inside the authenticated app, where the button to reveal
+  // values actually exists).
+  useEffect(() => {
+    setPricingVisible(true);
+  }, []);
+
+  // A config's customer: the FK when the payload carries it, else the nested
+  // customer's id. Both are matched because the public select has shipped
+  // without the FK before — and when nothing matches, the page silently falls
+  // back to the complete view instead of the one customer that was asked for.
+  const configCustomerId = (config: any): string | undefined => config?.customerId || config?.customer?.id;
+  const serviceCustomerId = (svc: any): string | undefined => svc?.invoiceToCustomerId || svc?.invoiceToCustomer?.id;
 
   // Use customerId from URL to filter services for a specific invoiceTo customer
-  // If customerId matches one of the customerConfigs' customerId, activate filtering
+  // If customerId matches one of the customerConfigs' customer, activate filtering
   const selectedCustomerId = useMemo(() => {
     if (!customerId || !quote?.customerConfigs) return null;
-    const isConfigCustomer = quote.customerConfigs.some(c => c.customerId === customerId);
+    const isConfigCustomer = quote.customerConfigs.some(c => configCustomerId(c) === customerId);
     return isConfigCustomer ? customerId : null;
   }, [customerId, quote?.customerConfigs]);
 
@@ -97,65 +120,23 @@ export function PublicBudgetPage() {
   }, [fetchQuote]);
 
   // Handle signature file selection
-  const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
-      if (!allowedTypes.includes(file.type)) {
-        toast.error("Tipo de arquivo inválido. Use PNG, JPEG ou WebP.");
-        return;
-      }
-
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Arquivo muito grande. Máximo 5MB.");
-        return;
-      }
-
-      setSignatureFile(file);
-
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = () => {
-        setSignaturePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Handle signature upload
-  const handleUploadSignature = async () => {
-    if (!signatureFile || !id) return;
-
-    try {
-      setUploading(true);
-      const response = await taskQuoteService.uploadPublicSignature(id, signatureFile);
-      if (response.data?.success) {
-        // Success toast handled by the axios interceptor.
-        // Refresh quote data
-        await fetchQuote();
-        setSignatureFile(null);
-        setSignaturePreview(null);
-      } else {
-        // success === false skips the interceptor toast, so show it here.
-        toast.error(response.data?.message || "Erro ao enviar assinatura.");
-      }
-    } catch {
-      // Error toast handled by the axios interceptor.
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Filter services based on selected customer (hooks must be before early returns)
+  // Filter services based on selected customer (hooks must be before early returns).
+  //
+  // A service with no invoice-to customer belongs to every view on a
+  // single-customer quote (the API's own per-config totals count all services
+  // there). On a MULTI-customer quote it belongs to no config and is counted in
+  // no config total, so listing it under one customer would show a line the
+  // Total below doesn't include.
   const filteredServices = useMemo(() => {
     if (!quote?.services) return [];
     if (!selectedCustomerId) return quote.services;
-    return quote.services.filter(
-      (service) => service.invoiceToCustomerId === selectedCustomerId || service.invoiceToCustomerId === null
-    );
-  }, [quote?.services, selectedCustomerId]);
+    const isMultiCustomerQuote = (quote?.customerConfigs?.length ?? 0) >= 2;
+    return quote.services.filter((service) => {
+      const svcCustomer = serviceCustomerId(service);
+      if (svcCustomer) return svcCustomer === selectedCustomerId;
+      return !isMultiCustomerQuote;
+    });
+  }, [quote?.services, quote?.customerConfigs?.length, selectedCustomerId]);
 
   // Recalculate subtotal for filtered services
   const filteredSubtotal = useMemo(() => {
@@ -163,7 +144,7 @@ export function PublicBudgetPage() {
   }, [filteredServices]);
 
   // Compute discount from customer config level (must be before early returns)
-  const activeConfigForDiscount = quote?.customerConfigs?.find((c: any) => c.customerId === selectedCustomerId) || quote?.customerConfigs?.[0];
+  const activeConfigForDiscount = quote?.customerConfigs?.find((c: any) => configCustomerId(c) === selectedCustomerId) || quote?.customerConfigs?.[0];
   const computedDiscountAmount = useMemo(() => {
     if (!activeConfigForDiscount) return 0;
     const subtotal = typeof activeConfigForDiscount.subtotal === 'number' ? activeConfigForDiscount.subtotal : Number(activeConfigForDiscount.subtotal) || 0;
@@ -204,9 +185,8 @@ export function PublicBudgetPage() {
   if (!quote) return null;
 
   // Calculate derived data
-  const corporateName = quote.task?.customer?.corporateName || quote.task?.customer?.fantasyName || "Cliente";
   // Find the relevant customer config (filtered by URL param, or first available)
-  const activeConfig = quote.customerConfigs?.find(c => c.customerId === selectedCustomerId) || quote.customerConfigs?.[0];
+  const activeConfig = quote.customerConfigs?.find(c => configCustomerId(c) === selectedCustomerId) || quote.customerConfigs?.[0];
   // The budget's contact is ALWAYS the task's first responsible — the quote no longer
   // carries its own (which went stale after duplicating a task + changing its responsible).
   const contactName = quote.task?.responsibles?.[0]?.name || "";
@@ -239,14 +219,11 @@ export function PublicBudgetPage() {
   const guaranteeText = generateGuaranteeText(quote);
 
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
-  const configSignature = activeConfig?.customerSignature;
-  const hasExistingSignature = !!configSignature?.id;
   // Use serve endpoint for full quality images (layoutFiles array, up to 2)
   const layoutImageUrls: string[] = (quote.layoutFiles || [])
     .filter((f: any) => f?.id)
     .map((f: any) => getFileServeUrl(f));
   // Use serve endpoint for signature to preserve PNG transparency
-  const signatureImageUrl = configSignature?.id ? getFileServeUrl(configSignature) : null;
 
   // Recalculate discount and total based on active filter
   const isCompleteViewGlobal = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
@@ -276,44 +253,28 @@ export function PublicBudgetPage() {
   };
 
   // Export as PDF (same output as task detail page)
+  /**
+   * Baixa o MESMO documento que o "Ver documento" abre.
+   *
+   * Antes isto chamava o gerador do navegador (`exportBudgetPdfFromData`), que
+   * produzia um PDF diferente do que está sendo assinado — dois documentos com o
+   * mesmo número. Agora existe uma única fonte: o artefato congelado no servidor.
+   * Quando ainda não há coleta, cai no gerador antigo, que é o único caminho
+   * disponível nesse caso.
+   */
   const handleExportPdf = async () => {
     try {
-      toast.info("Gerando PDF...");
-      await exportBudgetPdfFromData({
-        // Match the on-screen intro: use the active-config (invoice-to) customer's
-        // name + document, falling back to the task's main customer name when absent.
-        corporateName: invoiceName || corporateName,
-        customerDocument: invoiceDoc || null,
-        taskName: quote.task?.name || '',
-        contactName,
-        currentDate: formatDate(quote.createdAt),
-        validityDays,
-        budgetNumber,
-        items: quote.services || [],
-        subtotal: quote.subtotal,
-        total: quote.total,
-        termDate,
-        customDeliveryDays,
-        paymentText,
-        guaranteeText,
-        layoutImageUrls,
-        customerSignatureUrl: signatureImageUrl,
-        serialNumber: quote.task?.serialNumber || null,
-        plate: quote.task?.truck?.plate || null,
-        chassisNumber: quote.task?.truck?.chassisNumber || null,
-        vinPlate: quote.task?.truck?.vinPlate || null,
-        truckCategory: quote.task?.truck?.category ? (TRUCK_CATEGORY_LABELS[quote.task.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || quote.task.truck.category) : null,
-        truckImplementType: quote.task?.truck?.implementType ? (IMPLEMENT_TYPE_LABELS[quote.task.truck.implementType as keyof typeof IMPLEMENT_TYPE_LABELS] || quote.task.truck.implementType) : null,
-        simultaneousTasks: quote.simultaneousTasks || null,
-        customerFilter: selectedCustomerId,
-        discountType: activeConfig?.discountType || null,
-        discountValue: activeConfig?.discountValue != null ? Number(activeConfig.discountValue) : null,
-        discountReference: activeConfig?.discountReference || null,
-      });
-      toast.success("PDF exportado!");
-    } catch (err) {
+      const res = await fetch(signatureService.quoteDocumentUrl(id!), { credentials: "omit" });
+      if (!res.ok) throw new Error(String(res.status));
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `orcamento-${quote?.budgetNumber ?? ""}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
       toast.error(
-        err instanceof Error ? err.message : "Erro ao exportar PDF."
+        "Este orçamento ainda não foi enviado para assinatura, então não há documento oficial para baixar.",
       );
     }
   };
@@ -340,7 +301,7 @@ export function PublicBudgetPage() {
                       <IconChevronDown className={`h-3.5 w-3.5 opacity-70 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="end" sideOffset={6} className="w-52 p-1 bg-white border border-gray-200 shadow-lg">
+                  <PopoverContent align="end" sideOffset={6} className="w-60 p-1 bg-white border border-gray-200 shadow-lg">
                     <button
                       onClick={() => { setMenuOpen(false); handleCopyLink(); }}
                       className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
@@ -362,6 +323,20 @@ export function PublicBudgetPage() {
                       <IconFileTypePdf className="h-4 w-4 text-red-500" />
                       Baixar PDF
                     </button>
+                    {/* Só existe quando há envelope emitido: sem código de
+                        verificação não há o que verificar. */}
+                    {verificationCode && (
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          window.open(`/v/${verificationCode}`, "_blank", "noopener,noreferrer");
+                        }}
+                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                      >
+                        <IconShieldCheck className="h-4 w-4" style={{ color: COMPANY.primaryGreen }} />
+                        Verificar autenticidade
+                      </button>
+                    )}
                   </PopoverContent>
                 </Popover>
                 <div className="text-right">
@@ -446,38 +421,44 @@ export function PublicBudgetPage() {
               <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
                 Serviços
               </h3>
-              <table className="w-full ml-4" style={{ borderCollapse: 'collapse' }}>
-                <tbody>
-                {filteredServices.map((service, index) => {
-                  const isOutros = service.description?.trim().toLowerCase() === "outros";
-                  const description = toTitleCase(service.description || "");
-                  const observation = service.observation || "";
-                  const displayText = isOutros && observation
-                    ? observation
-                    : observation
-                      ? `${description} ${observation}`
-                      : description;
-                  const amount = Number(service.amount) || 0;
-                  const svc = service as any;
-                  const invoiceToName = svc.invoiceToCustomer?.corporateName || svc.invoiceToCustomer?.fantasyName;
-                  return (
-                    <tr key={service.id} className="align-top">
-                      <td className="text-gray-800 py-1 pr-2">
-                        {index + 1} - {displayText}
-                      </td>
-                      {isCompleteView && (
-                        <td className="text-xs text-gray-500 whitespace-nowrap py-1 px-2">
-                          {invoiceToName || '-'}
+              {/* pl-4 (not ml-4) so the price column's right edge lines up EXACTLY with
+                  the Subtotal/Total column below (also pl-4) — a margin here would push
+                  this table's full-width box 1rem further right than the totals div,
+                  which only insets its content via padding. */}
+              <div className="pl-4">
+                <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                  <tbody>
+                  {filteredServices.map((service, index) => {
+                    const isOutros = service.description?.trim().toLowerCase() === "outros";
+                    const description = toTitleCase(service.description || "");
+                    const observation = service.observation || "";
+                    const displayText = isOutros && observation
+                      ? observation
+                      : observation
+                        ? `${description} ${observation}`
+                        : description;
+                    const amount = Number(service.amount) || 0;
+                    const svc = service as any;
+                    const invoiceToName = svc.invoiceToCustomer?.corporateName || svc.invoiceToCustomer?.fantasyName;
+                    return (
+                      <tr key={service.id} className="align-top">
+                        <td className="text-gray-800 py-1 pr-2">
+                          {index + 1} - {displayText}
                         </td>
-                      )}
-                      <td className="text-gray-800 font-normal whitespace-nowrap text-right py-1 pl-2">
-                        {formatCurrency(amount)}
-                      </td>
-                    </tr>
-                  );
-                })}
-                </tbody>
-              </table>
+                        {isCompleteView && (
+                          <td className="text-xs text-gray-500 whitespace-nowrap py-1 px-2">
+                            {invoiceToName || '-'}
+                          </td>
+                        )}
+                        <td className="text-gray-800 font-normal whitespace-nowrap text-right py-1">
+                          {formatCurrency(amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  </tbody>
+                </table>
+              </div>
 
               {/* Totals */}
               {isCompleteView ? (
@@ -651,98 +632,17 @@ export function PublicBudgetPage() {
               </div>
             )}
 
-            {/* Signature Section */}
-            <div className="mt-8 mb-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Company Signature */}
-                <div className="text-center">
-                  <div className="h-24 flex items-end justify-center mb-2">
-                    <img
-                      src="/sergio-signature.webp"
-                      alt="Assinatura Sergio Rodrigues"
-                      className="max-h-20 object-contain mt-10"
-                    />
-                  </div>
-                  <div className="border-t border-gray-900 pt-3">
-                    <p className="text-gray-900">{COMPANY.directorName}</p>
-                    <p className="text-sm text-gray-600">{COMPANY.directorTitle}</p>
-                  </div>
-                </div>
-
-                {/* Customer Signature */}
-                <div className="text-center">
-                  {/* Signature image or file picker */}
-                  <div className="h-24 flex items-end justify-center mb-2">
-                    {hasExistingSignature && signatureImageUrl ? (
-                      <img
-                        src={signatureImageUrl}
-                        alt="Assinatura do Cliente"
-                        className="max-h-20 object-contain"
-                      />
-                    ) : signaturePreview ? (
-                      <div className="flex flex-col items-center gap-2 w-full">
-                        <img
-                          src={signaturePreview}
-                          alt="Preview da assinatura"
-                          className="max-h-14 object-contain"
-                        />
-                        <Button
-                          onClick={handleUploadSignature}
-                          disabled={uploading}
-                          size="sm"
-                          style={{ backgroundColor: COMPANY.primaryGreen }}
-                          className="text-white hover:opacity-90 px-4 py-2"
-                        >
-                          {uploading ? (
-                            <>
-                              <IconLoader2 className="h-4 w-4 animate-spin mr-2" />
-                              Enviando...
-                            </>
-                          ) : (
-                            <>
-                              <IconUpload className="h-4 w-4 mr-2" />
-                              Confirmar Assinatura
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center w-full">
-                        <label
-                          htmlFor="signature-upload"
-                          className="cursor-pointer flex flex-col items-center gap-2 px-6 py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors w-full max-w-xs"
-                        >
-                          <IconUpload className="h-8 w-8 text-gray-400" />
-                          <span className="text-sm text-gray-500 font-medium">Enviar assinatura</span>
-                          <span className="text-xs text-gray-400">PNG, JPEG ou WebP</span>
-                          <input
-                            id="signature-upload"
-                            type="file"
-                            accept="image/png,image/jpeg,image/jpg,image/webp"
-                            onChange={handleSignatureChange}
-                            className="hidden"
-                          />
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                  <div className="border-t border-gray-900 pt-3">
-                    <p className="text-gray-900">Responsável CLIENTE</p>
-                    <p className="text-sm text-gray-600">&nbsp;</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Success message when signature exists */}
-            {hasExistingSignature && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-8 flex items-center gap-3">
-                <IconCheck className="h-5 w-5 text-green-600 flex-shrink-0" />
-                <p className="text-green-800">
-                  Assinatura enviada com sucesso! O orçamento foi confirmado.
-                </p>
-              </div>
-            )}
+            {/* Assinaturas — estado real da coleta eletrônica.
+                O upload de imagem que existia aqui foi removido: aceitava um PNG
+                qualquer, não registrava quem assinou, IP, hora, consentimento nem
+                hash, e não alterava o status do orçamento — apesar de a tela
+                afirmar que "o orçamento foi confirmado". Quem assina agora é o
+                signatário, pelo link pessoal que recebe por WhatsApp. */}
+            <BudgetSignaturePanel
+              quoteId={id!}
+              customerName={invoiceName || undefined}
+              onEnvelope={handleEnvelope}
+            />
 
             {/* Footer */}
             <div

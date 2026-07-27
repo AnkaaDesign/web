@@ -1,11 +1,11 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 // The app mounts the custom Toaster (@/components/ui/sonner) which strips background/padding from
 // raw sonner toasts — use the wrapper so the validation-error toast renders styled.
 import { toast } from "@/components/ui/sonner";
 import { IconArrowBackUp, IconBellPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useAttentionField, attentionRowClass, useSendWarning, canSendAttentionWarning, type AttentionEntityType } from "@/lib/attention";
+import { useAttentionField, attentionRowClass, useAnnouncePresence, useSendWarning, canSendAttentionWarning, type AttentionEntityType } from "@/lib/attention";
 import { useAuth } from "@/contexts/auth-context";
 import { SECTOR_PRIVILEGES } from "@/constants";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { DetailRow } from "@/components/ui/detail-row";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { DetailFieldDef, FieldDataType, InlineEditDef } from "./detail-page-types";
 import { enumOptions, enumTriggerClass, renderFieldValue } from "./inline-widgets";
 
@@ -338,13 +339,43 @@ function InlineEditFieldInner<TData>({ field, row, editable, lockedReason }: Inl
   const { open: openSendWarning } = useSendWarning();
   const attnRowCls = field.attention ? cn("group/attnrow", attentionRowClass(attnState)) : undefined;
 
+  // WHY this field is ringing, on hover of the field itself — a ring with no explanation is
+  // the thing users ask about. Styled (Radix) rather than a `title` attribute: the native
+  // browser tooltip looks out of place and, worse, renders alongside the styled tooltips
+  // already used elsewhere in the header, so the user got two different popups at once.
+  // For a manual warning the rule's `name` IS the sender's message (see `pushedRule`).
+  const attnReason = attnState?.active ? attnState.match.rule.name : undefined;
+
+  // Anchoring for the row tooltip — see `withRowTooltip`.
+  const rowAnchorRef = useRef<HTMLDivElement>(null);
+  const pointerXRef = useRef(0);
+  const [tooltipAlignOffset, setTooltipAlignOffset] = useState(0);
+
+  // PRESENCE: while this field is actually open in edit mode, announce that this user
+  // holds the record, so everyone else sees "está editando" and their own edit
+  // affordances lock. Inline edits used to be completely invisible to the guard — a
+  // user could sit editing a field on the detail page while someone else opened the
+  // full edit form and overwrote it, with neither side warned.
+  //
+  // Only announces when the field declares its entity type: guessing (e.g. defaulting
+  // to TASK) would broadcast presence onto the wrong entity from every other detail page.
+  // The gateway refcounts per tab, so several fields open at once release correctly.
+  const presenceEntityType = field.attention?.entityType as AttentionEntityType | undefined;
+  const presenceRowId = presenceEntityType ? (row as { id?: string } | null)?.id : undefined;
+  useAnnouncePresence(presenceEntityType ?? "TASK", presenceRowId, editing && !!presenceRowId);
+
   // "Enviar aviso" (send a manual warning) — ADMIN/COMMERCIAL only, and never a
   // standing icon on the row: it only appears once the field is actually opened
   // (double-click), next to the editor for editable fields, or as the double-click
   // action itself for read-only fields (which have no editor to sit next to).
   const { user } = useAuth();
   const canSendWarning = canSendAttentionWarning(user?.sector?.privileges);
-  const allowedPrivileges = field.editablePrivilege ?? field.requiredPrivilege;
+  // Recipients = the people who can ACT on this field. Normally that is the field's own
+  // privilege gate, but a field whose edit gate is a capability (team leadership, a state
+  // machine, ownership) declares nothing here — and an undeclared audience widens the picker
+  // to EVERY active user, which is how "Status" ended up offering PRODUCTION (who can't touch
+  // it at all). `attention.warnPrivileges` is the explicit override for exactly that case.
+  const allowedPrivileges = field.attention?.warnPrivileges ?? field.editablePrivilege ?? field.requiredPrivilege;
   // ADMIN can edit/see every field (privileges are inherited), so admins are always
   // valid recipients even when they aren't in the field's literal privilege list —
   // otherwise "send to another admin" silently returns nobody.
@@ -518,8 +549,54 @@ function InlineEditFieldInner<TData>({ field, row, editable, lockedReason }: Inl
     [edit, row, startUndo],
   );
 
-  if (editing && edit) {
+  /**
+   * ONE tooltip per field row, always the styled (Radix) one — the same component the header's
+   * action buttons use. The three things a row can have to say used to arrive by two different
+   * mechanisms: the attention reason and the interaction hint as native `title` attributes, the
+   * edit lock as a styled popup on "Editar". Mixing them let two visually unrelated popups sit
+   * on screen at once, one of them the browser's.
+   *
+   * Order is by usefulness: why it is ringing, then why you cannot edit it, and the "what do I
+   * do here" hint only when there is nothing more important to say.
+   *
+   * `DetailRow` is a plain function component (no ref forwarding), so `asChild` gets a wrapper
+   * element rather than the row itself; the wrapper is layout-neutral and the ring stays on the
+   * row inside it.
+   */
+  const withRowTooltip = (rowNode: ReactNode, hint?: string) => {
+    const lines: string[] = [];
+    if (attnReason) lines.push(attnReason);
+    if (lockedReason && field.edit) lines.push(lockedReason);
+    if (lines.length === 0 && hint) lines.push(hint);
+    if (lines.length === 0) return rowNode;
     return (
+      <Tooltip
+        // A field row spans the whole card, and Radix anchors to the TRIGGER — so a
+        // centred tooltip landed a long way from wherever the pointer actually was.
+        // Resolve the horizontal offset from the last pointer position at OPEN time.
+        onOpenChange={(open) => {
+          if (!open) return;
+          const rect = rowAnchorRef.current?.getBoundingClientRect();
+          if (rect) setTooltipAlignOffset(Math.round(pointerXRef.current - rect.left));
+        }}
+      >
+        <TooltipTrigger asChild>
+          {/* Tracked on a ref, not state: a row re-render per mousemove is not worth it. */}
+          <div ref={rowAnchorRef} onPointerMove={(e) => (pointerXRef.current = e.clientX)}>
+            {rowNode}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" alignOffset={tooltipAlignOffset} sideOffset={6} collisionPadding={8}>
+          {lines.map((line) => (
+            <div key={line}>{line}</div>
+          ))}
+        </TooltipContent>
+      </Tooltip>
+    );
+  };
+
+  if (editing && edit) {
+    return withRowTooltip(
       <DetailRow
         icon={field.icon}
         label={field.label}
@@ -527,7 +604,7 @@ function InlineEditFieldInner<TData>({ field, row, editable, lockedReason }: Inl
         block={field.block}
         trailing={sendWarningBtn}
         className={cn(inlineRowCls, attnRowCls)}
-      />
+      />,
     );
   }
 
@@ -587,7 +664,7 @@ function InlineEditFieldInner<TData>({ field, row, editable, lockedReason }: Inl
     // The WHOLE row is the double-click target (big, easy hit area) with a neutral hover.
     // No standing "send warning" affordance here — double-click enters edit mode, above,
     // where the bell appears next to the editor for ADMIN/COMMERCIAL.
-    return (
+    return withRowTooltip(
       <DetailRow
         icon={field.icon}
         label={field.label}
@@ -595,7 +672,6 @@ function InlineEditFieldInner<TData>({ field, row, editable, lockedReason }: Inl
         block={field.block}
         role="button"
         tabIndex={0}
-        title="Duplo clique para editar"
         onDoubleClick={begin}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === "F2") {
@@ -610,7 +686,8 @@ function InlineEditFieldInner<TData>({ field, row, editable, lockedReason }: Inl
           "cursor-pointer select-none outline-none transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-border",
           pending && "pointer-events-none opacity-60",
         )}
-      />
+      />,
+      "Duplo clique para editar",
     );
   }
 
@@ -620,18 +697,16 @@ function InlineEditFieldInner<TData>({ field, row, editable, lockedReason }: Inl
   // ADMIN/COMMERCIAL only. No standing icon; the row itself is the only affordance.
   const openWarningOnRow = field.attention?.sendWarning && attnRowId && canSendWarning ? openWarningForField : undefined;
 
-  return (
+  return withRowTooltip(
     <DetailRow
       icon={field.icon}
       label={field.label}
       value={node}
       block={field.block}
-      // A field with an `edit` def that's read-only ONLY because of the lock gets a
-      // "someone is editing" tooltip; otherwise the send-warning hint (if any).
-      title={lockedReason && field.edit ? lockedReason : openWarningOnRow ? "Duplo clique para enviar aviso" : undefined}
       onDoubleClick={openWarningOnRow}
       className={cn(inlineRowCls, attnRowCls, openWarningOnRow && "cursor-pointer", lockedReason && field.edit && "opacity-70")}
-    />
+    />,
+    openWarningOnRow ? "Duplo clique para enviar aviso" : undefined,
   );
 }
 

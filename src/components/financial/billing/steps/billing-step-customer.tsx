@@ -87,12 +87,29 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
     setPaymentConfig({ ...(paymentConfig as PaymentConfig), ...partial } as PaymentConfig);
   }, [setPaymentConfig, paymentConfig]);
 
+  // Declared here (rather than alongside setCustomerField below) so handleTypeChange
+  // — which needs it to auto-sync "Gerar Boleto" with the chosen method — can
+  // reference it in its dependency array without a temporal-dead-zone error.
+  const setConfigField = useCallback((field: string, value: any) => {
+    setFormValue(`customerConfigs.${configIndex}.${field}`, value, { shouldDirty: true });
+  }, [setFormValue, configIndex]);
+
   const handleTypeChange = useCallback((v: string | string[] | null | undefined) => {
     const val = typeof v === "string" ? v : "";
     if (!val) { setPaymentConfig(null); setShowDateInput(false); return; }
-    if (val === "CASH") {
+    if (val === "CASH_BANK_SLIP" || val === "CASH_PIX") {
       setShowDateInput(!!paymentConfig?.specificDate);
-      setPaymentConfig({ type: "CASH", cashDays: paymentConfig?.cashDays ?? 5, specificDate: paymentConfig?.specificDate });
+      setPaymentConfig({
+        type: "CASH",
+        method: val === "CASH_PIX" ? "PIX" : "BANK_SLIP",
+        cashDays: paymentConfig?.cashDays ?? 5,
+        specificDate: paymentConfig?.specificDate,
+      });
+      // Pix settles directly — no boleto to emit. Boleto flips generation back on
+      // (a bank slip is meaningless while a customer might still be on Pix, but once
+      // they're back on Boleto they need one; both directions stay in sync with the
+      // method so the toggle never silently disagrees with what was just chosen).
+      setConfigField("generateBankSlip", val === "CASH_BANK_SLIP");
       return;
     }
     const m = val.match(/^INST_(\d+)$/);
@@ -100,13 +117,16 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
       setShowDateInput(!!paymentConfig?.specificDate);
       setPaymentConfig({
         type: "INSTALLMENTS",
+        // No Boleto/Pix picker for installments — always starts on BANK_SLIP.
+        method: "BANK_SLIP",
         installmentCount: Number(m[1]),
         installmentStep: paymentConfig?.installmentStep ?? 20,
         entryDays: paymentConfig?.entryDays ?? 5,
         specificDate: paymentConfig?.specificDate,
       });
+      setConfigField("generateBankSlip", true);
     }
-  }, [setPaymentConfig, paymentConfig]);
+  }, [setPaymentConfig, paymentConfig, setConfigField]);
 
   const vencimentoValue = paymentConfig?.specificDate ? "CUSTOM" : String(paymentConfig?.cashDays ?? "");
   const handleVencimentoChange = useCallback((v: string | string[] | null | undefined) => {
@@ -131,10 +151,6 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
 
   const setCustomerField = useCallback((field: string, value: any) => {
     setFormValue(`customerConfigs.${configIndex}.customerData.${field}`, value, { shouldDirty: true });
-  }, [setFormValue, configIndex]);
-
-  const setConfigField = useCallback((field: string, value: any) => {
-    setFormValue(`customerConfigs.${configIndex}.${field}`, value, { shouldDirty: true });
   }, [setFormValue, configIndex]);
 
   const { lookupCnpj, isLoading: isLookingUpCnpj } = useCnpjLookup({

@@ -7,12 +7,13 @@ import type { PaymentConfig } from "@/schemas/task-quote";
 // ─── Type selector options ────────────────────────────────────────────────────
 
 export const PAYMENT_TYPE_OPTIONS = [
-  { value: "CASH",   label: "À vista"      },
-  { value: "INST_2", label: "Parcelado 2x" },
-  { value: "INST_3", label: "Parcelado 3x" },
-  { value: "INST_4", label: "Parcelado 4x" },
-  { value: "INST_5", label: "Parcelado 5x" },
-  { value: "INST_6", label: "Parcelado 6x" },
+  { value: "CASH_BANK_SLIP", label: "À Vista - Boleto" },
+  { value: "CASH_PIX",       label: "À Vista - Pix"    },
+  { value: "INST_2",         label: "Parcelado 2x"     },
+  { value: "INST_3",         label: "Parcelado 3x"     },
+  { value: "INST_4",         label: "Parcelado 4x"     },
+  { value: "INST_5",         label: "Parcelado 5x"     },
+  { value: "INST_6",         label: "Parcelado 6x"     },
 ];
 
 // Vencimento (À vista) — days + Personalizado to open date input
@@ -52,23 +53,25 @@ export const INSTALLMENT_STEP_OPTIONS = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Convert legacy paymentCondition string into a PaymentConfig for display */
+/** Convert legacy paymentCondition string into a PaymentConfig for display.
+ *  Legacy conditions predate the Boleto/Pix choice — default to BANK_SLIP,
+ *  matching the historical behavior (boletos were the only mechanism before). */
 export function legacyToConfig(condition: string | null | undefined): PaymentConfig | null {
   if (!condition || condition === "CUSTOM") return null;
-  if (condition === "CASH_5")  return { type: "CASH", cashDays: 5  };
-  if (condition === "CASH_10") return { type: "CASH", cashDays: 10 };
-  if (condition === "CASH_20") return { type: "CASH", cashDays: 20 };
-  if (condition === "CASH_40") return { type: "CASH", cashDays: 40 };
+  if (condition === "CASH_5")  return { type: "CASH", method: "BANK_SLIP", cashDays: 5  };
+  if (condition === "CASH_10") return { type: "CASH", method: "BANK_SLIP", cashDays: 10 };
+  if (condition === "CASH_20") return { type: "CASH", method: "BANK_SLIP", cashDays: 20 };
+  if (condition === "CASH_40") return { type: "CASH", method: "BANK_SLIP", cashDays: 40 };
   const m = condition.match(/^INSTALLMENTS_(\d+)$/);
   // API caps installmentCount at 6; clamp legacy values (e.g. INSTALLMENTS_7) so resubmits don't 400
-  if (m) return { type: "INSTALLMENTS", installmentCount: Math.min(Number(m[1]), 6), installmentStep: 20, entryDays: 5 };
+  if (m) return { type: "INSTALLMENTS", method: "BANK_SLIP", installmentCount: Math.min(Number(m[1]), 6), installmentStep: 20, entryDays: 5 };
   return null;
 }
 
 /** Derive type combobox value from a PaymentConfig */
 export function configToTypeValue(config: PaymentConfig | null | undefined): string {
   if (!config) return "";
-  if (config.type === "CASH") return "CASH";
+  if (config.type === "CASH") return config.method === "PIX" ? "CASH_PIX" : "CASH_BANK_SLIP";
   if (config.type === "INSTALLMENTS" && config.installmentCount) return `INST_${config.installmentCount}`;
   return "";
 }
@@ -106,9 +109,14 @@ export function PaymentConfigField({
   const handleTypeChange = (v: string | string[] | null | undefined) => {
     const val = typeof v === "string" ? v : "";
     if (!val) { onChange(null); setShowDateInput(false); return; }
-    if (val === "CASH") {
+    if (val === "CASH_BANK_SLIP" || val === "CASH_PIX") {
       setShowDateInput(!!paymentConfig?.specificDate);
-      onChange({ type: "CASH", cashDays: paymentConfig?.cashDays ?? 5, specificDate: paymentConfig?.specificDate });
+      onChange({
+        type: "CASH",
+        method: val === "CASH_PIX" ? "PIX" : "BANK_SLIP",
+        cashDays: paymentConfig?.cashDays ?? 5,
+        specificDate: paymentConfig?.specificDate,
+      });
       return;
     }
     const m = val.match(/^INST_(\d+)$/);
@@ -116,6 +124,8 @@ export function PaymentConfigField({
       setShowDateInput(!!paymentConfig?.specificDate);
       onChange({
         type: "INSTALLMENTS",
+        // No Boleto/Pix picker for installments — always starts on BANK_SLIP.
+        method: "BANK_SLIP",
         installmentCount: Number(m[1]),
         installmentStep: paymentConfig?.installmentStep ?? 20,
         entryDays: paymentConfig?.entryDays ?? 5,

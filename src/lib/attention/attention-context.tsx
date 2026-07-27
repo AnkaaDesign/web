@@ -12,12 +12,16 @@
 // `use-attention.ts`; they never touch the engine or this registry directly.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from "react";
+import { useLocation } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/contexts/auth-context";
 
 import { createServerBackedAckStore, type ServerAckStore } from "./ack-store-server";
-import { configureAckStore, refreshAttention, resetEngine, setEntities, setUserPrivilege } from "./engine";
+import { configureAckStore, refreshAttention, resetEngine, setEntities, setUserPrivilege, subscribeAckWritten } from "./engine";
+import { ATTENTION_ACTIVE_TYPES, attentionEntityDescriptor } from "./entities";
 import { SendWarningProvider } from "./send-warning";
+import { setRouteSurfaces } from "./surface";
 import { useAttentionSocket } from "./use-attention-socket";
 import type { AttentionEntityType } from "./types";
 
@@ -91,6 +95,40 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setUserPrivilege(privilege);
   }, [privilege]);
+
+  // An ack changed what the SERVER would report, so refetch the summary instead of waiting
+  // out its poll interval. Debounced because `markViewed` writes one ack per matching rule
+  // and the PUTs are fire-and-forget — the delay lets them land, so the refetch reads the new
+  // state rather than racing it. The local engine has already quieted the row and the nav; this
+  // only keeps the global (unloaded-entities) half of the signal honest.
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = subscribeAckWritten(() => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        void queryClient.invalidateQueries({ queryKey: ["attention-summary"] });
+      }, 800);
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [queryClient]);
+
+  // Route → surface presence. This provider is the one place that already sits inside the
+  // router AND owns the attention singletons, so the pathname is resolved to entity types
+  // exactly once instead of each consumer re-deriving it (the sidebar and the engine both
+  // need the answer, and two derivations would drift).
+  const { pathname } = useLocation();
+  useEffect(() => {
+    setRouteSurfaces(
+      ATTENTION_ACTIVE_TYPES.filter((type) =>
+        attentionEntityDescriptor(type)?.navPaths.some((p) => pathname === p || pathname.startsWith(p + "/")),
+      ),
+    );
+  }, [pathname]);
 
   // Only true unmount (logout / app teardown) resets the engine.
   useEffect(() => () => resetEngine(), []);

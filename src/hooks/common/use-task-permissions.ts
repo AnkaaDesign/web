@@ -89,7 +89,16 @@ export function useTaskPermissions() {
   const canEditIdentity = !isFinancial && !isWarehouse && !isDesigner;
   const canEditSector = !isFinancial && !isWarehouse && !isDesigner && !isCommercial;
   const canEditBonification = !isFinancial && !isDesigner && !isLogistic && !isProductionManager && !isWarehouse;
+  // Shared date fields (Previsão de Liberação, Iniciado, Finalizado).
   const canEditDates = !isWarehouse && !isFinancial && !isDesigner;
+  // Data de Entrada — when the vehicle arrived at the yard. Recorded by the desks
+  // that receive it (LOGISTIC / PRODUCTION_MANAGER) + ADMIN. COMMERCIAL is excluded.
+  // Mirrors the API `entryDate` field domain (task.permissions.ts).
+  const canEditEntryDate = canEditDates && !isCommercial;
+  // Prazo de Entrega — the deadline negotiated with the customer. COMMERCIAL +
+  // ADMIN only; PRODUCTION_MANAGER and LOGISTIC are excluded. Mirrors the API
+  // `term` field domain (task.permissions.ts).
+  const canEditTerm = isAdmin || isCommercial;
   const canEditResponsibles = !isFinancial && !isDesigner && !isLogistic && !isProductionManager;
   const canEditServices = !isWarehouse;
   const canEditLayout = !isFinancial && !isDesigner;
@@ -142,6 +151,8 @@ export function useTaskPermissions() {
     canEditSector,
     canEditBonification,
     canEditDates,
+    canEditEntryDate,
+    canEditTerm,
     canEditResponsibles,
     canEditServices,
     canEditLayout,

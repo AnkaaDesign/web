@@ -2,36 +2,40 @@
 // Attention system — <IsEditingBadge> "someone else has this open" indicator
 // =====================================================
 //
-// Small, reusable presence display. The transport (gateway + socket + store) and
-// the announce side (useAnnouncePresence, called from the edit route) already
-// work; this is the missing READ side — render it anywhere an entity can be
-// concurrently edited: the detail page, the table row, and the edit form itself.
+// The READ side of presence: render it anywhere an entity can be concurrently
+// edited — the detail page, the table row, and the edit form itself.
+//
+// Shows WHO and SINCE WHEN. The duration matters: "Ana está editando" is ambiguous
+// (did she just open it, or has it been sitting there since this morning?), and that
+// ambiguity is what makes people ignore the warning and save anyway.
 
+import { useEffect, useState } from "react";
 import { IconEdit } from "@tabler/icons-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-import { ATTENTION_CLIENT_ID } from "./attention-socket";
-import { useEntityPresence, type PresenceEditor } from "./presence";
+import { formatEditingSince, useOtherEditors, type PresenceEditor } from "./presence";
 import type { AttentionEntityType } from "./types";
+
+/** Re-render on a timer so "há 3 min" doesn't sit frozen at "agora". Only ticks while
+ * something is actually being edited, and only once a minute. */
+function useMinuteTick(enabled: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!enabled) return;
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, [enabled]);
+  return now;
+}
 
 /**
  * Who else is editing this entity right now — excluding THIS tab's own announcement.
- * Keyed by the stable per-tab ATTENTION_CLIENT_ID (a module constant, never undefined,
- * never changes on reconnect), so self-exclusion is reliable — the original bug was
- * comparing against socket.id, which is undefined until connect and re-generated on
- * every reconnect, so the tab's own entry randomly survived the filter and it warned
- * about itself. "My account in a DIFFERENT tab" (different clientId, same userId) is a
- * real conflict and is kept, collapsed to one entry per user.
+ * Re-exported from `presence.ts`, where the de-duplication lives, so the badge and the
+ * lock predicates can never disagree about who counts as "someone else".
  */
-export function useOtherEditors(type: AttentionEntityType, id: string | undefined): ReadonlyArray<PresenceEditor> {
-  const editors = useEntityPresence(type, id);
-  const others = editors.filter((e) => e.clientId !== ATTENTION_CLIENT_ID);
-  // Collapse multiple tabs of the SAME user (other than this one) into one badge entry.
-  const seen = new Set<string>();
-  return others.filter((e) => (seen.has(e.userId) ? false : (seen.add(e.userId), true)));
-}
+export { useOtherEditors };
 
 export function IsEditingBadge({
   type,
@@ -49,8 +53,10 @@ export function IsEditingBadge({
   compact?: boolean;
 }) {
   const others = useOtherEditors(type, id);
+  const now = useMinuteTick(others.length > 0);
   if (others.length === 0) return null;
-  const names = others.map((e) => e.userName).join(", ");
+
+  const label = describe(others, now);
 
   return (
     <Tooltip>
@@ -58,7 +64,11 @@ export function IsEditingBadge({
         {compact ? (
           // Bare pencil icon (no bordered circle) so it aligns cleanly inline with the row text.
           // BLUE = "is editing" (distinct from amber/red attention).
-          <IconEdit className={cn("h-3.5 w-3.5 shrink-0 text-blue-500 dark:text-blue-400", className)} aria-label="Sendo editado" />
+          <IconEdit
+            className={cn("h-3.5 w-3.5 shrink-0 text-blue-500 dark:text-blue-400", className)}
+            role="img"
+            aria-label={label}
+          />
         ) : (
           <span
             className={cn(
@@ -66,15 +76,23 @@ export function IsEditingBadge({
               "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
               className,
             )}
+            role="status"
           >
-            <IconEdit className="h-3 w-3 shrink-0" />
-            <span className="leading-none">{others.length === 1 ? `${others[0].userName} está editando` : `${others.length} pessoas editando`}</span>
+            <IconEdit className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <span className="leading-none">{label}</span>
           </span>
         )}
       </TooltipTrigger>
-      <TooltipContent>
-        {names} {others.length === 1 ? "está editando isso agora" : "estão editando isso agora"}
-      </TooltipContent>
+      <TooltipContent>{describeLong(others, now)}</TooltipContent>
     </Tooltip>
   );
+}
+
+function describe(others: ReadonlyArray<PresenceEditor>, now: number): string {
+  if (others.length === 1) return `${others[0].userName} está editando ${formatEditingSince(others[0].since, now)}`;
+  return `${others.length} pessoas editando`;
+}
+
+function describeLong(others: ReadonlyArray<PresenceEditor>, now: number): string {
+  return others.map((e) => `${e.userName} — ${formatEditingSince(e.since, now)}`).join(" · ");
 }

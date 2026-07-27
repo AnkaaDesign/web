@@ -55,6 +55,10 @@ export const paymentConditionSchema = z.enum([
 // New structured payment config (replaces paymentCondition going forward)
 export const paymentConfigSchema = z.object({
   type: z.enum(['CASH', 'INSTALLMENTS']),
+  // Intended settlement method (mirrors api/src/schemas/task-quote.ts). CASH carries an
+  // explicit Boleto/Pix choice (PaymentConfigField); INSTALLMENTS defaults to BANK_SLIP
+  // server-side when omitted.
+  method: z.enum(['PIX', 'BANK_SLIP']).optional(),
   cashDays: z.union([z.literal(5), z.literal(10), z.literal(20), z.literal(40)]).optional(),
   installmentCount: z.number().int().min(2).max(6).optional(),
   installmentStep: z.number().int().min(1).max(365).optional(),

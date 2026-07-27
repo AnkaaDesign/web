@@ -473,16 +473,27 @@ export function TaskPreparationPage() {
   const [quoteLayoutModal, setQuoteLayoutModal] = useState<ModalState>(CLOSED_MODAL);
   const [deleteModal, setDeleteModal] = useState<ModalState>(CLOSED_MODAL);
 
+  // Ids currently held by an open "Avançados" bulk modal. Tracked in state (rather than
+  // fired-and-forgotten through the ref) so the same bulk action announces presence here
+  // exactly as it does on the Cronograma — it previously did on one page and was silent
+  // on the other, which made the guard's coverage depend on which screen you started from.
+  const [advancedTaskIds, setAdvancedTaskIds] = useState<string[]>([]);
+  const openAdvanced = useCallback((type: string, ids: string[]) => {
+    setAdvancedTaskIds(ids);
+    advancedRef.current?.openModal(type, ids);
+  }, []);
+
   // Announce "is editing" for tasks subject to any OPEN mutating action modal (set
-  // sector/term/status, quote layout, duplicate, copy-from) so other users see it.
+  // sector/term/status, quote layout, duplicate, copy-from, avançados) so other users see it.
   const editingActionIds = useMemo(() => {
     const ids = new Set<string>();
     for (const m of [duplicateModal, sectorModal, termModal, statusModal, quoteLayoutModal]) {
       if (m.open) m.taskIds.forEach((id) => ids.add(id));
     }
     if (copyFrom.step !== "idle") copyFrom.targetTasks.forEach((t) => ids.add(t.id));
+    advancedTaskIds.forEach((id) => ids.add(id));
     return [...ids];
-  }, [duplicateModal, sectorModal, termModal, statusModal, quoteLayoutModal, copyFrom]);
+  }, [duplicateModal, sectorModal, termModal, statusModal, quoteLayoutModal, copyFrom, advancedTaskIds]);
   useAnnouncePresenceForIds("TASK", editingActionIds, editingActionIds.length > 0);
 
   // Resolve live Task objects for a set of ids: the schedule modals need `tasks` for their count and
@@ -650,7 +661,8 @@ export function TaskPreparationPage() {
         key: "definir-prazo",
         label: "Definir/Alterar Prazo",
         icon: <IconCalendarTime className="h-4 w-4" />,
-        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.COMMERCIAL],
+        // Prazo de Entrega — COMMERCIAL + ADMIN only (the API `term` field domain).
+        requiredPrivilege: [SECTOR_PRIVILEGES.COMMERCIAL],
         onClick: (rows) => setTermModal({ open: true, taskIds: expandClusterTaskIds(rows) }),
       },
       {
@@ -680,14 +692,14 @@ export function TaskPreparationPage() {
         icon: <IconPhoto className="h-4 w-4" />,
         separatorBefore: true,
         requiredPrivilege: ARTS,
-        onClick: (rows) => advancedRef.current?.openModal("arts", expandClusterTaskIds(rows)),
+        onClick: (rows) => openAdvanced("arts", expandClusterTaskIds(rows)),
       },
       {
         key: "adv-base-files",
         label: "Arquivos Base",
         icon: <IconFileText className="h-4 w-4" />,
         requiredPrivilege: ADVANCED,
-        onClick: (rows) => advancedRef.current?.openModal("baseFiles", expandClusterTaskIds(rows)),
+        onClick: (rows) => openAdvanced("baseFiles", expandClusterTaskIds(rows)),
       },
       {
         key: "adv-paints",
@@ -697,7 +709,7 @@ export function TaskPreparationPage() {
         // paints via PUT /tasks/batch; others silently 400. That domain = COMMERCIAL + DESIGNER.
         // (Fixes both the LOGISTIC/PM false-positive AND the DESIGNER capability gap.)
         requiredPrivilege: [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.DESIGNER],
-        onClick: (rows) => advancedRef.current?.openModal("paints", expandClusterTaskIds(rows)),
+        onClick: (rows) => openAdvanced("paints", expandClusterTaskIds(rows)),
       },
       {
         key: "adv-cutting-plans",
@@ -705,14 +717,14 @@ export function TaskPreparationPage() {
         icon: <IconCut className="h-4 w-4" />,
         // `cuts` field-domain (api task.permissions.ts) is DESIGNER-only; PM would silently 400.
         requiredPrivilege: [SECTOR_PRIVILEGES.DESIGNER],
-        onClick: (rows) => advancedRef.current?.openModal("cuttingPlans", expandClusterTaskIds(rows)),
+        onClick: (rows) => openAdvanced("cuttingPlans", expandClusterTaskIds(rows)),
       },
       {
         key: "adv-service-order",
         label: "Ordem de Serviço",
         icon: <IconFileInvoice className="h-4 w-4" />,
         requiredPrivilege: ADVANCED,
-        onClick: (rows) => advancedRef.current?.openModal("serviceOrder", expandClusterTaskIds(rows)),
+        onClick: (rows) => openAdvanced("serviceOrder", expandClusterTaskIds(rows)),
       },
       {
         key: "adv-layout",
@@ -725,7 +737,7 @@ export function TaskPreparationPage() {
           SECTOR_PRIVILEGES.COMMERCIAL,
           SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
         ],
-        onClick: (rows) => advancedRef.current?.openModal("layout", expandClusterTaskIds(rows)),
+        onClick: (rows) => openAdvanced("layout", expandClusterTaskIds(rows)),
       },
       {
         // COMMERCIAL sets the quote's approved layout files (TaskQuote.layoutFiles) — distinct from the

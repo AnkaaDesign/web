@@ -20,6 +20,7 @@ export const externalOperationServiceItemSchema = z.object({
 // Payment config schema (same shape as TaskQuoteCustomerConfig.paymentConfig)
 export const externalOperationPaymentConfigSchema = z.object({
   type: z.enum(["CASH", "INSTALLMENTS"]),
+  method: z.enum(["PIX", "BANK_SLIP"]).optional(),
   cashDays: z.number().int().optional(),
   installmentCount: z.number().int().optional(),
   installmentStep: z.number().int().optional(),

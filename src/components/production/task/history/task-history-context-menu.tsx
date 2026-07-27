@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { IconExternalLink, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter, IconReceipt, IconCalendarTime, IconBellPlus } from "@tabler/icons-react";
-import { useSendWarning } from "@/lib/attention";
+import { useAnnouncePresenceForIds, useSendWarning } from "@/lib/attention";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
@@ -74,6 +74,23 @@ export function TaskHistoryContextMenu({
   const isBulk = selectedIds.length > 1;
   const taskIds = tasks.map(t => t.id);
   const task = tasks[0];
+
+  // PRESENCE — this menu carries 14 write paths and is embedded far outside the
+  // production module (customer, sector, paint, payroll and bonus detail pages all
+  // render it via their task tables). Without this, every one of those surfaces could
+  // mutate a task completely invisibly to the override guard.
+  //
+  // Announce for the affected rows while any mutating modal/dialog is open, so other
+  // users see "está editando" for the duration of the action and their own edit
+  // affordances lock. Released automatically on close (and on unmount / tab close).
+  const presenceActionIds = React.useMemo(
+    () =>
+      setStatusModalOpen || setSectorModalOpen || setTermModalOpen || quoteLayoutModalOpen || duplicateModalOpen || deleteDialog.open
+        ? selectedIds
+        : [],
+    [setStatusModalOpen, setSectorModalOpen, setTermModalOpen, quoteLayoutModalOpen, duplicateModalOpen, deleteDialog.open, selectedIds],
+  );
+  useAnnouncePresenceForIds("TASK", presenceActionIds);
 
   // Check task statuses for status actions
   // Finalizar is only offered once a task is in production AND every (non-cancelled)
@@ -695,8 +712,9 @@ export function TaskHistoryContextMenu({
             </DropdownMenuItem>
           )}
 
-          {/* Set Term action - Production Manager, Commercial (and Admin) */}
-          {(isAdmin || isProductionManager || isCommercial) && (
+          {/* Set Term action — COMMERCIAL + ADMIN only (the API `term` field domain;
+              PRODUCTION_MANAGER and LOGISTIC may not change the customer deadline). */}
+          {(isAdmin || isCommercial) && (
             <DropdownMenuItem
               onClick={handleSetTerm}
               onSelect={(e) => e.preventDefault()}

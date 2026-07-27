@@ -64,6 +64,14 @@ export interface ResponsibleRowData {
   phone: string;
   name: string;
   roles: ResponsibleRole[];
+  /**
+   * Papéis que o contato tinha quando entrou na linha.
+   *
+   * Só para distinguir uma edição inline de uma linha intocada: sem isto,
+   * `syncResponsibleRoles` daria PUT em TODO contato já cadastrado do formulário
+   * e escreveria uma entrada de changelog para cada um.
+   */
+  originalRoles?: ResponsibleRole[];
   isActive: boolean;
   isEditing?: boolean;
   isNew?: boolean;
