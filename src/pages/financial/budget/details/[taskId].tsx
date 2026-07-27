@@ -462,7 +462,7 @@ export const FinancialBudgetDetailPage = () => {
           name: r.name || "",
           phone: r.phone || "",
           email: r.email || "",
-          role: (r.role || "COMMERCIAL") as ResponsibleRole,
+          roles: (Array.isArray(r.roles) && r.roles.length ? r.roles : ["COMMERCIAL"]) as ResponsibleRole[],
           isActive: r.isActive ?? true,
           isNew: false,
           isEditing: false,
@@ -848,7 +848,7 @@ export const FinancialBudgetDetailPage = () => {
           name: row.name.trim(),
           phone: row.phone.trim(),
           email: row.email?.trim() || undefined,
-          role: row.role,
+          roles: row.roles,
           isActive: row.isActive,
           customerId: data.customerId || undefined,
         }));

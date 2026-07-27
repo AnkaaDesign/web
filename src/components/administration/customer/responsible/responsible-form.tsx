@@ -18,7 +18,8 @@ import type { Responsible } from '@/types/responsible';
 import type { Customer } from '@/types/customer';
 import {
   RESPONSIBLE_ROLE_LABELS,
-  ResponsibleRole
+  ResponsibleRole,
+  getResponsibleRoles
 } from '@/types/responsible';
 import { CustomerLogoDisplay } from '@/components/ui/avatar-display';
 import { formatCNPJ } from '@/utils';
@@ -31,7 +32,8 @@ const responsibleSchema = z.object({
   email: z.string().email('E-mail inválido').optional().nullable().or(z.literal('')),
   password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres').optional().nullable().or(z.literal('')),
   companyId: z.string().optional().nullable().or(z.literal('')),
-  role: z.nativeEnum(ResponsibleRole),
+  // A contact can hold several roles at once (e.g. proprietário + financeiro).
+  roles: z.array(z.nativeEnum(ResponsibleRole)).min(1, 'Selecione ao menos uma função'),
   isActive: z.boolean().default(true),
   hasSystemAccess: z.boolean().default(false),
 });
@@ -159,7 +161,9 @@ export function ResponsibleForm({
       email: initialData?.email || '',
       password: '',
       companyId: initialData?.companyId || '',
-      role: initialData?.role || ResponsibleRole.COMMERCIAL,
+      roles: getResponsibleRoles(initialData).length
+        ? getResponsibleRoles(initialData)
+        : [ResponsibleRole.COMMERCIAL],
       isActive: initialData?.isActive ?? true,
       hasSystemAccess: !!(initialData?.email && initialData?.password),
     },
@@ -347,16 +351,17 @@ export function ResponsibleForm({
 
                 <FormField
                   control={form.control}
-                  name="role"
+                  name="roles"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Função <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Combobox
+                          mode="multiple"
                           options={roleOptions}
                           value={field.value}
                           onValueChange={field.onChange}
-                          placeholder="Selecione uma função"
+                          placeholder="Selecione as funções"
                           searchPlaceholder="Buscar função..."
                           emptyText="Nenhuma função encontrada"
                           disabled={isSubmitting}

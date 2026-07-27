@@ -20,7 +20,7 @@ export interface Responsible {
   name: string;
   password?: string | null;
   companyId?: string | null;
-  role: ResponsibleRole;
+  roles: ResponsibleRole[];
   isActive: boolean;
   lastLogin?: Date | null;
   createdAt: Date;
@@ -36,7 +36,7 @@ export interface ResponsibleCreateFormData {
   name: string;
   password?: string | null;
   companyId?: string | null;
-  role: ResponsibleRole;
+  roles: ResponsibleRole[];
   isActive?: boolean;
 }
 
@@ -45,7 +45,7 @@ export interface ResponsibleUpdateFormData {
   phone?: string;
   name?: string;
   password?: string | null;
-  role?: ResponsibleRole;
+  roles?: ResponsibleRole[];
   isActive?: boolean;
 }
 
@@ -54,7 +54,7 @@ export interface ResponsibleCreateInline {
   phone: string;
   name: string;
   password?: string | null;
-  role: ResponsibleRole;
+  roles: ResponsibleRole[];
   isActive?: boolean;
 }
 
@@ -63,7 +63,7 @@ export interface ResponsibleRowData {
   email?: string | null;
   phone: string;
   name: string;
-  role: ResponsibleRole;
+  roles: ResponsibleRole[];
   isActive: boolean;
   isEditing?: boolean;
   isNew?: boolean;
@@ -77,7 +77,8 @@ export interface ResponsibleGetManyFormData {
   pageSize?: number;
   search?: string;
   companyId?: string;
-  role?: ResponsibleRole;
+  // Any-of: the API maps this to Prisma `hasSome` over the roles array.
+  roles?: ResponsibleRole[];
   isActive?: boolean;
   include?: string[];
 }
@@ -140,3 +141,32 @@ export const RESPONSIBLE_ROLE_COLORS: Record<ResponsibleRole, string> = {
   [ResponsibleRole.FLEET_MANAGER]: 'gray',
   [ResponsibleRole.DRIVER]: 'yellow',
 };
+
+/** Enum declaration order — the canonical order the API sorts `roles` by. */
+const ROLE_DECLARATION_ORDER = Object.values(ResponsibleRole);
+
+/**
+ * A contact's roles, always as an array.
+ *
+ * Tolerates the pre-2026-07-26 scalar `role` so anything still holding a cached
+ * payload (React Query cache, a persisted table layout, an older mobile build)
+ * keeps rendering instead of showing an empty badge.
+ */
+export const getResponsibleRoles = (
+  responsible: { roles?: ResponsibleRole[] | null; role?: ResponsibleRole | null } | null | undefined,
+): ResponsibleRole[] => {
+  if (!responsible) return [];
+  if (Array.isArray(responsible.roles)) return responsible.roles;
+  return responsible.role ? [responsible.role] : [];
+};
+
+/** De-duplicated and put back in enum order, matching the API's normalization. */
+export const normalizeResponsibleRoles = (roles: ResponsibleRole[]): ResponsibleRole[] =>
+  [...new Set(roles)].sort(
+    (a, b) => ROLE_DECLARATION_ORDER.indexOf(a) - ROLE_DECLARATION_ORDER.indexOf(b),
+  );
+
+/** Human-readable label for a set of roles, e.g. "Comercial, Financeiro". */
+export const formatResponsibleRoles = (
+  roles: readonly ResponsibleRole[] | null | undefined,
+): string => (roles ?? []).map(role => RESPONSIBLE_ROLE_LABELS[role] ?? role).join(', ');

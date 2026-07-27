@@ -23,6 +23,7 @@ import type { Responsible } from "@/types/responsible";
 import {
   RESPONSIBLE_ROLE_LABELS,
   RESPONSIBLE_ROLE_COLORS,
+  getResponsibleRoles,
 } from "@/types/responsible";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -93,14 +94,19 @@ export function createResponsibleColumns({
       accessorKey: "role",
       header: () => <span className="font-bold uppercase text-xs">FUNÇÃO</span>,
       cell: ({ row }) => {
-        const role = row.original.role;
+        const roles = getResponsibleRoles(row.original);
         return (
-          <Badge
-            variant={RESPONSIBLE_ROLE_COLORS[role] as any}
-            className="text-xs"
-          >
-            {RESPONSIBLE_ROLE_LABELS[role]}
-          </Badge>
+          <div className="flex flex-wrap gap-1">
+            {roles.map((role) => (
+              <Badge
+                key={role}
+                variant={RESPONSIBLE_ROLE_COLORS[role] as any}
+                className="text-xs"
+              >
+                {RESPONSIBLE_ROLE_LABELS[role]}
+              </Badge>
+            ))}
+          </div>
         );
       },
     },

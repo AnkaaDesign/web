@@ -64,7 +64,7 @@ export const ResponsibleManager: React.FC<ResponsibleManagerProps> = ({
           name: '',
           phone: '',
           email: '',
-          role: allowedRoles?.[0] || ('COMMERCIAL' as ResponsibleRole),
+          roles: [allowedRoles?.[0] || ('COMMERCIAL' as ResponsibleRole)],
           isActive: true,
           isNew: true,
           isEditing: false, // Start with combobox visible, not edit mode
@@ -96,7 +96,7 @@ export const ResponsibleManager: React.FC<ResponsibleManagerProps> = ({
       name: '',
       phone: '',
       email: '',
-      role: allowedRoles?.[0] || ('COMMERCIAL' as ResponsibleRole),
+      roles: [allowedRoles?.[0] || ('COMMERCIAL' as ResponsibleRole)],
       isActive: true,
       isNew: true,
       isEditing: false, // Start with combobox visible, not edit mode

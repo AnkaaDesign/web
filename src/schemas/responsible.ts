@@ -1,8 +1,23 @@
 import { z } from 'zod';
-import { ResponsibleRole } from '@/types/responsible';
+import { ResponsibleRole, normalizeResponsibleRoles } from '@/types/responsible';
 
 // Phone validation regex (Brazilian format)
 const phoneRegex = /^(\+55\s?)?(\(?\d{2}\)?\s?)?(\d{4,5}[-.\s]?\d{4})$/;
+
+// A contact can hold several roles at once (owner AND financial, say), so the
+// API stores `roles` as an array. A bare scalar is accepted and wrapped: older
+// callers and persisted form state still send `role`.
+const rolesSchema = z.preprocess(
+  value => (value === undefined || Array.isArray(value) ? value : [value]),
+  z
+    .array(
+      z.nativeEnum(ResponsibleRole, {
+        errorMap: () => ({ message: 'Função inválida' }),
+      }),
+    )
+    .min(1, 'Selecione ao menos uma função')
+    .transform(normalizeResponsibleRoles),
+);
 
 // Email validation
 const emailSchema = z
@@ -36,9 +51,7 @@ export const responsibleCreateSchema = z.object({
     .uuid('ID da empresa inválido')
     .optional()
     .nullable(),
-  role: z.nativeEnum(ResponsibleRole, {
-    errorMap: () => ({ message: 'Função inválida' }),
-  }),
+  roles: rolesSchema,
   isActive: z
     .boolean()
     .optional()
@@ -74,9 +87,7 @@ export const responsibleCreateInlineSchema = z.object({
     .uuid('ID da empresa inválido')
     .optional()
     .nullable(),
-  role: z.nativeEnum(ResponsibleRole, {
-    errorMap: () => ({ message: 'Função inválida' }),
-  }),
+  roles: rolesSchema,
   isActive: z
     .boolean()
     .optional()
@@ -96,11 +107,7 @@ export const responsibleUpdateSchema = z.object({
     .max(100, 'Nome deve ter no máximo 100 caracteres')
     .optional(),
   password: passwordSchema,
-  role: z
-    .nativeEnum(ResponsibleRole, {
-      errorMap: () => ({ message: 'Função inválida' }),
-    })
-    .optional(),
+  roles: rolesSchema.optional(),
   isActive: z
     .boolean()
     .optional(),
@@ -126,8 +133,13 @@ export const responsibleGetManySchema = z.object({
     .string()
     .uuid('ID da empresa inválido')
     .optional(),
-  role: z
-    .nativeEnum(ResponsibleRole)
+  // Any-of: the API maps this to Prisma `hasSome`. A bare scalar is wrapped so
+  // `?roles=OWNER` and saved single-value filters both keep working.
+  roles: z
+    .preprocess(
+      value => (value === undefined || Array.isArray(value) ? value : [value]),
+      z.array(z.nativeEnum(ResponsibleRole)),
+    )
     .optional(),
   isActive: z
     .boolean()
@@ -188,7 +200,7 @@ export const responsibleRowDataSchema = z.object({
   email: z.string().nullable().optional(),
   phone: z.string(),
   name: z.string(),
-  role: z.nativeEnum(ResponsibleRole),
+  roles: z.array(z.nativeEnum(ResponsibleRole)),
   isActive: z.boolean(),
   isEditing: z.boolean().optional(),
   isNew: z.boolean().optional(),

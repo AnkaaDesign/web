@@ -89,7 +89,7 @@ export const FinancialBudgetCreatePage = () => {
     name: '',
     phone: '',
     email: '',
-    role: 'COMMERCIAL' as ResponsibleRole,
+    roles: ['COMMERCIAL' as ResponsibleRole],
     isActive: true,
     isNew: true,
     isEditing: false,
@@ -606,7 +606,7 @@ export const FinancialBudgetCreatePage = () => {
           name: row.name.trim(),
           phone: row.phone.trim(),
           email: row.email?.trim() || undefined,
-          role: row.role,
+          roles: row.roles,
           isActive: row.isActive,
           customerId: data.customerId || undefined,
         }));

@@ -29,12 +29,14 @@ export function ResponsibleFilters({
   onFiltersChange,
   onClearFilters,
 }: ResponsibleFiltersProps) {
+  // Single-select in the UI, sent as a one-element any-of: the API matches
+  // contacts holding that role among several.
   const handleRoleChange = (value: string) => {
     if (value === "all") {
-      const { role, ...rest } = filters;
+      const { roles, ...rest } = filters;
       onFiltersChange(rest);
     } else {
-      onFiltersChange({ ...filters, role: value as ResponsibleRole });
+      onFiltersChange({ ...filters, roles: [value as ResponsibleRole] });
     }
   };
 
@@ -67,7 +69,7 @@ export function ResponsibleFilters({
           <div className="space-y-2">
             <Label htmlFor="role">Função</Label>
             <Select
-              value={filters.role || "all"}
+              value={filters.roles?.[0] || "all"}
               onValueChange={handleRoleChange}
             >
               <SelectTrigger id="role">

@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { RESPONSIBLE_ROLE_LABELS } from "@/types/responsible";
+import { formatResponsibleRoles } from "@/types/responsible";
 
 interface ResponsibleListProps {
   className?: string;
@@ -80,9 +80,10 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
   const deserializeResponsibleFilters = useCallback((params: URLSearchParams): Partial<ResponsibleGetManyFormData> => {
     const filters: Partial<ResponsibleGetManyFormData> = {};
 
-    // Parse role filter
+    // Parse role filter. The URL keeps the singular `role` key -- shared links
+    // and bookmarks predate the multi-role change.
     const role = params.get("role");
-    if (role) filters.role = role as any;
+    if (role) filters.roles = [role as any];
 
     // Parse status filter
     const isActive = params.get("isActive");
@@ -102,7 +103,7 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
   const serializeResponsibleFilters = useCallback((filters: Partial<ResponsibleGetManyFormData>): Record<string, string> => {
     const params: Record<string, string> = {};
 
-    if (filters.role) params.role = filters.role;
+    if (filters.roles?.length) params.role = filters.roles[0];
     if (filters.isActive !== undefined) params.isActive = String(filters.isActive);
 
     return params;
@@ -196,7 +197,7 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
     if (key === "searchingFor") {
       setSearch("");
     } else if (key === "role") {
-      const { role, ...rest } = filters;
+      const { roles, ...rest } = filters;
       updateFilters(rest);
     } else if (key === "isActive") {
       const { isActive, ...rest } = filters;
@@ -226,11 +227,11 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
     }
 
     // Add role filter
-    if (filters.role) {
+    if (filters.roles?.length) {
       items.push({
         id: "role",
         label: "Função",
-        value: RESPONSIBLE_ROLE_LABELS[filters.role],
+        value: formatResponsibleRoles(filters.roles),
         onRemove: () => onRemoveFilter("role"),
       });
     }
@@ -251,7 +252,7 @@ export function ResponsibleList({ className, companyId }: ResponsibleListProps) 
   // Count active filters (excluding search)
   const activeFilterCountWithoutSearch = useMemo(() => {
     let count = 0;
-    if (filters.role) count++;
+    if (filters.roles?.length) count++;
     if (filters.isActive !== undefined) count++;
     return count;
   }, [filters]);

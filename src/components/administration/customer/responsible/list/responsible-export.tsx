@@ -2,7 +2,7 @@ import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/compo
 import { toast } from "@/components/ui/sonner";
 import type { Responsible } from "@/types/responsible";
 import type { ResponsibleGetManyFormData } from "@/types/responsible";
-import { RESPONSIBLE_ROLE_LABELS } from "@/types/responsible";
+import { formatResponsibleRoles, getResponsibleRoles } from "@/types/responsible";
 import { formatBrazilianPhone, formatDate, formatDateTime } from "@/utils";
 import { responsibleService } from "@/services/responsibleService";
 
@@ -18,7 +18,7 @@ interface ResponsibleExportProps {
 // Column configuration for export
 const EXPORT_COLUMNS: ExportColumn<Responsible>[] = [
   { id: "name", label: "NOME", getValue: (resp: Responsible) => resp.name },
-  { id: "role", label: "FUNÇÃO", getValue: (resp: Responsible) => RESPONSIBLE_ROLE_LABELS[resp.role] || resp.role },
+  { id: "role", label: "FUNÇÃO", getValue: (resp: Responsible) => formatResponsibleRoles(getResponsibleRoles(resp)) },
   { id: "company", label: "EMPRESA", getValue: (resp: Responsible) => resp.company?.corporateName || resp.company?.fantasyName || "" },
   { id: "phone", label: "TELEFONE", getValue: (resp: Responsible) => formatBrazilianPhone(resp.phone || "") },
   { id: "email", label: "E-MAIL", getValue: (resp: Responsible) => resp.email || "" },

@@ -4,7 +4,7 @@ import { IconBrandWhatsapp, IconUser } from "@tabler/icons-react";
 
 import { SECTOR_PRIVILEGES } from "@/constants";
 import type { Task } from "@/types";
-import { RESPONSIBLE_ROLE_LABELS, ResponsibleRole } from "@/types/responsible";
+import { ResponsibleRole, formatResponsibleRoles, getResponsibleRoles } from "@/types/responsible";
 
 /**
  * Formats a Brazilian phone number for display.
@@ -35,8 +35,10 @@ export function ResponsiblesSection({ task, role }: { task: Task; role: string }
   const isDesignerSector = role === SECTOR_PRIVILEGES.DESIGNER;
   const reps = isDesignerSector
     ? (() => {
-        const marketing = responsibles.filter((r) => r.role === ResponsibleRole.MARKETING);
-        return marketing.length > 0 ? marketing : responsibles.filter((r) => r.role === ResponsibleRole.COMMERCIAL);
+        const marketing = responsibles.filter((r) => getResponsibleRoles(r).includes(ResponsibleRole.MARKETING));
+        return marketing.length > 0
+          ? marketing
+          : responsibles.filter((r) => getResponsibleRoles(r).includes(ResponsibleRole.COMMERCIAL));
       })()
     : responsibles;
 
@@ -47,7 +49,7 @@ export function ResponsiblesSection({ task, role }: { task: Task; role: string }
       {reps.map((rep) => {
         const cleanPhone = rep.phone.replace(/\D/g, "");
         const whatsappNumber = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-        const roleLabel = RESPONSIBLE_ROLE_LABELS[rep.role] || rep.role;
+        const roleLabel = formatResponsibleRoles(getResponsibleRoles(rep));
 
         return (
           <div key={rep.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 px-4 py-2.5">

@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { responsibleService } from '@/services/responsibleService';
 import { toBrazilianNameCase } from '@/utils/formatters';
 import type { Responsible, ResponsibleRole, ResponsibleRowData } from '@/types/responsible';
-import { RESPONSIBLE_ROLE_LABELS } from '@/types/responsible';
+import { RESPONSIBLE_ROLE_LABELS, getResponsibleRoles } from '@/types/responsible';
 
 interface ResponsibleRowProps {
   control?: any;
@@ -77,27 +77,24 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     // Provide the currently selected rep as initial option so the Combobox can display it
     const initialOptions = useMemo(() => {
       if (value.id && !value.id.startsWith('temp-') && value.name) {
-        const rep = { id: value.id, name: value.name, phone: value.phone || '', email: value.email || '', role: value.role, isActive: true } as Responsible;
+        const rep = { id: value.id, name: value.name, phone: value.phone || '', email: value.email || '', roles: value.roles ?? [], isActive: true } as Responsible;
         responsibleCache.set(rep.id, rep);
         return [rep];
       }
       return [];
-    }, [value.id, value.name, value.phone, value.email, value.role]);
+    }, [value.id, value.name, value.phone, value.email, value.roles]);
 
-    // Handle role selection
+    // Handle role selection — a contact can hold several roles at once.
+    //
+    // Only the roles change here. This used to blank id/name/phone and flag the
+    // row as new, which was survivable while the selector existed solely in
+    // create mode; now that selection mode shows it too, editing the role of an
+    // already-chosen contact would have thrown that contact away.
     const handleRoleChange = useCallback((role: string | string[] | null | undefined) => {
-      if (!role || Array.isArray(role)) return;
-      const roleValue = role as ResponsibleRole;
-      onChange({
-        role: roleValue,
-        id: `temp-${Date.now()}`,
-        name: '',
-        phone: '',
-        email: '',
-        isNew: true,
-        isEditing: value.isEditing,
-      });
-    }, [onChange, value.isEditing]);
+      if (!role) return;
+      const roles = (Array.isArray(role) ? role : [role]) as ResponsibleRole[];
+      onChange({ ...value, roles });
+    }, [onChange, value]);
 
     // Handle responsible selection
     const handleResponsibleChange = useCallback((selectedValue: string | string[] | null | undefined, searchTerm?: string) => {
@@ -137,7 +134,11 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
             name: rep.name,
             phone: rep.phone,
             email: rep.email || '',
-            // Keep user's role selection instead of overwriting with DB role
+            // Adopt the contact's registered roles. The row now shows a role
+            // editor next to the combobox, so leaving the previous row's roles
+            // in place would display something the contact does not actually
+            // hold; the user can still edit them afterwards.
+            roles: getResponsibleRoles(rep),
             isActive: rep.isActive,
             isNew: false,
             isEditing: false,
@@ -198,9 +199,12 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
 
     return (
       <div ref={ref} className={cn("space-y-3", (nameError || phoneError) && "pb-4")}>
+        {/* items-start, not items-end: the multi-role Combobox grows taller as
+            chips wrap, and bottom alignment pushed every sibling input down with
+            it. Each cell carries its own label, so the tops line up. */}
         <div className={cn(
-          "grid grid-cols-1 gap-2 items-end",
-          showCreateInputs ? "sm:grid-cols-[3fr_3fr_2fr_3fr_auto]" : "sm:grid-cols-[1fr_auto]"
+          "grid grid-cols-1 gap-2 items-start",
+          showCreateInputs ? "sm:grid-cols-[3fr_3fr_2fr_3fr_auto]" : "sm:grid-cols-[2fr_3fr_auto]"
         )}>
           {showCreateInputs ? (
             /* Inline Create Mode: Role + Name + Phone + Company + Remove */
@@ -209,10 +213,11 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
               <div className="space-y-2">
                 {isFirstRow && <FormLabel>Função</FormLabel>}
                 <Combobox
-                  value={value.role || ''}
+                  mode="multiple"
+                  value={value.roles ?? []}
                   onValueChange={handleRoleChange}
                   options={roleOptions}
-                  placeholder="Selecione uma função"
+                  placeholder="Selecione as funções"
                   emptyText="Nenhuma função encontrada"
                   disabled={disabled || readOnly}
                   searchable={false}
@@ -280,8 +285,26 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
               </div>
             </>
           ) : (
-            /* Selection Mode: Just the Responsible combobox */
-            <div className="space-y-2">
+            /* Selection Mode: Função + Responsible combobox */
+            <>
+              {/* Role editor — mirrors the detail page, which shows each contact
+                  as "Responsável <funções>". Without it the row could only pick
+                  a contact and never see or correct the roles being recorded. */}
+              <div className="space-y-2">
+                {isFirstRow && <FormLabel>Função</FormLabel>}
+                <Combobox
+                  mode="multiple"
+                  value={value.roles ?? []}
+                  onValueChange={handleRoleChange}
+                  options={roleOptions}
+                  placeholder="Selecione as funções"
+                  emptyText="Nenhuma função encontrada"
+                  disabled={disabled || readOnly}
+                  searchable={false}
+                />
+              </div>
+
+              <div className="space-y-2">
               {isFirstRow && <FormLabel>Responsável</FormLabel>}
               <Combobox<Responsible>
                 value={currentResponsibleValue || ''}
@@ -305,11 +328,14 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                 searchable={true}
                 fixedTopContent={fixedTopContent}
               />
-            </div>
+              </div>
+            </>
           )}
 
-          {/* Remove Button */}
-          <div>
+          {/* Remove Button. The invisible label keeps the button level with the
+              inputs on the first row, now that the grid aligns to the top. */}
+          <div className="space-y-2">
+            {isFirstRow && <FormLabel className="invisible block">Remover</FormLabel>}
             {!readOnly && !disabled && (
               <Button
                 type="button"

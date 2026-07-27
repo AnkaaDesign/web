@@ -35,7 +35,7 @@ import { cutKeys, airbrushingKeys } from "../../../../hooks/common/query-keys";
 import { cutService } from "../../../../api-client/cut";
 import { airbrushingService } from "../../../../api-client/airbrushing";
 import type { ResponsibleRowData } from "@/types/responsible";
-import { ResponsibleRole } from "@/types/responsible";
+import { ResponsibleRole, getResponsibleRoles } from "@/types/responsible";
 import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, BONIFICATION_STATUS, BONIFICATION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS } from "../../../../constants";
 import { createFormDataWithContext, createAirbrushingFormData } from "@/utils/form-data-helper";
@@ -584,7 +584,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         name: rep.name,
         phone: rep.phone,
         email: rep.email || '',
-        role: rep.role,
+        roles: getResponsibleRoles(rep),
         isActive: rep.isActive,
         isNew: false,
         isEditing: false,
@@ -598,7 +598,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       name: '',
       phone: '',
       email: '',
-      role: 'COMMERCIAL' as ResponsibleRole,
+      roles: ['COMMERCIAL' as ResponsibleRole],
       isActive: true,
       isNew: true,
       isEditing: false,
@@ -1815,7 +1815,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
               name: row.name.trim(),
               phone: row.phone.trim(),
               email: row.email?.trim() || undefined,
-              role: row.role,
+              roles: row.roles,
               isActive: row.isActive !== undefined ? row.isActive : true,
               companyId: row.companyId || defaultCompanyId,
             }));
@@ -2135,7 +2135,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
               name: row.name.trim(),
               phone: row.phone.trim(),
               email: row.email?.trim() || undefined,
-              role: row.role,
+              roles: row.roles,
               isActive: row.isActive,
               companyId: row.companyId || defaultCompanyIdForJson,
             }));
@@ -3360,8 +3360,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                       companyId={customerIdValue || undefined}
                       value={isDesignerUser
                         ? (() => {
-                            const marketing = responsibleRows.filter(r => r.role === ResponsibleRole.MARKETING);
-                            return marketing.length > 0 ? marketing : responsibleRows.filter(r => r.role === ResponsibleRole.COMMERCIAL);
+                            const marketing = responsibleRows.filter(r => r.roles?.includes(ResponsibleRole.MARKETING));
+                            return marketing.length > 0 ? marketing : responsibleRows.filter(r => r.roles?.includes(ResponsibleRole.COMMERCIAL));
                           })()
                         : responsibleRows}
                       onChange={handleResponsibleRowsChange}

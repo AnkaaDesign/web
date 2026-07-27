@@ -29,6 +29,7 @@ import type {
   TaskBatchDeleteResponse,
 } from "../types";
 import { responsibleService } from "@/services/responsibleService";
+import { formatResponsibleRoles, getResponsibleRoles } from "@/types/responsible";
 
 // =====================
 // Task Service Class
@@ -82,7 +83,7 @@ export class TaskService {
     if (errors.length > 0) {
       const errorMessages = errors.map(
         ({ responsible, error }) =>
-          `${responsible.name} (${responsible.role}): ${error.message || 'Erro desconhecido'}`
+          `${responsible.name} (${formatResponsibleRoles(getResponsibleRoles(responsible))}): ${error.message || 'Erro desconhecido'}`
       ).join('; ');
 
       throw new Error(`Falha ao criar responsáveis: ${errorMessages}`);

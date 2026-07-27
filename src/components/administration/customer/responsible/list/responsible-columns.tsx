@@ -3,6 +3,7 @@ import type { Responsible } from "@/types/responsible";
 import {
   RESPONSIBLE_ROLE_LABELS,
   RESPONSIBLE_ROLE_COLORS,
+  getResponsibleRoles,
 } from "@/types/responsible";
 import { Badge } from "@/components/ui/badge";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
@@ -33,12 +34,17 @@ export function createResponsibleColumns(): ResponsibleColumn[] {
       key: "role",
       header: "FUNÇÃO",
       accessor: (responsible) => (
-        <Badge
-          variant={RESPONSIBLE_ROLE_COLORS[responsible.role] as any}
-          className="text-xs"
-        >
-          {RESPONSIBLE_ROLE_LABELS[responsible.role]}
-        </Badge>
+        <div className="flex flex-wrap gap-1">
+          {getResponsibleRoles(responsible).map((role) => (
+            <Badge
+              key={role}
+              variant={RESPONSIBLE_ROLE_COLORS[role] as any}
+              className="text-xs"
+            >
+              {RESPONSIBLE_ROLE_LABELS[role]}
+            </Badge>
+          ))}
+        </div>
       ),
       sortable: false,
       className: "min-w-[120px]",
