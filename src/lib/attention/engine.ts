@@ -97,16 +97,13 @@ let globalVersion = 0;
 /** Global sound slot — bips are silent until now >= this (serializes bursts). */
 let soundSlotUntil = 0;
 
-/**
- * Entity types the user is currently LOOKING AT (see `surface.ts`). Their cycles keep
- * blinking — the ring is the signal — but they do not bip: beeping at someone about a row
- * already in front of them is the single most-complained-about part of this feature.
- */
-let activeSurfaces: ReadonlySet<AttentionEntityType> = new Set();
-
-export function setActiveSurfaces(types: ReadonlySet<AttentionEntityType>): void {
-  activeSurfaces = types;
-}
+// NOTE: the bip is deliberately NOT gated on whether the user is looking at the entity's
+// queue (`surface.ts`). It used to be, and that made the sound unreachable in practice:
+// EVERY page that registers TASK or CUT entities with the engine is also that entity's own
+// surface (/producao/cronograma, /producao/agenda, /producao/recorte, and each detail page
+// via `useAttentionEntity`), while pages that are not a surface register no entities at all
+// and so have no cycle to bip. Rows blinked in silence everywhere. Surfaces still suppress
+// the NAV hint (see `use-nav-activity.ts`) — that part was never the problem.
 
 let reconcileScheduled = false;
 
@@ -497,8 +494,7 @@ function scheduleBip(key: string, bipNow: boolean, delayMs = BIP_REPEAT_MS): voi
   if (!cycle || cycle.status !== "bursting") return;
   const { cadence } = cycle.match.rule;
   const now = Date.now();
-  const onSurface = activeSurfaces.has(cycle.match.entityType);
-  if (bipNow && !onSurface && cadence.soundEnabled && cadence.tone !== "none" && now >= soundSlotUntil) {
+  if (bipNow && cadence.soundEnabled && cadence.tone !== "none" && now >= soundSlotUntil) {
     const burstMs = Math.max(1, cadence.blinkCount) * cadence.intervalMs;
     soundSlotUntil = now + burstMs;
     ackStore.patch(key, { lastFiredAt: now });

@@ -130,7 +130,13 @@ as your existing schema-duplication convention). Field paths use dotted access
 ### 3.2 The three Task rules, encoded
 
 Confirmed field names: `Task.cleared: boolean`, `Task.entryDate`, `Task.term`,
-`Task.forecastDate`; chassis/vinplate live on `truck.chassisNumber` / `truck.vinPlate`.
+`Task.forecastDate`, `Task.serialNumber`; chassis/plate live on `truck.chassisNumber` /
+`truck.plate`.
+
+> **Superseded 2026-07-27 — read `src/lib/attention/rules.ts`, not the snippets below.**
+> R3 was split into R3a (chassis) and R3b (plate). `truck.vinPlate` (Plaqueta) no longer has
+> any rule, and the plate rule only fires when the task has **no serial number** — the two
+> identify the same vehicle, so a task carrying a serial is already identified.
 
 ```ts
 // R1 — cleared but no entry date yet → blink the forecast field for logistics + prod manager

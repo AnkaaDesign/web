@@ -12,16 +12,7 @@ vi.mock("@/utils/nav-alert-sound", () => ({ playAttentionBeep, playAnnoyingBeep:
 import { SECTOR_PRIVILEGES, CUT_STATUS, TASK_STATUS } from "@/constants";
 
 import { createLocalAckStore } from "./ack-store";
-import {
-  configureAckStore,
-  getAddressState,
-  getAttentionSnapshot,
-  markViewed,
-  resetEngine,
-  setActiveSurfaces,
-  setEntities,
-  setUserPrivilege,
-} from "./engine";
+import { configureAckStore, getAddressState, getAttentionSnapshot, markViewed, resetEngine, setEntities, setUserPrivilege } from "./engine";
 import { addressKey } from "./types";
 import type { AttentionEntityType } from "./types";
 
@@ -35,9 +26,10 @@ const overdueTask = {
   status: TASK_STATUS.IN_PRODUCTION,
   cleared: false,
   entryDate: null,
+  serialNumber: "SN-1",
   // R2 "Previsão vencida sem liberação" — harsh, ack: onExitCooldown, target: forecastDate
   forecastDate: new Date("2026-01-01T00:00:00Z"),
-  truck: { chassisNumber: "CH", vinPlate: "VP" },
+  truck: { chassisNumber: "CH", plate: "ABC1D23" },
 };
 
 /** R0 "Recorte pendente" — harsh, ack: onView, target: row */
@@ -61,7 +53,6 @@ beforeEach(async () => {
   vi.setSystemTime(new Date("2026-07-26T12:00:00Z"));
   playAttentionBeep.mockClear();
   resetEngine();
-  setActiveSurfaces(new Set());
   // The ack store is a module singleton backed by localStorage — give each test a clean one.
   // (localStorage is absent in this environment; the store degrades to in-memory by design.)
   globalThis.localStorage?.clear?.();
@@ -114,6 +105,41 @@ describe("TASK — ack: onExitCooldown", () => {
   });
 });
 
+describe("TASK — R3b, plate only when there is no serial number", () => {
+  /** Truck already on site (entryDate given), forecast still in the future → only R3a/R3b can fire. */
+  const arrived = (over: Record<string, unknown>) => ({
+    id: "task-3",
+    status: TASK_STATUS.IN_PRODUCTION,
+    cleared: false,
+    entryDate: new Date("2026-07-01T00:00:00Z"),
+    forecastDate: new Date("2026-12-01T00:00:00Z"), // not overdue → R2 silent
+    serialNumber: null as string | null,
+    truck: { chassisNumber: "CH", plate: null as string | null, vinPlate: null as string | null },
+    ...over,
+  });
+
+  it("blinks the plate field when the task has no serial number", async () => {
+    setEntities("TASK", [arrived({ serialNumber: null })]);
+    await settle();
+    expect(field("TASK", "task-3", "plate")).toEqual(ARMED);
+  });
+
+  it("stays silent when the task carries a serial number", async () => {
+    // The serial and the plate identify the same vehicle; a task with a serial is identified,
+    // so a missing plate is not work anyone has to do.
+    setEntities("TASK", [arrived({ serialNumber: "SN-3" })]);
+    await settle();
+    expect(row("TASK", "task-3")).toBeNull();
+  });
+
+  it("has no rule for vinPlate (Plaqueta)", async () => {
+    // Everything the rules care about is filled in; only the plaqueta is empty → nothing.
+    setEntities("TASK", [arrived({ serialNumber: "SN-3", truck: { chassisNumber: "CH", plate: "ABC1D23", vinPlate: null } })]);
+    await settle();
+    expect(row("TASK", "task-3")).toBeNull();
+  });
+});
+
 describe("CUT — ack: onView", () => {
   it("rests as soon as the detail page opens", async () => {
     setEntities("CUT", [pendingCut]);
@@ -162,8 +188,14 @@ describe("nav projection — getAttentionSnapshot", () => {
   });
 
   it("counts an entity once even when several rules match it", async () => {
-    // R3a (no chassis) + R3b (no plate) both fire on this one task.
-    const task = { ...overdueTask, id: "task-2", entryDate: new Date("2026-07-01T00:00:00Z"), truck: { chassisNumber: null, vinPlate: null } };
+    // R2 (overdue) + R3a (no chassis) + R3b (no serial, no plate) all fire on this one task.
+    const task = {
+      ...overdueTask,
+      id: "task-2",
+      entryDate: new Date("2026-07-01T00:00:00Z"),
+      serialNumber: null,
+      truck: { chassisNumber: null, plate: null },
+    };
     setEntities("TASK", [task]);
     await settle();
     expect(getAttentionSnapshot().get("TASK")?.count).toBe(1);
@@ -183,19 +215,32 @@ describe("nav projection — getAttentionSnapshot", () => {
   });
 });
 
-describe("surface presence", () => {
-  it("silences the bip for an entity the user is looking at, without stopping the blink", async () => {
-    setActiveSurfaces(new Set<AttentionEntityType>(["CUT"]));
-    setEntities("CUT", [pendingCut]);
-    await settle();
-    expect(row("CUT", "cut-1")).toEqual(ARMED); // still visibly blinking
-    expect(playAttentionBeep).not.toHaveBeenCalled();
-  });
-
-  it("bips when the user is not on that surface", async () => {
+describe("sound", () => {
+  // The regression these pin: the bip used to be gated on "is the user looking at this entity
+  // type's surface". Every page that registers entities IS that entity's surface, so the gate
+  // was always closed wherever a cycle existed — the app blinked in total silence. There is no
+  // surface gate on sound any more; only the ack/cooldown and the shared slot quiet it.
+  it("bips as soon as a cycle arms", async () => {
     setEntities("CUT", [pendingCut]);
     await settle();
     expect(playAttentionBeep).toHaveBeenCalled();
+  });
+
+  it("bips on the entity's own queue page too", async () => {
+    // Same call the cut list makes; nothing about being on /producao/recorte reaches the engine.
+    setEntities("CUT", [pendingCut]);
+    await settle();
+    expect(playAttentionBeep).toHaveBeenCalledWith("harsh");
+  });
+
+  it("does not bip a cycle that is inside its cooldown", async () => {
+    setEntities("CUT", [pendingCut]);
+    await settle();
+    playAttentionBeep.mockClear();
+    markViewed("CUT", "cut-1", { snapshot: pendingCut, policies: ["onView"] });
+    await settle();
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+    expect(playAttentionBeep).not.toHaveBeenCalled();
   });
 });
 

@@ -9,7 +9,7 @@ import { useScrollHideHeader, exportToPdf, exportToXlsx, copyShareLink } from "@
 import type { DataTableColumnDef, ExportCellValue } from "@/components/ui/datatable";
 import type { FAVORITE_PAGES, SECTOR_PRIVILEGES } from "@/constants";
 import { usePrivileges } from "@/hooks/common/use-privileges";
-import { useAttentionEntity, type AttentionEntityType } from "@/lib/attention";
+import { useAttentionEntity, attentionRowClass, type AttentionEntityType } from "@/lib/attention";
 import { cn } from "@/lib/utils";
 import { useDetailLayout } from "./use-detail-layout";
 import { useRecordNavigation } from "./use-record-navigation";
@@ -160,11 +160,16 @@ export function DetailPage<TData>({
   // Attention: register the record + ack per rule policy. The hook is unconditional — it
   // no-ops when `attention` is absent or the record hasn't loaded.
   //
-  // The PAGE HEADER deliberately shows NO indicator. The rules that reach a detail page are
-  // field-targeted, so the field itself rings and explains (see `inline-edit-field`); a ring
-  // around the header only repeated that one level up, and the plain `title` attribute it
-  // carried rendered as a native browser tooltip that fought with the styled one on "Editar".
-  useAttentionEntity(attention?.entityType, recordId || undefined, data);
+  // The header rings ONLY when the matching rule has nowhere better to point. A FIELD-targeted
+  // rule (every TASK rule) rings the field itself and explains there (see `inline-edit-field`);
+  // ringing the header too just repeats it one level up, and the plain `title` it used to carry
+  // rendered as a native browser tooltip that fought with the styled one on "Editar". But a
+  // ROW/DETAIL-targeted rule (`cut.pending`) has no field, so with the header suppressed
+  // unconditionally the cut detail page showed no indicator at all — you could open a blinking
+  // cut and see nothing. Never a `title` attribute, for the reason above.
+  const attentionState = useAttentionEntity(attention?.entityType, recordId || undefined, data);
+  const headerAttentionClass =
+    attentionState?.active && attentionState.match.target.level !== "field" ? attentionRowClass(attentionState) : "";
 
   const nav = useRecordNavigation({
     ids: navigation?.ids,
@@ -381,7 +386,7 @@ export function DetailPage<TData>({
         className="grid shrink-0 grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out will-change-[grid-template-rows] data-[hidden=true]:grid-rows-[0fr]"
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="pb-3">
+          <div className={cn("pb-3", headerAttentionClass && `rounded-lg ${headerAttentionClass}`)}>
             <PageHeader
               variant="detail"
               title={title}

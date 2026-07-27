@@ -4,16 +4,16 @@
 //
 // "Is the user already looking at a surface that shows this entity type's records?"
 //
-// ONE authority, two consumers:
-//   • the sidebar — an entity whose queue is on screen contributes NO nav indicator. The
-//     nav exists to LEAD you to unresolved work; pointing at the page you are already on
-//     is noise, and it is worse than noise when it lands on the ACTIVE entry, whose own
-//     highlight swallows the ring (which is why the Recorte entry looked dead on the
-//     Recorte page while Cronograma lit up on the Agenda page — same rule, different
-//     number of nav paths per entity).
-//   • the engine  — no BIP for an entity you are looking at. The visual ring stays; only
-//     the sound stops. A warehouse operator staring at the cut queue does not need to be
-//     beeped at every 60s about the row in front of them.
+// ONE authority, ONE consumer: the sidebar. An entity whose queue is on screen contributes
+// NO nav indicator. The nav exists to LEAD you to unresolved work; pointing at the page you
+// are already on is noise, and it is worse than noise when it lands on the ACTIVE entry,
+// whose own highlight swallows the ring (which is why the Recorte entry looked dead on the
+// Recorte page while Cronograma lit up on the Agenda page — same rule, different number of
+// nav paths per entity).
+//
+// This does NOT gate the bip. It used to, and because every page that registers entities is
+// also that entity's surface, the sound became unreachable app-wide — see the note in
+// `engine.ts` above `scheduleBip`.
 //
 // Two things feed it, both entity-agnostic:
 //   • ROUTE     — the pathname is inside one of the entity's `navPaths` (list root or any
@@ -29,7 +29,6 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 
-import { setActiveSurfaces } from "./engine";
 import type { AttentionEntityType } from "./types";
 
 /** Refcount of mounted component surfaces per type. */
@@ -46,7 +45,6 @@ function republish(): void {
   // useSyncExternalStore needs a stable reference when nothing changed.
   if (next.size === snapshot.size && [...next].every((t) => snapshot.has(t))) return;
   snapshot = next;
-  setActiveSurfaces(next); // the engine gates its bip on this
   listeners.forEach((l) => l());
 }
 
@@ -70,7 +68,7 @@ export function setRouteSurfaces(types: ReadonlyArray<AttentionEntityType>): voi
 
 /**
  * Declare that this component is a surface showing `type`'s records. While it is mounted,
- * nav entries for that entity stay quiet and the entity does not bip.
+ * nav entries for that entity stay quiet (the rows themselves are the signal).
  *
  * `active` gates it so the hook can stay unconditional in a generic component that only
  * sometimes participates — `DetailPage` calls it on every detail page in the app, and an

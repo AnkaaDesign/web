@@ -9,9 +9,12 @@
 // when the source flips from code to DB.
 //
 // Field names are the REAL task fields (verified): Task.cleared:boolean,
-// Task.entryDate, Task.forecastDate; chassis/vinplate live on the related truck
-// (truck.chassisNumber / truck.vinPlate). Field targets name the DetailFieldDef
-// id / DataTable column id so the exact field blinks.
+// Task.entryDate, Task.forecastDate, Task.serialNumber; chassis/plate live on the
+// related truck (truck.chassisNumber / truck.plate). Field targets name the
+// DetailFieldDef id / DataTable column id so the exact field blinks.
+//
+// `truck.vinPlate` (Plaqueta) deliberately has NO rule: a missing plaqueta is not
+// something anyone has to act on, and it fired on nearly every in-flight task.
 
 import { SECTOR_PRIVILEGES, CUT_STATUS, TASK_STATUS } from "@/constants";
 
@@ -91,8 +94,8 @@ export const ATTENTION_RULES: AttentionRule[] = [
   },
 
   // R3a — truck is here (entry given) but the CHASSIS is missing → blink the chassis field.
-  // Split from vinPlate so each blinks the field that is ACTUALLY empty (blinking a filled
-  // chassis just because the plate is missing is misleading).
+  // Split from the plate rule so each blinks the field that is ACTUALLY empty (blinking a
+  // filled chassis just because the plate is missing is misleading).
   {
     id: "task.entry-without-chassis",
     name: "Entrada sem chassi",
@@ -112,10 +115,15 @@ export const ATTENTION_RULES: AttentionRule[] = [
     cadence: cadence({ tone: "soft" }),
   },
 
-  // R3b — truck is here but the PLATE (Plaqueta / vinPlate) is missing → blink the plate field.
+  // R3b — truck is here but the PLATE (truck.plate) is missing → blink the plate field.
+  //
+  // Gated on the task having NO serial number: the serial and the plate are two ways of
+  // identifying the same vehicle, and a task that already carries a serial is identified.
+  // Nagging for a plate it will never have is the kind of permanently-unresolvable alert
+  // that teaches people to ignore the whole system.
   {
     id: "task.entry-without-plate",
-    name: "Entrada sem plaqueta",
+    name: "Entrada sem placa",
     entityType: "TASK",
     enabled: true,
     priority: 20,
@@ -124,10 +132,11 @@ export const ATTENTION_RULES: AttentionRule[] = [
       op: "and",
       nodes: [
         { op: "notNull", field: "entryDate" },
-        { op: "isNull", field: "truck.vinPlate" },
+        { op: "isNull", field: "serialNumber" },
+        { op: "isNull", field: "truck.plate" },
       ],
     }),
-    target: { level: "field", field: "vinPlate" },
+    target: { level: "field", field: "plate" },
     ack: "onExitCooldown",
     cadence: cadence({ tone: "soft" }),
   },

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { arrayMove } from "@dnd-kit/sortable";
 import { IconExternalLink, IconPlayerPlay, IconCheck, IconScissors, IconTrash, IconAlertTriangle, IconPlus } from "@tabler/icons-react";
 import { DataTablePage } from "@/components/ui/datatable";
+import { cn } from "@/lib/utils";
 import { usePrivileges } from "@/hooks/common/use-privileges";
 import type { DataTableRowAction, DataTableFilterDef, DataTableRowClickMeta, DataTableFilterValues } from "@/components/ui/datatable";
 import {
@@ -34,7 +35,7 @@ import {
 } from "../../../../constants";
 import { CutRequestModal } from "../list/cut-request-modal";
 import { createCutColumns, CUT_SECTOR_DEFAULTS } from "./cut-table-columns";
-import { useRegisterAttentionEntities, useAttentionVersion, attentionRowClassFor } from "@/lib/attention";
+import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor } from "@/lib/attention";
 
 // Trimmed include — only what the columns render (task name, file thumbnail/name, recut parent file).
 const LIST_INCLUDE = {
@@ -192,6 +193,9 @@ export function CutTablePage() {
   // cut detail page) or its status moves off PENDING (predicate no longer matches).
   useRegisterAttentionEntities("CUT", cuts);
   useAttentionVersion();
+  // …and the blue "someone else has this open" ring, same as the task tables. Cuts were the
+  // only attention-aware table without it, so a cut being edited elsewhere looked idle here.
+  usePresenceVersion();
 
   // Export "all": page through every cut matching the current search/filters/sort (the table only
   // holds the current page). The API caps `limit` at 100, so page through the full set.
@@ -497,7 +501,7 @@ export function CutTablePage() {
             rowReorder,
             getRowId: (c) => c.id,
             onRowClick,
-            getRowClassName: (c) => attentionRowClassFor("CUT", c.id),
+            getRowClassName: (c) => cn(attentionRowClassFor("CUT", c.id), presenceRowClassFor("CUT", c.id)),
             isLoading,
             mode: "server",
             rowCount: totalRecords,
