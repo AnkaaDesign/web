@@ -15,7 +15,7 @@
  * corretamente vale como conferência.
  */
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,7 +40,6 @@ import {
   assembleCpf,
   buildPhoneConfirm,
   isCpfWellFormed,
-  maskCpfInput,
   onlyDigits,
   type SignatureMaskParts,
 } from "./identity";
@@ -65,8 +64,12 @@ interface AffixDigitsProps {
   staticPrefix?: string;
   /** Separador entre as caixas do cadastro e as que se digitam. */
   beforeInput?: string;
-  /** Separador DENTRO das caixas digitáveis, após N delas (o 2º ponto do CPF). */
-  innerSeparatorAfter?: number;
+  /**
+   * Separadores DENTRO das caixas digitáveis. `after` conta caixas digitáveis, a
+   * partir de 1. São vários porque o CPF sem âncora se digita inteiro e precisa
+   * dos dois pontos e do hífen: `000.000.000-00`.
+   */
+  innerSeparators?: Array<{ after: number; char: string }>;
   /** Separador entre as caixas digitáveis e as finais do cadastro. */
   afterInput?: string;
 }
@@ -89,7 +92,9 @@ function Separator({ char }: { char: string }) {
 }
 
 /**
- * Dígitos que faltam, em caixas, entre os afixos que vêm do cadastro.
+ * Dígitos que faltam, em caixas, entre os afixos que vêm do cadastro. Com
+ * `prefix`/`suffix` vazios vira a sequência inteira em caixas — é assim que o
+ * CPF é digitado quando o cadastro não tem nenhum para ancorar.
  *
  * Usa o `InputOTP` do projeto — o MESMO widget da etapa do código e do
  * `verification-code-form`. A versão anterior era um `<input>` solto: o CPF
@@ -112,7 +117,7 @@ function AffixDigits({
   disabled,
   staticPrefix,
   beforeInput,
-  innerSeparatorAfter,
+  innerSeparators,
   afterInput,
 }: AffixDigitsProps) {
   const prefixDigits = onlyDigits(prefix);
@@ -127,7 +132,22 @@ function AffixDigits({
     </InputOTPGroup>
   );
 
-  const split = innerSeparatorAfter ?? 0;
+  // Fatia as caixas digitáveis nos pontos de separação. Sem separador vira uma
+  // fatia só, que é o caso do telefone.
+  const cuts = (innerSeparators ?? [])
+    .filter(s => s.after > 0 && s.after < length)
+    .sort((a, b) => a.after - b.after);
+  const segments = cuts.reduce<Array<{ from: number; to: number; separatorAfter?: string }>>(
+    (acc, cut) => {
+      const last = acc[acc.length - 1];
+      if (cut.after <= last.from) return acc;
+      last.to = cut.after;
+      last.separatorAfter = cut.char;
+      acc.push({ from: cut.after, to: length });
+      return acc;
+    },
+    [{ from: 0, to: length }],
+  );
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-0.5 gap-y-2">
@@ -137,11 +157,13 @@ function AffixDigits({
         </span>
       )}
 
-      <div className="flex">
-        {prefixDigits.split("").map((char, i) => (
-          <FixedSlot key={`p${i}`} char={char} />
-        ))}
-      </div>
+      {prefixDigits && (
+        <div className="flex">
+          {prefixDigits.split("").map((char, i) => (
+            <FixedSlot key={`p${i}`} char={char} />
+          ))}
+        </div>
+      )}
 
       {beforeInput ? <Separator char={beforeInput} /> : null}
 
@@ -157,24 +179,23 @@ function AffixDigits({
         className="text-base"
         autoComplete="off"
       >
-        {split > 0 && split < length ? (
-          <>
-            {inputSlots(0, split)}
-            <Separator char="." />
-            {inputSlots(split, length)}
-          </>
-        ) : (
-          inputSlots(0, length)
-        )}
+        {segments.map(segment => (
+          <Fragment key={segment.from}>
+            {inputSlots(segment.from, segment.to)}
+            {segment.separatorAfter ? <Separator char={segment.separatorAfter} /> : null}
+          </Fragment>
+        ))}
       </InputOTP>
 
       {afterInput ? <Separator char={afterInput} /> : null}
 
-      <div className="flex">
-        {suffixDigits.split("").map((char, i) => (
-          <FixedSlot key={`s${i}`} char={char} />
-        ))}
-      </div>
+      {suffixDigits && (
+        <div className="flex">
+          {suffixDigits.split("").map((char, i) => (
+            <FixedSlot key={`s${i}`} char={char} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -329,7 +350,7 @@ export function IdentityConfirmationDialog({
                   onChange={touch(setCpfHidden)}
                   disabled={submitting}
                   beforeInput="."
-                  innerSeparatorAfter={3}
+                  innerSeparators={[{ after: 3, char: "." }]}
                   afterInput="-"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -339,15 +360,24 @@ export function IdentityConfirmationDialog({
               </>
             ) : (
               <>
-                <Input
+                {/* Sem âncora no cadastro digitam-se os 11 dígitos — mas nas MESMAS
+                    caixas do caso ancorado e do campo do WhatsApp logo abaixo. Um
+                    `<input>` de texto aqui fazia a janela ter dois widgets
+                    diferentes para a mesma coisa, e o campo mais importante da
+                    conferência era justamente o que parecia menos deliberado. */}
+                <AffixDigits
                   id="cpf-confirm"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  placeholder="000.000.000-00"
-                  className="h-12 text-base"
+                  prefix=""
+                  suffix=""
+                  length={11}
                   value={cpfFull}
-                  onChange={v => touch(setCpfFull)(maskCpfInput(String(v ?? "")))}
+                  onChange={touch(setCpfFull)}
                   disabled={submitting}
+                  innerSeparators={[
+                    { after: 3, char: "." },
+                    { after: 6, char: "." },
+                    { after: 9, char: "-" },
+                  ]}
                 />
                 <p className="text-xs text-muted-foreground">
                   O cadastro deste orçamento não tem CPF. Informe o seu por inteiro.
