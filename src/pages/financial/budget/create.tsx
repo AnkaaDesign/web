@@ -475,8 +475,6 @@ export const FinancialBudgetCreatePage = () => {
       // has to be written onto the Responsible itself -- that is what makes it
       // appear on this task, on its quote, and on every other task sharing the
       // contact. Runs before the task save so a failure aborts cleanly.
-      await syncResponsibleRoles(responsibleRows);
-
       // Validate responsibles
       if (!validateResponsibleRows(responsibleRows)) {
         setShowResponsibleErrors(true);
@@ -484,6 +482,12 @@ export const FinancialBudgetCreatePage = () => {
         setIsSubmitting(false);
         return;
       }
+
+      // VALIDAR ANTES DE GRAVAR. `syncResponsibleRoles` escreve direto no
+      // Responsible; rodá-lo antes da validação fazia a função de um contato ser
+      // gravada e o resto do submit abortar logo em seguida — escrita parcial num
+      // envio que o usuário viu como cancelado, e que ele não tem como desfazer.
+      await syncResponsibleRoles(responsibleRows);
 
       // Validate services
       const validServices = (data.services || []).filter(
@@ -613,6 +617,7 @@ export const FinancialBudgetCreatePage = () => {
           name: row.name.trim(),
           phone: row.phone.trim(),
           email: row.email?.trim() || undefined,
+          cpf: (row.cpf || '').replace(/\D/g, '') || undefined,
           roles: row.roles,
           isActive: row.isActive,
           customerId: data.customerId || undefined,

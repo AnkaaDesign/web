@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconPhone, IconMail, IconPhoneCall, IconBrandWhatsapp, IconLock, IconLockOpen } from "@tabler/icons-react";
+import { IconPhone, IconMail, IconPhoneCall, IconBrandWhatsapp, IconId, IconLock, IconLockOpen } from "@tabler/icons-react";
 import type { Responsible } from "@/types/responsible";
 import { cn } from "@/lib/utils";
-import { formatBrazilianPhone } from "@/utils";
+import { formatBrazilianPhone, formatCPF } from "@/utils";
 
 interface ContactDetailsCardProps {
   responsible: Responsible;
@@ -69,6 +69,24 @@ export function ContactDetailsCard({ responsible, className }: ContactDetailsCar
                 >
                   {responsible.email}
                 </a>
+              </div>
+            </div>
+          )}
+
+          {/* CPF Section — mostrado por INTEIRO aqui, que é a tela interna do
+              cadastro. O mascaramento existe no painel de assinatura, onde o
+              documento aparece ao lado de outras partes. */}
+          {responsible.cpf && (
+            <div className="pt-6 border-t border-border">
+              <h3 className="text-base font-semibold mb-4 text-foreground">CPF</h3>
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconId className="h-4 w-4" />
+                  CPF
+                </span>
+                <span className="text-sm font-semibold font-mono text-foreground">
+                  {formatCPF(responsible.cpf)}
+                </span>
               </div>
             </div>
           )}

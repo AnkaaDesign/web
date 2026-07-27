@@ -50,7 +50,13 @@ export const signatureService = {
     `${apiClient.defaults.baseURL ?? ""}/assinatura/publico/${token}/document.pdf`,
 
   requestCode: (token: string, data: { cpf: string; cargo: string; phoneConfirm: string }) =>
-    apiClient.post(`/assinatura/publico/${token}/codigo`, data),
+    // `suppressToast`: o interceptor de sucesso do axiosClient toasta TODO write,
+    // e esta rota não devolve `message` — então o cliente via um "Criado com
+    // sucesso" genérico por cima do "Código enviado para +55 43 9****-2403" que
+    // a página já mostra. A página é dona da mensagem aqui.
+    apiClient.post(`/assinatura/publico/${token}/codigo`, data, {
+      metadata: { suppressToast: true },
+    } as any),
 
   sign: (
     token: string,

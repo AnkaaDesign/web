@@ -23,7 +23,16 @@ const ABREVIADO_TO_TONE: Record<string, keyof typeof TONE_CLASSES> = (() => {
 })();
 
 function getJustificationTone(text: string): keyof typeof TONE_CLASSES {
-  return ABREVIADO_TO_TONE[text.toUpperCase()] ?? "amber";
+  const token = text.toUpperCase();
+  const exact = ABREVIADO_TO_TONE[token];
+  if (exact) return exact;
+  // Secullum truncates NomeAbreviado differently across screens ("ATEST" in the
+  // catalog vs "ATESTAD" in a time-card cell), so fall back to a prefix match
+  // before giving up and painting everything amber.
+  for (const [key, tone] of Object.entries(ABREVIADO_TO_TONE)) {
+    if (key.length >= 4 && (token.startsWith(key) || key.startsWith(token))) return tone;
+  }
+  return "amber";
 }
 
 // Time / justification cell — HH:MM passes through plain; anything else (FÉRIAS,

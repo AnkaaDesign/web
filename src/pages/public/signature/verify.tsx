@@ -25,6 +25,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
+import { apiStatusCode, extractApiMessage } from "@/components/public/signature/identity";
 import {
   IconAlertCircle,
   IconCircleCheck,
@@ -114,17 +115,34 @@ export default function PublicSignatureVerifyPage() {
 
   const lookup = useCallback(async (value: string) => {
     const clean = value.trim().toUpperCase();
-    if (!clean) return;
+    // Buscar com o campo vazio não fazia NADA: nem requisição, nem aviso. Numa
+    // página cuja única interação é esta, o botão parecia quebrado.
+    if (!clean) {
+      setData(null);
+      setError("Informe o código impresso no rodapé do documento.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const res: any = await signatureService.verify(clean);
       setData(res?.data?.data ?? res?.data);
-    } catch (e: any) {
+    } catch (e) {
       setData(null);
+      // 404 é o ÚNICO caso em que a culpa pode ser da transcrição. Antes
+      // qualquer falha caía nesta mesma frase — com a rede fora, ou num 429, a
+      // página mandava conferir caracteres que estavam certos. E a mensagem do
+      // servidor nunca chegava aqui: o interceptor do axios rejeita com um
+      // `Error` sintético, então `error.response.data.message` é sempre
+      // `undefined` (é o mesmo furo que `extractApiMessage` já corrige na tela
+      // de assinatura).
       setError(
-        e?.response?.data?.message ??
-          "Código não encontrado. Confira os caracteres impressos no rodapé do documento.",
+        apiStatusCode(e) === 404
+          ? "Código não encontrado. Confira os caracteres impressos no rodapé do documento."
+          : extractApiMessage(
+              e,
+              "Não foi possível verificar o código agora. Tente novamente em instantes.",
+            ),
       );
     } finally {
       setLoading(false);

@@ -3,7 +3,7 @@ import { toast } from "@/components/ui/sonner";
 import type { Responsible } from "@/types/responsible";
 import type { ResponsibleGetManyFormData } from "@/types/responsible";
 import { formatResponsibleRoles, getResponsibleRoles } from "@/types/responsible";
-import { formatBrazilianPhone, formatDate, formatDateTime } from "@/utils";
+import { formatBrazilianPhone, formatCPF, formatDate, formatDateTime } from "@/utils";
 import { responsibleService } from "@/services/responsibleService";
 
 interface ResponsibleExportProps {
@@ -21,6 +21,7 @@ const EXPORT_COLUMNS: ExportColumn<Responsible>[] = [
   { id: "role", label: "FUNÇÃO", getValue: (resp: Responsible) => formatResponsibleRoles(getResponsibleRoles(resp)) },
   { id: "company", label: "EMPRESA", getValue: (resp: Responsible) => resp.company?.corporateName || resp.company?.fantasyName || "" },
   { id: "phone", label: "TELEFONE", getValue: (resp: Responsible) => formatBrazilianPhone(resp.phone || "") },
+  { id: "cpf", label: "CPF", getValue: (resp: Responsible) => (resp.cpf ? formatCPF(resp.cpf) : "") },
   { id: "email", label: "E-MAIL", getValue: (resp: Responsible) => resp.email || "" },
   { id: "access", label: "ACESSO", getValue: (resp: Responsible) => (resp.email && resp.password ? "Com acesso" : "Sem acesso") },
   { id: "isActive", label: "STATUS", getValue: (resp: Responsible) => (resp.isActive ? "Ativo" : "Inativo") },
@@ -402,6 +403,7 @@ export function ResponsibleExport({ className, filters = {}, currentResponsibles
                             break;
                           case "email":
                           case "phone":
+                          case "cpf":
                           case "createdAt":
                             className = "text-left text-muted";
                             break;

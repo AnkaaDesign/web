@@ -23,6 +23,7 @@ import {
 } from '@/types/responsible';
 import { CustomerLogoDisplay } from '@/components/ui/avatar-display';
 import { formatCNPJ } from '@/utils';
+import { isValidCPF } from '@/utils/validators';
 import { useCnpjAutocomplete } from '@/hooks/common/use-cnpj-autocomplete';
 
 // Schema for responsible form
@@ -30,6 +31,21 @@ const responsibleSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   phone: z.string().min(1, 'Telefone é obrigatório'),
   email: z.string().email('E-mail inválido').optional().nullable().or(z.literal('')),
+  // CPF é OPCIONAL e NÃO é único (a identidade do contato vem do telefone), mas
+  // quando informado tem de passar no mod-11: é o mesmo campo que a cerimônia de
+  // assinatura eletrônica usa para a conferência parcial do documento.
+  cpf: z
+    .string()
+    .optional()
+    .nullable()
+    .or(z.literal(''))
+    .refine(
+      value => {
+        const digits = (value || '').replace(/\D/g, '');
+        return digits.length === 0 || isValidCPF(digits);
+      },
+      { message: 'CPF inválido' },
+    ),
   password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres').optional().nullable().or(z.literal('')),
   companyId: z.string().optional().nullable().or(z.literal('')),
   // A contact can hold several roles at once (e.g. proprietário + financeiro).
@@ -159,11 +175,13 @@ export function ResponsibleForm({
       name: initialData?.name || '',
       phone: initialData?.phone || '',
       email: initialData?.email || '',
+      cpf: initialData?.cpf || '',
       password: '',
       companyId: initialData?.companyId || '',
-      roles: getResponsibleRoles(initialData).length
-        ? getResponsibleRoles(initialData)
-        : [ResponsibleRole.COMMERCIAL],
+      // Sem função pré-selecionada: quem cadastra escolhe. O schema exige ao
+      // menos uma ("Selecione ao menos uma função"), então o campo vazio avisa
+      // em vez de gravar um "Comercial" que ninguém marcou.
+      roles: getResponsibleRoles(initialData),
       isActive: initialData?.isActive ?? true,
       hasSystemAccess: !!(initialData?.email && initialData?.password),
     },
@@ -205,6 +223,8 @@ export function ResponsibleForm({
       ...data,
       // Convert empty strings to null for optional fields
       email: hasSystemAccess && data.email ? data.email : null,
+      // Dígitos puros: é assim que a API grava (e o `cpfNormalized` gerado indexa).
+      cpf: (data.cpf || '').replace(/\D/g, '') || null,
       password: hasSystemAccess && data.password ? data.password : null,
       companyId: data.companyId || null,
     };
@@ -239,8 +259,10 @@ export function ResponsibleForm({
               <CardDescription>Dados fundamentais do responsável</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Name and Phone in same row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Nome + Telefone + CPF na mesma linha: os três identificam a
+                  PESSOA. O CPF é opcional, mas é o que permite a conferência
+                  parcial do documento na assinatura eletrônica. */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <FormField
                   control={form.control}
                   name="name"
@@ -271,6 +293,28 @@ export function ResponsibleForm({
                           {...field}
                           type="phone"
                           placeholder="(00) 00000-0000"
+                          disabled={isSubmitting}
+                          className="bg-transparent"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cpf"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CPF</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="cpf"
+                          value={field.value ?? ''}
+                          onChange={(newValue) => field.onChange(typeof newValue === 'string' ? newValue : '')}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          placeholder="000.000.000-00"
                           disabled={isSubmitting}
                           className="bg-transparent"
                         />

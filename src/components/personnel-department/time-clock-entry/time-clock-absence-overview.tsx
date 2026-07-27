@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  IconAlertTriangle,
   IconCalendarOff,
   IconEdit,
 } from "@tabler/icons-react";
@@ -9,12 +10,14 @@ import {
 import type { SecullumAbsenceDayRow } from "@/types";
 import {
   CONTRACT_STATUS,
-  SECULLUM_JUSTIFICATIVAS,
+  UNJUSTIFIED_JUSTIFICATIVA_ID,
   getJustificativaCategory,
-  getJustificativaMeta,
+  isJustificativaJustified,
+  mergeJustificativaCatalog,
   TONE_CLASSES,
+  type SecullumJustificativaMeta,
 } from "@/constants";
-import { useSecullumAbsenceDays, useUsers } from "@/hooks";
+import { useSecullumAbsenceDays, useSecullumJustifications, useUsers } from "@/hooks";
 import { AbsenceFormDialog } from "@/components/personnel-department/absence/form/absence-form-dialog";
 import type { SecullumAggregatedAbsence } from "@/types";
 import {
@@ -24,6 +27,7 @@ import {
 } from "./time-clock-absence-export";
 import { PeriodControl } from "./period-control";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import type { ComboboxOption } from "@/components/ui/combobox";
@@ -50,20 +54,35 @@ import { cn } from "@/lib/utils";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ALL_USERS = "__ALL__";
-const FERIAS_JUSTIFICATIVA_ID = 2;
 const WEEKDAY_SHORT_PT = ["Dom.", "Seg.", "Ter.", "Qua.", "Qui.", "Sex.", "Sáb."];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type AbsenceFilterMode =
-  | "TODOS"
-  | "FALTA_NAO_JUSTIFICADA"
-  | "FALTA"
-  | "AUSENCIA"
-  | "FERIAS"
-  | string; // `JUSTIFICATIVA_${number}` for specific justificativas
+// Aggregate filters. NOTE: the old "AUSENCIA" aggregate (JustificativaId whose
+// `category` is AUSENCIA) is deliberately gone — on a page called "Ausências" it
+// read as "show the justified absences" but actually meant "show scheduled
+// leave", so every Atestado Médico / Atestado de Óbito (category FALTA, but very
+// much justified) was filtered out. The justified/unjustified axis below is the
+// one users mean; per-type options cover the "only férias" style needs.
+const FILTER_ALL = "TODOS";
+const FILTER_JUSTIFIED = "JUSTIFICADAS";
+const FILTER_UNJUSTIFIED = "NAO_JUSTIFICADAS";
+const FILTER_FALTA = "FALTA";
+const JUSTIFICATIVA_PREFIX = "JUSTIFICATIVA_";
+
+type AbsenceFilterMode = string;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// "YYYY-MM-DD" → Date at LOCAL midnight. `new Date("2026-07-27")` parses as UTC
+// midnight, which in UTC-3 lands on the 26th — that off-by-one silently shifted
+// every date comparison on this page by a day.
+const parseIsoDateLocal = (s: string): Date | null => {
+  const parts = s.substring(0, 10).split("-");
+  if (parts.length !== 3) return null;
+  const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+  return isNaN(d.getTime()) ? null : d;
+};
 
 const getPayrollPeriod = (month: Date) => ({
   start: new Date(month.getFullYear(), month.getMonth() - 1, 26),
@@ -88,47 +107,51 @@ const getPayrollPeriodDisplay = (month: Date) => {
 };
 
 const fmtDate = (s: string) => {
-  const parts = s.substring(0, 10).split("-");
-  if (parts.length !== 3) return s;
-  const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
-  return isNaN(d.getTime()) ? s : format(d, "dd/MM/yy", { locale: ptBR });
+  const d = parseIsoDateLocal(s);
+  return d ? format(d, "dd/MM/yy", { locale: ptBR }) : s;
 };
 
 const fmtWeekday = (dateStr: string) => {
-  const parts = dateStr.substring(0, 10).split("-");
-  if (parts.length !== 3) return "";
-  const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
-  return WEEKDAY_SHORT_PT[d.getDay()] ?? "";
+  const d = parseIsoDateLocal(dateStr);
+  return d ? (WEEKDAY_SHORT_PT[d.getDay()] ?? "") : "";
 };
 
-// ─── Filter options ───────────────────────────────────────────────────────────
+// ─── Filter predicate ─────────────────────────────────────────────────────────
 
-// JustificativaIds that already have a dedicated aggregate filter above
-// (excluded from the spread to avoid duplicate labels in the combobox).
-const AGGREGATE_DUPLICATE_IDS = new Set<number>([
-  FERIAS_JUSTIFICATIVA_ID, // matches "FERIAS" aggregate (label: "Férias")
-  3, // matches "FALTA_NAO_JUSTIFICADA" aggregate (label: "Falta sem Justificativa")
-]);
+const matchesFilterMode = (r: SecullumAbsenceDayRow, mode: AbsenceFilterMode): boolean => {
+  if (mode === FILTER_ALL) return true;
 
-const ABSENCE_FILTER_OPTIONS: ComboboxOption[] = [
-  { value: "TODOS", label: "Todos os registros" },
-  { value: "FALTA_NAO_JUSTIFICADA", label: "Faltas Não Justificadas" },
-  { value: "FALTA", label: "Todas as Faltas" },
-  { value: "AUSENCIA", label: "Ausências" },
-  { value: "FERIAS", label: "Férias" },
-  ...Object.values(SECULLUM_JUSTIFICATIVAS)
-    .filter((j) => !AGGREGATE_DUPLICATE_IDS.has(j.id))
-    .map((j) => ({
-      value: `JUSTIFICATIVA_${j.id}`,
-      label: j.label,
-    })),
-];
+  // The API could not read the afastamentos for this employee, so its
+  // JustificativaId is a placeholder. It is a missed workday, but we cannot
+  // claim it is justified OR unjustified — keep it out of both buckets.
+  if (r.justificativaUnavailable) return mode === FILTER_FALTA;
+
+  const { JustificativaId: id } = r;
+  if (mode === FILTER_JUSTIFIED) return isJustificativaJustified(id);
+  if (mode === FILTER_UNJUSTIFIED) return id === UNJUSTIFIED_JUSTIFICATIVA_ID;
+  if (mode === FILTER_FALTA) return getJustificativaCategory(id) === "FALTA";
+  if (mode.startsWith(JUSTIFICATIVA_PREFIX)) {
+    const wanted = parseInt(mode.slice(JUSTIFICATIVA_PREFIX.length), 10);
+    return Number.isFinite(wanted) && id === wanted;
+  }
+  return true;
+};
 
 // ─── Tipo label pill (no background, just colored text + dot) ─────────────────
 
-function TipoPill({ justificativaId, descricao }: { justificativaId: number; descricao?: string }) {
-  const meta = getJustificativaMeta(justificativaId);
-  const label = meta?.label ?? descricao ?? `#${justificativaId}`;
+function TipoPill({ row, catalog }: { row: SecullumAbsenceDayRow; catalog: Map<number, SecullumJustificativaMeta> }) {
+  if (row.justificativaUnavailable) {
+    return (
+      <span
+        className="text-sm font-medium whitespace-nowrap text-muted-foreground italic"
+        title="Não foi possível ler os afastamentos deste colaborador no Secullum — o tipo desta ausência é desconhecido."
+      >
+        Justificativa indisponível
+      </span>
+    );
+  }
+  const meta = catalog.get(row.JustificativaId);
+  const label = meta?.label ?? row.JustificativaDescricao ?? `#${row.JustificativaId}`;
   return (
     <span
       className={cn(
@@ -157,11 +180,15 @@ function AbsenceOverviewTable({
   isLoading,
   onEdit,
   visibleColumns,
+  catalog,
+  emptyState,
 }: {
   records: SecullumAbsenceDayRow[];
   isLoading: boolean;
   onEdit: (r: SecullumAbsenceDayRow) => void;
   visibleColumns: Set<string>;
+  catalog: Map<number, SecullumJustificativaMeta>;
+  emptyState: { title: string; hint?: string; onClear?: () => void };
 }) {
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -217,7 +244,13 @@ function AbsenceOverviewTable({
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
         <IconCalendarOff className="h-8 w-8 opacity-40" />
-        <p className="text-sm">Nenhum registro encontrado no período</p>
+        <p className="text-sm">{emptyState.title}</p>
+        {emptyState.hint && <p className="text-xs opacity-80">{emptyState.hint}</p>}
+        {emptyState.onClear && (
+          <Button variant="outline" size="sm" className="mt-2" onClick={emptyState.onClear}>
+            Limpar filtros
+          </Button>
+        )}
       </div>
     );
   }
@@ -274,7 +307,7 @@ function AbsenceOverviewTable({
               )}
               {visibleColumns.has("tipo") && (
                 <TableCell className="px-4">
-                  <TipoPill justificativaId={r.JustificativaId} descricao={r.JustificativaDescricao} />
+                  <TipoPill row={r} catalog={catalog} />
                 </TableCell>
               )}
               {visibleColumns.has("setor") && (
@@ -358,7 +391,7 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
   const [startDate, setStartDate] = useState<Date>(start);
   const [endDate, setEndDate] = useState<Date>(end);
   const [selectedUserId, setSelectedUserId] = useState<string>(ALL_USERS);
-  const [filterMode, setFilterMode] = useState<AbsenceFilterMode>("TODOS");
+  const [filterMode, setFilterMode] = useState<AbsenceFilterMode>(FILTER_ALL);
   const [editing, setEditing] = useState<SecullumAggregatedAbsence | null>(null);
 
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
@@ -376,6 +409,10 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
 
   const { data: absenceDaysData, isLoading: absenceDaysLoading } =
     useSecullumAbsenceDays(fetchParams);
+
+  // Live justificativa catalog — keeps labels in sync with Secullum and makes
+  // sure a code HR adds there is filterable here without a redeploy.
+  const { data: justificationsData } = useSecullumJustifications();
 
   const { data: usersData } = useUsers({
     statuses: [CONTRACT_STATUS.ACTIVE],
@@ -398,29 +435,65 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
     return [];
   }, [absenceDaysData]);
 
-  const filteredAbsences = useMemo<SecullumAbsenceDayRow[]>(() => {
+  // The API answers 200 with whatever it managed to read from Secullum. Without
+  // this banner a throttled/failed upstream call looks identical to a genuinely
+  // absence-free period.
+  const incompleteEmployees = useMemo<string[]>(() => {
+    const root: any = absenceDaysData?.data;
+    return Array.isArray(root?.incompleteEmployees) ? root.incompleteEmployees : [];
+  }, [absenceDaysData]);
+
+  // Merged catalog: static presentation + live Secullum names + any id that
+  // actually shows up in the loaded rows. Nothing can be unfilterable.
+  const catalogList = useMemo<SecullumJustificativaMeta[]>(() => {
+    const live = (justificationsData?.data as any)?.data ?? justificationsData?.data;
+    return mergeJustificativaCatalog(
+      Array.isArray(live) ? live : [],
+      allAbsenceDays.map((r) => r.JustificativaId),
+    );
+  }, [justificationsData, allAbsenceDays]);
+
+  const catalogById = useMemo(
+    () => new Map(catalogList.map((m) => [m.id, m])),
+    [catalogList],
+  );
+
+  const filterOptions = useMemo<ComboboxOption[]>(
+    () => [
+      { value: FILTER_ALL, label: "Todos os registros" },
+      { value: FILTER_JUSTIFIED, label: "Ausências Justificadas" },
+      { value: FILTER_UNJUSTIFIED, label: "Faltas Não Justificadas" },
+      { value: FILTER_FALTA, label: "Todas as Faltas" },
+      ...catalogList
+        // "Falta sem Justificativa" is already the FILTER_UNJUSTIFIED aggregate.
+        .filter((m) => m.id !== UNJUSTIFIED_JUSTIFICATIVA_ID)
+        .map((m) => ({ value: `${JUSTIFICATIVA_PREFIX}${m.id}`, label: m.label })),
+    ],
+    [catalogList],
+  );
+
+  // Rows in the period, before the type/collaborator filters — the denominator
+  // for the result count and the "your filter hid everything" empty state.
+  const periodAbsences = useMemo<SecullumAbsenceDayRow[]>(() => {
     return allAbsenceDays.filter((r) => {
-      // Exclude today for unjustified — current workday may be unfinished
-      if (r.JustificativaId === 3) {
-        const d = new Date(r.date);
-        d.setHours(0, 0, 0, 0);
-        if (d >= today) return false;
-      }
-
-      if (selectedUserId !== ALL_USERS && r.userId !== selectedUserId) return false;
-
-      if (filterMode === "TODOS") return true;
-      if (filterMode === "FALTA_NAO_JUSTIFICADA") return r.JustificativaId === 3;
-      if (filterMode === "FALTA") return getJustificativaCategory(r.JustificativaId) === "FALTA";
-      if (filterMode === "AUSENCIA") return getJustificativaCategory(r.JustificativaId) === "AUSENCIA";
-      if (filterMode === "FERIAS") return r.JustificativaId === FERIAS_JUSTIFICATIVA_ID;
-      if (filterMode.startsWith("JUSTIFICATIVA_")) {
-        const id = parseInt(filterMode.replace("JUSTIFICATIVA_", ""), 10);
-        return r.JustificativaId === id;
+      // Exclude today onwards for unjustified — the current workday may still be
+      // unfinished, so its Faltas reading is not yet meaningful.
+      if (r.JustificativaId === UNJUSTIFIED_JUSTIFICATIVA_ID) {
+        const d = parseIsoDateLocal(r.date);
+        if (d && d >= today) return false;
       }
       return true;
     });
-  }, [allAbsenceDays, filterMode, selectedUserId, today]);
+  }, [allAbsenceDays, today]);
+
+  const filteredAbsences = useMemo<SecullumAbsenceDayRow[]>(() => {
+    return periodAbsences.filter((r) => {
+      if (selectedUserId !== ALL_USERS && r.userId !== selectedUserId) return false;
+      return matchesFilterMode(r, filterMode);
+    });
+  }, [periodAbsences, filterMode, selectedUserId]);
+
+  const hasActiveFilter = filterMode !== FILTER_ALL || selectedUserId !== ALL_USERS;
 
   const userOptions = useMemo<ComboboxOption[]>(() => {
     const list: any[] = usersData?.data ?? [];
@@ -454,12 +527,15 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
     : period;
 
   const filterLabel = useMemo(
-    () => ABSENCE_FILTER_OPTIONS.find((o) => o.value === filterMode)?.label,
-    [filterMode],
+    () => filterOptions.find((o) => o.value === filterMode)?.label,
+    [filterOptions, filterMode],
   );
   const exportRows = useMemo(
-    () => filteredAbsences.map(toAbsenceExportRow),
-    [filteredAbsences],
+    () =>
+      filteredAbsences.map((r) =>
+        toAbsenceExportRow(r, (id) => catalogById.get(id)?.label),
+      ),
+    [filteredAbsences, catalogById],
   );
 
   // Push filtered data up to the parent so the page-header export button
@@ -488,21 +564,28 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
             }
             options={userOptions}
             placeholder="Todos os colaboradores"
-            className="w-[260px]"
+            className="w-[360px]"
             searchable
             clearable={false}
           />
           <Combobox
             value={filterMode}
             onValueChange={(v) =>
-              setFilterMode((v || "TODOS") as AbsenceFilterMode)
+              setFilterMode((typeof v === "string" && v ? v : FILTER_ALL) as AbsenceFilterMode)
             }
-            options={ABSENCE_FILTER_OPTIONS}
+            options={filterOptions}
             placeholder="Tipo de registro"
             className="w-[260px]"
             searchable
             clearable={false}
           />
+          <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+            {absenceDaysLoading
+              ? "—"
+              : hasActiveFilter
+                ? `${filteredAbsences.length} de ${periodAbsences.length} registros`
+                : `${periodAbsences.length} registros`}
+          </span>
 
           {/* Right: period control + column visibility + export */}
           <div className="flex items-center gap-2 ml-auto">
@@ -533,6 +616,19 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
           </div>
         </div>
 
+        {/* ── Partial-data warning ── */}
+        {incompleteEmployees.length > 0 && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+            <IconAlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span>
+              O Secullum não respondeu para {incompleteEmployees.length} colaborador(es) —{" "}
+              <span className="font-medium">{incompleteEmployees.slice(0, 3).join(", ")}</span>
+              {incompleteEmployees.length > 3 && ` e mais ${incompleteEmployees.length - 3}`}. A
+              lista abaixo pode estar incompleta; recarregue para tentar novamente.
+            </span>
+          </div>
+        )}
+
         {/* ── Table ── */}
         <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
           <AbsenceOverviewTable
@@ -540,6 +636,19 @@ export function TimeClockAbsenceOverview({ className, onExportDataChange }: Time
             isLoading={absenceDaysLoading}
             onEdit={(r) => setEditing(rowToAggregated(r))}
             visibleColumns={visibleColumns}
+            catalog={catalogById}
+            emptyState={
+              periodAbsences.length > 0 && hasActiveFilter
+                ? {
+                    title: "Nenhum registro para os filtros selecionados",
+                    hint: `${periodAbsences.length} registro(s) no período foram ocultados pelos filtros.`,
+                    onClear: () => {
+                      setFilterMode(FILTER_ALL);
+                      setSelectedUserId(ALL_USERS);
+                    },
+                  }
+                : { title: "Nenhum registro encontrado no período" }
+            }
           />
         </div>
       </CardContent>

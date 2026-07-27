@@ -3,6 +3,7 @@ import { IconPlus } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/common/use-toast';
+import { isValidCPF } from '@/utils/validators';
 import type {
   ResponsibleRole,
   ResponsibleRowData,
@@ -20,7 +21,20 @@ export function validateResponsibleRows(rows: ResponsibleRowData[]): boolean {
     // applies to already-registered contacts too, whose roles are editable
     // inline -- otherwise clearing every role would silently save nothing.
     if (isInlineCreate) {
-      return !!row.name?.trim() && !!row.phone?.trim() && (row.roles?.length ?? 0) > 0;
+      // CPF e e-mail são opcionais, mas quando preenchidos têm de ser válidos:
+      // a API valida CPF por mod-11 e devolve uma mensagem genérica, então
+      // deixar passar aqui só troca um erro de campo por um 400 sem contexto.
+      const cpfDigits = (row.cpf || '').replace(/\D/g, '');
+      const cpfOk = cpfDigits.length === 0 || isValidCPF(cpfDigits);
+      const email = row.email?.trim() || '';
+      const emailOk = email.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      return (
+        !!row.name?.trim() &&
+        !!row.phone?.trim() &&
+        (row.roles?.length ?? 0) > 0 &&
+        cpfOk &&
+        emailOk
+      );
     }
     const isExisting = !!row.id && !row.id.startsWith('temp-');
     return isExisting ? (row.roles?.length ?? 0) > 0 : true;
@@ -70,6 +84,7 @@ export const ResponsibleManager: React.FC<ResponsibleManagerProps> = ({
           name: '',
           phone: '',
           email: '',
+          cpf: null,
           // Sem função pré-selecionada: marcar "Comercial" sozinho fazia o
       // formulário afirmar um papel que ninguém escolheu.
       roles: [],
@@ -104,6 +119,7 @@ export const ResponsibleManager: React.FC<ResponsibleManagerProps> = ({
       name: '',
       phone: '',
       email: '',
+      cpf: null,
       // Sem função pré-selecionada: marcar "Comercial" sozinho fazia o
       // formulário afirmar um papel que ninguém escolheu.
       roles: [],

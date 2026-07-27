@@ -297,13 +297,19 @@ export default function PublicSignaturePage() {
         clientTimestamp: new Date().toISOString(),
         geo,
       });
-      toast.success("Orçamento assinado com sucesso.");
+      // Sem toast próprio: o `api-client` já anuncia a mensagem que o servidor
+      // devolve neste POST ("Orçamento assinado com sucesso."), e o cartão verde
+      // logo abaixo repete o fato. Um `toast.success` aqui empilhava dois avisos
+      // idênticos na tela do cliente.
       setStep("done");
       void load();
     } catch (e) {
       const message = extractApiMessage(e, "Não foi possível concluir a assinatura.");
       setStepError(message);
-      setCode("");
+      // Só apaga o código quando foi ELE que o servidor recusou. Numa queda de
+      // conexão o que o signatário digitou está certo, e limpar o campo o obriga
+      // a sair da página para reler o WhatsApp — justamente no passo final.
+      if (/c[óo]digo/i.test(message)) setCode("");
       if (isTerminalSignatureError(e, message)) void load();
     } finally {
       setBusy(false);
@@ -331,8 +337,9 @@ export default function PublicSignaturePage() {
         code: digits,
         reason: refusalReason.trim(),
       });
+      // Idem: o `api-client` já toasta "Recusa registrada." (mensagem do
+      // servidor) e o cartão vermelho abaixo diz que a Ankaa foi notificada.
       setStep("refused");
-      toast.success("Recusa registrada. A Ankaa foi notificada.");
     } catch (e) {
       const message = extractApiMessage(e, "Não foi possível registrar a recusa.");
       setStepError(message);
@@ -501,18 +508,24 @@ export default function PublicSignaturePage() {
             </div>
 
             {/* Um aceite só. As quatro chaves seguem sendo enviadas ao servidor —
-                o que muda é quantos cliques se pede por um único consentimento. */}
-            <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-              <Checkbox
-                checked={consentChecked}
-                onCheckedChange={v => acceptAll(v === true)}
-                className="mt-0.5"
-                disabled={busy}
-              />
-              <span className="text-foreground">
-                Li e concordo com o termo de aceite eletrônico e com as declarações acima.
-              </span>
-            </label>
+                o que muda é quantos cliques se pede por um único consentimento.
+                NÃO aparece no modo recusa: pedir "li e concordo com o termo de
+                aceite" dentro de uma janela intitulada "Recusar assinatura" é
+                pedir o contrário do ato, e a recusa não usa esse aceite (o
+                servidor exige motivo + código, não declarações). */}
+            {refusing ? null : (
+              <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+                <Checkbox
+                  checked={consentChecked}
+                  onCheckedChange={v => acceptAll(v === true)}
+                  className="mt-0.5"
+                  disabled={busy}
+                />
+                <span className="text-foreground">
+                  Li e concordo com o termo de aceite eletrônico e com as declarações acima.
+                </span>
+              </label>
+            )}
 
             {refusing ? (
               <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
@@ -693,6 +706,24 @@ export default function PublicSignaturePage() {
           </Card>
         )}
 
+        {/* Coleta encerrada (cancelada, vencida, substituída, já concluída) —
+            ACIMA do documento, junto dos outros cartões de estado.
+            Estava abaixo dele: num orçamento já selado o PDF tem 3 páginas e
+            empurrava este aviso para ~2900px, três telas e meia abaixo no
+            celular. Quem abre um link morto precisa saber disso antes de ler o
+            documento inteiro, não depois. */}
+        {!state.canSign && step !== "done" && step !== "refused" && (
+          <Card className="border-amber-500/30 bg-amber-500/10">
+            <CardContent className="flex items-center gap-3 py-4">
+              <IconAlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
+              <p className="text-sm text-foreground">
+                Esta coleta de assinaturas não está mais ativa. Se o orçamento foi alterado,
+                você receberá um novo link para revisão.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Documento — sempre visível, inclusive depois de assinado */}
         <Card>
           <CardContent className="p-0">
@@ -721,18 +752,6 @@ export default function PublicSignaturePage() {
             </div>
           </CardContent>
         </Card>
-
-        {!state.canSign && step !== "done" && step !== "refused" && (
-          <Card className="border-amber-500/30 bg-amber-500/10">
-            <CardContent className="flex items-center gap-3 py-4">
-              <IconAlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
-              <p className="text-sm text-foreground">
-                Esta coleta de assinaturas não está mais ativa. Se o orçamento foi alterado,
-                você receberá um novo link para revisão.
-              </p>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Etapa 1 — identificação (leitura) */}
         {identityVisible && (

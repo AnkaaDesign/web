@@ -18,6 +18,17 @@ export interface Responsible {
   email?: string | null;
   phone: string;
   name: string;
+  /**
+   * CPF em dígitos puros (11 caracteres), sem pontuação — é assim que a API
+   * grava e devolve.
+   *
+   * Opcional de propósito e SEM unicidade: a identidade do contato vem do
+   * telefone. O CPF também é gravado durante a cerimônia de assinatura
+   * eletrônica, e tê-lo no cadastro é o que permite pedir ao signatário apenas
+   * os dígitos que a máscara esconde — a conferência parcial só existe se
+   * houver um número cadastrado para conferir.
+   */
+  cpf?: string | null;
   password?: string | null;
   companyId?: string | null;
   roles: ResponsibleRole[];
@@ -34,6 +45,8 @@ export interface ResponsibleCreateFormData {
   email?: string | null;
   phone: string;
   name: string;
+  /** Dígitos puros; a API valida mod-11 e recusa CPF inválido. */
+  cpf?: string | null;
   password?: string | null;
   companyId?: string | null;
   roles: ResponsibleRole[];
@@ -44,6 +57,8 @@ export interface ResponsibleUpdateFormData {
   email?: string | null;
   phone?: string;
   name?: string;
+  /** Dígitos puros; a API valida mod-11 e recusa CPF inválido. */
+  cpf?: string | null;
   password?: string | null;
   roles?: ResponsibleRole[];
   isActive?: boolean;
@@ -53,6 +68,7 @@ export interface ResponsibleCreateInline {
   email?: string | null;
   phone: string;
   name: string;
+  cpf?: string | null;
   password?: string | null;
   roles: ResponsibleRole[];
   isActive?: boolean;
@@ -63,6 +79,8 @@ export interface ResponsibleRowData {
   email?: string | null;
   phone: string;
   name: string;
+  /** Dígitos puros. Vazio/ausente é válido — o CPF não é obrigatório. */
+  cpf?: string | null;
   roles: ResponsibleRole[];
   /**
    * Papéis que o contato tinha quando entrou na linha.

@@ -7,7 +7,7 @@ import {
 } from "@/types/responsible";
 import { Badge } from "@/components/ui/badge";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
-import { formatBrazilianPhone, formatDateTime } from "@/utils";
+import { formatBrazilianPhone, formatCPF, formatDateTime } from "@/utils";
 
 export interface ResponsibleColumn {
   key: string;
@@ -89,6 +89,24 @@ export function createResponsibleColumns(): ResponsibleColumn[] {
       ),
       sortable: false,
       className: "min-w-[140px]",
+      align: "left",
+    },
+    {
+      // CPF fica ao lado do telefone: os dois identificam a PESSOA, e é por eles
+      // que a assinatura eletrônica confere quem assinou.
+      key: "cpf",
+      header: "CPF",
+      accessor: (responsible) => (
+        <div className="text-sm tabular-nums">
+          {responsible.cpf ? (
+            <span>{formatCPF(responsible.cpf)}</span>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </div>
+      ),
+      sortable: false,
+      className: "min-w-[150px]",
       align: "left",
     },
     {

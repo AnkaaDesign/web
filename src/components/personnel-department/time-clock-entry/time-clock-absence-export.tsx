@@ -20,7 +20,13 @@ export interface AbsenceExportRow {
   isPartialDay: boolean;
 }
 
-export function toAbsenceExportRow(r: SecullumAbsenceDayRow): AbsenceExportRow {
+// `resolveLabel` lets the caller pass the live Secullum catalog so the export
+// shows the same "Tipo" text as the table (Secullum only returns the abbreviated
+// NomeAbreviado on absence rows, e.g. "ATEST" instead of "Atestado Médico").
+export function toAbsenceExportRow(
+  r: SecullumAbsenceDayRow,
+  resolveLabel?: (id: number) => string | undefined,
+): AbsenceExportRow {
   const meta = getJustificativaMeta(r.JustificativaId);
   return {
     id: `${r.userId}-${r.date}-${r.JustificativaId}`,
@@ -28,7 +34,11 @@ export function toAbsenceExportRow(r: SecullumAbsenceDayRow): AbsenceExportRow {
     userName: r.userName,
     sectorName: r.sectorName ?? "",
     justificativaId: r.JustificativaId,
-    justificativaLabel: meta?.label ?? r.JustificativaDescricao ?? `#${r.JustificativaId}`,
+    justificativaLabel:
+      resolveLabel?.(r.JustificativaId) ??
+      meta?.label ??
+      r.JustificativaDescricao ??
+      `#${r.JustificativaId}`,
     faltas: r.faltas ?? "",
     motivo: r.Motivo ?? "",
     isPartialDay: !!r.isPartialDay,

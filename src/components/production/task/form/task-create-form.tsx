@@ -55,7 +55,6 @@ import { LayoutFileUploadField } from "./layout-file-upload-field";
 import { MultiAirbrushingSelector } from "./multi-airbrushing-selector";
 import { createAirbrushingsForTask } from "@/utils/airbrushing-submit";
 import type { ResponsibleRowData } from "@/types/responsible";
-import { ResponsibleRole } from "@/types/responsible";
 import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toast } from "@/components/ui/sonner";
@@ -202,7 +201,11 @@ export const TaskCreateForm = () => {
     name: '',
     phone: '',
     email: '',
-    roles: ['COMMERCIAL' as ResponsibleRole],
+    // Sem função pré-selecionada: quem cadastra escolhe. Marcar "Comercial"
+    // sozinho fazia o formulário afirmar um papel que ninguém escolheu — e, ao
+    // selecionar um contato já cadastrado, essa função fantasma competia com as
+    // funções reais do cadastro.
+    roles: [],
     isActive: true,
     isNew: true,
     isEditing: false,
@@ -349,14 +352,18 @@ export const TaskCreateForm = () => {
       // has to be written onto the Responsible itself -- that is what makes it
       // appear on this task, on its quote, and on every other task sharing the
       // contact. Runs before the task save so a failure aborts cleanly.
-      await syncResponsibleRoles(responsibleRows);
-
         // Validate responsible rows before submitting
         if (!validateResponsibleRows(responsibleRows)) {
           setShowResponsibleErrors(true);
           toast.error("Preencha o nome, telefone e ao menos uma função dos responsáveis");
           return;
         }
+
+      // VALIDAR ANTES DE GRAVAR. `syncResponsibleRoles` escreve direto no
+      // Responsible; rodá-lo antes da validação fazia a função de um contato ser
+      // gravada e o resto do submit abortar logo em seguida — escrita parcial num
+      // envio que o usuário viu como cancelado, e que ele não tem como desfazer.
+        await syncResponsibleRoles(responsibleRows);
 
         const { plates, serialNumbers, name, customerId, status, category, implementType, forecastDate, term, details, paintId, paintIds } = data;
 
@@ -416,6 +423,9 @@ export const TaskCreateForm = () => {
             name: row.name.trim(),
             phone: row.phone.trim(),
             email: row.email?.trim() || undefined,
+            // Dígitos puros — o Input `type="cpf"` já entrega limpo. Vazio vira
+            // `undefined` para o schema opcional da API não receber "".
+            cpf: (row.cpf || '').replace(/\D/g, '') || undefined,
             roles: row.roles,
             isActive: row.isActive,
             customerId: customerIdValue || undefined,

@@ -9,6 +9,7 @@ import { CustomerCombobox } from '@/components/ui/customer-combobox';
 import { cn } from '@/lib/utils';
 import { responsibleService } from '@/services/responsibleService';
 import { toBrazilianNameCase } from '@/utils/formatters';
+import { isValidCPF } from '@/utils/validators';
 import type { Responsible, ResponsibleRole, ResponsibleRowData } from '@/types/responsible';
 import { RESPONSIBLE_ROLE_LABELS, getResponsibleRoles } from '@/types/responsible';
 
@@ -47,13 +48,24 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     const showCreateInputs = value.isEditing && value.id?.startsWith('temp-');
 
     // Track which fields have been touched (blurred) for inline validation
-    const [touched, setTouched] = useState<{ name?: boolean; phone?: boolean }>({});
+    const [touched, setTouched] = useState<{ name?: boolean; phone?: boolean; cpf?: boolean; email?: boolean }>({});
 
     // Validation: name and phone are required when in create mode
     const nameEmpty = showCreateInputs && !value.name?.trim();
     const phoneEmpty = showCreateInputs && !value.phone?.trim();
     const nameError = nameEmpty && (touched.name || showErrors);
     const phoneError = phoneEmpty && (touched.phone || showErrors);
+
+    // CPF e e-mail são OPCIONAIS — só erram quando preenchidos e inválidos.
+    // O CPF vai para o mesmo campo que a cerimônia de assinatura consulta, e o
+    // servidor recusa mod-11 inválido com uma mensagem genérica; conferir aqui
+    // é o que dá ao usuário um erro no campo certo.
+    const cpfDigits = (value.cpf || '').replace(/\D/g, '');
+    const cpfInvalid = showCreateInputs && cpfDigits.length > 0 && !isValidCPF(cpfDigits);
+    const cpfError = cpfInvalid && (touched.cpf || showErrors);
+    const emailInvalid =
+      showCreateInputs && !!value.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim());
+    const emailError = emailInvalid && (touched.email || showErrors);
 
     // Async query function for the Combobox
     const queryFn = useCallback(async (searchTerm: string, page?: number) => {
@@ -77,12 +89,12 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     // Provide the currently selected rep as initial option so the Combobox can display it
     const initialOptions = useMemo(() => {
       if (value.id && !value.id.startsWith('temp-') && value.name) {
-        const rep = { id: value.id, name: value.name, phone: value.phone || '', email: value.email || '', roles: value.roles ?? [], isActive: true } as Responsible;
+        const rep = { id: value.id, name: value.name, phone: value.phone || '', email: value.email || '', cpf: value.cpf ?? null, roles: value.roles ?? [], isActive: true } as Responsible;
         responsibleCache.set(rep.id, rep);
         return [rep];
       }
       return [];
-    }, [value.id, value.name, value.phone, value.email, value.roles]);
+    }, [value.id, value.name, value.phone, value.email, value.cpf, value.roles]);
 
     // Handle role selection — a contact can hold several roles at once.
     //
@@ -109,6 +121,7 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
           name: '',
           phone: '',
           email: '',
+          cpf: null,
           isNew: false,
           isEditing: false,
         });
@@ -122,6 +135,7 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
           name: toBrazilianNameCase(searchTerm || ''),
           phone: '',
           email: '',
+          cpf: null,
           isNew: true,
           isEditing: true, // This will trigger showCreateInputs
         });
@@ -134,6 +148,7 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
             name: rep.name,
             phone: rep.phone,
             email: rep.email || '',
+            cpf: rep.cpf ?? null,
             // Adopt the contact's registered roles. The row now shows a role
             // editor next to the combobox, so leaving the previous row's roles
             // in place would display something the contact does not actually
@@ -201,17 +216,21 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     const currentResponsibleValue = value.id && !value.id.startsWith('temp-') ? value.id : '';
 
     return (
-      <div ref={ref} className={cn("space-y-3", (nameError || phoneError) && "pb-4")}>
+      <div ref={ref} className={cn("space-y-3", (nameError || phoneError || cpfError || emailError) && "pb-4")}>
         {/* items-start, not items-end: the multi-role Combobox grows taller as
             chips wrap, and bottom alignment pushed every sibling input down with
             it. Each cell carries its own label, so the tops line up. */}
         <div className={cn(
           "grid grid-cols-1 gap-2 items-start",
           // Nome primeiro: a linha se identifica por QUEM e, nao pela funcao.
-          showCreateInputs ? "sm:grid-cols-[3fr_2fr_3fr_3fr_auto]" : "sm:grid-cols-[3fr_2fr_auto]"
+          // Cadastro inline tem 6 campos: em telas medias eles quebram em duas
+          // colunas em vez de espremer tudo numa faixa ilegivel.
+          showCreateInputs
+            ? "sm:grid-cols-2 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)_minmax(0,2fr)_minmax(0,3fr)_minmax(0,2fr)_minmax(0,3fr)_auto]"
+            : "sm:grid-cols-[3fr_2fr_auto]"
         )}>
           {showCreateInputs ? (
-            /* Cadastro inline: Nome + Telefone + Função + Empresa + Remover */
+            /* Cadastro inline: Nome + Telefone + CPF + E-mail + Função + Empresa + Remover */
             <>
               {/* Name */}
               <div className="relative space-y-2">
@@ -260,6 +279,54 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                   className={cn("bg-transparent", phoneError && "border-destructive")}
                 />
                 {phoneError && <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">Telefone é obrigatório</p>}
+              </div>
+
+              {/* CPF — opcional, mas é o que permite a conferência PARCIAL do
+                  documento na assinatura eletrônica: com CPF cadastrado o
+                  signatário completa só os dígitos ocultos, e acertar vale como
+                  conferência de identidade. Sem ele, o primeiro a assinar digita
+                  o número inteiro e é esse valor que fica gravado. */}
+              <div className="relative space-y-2">
+                {isFirstRow && <FormLabel>CPF</FormLabel>}
+                <Input
+                  type="cpf"
+                  value={value.cpf ?? ''}
+                  onChange={(newValue) => {
+                    onChange({
+                      ...value,
+                      // O Input `type="cpf"` mascara na tela e devolve os dígitos limpos.
+                      cpf: typeof newValue === 'string' && newValue !== '' ? newValue : null,
+                    });
+                  }}
+                  onBlur={() => setTouched(prev => ({ ...prev, cpf: true }))}
+                  placeholder="000.000.000-00"
+                  disabled={disabled || readOnly}
+                  className={cn("bg-transparent", cpfError && "border-destructive")}
+                  transparent
+                />
+                {cpfError && <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">CPF inválido</p>}
+              </div>
+
+              {/* E-mail — já existia em `ResponsibleRowData` e já era enviado no
+                  payload, mas não tinha campo: era impossível preencher pela
+                  linha. */}
+              <div className="relative space-y-2">
+                {isFirstRow && <FormLabel>E-mail</FormLabel>}
+                <Input
+                  type="email"
+                  value={value.email || ''}
+                  onChange={(newValue) => {
+                    onChange({
+                      ...value,
+                      email: typeof newValue === 'string' ? newValue : '',
+                    });
+                  }}
+                  onBlur={() => setTouched(prev => ({ ...prev, email: true }))}
+                  placeholder="email@exemplo.com"
+                  disabled={disabled || readOnly}
+                  className={cn("bg-transparent", emailError && "border-destructive")}
+                />
+                {emailError && <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">E-mail inválido</p>}
               </div>
 
               {/* Role Selection */}

@@ -271,7 +271,11 @@ export function SignatureEnvelopeCard({
             Carregando…
           </div>
         ) : !current ? (
-          <div className="flex flex-col items-start gap-3 rounded-lg bg-muted/50 px-4 py-5">
+          <div className="flex flex-col items-start justify-between gap-3 rounded-lg bg-muted/50 px-4 py-5 sm:flex-row sm:items-center">
+            {/* Texto à esquerda, ação à direita: a explicação é contexto e o botão
+                é o ato. Empilhados, o botão ficava solto no canto inferior
+                esquerdo, longe de onde o olho termina de ler. Só empilha no
+                celular, onde os dois não cabem lado a lado. */}
             <div className="space-y-1">
               <p className="text-sm font-medium">Nenhuma coleta emitida</p>
               <p className="text-xs text-muted-foreground">
@@ -282,7 +286,7 @@ export function SignatureEnvelopeCard({
             {canManage && (
               <Button
                 size="sm"
-                className="gap-1.5"
+                className="shrink-0 gap-1.5"
                 disabled={busy}
                 onClick={() => run(() => signatureService.createEnvelope(quoteId), "Enviado para assinatura.")}
               >

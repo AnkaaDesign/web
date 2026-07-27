@@ -23,7 +23,7 @@ import {
   getQuoteStatusPath,
 } from "@/utils/permissions/quote-permissions";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
-import { validateResponsibleRows } from "@/components/administration/customer/responsible";
+import { validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
 import { useAuth } from "@/contexts/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/page-header";
@@ -40,7 +40,7 @@ import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { readReturnTo } from "@/hooks/common/use-return-to";
 import type { FileWithPreview } from "@/components/common/file";
 import type { ResponsibleRowData } from "@/types/responsible";
-import { ResponsibleRole } from "@/types/responsible";
+import { getResponsibleRoles } from "@/types/responsible";
 // Step components
 import { BudgetStepTask } from "@/components/financial/budget/steps/budget-step-task";
 import { BudgetStepInfo } from "@/components/financial/budget/steps/budget-step-info";
@@ -463,7 +463,11 @@ export const FinancialBudgetDetailPage = () => {
           name: r.name || "",
           phone: r.phone || "",
           email: r.email || "",
-          roles: (Array.isArray(r.roles) && r.roles.length ? r.roles : ["COMMERCIAL"]) as ResponsibleRole[],
+          cpf: r.cpf ?? null,
+          roles: getResponsibleRoles(r),
+          // Retrato do cadastro: sem ele `syncResponsibleRoles` trataria toda
+          // linha como alterada e daria PUT em todo contato do orçamento.
+          originalRoles: getResponsibleRoles(r),
           isActive: r.isActive ?? true,
           isNew: false,
           isEditing: false,
@@ -688,8 +692,25 @@ export const FinancialBudgetDetailPage = () => {
     const data = form.getValues();
     if (!taskId) return;
 
+    // 0a. Responsáveis: as demais telas (criar tarefa, editar tarefa, criar
+    // orçamento) validam aqui e avisam. Esta não validava, então apagar todas as
+    // funções de um contato salvava "com sucesso" sem gravar nada —
+    // `syncResponsibleRoles` ignora linha sem função — e sem nenhuma mensagem.
+    if (!validateResponsibleRows(responsibleRows)) {
+      setShowResponsibleErrors(true);
+      setCurrentStep(1);
+      toast.error("Preencha o nome, telefone e ao menos uma função dos responsáveis.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      // 0b. Edição inline de função em contato JÁ CADASTRADO.
+      // Essas linhas não fazem parte do payload da tarefa (só `newResponsibles`
+      // entra), então sem esta escrita a alteração se perdia em silêncio — que
+      // é exatamente o que acontecia nesta página até agora.
+      await syncResponsibleRoles(responsibleRows);
+
       // 1. Upload new artwork files
       // Maps a freshly-uploaded file's LOCAL id -> its real server File id, so a
       // layout the user selected from a brand-new Step-1 artwork (still a local id
@@ -849,6 +870,7 @@ export const FinancialBudgetDetailPage = () => {
           name: row.name.trim(),
           phone: row.phone.trim(),
           email: row.email?.trim() || undefined,
+          cpf: (row.cpf || '').replace(/\D/g, '') || undefined,
           roles: row.roles,
           isActive: row.isActive,
           customerId: data.customerId || undefined,

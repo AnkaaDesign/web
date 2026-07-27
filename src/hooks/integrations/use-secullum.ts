@@ -420,7 +420,9 @@ export const useSecullumTimeEntries = (params?: {
 // Update a single Secullum time-card row. The Secullum Batidas endpoint expects
 // the full row payload (Versao, Entrada1..Saida5, FonteDados*, NumeroHorario, ...);
 // for justifications send the abbreviated NomeAbreviado as the cell value
-// ("ATESTAD"); for manual time edits set the cell to "HH:MM" and append a
+// (e.g. "ATEST" — take it from GET /justifications, do NOT hardcode it: the
+// catalog is editable in Secullum); for manual time edits set the cell to
+// "HH:MM" and append a
 // ListaFonteDados entry with the user-supplied motivo.
 // Toasts are emitted by the axios interceptor (write-method auto-toast) — no
 // hook-level toast to avoid duplicates.

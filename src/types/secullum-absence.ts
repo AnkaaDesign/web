@@ -35,6 +35,9 @@ export interface SecullumAbsenceDayRow {
   carga: string | null;
   isPartialDay: boolean;
   absenceRecordId?: number;
+  // True when the API could not read /FuncionariosAfastamentos for this
+  // employee — JustificativaId 3 on such a row is a fallback, not a finding.
+  justificativaUnavailable?: boolean;
 }
 
 export interface SecullumAbsenceFormData {

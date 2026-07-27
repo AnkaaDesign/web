@@ -36,7 +36,7 @@ import { cutService } from "../../../../api-client/cut";
 import { airbrushingService } from "../../../../api-client/airbrushing";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole, getResponsibleRoles } from "@/types/responsible";
-import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
+import { ResponsibleManager, validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, BONIFICATION_STATUS, BONIFICATION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS, AIRBRUSHING_PAYMENT_STATUS } from "../../../../constants";
 import { createFormDataWithContext, createAirbrushingFormData } from "@/utils/form-data-helper";
 import { areAllProductionServiceOrdersComplete } from "@/utils/serviceOrder";
@@ -235,6 +235,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
   // Wrap updateAsync for debugging/logging
   const updateAsync = async (params: any) => {
+    // NB: a sincronização de funções dos responsáveis NÃO mora aqui — ver
+    // `handleFormSubmit`. Este wrapper só é alcançado quando a tarefa realmente
+    // tem alterações, e a troca de função sozinha não gera nenhuma.
     console.log('[Task Update] 🚀 Submitting with params:', params);
     console.log('[Task Update] Quote data being sent:', params.data?.quote ? JSON.stringify(params.data.quote, null, 2) : 'NO QUOTE DATA');
     // NOTE: layoutStatuses is now added in the FormData/JSON preparation sections
@@ -584,7 +587,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         name: rep.name,
         phone: rep.phone,
         email: rep.email || '',
+        cpf: (rep as any).cpf ?? null,
         roles: getResponsibleRoles(rep),
+        // Retrato do cadastro — ver `syncResponsibleRoles`.
+        originalRoles: getResponsibleRoles(rep),
         isActive: rep.isActive,
         isNew: false,
         isEditing: false,
@@ -598,7 +604,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       name: '',
       phone: '',
       email: '',
-      roles: ['COMMERCIAL' as ResponsibleRole],
+      // Sem função pré-selecionada: quem cadastra escolhe.
+      roles: [],
       isActive: true,
       isNew: true,
       isEditing: false,
@@ -1104,6 +1111,22 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         }
 
         setIsSubmitting(true);
+
+        // Edição inline da função de um contato JÁ CADASTRADO.
+        //
+        // Tem de rodar AQUI, e não dentro de `updateAsync`: quando só a função
+        // mudou, `changedData` fica vazio e o fluxo dá early-return bem antes de
+        // chegar ao PUT da tarefa — ou seja, a gravação nunca acontecia. Estas
+        // linhas não entram no payload da tarefa (só `newResponsibles` entra),
+        // então a mudança precisa ser escrita direto no Responsible, que é o que
+        // a faz aparecer nesta tarefa, no orçamento dela e em toda tarefa que
+        // compartilha o contato.
+        await syncResponsibleRoles(responsibleRows);
+        // Novo retrato do cadastro: sem isto o próximo Salvar repetiria o PUT e
+        // o botão continuaria "sujo" depois de gravar.
+        setResponsibleRows(rows =>
+          rows.map(row => (row.isNew ? row : { ...row, originalRoles: row.roles })),
+        );
 
         console.log('[TaskEditForm] 📋 ========== FORM SUBMISSION START ==========');
         console.log('[TaskEditForm] Raw changedData.quote BEFORE any processing:', JSON.stringify(changedData.quote, null, 2));
@@ -1815,6 +1838,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
               name: row.name.trim(),
               phone: row.phone.trim(),
               email: row.email?.trim() || undefined,
+              cpf: (row.cpf || '').replace(/\D/g, '') || undefined,
               roles: row.roles,
               isActive: row.isActive !== undefined ? row.isActive : true,
               companyId: row.companyId || defaultCompanyId,
@@ -2135,6 +2159,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
               name: row.name.trim(),
               phone: row.phone.trim(),
               email: row.email?.trim() || undefined,
+              cpf: (row.cpf || '').replace(/\D/g, '') || undefined,
               roles: row.roles,
               isActive: row.isActive,
               companyId: row.companyId || defaultCompanyIdForJson,
@@ -2748,8 +2773,28 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     return result;
   }, [responsibleRows]);
 
+  // Edição inline da função de um contato JÁ CADASTRADO.
+  //
+  // `responsibleRows` é estado próprio, fora do react-hook-form, então esta
+  // alteração não aparece em `formFieldChanges` — e `hasNewResponsibles` só
+  // enxerga linhas novas. Sem contá-la aqui o botão Salvar permanecia
+  // desabilitado e `syncResponsibleRoles` nunca chegava a rodar: a troca de
+  // função era simplesmente impossível de gravar por esta tela.
+  const hasResponsibleRoleChanges = useMemo(() => {
+    const sameRoles = (a: ResponsibleRole[] = [], b: ResponsibleRole[] = []) =>
+      a.length === b.length && [...a].sort().every((role, i) => role === [...b].sort()[i]);
+    return responsibleRows.some(
+      row =>
+        !row.isNew &&
+        !!row.id &&
+        !row.id.startsWith('temp-') &&
+        (row.roles?.length ?? 0) > 0 &&
+        !sameRoles(row.roles, row.originalRoles),
+    );
+  }, [responsibleRows]);
+
   // Compute hasChanges including cuts to create, artwork status changes, and new responsibles
-  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasLayoutStatusChanges || hasCutsToCreate || hasNewResponsibles;
+  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasLayoutStatusChanges || hasCutsToCreate || hasNewResponsibles || hasResponsibleRoleChanges;
 
   console.log('[TaskEditForm] hasChanges calculation:', {
     hasChanges,
@@ -2834,7 +2879,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   useEffect(() => {
     if (onFormStateChange) {
       const changedFields = getChangedFields();
-      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges || hasLayoutStatusChanges || hasCutsToCreate || hasNewResponsibles;
+      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges || hasLayoutStatusChanges || hasCutsToCreate || hasNewResponsibles || hasResponsibleRoleChanges;
 
       // Check if form is valid (no blocking validation errors)
       // This matches the form's internal validation but WITHOUT the hasChanges check
@@ -2860,6 +2905,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     hasLayoutStatusChanges,
     hasCutsToCreate,
     hasNewResponsibles,
+    hasResponsibleRoleChanges,
     isSubmitting,
     hasCutsWithoutFiles,
     hasIncompleteServices,
