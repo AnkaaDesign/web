@@ -506,7 +506,7 @@ export const BillingDetailPage = () => {
           if (!lf.uploaded) {
             try {
               const response = await uploadSingleFile(lf, {
-                fileContext: "quote-layout",
+                fileContext: "quote-layouts",
               });
               if (response.success && response.data) {
                 resolvedLayoutIds.push(response.data.id);

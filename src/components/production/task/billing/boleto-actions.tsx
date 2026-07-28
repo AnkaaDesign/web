@@ -284,7 +284,7 @@ export function BoletoActions({
     const uploadedIds: string[] = [];
     for (const file of files) {
       const result = await uploadSingleFile(file as File, {
-        fileContext: 'receipt',
+        fileContext: 'installmentReceipts',
         entityId: installmentId,
         entityType: 'installment',
       });

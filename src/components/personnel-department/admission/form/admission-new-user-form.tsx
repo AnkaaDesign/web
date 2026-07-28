@@ -284,7 +284,7 @@ export function AdmissionNewUserForm({ onSubmit, isSubmitting }: AdmissionNewUse
       for (const type of isProvider ? [] : (Object.keys(docFiles) as ADMISSION_DOCUMENT_TYPE[])) {
         const file = docFiles[type];
         if (!file) continue;
-        const res = await uploadSingleFile(file, { fileContext: "admissionDocument" } as any);
+        const res = await uploadSingleFile(file, { fileContext: "documents" } as any);
         if (res?.data?.id) {
           documents.push({ type, fileId: res.data.id });
         }

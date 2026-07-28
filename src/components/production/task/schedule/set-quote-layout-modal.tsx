@@ -258,7 +258,7 @@ export function SetQuoteLayoutModal({ open, onOpenChange, tasks }: SetQuoteLayou
       const resolvedIds: string[] = [];
       for (const f of files) {
         if (f instanceof File) {
-          const response = await uploadSingleFile(f, { fileContext: "quote-layout" });
+          const response = await uploadSingleFile(f, { fileContext: "quote-layouts" });
           if (!response.success || !response.data) {
             toast.error("Erro ao enviar o layout");
             return;

@@ -378,7 +378,7 @@ export const TaskCreateForm = () => {
             }
           } else if (!file.error) {
             try {
-              const response = await uploadSingleFile(file, { fileContext: 'artwork' });
+              const response = await uploadSingleFile(file, { fileContext: 'tasksLayouts' });
               if (response.success && response.data) {
                 layoutIds.push(response.data.id);
                 // Remap artwork status from local file ID to backend File ID
@@ -397,7 +397,7 @@ export const TaskCreateForm = () => {
         for (const file of baseFiles) {
           if (!file.uploaded && !file.error) {
             try {
-              const response = await uploadSingleFile(file, { fileContext: 'basefile' });
+              const response = await uploadSingleFile(file, { fileContext: 'taskBaseFiles' });
               if (response.success && response.data) {
                 uploadedBaseFileIds.push(response.data.id);
               }

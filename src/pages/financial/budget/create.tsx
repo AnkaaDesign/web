@@ -535,7 +535,7 @@ export const FinancialBudgetCreatePage = () => {
           }
         } else if (!file.error) {
           try {
-            const response = await uploadSingleFile(file, { fileContext: 'artwork' });
+            const response = await uploadSingleFile(file, { fileContext: 'tasksLayouts' });
             if (response.success && response.data) {
               uploadedLayoutIds.push(response.data.id);
               localIdToRealFileId[file.id] = response.data.id;
@@ -554,7 +554,7 @@ export const FinancialBudgetCreatePage = () => {
       for (const file of baseFiles) {
         if (!file.uploaded && !file.error) {
           try {
-            const response = await uploadSingleFile(file, { fileContext: 'basefile' });
+            const response = await uploadSingleFile(file, { fileContext: 'taskBaseFiles' });
             if (response.success && response.data) {
               uploadedBaseFileIds.push(response.data.id);
             }
@@ -578,7 +578,7 @@ export const FinancialBudgetCreatePage = () => {
           resolvedLayoutIds.push(remapped);
         } else if (!lf.uploaded) {
           try {
-            const response = await uploadSingleFile(lf, { fileContext: "quote-layout" });
+            const response = await uploadSingleFile(lf, { fileContext: "quote-layouts" });
             if (response.success && response.data) {
               resolvedLayoutIds.push(response.data.id);
             }

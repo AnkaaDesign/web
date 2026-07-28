@@ -845,7 +845,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
               if (cut.file && cut.file instanceof File) {
                 // Upload the file
                 const uploadResponse = await fileService.uploadFiles([cut.file], {
-                  fileContext: 'cut',
+                  fileContext: 'cutFiles',
                   entityType: 'task',
                 });
                 const uploadedFile = uploadResponse.data?.success?.[0];

@@ -9,7 +9,7 @@ import { useScrollHideHeader, exportToPdf, exportToXlsx, copyShareLink } from "@
 import type { DataTableColumnDef, ExportCellValue } from "@/components/ui/datatable";
 import type { FAVORITE_PAGES, SECTOR_PRIVILEGES } from "@/constants";
 import { usePrivileges } from "@/hooks/common/use-privileges";
-import { useAttentionEntity, attentionRowClass, type AttentionEntityType } from "@/lib/attention";
+import { useAttentionEntity, type AttentionEntityType } from "@/lib/attention";
 import { cn } from "@/lib/utils";
 import { useDetailLayout } from "./use-detail-layout";
 import { useRecordNavigation } from "./use-record-navigation";
@@ -160,16 +160,14 @@ export function DetailPage<TData>({
   // Attention: register the record + ack per rule policy. The hook is unconditional — it
   // no-ops when `attention` is absent or the record hasn't loaded.
   //
-  // The header rings ONLY when the matching rule has nowhere better to point. A FIELD-targeted
-  // rule (every TASK rule) rings the field itself and explains there (see `inline-edit-field`);
-  // ringing the header too just repeats it one level up, and the plain `title` it used to carry
-  // rendered as a native browser tooltip that fought with the styled one on "Editar". But a
-  // ROW/DETAIL-targeted rule (`cut.pending`) has no field, so with the header suppressed
-  // unconditionally the cut detail page showed no indicator at all — you could open a blinking
-  // cut and see nothing. Never a `title` attribute, for the reason above.
-  const attentionState = useAttentionEntity(attention?.entityType, recordId || undefined, data);
-  const headerAttentionClass =
-    attentionState?.active && attentionState.match.target.level !== "field" ? attentionRowClass(attentionState) : "";
+  // The detail page NEVER renders an attention indicator of its own — opening the record IS
+  // the answer to the signal, so the header must look at rest the moment you arrive. The two
+  // levels each have exactly one home: a FIELD-targeted rule (every TASK rule) blinks the
+  // field it names (see `inline-edit-field`), and a ROW/DETAIL-targeted rule (`cut.pending`)
+  // lives on the TABLE ROW only. Ringing the header repeated the row's signal one level up on
+  // the very page that acknowledges it, which read as "still needs attention" right after you
+  // had dealt with it. The hook's return value is deliberately unused here.
+  useAttentionEntity(attention?.entityType, recordId || undefined, data);
 
   const nav = useRecordNavigation({
     ids: navigation?.ids,
@@ -386,7 +384,7 @@ export function DetailPage<TData>({
         className="grid shrink-0 grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out will-change-[grid-template-rows] data-[hidden=true]:grid-rows-[0fr]"
       >
         <div className="min-h-0 overflow-hidden">
-          <div className={cn("pb-3", headerAttentionClass && `rounded-lg ${headerAttentionClass}`)}>
+          <div className="pb-3">
             <PageHeader
               variant="detail"
               title={title}

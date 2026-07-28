@@ -732,7 +732,7 @@ export const FinancialBudgetDetailPage = () => {
         } else if (!file.error) {
           try {
             const response = await uploadSingleFile(file, {
-              fileContext: "artwork",
+              fileContext: "tasksLayouts",
             });
             if (response.success && response.data) {
               uploadedLayoutIds.push(response.data.id);
@@ -760,7 +760,7 @@ export const FinancialBudgetDetailPage = () => {
         } else if (!file.error) {
           try {
             const response = await uploadSingleFile(file, {
-              fileContext: "task-base",
+              fileContext: "taskBaseFiles",
             });
             if (response.success && response.data) {
               uploadedBaseFileIds.push(response.data.id);
@@ -821,7 +821,7 @@ export const FinancialBudgetDetailPage = () => {
         } else if (!lf.uploaded) {
           try {
             const response = await uploadSingleFile(lf, {
-              fileContext: "quote-layout",
+              fileContext: "quote-layouts",
             });
             if (response.success && response.data) {
               resolvedLayoutIds.push(response.data.id);

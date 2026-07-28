@@ -85,31 +85,52 @@ const mapLayouts = (arr: any[]): FileWithPreview[] =>
     return convertFilesToFileWithPreview([f])[0];
   });
 
-const mapFieldValueToItem = (airbrushing: any, index: number): AirbrushingItem => ({
-  id: airbrushing.id || `airbrushing-${Date.now()}-${index}`,
-  status: airbrushing.status || AIRBRUSHING_STATUS.PREPARATION,
-  paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
-  price: airbrushing.price || null,
-  description: airbrushing.description ?? null,
-  startDate: airbrushing.startDate || null,
-  finishDate: airbrushing.finishDate || null,
-  startedAt: airbrushing.startedAt || null,
-  finishedAt: airbrushing.finishedAt || null,
-  painterId: airbrushing.painterId || null,
-  painter: airbrushing.painter || null,
-  receiptFiles: [
+/** File ids of the already-persisted entries in a hydrated file list. */
+const uploadedIds = (files: FileWithPreview[]): string[] =>
+  files
+    .filter((f) => (f as any).uploaded)
+    .map((f) => (f as any).uploadedFileId || (f as any).id)
+    .filter(Boolean) as string[];
+
+const mapFieldValueToItem = (airbrushing: any, index: number): AirbrushingItem => {
+  const receiptFiles = [
     ...convertFilesToFileWithPreview(airbrushing.receipts || []),
     ...(airbrushing.receiptFiles || []),
-  ],
-  invoiceFiles: [
+  ];
+  const invoiceFiles = [
     ...convertFilesToFileWithPreview(airbrushing.invoices || []),
     ...(airbrushing.invoiceFiles || []),
-  ],
-  layouts: mapLayouts(airbrushing.layouts || []),
-  receiptIds: airbrushing.receiptIds || [],
-  invoiceIds: airbrushing.invoiceIds || [],
-  layoutIds: airbrushing.layoutIds || [],
-});
+  ];
+  const layouts = mapLayouts(airbrushing.layouts || []);
+
+  return {
+    id: airbrushing.id || `airbrushing-${Date.now()}-${index}`,
+    status: airbrushing.status || AIRBRUSHING_STATUS.PREPARATION,
+    paymentStatus: airbrushing.paymentStatus || AIRBRUSHING_PAYMENT_STATUS.PENDING,
+    price: airbrushing.price || null,
+    description: airbrushing.description ?? null,
+    startDate: airbrushing.startDate || null,
+    finishDate: airbrushing.finishDate || null,
+    startedAt: airbrushing.startedAt || null,
+    finishedAt: airbrushing.finishedAt || null,
+    painterId: airbrushing.painterId || null,
+    painter: airbrushing.painter || null,
+    receiptFiles,
+    invoiceFiles,
+    layouts,
+    // Derive the *Ids from the hydrated relations. The API returns the RELATIONS
+    // (receipts/invoices/layouts) — there is no receiptIds/invoiceIds/layoutIds scalar on
+    // Airbrushing — so reading airbrushing.receiptIds always yielded []. The task update
+    // then submitted that [] and TaskService turned it into `receipts: { set: [] }`,
+    // silently detaching every receipt/invoice/layout on an unrelated task edit.
+    // These must be FILE ids, not Layout entity ids (see the ID DOMAIN note in
+    // airbrushing.service.ts) — uploadedIds reads uploadedFileId, which mapLayouts sets
+    // to the Layout's fileId.
+    receiptIds: airbrushing.receiptIds || uploadedIds(receiptFiles),
+    invoiceIds: airbrushing.invoiceIds || uploadedIds(invoiceFiles),
+    layoutIds: airbrushing.layoutIds || uploadedIds(layouts),
+  };
+};
 
 export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, MultiAirbrushingSelectorProps>(
   ({ control, disabled, isEditMode = false, onAirbrushingsCountChange, customerId }, ref) => {
