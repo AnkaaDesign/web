@@ -136,6 +136,69 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
       [numPages, pageNumber, scale, rotation, zoomIn, zoomOut, rotate, resetZoom, goToPage, nextPage, prevPage]
     );
 
+    // ------------------------------------------------------------------
+    // Drag-to-pan
+    // ------------------------------------------------------------------
+    // The page lives in a native scroll container, so panning is just
+    // scroll manipulation — that keeps scrollbars, wheel and keyboard in sync.
+    const panRef = React.useRef<{ id: number; startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
+    const [isPanning, setIsPanning] = React.useState(false);
+    const [canPan, setCanPan] = React.useState(false);
+
+    // Recompute whether there is anything to pan whenever the render changes.
+    React.useEffect(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      const check = () => setCanPan(el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
+      check();
+      const observer = new ResizeObserver(check);
+      observer.observe(el);
+      const canvas = canvasRef.current;
+      if (canvas) observer.observe(canvas);
+      return () => observer.disconnect();
+    }, [scale, rotation, pageNumber, loading]);
+
+    const handlePanPointerDown = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+      // Touch keeps native momentum scrolling.
+      if (e.pointerType === "touch") return;
+      if (e.button !== 0) return;
+
+      const el = containerRef.current;
+      if (!el) return;
+      if (el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight) return;
+
+      panRef.current = {
+        id: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        scrollLeft: el.scrollLeft,
+        scrollTop: el.scrollTop,
+      };
+      el.setPointerCapture(e.pointerId);
+      setIsPanning(true);
+      e.preventDefault();
+    }, []);
+
+    const handlePanPointerMove = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+      const session = panRef.current;
+      const el = containerRef.current;
+      if (!session || !el || session.id !== e.pointerId) return;
+
+      el.scrollLeft = session.scrollLeft - (e.clientX - session.startX);
+      el.scrollTop = session.scrollTop - (e.clientY - session.startY);
+    }, []);
+
+    const handlePanPointerEnd = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+      const session = panRef.current;
+      if (!session || session.id !== e.pointerId) return;
+
+      panRef.current = null;
+      if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      setIsPanning(false);
+    }, []);
+
     // Load PDF document
     React.useEffect(() => {
       let cancelled = false;
@@ -289,8 +352,12 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
         {/* PDF Container */}
         <div
           ref={containerRef}
-          className="relative overflow-auto rounded-lg w-full h-full"
+          className={cn("relative overflow-auto rounded-lg w-full h-full", canPan && (isPanning ? "cursor-grabbing" : "cursor-grab"))}
           style={{ maxHeight }}
+          onPointerDown={handlePanPointerDown}
+          onPointerMove={handlePanPointerMove}
+          onPointerUp={handlePanPointerEnd}
+          onPointerCancel={handlePanPointerEnd}
         >
           {/* Loading State */}
           {loading && !error && (
@@ -326,12 +393,18 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           {/* PDF Canvas */}
           {!loading && !error && (
             <div
-              className="min-h-full min-w-full flex justify-center p-4"
+              className="min-h-full min-w-full flex p-4"
               style={{
-                alignItems: scale <= 1 ? 'center' : 'flex-start',
+                // `safe center` centres the page while it fits, but falls back to
+                // start-alignment once it overflows. Plain `center` would push the
+                // page's top/left edge outside the scrollable area, making the
+                // overflowing part unreachable by scrolling or dragging.
+                justifyContent: "safe center",
+                alignItems: "safe center",
+                width: "max-content",
               }}
             >
-              <canvas ref={canvasRef} className="shadow-2xl rounded-lg block" style={{ background: "white" }} />
+              <canvas ref={canvasRef} className="shadow-2xl rounded-lg block select-none" style={{ background: "white" }} draggable={false} />
             </div>
           )}
         </div>

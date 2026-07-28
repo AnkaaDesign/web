@@ -48,6 +48,10 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/sonner";
 import { FileCardUploadField, FileThumbnail, type FileWithPreview } from "@/components/common/file";
 import { generatePDFThumbnailFromBlob } from "@/utils/pdf-thumbnail";
+// ONE uploader drives the whole "Arquivos" card so the three columns are identical by
+// construction — same dropzone size, same "anexados" list. Recibos and notas fiscais use
+// the shared FileCardUploadField; layouts use LayoutFileUploadField, which is that same
+// component plus the per-file status selector.
 import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
 import { createAirbrushingFormData } from "@/utils/form-data-helper";
 import { createAirbrushingsForTasks, isMeaningfulAirbrushing, type AirbrushingTaskTarget } from "@/utils/airbrushing-submit";
@@ -90,6 +94,22 @@ const makeEmptyAirbrushing = () => ({
   invoiceIds: [],
   layoutIds: [],
 });
+
+// Recibos / notas fiscais are paperwork, not artwork: they accept the office-document set
+// on top of images (the layouts column keeps the uploader's image/PDF/vector default).
+const DOCUMENT_FILE_TYPES: Record<string, string[]> = {
+  "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
+  "application/pdf": [".pdf"],
+  "application/msword": [".doc"],
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+  "application/vnd.ms-excel": [".xls"],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+  "text/plain": [".txt"],
+  "text/csv": [".csv"],
+};
+
+/** 50 MB — the ceiling the recibo/NF pickers have always enforced. */
+const DOCUMENT_MAX_SIZE = 50 * 1024 * 1024;
 
 // Review-step layout preview. Uploaded (server) files reuse FileThumbnail (server thumbnail
 // endpoints). A JUST-SELECTED local File has no server id/thumbnail, so we render it client-side:
@@ -821,7 +841,10 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* items-start: the layouts column grows with its attached-files
+                              list — without it the other two dropzones stretch to match the
+                              tallest column and the row stops looking like one set. */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                             {/* Recibos */}
                             <FormItem className="flex flex-col">
                               <FormLabel className="flex items-center gap-2">
@@ -832,9 +855,11 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                                 <FileCardUploadField
                                   onFilesChange={handleReceiptFilesChange}
                                   existingFiles={receiptFiles}
+                                  acceptedFileTypes={DOCUMENT_FILE_TYPES}
                                   maxFiles={10}
+                                  maxSize={DOCUMENT_MAX_SIZE}
                                   showPreview={true}
-                                  variant="card"
+                                  variant="list"
                                   placeholder="Adicione recibos do serviço"
                                   label="Recibos anexados"
                                   disabled={isSubmitting}
@@ -852,9 +877,11 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                                 <FileCardUploadField
                                   onFilesChange={handleInvoiceFilesChange}
                                   existingFiles={invoiceFiles}
+                                  acceptedFileTypes={DOCUMENT_FILE_TYPES}
                                   maxFiles={10}
+                                  maxSize={DOCUMENT_MAX_SIZE}
                                   showPreview={true}
-                                  variant="card"
+                                  variant="list"
                                   placeholder="Adicione notas fiscais"
                                   label="NFes anexadas"
                                   disabled={isSubmitting}
@@ -878,6 +905,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                                   placeholder="Adicione os layouts da aerografia"
                                   label="Layouts anexados"
                                   variant="list"
+                                  disabled={isSubmitting}
                                 />
                               </FormControl>
                             </FormItem>
