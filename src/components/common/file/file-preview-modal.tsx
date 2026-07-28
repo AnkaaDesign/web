@@ -141,6 +141,10 @@ export function FilePreviewModal({
 
   const currentFile = files[currentIndex];
   const isCurrentFilePreviewable = currentFile && isPreviewableFile(currentFile);
+  // Computed early (before the gesture handlers) so pan/zoom/wheel handlers can
+  // bail out for file types that manage their own scrolling (PDF) or input (video).
+  const isPDF = !!currentFile && getFileExtension(currentFile.filename).toLowerCase() === "pdf";
+  const isVideo = !!currentFile && isVideoFile(currentFile);
 
   // Find current image index within previewable files
   const currentImageIndex = React.useMemo(() => {
@@ -320,56 +324,182 @@ export function FilePreviewModal({
     setIsFullscreen((prev) => !prev);
   }, []);
 
-  // Image load handler
+  // Image load handler.
+  // The image is fitted to the container by CSS (max-width/max-height: 100% on the
+  // padded container), so the "fit" state is simply scale 1. `fitZoom` stays as the
+  // baseline that `zoom` is measured against — the displayed percentage and the
+  // zoom limits are all ratios of it, so it no longer needs to be measured by hand.
   const handleImageLoad = React.useCallback(() => {
     setImageLoading(false);
     setImageError(false);
-
-    if (imageRef.current && containerRef.current) {
-      const img = imageRef.current;
-      const container = containerRef.current;
-
-      // Calculate available space with proper margins
-      const headerHeight = 100; // Fixed header at top
-      const thumbnailStripHeight = showThumbnailStrip && totalImages > 1 ? 100 : 20; // Thumbnail strip or minimal bottom padding
-      const horizontalMargin = 40; // 20px margin on each side
-      const verticalMargin = 20; // Additional vertical spacing
-
-      const availableWidth = container.clientWidth - horizontalMargin;
-      const availableHeight = container.clientHeight - headerHeight - thumbnailStripHeight - verticalMargin;
-
-      // Calculate optimal scale considering rotation
-      let imgWidth = img.naturalWidth;
-      let imgHeight = img.naturalHeight;
-
-      // Swap dimensions for 90° or 270° rotation
-      if (rotation === 90 || rotation === 270) {
-        [imgWidth, imgHeight] = [imgHeight, imgWidth];
-      }
-
-      // Calculate scale factors for both dimensions
-      const scaleX = availableWidth / imgWidth;
-      const scaleY = availableHeight / imgHeight;
-
-      // Choose the limiting dimension - use the smaller scale to ensure the image fits
-      // This ensures maximum size while maintaining aspect ratio and margins
-      const optimalScale = Math.min(scaleX, scaleY, 1);
-
-      setFitZoom(optimalScale);
-      setZoom(optimalScale);
-    }
-  }, [rotation, showThumbnailStrip, totalImages]);
+    setFitZoom(1);
+    setZoom(1);
+    setPanX(0);
+    setPanY(0);
+  }, []);
 
   const handleImageError = React.useCallback(() => {
     setImageLoading(false);
     setImageError(true);
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // Panning
+  // ---------------------------------------------------------------------------
+  // Pan is expressed in *screen* pixels. The transform applies `translate` first
+  // (leftmost function), so it is not affected by `scale`/`rotate` and a 1px
+  // pointer movement is always a 1px image movement.
+
+  // Active pointer-drag session (mouse/pen). Kept in a ref so move events never
+  // depend on a re-render to see the latest start offsets.
+  const panPointerRef = React.useRef<{
+    id: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    moved: boolean;
+  } | null>(null);
+  // Set when a drag actually moved, so the trailing `click` doesn't reset zoom.
+  const suppressClickRef = React.useRef(false);
+
+  // How far the image may travel before its far edge would leave the viewport.
+  // Recomputed whenever the geometry changes and cached, so a pointermove never
+  // pays for a layout measurement.
+  const panBoundsRef = React.useRef({ maxX: 0, maxY: 0 });
+  // Whether there is any overflow to pan — drives the grab cursor and gesture routing.
+  const [canPanImage, setCanPanImage] = React.useState(false);
+
+  const recomputePanBounds = React.useCallback(() => {
+    const img = imageRef.current;
+    const container = containerRef.current;
+    if (!img || !container) {
+      panBoundsRef.current = { maxX: 0, maxY: 0 };
+      setCanPanImage(false);
+      return;
+    }
+
+    // offsetWidth/Height are the *layout* size and ignore the transform, so this
+    // stays correct even mid-animation — getBoundingClientRect() would return an
+    // interpolated size while the 200ms zoom transition is still running.
+    const scale = fitZoom > 0 ? zoom / fitZoom : 1;
+    let width = img.offsetWidth * scale;
+    let height = img.offsetHeight * scale;
+    // Rotation is always a multiple of 90°, so the bounding box just swaps axes.
+    if (rotation === 90 || rotation === 270) [width, height] = [height, width];
+
+    const styles = window.getComputedStyle(container);
+    const viewportWidth = container.clientWidth - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight);
+    const viewportHeight = container.clientHeight - parseFloat(styles.paddingTop) - parseFloat(styles.paddingBottom);
+
+    const bounds = {
+      maxX: Math.max(0, (width - viewportWidth) / 2),
+      maxY: Math.max(0, (height - viewportHeight) / 2),
+    };
+    panBoundsRef.current = bounds;
+    setCanPanImage(bounds.maxX > 1 || bounds.maxY > 1);
+  }, [zoom, fitZoom, rotation]);
+
+  React.useLayoutEffect(() => {
+    recomputePanBounds();
+  }, [recomputePanBounds, currentIndex, imageLoading, isFullscreen, showThumbnailStrip, totalImages]);
+
+  React.useEffect(() => {
+    window.addEventListener("resize", recomputePanBounds);
+    return () => window.removeEventListener("resize", recomputePanBounds);
+  }, [recomputePanBounds]);
+
+  // Keep the image from being dragged completely out of the viewport.
+  const clampPan = React.useCallback((x: number, y: number) => {
+    const { maxX, maxY } = panBoundsRef.current;
+    return {
+      x: Math.min(maxX, Math.max(-maxX, x)),
+      y: Math.min(maxY, Math.max(-maxY, y)),
+    };
+  }, []);
+
+  const handlePanPointerDown = React.useCallback(
+    (e: React.PointerEvent<HTMLImageElement>) => {
+      // Touch is handled by the dedicated touch handlers (pinch + swipe + pan).
+      if (e.pointerType === "touch") return;
+      if (e.button !== 0) return;
+      // Nothing to pan while the whole image fits on screen.
+      if (!canPanImage) return;
+
+      e.preventDefault();
+      panPointerRef.current = {
+        id: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        originX: panX,
+        originY: panY,
+        moved: false,
+      };
+      // Pointer capture keeps the drag alive when the cursor leaves the image.
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setIsDragging(true);
+    },
+    [canPanImage, panX, panY],
+  );
+
+  const handlePanPointerMove = React.useCallback(
+    (e: React.PointerEvent<HTMLImageElement>) => {
+      const session = panPointerRef.current;
+      if (!session || session.id !== e.pointerId) return;
+
+      const deltaX = e.clientX - session.startX;
+      const deltaY = e.clientY - session.startY;
+
+      // Small threshold so a slightly shaky click still counts as a click.
+      if (!session.moved && Math.hypot(deltaX, deltaY) < 3) return;
+      session.moved = true;
+
+      const next = clampPan(session.originX + deltaX, session.originY + deltaY);
+      setPanX(next.x);
+      setPanY(next.y);
+    },
+    [clampPan],
+  );
+
+  const handlePanPointerEnd = React.useCallback((e: React.PointerEvent<HTMLImageElement>) => {
+    const session = panPointerRef.current;
+    if (!session || session.id !== e.pointerId) return;
+
+    if (session.moved) suppressClickRef.current = true;
+    panPointerRef.current = null;
+
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    setIsDragging(false);
+  }, []);
+
+  // Click toggles between fit and zoomed — unless it's the tail end of a pan.
+  const handleImageClick = React.useCallback(() => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    if (zoom === fitZoom) {
+      handleZoomIn();
+    } else {
+      handleResetZoom();
+    }
+  }, [zoom, fitZoom, handleZoomIn, handleResetZoom]);
+
+  // Re-clamp the pan whenever zoom or rotation shrinks the image, otherwise the
+  // image can stay stranded off-centre after zooming back out.
+  React.useEffect(() => {
+    const next = clampPan(panX, panY);
+    if (next.x !== panX) setPanX(next.x);
+    if (next.y !== panY) setPanY(next.y);
+  }, [zoom, rotation, clampPan, panX, panY]);
+
   // Drag handler for dragging images to external targets (desktop, etc.)
   const handleDragStart = React.useCallback(
     (e: React.DragEvent<HTMLImageElement>) => {
-      if (!currentFile || zoom !== fitZoom) {
-        // Only allow drag when not zoomed (preserve pan behavior when zoomed)
+      if (!currentFile || canPanImage) {
+        // Only allow drag when there is nothing to pan (preserve pan behavior)
         e.preventDefault();
         return;
       }
@@ -388,12 +518,14 @@ export function FilePreviewModal({
         e.dataTransfer.setDragImage(imageRef.current, 0, 0);
       }
     },
-    [currentFile, zoom, fitZoom],
+    [currentFile, canPanImage],
   );
 
   // Touch event handlers for mobile support
   const handleTouchStart = React.useCallback(
     (e: React.TouchEvent) => {
+      // PDFs scroll natively and videos own their own touch input.
+      if (isPDF || isVideo) return;
       const touches = e.touches;
 
       if (touches.length === 2 && enablePinchZoom) {
@@ -422,12 +554,15 @@ export function FilePreviewModal({
         });
       }
     },
-    [zoom, enablePinchZoom, enableSwipeNavigation],
+    [zoom, enablePinchZoom, enableSwipeNavigation, isPDF, isVideo],
   );
 
   const handleTouchMove = React.useCallback(
     (e: React.TouchEvent) => {
-      e.preventDefault(); // Prevent scrolling
+      if (isPDF || isVideo) return;
+      // Only meaningful when the listener is non-passive; `touch-action: none` on
+      // the image is what actually stops the browser from stealing the gesture.
+      if (e.cancelable) e.preventDefault();
       const touches = e.touches;
 
       if (touches.length === 2 && touchState && enablePinchZoom) {
@@ -439,32 +574,15 @@ export function FilePreviewModal({
         const scale = (distance / touchState.startDistance) * touchState.startScale;
         const clampedScale = Math.max(fitZoom * 0.1, Math.min(scale, fitZoom * 10));
         setZoom(clampedScale);
-      } else if (touches.length === 1 && swipeState && enableSwipeNavigation) {
-        // Handle swipe navigation
+      } else if (touches.length === 1 && swipeState) {
         const touch = touches[0];
-        const deltaX = touch.clientX - swipeState.startX;
-        const deltaY = touch.clientY - swipeState.startY;
-        const absDeltaX = Math.abs(deltaX);
-        const absDeltaY = Math.abs(deltaY);
 
-        // Determine if this is a horizontal swipe
-        if (absDeltaX > 20 && absDeltaX > absDeltaY * 2) {
-          const direction = deltaX > 0 ? "right" : "left";
-          setSwipeState((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  currentX: touch.clientX,
-                  currentY: touch.clientY,
-                  isSwiping: true,
-                  swipeDirection: direction,
-                }
-              : null,
-          );
-        } else if (zoom > fitZoom) {
-          // Handle pan when zoomed
-          setPanX((prev) => prev + (touch.clientX - (swipeState.currentX || touch.clientX)));
-          setPanY((prev) => prev + (touch.clientY - (swipeState.currentY || touch.clientY)));
+        if (canPanImage) {
+          // Zoomed in: a one-finger drag pans. This must be checked BEFORE swipe
+          // detection, otherwise every horizontal pan is swallowed as "next image".
+          const next = clampPan(panX + (touch.clientX - swipeState.currentX), panY + (touch.clientY - swipeState.currentY));
+          setPanX(next.x);
+          setPanY(next.y);
           setSwipeState((prev) =>
             prev
               ? {
@@ -474,10 +592,31 @@ export function FilePreviewModal({
                 }
               : null,
           );
+        } else if (enableSwipeNavigation) {
+          // Fitted to screen: nothing to pan, so a horizontal drag navigates.
+          const deltaX = touch.clientX - swipeState.startX;
+          const deltaY = touch.clientY - swipeState.startY;
+          const absDeltaX = Math.abs(deltaX);
+          const absDeltaY = Math.abs(deltaY);
+
+          if (absDeltaX > 20 && absDeltaX > absDeltaY * 2) {
+            const direction = deltaX > 0 ? "right" : "left";
+            setSwipeState((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    currentX: touch.clientX,
+                    currentY: touch.clientY,
+                    isSwiping: true,
+                    swipeDirection: direction,
+                  }
+                : null,
+            );
+          }
         }
       }
     },
-    [touchState, swipeState, fitZoom, zoom, enablePinchZoom, enableSwipeNavigation],
+    [touchState, swipeState, fitZoom, zoom, panX, panY, canPanImage, clampPan, enablePinchZoom, enableSwipeNavigation, isPDF, isVideo],
   );
 
   const handleTouchEnd = React.useCallback(() => {
@@ -500,22 +639,43 @@ export function FilePreviewModal({
     setIsDragging(false);
   }, [swipeState, totalImages, handlePrevious, handleNext, enableSwipeNavigation]);
 
-  // Mouse wheel zoom for desktop
+  // Mouse wheel zoom for desktop.
+  // Registered natively with { passive: false } — React's own onWheel is passive at
+  // the root, so preventDefault() there is ignored (and warns in the console).
   const handleWheel = React.useCallback(
-    (e: React.WheelEvent) => {
-      if (!isCurrentFilePreviewable) return;
+    (e: WheelEvent) => {
+      if (!isCurrentFilePreviewable || isVideo) return;
+
+      if (isPDF) {
+        // Plain wheel scrolls the PDF natively; ctrl/⌘+wheel zooms it.
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          handlePdfZoomIn();
+        } else {
+          handlePdfZoomOut();
+        }
+        return;
+      }
 
       e.preventDefault();
-      const delta = e.deltaY;
 
-      if (delta < 0) {
+      if (e.deltaY < 0) {
         handleZoomIn();
       } else {
         handleZoomOut();
       }
     },
-    [isCurrentFilePreviewable, handleZoomIn, handleZoomOut],
+    [isCurrentFilePreviewable, isPDF, isVideo, handleZoomIn, handleZoomOut, handlePdfZoomIn, handlePdfZoomOut],
   );
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!open || !container) return;
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [open, handleWheel]);
 
   // Keyboard navigation and shortcuts
   React.useEffect(() => {
@@ -612,9 +772,7 @@ export function FilePreviewModal({
 
   if (!currentFile) return null;
 
-  const isPDF = getFileExtension(currentFile.filename).toLowerCase() === "pdf";
   const isEPS = isEpsFile(currentFile);
-  const isVideo = isVideoFile(currentFile);
   const isSVG = isSvgFile(currentFile);
   // Check if this is a remote storage file without a database record (can't be loaded inline due to CORS)
   // Files with database IDs (not starting with "remote-") can be served through the API endpoint
@@ -883,7 +1041,6 @@ export function FilePreviewModal({
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            onWheel={handleWheel}
           >
             {isCurrentFilePreviewable ? (
               isPDF ? (
@@ -992,31 +1149,39 @@ export function FilePreviewModal({
                       }
                       alt={currentFile.filename}
                       className={cn(
-                        "transition-all duration-200 rounded-lg shadow-2xl",
-                        zoom === fitZoom ? "select-auto" : "select-none",
-                        zoom > fitZoom ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
+                        "rounded-lg shadow-2xl",
+                        canPanImage ? "select-none" : "select-auto",
+                        canPanImage ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-pointer",
                         isEPS && "ring-2 ring-indigo-400 ring-opacity-60",
                         isSVG && "bg-white p-4",
                       )}
                       style={{
-                        transform: `
-                          scale(${zoom / fitZoom})
-                          rotate(${rotation}deg)
-                          translate(${panX}px, ${panY}px)
-                        `,
+                        // `translate` FIRST so the pan is applied in screen pixels and
+                        // is not multiplied by `scale` or spun around by `rotate`.
+                        transform: `translate(${panX}px, ${panY}px) rotate(${rotation}deg) scale(${zoom / fitZoom})`,
                         transformOrigin: "center center",
-                        maxWidth: "none",
-                        maxHeight: "none",
-                        width: `${100 * fitZoom}%`,
+                        // Let the browser fit the image to the padded container; `zoom`
+                        // is then a pure multiplier on top of that fitted size.
+                        maxWidth: "100%",
+                        maxHeight: "100%",
+                        width: "auto",
                         height: "auto",
+                        // No animation while dragging, or every pan frame lags 200ms behind.
+                        transition: isDragging ? "none" : "transform 200ms ease-out",
+                        // Stop the browser from claiming the gesture before our handlers see it.
+                        touchAction: "none",
                       }}
                       onLoad={handleImageLoad}
                       onError={handleImageError}
-                      onClick={zoom === fitZoom ? handleZoomIn : handleResetZoom}
-                      draggable={zoom === fitZoom}
+                      onClick={handleImageClick}
+                      // Native drag-to-desktop only while there is nothing to pan,
+                      // otherwise it hijacks the pan gesture.
+                      draggable={!canPanImage}
                       onDragStart={handleDragStart}
-                      onMouseDown={() => setIsDragging(true)}
-                      onMouseUp={() => setIsDragging(false)}
+                      onPointerDown={handlePanPointerDown}
+                      onPointerMove={handlePanPointerMove}
+                      onPointerUp={handlePanPointerEnd}
+                      onPointerCancel={handlePanPointerEnd}
                     />
                   )}
                 </>
