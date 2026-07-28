@@ -1030,15 +1030,17 @@ export const Sidebar = memo(() => {
                 <IconUser size={16} />
                 <span>Perfil</span>
               </button>
+              {/* Preferências hub — display settings + the notification preferences (a tab inside it).
+                  /perfil/notificacoes still resolves for old links/bookmarks. */}
               <button
                 onClick={() => {
-                  navigate(routes.profileNotifications);
+                  navigate(routes.profilePreferences);
                   setShowUserMenu(false);
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors"
               >
                 <IconSettings size={16} />
-                <span>Notificações</span>
+                <span>Preferências</span>
               </button>
               <button onClick={() => logout()} className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-destructive">
                 <IconLogout size={16} />

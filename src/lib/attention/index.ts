@@ -39,9 +39,11 @@ export {
   snooze as snoozeAttention,
   configureAckStore,
   setRules,
+  setRemoteMatches,
   getAttentionSnapshot,
 } from "./engine";
-export type { PushedAttention, AttentionTypeSnapshot } from "./engine";
+export type { PushedAttention, AttentionTypeSnapshot, RemoteMatchRef } from "./engine";
+export { ATTENTION_SUMMARY_KEY } from "./use-attention-summary";
 export { useAttentionSurface, useAttentionSurfaceTypes } from "./surface";
 export { ATTENTION_ENTITIES, ATTENTION_ACTIVE_TYPES, attentionEntityDescriptor, attentionAudience } from "./entities";
 export type { AttentionEntityDescriptor } from "./entities";

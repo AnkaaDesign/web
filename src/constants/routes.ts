@@ -834,6 +834,9 @@ export const routes = {
 
   // Profile - User profile page
   profile: "/perfil",
+  // Preferências hub — display settings + the notification preferences (which keep their own
+  // /perfil/notificacoes route, still linked from the sidebar/notifications).
+  profilePreferences: "/perfil/preferencias",
   profileNotifications: "/perfil/notificacoes",
 
   // Customer routes (public, no authentication required).

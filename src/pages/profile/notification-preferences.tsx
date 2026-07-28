@@ -259,7 +259,15 @@ function PreferenceRow({ config, userChannels, onChange, isSaving }: PreferenceR
 // Main Component
 // =====================
 
-export function NotificationPreferencesPage() {
+interface NotificationPreferencesPageProps {
+  /**
+   * Rendered as a tab inside the Preferências hub (/perfil/preferencias) rather than as its own
+   * route: the hub owns the page header and outer spacing, so drop ours and just fill the tab.
+   */
+  embedded?: boolean;
+}
+
+export function NotificationPreferencesPage({ embedded = false }: NotificationPreferencesPageProps = {}) {
   // State
   const [configurations, setConfigurations] = useState<GroupedConfigurationsResponse | null>(null);
   const [preferences, setPreferences] = useState<Record<string, NotificationChannel[]>>({});
@@ -449,9 +457,13 @@ export function NotificationPreferencesPage() {
   // Render
   // =====================
 
+  // Embedded (inside the Preferências hub) the shell belongs to the hub: no page header, no
+  // full-viewport heights — just fill the tab.
+  const shellClass = embedded ? "flex flex-col h-full min-h-0" : cn("flex flex-col h-full", DETAIL_PAGE_SPACING.CONTAINER);
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className={cn("flex items-center justify-center", embedded ? "h-64" : "h-screen")}>
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -459,7 +471,8 @@ export function NotificationPreferencesPage() {
 
   if (!configurations || groupedSections.length === 0) {
     return (
-      <div className={cn("flex flex-col h-full", DETAIL_PAGE_SPACING.CONTAINER)}>
+      <div className={shellClass}>
+        {!embedded && (
         <div className="flex-shrink-0">
           <PageHeader
             title="Preferências de Notificação"
@@ -472,6 +485,7 @@ export function NotificationPreferencesPage() {
             ]}
           />
         </div>
+        )}
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <Info className="w-12 h-12 text-muted-foreground" />
           <p className="text-muted-foreground">Nenhuma configuração de notificação disponível</p>
@@ -485,7 +499,8 @@ export function NotificationPreferencesPage() {
   }
 
   return (
-    <div className={cn("flex flex-col h-full", DETAIL_PAGE_SPACING.CONTAINER)}>
+    <div className={shellClass}>
+      {!embedded && (
       <div className="flex-shrink-0">
         <PageHeader
           title="Preferências de Notificação"
@@ -508,9 +523,10 @@ export function NotificationPreferencesPage() {
           ]}
         />
       </div>
+      )}
 
       {/* Sticky Header - Channel Legend and Info Card */}
-      <div className="flex-shrink-0 pt-6 pb-4 space-y-4">
+      <div className={cn("flex-shrink-0 pb-4 space-y-4", embedded ? "pt-0" : "pt-6")}>
         {/* Channel Legend */}
         <div className="flex items-center gap-4 p-3 bg-card border border-border rounded-lg flex-wrap">
           <span className="text-sm text-muted-foreground">Canais:</span>

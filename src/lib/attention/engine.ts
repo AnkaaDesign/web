@@ -60,9 +60,14 @@ type Timer = ReturnType<typeof setTimeout>;
 interface Cycle {
   match: AttentionMatch;
   status: "idle" | "bursting" | "cooldown";
-  bipTimers: Timer[];
-  burstTimer: Timer | null;
   wakeTimer: Timer | null;
+}
+
+/** A match the SERVER reported for a record no mounted page has loaded. */
+export interface RemoteMatchRef {
+  ruleId: string;
+  entityType: AttentionEntityType;
+  entityId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,6 +87,19 @@ const entities = new Map<AttentionEntityType, Map<string, unknown>>();
  * through the same cycle machinery via a synthetic rule. Keyed by their own id.
  */
 const pushed = new Map<string, PushedAttention>();
+/**
+ * Matches the SERVER found (GET /attention/summary), keyed by matchKey. This is what makes the
+ * system whole: without it the engine could only see records a mounted page had registered, so
+ * on any other page there was no cycle in existence and therefore — structurally, not by
+ * configuration — no bip. Rule metadata is NOT transmitted; only `ruleId`, resolved locally
+ * against the same rule registry, so remote and local matches are the same kind of thing.
+ */
+const remoteMatches = new Map<string, RemoteMatchRef>();
+/** Rule ids the server actually evaluated, per its last response. Empty until it answers —
+ * silence from a request that has not happened is not evidence that anything was resolved. */
+let remoteEvaluatedRules: ReadonlySet<string> = new Set();
+/** Types whose match list the server capped, per its last response. */
+let remoteTruncated: ReadonlySet<string> = new Set();
 /** Live cycles keyed by matchKey. */
 const cycles = new Map<string, Cycle>();
 /** Immutable state per address, read by subscribers. */
@@ -94,16 +112,22 @@ const addressListeners = new Map<string, Set<() => void>>();
 const globalListeners = new Set<() => void>();
 let globalVersion = 0;
 
-/** Global sound slot — bips are silent until now >= this (serializes bursts). */
-let soundSlotUntil = 0;
+// --- the bip slot (ONE, app-wide) ------------------------------------------------------
+// Sound is not per cycle. Cycles now cover every matching record in the database, not just
+// the rows on screen, so a per-cycle cadence would turn a normal backlog into a stream of
+// beeps. Exactly one burst plays per GLOBAL_BIP_MS, from the cycle that most deserves it.
+/** Earliest time the next burst may start. */
+let nextBipAllowedAt = 0;
+/** Timers for the beeps inside the burst currently playing, and whose cycle owns them. */
+let burstTimers: Timer[] = [];
+let burstOwner: string | null = null;
+/** The driver's own wake timer (next slot / next eligibility check). */
+let bipDriverTimer: Timer | null = null;
 
 // NOTE: the bip is deliberately NOT gated on whether the user is looking at the entity's
-// queue (`surface.ts`). It used to be, and that made the sound unreachable in practice:
-// EVERY page that registers TASK or CUT entities with the engine is also that entity's own
-// surface (/producao/cronograma, /producao/agenda, /producao/recorte, and each detail page
-// via `useAttentionEntity`), while pages that are not a surface register no entities at all
-// and so have no cycle to bip. Rows blinked in silence everywhere. Surfaces still suppress
-// the NAV hint (see `use-nav-activity.ts`) — that part was never the problem.
+// queue (`surface.ts`). Surfaces suppress the NAV hint only (see `use-nav-activity.ts`) —
+// pointing at the page you are on is noise, but going silent on the page where you can hear
+// it is the opposite of useful.
 
 let reconcileScheduled = false;
 
@@ -163,6 +187,40 @@ export function setEntities(type: AttentionEntityType, list: ReadonlyArray<{ id:
   for (const e of list) if (e && e.id != null) map.set(String(e.id), e);
   entities.set(type, map);
   scheduleReconcile();
+}
+
+/**
+ * Replace the server-reported match set (see `use-attention-summary.ts`). Not a merge: the
+ * server's answer is complete per poll, so a match it stops reporting is gone.
+ */
+export function setRemoteMatches(
+  list: ReadonlyArray<RemoteMatchRef>,
+  meta: { evaluatedRuleIds?: ReadonlyArray<string>; truncatedTypes?: ReadonlyArray<string> } = {},
+): void {
+  remoteMatches.clear();
+  for (const m of list) {
+    if (!m?.ruleId || !m.entityType || !m.entityId) continue;
+    remoteMatches.set(matchKey(m), m);
+  }
+  remoteEvaluatedRules = new Set(meta.evaluatedRuleIds ?? []);
+  remoteTruncated = new Set(meta.truncatedTypes ?? []);
+  scheduleReconcile();
+}
+
+/**
+ * Is the server's silence about this exact match real evidence that it RESOLVED, as opposed to
+ * evidence of nothing? Only then may the teardown clear its cooldown.
+ *
+ * Three ways an absence can be meaningless, and each one bit at some point:
+ *   • the server has not answered yet (nothing evaluated),
+ *   • it does not implement this rule — the conditions are hand-mirrored across two languages,
+ *     and without this check every drift turned into re-blinking and re-bipping,
+ *   • the type's list was capped, so past-the-cap is indistinguishable from resolved.
+ * Anything else — including a rule that legitimately matched ZERO records — is real resolution,
+ * which is the case a naive "did the payload mention this type?" test would have thrown away.
+ */
+function remoteResolved(match: AttentionMatch): boolean {
+  return remoteEvaluatedRules.has(match.ruleId) && !remoteTruncated.has(match.entityType);
 }
 
 /** Build the synthetic rule that carries a pushed/manual attention through the engine. */
@@ -384,7 +442,25 @@ function reconcile(): void {
     }
   }
 
-  // 1b) Add manual / server-pushed attentions (already targeted at this user).
+  // 1b) Add the server's matches for records this tab has NOT loaded. A locally registered
+  //     record is always evaluated locally instead — that read is current, while the poll is
+  //     up to a minute old, so an inline edit that fills the missing chassis stops the blink
+  //     immediately rather than lingering until the next fetch.
+  for (const m of remoteMatches.values()) {
+    if (entities.get(m.entityType)?.has(m.entityId)) continue;
+    const rule = rules.find((r) => r.id === m.ruleId);
+    // An unknown rule id (client older/newer than the server) is ignored, never guessed at.
+    if (!rule || !ruleAppliesToUser(rule)) continue;
+    matched.set(matchKey(m), {
+      ruleId: rule.id,
+      entityType: m.entityType,
+      entityId: m.entityId,
+      target: rule.target,
+      rule,
+    });
+  }
+
+  // 1c) Add manual / server-pushed attentions (already targeted at this user).
   for (const p of pushed.values()) {
     if (p.expiresAt && p.expiresAt <= now) continue;
     const rule = pushedRule(p);
@@ -401,14 +477,19 @@ function reconcile(): void {
   for (const [key, cycle] of cycles) {
     if (matched.has(key)) continue;
     const { entityType, entityId } = cycle.match;
-    // RESOLVED (entity still loaded, but predicate now false) → clear ack + snooze so a
-    // future recurrence re-alerts immediately. UNREGISTERED (entity no longer loaded, e.g.
-    // navigated to another page) → KEEP the ack/snooze so returning respects the cooldown
-    // and doesn't re-bip. (This is what stops "it bips every time I open the table".)
-    const stillLoaded = entities.get(entityType)?.has(entityId) ?? false;
+    // RESOLVED (we can still see the record and it no longer matches) → clear ack + snooze so
+    // a future recurrence re-alerts immediately. OUT OF SIGHT (we simply stopped observing it)
+    // → KEEP the ack/snooze so returning respects the cooldown and doesn't re-bip. (This is
+    // what stops "it bips every time I open the table".)
+    //
+    // "Can still see it" now has two forms, and conflating them was a live hazard: locally
+    // registered (the predicate was re-evaluated just now), or the server looked for this exact
+    // rule and did not report the record (see `remoteResolved`, which is deliberately strict
+    // about which absences count as an answer).
+    const observed = (entities.get(entityType)?.has(entityId) ?? false) || remoteResolved(cycle.match);
     teardownCycle(key, cycle);
     cycles.delete(key);
-    if (stillLoaded) {
+    if (observed) {
       const rec = ackStore.get(key);
       if (rec && (rec.acknowledged || rec.snoozeUntil)) {
         ackStore.patch(key, { acknowledged: false, snoozeUntil: 0 });
@@ -438,7 +519,7 @@ function reconcile(): void {
     if (!snoozed) {
       if (cycle.status !== "bursting") armCycle(key); // start (or resume) blinking
     } else {
-      if (cycle.status === "bursting") quietCycle(cycle);
+      if (cycle.status === "bursting") quietCycle(key, cycle);
       else cycle.status = "cooldown";
       if (cycle.wakeTimer) clearTimeout(cycle.wakeTimer);
       cycle.wakeTimer = setTimeout(() => reEvaluate(key), rec!.snoozeUntil - now + 30);
@@ -447,6 +528,9 @@ function reconcile(): void {
 
   // 4) Republish per-address state and notify only changed addresses.
   publish();
+  // 5) Re-pick the bip slot LAST, once the armed set is settled — otherwise the slot could be
+  //    handed to a cycle that this same pass is about to quiet.
+  driveBip();
 }
 
 /** A cooled-down cycle's wake fired → re-arm (blink again) if still matching + un-acked. */
@@ -463,68 +547,97 @@ function reEvaluate(key: string): void {
   }
   armCycle(key);
   publish();
+  driveBip();
 }
 
-/** How often an armed cycle repeats its bip burst (the visual blink is continuous). */
-const BIP_REPEAT_MS = 60 * 1000;
+/** Minimum spacing between bip bursts — APP-WIDE, and also the per-cycle re-bip interval. */
+const GLOBAL_BIP_MS = 60 * 1000;
 
 /**
  * ARM a cycle: it BLINKS CONTINUOUSLY (the CSS `-burst` class loops while status is
- * "bursting") and bips PERIODICALLY. The bip is gated by `lastFiredAt` so navigating
- * away and back does NOT re-bip immediately (only the visual blink resumes) — the bip
- * fires at most once per BIP_REPEAT_MS per entity, like the nav alert. Viewing the entity
- * (markViewed → ack) or resolving the predicate is what stops it.
+ * "bursting"). Sound is not its concern — `driveBip` decides which armed cycle gets the
+ * one shared bip slot. Viewing the entity (markViewed → ack) or resolving the predicate is
+ * what stops it.
  */
 function armCycle(key: string): void {
   const cycle = cycles.get(key);
   if (!cycle || cycle.status === "bursting") return;
   cycle.status = "bursting";
-  const rec = ackStore.get(key);
-  const sinceLastBip = Date.now() - (rec?.lastFiredAt ?? 0);
-  if (sinceLastBip >= BIP_REPEAT_MS) {
-    scheduleBip(key, true); // been quiet a while → bip now
-  } else {
-    scheduleBip(key, false, BIP_REPEAT_MS - sinceLastBip); // bipped recently → wait, no re-bip
-  }
 }
 
-/** Play one bip burst (if `bipNow` and it wins the shared sound slot) and schedule the next. */
-function scheduleBip(key: string, bipNow: boolean, delayMs = BIP_REPEAT_MS): void {
-  const cycle = cycles.get(key);
-  if (!cycle || cycle.status !== "bursting") return;
-  const { cadence } = cycle.match.rule;
+/**
+ * The single bip authority: pick the ONE armed cycle that gets to make noise now, play its
+ * burst, and schedule the next slot.
+ *
+ * This used to be per cycle, with a shared slot that only prevented two bursts from
+ * OVERLAPPING — so N blinking rows meant N bursts a minute, staggered. That was survivable
+ * while cycles existed only for the rows on screen. Now they exist for every matching record
+ * the server reports, so the cadence has to be a property of the APP, not of each cycle.
+ *
+ * Choice of cycle: highest rule priority first (an overdue forecast should be what you hear,
+ * not a missing plate), then whichever has been silent longest — so within one priority the
+ * records take turns instead of one record monopolising the slot forever.
+ *
+ * Per-cycle `lastFiredAt` still gates eligibility, which is what keeps navigating away and
+ * back from re-bipping immediately: only the visual blink resumes.
+ */
+function driveBip(): void {
+  if (bipDriverTimer) {
+    clearTimeout(bipDriverTimer);
+    bipDriverTimer = null;
+  }
   const now = Date.now();
-  if (bipNow && cadence.soundEnabled && cadence.tone !== "none" && now >= soundSlotUntil) {
-    const burstMs = Math.max(1, cadence.blinkCount) * cadence.intervalMs;
-    soundSlotUntil = now + burstMs;
-    ackStore.patch(key, { lastFiredAt: now });
-    cycle.bipTimers.forEach(clearTimeout);
-    cycle.bipTimers = [];
-    for (let i = 0; i < cadence.blinkCount; i++) {
-      cycle.bipTimers.push(setTimeout(() => playAttentionBeep(cadence.tone), i * cadence.intervalMs));
-    }
+
+  const eligible = [...cycles.entries()].filter(([key, cycle]) => {
+    if (cycle.status !== "bursting") return false;
+    const { cadence } = cycle.match.rule;
+    if (!cadence.soundEnabled || cadence.tone === "none") return false;
+    return now - (ackStore.get(key)?.lastFiredAt ?? 0) >= GLOBAL_BIP_MS;
+  });
+  if (eligible.length === 0) return;
+
+  if (now < nextBipAllowedAt) {
+    bipDriverTimer = setTimeout(driveBip, nextBipAllowedAt - now + 30);
+    return;
   }
-  if (cycle.burstTimer) clearTimeout(cycle.burstTimer);
-  cycle.burstTimer = setTimeout(() => scheduleBip(key, true), delayMs);
+
+  eligible.sort(
+    ([keyA, a], [keyB, b]) =>
+      b.match.rule.priority - a.match.rule.priority ||
+      (ackStore.get(keyA)?.lastFiredAt ?? 0) - (ackStore.get(keyB)?.lastFiredAt ?? 0),
+  );
+  const [key, cycle] = eligible[0];
+  const { cadence } = cycle.match.rule;
+
+  nextBipAllowedAt = now + GLOBAL_BIP_MS;
+  ackStore.patch(key, { lastFiredAt: now });
+  stopBurst();
+  burstOwner = key;
+  for (let i = 0; i < cadence.blinkCount; i++) {
+    burstTimers.push(setTimeout(() => playAttentionBeep(cadence.tone), i * cadence.intervalMs));
+  }
+  bipDriverTimer = setTimeout(driveBip, GLOBAL_BIP_MS + 30);
 }
 
-/** Stop an armed cycle's blink + bips (shared by markViewed's two policies). */
-function quietCycle(cycle: Cycle): void {
-  cycle.bipTimers.forEach(clearTimeout);
-  cycle.bipTimers = [];
-  if (cycle.burstTimer) {
-    clearTimeout(cycle.burstTimer);
-    cycle.burstTimer = null;
-  }
+/** Cancel the beeps still queued in the current burst. */
+function stopBurst(): void {
+  burstTimers.forEach(clearTimeout);
+  burstTimers = [];
+  burstOwner = null;
+}
+
+/** Stop an armed cycle's blink (shared by markViewed's two policies). */
+function quietCycle(key: string, cycle: Cycle): void {
+  // Opening the record mid-burst has to silence the burst too, not just the next one.
+  if (burstOwner === key) stopBurst();
   cycle.status = "cooldown";
 }
 
-function teardownCycle(_key: string, cycle: Cycle): void {
-  cycle.bipTimers.forEach(clearTimeout);
-  cycle.bipTimers = [];
-  if (cycle.burstTimer) clearTimeout(cycle.burstTimer);
+function teardownCycle(key: string, cycle: Cycle): void {
+  // A cycle whose match resolved must not keep beeping through the rest of its burst — that
+  // is the "I fixed it and it carried on nagging" complaint, in miniature.
+  if (burstOwner === key) stopBurst();
   if (cycle.wakeTimer) clearTimeout(cycle.wakeTimer);
-  cycle.burstTimer = null;
   cycle.wakeTimer = null;
   cycle.status = "idle";
 }
@@ -591,7 +704,13 @@ export function resetEngine(): void {
   cycles.clear();
   entities.clear();
   pushed.clear();
-  soundSlotUntil = 0;
+  remoteMatches.clear();
+  remoteEvaluatedRules = new Set();
+  remoteTruncated = new Set();
+  stopBurst();
+  if (bipDriverTimer) clearTimeout(bipDriverTimer);
+  bipDriverTimer = null;
+  nextBipAllowedAt = 0;
   const addrs = [...stateByAddress.keys()];
   stateByAddress.clear();
   addrs.forEach(notify);

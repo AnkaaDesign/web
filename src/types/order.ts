@@ -534,15 +534,24 @@ export interface PayableRow {
   /** Grouping key — supplier id, painter id, or schedule supplier id. May be null. */
   payeeId: string | null;
   payeeName: string;
-  /** Supplier CNPJ of the counterparty (the "Tomador") — may be null. */
+  /**
+   * CNPJ of the counterparty (the "Tomador") — the supplier on order rows, the
+   * terceirizado/PJ painter's provider on airbrushing rows. Null when the payee has
+   * no CNPJ (e.g. a CLT/autônomo painter, who is paid against a CPF).
+   */
   payeeCnpj: string | null;
   /**
-   * False for PENDING orders that still need an admin's "Requisitar Pagamento";
-   * true for every already-requested obligation. PENDING rows render muted and
-   * cannot be settled (mirrors the EXPECTED/forecast treatment).
+   * False for PENDING orders that still need an admin's "Requisitar Pagamento",
+   * and for airbrushing jobs that are not COMPLETED yet; true for every
+   * already-payable obligation. False rows render muted and cannot be settled
+   * (mirrors the EXPECTED/forecast treatment).
    */
   paymentRequested: boolean;
-  /** Order PIX key — populated only when the payment method is PIX, else null. */
+  /**
+   * Key used to pay the row: the order's PIX key (only when the payment method is
+   * PIX) or, on airbrushing rows, the painter's provider CNPJ when they are
+   * terceirizado/PJ, else their own CPF. Null when unknown.
+   */
   pixKey: string | null;
   description: string;
   amount: number;

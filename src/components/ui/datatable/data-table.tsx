@@ -27,6 +27,7 @@ import { notify } from "@/api-client";
 import { IconChevronUp, IconChevronDown, IconSelector, IconPin, IconPinnedOff, IconChevronRight } from "@tabler/icons-react";
 import { useDebouncedValue } from "@/hooks/common/use-debounced-value";
 import { usePrivileges } from "@/hooks/common/use-privileges";
+import { usePricingVisible } from "@/hooks/common/use-pricing-visible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { cn } from "@/lib/utils";
@@ -1286,6 +1287,10 @@ function DataRowInner<TData>({
   isDragging,
 }: DataRowProps<TData>) {
   const cells = row.getVisibleCells();
+  // The row is memo()'d on the props below (row.original identity, selection, geometry…) — a
+  // "mostrar/ocultar valores" toggle changes none of them, so money cells would keep rendering
+  // their previous masked/unmasked string. Subscribing here makes the toggle re-render the row.
+  void usePricingVisible();
   // Row ref MUST be attached exactly once. React re-runs a ref whenever its identity changes, and the
   // virtualizer's measure ref sets up a ResizeObserver on the node — so re-attaching every render
   // re-observes the row, which fires the RO → setState → re-render → re-attach → measure → … an

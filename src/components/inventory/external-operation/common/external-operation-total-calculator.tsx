@@ -1,6 +1,9 @@
 import React from "react";
 import { formatCurrency } from "../../../../utils";
 import { useCanViewPrices } from "../../../../hooks";
+// These totals are React.memo()'d: their props don't change when "mostrar/ocultar valores" flips,
+// so they must subscribe to the flag themselves or keep rendering a stale R$ ••••••.
+import { usePricingVisible } from "@/hooks/common/use-pricing-visible";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -45,6 +48,7 @@ const ExternalOperationTotalCalculatorComponent: React.FC<ExternalOperationTotal
   showItemBreakdown = false,
 }) => {
   const canViewPrices = useCanViewPrices();
+  void usePricingVisible();
   // Calculate individual item totals and grand total
   const itemCalculations = React.useMemo(() => {
     if (type !== EXTERNAL_OPERATION_TYPE.CHARGEABLE) return [];
@@ -210,6 +214,7 @@ const ExternalOperationTotalBadgeComponent: React.FC<{
   type: EXTERNAL_OPERATION_TYPE;
 }> = ({ selectedItems, quantities, prices, items = [], services = [], type }) => {
   const canViewPrices = useCanViewPrices();
+  void usePricingVisible();
   const grandTotal = React.useMemo(() => {
     if (type !== EXTERNAL_OPERATION_TYPE.CHARGEABLE) return 0;
 

@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { usePricingVisible } from "@/hooks/common/use-pricing-visible";
 import { InlineEditField } from "./inline-edit-field";
 import { useFieldGate } from "./use-field-gate";
 import type { ResolvedSection } from "./use-detail-layout";
@@ -30,6 +31,10 @@ const DEFAULT_SCROLL_HEIGHT = 440;
 function DetailSectionInner<TData>({ section, row, hideEmptyFields, editLocked, editLockedReason }: DetailSectionProps<TData>) {
   const { def } = section;
   const { canEdit, isAllowed } = useFieldGate();
+  // A section is memo()'d on (section, row, …) — none of which change when "mostrar/ocultar
+  // valores" flips, so without this subscription every money value rendered by `def.render`
+  // (the embedded items/quote/payment tables) would stay frozen at its previous masking.
+  void usePricingVisible();
   const sectionEditable = isAllowed(def.editablePrivilege) && !editLocked;
   // When hiding empty fields, KEEP an empty field the user can still inline-edit (forecast / notes /
   // paymentMethod / pix, etc.) so it stays reachable; only hide read-only empties. The editable

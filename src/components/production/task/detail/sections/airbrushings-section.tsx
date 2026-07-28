@@ -4,6 +4,7 @@ import { IconBrush, IconCalendar, IconCalendarEvent, IconUser, IconFileDescripti
 
 import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
 import { Badge } from "@/components/ui/badge";
+import { DetailRow } from "@/components/ui/detail-row";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/utils/date";
 import { getApiBaseUrl } from "@/utils/file";
@@ -150,19 +151,15 @@ export function AirbrushingsSection({
               </Badge>
             </div>
 
-            {/* Info rows (bg-muted idiom, matching the standalone airbrushing detail card) */}
-            <div className="flex flex-col gap-2">
-              {airbrushing.painter?.name && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                    <IconUser className="h-3.5 w-3.5" />
-                    Pintor
-                  </span>
-                  <span className="text-xs font-semibold text-foreground">{airbrushing.painter.name}</span>
-                </div>
-              )}
+            {/* Info rows — the shared `DetailRow` primitive, so these read EXACTLY like the task's own
+                Informações Gerais rows (and the standalone airbrushing detail page, which is DetailPage-
+                driven): label left, value right-aligned and capped at ~55% so long text wraps in place
+                instead of stacking under the label. Descrição is deliberately NOT `block`: free-form text
+                still belongs on the right, matching the task's multi-line "Detalhes" field. */}
+            <div className="space-y-2">
+              {airbrushing.painter?.name && <DetailRow icon={IconUser} label="Pintor" value={airbrushing.painter.name} />}
 
-              {/* Dates — same label + grayish-card idiom as Pintor */}
+              {/* Dates — same row primitive as Pintor */}
               {(() => {
                 const rows: { key: string; icon: typeof IconCalendar; label: string; value: Date }[] = [];
                 if (airbrushing.startDate) rows.push({ key: "startDate", icon: IconCalendar, label: "Início", value: airbrushing.startDate as unknown as Date });
@@ -171,30 +168,10 @@ export function AirbrushingsSection({
                 if (airbrushing.finishedAt) rows.push({ key: "finishedAt", icon: IconCalendarEvent, label: "Finalizado em", value: airbrushing.finishedAt as unknown as Date });
                 // Fall back to the creation date only when no planned/actual dates exist.
                 if (rows.length === 0 && airbrushing.createdAt) rows.push({ key: "createdAt", icon: IconCalendar, label: "Criado", value: airbrushing.createdAt as unknown as Date });
-                return rows.map(({ key, icon: Icon, label, value }) => (
-                  <div key={key} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
-                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                      <Icon className="h-3.5 w-3.5" />
-                      {label}
-                    </span>
-                    <span className="text-xs font-semibold text-foreground">{formatDate(value)}</span>
-                  </div>
-                ));
+                return rows.map(({ key, icon, label, value }) => <DetailRow key={key} icon={icon} label={label} value={formatDate(value)} />);
               })()}
 
-              {/* Description — stacked (not the justify-between idiom of the sibling rows),
-                  because the body is free-form multi-line text. */}
-              {airbrushing.description && (
-                <div className="flex flex-col gap-1 bg-muted/50 rounded-lg px-3 py-2">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                    <IconFileDescription className="h-3.5 w-3.5" />
-                    Descrição
-                  </span>
-                  <span className="text-xs font-semibold text-foreground whitespace-pre-wrap break-words">
-                    {airbrushing.description}
-                  </span>
-                </div>
-              )}
+              {airbrushing.description && <DetailRow icon={IconFileDescription} label="Descrição" value={airbrushing.description} />}
             </div>
 
             {/* Layouts — shared FileItem grid/list (no more bespoke thumbnail plumbing) */}

@@ -3,6 +3,7 @@ import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import { CHART_COLORS, chartColorAt, formatCurrency, type StatisticsChartType, type YAxisMode, type TrendLineType } from '@/types/statistics-common';
 import { useChartTheme } from '@/hooks/common/use-chart-theme';
+import { usePricingVisible } from '@/hooks/common/use-pricing-visible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
@@ -268,6 +269,8 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   // ReactECharts pages use, so axis/grid/tooltip colors can't drift.
   const theme = useChartTheme();
   const { isDark } = theme;
+  // Rebuilds the chart option when "mostrar/ocultar valores" flips (see the option memo's deps).
+  const pricingVisible = usePricingVisible();
   // Per-series color overrides + hidden set — keyed by series name. Controlled
   // by the parent when props are supplied (so state survives a chart-type
   // remount); otherwise managed internally.
@@ -1060,7 +1063,10 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       color: CHART_COLORS, dataZoom,
       series: [...categoryBandSeries, ...yearBandSeries, ...goalLineSeries, ...trendSeries, ...series],
     };
-  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, theme, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType, tooltipTrigger, categoryBands, yearBands, valueColor, effectiveCategoryLegend, legendHeight, legendBottomPx]);
+    // `pricingVisible`: axis/label/tooltip text is baked into this option by currency formatters that
+    // read the "mostrar/ocultar valores" flag at build time. Without it as a dependency, toggling
+    // would only lift the CSS blur and expose the previously-masked "R$ ••••••" labels.
+  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, theme, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType, tooltipTrigger, categoryBands, yearBands, valueColor, effectiveCategoryLegend, legendHeight, legendBottomPx, pricingVisible]);
 
   const onEvents = useMemo((): Record<string, (params: any) => void> => {
     if (!hasClickHandler) return {};

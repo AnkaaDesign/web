@@ -1,6 +1,9 @@
 import React from "react";
 import { formatCurrency } from "../../../../utils";
 import { useCanViewPrices } from "../../../../hooks";
+// These totals are React.memo()'d: their props don't change when "mostrar/ocultar valores" flips,
+// so they must subscribe to the flag themselves or keep rendering a stale R$ ••••••.
+import { usePricingVisible } from "@/hooks/common/use-pricing-visible";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -21,6 +24,7 @@ interface OrderTotalCalculatorProps {
 
 const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ orderItems = [], discount = 0, freight = 0, totalOverride = null, className, showItemBreakdown = false, showTaxBreakdown = false }) => {
   const canViewPrices = useCanViewPrices();
+  void usePricingVisible();
   // Calculate individual item totals, taxes, and grand total
   const itemCalculations = React.useMemo(() => {
     return orderItems.map((orderItem) => {
@@ -199,6 +203,7 @@ const OrderTotalBadgeComponent: React.FC<{
   totalOverride?: number | null;
 }> = ({ orderItems = [], discount = 0, freight = 0, totalOverride = null }) => {
   const canViewPrices = useCanViewPrices();
+  void usePricingVisible();
   const computedTotal = React.useMemo(() => {
     let goodsSubtotal = 0;
     const total = orderItems.reduce((acc, orderItem) => {
@@ -268,6 +273,7 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
   showTaxBreakdown = false,
 }) => {
   const canViewPrices = useCanViewPrices();
+  void usePricingVisible();
   // Calculate individual item totals, taxes, and grand total
   const itemCalculations = React.useMemo(() => {
     const itemsArray = Array.isArray(selectedItems) ? selectedItems : Array.from(selectedItems);
@@ -438,6 +444,7 @@ const OrderFormTotalBadgeComponent: React.FC<{
   discount?: number;
 }> = ({ selectedItems, quantities, prices, icmses = {}, ipis = {}, items = [], discount = 0 }) => {
   const canViewPrices = useCanViewPrices();
+  void usePricingVisible();
   const grandTotal = React.useMemo(() => {
     const itemsArray = Array.isArray(selectedItems) ? selectedItems : Array.from(selectedItems);
     let goodsSubtotal = 0;

@@ -7,6 +7,7 @@ import { IconArrowBackUp, IconBellPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useAttentionField, attentionRowClass, useAnnouncePresence, useSendWarning, canSendAttentionWarning, type AttentionEntityType } from "@/lib/attention";
 import { useAuth } from "@/contexts/auth-context";
+import { usePricingVisible } from "@/hooks/common/use-pricing-visible";
 import { SECTOR_PRIVILEGES } from "@/constants";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -324,6 +325,9 @@ interface InlineEditFieldProps<TData> {
 function InlineEditFieldInner<TData>({ field, row, editable, lockedReason }: InlineEditFieldProps<TData>) {
   const { dataType = "text", edit } = field;
   const canEdit = editable && !!edit;
+  // memo()'d on (field, row, editable, lockedReason) — none of which change when "mostrar/ocultar
+  // valores" flips. Money fields (and any custom `render`) would otherwise keep their stale masking.
+  void usePricingVisible();
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
   // Re-entrancy guard: a blur firing mid-commit must not kick off a second mutation / confirm dialog.

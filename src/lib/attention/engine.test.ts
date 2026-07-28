@@ -12,7 +12,17 @@ vi.mock("@/utils/nav-alert-sound", () => ({ playAttentionBeep, playAnnoyingBeep:
 import { SECTOR_PRIVILEGES, CUT_STATUS, TASK_STATUS } from "@/constants";
 
 import { createLocalAckStore } from "./ack-store";
-import { configureAckStore, getAddressState, getAttentionSnapshot, markViewed, resetEngine, setEntities, setUserPrivilege } from "./engine";
+import {
+  configureAckStore,
+  getAddressState,
+  getAttentionSnapshot,
+  markViewed,
+  resetEngine,
+  setEntities,
+  setRemoteMatches,
+  setUserPrivilege,
+} from "./engine";
+import { ATTENTION_RULES } from "./rules";
 import { addressKey } from "./types";
 import type { AttentionEntityType } from "./types";
 
@@ -278,6 +288,174 @@ describe("sound", () => {
     await settle();
     await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
     expect(playAttentionBeep).not.toHaveBeenCalled();
+  });
+
+  it("stops the burst mid-flight when the record is opened", async () => {
+    setEntities("CUT", [pendingCut]);
+    await settle(); // first beep of the burst has played
+    const beepsBefore = playAttentionBeep.mock.calls.length;
+    markViewed("CUT", "cut-1", { snapshot: pendingCut, policies: ["onView"] });
+    await settle();
+    await vi.advanceTimersByTimeAsync(10_000); // the rest of the burst would have landed here
+    expect(playAttentionBeep).toHaveBeenCalledTimes(beepsBefore);
+  });
+});
+
+// The bip cadence belongs to the APP, not to each cycle. Cycles now exist for every matching
+// record the server reports — not just the rows on screen — so a per-cycle cadence would turn
+// an ordinary backlog into a stream of beeps.
+describe("sound — one slot, app-wide", () => {
+  const BURST = 5 * 750; // blinkCount x intervalMs, comfortably covering one burst
+
+  it("plays ONE burst even when many records are blinking", async () => {
+    setEntities("CUT", [{ id: "cut-1", status: CUT_STATUS.PENDING }, { id: "cut-2", status: CUT_STATUS.PENDING }, { id: "cut-3", status: CUT_STATUS.PENDING }]);
+    await settle();
+    await vi.advanceTimersByTimeAsync(BURST);
+    expect(playAttentionBeep).toHaveBeenCalledTimes(5); // one burst of 5, not three
+  });
+
+  it("gives the next minute's slot to a DIFFERENT record, so none monopolises it", async () => {
+    setEntities("CUT", [{ id: "cut-1", status: CUT_STATUS.PENDING }, { id: "cut-2", status: CUT_STATUS.PENDING }]);
+    await settle();
+    await vi.advanceTimersByTimeAsync(BURST);
+    playAttentionBeep.mockClear();
+    // Nothing until the slot reopens...
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(playAttentionBeep).not.toHaveBeenCalled();
+    // ...then exactly one more burst, from the record that has been silent longest.
+    await vi.advanceTimersByTimeAsync(30_000 + BURST);
+    expect(playAttentionBeep).toHaveBeenCalledTimes(5);
+  });
+
+  it("prefers the harsher, higher-priority rule when both are waiting", async () => {
+    // R2 (forecast overdue, priority 30, harsh) vs R3a (missing chassis, priority 20, soft).
+    setEntities("TASK", [overdueTask, { id: "task-2", status: TASK_STATUS.IN_PRODUCTION, cleared: false, entryDate: new Date("2026-07-01"), serialNumber: "SN-2", forecastDate: null, truck: { chassisNumber: null, plate: "XYZ", vinPlateId: "f1" } }]);
+    await settle();
+    expect(playAttentionBeep).toHaveBeenCalledWith("harsh");
+    expect(playAttentionBeep).not.toHaveBeenCalledWith("soft");
+  });
+});
+
+// The bug this whole layer exists for: the engine could only see records a mounted page had
+// registered, and a blink/bip cycle only exists for a match — so on any page that loads neither
+// tasks nor cuts there was nothing in existence to make a sound. The nav ring lit up (it read
+// plain counts from the server) while the app stayed silent, i.e. the signal was audible only
+// where the rows were already visible.
+describe("remote matches — the server's half of the match set", () => {
+  const remoteCut = { ruleId: "cut.pending", entityType: "CUT" as const, entityId: "cut-9" };
+  /** A server whose mirror implements every client rule and truncated nothing. */
+  const ALL_EVALUATED = { evaluatedRuleIds: ATTENTION_RULES.map((r) => r.id), truncatedTypes: [] as string[] };
+
+  it("blinks AND bips for a record no page has loaded", async () => {
+    setRemoteMatches([remoteCut], ALL_EVALUATED);
+    await settle();
+    expect(row("CUT", "cut-9")).toEqual(ARMED);
+    expect(playAttentionBeep).toHaveBeenCalledWith("harsh");
+  });
+
+  it("reaches the nav projection like any other match", async () => {
+    setRemoteMatches([remoteCut], ALL_EVALUATED);
+    await settle();
+    expect(getAttentionSnapshot().get("CUT")).toEqual({ count: 1, armed: true, harsh: true });
+  });
+
+  it("lights the rule's own FIELD, not just the row", async () => {
+    // Target/cadence/priority are recovered from the local rule registry by id — none of that
+    // travels over the wire, which is what keeps a remote match the same kind of thing as a
+    // locally-evaluated one.
+    setRemoteMatches([{ ruleId: "task.forecast-overdue-not-cleared", entityType: "TASK", entityId: "task-7" }], ALL_EVALUATED);
+    await settle();
+    expect(field("TASK", "task-7", "forecastDate")).toEqual(ARMED);
+  });
+
+  it("ignores a rule id it does not know", async () => {
+    setRemoteMatches([{ ruleId: "cut.invented-by-a-newer-server", entityType: "CUT", entityId: "cut-9" }], ALL_EVALUATED);
+    await settle();
+    expect(row("CUT", "cut-9")).toBeNull();
+  });
+
+  it("yields to the LOCAL evaluation once the record is on screen", async () => {
+    // A poll is up to a minute old. An inline edit that resolves the rule has to stop the blink
+    // now, not when the next fetch lands — so a loaded record is always evaluated locally.
+    const fixed = { ...overdueTask, cleared: true, entryDate: new Date("2026-07-20"), truck: { chassisNumber: "CH", plate: "ABC1D23", vinPlateId: "file-1" } };
+    setRemoteMatches([{ ruleId: "task.forecast-overdue-not-cleared", entityType: "TASK", entityId: overdueTask.id }], ALL_EVALUATED);
+    await settle();
+    expect(row("TASK", overdueTask.id)).toEqual(ARMED);
+
+    setEntities("TASK", [fixed]);
+    await settle();
+    expect(row("TASK", overdueTask.id)).toBeNull();
+  });
+
+  it("treats absence from a COMPLETE list as resolution, so a recurrence re-alerts", async () => {
+    setRemoteMatches([remoteCut], ALL_EVALUATED);
+    await settle();
+    markViewed("CUT", "cut-9", { snapshot: { id: "cut-9", status: CUT_STATUS.PENDING }, policies: ["onView"] });
+    await settle();
+    expect(row("CUT", "cut-9")).toEqual(RESTING);
+
+    setRemoteMatches([], ALL_EVALUATED); // server sees no pending cuts at all → it was dealt with
+    await settle();
+    expect(row("CUT", "cut-9")).toBeNull();
+
+    setRemoteMatches([remoteCut], ALL_EVALUATED); // it comes back → blinks again, old ack discarded
+    await settle();
+    expect(row("CUT", "cut-9")).toEqual(ARMED);
+  });
+
+  it("keeps the cooldown when the list was TRUNCATED, because absence proves nothing there", async () => {
+    setRemoteMatches([remoteCut], ALL_EVALUATED);
+    await settle();
+    markViewed("CUT", "cut-9", { snapshot: { id: "cut-9", status: CUT_STATUS.PENDING }, policies: ["onView"] });
+    await settle();
+
+    // Dropped out of a capped list — it may simply be past the cap. Clearing the ack here would
+    // re-arm and re-bip a record the user has already dealt with.
+    setRemoteMatches([{ ruleId: "cut.pending", entityType: "CUT", entityId: "cut-other" }], { ...ALL_EVALUATED, truncatedTypes: ["CUT"] });
+    await settle();
+    setRemoteMatches([remoteCut], { ...ALL_EVALUATED, truncatedTypes: ["CUT"] });
+    await settle();
+    expect(row("CUT", "cut-9")).toEqual(RESTING);
+  });
+
+  it("keeps the cooldown for a rule the SERVER does not implement", async () => {
+    // The rule conditions are mirrored by hand across TypeScript and Prisma. If a rule the
+    // server never runs had its absence read as resolution, every drift would clear the
+    // cooldown and the record would blink and bip again — the exact churn this guard prevents.
+    // `evaluatedRuleIds` is the server admitting what it actually looked for.
+    setEntities("CUT", [pendingCut]);
+    await settle();
+    markViewed("CUT", "cut-1", { snapshot: pendingCut, policies: ["onView"] });
+    await settle();
+    expect(row("CUT", "cut-1")).toEqual(RESTING);
+
+    setEntities("CUT", []); // leave the cut list
+    setRemoteMatches([], { evaluatedRuleIds: ["task.forecast-overdue-not-cleared"], truncatedTypes: [] });
+    await settle();
+
+    setEntities("CUT", [pendingCut]); // come back — still resting, not re-armed
+    await settle();
+    expect(row("CUT", "cut-1")).toEqual(RESTING);
+  });
+
+  it("does not treat a not-yet-answered poll as resolution", async () => {
+    setEntities("CUT", [pendingCut]);
+    await settle();
+    markViewed("CUT", "cut-1", { snapshot: pendingCut, policies: ["onView"] });
+    await settle();
+    setEntities("CUT", []);
+    await settle(); // no setRemoteMatches at all: the request has not landed
+    setEntities("CUT", [pendingCut]);
+    await settle();
+    expect(row("CUT", "cut-1")).toEqual(RESTING);
+  });
+
+  it("drops every remote match when the set comes back empty", async () => {
+    setRemoteMatches([remoteCut], ALL_EVALUATED);
+    await settle();
+    setRemoteMatches([], ALL_EVALUATED);
+    await settle();
+    expect(getAttentionSnapshot().get("CUT")).toBeUndefined();
   });
 });
 

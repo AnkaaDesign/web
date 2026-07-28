@@ -35,22 +35,14 @@
 // A resting entity is never hidden — that is what let the nav contradict the rows.
 
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 
-import { SECTOR_PRIVILEGES } from "@/constants";
-import { useAuth } from "@/contexts/auth-context";
-import { canAccessAnyPrivilege } from "@/utils/privilege";
 import {
   useAttentionVersion,
   getAttentionSnapshot,
   useAttentionSurfaceTypes,
   attentionEntityDescriptor,
-  attentionAudience,
   ATTENTION_ACTIVE_TYPES,
-  type AttentionEntityType,
-  type AttentionTypeSnapshot,
 } from "@/lib/attention";
-import { apiClient } from "@/api-client/axiosClient";
 
 /** A single "this nav entry needs attention" signal. */
 export interface NavActivityHint {
@@ -66,52 +58,16 @@ export interface NavActivityHint {
   armed?: boolean;
 }
 
-/** Per-entity-type counts as the server sees them (global, not just what's loaded). */
-type SummaryByType = Partial<Record<AttentionEntityType, AttentionTypeSnapshot>>;
-
-/**
- * Server-side attention summary (GET /attention/summary) — the global picture, not just
- * what this tab happens to have loaded. Polled independently of any list query so the nav
- * can blink from ANYWHERE, including pages (the Produção dashboard) that never register a
- * single entity with the local engine. Returns the same `{count, armed, harsh}` triple the
- * engine produces, per entity type, so the two merge without translation.
- *
- * Gated on the union of every active type's audience: a user who can see no rule at all
- * never issues the request.
- */
-function useAttentionSummary(): SummaryByType {
-  const { user } = useAuth();
-  const userPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
-
-  const enabled = useMemo(() => {
-    if (!userPrivilege) return false;
-    return ATTENTION_ACTIVE_TYPES.some((type) => {
-      const audience = attentionAudience(type);
-      return audience === null || canAccessAnyPrivilege(userPrivilege, audience as never);
-    });
-  }, [userPrivilege]);
-
-  const { data } = useQuery({
-    queryKey: ["attention-summary"],
-    queryFn: async () => {
-      const res = await apiClient.get("/attention/summary");
-      return ((res as { data?: SummaryByType })?.data ?? res) as SummaryByType;
-    },
-    enabled,
-    staleTime: 1000 * 30,
-    refetchInterval: enabled ? 1000 * 60 : false,
-    refetchOnWindowFocus: true,
-  });
-
-  return enabled ? (data ?? {}) : {};
-}
-
 /**
  * Attention engine → nav indicators, for every entity type that has rules.
  *
- * Local engine state (loaded rows) is merged with the server summary (everything else) by
- * taking the strongest signal of the two: the engine is authoritative the instant a row
- * changes, the server covers what isn't on screen.
+ * ONE source: `getAttentionSnapshot()`. The nav used to merge the engine's snapshot with a
+ * separate `{count, armed, harsh}` triple polled from the server, each side deciding for itself
+ * what "armed" meant — the engine from its ack store, the server from `AttentionAck` rows. Two
+ * implementations of one concept is how the nav and the rows kept contradicting each other. The
+ * server now reports which records MATCH and nothing more (see `use-attention-summary.ts`);
+ * those become ordinary cycles in the engine, so this projection covers loaded and unloaded
+ * records alike without knowing the difference.
  *
  * An entity whose records are ON SCREEN contributes NOTHING. Not a dimmed indicator — none.
  * The rows themselves are the signal at full fidelity, and an indicator pointing at the page
@@ -123,9 +79,8 @@ function useAttentionSummary(): SummaryByType {
  * is no lingering snooze.
  */
 function useAttentionNavActivity(): NavActivityHint[] {
-  useAttentionVersion(); // re-render whenever local attention state flips
-  const local = getAttentionSnapshot();
-  const server = useAttentionSummary();
+  useAttentionVersion(); // re-render whenever attention state flips
+  const snapshot = getAttentionSnapshot();
   const surfaces = useAttentionSurfaceTypes();
 
   const hints: NavActivityHint[] = [];
@@ -134,15 +89,11 @@ function useAttentionNavActivity(): NavActivityHint[] {
     const descriptor = attentionEntityDescriptor(type);
     if (!descriptor || descriptor.navPaths.length === 0) continue;
 
-    const l = local.get(type);
-    const s = server[type];
-    const count = Math.max(l?.count ?? 0, s?.count ?? 0);
-    if (count <= 0) continue;
+    const state = snapshot.get(type);
+    if (!state || state.count <= 0) continue;
 
-    const armed = (l?.armed ?? false) || (s?.armed ?? false);
-    const tone: "harsh" | "soft" = (l?.harsh ?? false) || (s?.harsh ?? false) ? "harsh" : "soft";
-
-    for (const path of descriptor.navPaths) hints.push({ path, count, tone, armed });
+    const tone: "harsh" | "soft" = state.harsh ? "harsh" : "soft";
+    for (const path of descriptor.navPaths) hints.push({ path, count: state.count, tone, armed: state.armed });
   }
   return hints;
 }

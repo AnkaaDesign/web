@@ -2734,6 +2734,7 @@ export enum FAVORITE_PAGES {
 
   // Perfil
   PERFIL_NOTIFICACOES = "/perfil/notificacoes",
+  PERFIL_PREFERENCIAS = "/perfil/preferencias",
 
   // Administração
   ADMINISTRACAO_APLICATIVOS_LISTAR = "/administracao/aplicativos",

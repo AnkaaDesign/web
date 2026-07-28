@@ -7,6 +7,7 @@ import { formatCurrency } from "../../../../utils";
 import { cn } from "@/lib/utils";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
+import { usePricingVisible } from "@/hooks/common/use-pricing-visible";
 import { usePositions } from "../../../../hooks";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,7 @@ const DEFAULT_PAGE_SIZE = 40;
 
 export function PositionList({ onDataUpdate, className }: PositionListProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const pricingVisible = usePricingVisible();
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [tableData, setTableData] = useState<{ positions: Position[]; totalRecords: number }>({ positions: [], totalRecords: 0 });
 
@@ -260,7 +262,8 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
     }
 
     return filterArray;
-  }, [searchingFor, currentMinRemuneration, currentMaxRemuneration, currentBonifiable, currentHasUsers, onRemoveFilter]);
+    // pricingVisible: the remuneration chips are formatted currency baked into this memo.
+  }, [searchingFor, currentMinRemuneration, currentMaxRemuneration, currentBonifiable, currentHasUsers, onRemoveFilter, pricingVisible]);
 
   // Handle filters apply from modal
   const handleFiltersApply = useCallback(

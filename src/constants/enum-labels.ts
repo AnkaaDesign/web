@@ -2316,6 +2316,7 @@ export const FAVORITE_PAGES_LABELS: Record<FAVORITE_PAGES, string> = {
   [FAVORITE_PAGES.SERVIDOR_REGISTROS_ALTERACOES_LISTAR]: "Registros de Alterações",
   // Perfil
   [FAVORITE_PAGES.PERFIL_NOTIFICACOES]: "Preferências de Notificação",
+  [FAVORITE_PAGES.PERFIL_PREFERENCIAS]: "Preferências",
   // Administração
   [FAVORITE_PAGES.ADMINISTRACAO_APLICATIVOS_LISTAR]: "Aplicativos Móveis",
 };

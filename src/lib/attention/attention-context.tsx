@@ -22,6 +22,7 @@ import { configureAckStore, refreshAttention, resetEngine, setEntities, setUserP
 import { ATTENTION_ACTIVE_TYPES, attentionEntityDescriptor } from "./entities";
 import { SendWarningProvider } from "./send-warning";
 import { setRouteSurfaces } from "./surface";
+import { ATTENTION_SUMMARY_KEY, useAttentionSummary } from "./use-attention-summary";
 import { useAttentionSocket } from "./use-attention-socket";
 import type { AttentionEntityType } from "./types";
 
@@ -41,6 +42,10 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
 
   // Connect the real-time channel (presence + pushed warnings + change invalidation).
   useAttentionSocket();
+
+  // The server's match set — records no mounted page has loaded. Without it the engine has no
+  // cycle for them, so neither the blink nor the BIP can reach the user off those pages.
+  useAttentionSummary();
 
   // Server-backed ack store (cross-device cooldown/snooze), with localStorage as the
   // offline cache. Configure once; hydrate the current user's acks on login.
@@ -96,11 +101,10 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
     setUserPrivilege(privilege);
   }, [privilege]);
 
-  // An ack changed what the SERVER would report, so refetch the summary instead of waiting
-  // out its poll interval. Debounced because `markViewed` writes one ack per matching rule
-  // and the PUTs are fire-and-forget — the delay lets them land, so the refetch reads the new
-  // state rather than racing it. The local engine has already quieted the row and the nav; this
-  // only keeps the global (unloaded-entities) half of the signal honest.
+  // An ack means the user acted on a record, so pull a fresh match set rather than waiting out
+  // the poll. Debounced because `markViewed` writes one ack per matching rule and the PUTs are
+  // fire-and-forget — the delay lets them land first. (The acks themselves are honoured
+  // locally and instantly; the refetch is about the records this tab has NOT loaded.)
   const queryClient = useQueryClient();
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -108,7 +112,7 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        void queryClient.invalidateQueries({ queryKey: ["attention-summary"] });
+        void queryClient.invalidateQueries({ queryKey: ATTENTION_SUMMARY_KEY });
       }, 800);
     });
     return () => {

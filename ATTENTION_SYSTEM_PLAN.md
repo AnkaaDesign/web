@@ -174,13 +174,25 @@ Confirmed field names: `Task.cleared: boolean`, `Task.entryDate`, `Task.term`,
 | Question | Decided by | Why |
 |---|---|---|
 | Which **row/field** on screen blinks | **Client** engine over loaded rows | Client already has the data; zero server cost; O(rows×rules), rules are few |
-| Whether a task **not on screen** needs attention (nav badge) | **Server** attention summary, pushed via socket | Client can't see unloaded data |
+| **Which records** not on screen need attention | **Server** — `GET /attention/summary` returns match refs (`ruleId` + `entityId`) | Client can't see unloaded data |
+| Whether any of them is **armed vs resting**, and the **bip** | **Client** engine, from those refs | One authority, so nav / row / detail / sound cannot disagree |
 | **Time-based** firing ("forecast date arrived") | **Server** cron → emits `attention` event | Time passing isn't a client event |
 | **Presence** ("being edited") | **Server** in-memory registry, pushed | Cross-user state |
 
 Client engine lives in the `AttentionProvider`: on every relevant react-query cache change it
 re-runs `evaluateRules(loadedEntities, currentUser)` and diffs the active-attention set, starting
 / stopping cycles accordingly. No polling — cache changes are themselves driven by socket events.
+
+**The server's match refs become ordinary cycles**, indistinguishable downstream from locally
+evaluated ones (the rule is recovered from the local registry by `ruleId`, so target, cadence and
+priority never travel). That is what makes the bip reachable off the Agenda / Cronograma / Recorte
+pages: a cycle only exists for a match, so before this the sound was structurally unreachable
+anywhere else — not misconfigured, simply absent. A record loaded locally is always evaluated
+locally, since a poll is up to a minute stale and an inline fix must stop the blink immediately.
+
+Because cycles now cover every matching record rather than a page's worth of rows, **sound is one
+app-wide slot**: one burst per minute, given to the highest-priority armed cycle and rotating
+among equals. Blink stays per record.
 
 ---
 
@@ -385,7 +397,10 @@ Apply in your environment (I did not run migrations against your DB):
    - `AttentionRule { …the §3 shape as columns/Json… }` · `AttentionRulePreference { userId, ruleId, muted, soundMuted, @@unique([userId,ruleId]) }`
 2. **API** — `AttentionAckService` + `GET/PUT /attention/ack` (mirror the notification-preference repo pattern); optional `@Cron` sweep for R2 emitting `attention`/`entity:changed`; server attention summary endpoint for the nav badge.
 3. **Web** — implement a server-backed `AttentionAckStore` and `configureAckStore(serverStore)` in the provider (localStorage stays as offline cache); admin rules editor cloned from `pages/administration/notifications/configurations/*`; per-user prefs tab in `pages/profile/notification-preferences.tsx`.
-4. **Nav unification** — once the server summary exists, feed `use-nav-activity` from it and retire the polling cut source.
+4. **Nav unification** — ✅ done. `use-nav-activity` now projects `getAttentionSnapshot()` and
+   nothing else; the polling cut source and the server's parallel `{count, armed, harsh}` triple
+   are both gone. See `api/docs/attention-server-side.md` §6 for why the endpoint returns match
+   refs rather than counts.
 
 ## 13. Resolved decisions (locked)
 

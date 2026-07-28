@@ -194,6 +194,10 @@ export const preferencesCreateSchema = z
         errorMap: () => ({ message: "esquema de cores inválido" }),
       })
       .default(COLOR_SCHEMA.LIGHT),
+    // "Mostrar valores por padrão": false = money starts masked on every load/navigation
+    // (the eye reveals it), true = starts visible (the eye hides it). Only the DEFAULT is
+    // persisted; the live on/off state stays in memory (utils/pricing-visibility.ts).
+    pricesVisibleByDefault: z.boolean().default(false).optional(),
     favorites: z
       .array(
         z.enum(Object.values(FAVORITE_PAGES) as [string, ...string[]], {
@@ -216,6 +220,8 @@ export const preferencesUpdateSchema = z
         errorMap: () => ({ message: "esquema de cores inválido" }),
       })
       .optional(),
+    // See create schema — only the DEFAULT visibility is persisted.
+    pricesVisibleByDefault: z.boolean().optional(),
     favorites: z
       .array(
         z.enum(Object.values(FAVORITE_PAGES) as [string, ...string[]], {

@@ -43,6 +43,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/auth-context";
+import { usePrivileges } from "@/hooks/common/use-privileges";
 import {
   canEditAirbrushings,
   canDeleteAirbrushings,
@@ -90,6 +91,7 @@ export function AirbrushingDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { hasAnyPrivilegeAccess } = usePrivileges();
   const { deleteMutation, updateAsync } = useAirbrushingMutations();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   // Grid/list view for the Layouts section — lifted here so the toggle can live in the
@@ -99,6 +101,10 @@ export function AirbrushingDetailPage() {
   const canEdit = canEditAirbrushings(user);
   const canDelete = canDeleteAirbrushings(user);
   const canRelease = canReleaseAirbrushings(user);
+  // The "Produção" dashboard (`pages/production/root.tsx`) is gated to FINANCIAL/ADMIN,
+  // while this detail page also admits PRODUCTION/ACCOUNTING/COMMERCIAL. Render the
+  // ancestor crumb as a plain label for those users instead of a link into a denied page.
+  const canOpenProductionRoot = hasAnyPrivilegeAccess([SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]);
 
   // Promise-based confirm for the inline "Status de Pagamento" edit. Settling / un-settling money
   // must be confirmed first; `beforeCommit` awaits this before the status actually changes.
@@ -561,12 +567,23 @@ export function AirbrushingDetailPage() {
         icon={IconBrush}
         actions={actions}
         hideEmptyFields
-        breadcrumbs={[
-          { label: "Início", href: routes.home },
-          { label: "Produção", href: routes.production.root },
-          { label: "Aerografia", href: routes.production.airbrushings.root },
-          { label: airbrushing?.task?.name ?? "Detalhe" },
-        ]}
+        breadcrumbs={
+          (location.state as { from?: string } | null)?.from === "payables"
+            ? [
+                // Arrived from Contas a Pagar — reflect the path actually taken
+                // instead of the Produção/Aerografia trail.
+                { label: "Início", href: routes.home },
+                { label: "Financeiro", href: routes.financial.root },
+                { label: "Contas a Pagar", href: routes.financial.accountsPayable.root },
+                { label: airbrushing?.task?.name ?? "Detalhe" },
+              ]
+            : [
+                { label: "Início", href: routes.home },
+                { label: "Produção", href: canOpenProductionRoot ? routes.production.root : undefined },
+                { label: "Aerografia", href: routes.production.airbrushings.root },
+                { label: airbrushing?.task?.name ?? "Detalhe" },
+              ]
+        }
         navigation={{
           ids: (location.state as { ids?: string[] } | null)?.ids,
           toRoute: (rid) => routes.production.airbrushings.details(rid),

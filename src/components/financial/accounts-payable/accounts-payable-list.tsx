@@ -139,6 +139,7 @@ function typeSortLabel(row: PayableRow): string {
 const AIRBRUSHING_VIEW_PRIVILEGES: SECTOR_PRIVILEGES[] = [
   SECTOR_PRIVILEGES.PRODUCTION,
   SECTOR_PRIVILEGES.FINANCIAL,
+  SECTOR_PRIVILEGES.ACCOUNTING,
   SECTOR_PRIVILEGES.COMMERCIAL,
   SECTOR_PRIVILEGES.ADMIN,
 ];
@@ -531,8 +532,10 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     }
     if (row.source === "AIRBRUSHING") {
       // row.id is the airbrushing id — open its own detail page (not the task
-      // cronograma, which finance/accounting users can't reach).
-      if (canViewAirbrushing) navigate(routes.production.airbrushings.details(row.id));
+      // cronograma, which finance/accounting users can't reach). Same contract as
+      // ORDER rows: `from: "payables"` tells the detail page to show
+      // "Financeiro / Contas a Pagar" instead of the Produção/Aerografia trail.
+      if (canViewAirbrushing) navigate(routes.production.airbrushings.details(row.id), { state: { from: "payables" } });
     } else if (row.bankTransactionId) {
       // Non-order/airbrushing cleared rows (folha/recorrentes/agendamentos) have
       // no own detail page — link to the bank line that cleared them.
@@ -884,10 +887,19 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
                 </DropdownMenuItem>
               )}
 
-              {ctxRow.source === "AIRBRUSHING" && ctxRow.paymentState !== "PAID" && (
+              {ctxRow.source === "AIRBRUSHING" && ctxRow.paymentState !== "PAID" && ctxRow.paymentRequested !== false && (
                 <DropdownMenuItem onClick={() => runAction(() => settleAirbrushing(ctxRow.id, AIRBRUSHING_PAYMENT_STATUS.PAID))}>
                   <IconCash className="mr-2 h-4 w-4" />
                   Marcar como pago
+                </DropdownMenuItem>
+              )}
+
+              {/* Airbrushing still in production — the painter is only owed once the
+                  job is concluded, so settling is blocked. Show why, disabled. */}
+              {ctxRow.source === "AIRBRUSHING" && ctxRow.paymentState !== "PAID" && ctxRow.paymentRequested === false && (
+                <DropdownMenuItem disabled>
+                  <IconClock className="mr-2 h-4 w-4" />
+                  Aguardando conclusão da aerografia
                 </DropdownMenuItem>
               )}
 

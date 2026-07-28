@@ -16,8 +16,10 @@ import { useAuth } from "@/contexts/auth-context";
 import { getLocalStorage } from "@/lib/storage";
 
 import { connectAttentionSocket, disconnectAttentionSocket, updateAttentionSocketToken } from "./attention-socket";
+import { ATTENTION_ACTIVE_TYPES } from "./entities";
 import { addPushedAttention, dismissPushedAttention, type PushedAttention } from "./engine";
 import { applyPresenceSnapshot, applyPresenceUpdate, clearPresence, type PresenceEditor } from "./presence";
+import { ATTENTION_SUMMARY_KEY } from "./use-attention-summary";
 
 /**
  * entityType → the react-query root key to invalidate on change.
@@ -88,10 +90,15 @@ export function useAttentionSocket(): void {
       if (Array.isArray(data?.entities)) applyPresenceSnapshot(data.entities);
     };
     const onEntityChanged = (data: { entityType: string; entityId: string }) => {
+      // A change to an entity that carries RULES also changes the server's match set, and that
+      // set is what the engine builds off-screen cycles (and therefore bips) from. Refreshing
+      // it here is what keeps the sound tied to reality: on the 60s backstop poll alone, a task
+      // could go overdue — or be fixed — and the bip would lag a minute behind either way.
+      // The summary's key is a single segment, so it rides the same debounced flush.
+      if (ATTENTION_ACTIVE_TYPES.includes(data?.entityType as never)) pendingRoots.add(ATTENTION_SUMMARY_KEY[0]);
       const rootKey = INVALIDATION_KEYS[data?.entityType];
-      if (!rootKey) return;
-      pendingRoots.add(rootKey);
-      if (!flushTimer) flushTimer = setTimeout(flush, INVALIDATE_DEBOUNCE_MS);
+      if (rootKey) pendingRoots.add(rootKey);
+      if (pendingRoots.size && !flushTimer) flushTimer = setTimeout(flush, INVALIDATE_DEBOUNCE_MS);
     };
 
     socket.on("attention:push", onPush);
@@ -108,6 +115,8 @@ export function useAttentionSocket(): void {
       for (const root of new Set(Object.values(INVALIDATION_KEYS))) {
         if (root) pendingRoots.add(root);
       }
+      // Every `entity:changed` in the gap was missed, so the match set is of unknown age.
+      pendingRoots.add(ATTENTION_SUMMARY_KEY[0]);
       if (!flushTimer) flushTimer = setTimeout(flush, INVALIDATE_DEBOUNCE_MS);
     };
     socket.io.on("reconnect", onReconnect);

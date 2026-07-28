@@ -80,6 +80,7 @@ export * from "./use-preferences";
 export * from "./use-statistics-page-persistence";
 export * from "./use-dashboard";
 export * from "./use-page-tracker";
+export * from "./use-pricing-visible";
 
 // Utility Hooks
 export * from "./use-toast";
