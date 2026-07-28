@@ -23,10 +23,6 @@ const copyEntrySchema = z.object({
     .string()
     .optional()
     .transform((val) => val?.trim().replace(/\s/g, "").toUpperCase() || undefined),
-  vinPlate: z
-    .string()
-    .optional()
-    .transform((val) => val?.trim() || undefined),
 });
 
 // Schema for multiple copies
@@ -37,7 +33,7 @@ const duplicateTaskSchema = z.object({
 type DuplicateTaskFormData = z.infer<typeof duplicateTaskSchema>;
 
 // Type for what the parent component receives (array of copies)
-export type DuplicateTaskCopyData = { serialNumber?: string; plate?: string; chassisNumber?: string; vinPlate?: string }[];
+export type DuplicateTaskCopyData = { serialNumber?: string; plate?: string; chassisNumber?: string }[];
 
 interface DuplicateTaskModalProps {
   open: boolean;
@@ -58,7 +54,7 @@ export function DuplicateTaskModal({ open, onOpenChange, task, onConfirm }: Dupl
   } = useForm<DuplicateTaskFormData>({
     resolver: zodResolver(duplicateTaskSchema),
     defaultValues: {
-      copies: [{ serialNumber: "", plate: "", chassisNumber: "", vinPlate: "" }],
+      copies: [{ serialNumber: "", plate: "", chassisNumber: "" }],
     },
   });
 
@@ -69,13 +65,13 @@ export function DuplicateTaskModal({ open, onOpenChange, task, onConfirm }: Dupl
 
   // Add a new copy entry
   const handleAddCopy = useCallback(() => {
-    append({ serialNumber: "", plate: "", chassisNumber: "", vinPlate: "" });
+    append({ serialNumber: "", plate: "", chassisNumber: "" });
   }, [append]);
 
   React.useEffect(() => {
     if (task && open) {
       reset({
-        copies: [{ serialNumber: "", plate: "", chassisNumber: "", vinPlate: "" }],
+        copies: [{ serialNumber: "", plate: "", chassisNumber: "" }],
       });
       setMode('quantity');
       setQuantity('');
@@ -86,7 +82,7 @@ export function DuplicateTaskModal({ open, onOpenChange, task, onConfirm }: Dupl
   const onDetailedSubmit = (data: DuplicateTaskFormData) => {
     onConfirm(data.copies);
     onOpenChange(false);
-    reset({ copies: [{ serialNumber: "", plate: "", chassisNumber: "", vinPlate: "" }] });
+    reset({ copies: [{ serialNumber: "", plate: "", chassisNumber: "" }] });
   };
 
   // Submit for quantity mode
@@ -95,7 +91,7 @@ export function DuplicateTaskModal({ open, onOpenChange, task, onConfirm }: Dupl
     const blankCopies: DuplicateTaskCopyData = Array.from({ length: quantity }, () => ({}));
     onConfirm(blankCopies);
     onOpenChange(false);
-    reset({ copies: [{ serialNumber: "", plate: "", chassisNumber: "", vinPlate: "" }] });
+    reset({ copies: [{ serialNumber: "", plate: "", chassisNumber: "" }] });
     setQuantity('');
   };
 
@@ -231,24 +227,6 @@ export function DuplicateTaskModal({ open, onOpenChange, task, onConfirm }: Dupl
                         />
                         {errors.copies?.[index]?.chassisNumber && (
                           <p className="text-sm text-destructive">{errors.copies[index].chassisNumber?.message}</p>
-                        )}
-                      </div>
-                      <div className="grid gap-1">
-                        {index === 0 && <Label htmlFor={`vinPlate-${index}`}>Plaqueta</Label>}
-                        <Controller
-                          control={control}
-                          name={`copies.${index}.vinPlate`}
-                          render={({ field: controllerField }) => (
-                            <Input
-                              id={`vinPlate-${index}`}
-                              placeholder="Plaqueta"
-                              value={controllerField.value || ""}
-                              onChange={(val) => controllerField.onChange(val)}
-                            />
-                          )}
-                        />
-                        {errors.copies?.[index]?.vinPlate && (
-                          <p className="text-sm text-destructive">{errors.copies[index].vinPlate?.message}</p>
                         )}
                       </div>
                     </div>

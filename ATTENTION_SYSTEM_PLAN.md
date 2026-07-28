@@ -134,9 +134,11 @@ Confirmed field names: `Task.cleared: boolean`, `Task.entryDate`, `Task.term`,
 `truck.plate`.
 
 > **Superseded 2026-07-27 — read `src/lib/attention/rules.ts`, not the snippets below.**
-> R3 was split into R3a (chassis) and R3b (plate). `truck.vinPlate` (Plaqueta) no longer has
-> any rule, and the plate rule only fires when the task has **no serial number** — the two
-> identify the same vehicle, so a task carrying a serial is already identified.
+> R3 was split into R3a (chassis), R3b (plate) and R3c (plaqueta). The plate rule only fires
+> when the task has **no serial number** — the two identify the same vehicle, so a task
+> carrying a serial is already identified. R3c tests `truck.vinPlateId`: a Plaqueta deixou de
+> ser texto e virou FOTO, então o alerta pede uma ação concreta (fotografar a plaqueta) em vez
+> de um número que ninguém digitava.
 
 ```ts
 // R1 — cleared but no entry date yet → blink the forecast field for logistics + prod manager

@@ -221,7 +221,6 @@ export interface TaskOrderBy {
   serialNumber?: ORDER_BY_DIRECTION;
   details?: ORDER_BY_DIRECTION;
   // Note: chassisNumber and plate are now on Truck, use truck.chassisNumber / truck.plate
-  // Note: vinPlate is now on Truck, use truck.vinPlate
   entryDate?: ORDER_BY_DIRECTION;
   term?: ORDER_BY_DIRECTION;
   startedAt?: ORDER_BY_DIRECTION;

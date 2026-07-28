@@ -115,7 +115,6 @@ export interface GarageTruck {
   serialNumber?: string | null;
   plate?: string | null;
   chassisNumber?: string | null;
-  vinPlate?: string | null;
   paintHex?: string | null;
   length: number; // Total length (with cabin if applicable)
   originalLength?: number; // Original length without cabin (for display)

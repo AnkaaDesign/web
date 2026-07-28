@@ -174,16 +174,6 @@ export function createTaskScheduleColumns(options: TaskScheduleColumnsOptions = 
       cell: ({ row }) => <span className="block truncate font-mono">{row.original.truck?.chassisNumber || "-"}</span>,
     },
     {
-      id: "vinPlate",
-      header: "PLAQUETA",
-      accessorFn: (row) => row.truck?.vinPlate || "",
-      enableSorting: true,
-      size: 140,
-      minSize: 110,
-      meta: { headerLabel: "Plaqueta", exportValue: (row) => row.truck?.vinPlate || "" },
-      cell: ({ row }) => <span className="block truncate font-mono">{row.original.truck?.vinPlate || "-"}</span>,
-    },
-    {
       id: "sectorName",
       header: "SETOR",
       accessorFn: (row) => row.sector?.name || "",

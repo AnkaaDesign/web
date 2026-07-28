@@ -45,7 +45,6 @@ interface TaskVehicle {
   plate?: string | null;
   serialNumber?: string | null;
   chassisNumber?: string | null;
-  vinPlate?: string | null;
   category?: string | null;
   implementType?: string | null;
 }
@@ -86,7 +85,6 @@ function buildVehicleRef(task: TaskVehicle): string {
   if (task.serialNumber) idParts.push(`n série: ${task.serialNumber}`);
   if (task.plate) idParts.push(`placa: ${task.plate}`);
   if (task.chassisNumber) idParts.push(`chassi: ${task.chassisNumber}`);
-  if (task.vinPlate) idParts.push(`plaqueta: ${task.vinPlate}`);
   const typePart = typeParts.join(" ");
   const idPart = idParts.join(", ");
   if (typePart && idPart) return `Referente aos serviços executados no veículo ${typePart} de ${idPart}.`;
@@ -140,7 +138,6 @@ function buildBoletoInformativos(
   else if (task.plate) identifiers.push(`Placa: ${task.plate}`);
   if (task.serialNumber && task.plate) identifiers.push(`placa: ${task.plate}`);
   if (task.chassisNumber) identifiers.push(`chassi: ${task.chassisNumber}`);
-  if (task.vinPlate) identifiers.push(`plaqueta: ${task.vinPlate}`);
   if (identifiers.length) parts.push(identifiers.join(", ").substring(0, 80));
 
   const remaining = 5 - parts.length;

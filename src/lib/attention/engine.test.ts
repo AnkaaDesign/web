@@ -106,7 +106,11 @@ describe("TASK — ack: onExitCooldown", () => {
 });
 
 describe("TASK — R3b, plate only when there is no serial number", () => {
-  /** Truck already on site (entryDate given), forecast still in the future → only R3a/R3b can fire. */
+  /**
+   * Truck already on site (entryDate given), forecast still in the future → only R3a/R3b/R3c
+   * can fire. `vinPlateId` starts FILLED so these cases isolate the plate rule; R3c has its
+   * own describe below.
+   */
   const arrived = (over: Record<string, unknown>) => ({
     id: "task-3",
     status: TASK_STATUS.IN_PRODUCTION,
@@ -114,7 +118,7 @@ describe("TASK — R3b, plate only when there is no serial number", () => {
     entryDate: new Date("2026-07-01T00:00:00Z"),
     forecastDate: new Date("2026-12-01T00:00:00Z"), // not overdue → R2 silent
     serialNumber: null as string | null,
-    truck: { chassisNumber: "CH", plate: null as string | null, vinPlate: null as string | null },
+    truck: { chassisNumber: "CH", plate: null as string | null, vinPlateId: "file-1" as string | null },
     ...over,
   });
 
@@ -131,12 +135,44 @@ describe("TASK — R3b, plate only when there is no serial number", () => {
     await settle();
     expect(row("TASK", "task-3")).toBeNull();
   });
+});
 
-  it("has no rule for vinPlate (Plaqueta)", async () => {
-    // Everything the rules care about is filled in; only the plaqueta is empty → nothing.
-    setEntities("TASK", [arrived({ serialNumber: "SN-3", truck: { chassisNumber: "CH", plate: "ABC1D23", vinPlate: null } })]);
+describe("TASK — R3c, plaqueta photo", () => {
+  /** Everything the OTHER rules want is filled in, so only R3c can fire. */
+  const arrived = (over: Record<string, unknown>) => ({
+    id: "task-4",
+    status: TASK_STATUS.IN_PRODUCTION,
+    cleared: false,
+    entryDate: new Date("2026-07-01T00:00:00Z"),
+    forecastDate: new Date("2026-12-01T00:00:00Z"),
+    serialNumber: "SN-4",
+    truck: { chassisNumber: "CH", plate: "ABC1D23", vinPlateId: null as string | null },
+    ...over,
+  });
+
+  it("blinks the plaqueta field when the photo is missing", async () => {
+    setEntities("TASK", [arrived({})]);
     await settle();
-    expect(row("TASK", "task-3")).toBeNull();
+    expect(field("TASK", "task-4", "vinPlate")).toEqual(ARMED);
+  });
+
+  it("stays silent once the photo is attached", async () => {
+    setEntities("TASK", [arrived({ truck: { chassisNumber: "CH", plate: "ABC1D23", vinPlateId: "file-9" } })]);
+    await settle();
+    expect(row("TASK", "task-4")).toBeNull();
+  });
+
+  it("stays silent before the truck arrives", async () => {
+    // Sem data de entrada o veículo ainda não está aqui — não há plaqueta para fotografar.
+    setEntities("TASK", [arrived({ entryDate: null })]);
+    await settle();
+    expect(field("TASK", "task-4", "vinPlate")).toBeNull();
+  });
+
+  it("stays silent on a finished task", async () => {
+    setEntities("TASK", [arrived({ status: TASK_STATUS.COMPLETED })]);
+    await settle();
+    expect(row("TASK", "task-4")).toBeNull();
   });
 });
 
@@ -188,7 +224,8 @@ describe("nav projection — getAttentionSnapshot", () => {
   });
 
   it("counts an entity once even when several rules match it", async () => {
-    // R2 (overdue) + R3a (no chassis) + R3b (no serial, no plate) all fire on this one task.
+    // R2 (overdue) + R3a (no chassis) + R3b (no serial, no plate) + R3c (no plaqueta photo)
+    // all fire on this one task.
     const task = {
       ...overdueTask,
       id: "task-2",

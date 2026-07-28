@@ -9,12 +9,15 @@
 // when the source flips from code to DB.
 //
 // Field names are the REAL task fields (verified): Task.cleared:boolean,
-// Task.entryDate, Task.forecastDate, Task.serialNumber; chassis/plate live on the
-// related truck (truck.chassisNumber / truck.plate). Field targets name the
-// DetailFieldDef id / DataTable column id so the exact field blinks.
+// Task.entryDate, Task.forecastDate, Task.serialNumber; chassis/plate/plaqueta live
+// on the related truck (truck.chassisNumber / truck.plate / truck.vinPlateId). Field
+// targets name the DetailFieldDef id / DataTable column id so the exact field blinks.
 //
-// `truck.vinPlate` (Plaqueta) deliberately has NO rule: a missing plaqueta is not
-// something anyone has to act on, and it fired on nearly every in-flight task.
+// A plaqueta voltou a ter regra (R3c) porque deixou de ser TEXTO e virou FOTO: o
+// motivo de a regra antiga ter caído era ser irresolvível na prática — ninguém
+// digitava o número. Fotografar a plaqueta é uma ação concreta, então o alerta
+// agora aponta para algo que dá para resolver. O teste é sobre `truck.vinPlateId`
+// (o escalar), não sobre a relação `truck.vinPlate`, que só vem quando incluída.
 
 import { SECTOR_PRIVILEGES, CUT_STATUS, TASK_STATUS } from "@/constants";
 
@@ -137,6 +140,31 @@ export const ATTENTION_RULES: AttentionRule[] = [
       ],
     }),
     target: { level: "field", field: "plate" },
+    ack: "onExitCooldown",
+    cadence: cadence({ tone: "soft" }),
+  },
+
+  // R3c — truck is here but nobody fotografou a PLAQUETA (truck.vinPlateId) → blink the
+  // plaqueta field.
+  //
+  // Diferente de R3b, esta NÃO é condicionada a série/placa: a plaqueta é a identificação
+  // física rebitada no veículo e a foto é o registro de que ela foi conferida. Vale para
+  // toda tarefa que já entrou, tenha série ou não.
+  {
+    id: "task.entry-without-vin-plate-photo",
+    name: "Entrada sem foto da plaqueta",
+    entityType: "TASK",
+    enabled: true,
+    priority: 20,
+    targetSectors: [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
+    predicate: whileInFlight({
+      op: "and",
+      nodes: [
+        { op: "notNull", field: "entryDate" },
+        { op: "isNull", field: "truck.vinPlateId" },
+      ],
+    }),
+    target: { level: "field", field: "vinPlate" },
     ack: "onExitCooldown",
     cadence: cadence({ tone: "soft" }),
   },

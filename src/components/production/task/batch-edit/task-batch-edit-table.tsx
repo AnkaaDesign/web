@@ -53,10 +53,6 @@ const taskBatchEditSchema = z.object({
             .regex(/^[A-Z0-9-]*$/, "O chassi deve conter apenas letras maiúsculas, números e hífens")
             .nullable()
             .optional(),
-          vinPlate: z
-            .string()
-            .nullable()
-            .optional(),
           details: createDescriptionSchema(1, 1000, false).nullable().optional(),
           forecastDate: nullableDate.optional(),
           term: nullableDate.optional(),
@@ -113,7 +109,6 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                 serialNumber: task.serialNumber || "",
                 plate: task.truck?.plate || "",
                 chassisNumber: task.truck?.chassisNumber || "",
-                vinPlate: task.truck?.vinPlate || "",
                 details: task.details || "",
                 forecastDate: task.forecastDate ? new Date(task.forecastDate) : null,
                 term: task.term ? new Date(task.term) : null,
@@ -145,7 +140,6 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
           serialNumber: task.serialNumber || "",
           plate: task.truck?.plate || "",
           chassisNumber: task.truck?.chassisNumber || "",
-          vinPlate: task.truck?.vinPlate || "",
           details: task.details || "",
           forecastDate: task.forecastDate ? new Date(task.forecastDate) : null,
           term: task.term ? new Date(task.term) : null,
@@ -207,7 +201,6 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
           task.data.serialNumber !== originalTask.serialNumber ||
           task.data.plate !== originalTask.truck?.plate ||
           task.data.chassisNumber !== originalTask.truck?.chassisNumber ||
-          task.data.vinPlate !== originalTask.truck?.vinPlate ||
           task.data.customerId !== originalTask.customerId ||
           task.data.sectorId !== originalTask.sectorId ||
           task.data.paintId !== originalTask.generalPainting?.id ||
@@ -393,11 +386,6 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                         <TableCell className="w-48 p-0 !border-r-0">
                           <div className="px-3 py-2">
                             <FormInput name={`tasks.${index}.data.chassisNumber`} placeholder="Chassi" className="uppercase" />
-                          </div>
-                        </TableCell>
-                        <TableCell className="w-48 p-0 !border-r-0">
-                          <div className="px-3 py-2">
-                            <FormInput name={`tasks.${index}.data.vinPlate`} placeholder="Plaqueta" />
                           </div>
                         </TableCell>
                         <TableCell className="w-72 p-0 !border-r-0">

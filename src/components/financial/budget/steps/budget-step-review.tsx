@@ -283,12 +283,6 @@ export function BudgetStepReview({
                 <span className="text-sm font-mono font-medium">{formatChassis(resolvedTask.truck.chassisNumber)}</span>
               </div>
             )}
-            {resolvedTask?.truck?.vinPlate && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">Plaqueta</span>
-                <span className="text-sm font-medium">{resolvedTask.truck.vinPlate}</span>
-              </div>
-            )}
             {resolvedTask?.truck?.category && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Categoria</span>

@@ -398,7 +398,6 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     serialNumber: task.serialNumber || null,
     plate: task.truck?.plate || null,
     chassisNumber: task.truck?.chassisNumber || null,
-    vinPlate: task.truck?.vinPlate || null,
     truckCategory: task.truck?.category ? (TRUCK_CATEGORY_LABELS[task.truck.category] || task.truck.category) : null,
     truckImplementType: task.truck?.implementType ? (IMPLEMENT_TYPE_LABELS[task.truck.implementType] || task.truck.implementType) : null,
     simultaneousTasks: task.quote.simultaneousTasks || null,
@@ -450,7 +449,6 @@ export interface BudgetHtmlData {
   serialNumber: string | null;
   plate: string | null;
   chassisNumber: string | null;
-  vinPlate: string | null;
   truckCategory?: string | null;
   truckImplementType?: string | null;
   simultaneousTasks?: number | null;
@@ -1037,7 +1035,6 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
           if (data.serialNumber) parts.push(` nº série: <strong>${escapeHtml(data.serialNumber)}</strong>`);
           if (data.plate) parts.push(` placa: <strong style="font-weight: 600;">${escapeHtml(data.plate)}</strong>`);
           if (data.chassisNumber) parts.push(` chassi: <strong style="font-weight: 600;">${escapeHtml(data.chassisNumber)}</strong>`);
-          if (data.vinPlate) parts.push(` plaqueta: <strong style="font-weight: 600;">${escapeHtml(data.vinPlate)}</strong>`);
           if (data.truckCategory) parts.push(` categoria: <strong style="font-weight: 600;">${escapeHtml(data.truckCategory)}</strong>`);
           if (data.truckImplementType) parts.push(` implemento: <strong style="font-weight: 600;">${escapeHtml(data.truckImplementType)}</strong>`);
           return parts.length ? ` no veículo${parts.join(',')}` : '';

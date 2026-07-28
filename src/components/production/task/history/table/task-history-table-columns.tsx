@@ -256,15 +256,6 @@ export function createTaskHistoryColumns(): DataTableColumnDef<Task>[] {
       cell: ({ row }) => (row.original.truck?.chassisNumber ? <span className="truncate">{row.original.truck.chassisNumber}</span> : <MutedDash />),
     },
     {
-      id: "vinPlate",
-      header: "Plaqueta",
-      accessorFn: (t) => t.truck?.vinPlate || "",
-      enableSorting: false,
-      size: 150,
-      meta: { defaultVisible: false, headerLabel: "Plaqueta", exportHeader: "Plaqueta", exportValue: (t) => t.truck?.vinPlate || "" },
-      cell: ({ row }) => (row.original.truck?.vinPlate ? <span className="truncate">{row.original.truck.vinPlate}</span> : <MutedDash />),
-    },
-    {
       id: "truckCategory",
       header: "Categoria",
       accessorFn: (t) => (t.truck?.category ? TRUCK_CATEGORY_LABELS[t.truck.category] : ""),

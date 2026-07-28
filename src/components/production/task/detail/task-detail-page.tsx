@@ -31,7 +31,7 @@ import type { PageAction } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
+import { FileItem, FileThumbnail, useFileViewer, type FileViewMode } from "@/components/common/file";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { useTaskDetail, useTaskMutations, useForecastHistory, useRescheduleForecast } from "@/hooks/production/use-task";
 import { useEditLock } from "@/lib/attention";
@@ -353,6 +353,8 @@ function TaskDetailContent() {
   );
   const canEdit = canEditTasks(user as never);
   const canFinish = canFinishTask(user as never);
+  // Visualizador de arquivos da aplicação — usado pela foto da plaqueta (campo `vinPlate`).
+  const fileViewer = useFileViewer();
   // Task-status state-machine capability (matches legacy useTaskPermissions): only admins/team-leaders
   // may push a task through production; only canFinish (ADMIN/PM/LOGISTIC) may complete it. Everyone
   // else (COMMERCIAL/DESIGNER/FINANCIAL) is locked to the current status — no transition.
@@ -643,13 +645,24 @@ function TaskDetailContent() {
             edit: canEdit && task?.truck ? { get: (t) => t.truck?.chassisNumber ?? "", onCommit: (v) => setTaskField({ truck: { chassisNumber: (v as string) || null } }) } : undefined,
           },
           {
+            // A plaqueta é uma FOTO (truck.vinPlate -> File), não um texto — por isso não
+            // tem `edit` inline: a imagem é enviada pelo formulário de edição da tarefa.
+            // O id continua "vinPlate" porque é o alvo do blink da regra R3c.
             id: "vinPlate",
             label: "Plaqueta",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
-            accessor: (t) => t.truck?.vinPlate || null,
-            render: (t) => <span>{t.truck?.vinPlate || "—"}</span>,
-            edit: canEdit && task?.truck ? { get: (t) => t.truck?.vinPlate ?? "", onCommit: (v) => setTaskField({ truck: { vinPlate: (v as string) || null } }) } : undefined,
+            accessor: (t) => t.truck?.vinPlateId || null,
+            render: (t) =>
+              t.truck?.vinPlate ? (
+                <FileThumbnail
+                  file={t.truck.vinPlate}
+                  size="sm"
+                  onClick={() => fileViewer.actions?.viewFiles?.([t.truck!.vinPlate!] as never, 0)}
+                />
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              ),
           },
           {
             id: "truckCategory",

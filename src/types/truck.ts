@@ -3,6 +3,7 @@
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
 import type { Task, TaskIncludes, TaskOrderBy } from "./task";
 import type { ImplementMeasure, ImplementMeasureIncludes } from "./implementMeasure";
+import type { File } from "./file";
 import type { ORDER_BY_DIRECTION, TRUCK_CATEGORY, IMPLEMENT_TYPE, TRUCK_SPOT } from "../constants";
 
 // =====================
@@ -13,7 +14,8 @@ export interface Truck extends BaseEntity {
   // Identification
   plate: string | null;
   chassisNumber: string | null;
-  vinPlate: string | null;
+  /** Foto da plaqueta de identificação (VIN). Imagem, não texto — a relação é `vinPlate`. */
+  vinPlateId: string | null;
 
   // Truck specifications
   category: TRUCK_CATEGORY | null;
@@ -28,6 +30,8 @@ export interface Truck extends BaseEntity {
   rightSideMeasureId: string | null;
   backSideMeasureId: string | null;
   task?: Task;
+  /** Foto da plaqueta de identificação (VIN). */
+  vinPlate?: File | null;
   leftSideMeasure?: ImplementMeasure;
   rightSideMeasure?: ImplementMeasure;
   backSideMeasure?: ImplementMeasure;
@@ -53,6 +57,8 @@ export interface TruckIncludes {
     | {
         include?: ImplementMeasureIncludes;
       };
+  /** Foto da plaqueta de identificação (VIN). */
+  vinPlate?: boolean;
   backSideMeasure?:
     | boolean
     | {
@@ -68,7 +74,7 @@ export interface TruckOrderBy {
   id?: ORDER_BY_DIRECTION;
   plate?: ORDER_BY_DIRECTION;
   chassisNumber?: ORDER_BY_DIRECTION;
-  vinPlate?: ORDER_BY_DIRECTION;
+  vinPlateId?: ORDER_BY_DIRECTION;
   category?: ORDER_BY_DIRECTION;
   implementType?: ORDER_BY_DIRECTION;
   spot?: ORDER_BY_DIRECTION;
@@ -122,7 +128,7 @@ export interface TruckGetByIdFormData {
 export interface TruckCreateFormData {
   plate?: string | null;
   chassisNumber?: string | null;
-  vinPlate?: string | null;
+  vinPlateId?: string | null;
   category?: TRUCK_CATEGORY | null;
   implementType?: IMPLEMENT_TYPE | null;
   spot?: TRUCK_SPOT | null;
@@ -135,7 +141,7 @@ export interface TruckCreateFormData {
 export interface TruckUpdateFormData {
   plate?: string | null;
   chassisNumber?: string | null;
-  vinPlate?: string | null;
+  vinPlateId?: string | null;
   category?: TRUCK_CATEGORY | null;
   implementType?: IMPLEMENT_TYPE | null;
   spot?: TRUCK_SPOT | null;

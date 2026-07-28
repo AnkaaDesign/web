@@ -43,7 +43,6 @@ export function exportInvoicePdf(options: ServiceReportPdfOptions): void {
     task.serialNumber ? `Nº Série: ${task.serialNumber}` : null,
     task.truck?.plate ? `Placa: ${task.truck.plate}` : null,
     task.truck?.chassisNumber ? `Chassi: ${task.truck.chassisNumber}` : null,
-    task.truck?.vinPlate ? `Plaqueta: ${task.truck.vinPlate}` : null,
   ].filter(Boolean).join(" | ");
 
   // ── Page 1: Services Summary ──

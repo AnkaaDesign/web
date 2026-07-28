@@ -503,7 +503,6 @@ export function PublicServiceReportPage() {
                   if (quote.task?.serialNumber) parts.push(<> nº de série: <strong>{quote.task.serialNumber}</strong></>);
                   if (quote.task?.truck?.plate) parts.push(<> placa: <strong>{quote.task.truck.plate}</strong></>);
                   if (quote.task?.truck?.chassisNumber) parts.push(<> chassi: <strong>{quote.task.truck.chassisNumber}</strong></>);
-                  if (quote.task?.truck?.vinPlate) parts.push(<> plaqueta: <strong>{quote.task.truck.vinPlate}</strong></>);
                   if (truckCategoryLabel) parts.push(<> categoria: <strong>{truckCategoryLabel}</strong></>);
                   if (truckImplementLabel) parts.push(<> implemento: <strong>{truckImplementLabel}</strong></>);
                   if (!parts.length) return null;

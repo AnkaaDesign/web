@@ -20,7 +20,6 @@ const BASE_TASK_SCHEDULE_COLUMNS: TaskScheduleColumn[] = [
   { id: "serialNumberOrPlate", header: "IDENTIFICADOR", sortable: true, width: "w-[140px]" },
   { id: "spot", header: "LOCAL", sortable: true, width: "w-[120px]" },
   { id: "chassisNumber", header: "Nº CHASSI", sortable: true, width: "w-[140px]" },
-  { id: "vinPlate", header: "PLAQUETA", sortable: true, width: "w-[140px]" },
   { id: "sector.name", header: "SETOR", sortable: true, width: "w-[120px]" },
   { id: "entryDate", header: "ENTRADA", sortable: true, width: "w-[110px]" },
   { id: "startedAt", header: "INICIADO EM", sortable: true, width: "w-[110px]" },

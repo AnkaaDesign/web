@@ -89,7 +89,7 @@ export const truckOrderBySchema = z.union([
       id: orderByDirectionSchema.optional(),
       plate: orderByDirectionSchema.optional(),
       chassisNumber: orderByDirectionSchema.optional(),
-      vinPlate: orderByDirectionSchema.optional(),
+      vinPlateId: orderByDirectionSchema.optional(),
       category: orderByDirectionSchema.optional(),
       implementType: orderByDirectionSchema.optional(),
       spot: orderByDirectionSchema.optional(),
@@ -123,7 +123,7 @@ export const truckOrderBySchema = z.union([
         id: orderByDirectionSchema.optional(),
         plate: orderByDirectionSchema.optional(),
         chassisNumber: orderByDirectionSchema.optional(),
-        vinPlate: orderByDirectionSchema.optional(),
+        vinPlateId: orderByDirectionSchema.optional(),
         category: orderByDirectionSchema.optional(),
         implementType: orderByDirectionSchema.optional(),
         spot: orderByDirectionSchema.optional(),
@@ -207,7 +207,7 @@ export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      vinPlate: z
+      vinPlateId: z
         .union([
           z.string(),
           z.null(),
@@ -482,11 +482,7 @@ export const truckCreateSchema = z.object({
     .nullable()
     .optional()
     .transform((val) => (val === "" ? null : val)),
-  vinPlate: z
-    .string()
-    .nullable()
-    .optional()
-    .transform((val) => (val === "" ? null : val)),
+  vinPlateId: z.string().uuid("Foto da plaqueta inválida").nullable().optional(),
 
   // Truck specifications
   category: z.nativeEnum(TRUCK_CATEGORY).nullable().optional(),
@@ -518,11 +514,7 @@ export const truckUpdateSchema = z.object({
     .nullable()
     .optional()
     .transform((val) => (val === "" ? null : val)),
-  vinPlate: z
-    .string()
-    .nullable()
-    .optional()
-    .transform((val) => (val === "" ? null : val)),
+  vinPlateId: z.string().uuid("Foto da plaqueta inválida").nullable().optional(),
 
   // Truck specifications
   category: z.nativeEnum(TRUCK_CATEGORY).nullable().optional(),
@@ -606,7 +598,7 @@ export type TruckBatchQueryFormData = z.infer<typeof truckBatchQuerySchema>;
 export const mapTruckToFormData = createMapToFormDataHelper<Truck, TruckUpdateFormData>((truck) => ({
   plate: truck.plate || undefined,
   chassisNumber: truck.chassisNumber || undefined,
-  vinPlate: truck.vinPlate || undefined,
+  vinPlateId: truck.vinPlateId || undefined,
   category: truck.category || undefined,
   implementType: truck.implementType || undefined,
   spot: truck.spot || undefined,

@@ -367,19 +367,6 @@ export const createTaskHistoryColumns = (options?: {
     },
   },
   {
-    id: "vinPlate",
-    header: "PLAQUETA",
-    accessorFn: (row) => row.truck?.vinPlate || "",
-    sortable: true,
-    filterable: true,
-    defaultVisible: false,
-    width: "140px",
-    formatter: (value: string | null) => {
-      if (!value) return <span className="text-muted-foreground">-</span>;
-      return <span className="truncate">{value}</span>;
-    },
-  },
-  {
     id: "truckCategory",
     header: "CATEGORIA DO CAMINHÃO",
     accessorFn: (row) => row.truck?.category || "",

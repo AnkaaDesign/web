@@ -994,14 +994,6 @@ const ChangelogTimelineItem = ({
                     </span>
                   </div>
                 )}
-                {entityDetails.vinPlate && (
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Plaqueta: </span>
-                    <span className="text-foreground font-medium">
-                      {entityDetails.vinPlate}
-                    </span>
-                  </div>
-                )}
                 {entityDetails.category && (
                   <div className="text-sm">
                     <span className="text-muted-foreground">Categoria: </span>

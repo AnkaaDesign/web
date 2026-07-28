@@ -36,7 +36,6 @@ const LIST_INCLUDE = {
       plate: true,
       category: true,
       chassisNumber: true,
-      vinPlate: true,
       implementType: true,
       leftSideMeasure: { select: { id: true, height: true, sections: { select: { id: true, width: true } } } },
       rightSideMeasure: { select: { id: true, height: true, sections: { select: { id: true, width: true } } } },

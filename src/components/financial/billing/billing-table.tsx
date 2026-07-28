@@ -83,7 +83,6 @@ export function BillingTable({ className, searchingFor, filters }: BillingTableP
         truck: {
           select: {
             chassisNumber: true,
-            vinPlate: true,
             plate: true,
           },
         },

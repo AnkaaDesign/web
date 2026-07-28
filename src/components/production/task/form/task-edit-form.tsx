@@ -470,6 +470,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   );
   const [hasProjectFileChanges, setHasProjectFileChanges] = useState(false);
 
+  // Foto da plaqueta de identificação (VIN) — imagem ÚNICA gravada no caminhão.
+  // Segue o mesmo desenho dos outros campos de arquivo: o estado guarda o que está na tela,
+  // arquivos novos vão por multipart (`truckVinPlate`) e os já existentes viajam como id.
+  const [vinPlateFiles, setVinPlateFiles] = useState<FileWithPreview[]>(
+    convertToFileWithPreview((task as any).truck?.vinPlate),
+  );
+
   // Initialize checkin/checkout files per service order from existing task data
   const mapFilesToPreview = (files: any[]): FileWithPreview[] =>
     (files || []).map((file: any) => ({
@@ -634,7 +641,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     serialNumber: "basic-information",
     "truck.plate": "basic-information",
     "truck.chassisNumber": "basic-information",
-    "truck.vinPlate": "basic-information",
+    "truck.vinPlateId": "basic-information",
     sectorId: "basic-information",
     status: "basic-information",
     bonification: "basic-information",
@@ -1007,7 +1014,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       truck: {
         plate: taskData.truck?.plate || null,
         chassisNumber: taskData.truck?.chassisNumber || null,
-        vinPlate: taskData.truck?.vinPlate || null,
+        vinPlateId: taskData.truck?.vinPlateId || null,
         category: taskData.truck?.category || null,
         implementType: taskData.truck?.implementType || null,
         spot: taskData.truck?.spot || null,
@@ -1465,11 +1472,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
         const hasNewCheckinCheckoutFiles = allNewCheckinFiles.length > 0 || allNewCheckoutFiles.length > 0;
 
+        // Foto da plaqueta: só entra no multipart se for um arquivo NOVO (ainda não enviado).
+        const newVinPlateFile = vinPlateFiles.find((f) => !f.uploaded && f instanceof File) as File | undefined;
+
         const hasNewFiles = newLayouts.length > 0 ||
                            newBaseFiles.length > 0 || newProjectFiles.length > 0 ||
                            hasCutFiles ||
                            newObservationFiles.length > 0 || layoutPhotoFiles.length > 0 ||
-                           hasNewCheckinCheckoutFiles;
+                           hasNewCheckinCheckoutFiles ||
+                           !!newVinPlateFile;
 
         let result;
 
@@ -1491,6 +1502,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           }
           if (newProjectFiles.length > 0) {
             files.projectFiles = newProjectFiles.filter(f => f instanceof File) as File[];
+          }
+          if (newVinPlateFile) {
+            files.truckVinPlate = [newVinPlateFile];
           }
           // Add new checkin/checkout files as flat arrays + mapping metadata
           if (allNewCheckinFiles.length > 0) {
@@ -2577,6 +2591,26 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     setHasProjectFileChanges(true);
   };
 
+  /**
+   * Foto da plaqueta — imagem única. Só o ÚLTIMO arquivo vale (maxFiles={1} já limita a
+   * seleção, mas o estado é normalizado aqui de qualquer forma).
+   *
+   * Um arquivo já existente (ou escolhido nas sugestões) viaja como `truck.vinPlateId`;
+   * um arquivo novo vai por multipart em `truckVinPlate` e a API grava o id. Limpar o campo
+   * manda `null` explícito — é assim que a foto é removida.
+   */
+  const handleVinPlateFilesChange = (files: FileWithPreview[]) => {
+    const picked = files.slice(-1);
+    setVinPlateFiles(picked);
+    // `hasFileChanges` já é o que destrava o submit e a guarda de "nada mudou".
+    setHasFileChanges(true);
+
+    const existing = picked.find((f) => f.uploaded);
+    form.setValue("truck.vinPlateId" as never, (existing?.uploadedFileId || existing?.id || null) as never, {
+      shouldDirty: true,
+    });
+  };
+
   // Handle checkin files change per service order (files sent with form submission)
   const handleCheckinFilesChange = useCallback((serviceOrderId: string, files: FileWithPreview[]) => {
     setCheckinFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: files }));
@@ -3260,31 +3294,30 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                         }}
                       />
 
-                      {/* Plaqueta */}
-                      <FormField
-                        control={form.control}
-                        name="truck.vinPlate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="flex items-center gap-2">
-                              <IconId className="h-4 w-4" />
-                              Plaqueta
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                ref={field.ref}
-                                value={field.value || ""}
-                                placeholder="Ex: 001234"
-                                className="bg-transparent"
-                                onChange={(value: string | number | null) => field.onChange(typeof value === "string" ? value : "")}
-                                onBlur={field.onBlur}
-                                disabled={isSubmitting || !canEditIdentity}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      {/* Plaqueta — FOTO da plaqueta de identificação (VIN), imagem única. */}
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <IconId className="h-4 w-4" />
+                          Plaqueta
+                        </FormLabel>
+                        <FormControl>
+                          <FileUploadField
+                            onFilesChange={handleVinPlateFilesChange}
+                            maxFiles={1}
+                            maxSize={20 * 1024 * 1024}
+                            disabled={isSubmitting || !canEditIdentity}
+                            showPreview={true}
+                            existingFiles={vinPlateFiles}
+                            variant="compact"
+                            placeholder="Fotografe ou anexe a plaqueta"
+                            label="Foto da plaqueta"
+                            acceptedFileTypes={{
+                              "image/*": [".jpeg", ".jpg", ".png", ".webp", ".heic"],
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
                     </div>
 
                     {/* Sector, Status and Bonification in a row */}

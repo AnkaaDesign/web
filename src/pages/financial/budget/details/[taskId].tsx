@@ -185,7 +185,6 @@ export const FinancialBudgetDetailPage = () => {
       plate: "" as string,
       serialNumber: "" as string,
       chassisNumber: "" as string,
-      vinPlate: "" as string,
       category: "" as string,
       // Do NOT default to a concrete enum — an unset implementType must stay
       // empty so an untouched budget save never clobbers the truck's real value
@@ -239,7 +238,6 @@ export const FinancialBudgetDetailPage = () => {
       plate: task.truck?.plate || "",
       serialNumber: task.serialNumber || "",
       chassisNumber: task.truck?.chassisNumber || "",
-      vinPlate: task.truck?.vinPlate || "",
       category: task.truck?.category || "",
       // Seed from the loaded truck; leave empty when absent. NEVER default to a
       // concrete enum here — that silently rewrites the truck's implementType to
@@ -930,8 +928,6 @@ export const FinancialBudgetDetailPage = () => {
       if (dirtyFields.plate) truckPayload.plate = data.plate || undefined;
       if (dirtyFields.chassisNumber)
         truckPayload.chassisNumber = data.chassisNumber || undefined;
-      if (dirtyFields.vinPlate)
-        truckPayload.vinPlate = data.vinPlate || undefined;
       if (dirtyFields.category)
         truckPayload.category = data.category || undefined;
       if (dirtyFields.implementType)

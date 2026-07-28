@@ -373,7 +373,6 @@ type ColumnKey =
   | "responsibles"
   | "serialNumber"
   | "chassisNumber"
-  | "vinPlate"
   | "plate"
   | "spot"
   | "sector"
@@ -426,7 +425,6 @@ const COLUMN_KEY_VALUES = [
   "responsibles",
   "serialNumber",
   "chassisNumber",
-  "vinPlate",
   "plate",
   "spot",
   "sector",
@@ -722,16 +720,6 @@ function buildColumnCatalog(): ColumnDef[] {
       render: (t) => (
         <span className="text-sm font-mono truncate">
           {(t.truck as any)?.chassisNumber || "—"}
-        </span>
-      ),
-    },
-    {
-      key: "vinPlate",
-      label: "Plaqueta",
-      track: "minmax(0, 1fr)",
-      render: (t) => (
-        <span className="text-sm font-mono truncate">
-          {(t.truck as any)?.vinPlate || "—"}
         </span>
       ),
     },
@@ -1628,7 +1616,6 @@ const ORDER_BY_PATH_MAP: Partial<Record<ColumnKey, readonly string[]>> = {
   generalPainting: ["generalPainting", "name"],
   plate: ["truck", "plate"],
   chassisNumber: ["truck", "chassisNumber"],
-  vinPlate: ["truck", "vinPlate"],
 };
 
 function orderByEntry(key: string, direction: "asc" | "desc"): Record<string, any> {

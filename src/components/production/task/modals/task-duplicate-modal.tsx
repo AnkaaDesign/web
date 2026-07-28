@@ -75,11 +75,6 @@ const copyEntrySchema = z.object({
     .nullable()
     .optional()
     .transform((val) => val?.trim().replace(/\s/g, "").toUpperCase() || null),
-  vinPlate: z
-    .string()
-    .nullable()
-    .optional()
-    .transform((val) => val?.trim() || null),
 });
 
 // Schema for multiple copies
@@ -115,7 +110,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
   const form = useForm<DuplicateFormData>({
     resolver: zodResolver(duplicateSchema),
     defaultValues: {
-      copies: [{ serialNumber: "", plate: "", chassisNumber: "", vinPlate: "" }],
+      copies: [{ serialNumber: "", plate: "", chassisNumber: "" }],
     },
   });
 
@@ -125,20 +120,20 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
   });
 
   const watchedCopies = useWatch({ control: form.control, name: "copies" });
-  const isCopyFilled = (c: { serialNumber?: string | null; plate?: string | null; chassisNumber?: string | null; vinPlate?: string | null } | undefined) =>
-    !!(c?.serialNumber?.trim() || c?.plate?.trim() || c?.chassisNumber?.trim() || c?.vinPlate?.trim());
+  const isCopyFilled = (c: { serialNumber?: string | null; plate?: string | null; chassisNumber?: string | null } | undefined) =>
+    !!(c?.serialNumber?.trim() || c?.plate?.trim() || c?.chassisNumber?.trim());
   const filledCopiesCount = (watchedCopies || []).filter(isCopyFilled).length;
   const hasEmptyCopy = (watchedCopies || []).some((c) => !isCopyFilled(c));
 
   const handleAddCopy = useCallback(() => {
     if (hasEmptyCopy) return;
-    append({ serialNumber: "", plate: "", chassisNumber: "", vinPlate: "" });
+    append({ serialNumber: "", plate: "", chassisNumber: "" });
   }, [append, hasEmptyCopy]);
 
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen && task) {
       form.reset({
-        copies: [{ serialNumber: "", plate: "", chassisNumber: "", vinPlate: "" }],
+        copies: [{ serialNumber: "", plate: "", chassisNumber: "" }],
       });
       setMode('quantity');
       setQuantity('');
@@ -162,7 +157,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
   };
 
   // Build comprehensive task data for a single copy
-  const buildTaskData = (copyData: { serialNumber?: string | null; plate?: string | null; chassisNumber?: string | null; vinPlate?: string | null }) => {
+  const buildTaskData = (copyData: { serialNumber?: string | null; plate?: string | null; chassisNumber?: string | null }) => {
     if (!sourceTask) return null;
 
     const truckData = sourceTask.truck;
@@ -221,11 +216,10 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
 
       // Truck - copy all fields, use form values for plate/chassis (no fallback to avoid duplicates)
       // Layouts are SHARED (connect to existing layout IDs)
-      truck: (copyData.plate || copyData.chassisNumber || copyData.vinPlate || truckData)
+      truck: (copyData.plate || copyData.chassisNumber || truckData)
         ? {
             plate: copyData.plate || null,
             chassisNumber: copyData.chassisNumber || null,
-            vinPlate: copyData.vinPlate || null,
             // Spot is a UNIQUE physical garage location — never copy it to a duplicate
             spot: null,
             category: truckData?.category || null,
@@ -322,7 +316,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
   const handleQuantitySubmit = async () => {
     if (!sourceTask || !quantity || quantity < 1) return;
     const tasksToCreate = Array.from({ length: quantity }, () =>
-      buildTaskData({ serialNumber: null, plate: null, chassisNumber: null, vinPlate: null })
+      buildTaskData({ serialNumber: null, plate: null, chassisNumber: null })
     ).filter(Boolean) as any[];
     await createCopies(tasksToCreate);
   };
@@ -473,28 +467,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                                 placeholder="Ex: 9BWZZZ377VT004251"
                                 className="uppercase"
                                 onChange={(value: string | number | null) => field.onChange(typeof value === 'string' ? value.toUpperCase() : String(value ?? '').toUpperCase())}
-                                onBlur={field.onBlur}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* Plaqueta */}
-                      <FormField
-                        control={form.control}
-                        name={`copies.${index}.vinPlate`}
-                        render={({ field }) => (
-                          <FormItem className="space-y-1">
-                            {index === 0 && <FormLabel>Plaqueta</FormLabel>}
-                            <FormControl>
-                              <Input
-                                ref={field.ref}
-                                value={field.value || ""}
-                                placeholder="Plaqueta"
-                                onChange={(value: string | number | null) => field.onChange(value == null ? '' : String(value))}
                                 onBlur={field.onBlur}
                                 disabled={isSubmitting}
                               />

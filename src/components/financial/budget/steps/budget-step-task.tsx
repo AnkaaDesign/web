@@ -273,28 +273,6 @@ export function BudgetStepTask({
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={control}
-                      name="vinPlate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-2">
-                            <IconId className="h-4 w-4" />
-                            Plaqueta
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              value={field.value || ""}
-                              onChange={(value) => field.onChange(value ?? "")}
-                              placeholder="Plaqueta"
-                              disabled={disabled}
-                              className="bg-transparent"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

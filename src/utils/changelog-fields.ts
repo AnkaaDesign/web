@@ -297,7 +297,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     statusOrder: "Ordem do Status",
     serialNumber: "Número de Série",
     chassisNumber: "Número do Chassi",
-    vinPlate: "Plaqueta",
+    vinPlateId: "Foto da Plaqueta",
     plate: "Placa",
     details: "Detalhes",
     entryDate: "Data de Entrada",
@@ -786,7 +786,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     // Truck fields (accessed via truck relation)
     plate: "Placa",
     chassisNumber: "Número do Chassi",
-    vinPlate: "Plaqueta",
+    vinPlateId: "Foto da Plaqueta",
     // Related garage fields
     "garage.name": "Nome da Garagem",
   },
