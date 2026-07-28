@@ -1,4 +1,5 @@
-import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "./index";
+// Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
+import { formatCurrencyUnmasked as formatCurrency, formatDate, toTitleCase, formatCNPJ } from "./index";
 import type { Task } from "../types/task";
 import { generatePaymentText, generateGuaranteeText } from "./quote-text-generators";
 import { getApiBaseUrl } from "./file";

@@ -41,7 +41,9 @@ function DetailSectionInner<TData>({ section, row, hideEmptyFields, editLocked, 
   // condition mirrors the `editable` prop passed to InlineEditField below (sectionEditable && canEdit
   // && has an edit def).
   const fields = hideEmptyFields
-    ? section.fields.filter((f) => !fieldIsEmpty(f, row) || (!!f.edit && sectionEditable && canEdit(f)))
+    ? section.fields.filter(
+        (f) => !fieldIsEmpty(f, row) || f.keepWhenEmpty || (!!f.edit && sectionEditable && canEdit(f)),
+      )
     : section.fields;
   const Icon = def.icon;
 

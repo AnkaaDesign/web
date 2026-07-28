@@ -652,6 +652,9 @@ function TaskDetailContent() {
             label: "Plaqueta",
             editablePrivilege: IDENTITY_EDIT_PRIVILEGES,
             attention: { entityType: "TASK", sendWarning: true },
+            // Sem edição inline (é foto), então o filtro de campos vazios apagaria a linha
+            // exatamente quando a regra R3c precisa piscar nela. Ver `keepWhenEmpty`.
+            keepWhenEmpty: true,
             accessor: (t) => t.truck?.vinPlateId || null,
             render: (t) =>
               t.truck?.vinPlate ? (

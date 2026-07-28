@@ -1,6 +1,7 @@
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
 import { toast } from "@/components/ui/sonner";
-import { formatCurrency, formatDate } from "../../../../utils";
+// Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
+import { formatCurrencyUnmasked as formatCurrency, formatDate } from "../../../../utils";
 import { formatCPF } from "../../../../utils/formatters";
 
 // Bonus row interface matching the list page

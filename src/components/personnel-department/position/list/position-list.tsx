@@ -27,8 +27,10 @@ interface PositionListProps {
 const DEFAULT_PAGE_SIZE = 40;
 
 export function PositionList({ onDataUpdate, className }: PositionListProps) {
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  // Show/hide currency values — the remuneration filter chips below are formatted
+  // inside a useMemo, so the flag has to be one of its deps (see `activeFilters`).
   const pricingVisible = usePricingVisible();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [tableData, setTableData] = useState<{ positions: Position[]; totalRecords: number }>({ positions: [], totalRecords: 0 });
 

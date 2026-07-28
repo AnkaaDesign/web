@@ -46,7 +46,7 @@ import {
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/sonner";
-import { FileUploadField, FileThumbnail, type FileWithPreview } from "@/components/common/file";
+import { FileCardUploadField, FileThumbnail, type FileWithPreview } from "@/components/common/file";
 import { generatePDFThumbnailFromBlob } from "@/utils/pdf-thumbnail";
 import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
 import { createAirbrushingFormData } from "@/utils/form-data-helper";
@@ -829,12 +829,12 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                                 Recibos
                               </FormLabel>
                               <FormControl>
-                                <FileUploadField
+                                <FileCardUploadField
                                   onFilesChange={handleReceiptFilesChange}
                                   existingFiles={receiptFiles}
                                   maxFiles={10}
                                   showPreview={true}
-                                  variant="compact"
+                                  variant="card"
                                   placeholder="Adicione recibos do serviço"
                                   label="Recibos anexados"
                                   disabled={isSubmitting}
@@ -849,12 +849,12 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                                 Notas Fiscais
                               </FormLabel>
                               <FormControl>
-                                <FileUploadField
+                                <FileCardUploadField
                                   onFilesChange={handleInvoiceFilesChange}
                                   existingFiles={invoiceFiles}
                                   maxFiles={10}
                                   showPreview={true}
-                                  variant="compact"
+                                  variant="card"
                                   placeholder="Adicione notas fiscais"
                                   label="NFes anexadas"
                                   disabled={isSubmitting}

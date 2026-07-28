@@ -244,6 +244,12 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   categoryLegend,
   showLegend = true,
 }, externalRef) {
+  // Show/hide currency values. Axis labels / tooltips are formatted with
+  // formatCurrency() inside the `option` memo, so the flag has to be one of its deps
+  // — otherwise the echarts option keeps the strings from the last build and the
+  // toggle never reaches the canvas.
+  const pricingVisible = usePricingVisible();
+
   const smooth = chartType === 'line-smooth' || chartType === 'area-smooth';
   const baseChartType = chartType === 'line-smooth' ? 'line' : chartType === 'area-smooth' ? 'area' : chartType;
 
@@ -269,8 +275,6 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   // ReactECharts pages use, so axis/grid/tooltip colors can't drift.
   const theme = useChartTheme();
   const { isDark } = theme;
-  // Rebuilds the chart option when "mostrar/ocultar valores" flips (see the option memo's deps).
-  const pricingVisible = usePricingVisible();
   // Per-series color overrides + hidden set — keyed by series name. Controlled
   // by the parent when props are supplied (so state survives a chart-type
   // remount); otherwise managed internally.

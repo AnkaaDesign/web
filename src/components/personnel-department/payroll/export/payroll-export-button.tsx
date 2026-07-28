@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { IconDownload, IconFileTypeCsv, IconFileTypeXls, IconFileTypePdf } from "@tabler/icons-react";
 import { toast } from "@/components/ui/sonner";
-import { formatCurrency } from "../../../../utils";
+// Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
+import { formatCurrencyUnmasked as formatCurrency } from "../../../../utils";
 import type { User } from "../../../../types";
 
 interface PayrollExportButtonProps {

@@ -2,8 +2,9 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { generatePaymentText } from "./quote-text-generators";
 import { setPricingVisible } from "./pricing-visibility";
 
-// formatCurrency masks values while the staff eye-toggle is off.
-beforeAll(() => setPricingVisible(true));
+// The generator now uses formatCurrencyUnmasked, so it prints real values regardless of
+// the staff eye-toggle. Kept hidden here on purpose: it pins that behaviour.
+beforeAll(() => setPricingVisible(false));
 
 describe("generatePaymentText", () => {
   it("names the settlement method inside the installments clause", () => {

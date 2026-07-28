@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { IconTrendingUp, IconTrendingDown, IconMinus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/utils/number";
 
 interface MetricCard {
   title: string;
@@ -62,10 +63,10 @@ export const MetricCards = ({ metrics, columns = 4, className }: MetricCardsProp
 
     switch (format) {
       case "currency":
-        return new Intl.NumberFormat("pt-BR", {
-          style: "currency",
-          currency: "BRL",
-        }).format(value);
+        // Shared helper, NOT a local Intl.NumberFormat: it honours the show/hide-values
+        // toggle. A private formatter here left these cards printing real values while
+        // the rest of the page was masked.
+        return formatCurrency(value);
       case "percentage":
         return `${value}%`;
       case "number":

@@ -2,7 +2,8 @@ import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/compo
 import { toast } from "@/components/ui/sonner";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { formatDate, formatDateTime, getDurationBetweenDates, formatCurrency, formatTaskMeasures } from "../../../../utils";
+// Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
+import { formatDate, formatDateTime, getDurationBetweenDates, formatCurrencyUnmasked as formatCurrency, formatTaskMeasures } from "../../../../utils";
 import { TASK_STATUS, BONIFICATION_STATUS_LABELS, BONIFICATION_STATUS, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS, TASK_QUOTE_STATUS_LABELS, TASK_QUOTE_STATUS } from "../../../../constants";
 import { taskService } from "../../../../api-client";
 

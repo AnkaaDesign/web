@@ -1,4 +1,5 @@
-import { formatCurrency, formatDate } from "./index";
+// Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
+import { formatCurrencyUnmasked as formatCurrency, formatDate } from "./index";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 
 /**

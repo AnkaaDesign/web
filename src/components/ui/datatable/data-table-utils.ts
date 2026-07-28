@@ -1,5 +1,6 @@
 import { formatDate } from "@/utils/date";
 import { formatCurrency } from "@/utils/number";
+import { withPricingVisible } from "@/utils/pricing-visibility";
 import type {
   DataTableColumnDef,
   DataTableFilterDef,
@@ -38,7 +39,10 @@ export function valueToString(v: Primitive): string {
  * else the column's `accessorKey` path. Used by both client search/filter and export.
  */
 export function rawColumnValue<TData>(col: DataTableColumnDef<TData>, row: TData): ExportCellValue {
-  if (col.meta?.exportValue) return col.meta.exportValue(row);
+  // Forced visible: `exportValue` typically runs formatCurrency(), and an export (or a
+  // search) must carry the REAL number — hiding values on screen must not write
+  // "R$ ••••••" into the user's spreadsheet or make a row unsearchable by its price.
+  if (col.meta?.exportValue) return withPricingVisible(() => col.meta!.exportValue!(row));
   const accessorKey = (col as { accessorKey?: string }).accessorKey;
   if (typeof accessorKey === "string") return getByPath(row, accessorKey) as ExportCellValue;
   return undefined;

@@ -19,6 +19,9 @@
 let _default = false;
 let _visible = _default;
 
+// Depth of active withPricingVisible() scopes (see below). Nestable, hence a counter.
+let _forceVisible = 0;
+
 const listeners = new Set<() => void>();
 
 const applyDomClass = (visible: boolean): void => {
@@ -30,7 +33,26 @@ const applyDomClass = (visible: boolean): void => {
 // charts / .price-value elements are masked correctly on first paint.
 applyDomClass(_visible);
 
-export const getPricingVisible = (): boolean => _visible;
+export const getPricingVisible = (): boolean => _visible || _forceVisible > 0;
+
+/**
+ * Runs `fn` with values forced visible, then restores the previous state.
+ *
+ * For producing DATA rather than screen output: spreadsheet/PDF exports, share links and
+ * the client-side search index. Hiding values on screen must not write "R$ ••••••" into a
+ * file the user deliberately exported, nor make a row unsearchable by its price.
+ *
+ * MUST be synchronous — it neither notifies listeners nor touches the <html> class (so
+ * nothing on screen unmasks), which only holds while React can't render in between.
+ */
+export const withPricingVisible = <T>(fn: () => T): T => {
+  _forceVisible++;
+  try {
+    return fn();
+  } finally {
+    _forceVisible--;
+  }
+};
 
 export const subscribePricingVisible = (listener: () => void): (() => void) => {
   listeners.add(listener);

@@ -9,7 +9,7 @@ import { routes } from "./constants";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthProvider } from "@/contexts/auth-context";
 import { SidebarProvider } from "@/contexts/sidebar-context";
-import { PricingProvider, PricingVisibilityBoundary } from "@/contexts/pricing-context";
+import { PricingProvider, usePricingVisible } from "@/contexts/pricing-context";
 import { FavoritesProvider } from "@/contexts/favorites-context";
 import { AttentionProvider } from "@/lib/attention";
 import { FileViewerProvider } from "@/components/common/file/file-viewer";
@@ -531,6 +531,17 @@ function App() {
     setupWebNotifications();
   }, []);
 
+  // Show/hide currency values (the eye toggle). Subscribing HERE is what makes the
+  // toggle reach the whole app: currency is printed by formatCurrency*(), plain string
+  // helpers that read the flag during render but are not React-subscribed, so the pages
+  // must re-render for the masked/unmasked strings to be recomputed. Every route
+  // `element={<Page />}` below is created by THIS render — re-running it hands React
+  // fresh elements for the entire tree, which reconciles as an UPDATE (same types, keys
+  // and positions), so values re-format while in-progress form state survives. A
+  // component that stops the update (React.memo — e.g. the DataTable's rows) has to
+  // subscribe on its own; `.prices-hidden` on <html> covers charts/`.price-value`.
+  usePricingVisible();
+
   return (
     <Router>
       {/* Mobile browsers are steered to the public /install page (see guard).
@@ -660,7 +671,6 @@ function App() {
                           <Toaster />
                           <SpotlightSearch />
                           <PushNotificationSetup />
-                          <PricingVisibilityBoundary>
                           <Routes>
                             {/* Auth routes */}
                             <Route element={<AuthLayout />}>
@@ -3684,7 +3694,6 @@ function App() {
                             {/* 404 Not Found route */}
                             <Route path="*" element={<NotFound />} />
                           </Routes>
-                          </PricingVisibilityBoundary>
                         </MessageModalProvider>
                       </FileViewerProvider>
                     </FavoritesProvider>

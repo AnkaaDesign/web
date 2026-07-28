@@ -257,9 +257,10 @@ export function PublicBudgetPage() {
    *
    * Antes isto chamava o gerador do navegador (`exportBudgetPdfFromData`), que
    * produzia um PDF diferente do que está sendo assinado — dois documentos com o
-   * mesmo número. Agora existe uma única fonte: o artefato congelado no servidor.
-   * Quando ainda não há coleta, cai no gerador antigo, que é o único caminho
-   * disponível nesse caso.
+   * mesmo número. Agora existe uma única fonte: o servidor. Quando ainda não há
+   * coleta, a MESMA rota devolve o orçamento renderizado sob demanda, com as
+   * linhas de assinatura em branco — o download nunca depende de existir
+   * assinatura.
    */
   const handleExportPdf = async () => {
     try {
@@ -272,9 +273,7 @@ export function PublicBudgetPage() {
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
-      toast.error(
-        "Este orçamento ainda não foi enviado para assinatura, então não há documento oficial para baixar.",
-      );
+      toast.error("Não foi possível gerar o PDF deste orçamento. Tente novamente.");
     }
   };
 

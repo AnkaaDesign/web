@@ -14,7 +14,8 @@
  * working schedule (jornada), so the contract renders the canonical CLT default
  * ("44 horas semanais") unless an explicit `jornada` string is passed in.
  */
-import { formatCurrency } from "./number";
+// Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
+import { formatCurrencyUnmasked as formatCurrency } from "./number";
 import { formatDate } from "./date";
 import { formatCPF } from "./formatters";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";

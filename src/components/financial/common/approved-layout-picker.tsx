@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
+import { useDropzone } from "react-dropzone";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -128,19 +129,29 @@ export function ApprovedLayoutPicker({
     ? "flex gap-3 overflow-x-auto pb-2"
     : "grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3";
   const fileViewer = useFileViewer();
-  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const canUpload =
     !!onUploadFiles && !disabled && layoutFiles.length < maxFiles;
-  const handleUploadPick = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const picked = Array.from(e.target.files || []);
-      if (picked.length && onUploadFiles) onUploadFiles(picked);
-      // Reset so re-selecting the same file re-fires onChange.
-      e.target.value = "";
+
+  // O card de upload aceita ARRASTAR E SOLTAR, não só o clique. Antes era um
+  // `<button>` com `onClick` e um `<input type="file">` irmão: soltar um arquivo
+  // em cima não fazia nada — o navegador caía no comportamento padrão e abria a
+  // imagem, perdendo o formulário. `useDropzone` é o mesmo mecanismo do
+  // `LayoutFileUploadField` ("Adicionar Layouts"), que este card espelha.
+  const onDrop = useCallback(
+    (accepted: File[]) => {
+      if (!accepted.length || !onUploadFiles) return;
+      onUploadFiles(accepted);
     },
     [onUploadFiles],
   );
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"] },
+    disabled: !canUpload,
+    // Sobra de vagas: soltar 5 imagens com 1 vaga livre não pode estourar o teto.
+    maxFiles: Math.max(0, maxFiles - layoutFiles.length),
+  });
 
   // The task's image layouts — the candidates for the approved layout. Callers are
   // responsible for narrowing the pool (e.g. the budget step passes only APPROVED
@@ -312,38 +323,42 @@ export function ApprovedLayoutPicker({
               {/* Leading dashed "upload" card (only when the caller supports upload),
                   matching the task "Adicionar Layouts" form. Adds a NEW reference. */}
               {onUploadFiles && (
-                <>
-                  <input
-                    ref={uploadInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleUploadPick}
-                  />
-                  <button
-                    type="button"
-                    disabled={!canUpload}
-                    onClick={() => uploadInputRef.current?.click()}
+                <div
+                  {...getRootProps()}
+                  className={cn(
+                    "flex h-[calc(13rem+4.25rem)] w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed bg-muted/20 p-4 text-center transition-colors",
+                    cardWidthClass,
+                    canUpload
+                      ? "cursor-pointer border-border/70 hover:border-primary/60 hover:bg-muted/40"
+                      : "cursor-not-allowed border-border/50 opacity-50",
+                    isDragActive && canUpload && "border-primary bg-primary/5",
+                  )}
+                >
+                  <input {...getInputProps()} />
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                    <IconUpload
+                      className={cn(
+                        "h-5 w-5",
+                        isDragActive && canUpload
+                          ? "text-primary"
+                          : "text-muted-foreground",
+                      )}
+                    />
+                  </span>
+                  <span
                     className={cn(
-                      "flex h-[calc(13rem+4.25rem)] w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed bg-muted/20 p-4 text-center transition-colors",
-                      cardWidthClass,
-                      canUpload
-                        ? "cursor-pointer border-border/70 hover:border-primary/60 hover:bg-muted/40"
-                        : "cursor-not-allowed border-border/50 opacity-50",
+                      "text-sm font-medium",
+                      isDragActive && canUpload
+                        ? "text-primary"
+                        : "text-muted-foreground",
                     )}
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                      <IconUpload className="h-5 w-5 text-muted-foreground" />
-                    </span>
-                    <span className="text-sm font-medium text-muted-foreground">
-                      {uploadLabel}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      .jpeg, .jpg, .png, .gif, .webp
-                    </span>
-                  </button>
-                </>
+                    {isDragActive && canUpload ? "Solte aqui..." : uploadLabel}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    .jpeg, .jpg, .png, .gif, .webp
+                  </span>
+                </div>
               )}
               {/* Task layouts — selectable. Click the image OR "Selecionar" to toggle;
                   "Ver" opens the viewer. Status is managed on the task. */}

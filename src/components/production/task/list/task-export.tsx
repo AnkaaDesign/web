@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { IconDownload, IconFileTypeCsv, IconFileTypeXls } from "@tabler/icons-react";
 import { useToast } from "@/hooks/common/use-toast";
 import { useAuth } from "@/hooks/common/use-auth";
-import { formatDate, formatDateTime, formatCurrency, getTaskStatusLabel } from "../../../../utils";
+// Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
+import { formatDate, formatDateTime, formatCurrencyUnmasked as formatCurrency, getTaskStatusLabel } from "../../../../utils";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { taskService } from "../../../../api-client";

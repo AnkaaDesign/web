@@ -36,7 +36,11 @@ export interface FileUploadFieldProps {
   disabled?: boolean;
   className?: string;
   showPreview?: boolean;
-  variant?: "compact" | "full" | "mini";
+  /**
+   * `inline` renderiza o campo com a MESMA caixa de um `Input` (h-10, borda, raio),
+   * para conviver em uma linha de campos de texto sem parecer um anexo solto.
+   */
+  variant?: "compact" | "full" | "mini" | "inline";
   placeholder?: string;
   label?: string;
   showFiles?: boolean;
@@ -295,6 +299,119 @@ export function FileUploadField({
   // URLs — are owned by the parent's state and outlive this component. Revoking
   // here broke the thumbnail of a just-added file when the accordion was
   // collapsed and reopened. Explicit removal still revokes in `removeFile`.
+
+  /**
+   * Variante de LINHA: ocupa a mesma caixa de um `<Input>` (h-10, borda, raio, px-2)
+   * para alinhar com os campos de texto vizinhos — Placa e Chassi, no caso da plaqueta.
+   *
+   * Vazio, é um campo com ícone + placeholder; preenchido, vira miniatura + nome do
+   * arquivo + botão de remover. As classes da caixa são copiadas de `ui/input.tsx`
+   * de propósito: se o Input mudar de altura, este campo precisa mudar junto.
+   */
+  if (variant === "inline") {
+    const inlineFile = files[0];
+    const isUploading =
+      !!inlineFile &&
+      inlineFile.uploadProgress !== undefined &&
+      inlineFile.uploadProgress > 0 &&
+      inlineFile.uploadProgress < 100 &&
+      !inlineFile.uploaded &&
+      !inlineFile.error;
+
+    const boxClasses =
+      "flex h-10 w-full items-center gap-2 rounded-md border border-border bg-transparent text-sm transition-all duration-200 ease-in-out";
+
+    if (inlineFile) {
+      const IconComponent = getFileIcon(inlineFile);
+      const thumbnailError = thumbnailErrors[inlineFile.id] || false;
+      const shouldShowThumbnail =
+        showPreview &&
+        !thumbnailError &&
+        (inlineFile.preview || (inlineFile.uploaded && inlineFile.thumbnailUrl));
+
+      const thumbnailSrc = (() => {
+        const apiBaseUrl = getApiBaseUrl();
+        if (inlineFile.thumbnailUrl) {
+          if (inlineFile.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${inlineFile.thumbnailUrl}`;
+          if (inlineFile.thumbnailUrl.startsWith("http")) return rewriteCdnUrl(inlineFile.thumbnailUrl);
+          return inlineFile.thumbnailUrl;
+        }
+        if (inlineFile.preview) return inlineFile.preview;
+        if (inlineFile.uploadedFileId) return `${apiBaseUrl}/files/thumbnail/${inlineFile.uploadedFileId}`;
+        return "";
+      })();
+
+      return (
+        <div className={cn("w-full", className)}>
+          {children}
+          <div className={cn(boxClasses, "pl-1 pr-1", disabled && "cursor-not-allowed opacity-50")}>
+            <button
+              type="button"
+              title={inlineFile.name}
+              disabled={isUploading}
+              onClick={() => !isUploading && openFilePreview(inlineFile)}
+              className={cn(
+                "flex min-w-0 flex-1 items-center gap-2 text-left",
+                !isUploading && "cursor-pointer",
+              )}
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
+                {isUploading ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border border-primary/30 border-t-primary" />
+                ) : shouldShowThumbnail ? (
+                  <img
+                    src={thumbnailSrc}
+                    alt={inlineFile.name}
+                    className="h-full w-full object-cover"
+                    onError={() => setThumbnailErrors((prev) => ({ ...prev, [inlineFile.id]: true }))}
+                  />
+                ) : (
+                  <IconComponent className="h-4 w-4 text-muted-foreground" />
+                )}
+              </span>
+              <span className="truncate">{inlineFile.name}</span>
+            </button>
+
+            {inlineFile.error && <IconAlertCircle className="h-4 w-4 shrink-0 text-destructive" />}
+
+            {!disabled && (
+              <button
+                type="button"
+                aria-label="Remover arquivo"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeFile(inlineFile.id);
+                }}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <IconX className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={cn("w-full", className)}>
+        {children}
+        <div
+          {...getRootProps()}
+          className={cn(
+            boxClasses,
+            "px-2 py-2 text-muted-foreground",
+            !disabled && "cursor-pointer hover:border-primary/50",
+            isDragActive && "border-primary bg-primary/5",
+            disabled && "cursor-not-allowed opacity-50",
+          )}
+        >
+          <input {...getInputProps()} />
+          <IconPaperclip className={cn("h-4 w-4 shrink-0", isDragActive && "text-primary")} />
+          <span className="truncate">{isDragActive ? "Solte a imagem aqui" : (placeholder ?? "Anexar arquivo")}</span>
+        </div>
+      </div>
+    );
+  }
 
   if (variant === "mini") {
     return (
