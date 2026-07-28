@@ -37,6 +37,7 @@ import { DataTableFilterSheet } from "./data-table-filter-sheet";
 import { DataTableShareDialog, type ShareFormat } from "./data-table-share-dialog";
 import { copyShareLink } from "./data-table-export";
 import { DataTableContextMenu, type DataTableContextMenuState } from "./data-table-context-menu";
+import { usePricingVisible } from "@/contexts/pricing-context";
 import {
   rowMatchesSearch,
   rowMatchesFilters,
@@ -245,6 +246,11 @@ export interface DataTableProps<TData> {
 }
 
 export function DataTable<TData>(props: DataTableProps<TData>) {
+  // Show/hide currency values. Cells render currency through formatCurrency*(), which
+  // reads the flag as a plain module value — so the table must subscribe itself, both
+  // to re-render on toggle and to bust the DataRow memo below (row data is unchanged
+  // by a toggle, so without this the rows keep their stale masked/unmasked strings).
+  const pricingVisible = usePricingVisible();
   const {
     tableId,
     data,
@@ -976,6 +982,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
             virtualStart={vi.start - scrollMargin}
             measureRef={rowVirtualizer.measureElement}
             columnsKey={columnsKey}
+            pricingVisible={pricingVisible}
             alignMap={alignMap}
             rowClassName={getRowClassName?.(row.original)}
             onSelectRow={handleSelectRow}
@@ -1237,6 +1244,9 @@ interface DataRowProps<TData> {
   virtualStart: number;
   measureRef: (node: Element | null) => void;
   columnsKey: string;
+  /** Show/hide currency values. Not rendered — it exists so the memo below re-renders
+   *  the row (and thus re-runs formatCurrency*() inside the cells) when it flips. */
+  pricingVisible: boolean;
   alignMap: Record<string, ColumnAlign>;
   /** Optional caller-supplied per-row classes (e.g. deadline tint) merged onto the row. */
   rowClassName?: string;
@@ -1515,6 +1525,7 @@ const DataRow = memo(DataRowInner, (prev, next) => {
     prev.canExpand === next.canExpand &&
     prev.isExpanded === next.isExpanded &&
     prev.columnsKey === next.columnsKey &&
+    prev.pricingVisible === next.pricingVisible &&
     prev.rowClassName === next.rowClassName &&
     prev.onSelectRow === next.onSelectRow &&
     prev.onToggleExpand === next.onToggleExpand &&

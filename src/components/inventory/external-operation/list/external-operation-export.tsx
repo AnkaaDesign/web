@@ -3,7 +3,8 @@ import type { ExternalOperation } from "../../../../types";
 import type { ExternalOperationGetManyFormData } from "../../../../schemas";
 import { externalOperationService } from "../../../../api-client";
 import { useCanViewPrices } from "../../../../hooks";
-import { formatCurrency, formatDate } from "../../../../utils";
+// Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
+import { formatCurrencyUnmasked as formatCurrency, formatDate } from "../../../../utils";
 import { EXTERNAL_OPERATION_STATUS, EXTERNAL_OPERATION_STATUS_LABELS, EXTERNAL_OPERATION_TYPE, EXTERNAL_OPERATION_TYPE_LABELS } from "../../../../constants";
 
 interface ExternalOperationExportProps {

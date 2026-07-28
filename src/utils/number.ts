@@ -1,6 +1,6 @@
 // packages/utils/src/number.ts
 
-import { getPricingVisible } from "./pricing-visibility";
+import { getPricingVisible, withPricingVisible } from "./pricing-visibility";
 
 // =====================
 // Currency Formatting
@@ -44,6 +44,20 @@ export const formatCurrencyWithoutSymbol = (value: number, locale: string = "pt-
     maximumFractionDigits: 2,
   }).format(value);
 };
+
+/**
+ * formatCurrency for GENERATED OUTPUT — PDFs, spreadsheets, WhatsApp/quote text.
+ *
+ * Ignores the show/hide-values toggle. Masking is a screen affordance (someone standing
+ * behind you); a document the user deliberately generated must carry the real number, or
+ * they get a PDF full of "R$ ••••••". Never use this to render to the screen.
+ */
+export const formatCurrencyUnmasked = (
+  value: number,
+  locale: string = "pt-BR",
+  currency: string = "BRL",
+  fractionDigits?: number,
+): string => withPricingVisible(() => formatCurrency(value, locale, currency, fractionDigits));
 
 export const parseCurrency = (value: string): number => {
   // Remove currency symbols and convert to number

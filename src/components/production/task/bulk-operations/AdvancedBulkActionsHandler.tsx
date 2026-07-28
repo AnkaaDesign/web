@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { FileUploadField, type FileWithPreview, FileSuggestions } from "@/components/common/file";
+import { FileCardUploadField, type FileWithPreview, FileSuggestions } from "@/components/common/file";
 import { LayoutFileUploadField } from "../form/layout-file-upload-field";
 import { GeneralPaintingSelector } from "../form/general-painting-selector";
 import { LogoPaintsSelector } from "../form/logo-paints-selector";
@@ -1328,13 +1328,13 @@ export const AdvancedBulkActionsHandler = forwardRef<
       case "baseFiles":
         return (
           <div className="space-y-4">
-            <FileUploadField
+            <FileCardUploadField
               onFilesChange={setBaseFiles}
               maxFiles={10}
               disabled={isSubmitting}
               showPreview={true}
               existingFiles={baseFiles}
-              variant="compact"
+              variant="card"
               placeholder="Selecione arquivos base para as tarefas"
               label="Arquivos Base"
             >
@@ -1358,7 +1358,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 }}
                 disabled={isSubmitting}
               />
-            </FileUploadField>
+            </FileCardUploadField>
             <Alert>
               <AlertDescription>
                 Arquivos base são usados como referência para criação dos layouts. Eles serão compartilhados entre todas as {currentTaskIds.length} tarefas selecionadas.

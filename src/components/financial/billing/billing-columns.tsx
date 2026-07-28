@@ -14,9 +14,9 @@ const renderDate = (date: Date | string | null | undefined) => {
 // regardless of its status — so every task quote shows a vencimento, not only
 // the ones currently "DUE". Falls back to the earliest due date when parcelas
 // aren't numbered from 1.
-// Exported so the table can sort by this value client-side — the due date lives
-// two relations deep (quote -> customerConfigs -> installments), which Prisma
-// can't order by directly, so this column sorts within the loaded page only.
+// The API mirrors this resolution for the `currentInstallmentDueDate` sort key
+// (see task-prisma.repository.ts) — keep both in sync so the rendered date and
+// the sort order never disagree.
 export const findFirstInstallmentDueDate = (task: Task): Date | null => {
   const configs = task.quote?.customerConfigs;
   if (!configs || configs.length === 0) return null;
@@ -112,8 +112,8 @@ export function createBillingColumns(): StandardizedColumn<Task>[] {
       },
     },
     {
-      // Sorted client-side (see billing-table.tsx) — the due date lives two
-      // relations deep, which Prisma can't order by directly.
+      // Computed key: the due date lives two relations deep, so the API resolves
+      // and sorts it over the whole result set before paginating.
       key: "currentInstallmentDueDate",
       header: "VENCIMENTO",
       sortable: true,

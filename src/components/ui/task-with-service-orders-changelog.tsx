@@ -1,5 +1,6 @@
 import { useCallback, useContext, useMemo, useState, type KeyboardEvent } from "react";
 import { getApiBaseUrl } from "@/config/api";
+import { formatCurrency as formatCurrencyMasked } from "@/utils/number";
 import { FileViewerContext } from "@/components/common/file/file-viewer";
 import { getFileById } from "@/api-client/file";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2723,14 +2724,11 @@ const ChangelogTimelineItem = ({
                                 return null;
                               };
 
-                              const formatCurrency = (value: number | null) => {
-                                if (value === null || value === undefined)
-                                  return null;
-                                return new Intl.NumberFormat("pt-BR", {
-                                  style: "currency",
-                                  currency: "BRL",
-                                }).format(value);
-                              };
+                              // Shared helper, NOT a local Intl.NumberFormat: it honours
+                              // the show/hide-values toggle, which a private formatter
+                              // silently bypassed.
+                              const formatCurrency = (value: number | null) =>
+                                value === null || value === undefined ? null : formatCurrencyMasked(value);
 
                               const oldQuote = parseValue(changelog.oldValue);
                               const newQuote = parseValue(changelog.newValue);

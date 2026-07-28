@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { CONTRACT_STATUS, EMPLOYEE_TYPE } from "../../../constants";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { usePersistedState } from "@/hooks/common/use-persisted-state";
+import { usePricingVisible } from "@/contexts/pricing-context";
 import { DataTable } from "@/components/ui/datatable";
 import { PromotionsSimulationFilters } from "./promotions-simulation-filters";
 import {
@@ -35,6 +36,12 @@ interface PromotionsSimulationInteractiveTableProps {
 }
 
 export function PromotionsSimulationInteractiveTable({ className }: PromotionsSimulationInteractiveTableProps) {
+  // Subscribe to the show/hide-values toggle: the totals below are formatted with
+  // formatCurrency() during THIS component's render, so without a subscription they
+  // keep the masked/unmasked string from the last render. (The table cells are
+  // covered by the DataTable's own subscription.)
+  usePricingVisible();
+
   const [simulatedUsers, setSimulatedUsers] = useState<SimulatedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 

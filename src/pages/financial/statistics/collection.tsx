@@ -14,6 +14,7 @@ import { getBonusPeriodStart, getBonusPeriodEnd } from '@/utils/bonus';
 import { GOAL_METRIC, GOAL_METRIC_UNIT, routes, FAVORITE_PAGES } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useChartTheme } from '@/hooks/common/use-chart-theme';
+import { usePricingVisible } from '@/contexts/pricing-context';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
 import { GoalMetaPopover } from '@/components/statistics/goal-meta-popover';
 import {
@@ -851,6 +852,10 @@ const FinancialOverviewPage = () => {
   usePageTracker({ page: 'financial-overview-analytics', title: 'Visão Financeira' });
 
   const theme = useChartTheme();
+  // Show/hide currency values. The chart options and summary cards below format money
+  // inside useMemo blocks, so the flag is carried in their dep arrays — without it they
+  // keep the masked/unmasked strings from the last build and the eye toggle does nothing.
+  const pricingVisible = usePricingVisible();
 
   const initialYear = useMemo(() => new Date().getFullYear().toString(), []);
   const [selectedYears, setSelectedYears] = useState<string[]>([initialYear]);
@@ -1344,7 +1349,7 @@ const FinancialOverviewPage = () => {
         data,
       }],
     };
-  }, [revenueFunnel, theme]);
+  }, [revenueFunnel, theme, pricingVisible]);
 
   // Estágio-do-orçamento funnel: 8 sales stages.
   const quoteFunnelOption = useMemo(() => {
@@ -1384,7 +1389,7 @@ const FinancialOverviewPage = () => {
         data: quoteFunnel.map(s => ({ name: s.stageLabel, value: s.count || 1 })),
       }],
     };
-  }, [quoteFunnel, theme]);
+  }, [quoteFunnel, theme, pricingVisible]);
 
   // -------- Pie / Donut option builders (Por Status / Setor) --------
 
@@ -1488,7 +1493,7 @@ const FinancialOverviewPage = () => {
         return `Orçamentos: ${formatNumber(c.quoteCount, 0)} · Conversão: ${formatPercentage(c.conversionRate)}`;
       },
     );
-  }, [topCustomers, buildHbarOption]);
+  }, [topCustomers, buildHbarOption, pricingVisible]);
 
   const topSectorsPieOption = useMemo(() => {
     if (!topSectors.length) return {};
@@ -1497,7 +1502,7 @@ const FinancialOverviewPage = () => {
       ['40%', '70%'],
       formatCurrency,
     );
-  }, [topSectors, buildPieOption]);
+  }, [topSectors, buildPieOption, pricingVisible]);
 
   // -------- Dimension-driven main chart options --------
 
@@ -1966,6 +1971,7 @@ const FinancialOverviewPage = () => {
     analysis.metric, metricStats, collectionSummary, receivablesSummary, quoteSummary, quoteFunnel,
     collectionLoading, receivablesLoading, quoteFunnelLoading,
     paidBucket, allBucket, bucketByKey, quoteItems, openBucketByKey, narrowToPeriod,
+    pricingVisible,
   ]);
 
   // -------- Render --------

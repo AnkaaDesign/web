@@ -1,6 +1,7 @@
 import React from "react";
 import { formatCurrency } from "../../../../utils";
 import { useCanViewPrices } from "../../../../hooks";
+import { usePricingVisible } from "@/contexts/pricing-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -45,6 +46,9 @@ const ExternalOperationTotalCalculatorComponent: React.FC<ExternalOperationTotal
   showItemBreakdown = false,
 }) => {
   const canViewPrices = useCanViewPrices();
+  // React.memo'd component: the show/hide-values toggle changes no prop here, so it
+  // must subscribe itself or the totals keep their last masked/unmasked strings.
+  usePricingVisible();
   // Calculate individual item totals and grand total
   const itemCalculations = React.useMemo(() => {
     if (type !== EXTERNAL_OPERATION_TYPE.CHARGEABLE) return [];
@@ -210,6 +214,9 @@ const ExternalOperationTotalBadgeComponent: React.FC<{
   type: EXTERNAL_OPERATION_TYPE;
 }> = ({ selectedItems, quantities, prices, items = [], services = [], type }) => {
   const canViewPrices = useCanViewPrices();
+  // React.memo'd component: the show/hide-values toggle changes no prop here, so it
+  // must subscribe itself or the totals keep their last masked/unmasked strings.
+  usePricingVisible();
   const grandTotal = React.useMemo(() => {
     if (type !== EXTERNAL_OPERATION_TYPE.CHARGEABLE) return 0;
 

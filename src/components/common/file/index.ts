@@ -5,6 +5,8 @@ export { FileThumbnail } from "./file-thumbnail";
 export { FilePreviewModal, FilePreview } from "./file-preview-modal";
 export { FileUploader } from "./file-uploader";
 export { FileUploadField } from "./file-upload-field";
+export { FileCardUploadField } from "./file-card-upload-field";
+export type { FileCardUploadFieldProps } from "./file-card-upload-field";
 export { FileItem } from "./file-item";
 export { VideoPlayer } from "./video-player";
 export { PDFViewer } from "./pdf-viewer";

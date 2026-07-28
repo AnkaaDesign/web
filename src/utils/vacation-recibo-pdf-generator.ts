@@ -3,7 +3,8 @@
  * Produces a standalone payable receipt — NOT embedded in the monthly folha.
  * Uses the same print-window approach as the other PDF generators in this repo.
  */
-import { formatCurrency } from "./number";
+// Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
+import { formatCurrencyUnmasked as formatCurrency } from "./number";
 import { formatDate } from "./date";
 import type { VacationRecibo } from "../types/vacation";
 

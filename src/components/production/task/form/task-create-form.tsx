@@ -50,7 +50,7 @@ import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 import { ResponsibleManager, validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
-import { FileUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
+import { FileUploadField, FileCardUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import { LayoutFileUploadField } from "./layout-file-upload-field";
 import { MultiAirbrushingSelector } from "./multi-airbrushing-selector";
 import { createAirbrushingsForTask } from "@/utils/airbrushing-submit";
@@ -1047,14 +1047,14 @@ export const TaskCreateForm = () => {
                     </AccordionTrigger>
                     <AccordionContent>
                       <CardContent className="pt-0">
-                        <FileUploadField
+                        <FileCardUploadField
                           onFilesChange={handleBaseFilesChange}
                           maxFiles={30}
                           maxSize={500 * 1024 * 1024}
                           disabled={isSubmitting}
                           showPreview={true}
                           existingFiles={baseFiles}
-                          variant="compact"
+                          variant="card"
                           placeholder="Adicione arquivos base para a tarefa (vídeos, imagens, PDFs)"
                           label="Arquivos base anexados"
                           acceptedFileTypes={{

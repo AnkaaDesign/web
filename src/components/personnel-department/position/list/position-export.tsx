@@ -1,7 +1,8 @@
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
 import { toast } from "@/components/ui/sonner";
 import { positionService } from "../../../../api-client";
-import { formatDate, formatCurrency } from "../../../../utils";
+// Generated output (PDF/planilha/texto) carries REAL values even while the screen is masked.
+import { formatDate, formatCurrencyUnmasked as formatCurrency } from "../../../../utils";
 import type { Position } from "../../../../types";
 import type { PositionGetManyFormData } from "../../../../schemas";
 

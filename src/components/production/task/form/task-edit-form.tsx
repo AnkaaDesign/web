@@ -60,7 +60,7 @@ import { GeneralPaintingSelector } from "./general-painting-selector";
 import type { ServiceOrderData } from "./designar-service-order-dialog";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
-import { FileUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
+import { FileUploadField, FileCardUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import { LayoutFileUploadField } from "./layout-file-upload-field";
 import { getApiBaseUrl } from "@/config/api";
 import { Badge } from "@/components/ui/badge";
@@ -133,7 +133,13 @@ const convertToFileWithPreview = (file: any | any[] | undefined | null): FileWit
  */
 type AirbrushingFiles = { receipts: File[]; invoices: File[]; layouts: File[] };
 type AirbrushingCreateOp = { data: Record<string, any>; files: AirbrushingFiles };
-type AirbrushingUpdateOp = { id: string; data: Record<string, any>; files: AirbrushingFiles };
+type AirbrushingUpdateOp = {
+  id: string;
+  data: Record<string, any>;
+  files: AirbrushingFiles;
+  /** The row's attachment set changed, so it must go through the single multipart endpoint. */
+  touchesFiles: boolean;
+};
 
 function planAirbrushingReconciliation(
   originalList: any[],
@@ -141,22 +147,46 @@ function planAirbrushingReconciliation(
 ): { toCreate: AirbrushingCreateOp[]; toUpdate: AirbrushingUpdateOp[]; toDelete: string[]; hasChanges: boolean } {
   const originalById = new Map<string, any>((originalList || []).map((a) => [a.id, a]));
 
+  // Ids of the files this row ALREADY has on the server. The rows reaching this planner
+  // come from two different places with two different shapes, and the predicate must
+  // accept both or it silently reports "this row has no files":
+  //   • rows the user touched  → `MultiAirbrushingSelector` hydrated them into
+  //     FileWithPreview (a real `File` carrying `uploaded: true` + `uploadedFileId`);
+  //   • rows the user did NOT touch → still the raw API objects `mapDataToForm` seeded,
+  //     which are plain objects with `id` and NO `uploaded` flag (the selector skips its
+  //     first sync-to-form on purpose, so the form value keeps them as-is).
+  // Testing `f.uploaded` alone therefore returned [] for every untouched airbrushing,
+  // which both marked the row as changed and sent `layoutIds: []` — the batch update then
+  // detached every layout the airbrushing had. Anything that is not a pending browser
+  // upload is already persisted, so key off that instead.
+  const isPendingUpload = (f: any): boolean => f instanceof File && !f.uploaded;
   const uploadedIds = (files: any[]): string[] =>
-    (files || []).filter((f) => f?.uploaded).map((f) => f.uploadedFileId || f.id).filter(Boolean);
-  const newFilesOf = (files: any[]): File[] =>
-    (files || []).filter((f) => f instanceof File && !(f as any).uploaded) as File[];
+    (files || [])
+      .filter((f) => f && !isPendingUpload(f))
+      .map((f) => f.uploadedFileId || f.fileId || f.id)
+      .filter(Boolean);
+  const newFilesOf = (files: any[]): File[] => (files || []).filter(isPendingUpload) as File[];
   const time = (d: any): number | null => (d ? new Date(d).getTime() : null);
   const sameIds = (a: string[], b: string[]): boolean => a.slice().sort().join(",") === b.slice().sort().join(",");
   const origFileIds = (files: any[]): string[] =>
     (files || []).map((f: any) => f.fileId || f.file?.id || f.id).filter(Boolean);
+
+  // The two row shapes also disagree on WHERE the receipt/invoice lists live: the selector
+  // publishes `receiptFiles`/`invoiceFiles`, while an untouched row still carries
+  // `mapDataToForm`'s `receipts`/`invoices`. Reading only the former reported "no receipts"
+  // for every untouched airbrushing and shipped `receiptIds: []`, which detached them the
+  // same way the layouts were lost. Always resolve through these accessors.
+  const rowReceipts = (a: any): any[] => a.receiptFiles ?? a.receipts ?? [];
+  const rowInvoices = (a: any): any[] => a.invoiceFiles ?? a.invoices ?? [];
+  const rowLayouts = (a: any): any[] => a.layouts ?? [];
 
   // A brand-new row is only worth creating if it carries real data (guards the default
   // empty row `mapDataToForm` seeds so it never counts as a change / phantom airbrushing).
   const isMeaningful = (a: any): boolean =>
     a.price != null || !!a.startDate || !!a.finishDate || !!a.startedAt || !!a.finishedAt || !!a.painterId ||
     !!a.description?.trim() ||
-    uploadedIds(a.receiptFiles).length > 0 || uploadedIds(a.invoiceFiles).length > 0 || uploadedIds(a.layouts).length > 0 ||
-    newFilesOf(a.receiptFiles).length > 0 || newFilesOf(a.invoiceFiles).length > 0 || newFilesOf(a.layouts).length > 0;
+    uploadedIds(rowReceipts(a)).length > 0 || uploadedIds(rowInvoices(a)).length > 0 || uploadedIds(rowLayouts(a)).length > 0 ||
+    newFilesOf(rowReceipts(a)).length > 0 || newFilesOf(rowInvoices(a)).length > 0 || newFilesOf(rowLayouts(a)).length > 0;
 
   const rowChanged = (a: any, orig: any): boolean => {
     if ((a.price ?? null) !== (orig.price ?? null)) return true;
@@ -169,13 +199,17 @@ function planAirbrushingReconciliation(
     if (time(a.finishDate) !== time(orig.finishDate)) return true;
     if (time(a.startedAt) !== time(orig.startedAt)) return true;
     if (time(a.finishedAt) !== time(orig.finishedAt)) return true;
-    if (!sameIds(uploadedIds(a.receiptFiles), origFileIds(orig.receipts))) return true;
-    if (!sameIds(uploadedIds(a.invoiceFiles), origFileIds(orig.invoices))) return true;
-    if (!sameIds(uploadedIds(a.layouts), origFileIds(orig.layouts))) return true;
-    if (newFilesOf(a.receiptFiles).length > 0 || newFilesOf(a.invoiceFiles).length > 0 || newFilesOf(a.layouts).length > 0) return true;
+    if (!sameIds(uploadedIds(rowReceipts(a)), origFileIds(orig.receipts))) return true;
+    if (!sameIds(uploadedIds(rowInvoices(a)), origFileIds(orig.invoices))) return true;
+    if (!sameIds(uploadedIds(rowLayouts(a)), origFileIds(orig.layouts))) return true;
+    if (newFilesOf(rowReceipts(a)).length > 0 || newFilesOf(rowInvoices(a)).length > 0 || newFilesOf(rowLayouts(a)).length > 0) return true;
     return false;
   };
 
+  // Scalar fields only. The attachment arrays are deliberately NOT part of this: the JSON
+  // batch endpoint cannot carry an upload, so including them there can only ever remove
+  // files — and the API now ignores them outright. Anything that touches attachments is
+  // routed to the single multipart endpoint via `buildFileData` below.
   const buildData = (a: any): Record<string, any> => ({
     status: a.status,
     paymentStatus: a.paymentStatus,
@@ -186,10 +220,21 @@ function planAirbrushingReconciliation(
     startedAt: a.startedAt ?? null,
     finishedAt: a.finishedAt ?? null,
     painterId: a.painterId ?? null,
-    receiptIds: uploadedIds(a.receiptFiles),
-    invoiceIds: uploadedIds(a.invoiceFiles),
-    layoutIds: uploadedIds(a.layouts),
   });
+
+  const buildFileData = (a: any): Record<string, any> => ({
+    receiptIds: uploadedIds(rowReceipts(a)),
+    invoiceIds: uploadedIds(rowInvoices(a)),
+    layoutIds: uploadedIds(rowLayouts(a)),
+  });
+
+  // Did the user actually change which files are attached? Only then may the attachment
+  // arrays be transmitted at all — a row whose files are untouched never sends them, so a
+  // hydration slip can no longer be mistaken for "the user removed everything".
+  const filesChanged = (a: any, orig: any): boolean =>
+    !sameIds(uploadedIds(rowReceipts(a)), origFileIds(orig.receipts)) ||
+    !sameIds(uploadedIds(rowInvoices(a)), origFileIds(orig.invoices)) ||
+    !sameIds(uploadedIds(rowLayouts(a)), origFileIds(orig.layouts));
 
   const toCreate: AirbrushingCreateOp[] = [];
   const toUpdate: AirbrushingUpdateOp[] = [];
@@ -197,18 +242,28 @@ function planAirbrushingReconciliation(
 
   for (const a of formList || []) {
     const files: AirbrushingFiles = {
-      receipts: newFilesOf(a.receiptFiles),
-      invoices: newFilesOf(a.invoiceFiles),
-      layouts: newFilesOf(a.layouts),
+      receipts: newFilesOf(rowReceipts(a)),
+      invoices: newFilesOf(rowInvoices(a)),
+      layouts: newFilesOf(rowLayouts(a)),
     };
     const orig = originalById.get(a.id);
     if (orig) {
       // Existing row: always kept; updated in place only if something actually changed
       // (preserving its status/payment/timestamps otherwise).
       keptIds.add(a.id);
-      if (rowChanged(a, orig)) toUpdate.push({ id: a.id, data: buildData(a), files });
+      if (rowChanged(a, orig)) {
+        const touchesFiles = filesChanged(a, orig) || newFilesOf(rowReceipts(a)).length > 0 ||
+          newFilesOf(rowInvoices(a)).length > 0 || newFilesOf(rowLayouts(a)).length > 0;
+        toUpdate.push({
+          id: a.id,
+          data: touchesFiles ? { ...buildData(a), ...buildFileData(a) } : buildData(a),
+          files,
+          touchesFiles,
+        });
+      }
     } else if (isMeaningful(a)) {
-      toCreate.push({ data: buildData(a), files });
+      // A brand-new row carries its whole file set by definition.
+      toCreate.push({ data: { ...buildData(a), ...buildFileData(a) }, files });
     }
   }
 
@@ -2414,10 +2469,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
               }
             }
 
-            // 2) Updates. Metadata-only edits batch as JSON (preserving untouched fields);
-            //    rows with new file uploads go through the single multipart endpoint.
-            const updatesNoFiles = toUpdate.filter((u) => !hasFiles(u.files));
-            const updatesWithFiles = toUpdate.filter((u) => hasFiles(u.files));
+            // 2) Updates. Scalar-only edits batch as JSON (preserving untouched fields);
+            //    any row whose ATTACHMENTS changed — new uploads or removals alike — goes
+            //    through the single multipart endpoint, which is the only path that owns
+            //    file reconciliation. The JSON batch endpoint deliberately ignores
+            //    attachment arrays, so routing a file change there would silently no-op.
+            const updatesNoFiles = toUpdate.filter((u) => !hasFiles(u.files) && !u.touchesFiles);
+            const updatesWithFiles = toUpdate.filter((u) => hasFiles(u.files) || u.touchesFiles);
             if (updatesNoFiles.length > 0) {
               const res: any = await airbrushingService.batchUpdateAirbrushings({
                 airbrushings: updatesNoFiles.map((u) => ({ id: u.id, data: u.data })),
@@ -3308,7 +3366,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                             disabled={isSubmitting || !canEditIdentity}
                             showPreview={true}
                             existingFiles={vinPlateFiles}
-                            variant="compact"
+                            variant="inline"
                             placeholder="Fotografe ou anexe a plaqueta"
                             label="Foto da plaqueta"
                             acceptedFileTypes={{
@@ -3921,14 +3979,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                   </AccordionTrigger>
                   <AccordionContent>
                     <CardContent className="pt-0">
-                      <FileUploadField
+                      <FileCardUploadField
                         onFilesChange={handleBaseFilesChange}
                         maxFiles={30}
                         maxSize={500 * 1024 * 1024}
                         disabled={isSubmitting}
                         showPreview={true}
                         existingFiles={baseFiles}
-                        variant="compact"
+                        variant="card"
                         placeholder="Adicione arquivos base (vídeos, imagens, PDFs)"
                         label="Arquivos base anexados"
                         acceptedFileTypes={{
@@ -3964,7 +4022,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                           }}
                           disabled={isSubmitting}
                         />
-                      </FileUploadField>
+                      </FileCardUploadField>
                     </CardContent>
                   </AccordionContent>
                 </Card>
@@ -3989,14 +4047,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                   </AccordionTrigger>
                   <AccordionContent>
                     <CardContent className="pt-0">
-                      <FileUploadField
+                      <FileCardUploadField
                         onFilesChange={handleProjectFilesChange}
                         maxFiles={30}
                         maxSize={500 * 1024 * 1024}
                         disabled={isSubmitting}
                         showPreview={true}
                         existingFiles={projectFiles}
-                        variant="compact"
+                        variant="card"
                         placeholder="Adicione arquivos de projeto (vídeos, imagens, PDFs)"
                         label="Projetos anexados"
                         acceptedFileTypes={{
@@ -4032,7 +4090,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                           }}
                           disabled={isSubmitting}
                         />
-                      </FileUploadField>
+                      </FileCardUploadField>
                     </CardContent>
                   </AccordionContent>
                 </Card>
@@ -4326,13 +4384,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                             <IconFile className="h-4 w-4 text-muted-foreground" />
                             Arquivos de Evidência (Opcional)
                           </Label>
-                          <FileUploadField
+                          <FileCardUploadField
                             onFilesChange={handleObservationFilesChange}
                             maxFiles={10}
                             disabled={isSubmitting || !canEditObservation}
                             showPreview={true}
                             existingFiles={observationFiles}
-                            variant="compact"
+                            variant="card"
                             placeholder="Adicione fotos, documentos ou outros arquivos"
                             label="Arquivos anexados"
                           />

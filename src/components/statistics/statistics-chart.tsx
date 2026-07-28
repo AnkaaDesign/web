@@ -3,6 +3,7 @@ import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import { CHART_COLORS, chartColorAt, formatCurrency, type StatisticsChartType, type YAxisMode, type TrendLineType } from '@/types/statistics-common';
 import { useChartTheme } from '@/hooks/common/use-chart-theme';
+import { usePricingVisible } from '@/contexts/pricing-context';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
@@ -243,6 +244,12 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   categoryLegend,
   showLegend = true,
 }, externalRef) {
+  // Show/hide currency values. Axis labels / tooltips are formatted with
+  // formatCurrency() inside the `option` memo, so the flag has to be one of its deps
+  // — otherwise the echarts option keeps the strings from the last build and the
+  // toggle never reaches the canvas.
+  const pricingVisible = usePricingVisible();
+
   const smooth = chartType === 'line-smooth' || chartType === 'area-smooth';
   const baseChartType = chartType === 'line-smooth' ? 'line' : chartType === 'area-smooth' ? 'area' : chartType;
 
@@ -1060,7 +1067,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       color: CHART_COLORS, dataZoom,
       series: [...categoryBandSeries, ...yearBandSeries, ...goalLineSeries, ...trendSeries, ...series],
     };
-  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, theme, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType, tooltipTrigger, categoryBands, yearBands, valueColor, effectiveCategoryLegend, legendHeight, legendBottomPx]);
+  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, theme, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType, tooltipTrigger, categoryBands, yearBands, valueColor, effectiveCategoryLegend, legendHeight, legendBottomPx, pricingVisible]);
 
   const onEvents = useMemo((): Record<string, (params: any) => void> => {
     if (!hasClickHandler) return {};

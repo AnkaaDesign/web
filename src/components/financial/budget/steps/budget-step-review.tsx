@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,7 @@ import {
   IconPhoto,
   IconExternalLink,
 } from "@tabler/icons-react";
+import { FileThumbnail, FileViewerContext } from "@/components/common/file";
 import { formatCurrency, formatDate, formatChassis } from "@/utils";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
@@ -107,6 +108,10 @@ export function BudgetStepReview({
       truck: task?.truck || (plates.length > 0 ? { plate: plates.join(", ") } : undefined),
     };
   }, [isCreateMode, task, formPlates, formSerialNumbers, formName]);
+
+  // Contexto direto (e não `useFileViewer`) porque o hook LANÇA quando não há provider,
+  // e este passo é montado tanto dentro quanto fora do FileViewerProvider.
+  const fileViewer = useContext(FileViewerContext);
 
   const [customerFilter, setCustomerFilter] = useState<string>("all");
 
@@ -281,6 +286,14 @@ export function BudgetStepReview({
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Chassi</span>
                 <span className="text-sm font-mono font-medium">{formatChassis(resolvedTask.truck.chassisNumber)}</span>
+              </div>
+            )}
+            {/* Plaqueta — é uma FOTO (truck.vinPlate -> File), não texto. Só aparece quando
+                existe: no create ainda não há caminhão gravado. */}
+            {resolvedTask?.truck?.vinPlate && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm text-muted-foreground">Plaqueta</span>
+                <FileThumbnail file={resolvedTask.truck.vinPlate} size="sm" onClick={() => fileViewer?.actions?.viewFiles?.([resolvedTask.truck!.vinPlate!] as never, 0)} />
               </div>
             )}
             {resolvedTask?.truck?.category && (

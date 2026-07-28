@@ -37,7 +37,7 @@ import { GeneralPaintingSelector } from "@/components/production/task/form/gener
 import { ResponsibleManager } from "@/components/administration/customer/responsible";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FileUploadField } from "@/components/common/file";
+import { FileCardUploadField } from "@/components/common/file";
 import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
 import { MultiAirbrushingSelector } from "@/components/production/task/form/multi-airbrushing-selector";
 import { FileSuggestions, type FileWithPreview } from "@/components/common/file";
@@ -454,14 +454,14 @@ export function BudgetStepTask({
             </AccordionTrigger>
             <AccordionContent>
               <CardContent className="pt-0">
-                <FileUploadField
+                <FileCardUploadField
                   onFilesChange={onBaseFilesChange}
                   maxFiles={30}
                   maxSize={500 * 1024 * 1024}
                   disabled={disabled}
                   showPreview={true}
                   existingFiles={baseFiles}
-                  variant="compact"
+                  variant="card"
                   placeholder="Adicione arquivos base para a tarefa (vídeos, imagens, PDFs)"
                   label="Arquivos base anexados"
                   acceptedFileTypes={{

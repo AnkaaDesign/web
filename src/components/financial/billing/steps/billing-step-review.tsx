@@ -42,7 +42,7 @@ import { invoiceService } from "@/api-client/invoice";
 import { nfseService } from "@/api-client/nfse";
 import { taskQuoteService } from "@/api-client/task-quote";
 import { SERVICE_ORDER_TYPE } from "@/constants/enums";
-import { useFileViewer } from "@/components/common/file";
+import { FileThumbnail, useFileViewer } from "@/components/common/file";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
@@ -463,6 +463,13 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Chassi</span>
                 <span className="text-sm font-medium">{formatChassis(task.truck.chassisNumber)}</span>
+              </div>
+            )}
+            {/* Plaqueta — é uma FOTO (truck.vinPlate -> File), não texto. */}
+            {task.truck?.vinPlate && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm text-muted-foreground">Plaqueta</span>
+                <FileThumbnail file={task.truck.vinPlate} size="sm" onClick={() => fileViewerContext?.actions.viewFiles([task.truck!.vinPlate!] as never, 0)} />
               </div>
             )}
             {task.truck?.category && (
