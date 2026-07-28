@@ -92,6 +92,39 @@ export const canAccessAllPrivileges = (userPrivilege: SECTOR_PRIVILEGES, require
 };
 
 // =====================
+// Privilege Groups
+// =====================
+
+/**
+ * The ONLY sectors allowed to see monetary values. Verbatim mirror of
+ * `api/src/utils/privilege.ts` — keep the two in sync.
+ *
+ * Single authority for "may this user see money?": item/order prices, quote and
+ * billing totals, freight, discounts, payables, salaries, other people's
+ * bonuses. Every gate derives from this list; do not restate it inline (the
+ * codebase previously carried 25+ ad-hoc arrays that disagreed with each other).
+ *
+ * An ALLOWLIST on purpose. It replaced `privilege !== WAREHOUSE`, an exclusion of
+ * exactly one sector that therefore leaked prices to PRODUCTION, MAINTENANCE,
+ * LOGISTIC, HUMAN_RESOURCES, DESIGNER, PLOTTING, PRODUCTION_MANAGER, EXTERNAL
+ * and BASIC. New privileges are denied by default — the correct failure direction.
+ */
+export const MONEY_PRIVILEGES: SECTOR_PRIVILEGES[] = [
+  SECTOR_PRIVILEGES.ADMIN,
+  SECTOR_PRIVILEGES.ACCOUNTING,
+  SECTOR_PRIVILEGES.COMMERCIAL,
+  SECTOR_PRIVILEGES.FINANCIAL,
+];
+
+/**
+ * Whether this user may see monetary values at all. No sector → denied.
+ */
+export const canViewMonetaryValues = (userPrivilege: SECTOR_PRIVILEGES | null | undefined): boolean => {
+  if (!userPrivilege) return false;
+  return MONEY_PRIVILEGES.includes(userPrivilege);
+};
+
+// =====================
 // Team Management Privilege Utilities
 // =====================
 

@@ -141,9 +141,16 @@ function fmtDateTime(v: string | null): string {
 export function SignatureEnvelopeCard({
   quoteId,
   canManage,
+  embedded = false,
 }: {
   quoteId: string | null | undefined;
   canManage: boolean;
+  /**
+   * Modo bloco: dispensa o `Card` próprio e usa a moldura `bg-muted/30 rounded-lg`
+   * das demais faixas da seção de orçamento do detalhe da tarefa, que já vive
+   * dentro de um `Card` do DetailPage — dois cartões aninhados destoavam.
+   */
+  embedded?: boolean;
 }) {
   const [envelopes, setEnvelopes] = useState<Envelope[]>([]);
   const [loading, setLoading] = useState(true);
@@ -215,294 +222,312 @@ export function SignatureEnvelopeCard({
   const total = current?.signers.length ?? 0;
   const label = current ? ENVELOPE_LABEL[current.status] ?? { text: current.status, tone: "muted" as Tone } : null;
 
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <IconSignature className="h-4 w-4 text-muted-foreground" />
-            Assinatura eletrônica
-            {current && (
-              <Badge variant="outline" className={`ml-1 ${toneClass[label!.tone]}`}>
-                {label!.text}
-              </Badge>
-            )}
-          </CardTitle>
+  const titleInner = (
+    <>
+      <IconSignature className="h-4 w-4 text-muted-foreground" />
+      Assinatura eletrônica
+      {current && (
+        <Badge variant="outline" className={`ml-1 ${toneClass[label!.tone]}`}>
+          {label!.text}
+        </Badge>
+      )}
+    </>
+  );
 
-          {current && (
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => openPdf(current.id)}>
-                <IconFileTypePdf className="h-3.5 w-3.5" />
-                PDF
-              </Button>
-              {canManage && current.status === "RUNNING" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  disabled={busy}
-                  onClick={() => run(() => signatureService.cancel(current.id), "Coleta cancelada.")}
-                >
-                  <IconX className="h-3.5 w-3.5" />
-                  Cancelar
-                </Button>
-              )}
-              {canManage && current.status !== "RUNNING" && current.status !== "COMPLETED" && (
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="h-8 gap-1.5"
-                  disabled={busy}
-                  onClick={() => run(() => signatureService.createEnvelope(quoteId), "Reenviado para assinatura.")}
-                >
-                  {busy ? <IconLoader2 className="h-3.5 w-3.5 animate-spin" /> : <IconSend className="h-3.5 w-3.5" />}
-                  Reenviar
-                </Button>
-              )}
-            </div>
+  const header = (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      {embedded ? (
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">{titleInner}</div>
+      ) : (
+        <CardTitle className="flex items-center gap-2 text-sm">{titleInner}</CardTitle>
+      )}
+
+      {current && (
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => openPdf(current.id)}>
+            <IconFileTypePdf className="h-3.5 w-3.5" />
+            PDF
+          </Button>
+          {canManage && current.status === "RUNNING" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+              disabled={busy}
+              onClick={() => run(() => signatureService.cancel(current.id), "Coleta cancelada.")}
+            >
+              <IconX className="h-3.5 w-3.5" />
+              Cancelar
+            </Button>
+          )}
+          {canManage && current.status !== "RUNNING" && current.status !== "COMPLETED" && (
+            <Button
+              variant="default"
+              size="sm"
+              className="h-8 gap-1.5"
+              disabled={busy}
+              onClick={() => run(() => signatureService.createEnvelope(quoteId), "Reenviado para assinatura.")}
+            >
+              {busy ? <IconLoader2 className="h-3.5 w-3.5 animate-spin" /> : <IconSend className="h-3.5 w-3.5" />}
+              Reenviar
+            </Button>
           )}
         </div>
-      </CardHeader>
+      )}
+    </div>
+  );
 
-      <CardContent>
-        {loading ? (
-          <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-            <IconLoader2 className="h-4 w-4 animate-spin" />
-            Carregando…
+  const body = loading ? (
+      <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+        <IconLoader2 className="h-4 w-4 animate-spin" />
+        Carregando…
+      </div>
+    ) : !current ? (
+      <div className="flex flex-col items-start justify-between gap-3 rounded-lg bg-muted/50 px-4 py-5 sm:flex-row sm:items-center">
+        {/* Texto à esquerda, ação à direita: a explicação é contexto e o botão
+            é o ato. Empilhados, o botão ficava solto no canto inferior
+            esquerdo, longe de onde o olho termina de ler. Só empilha no
+            celular, onde os dois não cabem lado a lado. */}
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Nenhuma coleta emitida</p>
+          <p className="text-xs text-muted-foreground">
+            Ao enviar, o documento é congelado e cada responsável recebe um link pessoal por
+            WhatsApp para revisar e assinar.
+          </p>
+        </div>
+        {canManage && (
+          <Button
+            size="sm"
+            className="shrink-0 gap-1.5"
+            disabled={busy}
+            onClick={() => run(() => signatureService.createEnvelope(quoteId), "Enviado para assinatura.")}
+          >
+            {busy ? <IconLoader2 className="h-4 w-4 animate-spin" /> : <IconSend className="h-4 w-4" />}
+            Enviar para assinatura
+          </Button>
+        )}
+      </div>
+    ) : (
+      <div className="space-y-3">
+        {current.invalidatedReason && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs">
+            <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <span>
+              <strong>{current.invalidatedReason}</strong> As assinaturas coletadas foram
+              invalidadas e os signatários avisados. Reenvie para colher novamente.
+            </span>
           </div>
-        ) : !current ? (
-          <div className="flex flex-col items-start justify-between gap-3 rounded-lg bg-muted/50 px-4 py-5 sm:flex-row sm:items-center">
-            {/* Texto à esquerda, ação à direita: a explicação é contexto e o botão
-                é o ato. Empilhados, o botão ficava solto no canto inferior
-                esquerdo, longe de onde o olho termina de ler. Só empilha no
-                celular, onde os dois não cabem lado a lado. */}
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Nenhuma coleta emitida</p>
-              <p className="text-xs text-muted-foreground">
-                Ao enviar, o documento é congelado e cada responsável recebe um link pessoal por
-                WhatsApp para revisar e assinar.
-              </p>
-            </div>
-            {canManage && (
-              <Button
-                size="sm"
-                className="shrink-0 gap-1.5"
-                disabled={busy}
-                onClick={() => run(() => signatureService.createEnvelope(quoteId), "Enviado para assinatura.")}
-              >
-                {busy ? <IconLoader2 className="h-4 w-4 animate-spin" /> : <IconSend className="h-4 w-4" />}
-                Enviar para assinatura
-              </Button>
-            )}
+        )}
+
+        {current.signers.some(s => s.inviteState === "INVITATION_FAILED") && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs">
+            <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <span>
+              <strong>O convite automático pelo WhatsApp falhou.</strong> A sessão do
+              WhatsApp provavelmente não está conectada. Use o ícone de link para copiar
+              o endereço pessoal de cada signatário, ou o ícone do WhatsApp para abrir a
+              conversa com a mensagem pronta.
+            </span>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {current.invalidatedReason && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs">
-                <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <span>
-                  <strong>{current.invalidatedReason}</strong> As assinaturas coletadas foram
-                  invalidadas e os signatários avisados. Reenvie para colher novamente.
-                </span>
-              </div>
-            )}
+        )}
 
-            {current.signers.some(s => s.inviteState === "INVITATION_FAILED") && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs">
-                <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <span>
-                  <strong>O convite automático pelo WhatsApp falhou.</strong> A sessão do
-                  WhatsApp provavelmente não está conectada. Use o ícone de link para copiar
-                  o endereço pessoal de cada signatário, ou o ícone do WhatsApp para abrir a
-                  conversa com a mensagem pronta.
-                </span>
-              </div>
-            )}
+        {/* Progresso */}
+        <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2.5">
+          <span className="text-sm text-muted-foreground">Progresso</span>
+          <span className="text-sm font-semibold">
+            {signed} de {total} assinaram
+          </span>
+        </div>
 
-            {/* Progresso */}
-            <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2.5">
-              <span className="text-sm text-muted-foreground">Progresso</span>
-              <span className="text-sm font-semibold">
-                {signed} de {total} assinaram
-              </span>
-            </div>
-
-            {/* Signatários */}
-            <div className="space-y-1.5">
-              {current.signers.map(s => {
-                const st = SIGNER_LABEL[s.status] ?? { text: s.status, tone: "muted" as Tone };
-                return (
-                  <div key={s.id} className="flex items-start gap-3 rounded-lg bg-muted/50 px-4 py-2.5">
-                    {s.status === "SIGNED" ? (
-                      <IconCircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                    ) : s.status === "REFUSED" || s.status === "VOIDED" ? (
-                      <IconX className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                    ) : s.timesViewed > 0 ? (
-                      <IconEye className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
-                    ) : (
-                      <IconClock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                    )}
-
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate text-sm font-medium">{s.name}</span>
-                        {s.side === "ANKAA" && (
-                          <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                            Ankaa
-                          </Badge>
-                        )}
-                        {/* Divergência entre o CPF que a Ankaa cadastrou e o que o
-                            signatário informou é fato auditável, não bloqueio. */}
-                        {s.cpfMatch === false && (
-                          <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${toneClass.bad}`}>
-                            CPF diverge
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {s.cargo ?? "Cargo não informado"} · {s.phoneMasked}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {s.cpfMasked ? `CPF ${s.cpfMasked}` : "CPF ainda não informado"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {s.signedAt
-                          ? `Assinou em ${fmtDateTime(s.signedAt)}${s.ipAddress ? ` · IP ${s.ipAddress}` : ""}`
-                          : s.refusalReason
-                            ? `Recusou: ${s.refusalReason}`
-                            : s.timesViewed > 0
-                              ? `Abriu o link ${s.timesViewed}× · último em ${fmtDateTime(s.lastViewedAt)}`
-                              : s.inviteState === "INVITATION_FAILED"
-                                ? "Convite não entregue — envie o link manualmente"
-                                : s.inviteState === "INVITATION_SENT"
-                                  ? "Convite enviado · ainda não abriu"
-                                  : "Aguardando envio do convite"}
-                      </p>
-                    </div>
-
-                    <div className="flex shrink-0 items-center gap-1">
-                      {canManage && s.status !== "SIGNED" && s.status !== "REFUSED" && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            title="Copiar link de assinatura"
-                            onClick={() => copyLink(s)}
-                          >
-                            <IconLink className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            title="Abrir WhatsApp com a mensagem pronta"
-                            onClick={() => openWhatsApp(s)}
-                          >
-                            <IconBrandWhatsapp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            title="Reenviar convite automaticamente"
-                            disabled={busy}
-                            onClick={() =>
-                              run(() => signatureService.resendInvitation(s.id), "Convite reenviado.")
-                            }
-                          >
-                            <IconSend className="h-3.5 w-3.5" />
-                          </Button>
-                        </>
-                      )}
-                      <Badge variant="outline" className={toneClass[st.tone]}>
-                        {st.text}
-                      </Badge>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Metadados — grade legível em vez da tira de 11px que exigia zoom. */}
-            <div className="grid gap-x-6 gap-y-2 rounded-lg bg-muted/50 px-4 py-3 sm:grid-cols-2">
-              <Meta label="Versão" value={`v${current.version}`} />
-              <Meta label="Código de verificação" value={current.verificationCode} mono />
-              <Meta
-                label="Prazo para assinatura"
-                value={new Date(current.deadlineAt).toLocaleDateString("pt-BR")}
-              />
-              <Meta
-                label="Selo ICP-Brasil"
-                value={
-                  current.padesLevel
-                    ? `PAdES ${current.padesLevel}${current.sealedAt ? ` · ${fmtDateTime(current.sealedAt)}` : ""}`
-                    : "Ainda não selado"
-                }
-                tone={current.padesLevel ? "ok" : undefined}
-              />
-              <div className="sm:col-span-2">
-                <p className="text-xs text-muted-foreground">SHA-256 do documento original</p>
-                <button
-                  type="button"
-                  title="Copiar hash SHA-256"
-                  className="mt-0.5 flex w-full items-center gap-1.5 text-left font-mono text-xs text-foreground hover:text-primary"
-                  onClick={() => {
-                    void navigator.clipboard.writeText(current.originalSha256);
-                    toast.success("Hash copiado.");
-                  }}
-                >
-                  <span className="truncate">{current.originalSha256}</span>
-                  <IconCopy className="h-3.5 w-3.5 shrink-0" />
-                </button>
-              </div>
-            </div>
-
-            {history.length > 0 && (
-              <div className="pt-1">
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground underline hover:text-foreground"
-                  onClick={() => setShowHistory(v => !v)}
-                >
-                  {showHistory ? "Ocultar" : `Ver ${history.length} versão(ões) anterior(es)`}
-                </button>
-                {showHistory && (
-                  <div className="mt-2 space-y-1">
-                    {history.map(h => {
-                      const hl = ENVELOPE_LABEL[h.status] ?? { text: h.status, tone: "muted" as Tone };
-                      return (
-                        <div
-                          key={h.id}
-                          className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-2 text-xs"
-                        >
-                          <span className="flex items-center gap-2">
-                            <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${toneClass[hl.tone]}`}>
-                              {hl.text}
-                            </Badge>
-                            <span className="text-muted-foreground">
-                              v{h.version} · {h.verificationCode}
-                            </span>
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 gap-1.5"
-                            onClick={() => openPdf(h.id)}
-                          >
-                            <IconFileTypePdf className="h-3.5 w-3.5" />
-                            PDF
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
+        {/* Signatários */}
+        <div className="space-y-1.5">
+          {current.signers.map(s => {
+            const st = SIGNER_LABEL[s.status] ?? { text: s.status, tone: "muted" as Tone };
+            return (
+              <div key={s.id} className="flex items-start gap-3 rounded-lg bg-muted/50 px-4 py-2.5">
+                {s.status === "SIGNED" ? (
+                  <IconCircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                ) : s.status === "REFUSED" || s.status === "VOIDED" ? (
+                  <IconX className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                ) : s.timesViewed > 0 ? (
+                  <IconEye className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
+                ) : (
+                  <IconClock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
+
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate text-sm font-medium">{s.name}</span>
+                    {s.side === "ANKAA" && (
+                      <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                        Ankaa
+                      </Badge>
+                    )}
+                    {/* Divergência entre o CPF que a Ankaa cadastrou e o que o
+                        signatário informou é fato auditável, não bloqueio. */}
+                    {s.cpfMatch === false && (
+                      <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${toneClass.bad}`}>
+                        CPF diverge
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {s.cargo ?? "Cargo não informado"} · {s.phoneMasked}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.cpfMasked ? `CPF ${s.cpfMasked}` : "CPF ainda não informado"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.signedAt
+                      ? `Assinou em ${fmtDateTime(s.signedAt)}${s.ipAddress ? ` · IP ${s.ipAddress}` : ""}`
+                      : s.refusalReason
+                        ? `Recusou: ${s.refusalReason}`
+                        : s.timesViewed > 0
+                          ? `Abriu o link ${s.timesViewed}× · último em ${fmtDateTime(s.lastViewedAt)}`
+                          : s.inviteState === "INVITATION_FAILED"
+                            ? "Convite não entregue — envie o link manualmente"
+                            : s.inviteState === "INVITATION_SENT"
+                              ? "Convite enviado · ainda não abriu"
+                              : "Aguardando envio do convite"}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-1">
+                  {canManage && s.status !== "SIGNED" && s.status !== "REFUSED" && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="Copiar link de assinatura"
+                        onClick={() => copyLink(s)}
+                      >
+                        <IconLink className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="Abrir WhatsApp com a mensagem pronta"
+                        onClick={() => openWhatsApp(s)}
+                      >
+                        <IconBrandWhatsapp className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="Reenviar convite automaticamente"
+                        disabled={busy}
+                        onClick={() =>
+                          run(() => signatureService.resendInvitation(s.id), "Convite reenviado.")
+                        }
+                      >
+                        <IconSend className="h-3.5 w-3.5" />
+                      </Button>
+                    </>
+                  )}
+                  <Badge variant="outline" className={toneClass[st.tone]}>
+                    {st.text}
+                  </Badge>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Metadados — grade legível em vez da tira de 11px que exigia zoom. */}
+        <div className="grid gap-x-6 gap-y-2 rounded-lg bg-muted/50 px-4 py-3 sm:grid-cols-2">
+          <Meta label="Versão" value={`v${current.version}`} />
+          <Meta label="Código de verificação" value={current.verificationCode} mono />
+          <Meta
+            label="Prazo para assinatura"
+            value={new Date(current.deadlineAt).toLocaleDateString("pt-BR")}
+          />
+          <Meta
+            label="Selo ICP-Brasil"
+            value={
+              current.padesLevel
+                ? `PAdES ${current.padesLevel}${current.sealedAt ? ` · ${fmtDateTime(current.sealedAt)}` : ""}`
+                : "Ainda não selado"
+            }
+            tone={current.padesLevel ? "ok" : undefined}
+          />
+          <div className="sm:col-span-2">
+            <p className="text-xs text-muted-foreground">SHA-256 do documento original</p>
+            <button
+              type="button"
+              title="Copiar hash SHA-256"
+              className="mt-0.5 flex w-full items-center gap-1.5 text-left font-mono text-xs text-foreground hover:text-primary"
+              onClick={() => {
+                void navigator.clipboard.writeText(current.originalSha256);
+                toast.success("Hash copiado.");
+              }}
+            >
+              <span className="truncate">{current.originalSha256}</span>
+              <IconCopy className="h-3.5 w-3.5 shrink-0" />
+            </button>
+          </div>
+        </div>
+
+        {history.length > 0 && (
+          <div className="pt-1">
+            <button
+              type="button"
+              className="text-xs text-muted-foreground underline hover:text-foreground"
+              onClick={() => setShowHistory(v => !v)}
+            >
+              {showHistory ? "Ocultar" : `Ver ${history.length} versão(ões) anterior(es)`}
+            </button>
+            {showHistory && (
+              <div className="mt-2 space-y-1">
+                {history.map(h => {
+                  const hl = ENVELOPE_LABEL[h.status] ?? { text: h.status, tone: "muted" as Tone };
+                  return (
+                    <div
+                      key={h.id}
+                      className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-2 text-xs"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${toneClass[hl.tone]}`}>
+                          {hl.text}
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          v{h.version} · {h.verificationCode}
+                        </span>
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1.5"
+                        onClick={() => openPdf(h.id)}
+                      >
+                        <IconFileTypePdf className="h-3.5 w-3.5" />
+                        PDF
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
-      </CardContent>
+      </div>
+    );
+
+  if (embedded) {
+    return (
+      <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+        {header}
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">{header}</CardHeader>
+      <CardContent>{body}</CardContent>
     </Card>
   );
 }

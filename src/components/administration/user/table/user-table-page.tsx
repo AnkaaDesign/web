@@ -134,7 +134,10 @@ export function UserTablePage() {
   );
   const loading = isLoading || !!hasNextPage;
 
-  const columns = useMemo(() => createUserColumns(), []);
+  // CONTABILIDADE reads this table side-by-side with uppercase payroll documents, so names render
+  // uppercase for them. Display-only — the stored value keeps its Brazilian name case.
+  const uppercaseName = privileges === SECTOR_PRIVILEGES.ACCOUNTING;
+  const columns = useMemo(() => createUserColumns({ uppercaseName }), [uppercaseName]);
   const filterDefs = useMemo(() => buildUserFilterDefs(users), [users]);
 
   // --- row → detail navigation (hands over the current filtered+sorted order for prev/next) ---

@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, orderByWithNullsSchema, normalizeOrderBy, emailSchema, phoneSchema, cpfSchema, pisSchema, createNameSchema, nullableDate, createDateSchema } from "./common";
 import { cleanCPF } from "../utils/cleaners";
+import { toBrazilianNameCase } from "../utils/formatters";
 import { isValidCPF } from "../utils/validators";
 import type { User } from '@types';
 import { CONTRACT_TYPE, CONTRACT_STATUS, EMPLOYEE_TYPE, TERMINATION_TYPE, VERIFICATION_TYPE, SECTOR_PRIVILEGES, INSALUBRITY_DEGREE, STABILITY_TYPE } from '@constants';
@@ -1000,7 +1001,11 @@ export const userContractCreateNestedSchema = z.object({
 export const userCreateSchema = z
   .object({
     email: emailSchema.nullable().optional(),
-    name: createNameSchema(2, 200, "Nome"),
+    // Brazilian name case is the canonical storage shape for User.name — the API
+    // applies the same transform, this mirrors it so what's submitted matches what
+    // the field shows. Also covers the admission collaborator form, which is
+    // `userCreateSchema.and(...)`.
+    name: createNameSchema(2, 200, "Nome").transform(toBrazilianNameCase),
     avatarId: z.string().uuid("ID de avatar inválido").nullable().optional(),
     // First vínculo (EmploymentContract) created with the collaborator. Optional;
     // the service defaults employeeType=CLT, contractType=EXPERIENCE_PERIOD_1, status=ACTIVE.
@@ -1177,7 +1182,8 @@ export const userCreateSchema = z
 export const userUpdateSchema = z
   .object({
     email: emailSchema.nullable().optional(),
-    name: createNameSchema(2, 200, "Nome").optional(),
+    // Same canonical casing as create — see userCreateSchema.name.
+    name: createNameSchema(2, 200, "Nome").transform(toBrazilianNameCase).optional(),
     avatarId: z.string().uuid("ID de avatar inválido").nullable().optional(),
     // Current vínculo edit — these update the user's CURRENT EmploymentContract
     // (and re-sync the User cache). The contract is the source of truth.

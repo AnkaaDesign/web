@@ -29,6 +29,7 @@ import { NfseStatusBadge } from "@/components/production/task/billing/nfse-statu
 import { NfseActions } from "@/components/production/task/billing/nfse-actions";
 import { NfseEnrichedInfo } from "@/components/production/task/billing/nfse-enriched-info";
 import { FileItem, useFileViewer } from "@/components/common/file";
+import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
 
 import { useInvoicesByTask } from "@/hooks/production/use-invoice";
 import { useCurrentUser } from "@/hooks/common/use-auth";
@@ -40,6 +41,7 @@ import { getApiBaseUrl } from "@/utils/file";
 import { formatCurrency } from "@/utils/number";
 import { formatDate } from "@/utils/date";
 import { hasPrivilege } from "@/utils/user";
+import { canEditQuote } from "@/utils/permissions/quote-permissions";
 
 import { routes, SECTOR_PRIVILEGES } from "@/constants";
 
@@ -79,6 +81,10 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
       hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) ||
       hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
       hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL));
+
+  // Mesma regra da página de orçamento: quem pode editar o orçamento pode emitir,
+  // cancelar e reenviar a coleta de assinaturas (ADMIN | FINANCIAL | COMMERCIAL).
+  const canManageSignature = canEditQuote(currentUser?.sector?.privileges || "");
 
   const quote = task.quote;
   if (!quote) return null;
@@ -768,6 +774,10 @@ export function QuoteBillingBreakdown({ task }: { task: Task }): React.ReactNode
           </div>
         );
       })()}
+
+      {/* Assinatura eletrônica — mesmo painel da página de orçamento (status, link
+          pessoal de cada signatário, WhatsApp, reenvio, PDF e hash). */}
+      <SignatureEnvelopeCard quoteId={quote.id} canManage={canManageSignature} embedded />
     </div>
   );
 }

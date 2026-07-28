@@ -307,10 +307,14 @@ export const formatPixKey = (key: string): string => {
  * Brazilian Portuguese prepositions/articles that should stay lowercase in names.
  * Covers the most common connecting words found in Brazilian personal names.
  */
+/**
+ * Connectives that stay lowercase inside a Brazilian person name.
+ * Keep in sync with api/src/utils/formatters.ts → BR_NAME_LOWERCASE_WORDS.
+ */
 const BR_NAME_LOWERCASE_WORDS = new Set([
   "de", "da", "do", "das", "dos",   // of, from (most common in names)
   "e",                                // and
-  "di", "del",                        // Italian-origin, common in BR names
+  "di", "du", "del",                  // Italian/French-origin, common in BR names
 ]);
 
 /**
@@ -318,22 +322,32 @@ const BR_NAME_LOWERCASE_WORDS = new Set([
  *
  * Rules:
  *  - First word is always capitalized
- *  - Common prepositions (de, da, do, das, dos, e, di, del) stay lowercase
+ *  - Common prepositions (de, da, do, das, dos, e, di, du, del) stay lowercase
  *  - All other words get first-letter capitalized, rest lowercase
  *  - Single-letter words (initials) are uppercased
+ *  - Compound separators (-, ') capitalize the segment that follows them
  *  - Handles ALL-CAPS and all-lowercase input gracefully
  *  - Collapses extra whitespace
+ *
+ * This is the canonical storage format for `User.name` — the API applies the same
+ * transform in userCreateSchema/userUpdateSchema, so this is a mirror for instant
+ * feedback in the forms, not the enforcement point.
  *
  * Examples:
  *  "joao da silva"          → "João da Silva"   (if typed with accent)
  *  "MARIA DOS SANTOS"       → "Maria dos Santos"
  *  "ana de souza"           → "Ana de Souza"
  *  "pedro di paolo"         → "Pedro di Paolo"
- *  "jose carlos de oliveira" → "Jose Carlos de Oliveira"
+ *  "ana-maria d'ávila"      → "Ana-Maria D'Ávila"
  *  "  FULANO  DE  TAL  "   → "Fulano de Tal"
  */
 export const toBrazilianNameCase = (str: string): string => {
   if (!str) return "";
+
+  // Capitalize the first letter of each hyphen/apostrophe-separated segment, so
+  // "ana-maria" → "Ana-Maria" and "d'avila" → "D'Avila".
+  const capitalizeSegments = (word: string): string =>
+    word.replace(/(^|[-'’])(\p{L})/gu, (_m, sep: string, letter: string) => sep + letter.toUpperCase());
 
   return str
     .trim()
@@ -354,8 +368,7 @@ export const toBrazilianNameCase = (str: string): string => {
         return word.toUpperCase();
       }
 
-      // Standard capitalize: first letter upper, rest lower
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
+      return capitalizeSegments(lower);
     })
     .join(" ");
 };

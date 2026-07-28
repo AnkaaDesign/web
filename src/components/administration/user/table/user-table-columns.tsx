@@ -44,7 +44,18 @@ function sizeCell(value: string | null | undefined, labels: Record<string, strin
  * user/collaborator fields (default-hidden, gated where sensitive). Every `accessorFn` column
  * carries `meta.exportValue` so it stays searchable + exportable.
  */
-export function createUserColumns(): DataTableColumnDef<User>[] {
+export interface CreateUserColumnsOptions {
+  /**
+   * Render the "Nome" column in uppercase. Requested by CONTABILIDADE (ACCOUNTING), who read this
+   * table against payroll/folha documents that are themselves uppercase.
+   *
+   * Purely presentational — applied as a CSS text-transform, so the underlying value (and therefore
+   * sorting, search and export) stays in the stored Brazilian name case.
+   */
+  uppercaseName?: boolean;
+}
+
+export function createUserColumns({ uppercaseName = false }: CreateUserColumnsOptions = {}): DataTableColumnDef<User>[] {
   return [
     // --- Identity -----------------------------------------------------------
     {
@@ -67,7 +78,9 @@ export function createUserColumns(): DataTableColumnDef<User>[] {
       size: 260,
       minSize: 200,
       meta: { headerLabel: "Nome" },
-      cell: ({ getValue }) => <TruncatedTextWithTooltip text={(getValue() as string) || "-"} className="truncate font-medium" />,
+      cell: ({ getValue }) => (
+        <TruncatedTextWithTooltip text={(getValue() as string) || "-"} className={`truncate font-medium${uppercaseName ? " uppercase" : ""}`} />
+      ),
     },
     {
       id: "email",

@@ -1,6 +1,15 @@
 import { useCurrentUser } from "./use-auth";
 import { SECTOR_PRIVILEGES } from "../../constants";
-import { canAccessAnyPrivilege, canAccessAllPrivileges, canAccessSector, getSectorPrivilegeSortOrder, hasPrivilege, hasAnyPrivilege, hasAllPrivileges } from "../../utils";
+import {
+  canAccessAnyPrivilege,
+  canAccessAllPrivileges,
+  canAccessSector,
+  canViewMonetaryValues,
+  getSectorPrivilegeSortOrder,
+  hasPrivilege,
+  hasAnyPrivilege,
+  hasAllPrivileges,
+} from "../../utils";
 
 /**
  * Unified privilege validation hook for both web and mobile applications
@@ -75,13 +84,21 @@ export function usePrivileges() {
 
   /**
    * Whether the current user is allowed to view monetary information
-   * (prices, costs, totals, monetary values).
+   * (prices, costs, totals, freight, discounts, fiscal values, salaries and
+   * other people's bonuses).
    *
-   * WAREHOUSE users manage inventory but must NOT see any monetary values.
-   * Every other privilege (including ADMIN, FINANCIAL, COMMERCIAL, etc.) keeps access.
+   * ALLOWLIST — only ADMIN, ACCOUNTING, COMMERCIAL and FINANCIAL
+   * (`MONEY_PRIVILEGES`). Every other sector keeps full access to the
+   * surrounding screens but never sees what anything cost.
+   *
+   * This replaced `privileges !== WAREHOUSE`, which excluded exactly ONE sector
+   * and therefore leaked prices to PRODUCTION, MAINTENANCE, LOGISTIC,
+   * HUMAN_RESOURCES, DESIGNER, PLOTTING, PRODUCTION_MANAGER, EXTERNAL and
+   * BASIC — the inverse of the intended rule.
+   *
    * Defaults to `false` while the user is still loading so prices never flash.
    */
-  const canViewPrices = !!user && user.sector?.privileges !== SECTOR_PRIVILEGES.WAREHOUSE;
+  const canViewPrices = canViewMonetaryValues(user?.sector?.privileges);
 
   /**
    * Backend controller pattern shortcuts

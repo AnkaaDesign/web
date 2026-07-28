@@ -53,6 +53,30 @@ export const ATTENTION_ENTITIES: AttentionEntityDescriptor[] = [
     label: "recorte",
     navPaths: [routes.production.cutting.root],
   },
+  {
+    entityType: "ORDER",
+    label: "pedido",
+    navPaths: [routes.inventory.orders.root],
+  },
+  {
+    entityType: "PPE_DELIVERY",
+    label: "entrega de EPI",
+    // Three nav homes, one per audience: the almoxarifado hands PPE over, a
+    // contabilidade reviews it, and every user signs for their own. The sidebar
+    // only lights paths the viewer can actually open, so listing all three is
+    // how one entity type serves three different sectors.
+    navPaths: [routes.inventory.ppe.deliveries.root, routes.occupationalHealth.ppe.deliveries.root, routes.personal.myPpes.root],
+  },
+  {
+    entityType: "AIRBRUSHING",
+    label: "aerografia",
+    navPaths: [routes.production.airbrushings.root],
+  },
+  {
+    entityType: "TASK_QUOTE",
+    label: "orçamento",
+    navPaths: [routes.financial.budget.root, routes.financial.billing.root],
+  },
 ];
 
 const BY_TYPE = new Map<AttentionEntityType, AttentionEntityDescriptor>(ATTENTION_ENTITIES.map((d) => [d.entityType, d]));
