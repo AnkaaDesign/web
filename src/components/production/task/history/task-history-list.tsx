@@ -21,6 +21,7 @@ import { extractActiveFilters, createFilterRemover } from "./filter-utils";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { CopyFromTaskModal } from "../schedule/copy-from-task-modal";
 import type { CopyableTaskField } from "@/types/task-copy";
+import { INVALID_COPY_SOURCE_MESSAGE, isInvalidCopySource } from "@/types/task-copy";
 import { IconFilter, IconHandClick, IconX, IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
@@ -433,6 +434,12 @@ export function TaskHistoryList({
   }, []);
 
   const handleSourceTaskSelected = useCallback(async (sourceTask: Task) => {
+    // Copying a task onto itself deletes its own quote server-side (the API also
+    // refuses it with 400) — stop here so the user can pick a different source.
+    if (isInvalidCopySource(sourceTask.id, copyFromTaskState.targetTasks)) {
+      toast.error(INVALID_COPY_SOURCE_MESSAGE);
+      return;
+    }
     try {
       const fullSourceTask = await taskService.getTaskById(sourceTask.id, {
         include: {
@@ -468,7 +475,7 @@ export function TaskHistoryList({
       toast.error('Falha ao carregar detalhes da tarefa de origem');
       setCopyFromTaskState(initialCopyFromTaskState);
     }
-  }, []);
+  }, [copyFromTaskState.targetTasks]);
 
   const handleCopyFromTaskConfirm = useCallback(
     async (selectedFields: CopyableTaskField[], sourceTask: Task) => {
@@ -493,11 +500,15 @@ export function TaskHistoryList({
         const successCount = results.filter(r => r.success).length;
         const failureCount = results.length - successCount;
 
-        if (successCount > 0) {
+        // A partial result is NOT a success — reporting it as one is how a copy that
+        // 500'd on some targets still read as "tudo certo" to the user.
+        if (successCount > 0 && failureCount === 0) {
           toast.success(`Campos copiados com sucesso`, {
-            description: failureCount === 0
-              ? `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${successCount} tarefa(s)`
-              : `${successCount} tarefa(s) atualizada(s), ${failureCount} falhou(ram)`,
+            description: `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${successCount} tarefa(s)`,
+          });
+        } else if (successCount > 0) {
+          toast.warning(`Cópia parcial`, {
+            description: `${successCount} tarefa(s) atualizada(s), ${failureCount} falhou(ram)`,
           });
         }
 

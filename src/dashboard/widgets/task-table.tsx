@@ -61,6 +61,7 @@ import { taskKeys } from "@/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import type { CopyableTaskField } from "@/types/task-copy";
+import { INVALID_COPY_SOURCE_MESSAGE, isInvalidCopySource } from "@/types/task-copy";
 import { getTaskQuoteEditRoute } from "../../utils/task";
 import { useReturnTo } from "../../hooks/common/use-return-to";
 import { useSectors } from "../../hooks/administration/use-sector";
@@ -2084,6 +2085,12 @@ function TaskTableRender({
 
   const handleCopySourceSelected = useCallback(
     async (sourceTask: Task) => {
+      // Copying a task onto itself deletes its own quote server-side (the API also
+      // refuses it with 400) — stop here so the user can pick a different source.
+      if (isInvalidCopySource(sourceTask.id, copyState.targetTasks)) {
+        toast.error(INVALID_COPY_SOURCE_MESSAGE);
+        return;
+      }
       try {
         const full = await taskService.getTaskById(sourceTask.id, {
           include: {
@@ -2113,7 +2120,7 @@ function TaskTableRender({
         resetCopyState();
       }
     },
-    [resetCopyState],
+    [resetCopyState, copyState.targetTasks],
   );
 
   const handleCopyConfirm = useCallback(
@@ -2133,9 +2140,16 @@ function TaskTableRender({
             // Aggregate — reported below.
           }
         }
+        const failure = targetTasks.length - success;
         if (success > 0) {
-          toast.success("Campos copiados com sucesso", {
-            description: `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${success} tarefa(s)`,
+          // A partial result is NOT a success — reporting it as one is how a copy
+          // that 500'd on some targets still read as "tudo certo" to the user.
+          const notify = failure === 0 ? toast.success : toast.warning;
+          notify(failure === 0 ? "Campos copiados com sucesso" : "Cópia parcial", {
+            description:
+              failure === 0
+                ? `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${success} tarefa(s)`
+                : `${success} tarefa(s) atualizada(s), ${failure} falhou(ram)`,
           });
           queryClient.invalidateQueries({ queryKey: taskKeys.all });
           refetch?.();

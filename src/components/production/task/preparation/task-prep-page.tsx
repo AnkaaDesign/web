@@ -49,6 +49,7 @@ import { CopyFromTaskModal } from "@/components/production/task/schedule/copy-fr
 import { Button } from "@/components/ui/button";
 import { taskService } from "@/api-client/task";
 import type { CopyableTaskField } from "@/types/task-copy";
+import { INVALID_COPY_SOURCE_MESSAGE, isInvalidCopySource } from "@/types/task-copy";
 import { toast } from "@/components/ui/sonner";
 import {
   AlertDialog,
@@ -311,6 +312,12 @@ export function TaskPreparationPage() {
   );
   const onSourceSelected = useCallback(
     async (source: Task) => {
+      // Copying a task onto itself deletes its own quote server-side (the API also
+      // refuses it with 400) — stop here so the user can pick a different source.
+      if (isInvalidCopySource(source.id, copyFrom.targetTasks)) {
+        toast.error(INVALID_COPY_SOURCE_MESSAGE);
+        return;
+      }
       try {
         const full = await taskService.getTaskById(source.id, {
           include: {
@@ -339,7 +346,7 @@ export function TaskPreparationPage() {
         resetCopyFrom();
       }
     },
-    [resetCopyFrom],
+    [resetCopyFrom, copyFrom.targetTasks],
   );
   const confirmCopyFrom = useCallback(
     async (fields: CopyableTaskField[], source: Task) => {

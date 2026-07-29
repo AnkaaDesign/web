@@ -290,3 +290,20 @@ export const COPYABLE_FIELD_METADATA: Record<CopyableTaskField, CopyableFieldMet
     category: 'Informações Gerais',
   },
 };
+
+/**
+ * Reject a source task that is also one of the copy targets.
+ *
+ * Copying a task onto itself is not a harmless no-op: server-side the quote branch
+ * deep-copies the quote, repoints the task at the copy, then deletes the task's
+ * previous quote as "orphaned" — i.e. the original. The API refuses this outright
+ * (400); this is the UI-side guard so the user gets a clear message at the moment
+ * they click the row instead of a failed request after confirming.
+ *
+ * Returns true when the selection is invalid (caller should abort).
+ */
+export const isInvalidCopySource = (sourceTaskId: string, targetTasks: { id: string }[]): boolean =>
+  targetTasks.some((t) => t.id === sourceTaskId);
+
+export const INVALID_COPY_SOURCE_MESSAGE =
+  'A tarefa de origem não pode ser uma das tarefas de destino. Escolha outra tarefa.';

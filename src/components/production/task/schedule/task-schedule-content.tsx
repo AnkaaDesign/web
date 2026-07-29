@@ -15,6 +15,7 @@ import { TaskScheduleExport } from "./task-schedule-export";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { CopyFromTaskModal } from "./copy-from-task-modal";
 import type { CopyableTaskField } from "@/types/task-copy";
+import { INVALID_COPY_SOURCE_MESSAGE, isInvalidCopySource } from "@/types/task-copy";
 import { IconSearch, IconFilter, IconX, IconHandClick } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -182,6 +183,13 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
     console.log('[CopyFromTask] Source task ID:', sourceTask?.id);
     console.log('[CopyFromTask] Source task layouts:', sourceTask?.layouts);
 
+    // Copying a task onto itself deletes its own quote server-side (the API also
+    // refuses it with 400) — stop here so the user can pick a different source.
+    if (isInvalidCopySource(sourceTask.id, copyFromTaskState.targetTasks)) {
+      toast.error(INVALID_COPY_SOURCE_MESSAGE);
+      return;
+    }
+
     // CRITICAL FIX: Refetch the source task with proper includes to get artwork fileIds
     // The task from the table doesn't have the file relationship loaded on layouts
     try {
@@ -228,7 +236,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
       // Reset to idle on error
       setCopyFromTaskState(initialCopyFromTaskState);
     }
-  }, []);
+  }, [copyFromTaskState.targetTasks]);
 
   const handleCopyFromTaskConfirm = useCallback(
     async (selectedFields: CopyableTaskField[], sourceTask: Task) => {
@@ -257,15 +265,16 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
         const successCount = results.filter(r => r.success).length;
         const failureCount = results.length - successCount;
 
-        if (successCount > 0) {
-          toast.success(
-            `Campos copiados com sucesso`,
-            {
-              description: failureCount === 0
-                ? `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${successCount} tarefa(s)`
-                : `${successCount} tarefa(s) atualizada(s), ${failureCount} falhou(ram)`,
-            }
-          );
+        // A partial result is NOT a success — reporting it as one is how a copy that
+        // 500'd on some targets still read as "tudo certo" to the user.
+        if (successCount > 0 && failureCount === 0) {
+          toast.success(`Campos copiados com sucesso`, {
+            description: `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${successCount} tarefa(s)`,
+          });
+        } else if (successCount > 0) {
+          toast.warning(`Cópia parcial`, {
+            description: `${successCount} tarefa(s) atualizada(s), ${failureCount} falhou(ram)`,
+          });
         }
 
         if (failureCount > 0 && successCount === 0) {

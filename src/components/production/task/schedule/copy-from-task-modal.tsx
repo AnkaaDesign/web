@@ -26,7 +26,11 @@ export interface CopyFromTaskModalProps {
   sourceTask: Task | null;
   step: "selecting_fields" | "confirming";
   onStartSourceSelection: (selectedFields: CopyableTaskField[]) => void;
-  onConfirm: (selectedFields: CopyableTaskField[], sourceTask: Task) => void;
+  /**
+   * May return a promise — the modal awaits it to keep the confirm button disabled
+   * for the whole N-target loop (see handleConfirm).
+   */
+  onConfirm: (selectedFields: CopyableTaskField[], sourceTask: Task) => void | Promise<void>;
   onCancel: () => void;
   onChangeSource: () => void;
   /** User's sector privilege - used to filter which fields they can copy */
@@ -180,6 +184,7 @@ export function CopyFromTaskModal({
   userPrivilege,
 }: CopyFromTaskModalProps) {
   const [selectedFields, setSelectedFields] = useState<Set<CopyableTaskField>>(new Set());
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get fields the user is allowed to copy based on their privilege
   const allowedFields = useMemo(
@@ -193,6 +198,11 @@ export function CopyFromTaskModal({
       setSelectedFields(new Set());
     }
   }, [open, step]);
+
+  // Never leave the button stuck disabled if the dialog is reopened after a copy.
+  useEffect(() => {
+    if (!open) setIsSubmitting(false);
+  }, [open]);
 
   // Group fields by category - only include fields user has permission to copy
   const fieldsByCategory = useMemo(() => {
@@ -260,11 +270,21 @@ export function CopyFromTaskModal({
     onStartSourceSelection(Array.from(selectedFields));
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!sourceTask || selectedFields.size === 0) return;
-    // Submit the individually selected fields directly (no 'all' meta-value in the set)
-    const fieldsToSubmit = Array.from(selectedFields);
-    onConfirm(fieldsToSubmit, sourceTask);
+    // The copy loops over N targets one request at a time and the dialog stays open
+    // for its whole duration, so an un-guarded button let every extra click start
+    // ANOTHER full loop. Those loops then ran concurrently, which is what raced the
+    // server's budgetNumber allocation into unique-constraint 500s.
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      // Submit the individually selected fields directly (no 'all' meta-value in the set)
+      const fieldsToSubmit = Array.from(selectedFields);
+      await onConfirm(fieldsToSubmit, sourceTask);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCancel = () => {
@@ -411,7 +431,7 @@ export function CopyFromTaskModal({
         )}
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={handleCancel}>
+          <Button type="button" variant="outline" onClick={handleCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
           {step === "selecting_fields" ? (
@@ -420,10 +440,12 @@ export function CopyFromTaskModal({
               <IconArrowRight className="ml-2 h-4 w-4" />
             </Button>
           ) : (
-            <Button type="button" onClick={handleConfirm} disabled={!sourceTask}>
+            <Button type="button" onClick={handleConfirm} disabled={!sourceTask || isSubmitting}>
               <IconClipboardCopy className="mr-2 h-4 w-4" />
               <span>
-                Copiar para {targetTasks.length} tarefa{targetTasks.length > 1 ? "s" : ""}
+                {isSubmitting
+                  ? `Copiando para ${targetTasks.length} tarefa${targetTasks.length > 1 ? "s" : ""}...`
+                  : `Copiar para ${targetTasks.length} tarefa${targetTasks.length > 1 ? "s" : ""}`}
               </span>
             </Button>
           )}

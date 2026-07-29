@@ -50,6 +50,7 @@ import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
 import { isDateInPast } from "@/utils";
 import type { Task } from "@/types";
 import type { CopyableTaskField } from "@/types/task-copy";
+import { INVALID_COPY_SOURCE_MESSAGE, isInvalidCopySource } from "@/types/task-copy";
 import { canDeleteTasks, canFinishTask, canLeaderManageTask } from "@/utils/permissions/entity-permissions";
 import { canViewQuote } from "@/utils/permissions/quote-permissions";
 import { isTeamLeader } from "@/utils/user";
@@ -446,6 +447,12 @@ export function TaskScheduleTablePage() {
   }, []);
 
   const handleSourceTaskSelected = useCallback(async (sourceTask: Task) => {
+    // Copying a task onto itself deletes its own quote server-side (the API also
+    // refuses it with 400) — stop here so the user can pick a different source.
+    if (isInvalidCopySource(sourceTask.id, copyState.targetTasks)) {
+      toast.error(INVALID_COPY_SOURCE_MESSAGE);
+      return;
+    }
     try {
       const full = await getTaskById(sourceTask.id, {
         include: {
@@ -472,7 +479,7 @@ export function TaskScheduleTablePage() {
       toast.error("Falha ao carregar detalhes da tarefa de origem");
       setCopyState(INITIAL_COPY_STATE);
     }
-  }, []);
+  }, [copyState.targetTasks]);
 
   const handleCopyConfirm = useCallback(
     async (selectedFields: CopyableTaskField[], sourceTask: Task) => {
@@ -490,7 +497,10 @@ export function TaskScheduleTablePage() {
         }
         const failure = targetTasks.length - success;
         if (success > 0) {
-          toast.success("Campos copiados com sucesso", {
+          // A partial result is NOT a success — reporting it as one is how a copy
+          // that 500'd on some targets still read as "tudo certo" to the user.
+          const notify = failure === 0 ? toast.success : toast.warning;
+          notify(failure === 0 ? "Campos copiados com sucesso" : "Cópia parcial", {
             description:
               failure === 0
                 ? `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${success} tarefa(s)`
