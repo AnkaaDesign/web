@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { IconFileTypeXls, IconFileTypePdf, IconSearch, IconGripVertical } from "@tabler/icons-react";
 import {
   DndContext,
@@ -180,14 +180,23 @@ export function DataTableShareDialog<TData>({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  // Latest values used to seed the dialog, kept in a ref so the init effect below can depend ONLY on
+  // `open`. `visibleColumnIds` is a brand-new array on every parent render (and `resolveAllRows` can
+  // be a fresh closure), and the table re-renders freely while the dialog is open — row measurement,
+  // selection churn, refetches. Listing them as deps re-ran the init MID-SESSION, wiping every column
+  // the user had just unchecked (very visible with rows selected, where the selection keeps the
+  // table's measure/render pipeline hot).
+  const initRef = useRef({ visibleColumnIds, exportable, entries, selectedCount, canExportAll: !!resolveAllRows });
+  initRef.current = { visibleColumnIds, exportable, entries, selectedCount, canExportAll: !!resolveAllRows };
+
   useEffect(() => {
-    if (open) {
-      setSelected(new Set(visibleColumnIds.length ? visibleColumnIds : exportable.map((c) => c.id)));
-      setColumnOrder(entries.map((e) => e.id));
-      setSearch("");
-      setScope(selectedCount > 0 ? "selected" : resolveAllRows ? "all" : "page");
-    }
-  }, [open, visibleColumnIds, exportable, entries, selectedCount, resolveAllRows]);
+    if (!open) return;
+    const { visibleColumnIds: visible, exportable: cols, entries: allEntries, selectedCount: count, canExportAll } = initRef.current;
+    setSelected(new Set(visible.length ? visible : cols.map((c) => c.id)));
+    setColumnOrder(allEntries.map((e) => e.id));
+    setSearch("");
+    setScope(count > 0 ? "selected" : canExportAll ? "all" : "page");
+  }, [open]);
 
   const orderedEntries = useMemo(() => {
     const idx = new Map(columnOrder.map((id, i) => [id, i] as const));

@@ -669,7 +669,12 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     const idx = new Map(order.map((id, i) => [id, i] as const));
     return [...columns].sort((a, b) => (idx.get(a.id) ?? 0) - (idx.get(b.id) ?? 0));
   }, [columns, order]);
-  const visibleColumnIds = table.getVisibleLeafColumns().map((c) => c.id);
+  // Content-keyed identity: `getVisibleLeafColumns().map()` allocates a fresh array on EVERY render,
+  // and this array is a prop/dep downstream (the share dialog's seed). The table re-renders for
+  // reasons unrelated to the columns — background refetches, attention/presence socket events, row
+  // measurement — so a per-render identity made those renders look like "the visible columns changed".
+  const visibleColumnsKey = table.getVisibleLeafColumns().map((c) => c.id).join(",");
+  const visibleColumnIds = useMemo(() => (visibleColumnsKey ? visibleColumnsKey.split(",") : []), [visibleColumnsKey]);
 
   // --- selection helpers (shift-click range + single toggle) ---
   const selectionAnchorRef = useRef<string | null>(null);
@@ -814,7 +819,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   const headerGroups = table.getHeaderGroups();
   const virtualItems = rowVirtualizer.getVirtualItems();
   const multiSort = table.getState().sorting.length > 1;
-  const columnsKey = `${visibleColumnIds.join(",")}|${alignKey}`;
+  const columnsKey = `${visibleColumnsKey}|${alignKey}`;
   const isEmpty = !isLoading && rows.length === 0;
 
   // Row/overlay positions inside the tbody are `virtualItem.start - scrollMargin` (0 in normal mode;
