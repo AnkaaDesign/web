@@ -46,6 +46,8 @@ interface EnvelopeSigner {
   email: string | null;
   phoneMasked: string | null;
   cpfMasked: string | null;
+  /** CPF que veio do CADASTRO. Existe desde a emissão, antes de qualquer assinatura. */
+  declaredCpfMasked: string | null;
   cargo: string | null;
   cpfMatch: boolean | null;
   side: "ANKAA" | "CUSTOMER";
@@ -464,8 +466,18 @@ export function SignatureEnvelopeCard({
                   <p className="text-xs text-muted-foreground">
                     {s.cargo ?? "Cargo não informado"} · {s.emailMasked}
                   </p>
+                  {/* Dois fatos diferentes, e a linha precisa dizer qual é:
+                      o CPF CONFERIDO pelo signatário no ato, ou o que está no
+                      cadastro enquanto ele ainda não assinou. Antes só o
+                      primeiro era lido, então um signatário que ainda não abriu
+                      o link aparecia como "CPF ainda não informado" mesmo com o
+                      documento gravado no cadastro desde a emissão. */}
                   <p className="text-xs text-muted-foreground">
-                    {s.cpfMasked ? `CPF ${s.cpfMasked}` : "CPF ainda não informado"}
+                    {s.cpfMasked
+                      ? `CPF ${s.cpfMasked} · conferido`
+                      : s.declaredCpfMasked
+                        ? `CPF ${s.declaredCpfMasked} · do cadastro`
+                        : "Sem CPF no cadastro"}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {s.signedAt
