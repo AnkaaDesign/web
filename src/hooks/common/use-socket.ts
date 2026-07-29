@@ -1,8 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import { socketService } from '@/lib/socket';
+import { socketService, updateNotificationSocketToken } from '@/lib/socket';
 import { getLocalStorage } from '@/lib/storage';
 import { useAuth } from '@/contexts/auth-context';
+
+/** How often to notice that the access token rotated. Cheap (a localStorage read).
+ * Mirrors TOKEN_WATCH_MS in the attention socket hook. */
+const TOKEN_WATCH_MS = 30_000;
 
 /**
  * Hook to manage Socket.io connection
@@ -12,7 +16,12 @@ import { useAuth } from '@/contexts/auth-context';
  */
 export function useSocket(): Socket | null {
   const { user, isAuthenticated } = useAuth();
-  const socketRef = useRef<Socket | null>(null);
+  // STATE, not a ref: the socket is created inside an effect, and a ref write does not
+  // re-render. Consumers (useNotificationSocket) read this during render and register
+  // their listeners in an effect keyed on it — with a ref they would capture `null`
+  // forever unless some unrelated re-render happened to land after the connect, so the
+  // notification listeners were only ever attached by luck.
+  const [socket, setSocket] = useState<Socket | null>(null);
   const isConnectingRef = useRef(false);
 
   useEffect(() => {
@@ -32,23 +41,31 @@ export function useSocket(): Socket | null {
     isConnectingRef.current = true;
 
     try {
-      const socket = socketService.connect(token);
-      socketRef.current = socket;
+      setSocket(socketService.connect(token));
     } catch (error) {
       console.error('[useSocket] Failed to connect socket:', error);
     } finally {
       isConnectingRef.current = false;
     }
 
+    // Keep the socket's credential current. Without this the handshake token captured
+    // above is replayed on every reconnect; once it expires the gateway rejects us and
+    // real-time notifications die silently until a page reload.
+    const tokenWatch = setInterval(() => {
+      const latest = getLocalStorage('token');
+      if (latest) updateNotificationSocketToken(latest);
+    }, TOKEN_WATCH_MS);
+
     // Cleanup function
     return () => {
+      clearInterval(tokenWatch);
       socketService.disconnect();
-      socketRef.current = null;
+      setSocket(null);
       isConnectingRef.current = false;
     };
   }, [isAuthenticated, user?.id]); // Re-connect if user changes
 
-  return socketRef.current;
+  return socket;
 }
 
 /**

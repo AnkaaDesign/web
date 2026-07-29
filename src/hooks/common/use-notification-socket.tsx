@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { IconX } from '@tabler/icons-react';
@@ -7,7 +7,12 @@ import { useSocket } from './use-socket';
 import { notificationKeys } from './query-keys';
 import { socketService, type ConnectionState } from '@/lib/socket';
 import { shouldShowNotification } from '@/lib/notification-dedup';
+import { useAuth } from '@/contexts/auth-context';
 import type { Notification } from '@/types';
+
+/** Coalesce bursts (a dispatch fan-out delivers several `notification:new` in a row)
+ * into a single refetch per window. */
+const INVALIDATE_DEBOUNCE_MS = 300;
 
 /**
  * Parse actionUrl which may be a JSON string containing web, mobile, webPath URLs.
@@ -45,6 +50,8 @@ export function useNotificationSocket() {
   const socket = useSocket();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userId = user?.id;
   const [connectionState, setConnectionState] = useState<ConnectionState>(
     socketService.getConnectionState()
   );
@@ -56,20 +63,25 @@ export function useNotificationSocket() {
     return unsubscribe;
   }, []);
 
-  // Callback to mark notification as read
-  const markAsRead = useCallback((notificationId: string) => {
-    socketService.markNotificationAsRead(notificationId);
-  }, []);
-
-  // Callback to mark notification as delivered
-  const markAsDelivered = useCallback((notificationId: string) => {
-    socketService.markNotificationAsDelivered(notificationId);
-  }, []);
-
   useEffect(() => {
     if (!socket) {
       return;
     }
+
+    // Every socket handler below goes through this instead of `setQueryData`.
+    // `setQueryData` needs an EXACT key match, and the notification center's real key
+    // is ["notifications","list",{take,orderBy,include}] — writing to
+    // notificationKeys.list() (no params) matched nothing, so every cache write was a
+    // no-op. Invalidating the ["notifications"] PREFIX subsumes every filtered variant
+    // (list, byUser, unread, count).
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    const invalidateNotifications = () => {
+      if (flushTimer) return;
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      }, INVALIDATE_DEBOUNCE_MS);
+    };
 
     // Handler for new notifications
     const handleNewNotification = (notification: Notification) => {
@@ -78,19 +90,7 @@ export function useNotificationSocket() {
         return;
       }
 
-      // Update React Query cache - add to beginning of list
-      queryClient.setQueryData<{ data: Notification[] }>(
-        notificationKeys.list(),
-        (old) => {
-          if (!old) {
-            return { data: [notification] };
-          }
-          return {
-            ...old,
-            data: [notification, ...old.data],
-          };
-        }
-      );
+      invalidateNotifications();
 
       // Show toast notification
       const getDuration = () => {
@@ -167,128 +167,47 @@ export function useNotificationSocket() {
         }
       }
 
-      // Invalidate unread count
-      queryClient.invalidateQueries({
-        queryKey: ['notifications', 'unread'],
-      });
     };
 
     // Handler for notification updates
     const handleNotificationUpdate = (notification: Notification) => {
-      // Update notification in cache
-      queryClient.setQueryData<{ data: Notification[] }>(
-        notificationKeys.list(),
-        (old) => {
-          if (!old) {
-            return old;
-          }
-          return {
-            ...old,
-            data: old.data.map((n) =>
-              n.id === notification.id ? notification : n
-            ),
-          };
-        }
-      );
-
-      // Invalidate queries to refetch fresh data
+      invalidateNotifications();
       queryClient.invalidateQueries({
         queryKey: notificationKeys.detail(notification.id),
       });
     };
 
     // Handler for notification deletion
-    const handleNotificationDelete = (notificationId: string) => {
-      // Remove notification from cache
-      queryClient.setQueryData<{ data: Notification[] }>(
-        notificationKeys.list(),
-        (old) => {
-          if (!old) {
-            return old;
-          }
-          return {
-            ...old,
-            data: old.data.filter((n) => n.id !== notificationId),
-          };
-        }
-      );
-
-      // Invalidate unread count
-      queryClient.invalidateQueries({
-        queryKey: ['notifications', 'unread'],
-      });
+    const handleNotificationDelete = (_notificationId: string) => {
+      invalidateNotifications();
     };
 
-    // Handler for mark as read
-    const handleMarkAsRead = (data: { notificationId: string; userId: string }) => {
-      // Update notification in cache
-      queryClient.setQueryData<{ data: Notification[] }>(
-        notificationKeys.list(),
-        (old) => {
-          if (!old) {
-            return old;
-          }
-          return {
-            ...old,
-            data: old.data.map((n) =>
-              n.id === data.notificationId
-                ? { ...n, isSeenByUser: true }
-                : n
-            ),
-          };
-        }
-      );
-
-      // Invalidate unread count
-      queryClient.invalidateQueries({
-        queryKey: ['notifications', 'unread'],
-      });
+    // Handler for mark as read (this user, from another tab/device)
+    const handleMarkAsRead = (_data: { notificationId: string; userId: string }) => {
+      invalidateNotifications();
     };
 
     // Handler for mark all as read
     const handleMarkAllAsRead = () => {
-      // Update all notifications in cache
-      queryClient.setQueryData<{ data: Notification[] }>(
-        notificationKeys.list(),
-        (old) => {
-          if (!old) {
-            return old;
-          }
-          return {
-            ...old,
-            data: old.data.map((n) => ({ ...n, isSeenByUser: true })),
-          };
-        }
-      );
-
-      // Invalidate unread count
-      queryClient.invalidateQueries({
-        queryKey: ['notifications', 'unread'],
-      });
+      invalidateNotifications();
     };
 
-    // Handler for sync response (when reconnecting)
-    const handleSyncResponse = (data: { notifications: Notification[] }) => {
-      // Invalidate all notification queries to refetch
-      queryClient.invalidateQueries({
-        queryKey: notificationKeys.all,
-      });
-
-      // Show toast if there are missed notifications
-      if (data.notifications && data.notifications.length > 0) {
-        toast.info('Notificações sincronizadas', `${data.notifications.length} ${data.notifications.length === 1 ? 'notificação recebida' : 'notificações recebidas'} enquanto você estava offline.`);
+    // Handler for notification count updates. The gateway pushes this on connect and
+    // after every dispatch, so it is the freshest unread count available — mirror it
+    // into the query cache so the badge (a different component tree) sees it too.
+    const handleNotificationCount = (data: { count: number }) => {
+      if (typeof data?.count !== 'number') return;
+      setUnreadCount(data.count);
+      if (userId) {
+        queryClient.setQueryData<number>(notificationKeys.count(userId), data.count);
       }
     };
 
-    // Handler for notification count updates
-    const handleNotificationCount = (data: { count: number }) => {
-      setUnreadCount(data.count);
-    };
-
-    // Handler for connection events
+    // Handler for connection events. A dropped socket misses every notification in the
+    // gap, so refresh the whole prefix on (re)connect. The gateway also pushes an
+    // unprompted `notification:count` on connect — no request emit needed.
     const handleConnect = () => {
-      // Request initial notification count
-      socketService.requestNotificationCount();
+      invalidateNotifications();
     };
 
     const handleDisconnect = (_reason: string) => {
@@ -304,15 +223,16 @@ export function useNotificationSocket() {
     socket.on('notification:read', handleMarkAsRead);
     socket.on('notification:read-all', handleMarkAllAsRead);
     socket.on('notification:count', handleNotificationCount);
-    socket.on('sync:notifications', handleSyncResponse);
 
-    // Request initial count if already connected
+    // If the socket connected before this effect ran, its `connect` event has already
+    // come and gone — close the same gap now.
     if (socket.connected) {
-      socketService.requestNotificationCount();
+      invalidateNotifications();
     }
 
     // Cleanup function - remove all listeners
     return () => {
+      if (flushTimer) clearTimeout(flushTimer);
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('notification:new', handleNewNotification);
@@ -321,31 +241,12 @@ export function useNotificationSocket() {
       socket.off('notification:read', handleMarkAsRead);
       socket.off('notification:read-all', handleMarkAllAsRead);
       socket.off('notification:count', handleNotificationCount);
-      socket.off('sync:notifications', handleSyncResponse);
     };
-  }, [socket, queryClient, navigate]);
+  }, [socket, queryClient, navigate, userId]);
 
   return {
     connectionState,
     isConnected: connectionState === 'connected',
     unreadCount,
-    markAsRead,
-    markAsDelivered,
-  };
-}
-
-/**
- * Hook to manually request notification sync
- * Useful after reconnection to fetch missed notifications
- */
-export function useNotificationSync(): () => void {
-  const socket = useSocket();
-
-  return () => {
-    if (!socket) {
-      return;
-    }
-
-    socket.emit('sync:request', { timestamp: Date.now() });
   };
 }

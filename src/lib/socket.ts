@@ -14,7 +14,14 @@ class SocketService {
   private socket: Socket | null = null;
   private token: string | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  /**
+   * Effectively infinite, matching the attention socket. A finite cap here used to be
+   * a silent kill switch: five failed handshakes (which a single expired access token
+   * produces in seconds) left the tab permanently refresh-only until a page reload.
+   * The exponential backoff below still clamps at `maxReconnectDelay`, so retrying
+   * forever costs one attempt every 30s at worst.
+   */
+  private maxReconnectAttempts = Infinity;
   private reconnectDelay = 1000; // Start with 1 second
   private maxReconnectDelay = 30000; // Max 30 seconds
   private reconnectTimer: NodeJS.Timeout | null = null;
@@ -78,8 +85,9 @@ class SocketService {
         this.reconnectTimer = null;
       }
 
-      // Sync missed data after reconnection
-      this.socket?.emit('sync:request', { timestamp: Date.now() });
+      // NOTE: no `sync:request` emit here — the gateway has no handler for it. Missed
+      // notifications are recovered by useNotificationSocket, which invalidates the
+      // `["notifications"]` prefix on every `connect`.
     });
 
     // Connection error
@@ -298,35 +306,31 @@ class SocketService {
   }
 
   /**
-   * Mark a notification as read
-   * @param notificationId - ID of the notification to mark as read
+   * Swap in a rotated access token WITHOUT tearing the connection down permanently.
+   *
+   * socket.io captures the handshake `auth` payload at connect time and replays that
+   * same value on every reconnect. Access tokens are short-lived, so once one rotates,
+   * the next reconnect hands the gateway an expired credential, gets rejected, and
+   * retries forever with the same dead token — notifications silently degrade to
+   * refresh-only until a full page reload. Mirrors `updateAttentionSocketToken`.
    */
-  markNotificationAsRead(notificationId: string): void {
-    this.emit('notification:mark-read', { notificationId });
-  }
-
-  /**
-   * Mark a notification as delivered
-   * @param notificationId - ID of the notification to mark as delivered
-   */
-  markNotificationAsDelivered(notificationId: string): void {
-    this.emit('notification:mark-delivered', { notificationId });
-  }
-
-  /**
-   * Mark all notifications as read
-   */
-  markAllNotificationsAsRead(): void {
-    this.emit('notification:mark-all-read');
-  }
-
-  /**
-   * Request notification count
-   */
-  requestNotificationCount(): void {
-    this.emit('notification:count-request');
+  updateToken(token: string): void {
+    if (!this.socket || this.token === token) return;
+    this.token = token;
+    (this.socket.auth as { token?: string }) = { token };
+    this.reconnectAttempts = 0;
+    // Force a reconnect so the handshake uses the new token.
+    this.socket.disconnect().connect();
   }
 }
 
 // Export singleton instance
 export const socketService = new SocketService();
+
+/**
+ * Keep the notifications socket's credential current after an access-token refresh.
+ * Call sites mirror `updateAttentionSocketToken`.
+ */
+export function updateNotificationSocketToken(token: string): void {
+  socketService.updateToken(token);
+}
