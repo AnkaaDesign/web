@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,10 @@ import {
   INSTALLMENT_STEP_OPTIONS,
 } from "@/components/financial/payment-config-field";
 import type { PaymentConfig } from "@/schemas/task-quote";
+import { attentionFieldClass, useAttentionField } from "@/lib/attention";
+import { missingBillingCustomerKeys, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
+import { PINNED_CUSTOMERS } from "@/config/company";
+import { cn } from "@/lib/utils";
 
 const STREET_TYPE_OPTIONS = [
   { value: "STREET", label: "Rua" },
@@ -37,6 +41,14 @@ const STATE_OPTIONS = [
   "SP", "SE", "TO",
 ].map((s) => ({ value: s, label: s }));
 
+const REGISTRATION_STATUS_OPTIONS = [
+  { value: "ACTIVE", label: "Ativa" },
+  { value: "SUSPENDED", label: "Suspensa" },
+  { value: "UNFIT", label: "Inapta" },
+  { value: "ACTIVE_NOT_REGULAR", label: "Ativa Não Regular" },
+  { value: "DEREGISTERED", label: "Baixada" },
+];
+
 const DOC_TYPE_OPTIONS = [
   { value: "cnpj", label: "CNPJ" },
   { value: "cpf", label: "CPF" },
@@ -46,12 +58,15 @@ interface BudgetStepCustomerPaymentProps {
   configIndex: number;
   customer: any;
   disabled?: boolean;
+  /** Attention entity id — the TASK_QUOTE this config belongs to. */
+  quoteId?: string;
 }
 
 export function BudgetStepCustomerPayment({
   configIndex,
   customer,
   disabled,
+  quoteId,
 }: BudgetStepCustomerPaymentProps) {
   const { control, setValue: setFormValue } = useFormContext();
   const config = useWatch({ control, name: `customerConfigs.${configIndex}` });
@@ -101,6 +116,35 @@ export function BudgetStepCustomerPayment({
   const setConfigField = useCallback((field: string, value: any) => {
     setFormValue(`customerConfigs.${configIndex}.${field}`, value, { shouldDirty: true });
   }, [setFormValue, configIndex]);
+
+  // Attention: `task-quote.ibipora-missing-order-number` targets the field `orderNumber` on the
+  // QUOTE, so a multi-customer quote shares one address across all of its customer steps. Narrow
+  // it to the config the rule is actually about — otherwise the other customer's N° do Pedido,
+  // which nobody is waiting on, would blink too.
+  const orderNumberAttention = useAttentionField("TASK_QUOTE", quoteId, "orderNumber");
+  const orderNumberAttentionClass =
+    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA && !config?.orderNumber
+      ? attentionFieldClass(orderNumberAttention)
+      : "";
+
+  // Attention: `task-quote.billing-customer-incomplete`. Identical narrowing to the Faturamento
+  // step (see `billing-step-customer.tsx`) — one address for the whole cadastro, painted only on
+  // the inputs that are empty in the FORM, and only for configs that will produce a nota. The
+  // rule can be active here because an approved budget is reachable from BOTH lists, and the
+  // cadastro is fixed in the same place either way.
+  const customerDataAttention = useAttentionField("TASK_QUOTE", quoteId, "customerData");
+  const missingBillingKeys = useMemo(
+    () =>
+      customerDataAttention?.active && config?.generateInvoice !== false
+        ? missingBillingCustomerKeys(customerData)
+        : [],
+    [customerDataAttention?.active, config?.generateInvoice, customerData],
+  );
+  const customerFieldAttention = useCallback(
+    (key: string) => (missingBillingKeys.includes(key) ? attentionFieldClass(customerDataAttention) : ""),
+    [missingBillingKeys, customerDataAttention],
+  );
+  const customerFieldTitle = customerDataAttention?.match.rule.name;
 
   const handleTypeChange = useCallback((v: string | string[] | null | undefined) => {
     const val = typeof v === "string" ? v : "";
@@ -218,82 +262,76 @@ export function BudgetStepCustomerPayment({
           <CardDescription>Informações do cliente para o orçamento</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Document Input - CPF/CNPJ switcher */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium">
-              {docType === "cnpj" ? (
-                <IconBuilding className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <IconIdBadge2 className="h-4 w-4 text-muted-foreground" />
-              )}
-              Documento
-            </Label>
-            <div className="flex gap-2">
-              <Combobox
-                value={docType}
-                onValueChange={handleDocTypeChange}
-                options={DOC_TYPE_OPTIONS}
-                searchable={false}
-                clearable={false}
-                className="w-32"
-                disabled={disabled}
-              />
-              {docType === "cnpj" ? (
-                <Input
-                  type="cnpj"
-                  value={customerData.cnpj ?? ""}
-                  onChange={(value) => handleCnpjChange(String(value ?? ""))}
-                  placeholder="00.000.000/0000-00"
-                  disabled={disabled || customerHasCnpj}
-                  transparent
-                  className="flex-1"
-                />
-              ) : (
-                <Input
-                  type="cpf"
-                  value={customerData.cpf ?? ""}
-                  onChange={(value) => setCustomerField("cpf", String(value ?? ""))}
-                  placeholder="000.000.000-00"
+          {/* Row 1: Documento + Situação Cadastral + Inscrição Estadual.
+              Same four-column grid as the Faturamento step: the two wizards edit the SAME Customer
+              record with the same required-field gate, so a field that sits in a different place on
+              each screen is just a way to miss it on one of them. */}
+          <div className="grid grid-cols-1 md:grid-cols-[auto_1fr_1fr_1fr] gap-4 items-end">
+            <div className="space-y-2 md:col-span-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                {docType === "cnpj" ? (
+                  <IconBuilding className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <IconIdBadge2 className="h-4 w-4 text-muted-foreground" />
+                )}
+                Documento
+                <span className="text-destructive">*</span>
+              </Label>
+              <div className="flex gap-2">
+                <Combobox
+                  value={docType}
+                  onValueChange={handleDocTypeChange}
+                  options={DOC_TYPE_OPTIONS}
+                  searchable={false}
+                  clearable={false}
+                  className="w-[150px]"
                   disabled={disabled}
-                  transparent
-                  className="flex-1"
                 />
+                {docType === "cnpj" ? (
+                  <Input
+                    type="cnpj"
+                    value={customerData.cnpj ?? ""}
+                    onChange={(value) => handleCnpjChange(String(value ?? ""))}
+                    placeholder="00.000.000/0000-00"
+                    disabled={disabled || customerHasCnpj}
+                    transparent
+                    className={cn("flex-1", customerFieldAttention(NFSE_DOCUMENT_KEY))}
+                    title={customerFieldAttention(NFSE_DOCUMENT_KEY) ? customerFieldTitle : undefined}
+                  />
+                ) : (
+                  <Input
+                    type="cpf"
+                    value={customerData.cpf ?? ""}
+                    onChange={(value) => setCustomerField("cpf", String(value ?? ""))}
+                    placeholder="000.000.000-00"
+                    disabled={disabled}
+                    transparent
+                    className={cn("flex-1", customerFieldAttention(NFSE_DOCUMENT_KEY))}
+                    title={customerFieldAttention(NFSE_DOCUMENT_KEY) ? customerFieldTitle : undefined}
+                  />
+                )}
+              </div>
+              {isLookingUpCnpj && (
+                <span className="text-xs text-primary animate-pulse">Buscando dados do CNPJ...</span>
+              )}
+              {docType === "cnpj" && customerHasCnpj && !isLookingUpCnpj && (
+                <span className="text-xs text-muted-foreground">
+                  CNPJ já cadastrado — para corrigi-lo, edite o cliente no cadastro.
+                </span>
               )}
             </div>
-            {isLookingUpCnpj && (
-              <span className="text-xs text-primary animate-pulse">Buscando dados do CNPJ...</span>
-            )}
-            {docType === "cnpj" && customerHasCnpj && !isLookingUpCnpj && (
-              <span className="text-xs text-muted-foreground">
-                CNPJ já cadastrado — para corrigi-lo, edite o cliente no cadastro.
-              </span>
-            )}
-          </div>
-
-          {/* Fantasy Name + Corporate Name */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Nome Fantasia</Label>
-              <Input
-                value={customerData.fantasyName || ""}
-                onChange={(value) => setCustomerField("fantasyName", String(value ?? ""))}
-                placeholder="Nome Fantasia"
+              <Label className="text-sm font-medium">Situação Cadastral</Label>
+              <Combobox
+                value={customerData.registrationStatus || ""}
+                onValueChange={(v) => setCustomerField("registrationStatus", v || null)}
+                options={REGISTRATION_STATUS_OPTIONS}
+                placeholder="Selecione..."
+                searchable={false}
+                clearable
                 disabled={disabled}
               />
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Razão Social</Label>
-              <Input
-                value={customerData.corporateName || ""}
-                onChange={(value) => setCustomerField("corporateName", String(value ?? ""))}
-                placeholder="Razão Social"
-                disabled={disabled}
-              />
-            </div>
-          </div>
-
-          {/* State Registration */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Inscrição Estadual</Label>
               <Input
@@ -305,29 +343,59 @@ export function BudgetStepCustomerPayment({
             </div>
           </div>
 
-          {/* Address - Row 1: CEP + City + State */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Row 2: Nome Fantasia + Razão Social */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">CEP</Label>
+              <Label className="text-sm font-medium">Nome Fantasia <span className="text-destructive">*</span></Label>
+              <Input
+                value={customerData.fantasyName || ""}
+                onChange={(value) => setCustomerField("fantasyName", String(value ?? ""))}
+                placeholder="Nome Fantasia"
+                disabled={disabled}
+                className={customerFieldAttention("fantasyName")}
+                title={customerFieldAttention("fantasyName") ? customerFieldTitle : undefined}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Razão Social <span className="text-destructive">*</span></Label>
+              <Input
+                value={customerData.corporateName || ""}
+                onChange={(value) => setCustomerField("corporateName", String(value ?? ""))}
+                placeholder="Razão Social"
+                disabled={disabled}
+                className={customerFieldAttention("corporateName")}
+                title={customerFieldAttention("corporateName") ? customerFieldTitle : undefined}
+              />
+            </div>
+          </div>
+
+          {/* Row 3: CEP + Cidade + UF + Tipo + Logradouro + Nº */}
+          <div className="grid grid-cols-2 md:grid-cols-[150px_1fr_150px_150px_1fr_150px] gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">CEP <span className="text-destructive">*</span></Label>
               <Input
                 type="cep"
                 value={customerData.zipCode || ""}
                 onChange={(value) => setCustomerField("zipCode", String(value ?? ""))}
                 placeholder="00000-000"
                 disabled={disabled}
+                className={customerFieldAttention("zipCode")}
+                title={customerFieldAttention("zipCode") ? customerFieldTitle : undefined}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Cidade</Label>
+              <Label className="text-sm font-medium">Cidade <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.city || ""}
                 onChange={(value) => setCustomerField("city", String(value ?? ""))}
                 placeholder="Cidade"
                 disabled={disabled}
+                className={customerFieldAttention("city")}
+                title={customerFieldAttention("city") ? customerFieldTitle : undefined}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Estado (UF)</Label>
+              <Label className="text-sm font-medium">UF <span className="text-destructive">*</span></Label>
               <Combobox
                 value={customerData.state || ""}
                 onValueChange={(v) => setCustomerField("state", typeof v === "string" ? v : "")}
@@ -336,13 +404,14 @@ export function BudgetStepCustomerPayment({
                 searchable
                 clearable
                 disabled={disabled}
+                // `triggerClassName`, not `className`: `className` lands on Combobox's wrapper div,
+                // whose padding box is exactly coincident with the trigger Button's border box —
+                // and a child's border paints over the parent's INSET shadow, so the ring was
+                // invisible at rest. On the trigger it also inherits the right radius.
+                triggerClassName={customerFieldAttention("state")}
               />
             </div>
-          </div>
-
-          {/* Address - Row 2: Street Type + Address + Number */}
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
-            <div className="md:col-span-2 space-y-2">
+            <div className="space-y-2">
               <Label className="text-sm font-medium">Tipo</Label>
               <Combobox
                 value={customerData.streetType || ""}
@@ -354,35 +423,41 @@ export function BudgetStepCustomerPayment({
                 disabled={disabled}
               />
             </div>
-            <div className="md:col-span-3 space-y-2">
-              <Label className="text-sm font-medium">Logradouro</Label>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Logradouro <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.address || ""}
                 onChange={(value) => setCustomerField("address", String(value ?? ""))}
                 placeholder="Rua, Avenida, etc."
                 disabled={disabled}
+                className={customerFieldAttention("address")}
+                title={customerFieldAttention("address") ? customerFieldTitle : undefined}
               />
             </div>
-            <div className="md:col-span-1 space-y-2">
-              <Label className="text-sm font-medium">Número</Label>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Nº <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.addressNumber || ""}
                 onChange={(value) => setCustomerField("addressNumber", String(value ?? ""))}
                 placeholder="Nº"
                 disabled={disabled}
+                className={customerFieldAttention("addressNumber")}
+                title={customerFieldAttention("addressNumber") ? customerFieldTitle : undefined}
               />
             </div>
           </div>
 
-          {/* Address - Row 3: Neighborhood + Complement */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Row 4: Bairro + Complemento */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Bairro</Label>
+              <Label className="text-sm font-medium">Bairro <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.neighborhood || ""}
                 onChange={(value) => setCustomerField("neighborhood", String(value ?? ""))}
                 placeholder="Bairro"
                 disabled={disabled}
+                className={customerFieldAttention("neighborhood")}
+                title={customerFieldAttention("neighborhood") ? customerFieldTitle : undefined}
               />
             </div>
             <div className="space-y-2">
@@ -451,6 +526,8 @@ export function BudgetStepCustomerPayment({
                 onChange={(value) => setConfigField("orderNumber", value != null ? String(value) : null)}
                 placeholder="Ex: 12345"
                 disabled={disabled}
+                className={orderNumberAttentionClass}
+                title={orderNumberAttentionClass ? orderNumberAttention?.match.rule.name : undefined}
               />
             </div>
             {/* ── Condição de Pagamento (type) ── */}

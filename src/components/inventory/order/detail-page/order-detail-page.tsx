@@ -630,6 +630,11 @@ export function OrderDetailPage() {
     <>
       <DetailPage<Order>
         detailKey="order-detail"
+        // Attention: opting in registers the record, honours `order.forecast-overdue`'s
+        // `onExitCooldown` ack (so the row rests for the cooldown once you have LOOKED at the
+        // order and stepped away) and rings the header. Without it the list row blinked forever
+        // because nothing could ever acknowledge it.
+        attention={{ entityType: "ORDER" }}
         data={order}
         isLoading={isLoading}
         error={error ? "Pedido não encontrado" : undefined}

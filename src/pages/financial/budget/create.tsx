@@ -458,6 +458,21 @@ export const FinancialBudgetCreatePage = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   }, []);
 
+  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
+  // the SAME gate as "Próximo", so a click can never skip a validation the button
+  // enforces. FormSteps only offers steps already reached (plus the next one).
+  const handleStepClick = useCallback(
+    (step: number) => {
+      if (step === currentStep) return;
+      if (step < currentStep) {
+        setCurrentStep(step);
+        return;
+      }
+      if (validateCurrentStep()) setCurrentStep(Math.min(step, totalSteps));
+    },
+    [currentStep, validateCurrentStep, totalSteps],
+  );
+
   // Handle form submission
   const handleSubmit = useCallback(async () => {
     // Re-entrancy guard. This handler awaits file uploads, then creates task + quote + nested
@@ -899,7 +914,7 @@ export const FinancialBudgetCreatePage = () => {
         ]}
       />
 
-      <FormSteps steps={steps} currentStep={currentStep} />
+      <FormSteps steps={steps} currentStep={currentStep} onStepClick={handleStepClick} disabled={isSubmitting} />
 
       <div className="flex-1 overflow-y-auto pb-6">
         <FormProvider {...form}>

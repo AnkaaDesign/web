@@ -32,18 +32,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CustomerSelector } from "@/components/production/task/form/customer-selector";
+import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { BillingStepInfo } from "./billing-step-info";
 
 interface BillingStepTaskProps {
   disabled?: boolean;
   customersCache: React.MutableRefObject<Map<string, any>>;
   initialCustomer?: any;
+  /** Foto da plaqueta (VIN) já anexada ao caminhão, se houver. */
+  vinPlateFiles?: FileWithPreview[];
+  onVinPlateFilesChange?: (files: FileWithPreview[]) => void;
 }
 
 export function BillingStepTask({
   disabled,
   customersCache,
   initialCustomer,
+  vinPlateFiles,
+  onVinPlateFilesChange,
 }: BillingStepTaskProps) {
   const { control } = useFormContext();
 
@@ -216,6 +222,35 @@ export function BillingStepTask({
                 </FormItem>
               )}
             />
+
+            {/* Plaqueta — FOTO da plaqueta de identificação (VIN), imagem única. Mesmo campo do
+                formulário de Tarefa: quem fatura é quem costuma descobrir que ela falta, e mandar
+                a pessoa abrir outra tela para anexar uma foto é como ela deixa de ser anexada. */}
+            {onVinPlateFilesChange && (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2">
+                  <IconId className="h-4 w-4" />
+                  Plaqueta
+                </FormLabel>
+                <FormControl>
+                  <FileUploadField
+                    onFilesChange={onVinPlateFilesChange}
+                    maxFiles={1}
+                    maxSize={20 * 1024 * 1024}
+                    disabled={disabled}
+                    showPreview={true}
+                    existingFiles={vinPlateFiles}
+                    variant="inline"
+                    placeholder="Fotografe ou anexe a plaqueta"
+                    label="Foto da plaqueta"
+                    acceptedFileTypes={{
+                      "image/*": [".jpeg", ".jpg", ".png", ".webp", ".heic"],
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           </div>
 
           {/* Finished At — read-only, never sent in update payload */}

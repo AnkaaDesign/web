@@ -9,6 +9,8 @@ import { formatCNPJ, formatBrazilianPhone } from "@/utils";
 import { IconUsers, IconUser, IconAlertTriangle, IconTrash } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { getCustomers } from "@/api-client/customer";
+import { missingBillingCustomerLabels } from "@/lib/billing-customer-data";
+import { PINNED_CUSTOMERS } from "@/config/company";
 import { useResponsibles } from "@/hooks/administration/use-responsible";
 
 interface BillingStepInfoProps {
@@ -33,8 +35,8 @@ export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoPro
     description: r.phone ? formatBrazilianPhone(r.phone) : undefined,
   }));
 
-  // Pin Ankaa customer first
-  const PINNED_CUSTOMER_ID = "93dfbeb1-aec0-4829-a297-6a2f09fcfe08";
+  // Pin the Ibiporã customer first (the highest-volume invoice-to client).
+  const PINNED_CUSTOMER_ID = PINNED_CUSTOMERS.IBIPORA;
 
   const searchCustomers = useCallback(
     async (search?: string, page: number = 1): Promise<{ data: any[]; hasMore: boolean }> => {
@@ -151,17 +153,14 @@ export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoPro
 
   const selectedCustomerIds = customerConfigs.map((c: any) => c.customerId);
 
+  // The SHARED requirement list. This used to check five fields while the save gate checked nine,
+  // so a customer could show "Dados completos" here and still be refused at BILLING_APPROVED —
+  // and the attention rule, which is built from the same list, would blink over a row this badge
+  // called fine. `missing` is surfaced in the badge's tooltip so "incompletos" says WHAT.
   const getCustomerValidationStatus = (customerId: string) => {
     const config = customerConfigs.find((c: any) => c.customerId === customerId);
-    const data = config?.customerData;
-    if (!data) return { valid: false };
-    const missing: string[] = [];
-    if (!data.cnpj && !data.cpf) missing.push("CNPJ/CPF");
-    if (!data.corporateName) missing.push("Razão Social");
-    if (!data.city) missing.push("Cidade");
-    if (!data.state) missing.push("Estado");
-    if (!data.address) missing.push("Endereço");
-    return { valid: missing.length === 0 };
+    const missing = missingBillingCustomerLabels(config?.customerData);
+    return { valid: missing.length === 0, missing };
   };
 
   return (
@@ -229,7 +228,11 @@ export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoPro
                       )}
                     </div>
                     {!validation.valid ? (
-                      <Badge variant="destructive" className="flex items-center gap-1 whitespace-nowrap">
+                      <Badge
+                        variant="destructive"
+                        className="flex items-center gap-1 whitespace-nowrap"
+                        title={validation.missing.join(", ")}
+                      >
                         <IconAlertTriangle className="h-3 w-3" />
                         Dados incompletos
                       </Badge>

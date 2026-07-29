@@ -508,27 +508,25 @@ input[type="time"]::-moz-calendar-picker-indicator {
     0%, 100% { box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.5), 0 0 0 1px hsl(0 84% 60% / 0.25); }
     50%      { box-shadow: inset 0 0 0 2px hsl(0 84% 60% / 1), 0 0 11px 2px hsl(0 84% 60% / 0.6); }
   }
-  @keyframes attention-field-blink-soft {
-    0%, 100% { background-color: hsl(38 92% 50% / 0.1); box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.45); }
-    50%      { background-color: hsl(38 92% 50% / 0.32); box-shadow: inset 0 0 0 2px hsl(38 92% 50% / 0.95); }
-  }
-  @keyframes attention-field-blink-harsh {
-    0%, 100% { background-color: hsl(0 84% 60% / 0.1); box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.5); }
-    50%      { background-color: hsl(0 84% 60% / 0.34); box-shadow: inset 0 0 0 2px hsl(0 84% 60% / 1); }
-  }
-
-  /* RESTING — faint STATIC ring/fill, no animation (this is what "stopped" looks like). */
-  .attention-row-ring-soft  { box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.4); }
-  .attention-row-ring-harsh { box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.45); }
-  .attention-field-soft  { padding-inline: 0.25rem; background-color: hsl(38 92% 50% / 0.08); box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.4); }
-  .attention-field-harsh { padding-inline: 0.25rem; background-color: hsl(0 84% 60% / 0.08); box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.45); }
+  /* RESTING — faint STATIC ring, no animation (this is what "stopped" looks like).
+   *
+   * A FIELD looks exactly like a ROW on purpose. The field style used to be a tinted background
+   * wash with horizontal padding, which meant a highlighted form field read as a completely
+   * different kind of signal from a highlighted detail row — and, because the wash has to sit on
+   * a wrapper to cover anything, it boxed in the label and squared off the input's rounded
+   * corners. One ring, applied to the CONTROL itself (input / combobox), is the whole vocabulary:
+   * it hugs the control's own radius and matches the ring the detail page draws. */
+  .attention-row-ring-soft,
+  .attention-field-soft  { box-shadow: inset 0 0 0 1px hsl(38 92% 50% / 0.4); }
+  .attention-row-ring-harsh,
+  .attention-field-harsh { box-shadow: inset 0 0 0 1px hsl(0 84% 60% / 0.45); }
 
   /* ARMED — the combined selector (two classes) outranks the resting rule; smooth pulse
    * at 1.6s ease-in-out (same cadence/feel as the nav blink) while `-burst` is applied. */
-  .attention-row-burst.attention-row-ring-soft  { animation: attention-row-blink-soft 1.6s ease-in-out infinite; }
-  .attention-row-burst.attention-row-ring-harsh { animation: attention-row-blink-harsh 1.6s ease-in-out infinite; }
-  .attention-field-burst.attention-field-soft  { animation: attention-field-blink-soft 1.6s ease-in-out infinite; }
-  .attention-field-burst.attention-field-harsh { animation: attention-field-blink-harsh 1.6s ease-in-out infinite; }
+  .attention-row-burst.attention-row-ring-soft,
+  .attention-field-burst.attention-field-soft   { animation: attention-row-blink-soft 1.6s ease-in-out infinite; }
+  .attention-row-burst.attention-row-ring-harsh,
+  .attention-field-burst.attention-field-harsh  { animation: attention-row-blink-harsh 1.6s ease-in-out infinite; }
 
   /* Presence ("being edited by someone else") — a calm BLUE ring, never bips. Blue keeps
    * it visually distinct from attention (amber/red) so the two are never confused. */
@@ -542,10 +540,10 @@ input[type="time"]::-moz-calendar-picker-indicator {
       animation: none;
     }
     /* Without motion, keep the armed state at its bright peak so it's still noticeable. */
-    .attention-row-burst.attention-row-ring-harsh { box-shadow: inset 0 0 0 2px hsl(0 84% 60% / 0.9); }
-    .attention-row-burst.attention-row-ring-soft  { box-shadow: inset 0 0 0 2px hsl(38 92% 50% / 0.9); }
-    .attention-field-burst.attention-field-harsh { background-color: hsl(0 84% 60% / 0.28); }
-    .attention-field-burst.attention-field-soft  { background-color: hsl(38 92% 50% / 0.28); }
+    .attention-row-burst.attention-row-ring-harsh,
+    .attention-field-burst.attention-field-harsh { box-shadow: inset 0 0 0 2px hsl(0 84% 60% / 0.9); }
+    .attention-row-burst.attention-row-ring-soft,
+    .attention-field-burst.attention-field-soft  { box-shadow: inset 0 0 0 2px hsl(38 92% 50% / 0.9); }
   }
 
   /* Ensure focus-visible works across browsers */

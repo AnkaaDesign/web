@@ -11,6 +11,16 @@ interface FieldProps<TData> {
   onChange: (value: unknown) => void;
 }
 
+/**
+ * Module-level so an EMPTY selection keeps the same array identity across renders.
+ *
+ * `Combobox`'s async option-merge effect lists `value` in its deps and resets the loaded option
+ * list back to page 1 whenever it changes. A fresh `[]` per render therefore threw away every page
+ * the user had scrolled in — while the page COUNTER kept advancing, so the next "carregar mais"
+ * skipped a whole page and those entities became unreachable without typing a search.
+ */
+const EMPTY_IDS: string[] = [];
+
 /** Renders a single declarative filter definition as the appropriate input. */
 export function DataTableFilterField<TData>({ def, value, onChange }: FieldProps<TData>) {
   switch (def.type) {
@@ -36,6 +46,35 @@ export function DataTableFilterField<TData>({ def, value, onChange }: FieldProps
           placeholder={def.placeholder ?? "Selecione..."}
         />
       );
+
+    case "entity-select":
+    case "entity-multiselect": {
+      // Server-searched picker: the option set is too large to ship up front (see
+      // DataTableAsyncFilterConfig). `initialOptions` carries the already-selected entities so a
+      // cold load — ids restored from the URL, nothing fetched yet — still shows names.
+      const cfg = def.async;
+      if (!cfg) return null;
+      const multiple = def.type === "entity-multiselect";
+      return (
+        <Combobox<any>
+          {...(multiple
+            ? { mode: "multiple" as const, value: (value as string[]) ?? EMPTY_IDS }
+            : { mode: "single" as const, value: (value as string) ?? "" })}
+          onValueChange={(v) => onChange(multiple ? (Array.isArray(v) ? v : []) : (v ?? undefined))}
+          async
+          queryKey={cfg.queryKey}
+          queryFn={cfg.queryFn}
+          initialOptions={cfg.selectedOptions ?? []}
+          minSearchLength={cfg.minSearchLength ?? 0}
+          getOptionValue={cfg.getOptionValue}
+          getOptionLabel={cfg.getOptionLabel}
+          renderOption={cfg.renderOption}
+          placeholder={def.placeholder ?? "Buscar..."}
+          emptyText={cfg.emptyText ?? "Nenhum resultado encontrado"}
+          clearable
+        />
+      );
+    }
 
     case "boolean":
       // A clean Sim/Não/Todos select (consistent with the other filters) instead of a toggle.

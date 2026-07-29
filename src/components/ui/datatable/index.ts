@@ -25,6 +25,7 @@ export type {
   DataTableFilterDef,
   DataTableFilterType,
   DataTableFilterOption,
+  DataTableAsyncFilterConfig,
   DataTableFilterValues,
   PersistedTableConfig,
   SectorDefaults,

@@ -202,6 +202,28 @@ export const CutCreateWizard = ({ initialTaskId, onSuccess, onCancel, className 
     if (validateStep(currentStep)) goToStep(currentStep + 1);
   }, [validateStep, currentStep, goToStep]);
 
+  // Step marker click. Back is free (nothing is lost by revisiting). Forward has to
+  // clear EVERY gate between here and the target — this wizard validates BY step, so
+  // unlike the others it can check the whole span instead of just the current one;
+  // a failing gate parks the user on the offending step with its toast.
+  const handleStepClick = useCallback(
+    (step: number) => {
+      if (step === currentStep) return;
+      if (step < currentStep) {
+        goToStep(step);
+        return;
+      }
+      for (let s = currentStep; s < step; s++) {
+        if (!validateStep(s)) {
+          goToStep(s);
+          return;
+        }
+      }
+      goToStep(step);
+    },
+    [currentStep, goToStep, validateStep],
+  );
+
   const handleCancel = useCallback(() => {
     if (onCancel) return onCancel();
     navigate(routes.production.cutting.list);
@@ -334,7 +356,7 @@ export const CutCreateWizard = ({ initialTaskId, onSuccess, onCancel, className 
             <form className="flex flex-col h-full" onSubmit={(e) => e.preventDefault()}>
               {/* Stepper */}
               <div className="flex-shrink-0 mb-6">
-                <FormSteps steps={STEPS} currentStep={currentStep} />
+                <FormSteps steps={STEPS} currentStep={currentStep} onStepClick={handleStepClick} disabled={isSubmitting} />
               </div>
 
               {/* Step content — step 2 (task table) takes full height. */}

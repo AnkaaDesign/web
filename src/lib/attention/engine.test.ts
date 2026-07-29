@@ -9,7 +9,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const { playAttentionBeep } = vi.hoisted(() => ({ playAttentionBeep: vi.fn() }));
 vi.mock("@/utils/nav-alert-sound", () => ({ playAttentionBeep, playAnnoyingBeep: vi.fn() }));
 
-import { SECTOR_PRIVILEGES, CUT_STATUS, TASK_STATUS } from "@/constants";
+import { SECTOR_PRIVILEGES, CUT_STATUS, TASK_STATUS, TASK_QUOTE_STATUS } from "@/constants";
+import { PINNED_CUSTOMERS } from "@/config/company";
 
 import { createLocalAckStore } from "./ack-store";
 import {
@@ -26,7 +27,7 @@ import { ATTENTION_RULES } from "./rules";
 import { addressKey } from "./types";
 import type { AttentionEntityType } from "./types";
 
-const COOLDOWN_MS = 30 * 60 * 1000; // every rule in rules.ts uses the 30-min default
+const COOLDOWN_MS = 30 * 60 * 1000; // the cadence() default, used by every rule these tests touch
 
 /** Let the engine's queueMicrotask reconcile run. */
 const settle = () => vi.advanceTimersByTimeAsync(1);
@@ -477,5 +478,196 @@ describe("resolution", () => {
     setEntities("CUT", [pendingCut]);
     await settle();
     expect(row("CUT", "cut-1")).toEqual(ARMED);
+  });
+});
+
+// Regression cover for `task-quote.ibipora-missing-order-number` — the first rule that requires
+// a COMPLETED task (so it must NOT go through `whileInFlight`) and the first that quantifies over
+// a to-many relation (`some` over customerConfigs).
+describe("TASK_QUOTE — Ibiporã sem N° do Pedido", () => {
+  const OTHER_CUSTOMER = "11111111-1111-1111-1111-111111111111";
+
+  const quote = (over: Record<string, unknown> = {}) => ({
+    id: "quote-1",
+    // BUDGET_APPROVED, not BILLING_APPROVED: the rule now stops once the quote has been billed,
+    // because at that point the nota is out and the pedido number can no longer block it. That
+    // narrowing is what removed eleven long-settled Ibiporã quotes from the Faturamento list.
+    status: TASK_QUOTE_STATUS.BUDGET_APPROVED,
+    task: { id: "task-9", status: TASK_STATUS.COMPLETED },
+    customerConfigs: [
+      { id: "cfg-other", customerId: OTHER_CUSTOMER, orderNumber: null, generateInvoice: true },
+      { id: "cfg-ibipora", customerId: PINNED_CUSTOMERS.IBIPORA, orderNumber: null, generateInvoice: true },
+    ],
+    ...over,
+  });
+
+  it("blinks the orderNumber field of a finished task billed to Ibiporã", async () => {
+    setEntities("TASK_QUOTE", [quote()]);
+    await settle();
+    expect(field("TASK_QUOTE", "quote-1", "orderNumber")).toEqual(ARMED);
+  });
+
+  it("stays silent while the task is still in flight", async () => {
+    setEntities("TASK_QUOTE", [quote({ task: { id: "task-9", status: TASK_STATUS.IN_PRODUCTION } })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+  });
+
+  it("treats an empty-string order number as missing", async () => {
+    setEntities("TASK_QUOTE", [quote({ customerConfigs: [{ id: "cfg-ibipora", customerId: PINNED_CUSTOMERS.IBIPORA, orderNumber: "", generateInvoice: true }] })]);
+    await settle();
+    expect(field("TASK_QUOTE", "quote-1", "orderNumber")).toEqual(ARMED);
+  });
+
+  it("stops the moment the number is filled in", async () => {
+    setEntities("TASK_QUOTE", [quote({ customerConfigs: [{ id: "cfg-ibipora", customerId: PINNED_CUSTOMERS.IBIPORA, orderNumber: "12345", generateInvoice: true }] })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+  });
+
+  it("ignores another customer's missing order number", async () => {
+    setEntities("TASK_QUOTE", [quote({ customerConfigs: [{ id: "cfg-other", customerId: OTHER_CUSTOMER, orderNumber: null, generateInvoice: true }] })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+  });
+
+  it("does not fire when the config was selected without orderNumber", async () => {
+    // The `notNull id` guard inside the `some`. `isNull` cannot tell "the column is empty" from
+    // "this key was never selected", so without the guard a select that forgot `orderNumber` would
+    // light up EVERY finished Ibiporã quote. A config with no `id` is by definition one the query
+    // did not select properly, so it must count as no evidence rather than as a missing number.
+    setEntities("TASK_QUOTE", [quote({ customerConfigs: [{ customerId: PINNED_CUSTOMERS.IBIPORA, generateInvoice: true }] })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+    expect(field("TASK_QUOTE", "quote-1", "orderNumber")).toBeNull();
+  });
+
+  it("does not fire when customerConfigs was left out of the include", async () => {
+    // An absent collection is a missing include, never evidence — `some` returns false for it.
+    setEntities("TASK_QUOTE", [quote({ customerConfigs: undefined })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+  });
+
+  it("stays silent on a cancelled quote", async () => {
+    setEntities("TASK_QUOTE", [quote({ status: TASK_QUOTE_STATUS.CANCELLED })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+  });
+
+  // The regression that made the Faturamento list unreadable: the rule used to say "not
+  // CANCELLED", which let every post-invoice status through. Quotes whose nota was issued and
+  // whose money had been in the bank for months went on blinking, and nobody could act on them.
+  it.each([
+    TASK_QUOTE_STATUS.BILLING_APPROVED,
+    TASK_QUOTE_STATUS.UPCOMING,
+    TASK_QUOTE_STATUS.DUE,
+    TASK_QUOTE_STATUS.PARTIAL,
+    TASK_QUOTE_STATUS.SETTLED,
+  ])("stays silent once the quote has been billed (%s)", async (status) => {
+    setEntities("TASK_QUOTE", [quote({ status })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+  });
+
+  it("stays silent when Ibiporã's config will not produce a nota", async () => {
+    // No invoice means nowhere to print the pedido de compra.
+    setEntities("TASK_QUOTE", [
+      quote({ customerConfigs: [{ id: "cfg-ibipora", customerId: PINNED_CUSTOMERS.IBIPORA, orderNumber: null, generateInvoice: false }] }),
+    ]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-1")).toBeNull();
+  });
+});
+
+// Cover for `task-quote.billing-customer-incomplete` — the other half of "what actually blocks an
+// invoice", and the first rule whose predicate is GENERATED from a shared list
+// (`NFSE_REQUIRED_CUSTOMER_FIELDS`) rather than written out.
+describe("TASK_QUOTE — cadastro do cliente incompleto", () => {
+  const OTHER_CUSTOMER = "11111111-1111-1111-1111-111111111111";
+
+  /** A customer that can receive an NFS-e: every required field present. */
+  const completeCustomer = {
+    id: "customer-1",
+    cnpj: "12345678000199",
+    cpf: null,
+    fantasyName: "Cliente",
+    corporateName: "Cliente LTDA",
+    zipCode: "86200-000",
+    city: "Ibiporã",
+    state: "PR",
+    address: "Rua X",
+    addressNumber: "100",
+    neighborhood: "Centro",
+  };
+
+  const quote = (customerOver: Record<string, unknown> = {}, over: Record<string, unknown> = {}) => ({
+    id: "quote-2",
+    status: TASK_QUOTE_STATUS.BUDGET_APPROVED,
+    task: { id: "task-10", status: TASK_STATUS.COMPLETED },
+    customerConfigs: [{ customerId: OTHER_CUSTOMER, generateInvoice: true, customer: { ...completeCustomer, ...customerOver } }],
+    ...over,
+  });
+
+  it("stays silent when the cadastro is complete", async () => {
+    setEntities("TASK_QUOTE", [quote()]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-2")).toBeNull();
+  });
+
+  it.each([
+    ["corporateName", { corporateName: null }],
+    ["zipCode", { zipCode: "" }],
+    ["city", { city: null }],
+    ["state", { state: "" }],
+    ["address", { address: null }],
+    ["addressNumber", { addressNumber: "" }],
+    ["neighborhood", { neighborhood: null }],
+    ["fantasyName", { fantasyName: "" }],
+  ])("blinks the customerData field when %s is missing", async (_label, over) => {
+    setEntities("TASK_QUOTE", [quote(over)]);
+    await settle();
+    expect(field("TASK_QUOTE", "quote-2", "customerData")).toEqual(ARMED);
+  });
+
+  it("needs BOTH documents missing before it fires", async () => {
+    // Either one satisfies the requirement, so a CPF-only customer is complete.
+    setEntities("TASK_QUOTE", [quote({ cnpj: null, cpf: "12345678901" })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-2")).toBeNull();
+
+    setEntities("TASK_QUOTE", [quote({ cnpj: null, cpf: null })]);
+    await settle();
+    expect(field("TASK_QUOTE", "quote-2", "customerData")).toEqual(ARMED);
+  });
+
+  it("ignores a config that will not produce a nota", async () => {
+    setEntities("TASK_QUOTE", [quote({ cnpj: null, cpf: null }, {
+      customerConfigs: [{ customerId: OTHER_CUSTOMER, generateInvoice: false, customer: { ...completeCustomer, cnpj: null, cpf: null } }],
+    })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-2")).toBeNull();
+  });
+
+  it("stays silent once the quote has been billed", async () => {
+    // Past BUDGET_APPROVED the nota is already out, so the cadastro was necessarily good enough.
+    setEntities("TASK_QUOTE", [quote({ cnpj: null, cpf: null }, { status: TASK_QUOTE_STATUS.SETTLED })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-2")).toBeNull();
+  });
+
+  it("stays silent while the task is still in flight", async () => {
+    setEntities("TASK_QUOTE", [quote({ cnpj: null, cpf: null }, { task: { id: "task-10", status: TASK_STATUS.IN_PRODUCTION } })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-2")).toBeNull();
+  });
+
+  it("does not fire when the customer relation was left out of the include", async () => {
+    // Same principle as the missing `customerConfigs`: an absent include is not evidence. Here it
+    // matters more, because the LIST query decides it — a quote fetched without these columns must
+    // not read as "cadastro complete" OR as "everything is broken".
+    setEntities("TASK_QUOTE", [quote({}, { customerConfigs: [{ customerId: OTHER_CUSTOMER, generateInvoice: true }] })]);
+    await settle();
+    expect(row("TASK_QUOTE", "quote-2")).toBeNull();
   });
 });

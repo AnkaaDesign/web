@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Icon as TablerIcon } from "@tabler/icons-react";
-import { IconChevronLeft, IconChevronRight, IconDownload, IconFileText, IconTable, IconLink } from "@tabler/icons-react";
+import { IconDownload, IconFileText, IconTable, IconLink } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { PageHeader, type PageAction } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { useAttentionEntity, type AttentionEntityType } from "@/lib/attention";
 import { cn } from "@/lib/utils";
 import { useDetailLayout } from "./use-detail-layout";
 import { useRecordNavigation } from "./use-record-navigation";
+import { recordPagerAction } from "./record-pager-action";
 import { DetailSection } from "./detail-section";
 import { DetailCustomizeManager } from "./detail-customize-manager";
 import type { DetailSectionDef, PersistedDetailConfig } from "./detail-page-types";
@@ -46,6 +47,12 @@ export interface DetailPageNavigation {
   toRoute: (id: string) => string;
   /** Prefetch neighbours (e.g. `queryClient.prefetchQuery` on the detail key). */
   onPrefetch?: (id: string) => void;
+  /**
+   * Extra navigation state forwarded on every prev/next hop (the id list always is). Without it a
+   * page that reads something else off `location.state` — `returnTo` being the common one — loses
+   * it the first time the user pages.
+   */
+  state?: Record<string, unknown>;
 }
 
 export interface DetailPageProps<TData> {
@@ -174,6 +181,7 @@ export function DetailPage<TData>({
     currentId: recordId,
     toRoute: navigation?.toRoute ?? (() => ""),
     onPrefetch: navigation?.onPrefetch,
+    state: navigation?.state,
     enabled: !!navigation && !!recordId,
   });
 
@@ -218,26 +226,8 @@ export function DetailPage<TData>({
 
   // Built-in header controls (rendered verbatim via PageAction's ReactNode-label slot).
   const builtin: PageAction[] = [];
-  if (navigation && nav.total > 0) {
-    builtin.push({
-      key: "record-nav",
-      hideOnMobile: true,
-      label: (
-        <div className="flex items-center gap-1">
-          {/* h-9 w-9 to match the "Seções" trigger (size="sm" = h-9) sitting beside it. */}
-          <Button variant="outline" size="icon" className="h-9 w-9" disabled={!nav.hasPrev} onClick={nav.goPrev} title="Anterior (←)">
-            <IconChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="min-w-[3.5rem] px-1 text-center text-sm tabular-nums text-muted-foreground">
-            {nav.position} / {nav.total}
-          </span>
-          <Button variant="outline" size="icon" className="h-9 w-9" disabled={!nav.hasNext} onClick={nav.goNext} title="Próximo (→)">
-            <IconChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    });
-  }
+  const pager = navigation ? recordPagerAction(nav) : null;
+  if (pager) builtin.push(pager);
   if (enableCustomize) {
     builtin.push({
       key: "customize",

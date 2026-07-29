@@ -205,6 +205,17 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
     }
   }, [mode, currentStep, searchParams, setSearchParams, onStepChange]);
 
+  const goToStep = useCallback(
+    (step: number) => {
+      if (mode !== "create") return;
+      const clamped = Math.max(1, Math.min(steps.length, step));
+      setCurrentStep(clamped);
+      setSearchParams(setStepInUrl(searchParams, clamped), { replace: true });
+      onStepChange?.(clamped);
+    },
+    [mode, searchParams, setSearchParams, onStepChange],
+  );
+
   // Step validation
   const validateCurrentStep = useCallback((): boolean => {
     switch (currentStep) {
@@ -373,6 +384,21 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       nextStep();
     }
   }, [validateCurrentStep, nextStep]);
+
+  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
+  // the SAME gate as "Próximo", so a click can never skip a validation the button
+  // enforces. FormSteps only offers steps already reached (plus the next one).
+  const handleStepClick = useCallback(
+    (step: number) => {
+      if (step === currentStep) return;
+      if (step < currentStep) {
+        goToStep(step);
+        return;
+      }
+      if (validateCurrentStep()) goToStep(step);
+    },
+    [currentStep, goToStep, validateCurrentStep],
+  );
 
   // Handle previous button click
   const handlePrev = useCallback(() => {
@@ -823,7 +849,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
             {/* Form Steps Indicator (only show in create mode) */}
             {mode === "create" && (
               <div className="flex-shrink-0 mb-6">
-                <FormSteps steps={steps} currentStep={currentStep} />
+                <FormSteps steps={steps} currentStep={currentStep} onStepClick={handleStepClick} disabled={form.formState.isSubmitting} />
               </div>
             )}
 

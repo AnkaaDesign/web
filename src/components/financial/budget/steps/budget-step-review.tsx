@@ -35,6 +35,14 @@ import { getApiBaseUrl } from "@/config/api";
 import { routes } from "@/constants";
 import { canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
 import { cn } from "@/lib/utils";
+import { attentionFieldClass, useAttentionField } from "@/lib/attention";
+import { PINNED_CUSTOMERS } from "@/config/company";
+import {
+  NFSE_DOCUMENT_KEY,
+  NFSE_REQUIRED_CUSTOMER_FIELDS,
+  missingBillingCustomerKeys,
+  missingBillingCustomerLabels,
+} from "@/lib/billing-customer-data";
 import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
@@ -90,6 +98,28 @@ export function BudgetStepReview({
   const totalValue = useWatch({ control, name: "total" });
   const expiresAt = useWatch({ control, name: "expiresAt" });
   const layoutFileIds = (useWatch({ control, name: "layoutFileIds" }) as string[] | undefined) || [];
+
+  // Attention on the quote's `orderNumber`. `attentionOrderNumberFor` narrows the quote-wide
+  // signal to the one customer config it is actually about, and returns "" for every other config
+  // so nothing else on this screen changes.
+  const orderNumberAttention = useAttentionField("TASK_QUOTE", existingQuote?.id, "orderNumber");
+  const attentionOrderNumberFor = (config: any): string =>
+    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA && !config?.orderNumber
+      ? attentionFieldClass(orderNumberAttention)
+      : "";
+
+  // The cadastro half of the same story. The Faturamento Resumo has had this since the rule
+  // landed; the Orçamento one did not — which is backwards, because
+  // `task-quote.billing-customer-incomplete` fires at BUDGET_APPROVED, a status set on THIS wizard.
+  const customerDataAttention = useAttentionField("TASK_QUOTE", existingQuote?.id, "customerData");
+  const attentionCustomerFor = (config: any, keys: string[]): string => {
+    if (!customerDataAttention?.active) return "";
+    if (config?.generateInvoice === false) return "";
+    const missing = missingBillingCustomerKeys(config?.customerData);
+    return keys.some((k) => missing.includes(k)) ? attentionFieldClass(customerDataAttention) : "";
+  };
+  /** Every key the rule can be about — this Resumo has one line, not one per field. */
+  const NFSE_ATTENTION_KEYS = [NFSE_DOCUMENT_KEY, ...NFSE_REQUIRED_CUSTOMER_FIELDS.map((f) => f.key)];
 
   // In create mode, read task fields directly from the form
   const formPlates = useWatch({ control, name: "plates" });
@@ -523,6 +553,25 @@ export function BudgetStepReview({
                     {customer?.corporateName || customer?.fantasyName || "Cliente"}
                   </div>
 
+                  {(() => {
+                    // Same principle as the N° do Pedido line below: when a rule is asking for the
+                    // cadastro, the Resumo has to have somewhere to point. It names the missing
+                    // fields rather than just glowing, because they are fixed on another step.
+                    const attnCls = attentionCustomerFor(config, NFSE_ATTENTION_KEYS);
+                    if (!attnCls) return null;
+                    return (
+                      <div
+                        className={cn("text-sm rounded-md px-2 py-1", attnCls)}
+                        title={customerDataAttention?.match.rule.name}
+                      >
+                        Cadastro incompleto:{" "}
+                        <span className="font-medium text-muted-foreground">
+                          {missingBillingCustomerLabels(config?.customerData).join(", ")}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
                     <span className="font-medium">{formatCurrency(configSubtotal)}</span>
@@ -550,11 +599,26 @@ export function BudgetStepReview({
                     </div>
                   )}
 
-                  {config.orderNumber && (
-                    <div className="text-sm text-muted-foreground">
-                      N° do Pedido: <span className="font-medium text-foreground">{config.orderNumber}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    // Normally shown only when filled. When a rule is asking for it, the line is
+                    // rendered EMPTY and highlighted — a missing value with no DOM node is a
+                    // signal with nothing to point at.
+                    const attnCls = attentionOrderNumberFor(config);
+                    if (!config.orderNumber && !attnCls) return null;
+                    return (
+                      <div
+                        // Padding is UNCONDITIONAL: making it depend on `attnCls` shifted the line 8px right the
+                        // moment the ring appeared, and back again the moment the number was typed.
+                        className={cn("text-sm text-muted-foreground rounded-md px-2 py-1", attnCls)}
+                        title={attnCls ? orderNumberAttention?.match.rule.name : undefined}
+                      >
+                        N° do Pedido:{" "}
+                        <span className={cn("font-medium", config.orderNumber ? "text-foreground" : "text-muted-foreground")}>
+                          {config.orderNumber || "Pendente"}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -574,7 +638,9 @@ export function BudgetStepReview({
             paymentCondition: config.paymentCondition,
             total: configTotal,
           });
-          const hasContent = paymentText || config.orderNumber;
+          // `attentionOrderNumberFor` keeps the block alive when a rule is pointing at the missing
+          // pedido — otherwise the whole card would be skipped and there would be nothing to blink.
+          const hasContent = paymentText || config.orderNumber || attentionOrderNumberFor(config);
           if (!hasContent) return null;
           return (
             <div className="bg-muted/30 rounded-lg p-4 space-y-2">
@@ -587,11 +653,21 @@ export function BudgetStepReview({
                   <p className="text-sm text-muted-foreground">{paymentText}</p>
                 </>
               )}
-              {config.orderNumber && (
-                <div className="text-sm text-muted-foreground">
-                  N° do Pedido: <span className="font-medium text-foreground">{config.orderNumber}</span>
-                </div>
-              )}
+              {(() => {
+                const attnCls = attentionOrderNumberFor(config);
+                if (!config.orderNumber && !attnCls) return null;
+                return (
+                  <div
+                    className={cn("text-sm text-muted-foreground rounded-md px-2 py-1", attnCls)}
+                    title={attnCls ? orderNumberAttention?.match.rule.name : undefined}
+                  >
+                    N° do Pedido:{" "}
+                    <span className={cn("font-medium", config.orderNumber ? "text-foreground" : "text-muted-foreground")}>
+                      {config.orderNumber || "Pendente"}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}

@@ -12,6 +12,9 @@
 //    "forecastDate < $now" works regardless of whether the field arrived as a
 //    Date, a number, or an ISO string.
 //  • eq/ne compare with `===`/`!==` after light normalisation (Date → ms).
+//  • `some`/`every` quantify over a to-many relation, evaluating the inner node
+//    with each ITEM as the entity (so its paths are relative to the item). An
+//    absent or empty collection is false for both — see PredicateNode.
 
 import type { PredicateNode, PredicatePrimitive } from "./types";
 import { NOW_SENTINEL } from "./types";
@@ -19,6 +22,10 @@ import { NOW_SENTINEL } from "./types";
 /** Read a dotted path (`truck.chassisNumber`) off an object; missing → undefined. */
 export function getFieldValue(entity: unknown, path: string): unknown {
   if (entity == null) return undefined;
+  // A node with no `field` is unreachable from TypeScript-defined rules, but the file's contract is
+  // that a malformed node yields `false` rather than throwing — and the moment rules come from the
+  // database (see types.ts) a missing key here would be a white screen instead of a quiet miss.
+  if (typeof path !== "string") return undefined;
   let cur: unknown = entity;
   for (const key of path.split(".")) {
     if (cur == null || typeof cur !== "object") return undefined;
@@ -86,6 +93,16 @@ export function evaluatePredicate(node: PredicateNode | undefined, entity: unkno
       if (node.op === "lt") return a < b;
       if (node.op === "gte") return a >= b;
       return a <= b;
+    }
+    case "some":
+    case "every": {
+      const list = getFieldValue(entity, node.field);
+      // Not included by the query, not an array, or empty → no evidence, so no match. Notably this
+      // also denies `every` its vacuous truth on an empty collection (see the type's doc comment).
+      if (!Array.isArray(list) || list.length === 0) return false;
+      return node.op === "some"
+        ? list.some((item) => evaluatePredicate(node.node, item, now))
+        : list.every((item) => evaluatePredicate(node.node, item, now));
     }
     default:
       return false;

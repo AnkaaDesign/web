@@ -89,8 +89,10 @@ export function rowMatchesFilters<TData>(
     const rv = filterFieldValue(def, row);
     switch (def.type) {
       case "select":
+      case "entity-select":
         return String(rv) === String(fv);
       case "multiselect":
+      case "entity-multiselect":
         return Array.isArray(fv) && fv.map(String).includes(String(rv ?? ""));
       case "boolean":
         return Boolean(rv) === (fv === true || fv === "true");
@@ -133,6 +135,28 @@ export function formatFilterChipValue<TData>(def: DataTableFilterDef<TData>, val
     case "multiselect": {
       const arr = Array.isArray(value) ? value : [];
       return arr.map((v) => def.options?.find((o) => o.value === String(v))?.label ?? String(v)).join(", ");
+    }
+    case "entity-select":
+    case "entity-multiselect": {
+      // The value is an id (or ids); names come from the entities the page resolved for the
+      // current selection.
+      const cfg = def.async;
+      // An id with no resolved entity is either "the lookup has not landed yet" (cold load from a
+      // shared URL) or "this entity no longer exists". Neither is worth printing a uuid for — that
+      // reads as data, and on a deleted entity it would never resolve. `…` at least says "one
+      // selected, name pending", which is true in both cases.
+      const UNRESOLVED = "…";
+      const labelFor = (v: unknown) => {
+        const id = String(v);
+        const hit = cfg?.selectedOptions?.find((o) => cfg.getOptionValue(o) === id);
+        return hit ? cfg!.getOptionLabel(hit) : UNRESOLVED;
+      };
+      if (def.type === "entity-select") return labelFor(value);
+      const ids = Array.isArray(value) ? value : [];
+      const labels = ids.map(labelFor);
+      // All still pending → a count is more useful than a row of ellipses.
+      if (ids.length > 1 && labels.every((l) => l === UNRESOLVED)) return `${ids.length} selecionados`;
+      return labels.join(", ");
     }
     case "boolean":
       return value === true || value === "true" ? "Sim" : "Não";

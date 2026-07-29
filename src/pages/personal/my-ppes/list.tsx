@@ -19,6 +19,7 @@ import { FilterIndicators as StandardFilterIndicators } from "@/components/ui/fi
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { IconSearch, IconPlus, IconPackage, IconFilter, IconTruck } from "@tabler/icons-react";
 import { useAuth } from "@/contexts/auth-context";
+import { attentionRowClassFor, useAttentionVersion, useRegisterAttentionEntities } from "@/lib/attention";
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -129,7 +130,16 @@ export const MyPpesPage = () => {
     staleTime: 1000 * 60 * 5,
   });
 
-  const deliveries = deliveriesData?.data || [];
+  // Memoized because `useRegisterAttentionEntities` keys on the ARRAY's identity — a fresh `[]`
+  // every render would re-register (and re-reconcile) on every render.
+  const deliveries = useMemo(() => deliveriesData?.data || [], [deliveriesData]);
+
+  // Attention: `ppe-delivery.awaiting-my-signature` is the ONE rule with an empty audience — the
+  // rule that finally reaches the sectors with no shared-entity screens at all — and this page is
+  // its only nav home. Without the registration + row class here, the sidebar blinked "Meus EPIs"
+  // at people and then showed them an ordinary-looking list.
+  useRegisterAttentionEntities("PPE_DELIVERY", deliveries);
+  useAttentionVersion();
   const totalRecords = deliveriesData?.meta?.totalRecords || 0;
   const totalPages = Math.ceil(totalRecords / pageSize);
 
@@ -346,7 +356,7 @@ export const MyPpesPage = () => {
                   </TableRow>
                 ) : (
                   deliveries.map((delivery) => (
-                    <TableRow key={delivery.id}>
+                    <TableRow key={delivery.id} className={attentionRowClassFor("PPE_DELIVERY", delivery.id)}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <IconPackage className="h-4 w-4 text-muted-foreground" />

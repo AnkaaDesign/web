@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,10 @@ import {
   INSTALLMENT_STEP_OPTIONS,
 } from "@/components/financial/payment-config-field";
 import type { PaymentConfig } from "@/schemas/task-quote";
+import { attentionFieldClass, useAttentionField } from "@/lib/attention";
+import { missingBillingCustomerKeys, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
+import { PINNED_CUSTOMERS } from "@/config/company";
+import { cn } from "@/lib/utils";
 
 const STREET_TYPE_OPTIONS = [
   { value: "STREET", label: "Rua" },
@@ -54,9 +58,11 @@ interface BillingStepCustomerProps {
   configIndex: number;
   customer: any;
   disabled?: boolean;
+  /** Attention entity id — the TASK_QUOTE this config belongs to. */
+  quoteId?: string;
 }
 
-export function BillingStepCustomer({ configIndex, customer, disabled }: BillingStepCustomerProps) {
+export function BillingStepCustomer({ configIndex, customer, disabled, quoteId }: BillingStepCustomerProps) {
   const { control, setValue: setFormValue, getValues } = useFormContext();
   // useWatch returns undefined on the very first render (before subscription fires);
   // fall back to getValues() which reads the form store synchronously.
@@ -93,6 +99,38 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
   const setConfigField = useCallback((field: string, value: any) => {
     setFormValue(`customerConfigs.${configIndex}.${field}`, value, { shouldDirty: true });
   }, [setFormValue, configIndex]);
+
+  // Attention: `task-quote.ibipora-missing-order-number` targets the field `orderNumber` on the
+  // QUOTE, so a multi-customer quote shares one address across all of its customer steps. Narrow
+  // it to the config the rule is actually about — otherwise the other customer's N° do Pedido,
+  // which nobody is waiting on, would blink too.
+  const orderNumberAttention = useAttentionField("TASK_QUOTE", quoteId, "orderNumber");
+  const orderNumberAttentionClass =
+    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA && !config?.orderNumber
+      ? attentionFieldClass(orderNumberAttention)
+      : "";
+
+  // Attention: `task-quote.billing-customer-incomplete` addresses the whole cadastro under one
+  // field id (`customerData`), so every customer step of a multi-customer quote reads the same
+  // state. Narrow it twice before painting anything:
+  //   • to configs that will actually produce a nota — `generateInvoice: false` needs no cadastro;
+  //   • to the inputs that are empty in the FORM right now, not in the saved customer, so typing
+  //     a CNPJ clears its own highlight immediately instead of after a save + refetch.
+  // The empty-check is `missingBillingCustomerKeys`, the same function the save gate and the
+  // "Dados completos" badge use, which is why what blinks is exactly what would be rejected.
+  const customerDataAttention = useAttentionField("TASK_QUOTE", quoteId, "customerData");
+  const missingBillingKeys = useMemo(
+    () =>
+      customerDataAttention?.active && config?.generateInvoice !== false
+        ? missingBillingCustomerKeys(customerData)
+        : [],
+    [customerDataAttention?.active, config?.generateInvoice, customerData],
+  );
+  const customerFieldAttention = useCallback(
+    (key: string) => (missingBillingKeys.includes(key) ? attentionFieldClass(customerDataAttention) : ""),
+    [missingBillingKeys, customerDataAttention],
+  );
+  const customerFieldTitle = customerDataAttention?.match.rule.name;
 
   const handleTypeChange = useCallback((v: string | string[] | null | undefined) => {
     const val = typeof v === "string" ? v : "";
@@ -231,7 +269,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                     placeholder="00.000.000/0000-00"
                     disabled={disabled}
                     transparent
-                    className="flex-1"
+                    className={cn("flex-1", customerFieldAttention(NFSE_DOCUMENT_KEY))}
+                    title={customerFieldAttention(NFSE_DOCUMENT_KEY) ? customerFieldTitle : undefined}
                   />
                 ) : (
                   <Input
@@ -241,7 +280,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                     placeholder="000.000.000-00"
                     disabled={disabled}
                     transparent
-                    className="flex-1"
+                    className={cn("flex-1", customerFieldAttention(NFSE_DOCUMENT_KEY))}
+                    title={customerFieldAttention(NFSE_DOCUMENT_KEY) ? customerFieldTitle : undefined}
                   />
                 )}
               </div>
@@ -281,6 +321,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 onChange={(value) => setCustomerField("fantasyName", String(value ?? ""))}
                 placeholder="Nome Fantasia"
                 disabled={disabled}
+                className={customerFieldAttention("fantasyName")}
+                title={customerFieldAttention("fantasyName") ? customerFieldTitle : undefined}
               />
             </div>
             <div className="space-y-2">
@@ -290,6 +332,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 onChange={(value) => setCustomerField("corporateName", String(value ?? ""))}
                 placeholder="Razão Social"
                 disabled={disabled}
+                className={customerFieldAttention("corporateName")}
+                title={customerFieldAttention("corporateName") ? customerFieldTitle : undefined}
               />
             </div>
           </div>
@@ -304,6 +348,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 onChange={(value) => setCustomerField("zipCode", String(value ?? ""))}
                 placeholder="00000-000"
                 disabled={disabled}
+                className={customerFieldAttention("zipCode")}
+                title={customerFieldAttention("zipCode") ? customerFieldTitle : undefined}
               />
             </div>
             <div className="space-y-2">
@@ -313,6 +359,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 onChange={(value) => setCustomerField("city", String(value ?? ""))}
                 placeholder="Cidade"
                 disabled={disabled}
+                className={customerFieldAttention("city")}
+                title={customerFieldAttention("city") ? customerFieldTitle : undefined}
               />
             </div>
             <div className="space-y-2">
@@ -325,6 +373,12 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 searchable
                 clearable
                 disabled={disabled}
+                // `triggerClassName`, not `className`: `className` lands on Combobox's wrapper div,
+                // whose padding box is exactly coincident with the trigger Button's border box —
+                // and a child's border paints over the parent's INSET shadow, so the ring was
+                // invisible at rest. On the trigger it also inherits the right radius, which is
+                // why the `rounded-md` patch (the trigger is rounded-lg) is gone.
+                triggerClassName={customerFieldAttention("state")}
               />
             </div>
             <div className="space-y-2">
@@ -346,6 +400,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 onChange={(value) => setCustomerField("address", String(value ?? ""))}
                 placeholder="Rua, Avenida, etc."
                 disabled={disabled}
+                className={customerFieldAttention("address")}
+                title={customerFieldAttention("address") ? customerFieldTitle : undefined}
               />
             </div>
             <div className="space-y-2">
@@ -355,6 +411,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 onChange={(value) => setCustomerField("addressNumber", String(value ?? ""))}
                 placeholder="Nº"
                 disabled={disabled}
+                className={customerFieldAttention("addressNumber")}
+                title={customerFieldAttention("addressNumber") ? customerFieldTitle : undefined}
               />
             </div>
           </div>
@@ -368,6 +426,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 onChange={(value) => setCustomerField("neighborhood", String(value ?? ""))}
                 placeholder="Bairro"
                 disabled={disabled}
+                className={customerFieldAttention("neighborhood")}
+                title={customerFieldAttention("neighborhood") ? customerFieldTitle : undefined}
               />
             </div>
             <div className="space-y-2">
@@ -436,6 +496,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 onChange={(value) => setConfigField("orderNumber", value != null ? String(value) : null)}
                 placeholder="Ex: 12345"
                 disabled={disabled}
+                className={orderNumberAttentionClass}
+                title={orderNumberAttentionClass ? orderNumberAttention?.match.rule.name : undefined}
               />
             </div>
             {/* ── Condição de Pagamento (type) ── */}

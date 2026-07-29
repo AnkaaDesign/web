@@ -46,13 +46,45 @@ import {
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
 import { BillingDocumentPreviews } from "@/components/financial/billing/preview/billing-document-previews";
 import { useNextNfseNumber } from "@/hooks/financial/use-nfse";
+// Imported from the filters module rather than the table barrel so the detail route does not pull
+// the whole list page into its bundle.
+import { BILLING_FALLBACK_LIST_QUERY } from "@/components/financial/billing/table/billing-table-filters";
+import { readQuoteSiblingState, useQuoteSiblingIds } from "@/components/financial/shared/quote-sibling-nav";
+import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
+import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
+import { toAttentionQuoteEntity } from "@/components/financial/shared/quote-attention";
+import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navigation";
+import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
+import { useAttentionEntity, useAttentionField } from "@/lib/attention";
+import { hasCompleteBillingCustomerData, missingBillingCustomerLabels } from "@/lib/billing-customer-data";
+import { PINNED_CUSTOMERS } from "@/config/company";
 
+/**
+ * Remount the wizard whenever the record changes.
+ *
+ * Prev/next paging swaps `:id` under a component that would otherwise stay mounted, and this page
+ * hydrates its form with `form.reset(..., { keepDirtyValues: true })` — right for a background
+ * refetch of the same record, wrong for a different one: record A's half-typed name, serial and
+ * customer CNPJ would render on record B, still flagged dirty, and `executeSave` would push them
+ * to B's task and to B's customers. The wizard step and the "jump to Resumo" latch have the same
+ * problem. A `key` reseeds all of it, which is what "a different record" means.
+ */
 export const BillingDetailPage = () => {
+  const { id } = useParams<{ id: string }>();
+  return <BillingDetailPageInner key={id ?? "novo"} />;
+};
+
+const BillingDetailPageInner = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   // Where to return after save — set by whoever sent the user here.
   const returnTo = readReturnTo(location.state);
+  // Prev/next pager context. `ids` is a fast path (the list handed it over on row click); when it
+  // is absent or is only the loaded page, the sibling hook rebuilds the list from `listQuery`, so
+  // the pager renders no matter how the user got here — refresh, Back, direct URL, new tab,
+  // notification, deep link, a receivable row, or the task detail's "Editar".
+  const siblingState = readQuoteSiblingState(location.state);
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const customersCache = useRef<Map<string, any>>(new Map());
@@ -73,6 +105,8 @@ export const BillingDetailPage = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [layoutFiles, setLayoutFiles] = useState<FileWithPreview[]>([]);
+  // Foto da plaqueta (VIN) — imagem única, espelhando o campo do formulário de Tarefa.
+  const [vinPlateFiles, setVinPlateFiles] = useState<FileWithPreview[]>([]);
   const [billingApprovalDialogOpen, setBillingApprovalDialogOpen] = useState(false);
   // Predicted NFS-e número (last emitted + 1) — fetched only while the approval modal is open.
   const { data: nextNfse } = useNextNfseNumber(billingApprovalDialogOpen);
@@ -87,7 +121,9 @@ export const BillingDetailPage = () => {
     enabled: !!id,
     include: {
       customer: { include: { logo: true } },
-      truck: true,
+      // `vinPlate` is a File relation, so a boolean `truck: true` would leave the Plaqueta field
+      // permanently empty and let a save wipe a photo that was already there.
+      truck: { include: { vinPlate: true } },
       serviceOrders: {
         include: {
           checkinFiles: true,
@@ -115,6 +151,13 @@ export const BillingDetailPage = () => {
 
   const task = taskResponse?.data;
   const quote = task?.quote;
+
+  // Attention: register this quote so its rules evaluate and honour their ack policy — the same
+  // entity the Faturamento list registers, in the same shape, so a record behaves identically
+  // whether it was loaded here or there. This page is a wizard, not a <DetailPage>, so the hook
+  // that DetailPage would have called is called directly.
+  const quoteAttentionEntity = useMemo(() => toAttentionQuoteEntity(task ?? null), [task]);
+  useAttentionEntity("TASK_QUOTE", quote?.id, quoteAttentionEntity);
 
   // The task's image layouts — the pool the "Layout Aprovado" picker chooses from
   // (billing edits an existing task, so the candidates are its persisted layouts).
@@ -172,6 +215,9 @@ export const BillingDetailPage = () => {
       plate: "" as string,
       serialNumber: "" as string,
       chassisNumber: "" as string,
+      // Foto da plaqueta (VIN). `null` é o valor EXPLÍCITO de "removida" — `undefined` faria a
+      // API pular o campo e a foto antiga sobreviveria a uma remoção.
+      vinPlateId: null as string | null,
       category: "" as string,
       implementType: IMPLEMENT_TYPE.REFRIGERATED as string,
       details: "" as string,
@@ -194,9 +240,58 @@ export const BillingDetailPage = () => {
     },
   });
 
+  // Unsaved changes guard — mirrors the Orçamento wizard. It was absent here, which was survivable
+  // while leaving meant a deliberate Back press; with the record pager, discarding a half-edited
+  // faturamento is one click away from the wizard's own "Próximo".
+  const { showDialog, confirmNavigation, cancelNavigation, guardedNavigate, allowNavigation } = useUnsavedChangesGuard({
+    isDirty: form.formState.isDirty,
+    isSubmitting: isSaving,
+  });
+
+  // Ordered sibling ids + the prev/next widget. Declared up here (before the loading/not-found
+  // early returns) because these are hooks; the widget itself is rendered in `headerExtra` further
+  // down, left of "Ver Dossiê" and clear of the wizard's own step buttons.
+  const { ids: siblingIds, complete: siblingIdsComplete } = useQuoteSiblingIds(BILLING_FALLBACK_LIST_QUERY, id ?? "", siblingState);
+  const recordNav = useRecordNavigation({
+    ids: siblingIds,
+    currentId: id ?? "",
+    toRoute: (rid) => routes.financial.billing.details(rid),
+    // Carried forward on every hop so the pager, the "voltar" target and the reconstructed list
+    // all survive paging.
+    state: { returnTo, listQuery: siblingState.listQuery, idsComplete: siblingIdsComplete },
+    // No ←/→ here: this is a form, and the hook's guard only skips a FOCUSED input, so an arrow
+    // key pressed with focus on the page body would page away mid-edit.
+    keyboard: false,
+    enabled: !!id,
+    // Same reason as the Orçamento page: the guard's pushState patch would catch a bare navigate,
+    // but it replays only the URL and would drop the id list the pager runs on.
+    onNavigate: guardedNavigate,
+  });
+
   // Populate form when task/quote data loads
   useEffect(() => {
     if (!task) return;
+
+    // Seed the Plaqueta photo. Above the `!quote` early return on purpose: a task without a quote
+    // still has a truck, and the field is on the Tarefa step either way.
+    const persistedVinPlate = (task.truck as any)?.vinPlate;
+    setVinPlateFiles(
+      persistedVinPlate
+        ? [
+            {
+              id: persistedVinPlate.id,
+              name: persistedVinPlate.originalName || persistedVinPlate.filename || "plaqueta",
+              size: persistedVinPlate.size || 0,
+              type: persistedVinPlate.mimetype || "image/jpeg",
+              lastModified: Date.now(),
+              uploaded: true,
+              uploadProgress: 100,
+              uploadedFileId: persistedVinPlate.id,
+              thumbnailUrl: persistedVinPlate.thumbnailUrl,
+            } as FileWithPreview,
+          ]
+        : [],
+    );
 
     const taskFields = {
       name: task.name || "",
@@ -204,6 +299,7 @@ export const BillingDetailPage = () => {
       plate: task.truck?.plate || "",
       serialNumber: task.serialNumber || "",
       chassisNumber: task.truck?.chassisNumber || "",
+      vinPlateId: task.truck?.vinPlateId || null,
       category: task.truck?.category || "",
       implementType: task.truck?.implementType || IMPLEMENT_TYPE.REFRIGERATED,
       details: task.details || "",
@@ -312,6 +408,8 @@ export const BillingDetailPage = () => {
 
   // Skip to summary step when invoices already exist
   const hasInitializedStep = useRef(false);
+  // No per-record reset needed here: the page is keyed by `:id` (see BillingDetailPage), so a
+  // prev/next hop remounts and this ref starts false again.
   useEffect(() => {
     if (hasInitializedStep.current) return;
     if (invoices.length > 0 && customerConfigs.length > 0) {
@@ -348,6 +446,42 @@ export const BillingDetailPage = () => {
   const proposalStepIdx = canSeeBudgetInfoStep ? 2 : null;
   const servicesStepIdx = canSeeBudgetInfoStep ? 3 : 2;
   const firstCustomerStepIdx = servicesStepIdx + 1;
+
+  // Attention: open on the customer step that a rule is asking about.
+  //
+  // Without this the signal is unreachable. Both fields it can point at — the N° do Pedido and the
+  // cadastro for the NFS-e — are editable only on a customer step; every customer step is mounted
+  // but `display: none` unless it is the current one, and the page opens on step 1 for exactly the
+  // records that match (a finished task with no invoice yet). So the user would follow a blinking
+  // row into a page with nothing highlighted anywhere — and leaving acks the rule for four hours.
+  // Only fires when a step was not already chosen for another reason ("jump to Resumo when
+  // invoices exist" wins, and the Resumo shows both gaps too).
+  const orderNumberAttention = useAttentionField("TASK_QUOTE", quote?.id, "orderNumber");
+  const orderNumberAttentionActive = !!orderNumberAttention?.active;
+  const customerDataAttention = useAttentionField("TASK_QUOTE", quote?.id, "customerData");
+  const customerDataAttentionActive = !!customerDataAttention?.active;
+  useEffect(() => {
+    if (hasInitializedStep.current) return;
+    if (invoices.length > 0) return;
+    if (!orderNumberAttentionActive && !customerDataAttentionActive) return;
+    // Wait for the configs to hydrate — latching on an empty list would spend the one-shot before
+    // there is anything to point at.
+    if (customerConfigs.length === 0) return;
+    // Latch FIRST, unconditionally. `customerConfigs` is a `form.watch`, so it is a fresh array on
+    // every keystroke; leaving the latch inside the `idx >= 0` branch meant that while nothing
+    // matched, the effect stayed live forever — and the moment the user cleared a field to retype
+    // it (say, on the Resumo) `idx` flipped and this teleported them off the step mid-edit.
+    hasInitializedStep.current = true;
+    // First config the active rule(s) actually name — a multi-customer quote must land on the
+    // one with the gap, not on whichever customer happens to be first.
+    const idx = customerConfigs.findIndex((c: any) => {
+      if (c?.generateInvoice === false) return false; // no nota, so neither rule applies to it
+      if (orderNumberAttentionActive && c?.customerId === PINNED_CUSTOMERS.IBIPORA && !c?.orderNumber) return true;
+      return customerDataAttentionActive && !hasCompleteBillingCustomerData(c?.customerData);
+    });
+    if (idx < 0) return;
+    setCurrentStep(firstCustomerStepIdx + idx);
+  }, [orderNumberAttentionActive, customerDataAttentionActive, invoices.length, customerConfigs, firstCustomerStepIdx]);
 
   const STATUSES_REQUIRING_COMPLETE_DATA = [
     "BUDGET_APPROVED",
@@ -412,16 +546,16 @@ export const BillingDetailPage = () => {
       const data = config.customerData || {};
       const paymentConfig = form.getValues(`customerConfigs.${i}.paymentConfig` as any);
       const paymentCondition = form.getValues(`customerConfigs.${i}.paymentCondition` as any);
-      const errors: string[] = [];
-      if (!data.cnpj && !data.cpf) errors.push("CNPJ ou CPF");
-      if (!data.fantasyName?.trim()) errors.push("Nome Fantasia");
-      if (!data.corporateName?.trim()) errors.push("Razão Social");
-      if (!data.zipCode?.trim()) errors.push("CEP");
-      if (!data.city?.trim()) errors.push("Cidade");
-      if (!data.state?.trim()) errors.push("Estado");
-      if (!data.address?.trim()) errors.push("Logradouro");
-      if (!data.addressNumber?.trim()) errors.push("Número");
-      if (!data.neighborhood?.trim()) errors.push("Bairro");
+      // The customer half comes from the SHARED requirement list, which is also what the attention
+      // rule `task-quote.billing-customer-incomplete` builds its predicate from — so a row can
+      // never blink over a field this gate would have accepted, or stay quiet about one it rejects.
+      //
+      // Which is why `generateInvoice === false` is skipped here too: the rule skips it, and the
+      // per-input highlight skips it. Without this the gate rejected a config no rule had ever
+      // named, dropping the user on a step where nothing was highlighted and no row had blinked.
+      // Condição de Pagamento is still required — that one is about collecting, not about the nota.
+      const skipCadastro = config.generateInvoice === false;
+      const errors: string[] = skipCadastro ? [] : missingBillingCustomerLabels(data);
       if (!paymentCondition && !(paymentConfig as any)?.type) errors.push("Condição de Pagamento");
       if (errors.length > 0) {
         setCurrentStep(firstCustomerStepIdx + i);
@@ -444,6 +578,42 @@ export const BillingDetailPage = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   }, []);
 
+  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
+  // the SAME gate as "Próximo" — including its read-only bypass, since a user who
+  // cannot edit has nothing to validate. FormSteps only offers steps already
+  // reached (plus the next one).
+  const handleStepClick = useCallback(
+    (step: number) => {
+      if (step === currentStep) return;
+      if (step < currentStep || !canEdit) {
+        setCurrentStep(Math.min(step, totalSteps));
+        return;
+      }
+      if (validateCurrentStep()) setCurrentStep(Math.min(step, totalSteps));
+    },
+    [currentStep, canEdit, validateCurrentStep, totalSteps],
+  );
+
+  /**
+   * Foto da plaqueta — imagem única, só o ÚLTIMO arquivo vale (`maxFiles={1}` já limita a seleção,
+   * mas o estado é normalizado aqui de qualquer forma).
+   *
+   * Um arquivo JÁ ENVIADO viaja como `truck.vinPlateId`; um arquivo novo ainda não tem id, então
+   * `vinPlateId` fica `null` até `executeSave` fazer o upload e preencher. Limpar o campo manda
+   * `null` explícito — é assim que a foto é removida.
+   */
+  const handleVinPlateFilesChange = useCallback(
+    (files: FileWithPreview[]) => {
+      const picked = files.slice(-1);
+      setVinPlateFiles(picked);
+      const existing = picked.find((f) => f.uploaded);
+      form.setValue("vinPlateId", (existing?.uploadedFileId || existing?.id || null) as never, {
+        shouldDirty: true,
+      });
+    },
+    [form],
+  );
+
   // Core save logic
   const executeSave = useCallback(async () => {
     if (!quote?.id || !task?.id) return;
@@ -453,6 +623,20 @@ export const BillingDetailPage = () => {
 
     setIsSaving(true);
     try {
+      // 0. Upload a newly picked Plaqueta photo, so step 1 can send its id. A failure here must
+      // NOT abort the save: the rest of the billing data is what the user came for, and the
+      // interceptor already toasted. `vinPlateId` then stays at whatever it was.
+      let vinPlateId: string | null = (formData as any).vinPlateId ?? null;
+      const pendingVinPlate = vinPlateFiles.find((f) => !f.uploaded);
+      if (pendingVinPlate) {
+        try {
+          const response = await uploadSingleFile(pendingVinPlate, { fileContext: "truckVinPlate" });
+          if (response.success && response.data) vinPlateId = response.data.id;
+        } catch (error: any) {
+          toast.error(`Erro ao enviar a foto da plaqueta: ${error.message}`);
+        }
+      }
+
       // 1. Update billing-relevant task fields
       const taskUpdateData: any = {
         name: formData.name || undefined,
@@ -465,6 +649,9 @@ export const BillingDetailPage = () => {
         truck: {
           plate: formData.plate || undefined,
           chassisNumber: formData.chassisNumber || undefined,
+          // Explicit null, never undefined: undefined is how the repo is told "don't touch",
+          // so clearing the field would silently keep the old photo.
+          vinPlateId,
           category: formData.category || undefined,
           implementType: formData.implementType || undefined,
         },
@@ -477,6 +664,10 @@ export const BillingDetailPage = () => {
         if (config.customerData && config.customerId) {
           try {
             await customerService.updateCustomer(config.customerId, {
+              // First entry of NFSE_REQUIRED_CUSTOMER_FIELDS, and the step renders an input for it
+              // — but it was missing here, so filling it was silently discarded and
+              // `billing-customer-incomplete` kept firing over a field the user had already typed.
+              fantasyName: config.customerData.fantasyName || undefined,
               corporateName: config.customerData.corporateName || undefined,
               cnpj: config.customerData.cnpj || undefined,
               cpf: config.customerData.cpf || undefined,
@@ -658,6 +849,9 @@ export const BillingDetailPage = () => {
           duration: 6000,
         });
       } else {
+        // The save just succeeded, so the form is no longer worth guarding — without this the
+        // guard would prompt on the way out of a successful save.
+        allowNavigation();
         navigate(returnTo ?? routes.financial.billing.root);
       }
     } catch {
@@ -674,6 +868,7 @@ export const BillingDetailPage = () => {
     updateTaskAsync,
     navigate,
     layoutFiles,
+    vinPlateFiles,
     canSeeBudgetInfoStep,
     returnTo,
   ]);
@@ -730,6 +925,8 @@ export const BillingDetailPage = () => {
   }
 
   // Build PageHeader actions. Read-only review mode has no step navigation.
+  // The record pager is NOT here — it renders in `headerExtra`, left of "Ver Dossiê", so it never
+  // sits shoulder to shoulder with the wizard's own "Anterior / Próximo".
   const actions: any[] = [];
   if (!reviewOnly && currentStep > 1) {
     actions.push({
@@ -796,59 +993,64 @@ export const BillingDetailPage = () => {
             { label: "Faturamento", href: routes.financial.billing.root },
             { label: taskDisplayName },
           ]}
-          onBreadcrumbNavigate={(path) => navigate(path)}
+          onBreadcrumbNavigate={(path) => guardedNavigate(path)}
           actions={actions}
           className="flex-shrink-0"
           headerExtra={
-            quote?.id && customerConfigs.length > 0 ? (
-              <>
-                {customerConfigs.length > 1 && (
-                  <Combobox
-                    value={dossieCustomerId}
-                    onValueChange={(v) => setDossieCustomerId((v as string) || "all")}
-                    options={[
-                      { value: "all", label: "Completo" },
-                      ...customerConfigs.map((config: any, i: number) => {
-                        const cached = customersCache.current.get(config.customerId);
-                        const name =
-                          cached?.fantasyName ||
-                          cached?.corporateName ||
-                          `Cliente ${i + 1}`;
-                        return { value: config.customerId, label: name };
-                      }),
-                    ]}
-                    searchable={false}
-                    clearable={false}
-                    className="w-[260px]"
-                    triggerClassName="h-8 text-sm"
-                  />
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 whitespace-nowrap"
-                  onClick={() => {
-                    // "Completo" = no customer segment. Substituting the first
-                    // config here (as this once did) opens ONE customer's dossiê
-                    // while the picker still reads "Completo".
-                    const custId = dossieCustomerId === "all" ? null : dossieCustomerId;
-                    if (quote?.id) {
-                      window.open(
-                        routes.customer.serviceReport(custId, quote.id),
-                        "_blank",
-                      );
-                    }
-                  }}
-                >
-                  <IconExternalLink className="h-4 w-4" />
-                  Ver Dossiê
-                </Button>
-              </>
-            ) : undefined
+            <>
+              {/* Left of "Ver Dossiê" on purpose: as a PageAction it lands beside the wizard's own
+                  "Anterior / Próximo", and two adjacent pairs of arrows read as one control. */}
+              <RecordPager nav={recordNav} keyboard={false} />
+              {quote?.id && customerConfigs.length > 0 && (
+                <>
+                  {customerConfigs.length > 1 && (
+                    <Combobox
+                      value={dossieCustomerId}
+                      onValueChange={(v) => setDossieCustomerId((v as string) || "all")}
+                      options={[
+                        { value: "all", label: "Completo" },
+                        ...customerConfigs.map((config: any, i: number) => {
+                          const cached = customersCache.current.get(config.customerId);
+                          const name =
+                            cached?.fantasyName ||
+                            cached?.corporateName ||
+                            `Cliente ${i + 1}`;
+                          return { value: config.customerId, label: name };
+                        }),
+                      ]}
+                      searchable={false}
+                      clearable={false}
+                      className="w-[260px]"
+                      triggerClassName="h-8 text-sm"
+                    />
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 whitespace-nowrap"
+                    onClick={() => {
+                      // "Completo" = no customer segment. Substituting the first
+                      // config here (as this once did) opens ONE customer's dossiê
+                      // while the picker still reads "Completo".
+                      const custId = dossieCustomerId === "all" ? null : dossieCustomerId;
+                      if (quote?.id) {
+                        window.open(
+                          routes.customer.serviceReport(custId, quote.id),
+                          "_blank",
+                        );
+                      }
+                    }}
+                  >
+                    <IconExternalLink className="h-4 w-4" />
+                    Ver Dossiê
+                  </Button>
+                </>
+              )}
+            </>
           }
         />
 
-        {!reviewOnly && <FormSteps steps={steps} currentStep={currentStep} className="flex-shrink-0" />}
+        {!reviewOnly && <FormSteps steps={steps} currentStep={currentStep} className="flex-shrink-0" onStepClick={handleStepClick} disabled={isSaving} />}
 
         <div className="flex-1 overflow-y-auto pb-6">
           <FormProvider {...form}>
@@ -860,6 +1062,8 @@ export const BillingDetailPage = () => {
                     disabled={!canEdit}
                     customersCache={customersCache}
                     initialCustomer={task?.customer}
+                    vinPlateFiles={vinPlateFiles}
+                    onVinPlateFilesChange={handleVinPlateFilesChange}
                   />
                 </div>
 
@@ -885,6 +1089,7 @@ export const BillingDetailPage = () => {
                         configIndex={i}
                         customer={cachedCustomer}
                         disabled={!canEdit}
+                        quoteId={quote?.id}
                       />
                     </div>
                   );
@@ -993,6 +1198,8 @@ export const BillingDetailPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <UnsavedChangesDialog open={showDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
     </PrivilegeRoute>
   );
 };

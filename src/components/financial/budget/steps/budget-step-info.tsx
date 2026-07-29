@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
+import { PINNED_CUSTOMERS } from "@/config/company";
 import { Input } from "@/components/ui/input";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { IconUsers, IconCalendar } from "@tabler/icons-react";
@@ -128,8 +129,8 @@ export function BudgetStepInfo({
     [setValue],
   );
 
-  // Customer search — pin Ankaa customer first
-  const PINNED_CUSTOMER_ID = "93dfbeb1-aec0-4829-a297-6a2f09fcfe08";
+  // Customer search — pin the Ibiporã customer first (the highest-volume invoice-to client).
+  const PINNED_CUSTOMER_ID = PINNED_CUSTOMERS.IBIPORA;
 
   const searchCustomers = useCallback(
     async (search?: string, page: number = 1): Promise<{ data: any[]; hasMore: boolean }> => {

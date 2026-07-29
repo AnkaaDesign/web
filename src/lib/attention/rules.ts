@@ -29,6 +29,9 @@ import {
   TASK_QUOTE_STATUS,
 } from "@/constants";
 
+import { PINNED_CUSTOMERS } from "@/config/company";
+import { NFSE_DOCUMENT_FIELDS, NFSE_REQUIRED_CUSTOMER_FIELDS } from "@/lib/billing-customer-data";
+
 import type { AttentionCadence, AttentionRule, PredicateNode } from "./types";
 import { NOW_SENTINEL } from "./types";
 
@@ -43,6 +46,58 @@ function whileInFlight(node: PredicateNode): PredicateNode {
   return {
     op: "and",
     nodes: [{ op: "ne", field: "status", value: TASK_STATUS.COMPLETED }, { op: "ne", field: "status", value: TASK_STATUS.CANCELLED }, node],
+  };
+}
+
+/**
+ * The quote has not been billed yet — the only window in which a missing invoicing field is
+ * still BLOCKING anything.
+ *
+ * Written as the two statuses that precede billing rather than as "not CANCELLED / not SETTLED",
+ * because the negative form let every post-invoice status through: eleven Ibiporã quotes whose
+ * nota had been issued and whose money had been in the bank for months kept blinking, which is
+ * half of why the Faturamento list looked like it was on fire. A new TaskQuoteStatus added later
+ * defaults to "already past this point", which is the safe direction for an alert.
+ */
+function notYetInvoiced(): PredicateNode {
+  return {
+    op: "or",
+    nodes: [
+      { op: "eq", field: "status", value: TASK_QUOTE_STATUS.PENDING },
+      { op: "eq", field: "status", value: TASK_QUOTE_STATUS.BUDGET_APPROVED },
+    ],
+  };
+}
+
+/**
+ * "This customer cannot receive an NFS-e yet", as a predicate over the customer at `prefix`.
+ *
+ * BUILT from `NFSE_REQUIRED_CUSTOMER_FIELDS` rather than transcribed, so the rule and the save
+ * gate that rejects the very same record (`validateCustomerData`) can never disagree about which
+ * fields matter. `isNull` counts "" as missing, matching the `= ''` in the server mirror.
+ *
+ * The `notNull` on the primary key is not a formality — it is what stops the rule from being a
+ * catastrophe. `isNull` cannot tell "this column is empty" from "this path is not in the object",
+ * so a quote registered by a query that forgot `customerConfigs.customer` reads as EVERY field
+ * missing, and the rule fires on every row in the list. That is the exact failure this whole
+ * change set exists to remove, so an unloaded relation must mean NO EVIDENCE, never evidence of
+ * absence. (A caught regression: the Ibiporã tests, whose fixtures carry no customer, all started
+ * matching this rule too.) The id is in every include that feeds the engine.
+ */
+function customerMissingBillingData(prefix: string): PredicateNode {
+  return {
+    op: "and",
+    nodes: [
+      { op: "notNull", field: `${prefix}.id` },
+      {
+        op: "or",
+        nodes: [
+          // The document is satisfied by EITHER — only missing when both are.
+          { op: "and", nodes: NFSE_DOCUMENT_FIELDS.map((key) => ({ op: "isNull", field: `${prefix}.${key}` }) as PredicateNode) },
+          ...NFSE_REQUIRED_CUSTOMER_FIELDS.map((field) => ({ op: "isNull", field: `${prefix}.${field.key}` }) as PredicateNode),
+        ],
+      },
+    ],
   };
 }
 
@@ -266,38 +321,137 @@ export const ATTENTION_RULES: AttentionRule[] = [
   },
 
   // ── Comercial / Financeiro ──────────────────────────────────────────────────
-  // Deliberately NOT "budget still pending": every budget is legitimately pending
-  // for a while, so that would be permanent noise. Past its OWN expiry date it is
-  // a real backlog item — renew it or cancel it.
+  //
+  // There were two more rules here — `task-quote.expired-pending` (orçamento PENDING past its
+  // own `expiresAt`) and `task-quote.due` (status DUE) — and they are GONE on purpose. Between
+  // them they matched 171 of the ~250 rows in Faturamento/Orçamento, which is how the list came
+  // to look like everything was on fire while nothing on it was actionable:
+  //
+  //   • DUE is a STATUS the table already prints in red, and it is resolved by the CUSTOMER
+  //     paying. Nobody here can clear it, so it re-armed every 30 minutes forever — the exact
+  //     "permanently unresolvable alert" this file's own rule-selection principle forbids.
+  //     Worse, half of them were already invoiced and settled downstream.
+  //   • expired-pending matched 147 budgets, 74 of them expired MORE THAN 90 DAYS ago. A backlog
+  //     that large is a report, not an alert; blinking all of it teaches people to ignore the
+  //     colour everywhere else.
+  //
+  // What replaces them is below: the two things that genuinely BLOCK an invoice from going out,
+  // both targeted at the exact field that unblocks it.
+
+  // R6 — Faturamento da Ibiporã sem N° do Pedido.
+  //
+  // A Ibiporã fatura contra pedido de compra: sem o número dela a nota não sai. Enquanto a tarefa
+  // está em andamento isso é só um cadastro incompleto; quando a tarefa TERMINA vira faturamento
+  // travado, e alguém precisa ligar e pedir o número. Por isso o gatilho é `task.status`
+  // COMPLETED — e por isso esta é a ÚNICA regra de tarefa que NÃO passa por `whileInFlight`, que
+  // existe exatamente para excluir COMPLETED/CANCELLED. Envolvê-la ali a tornaria estruturalmente
+  // incapaz de disparar, e silenciosamente.
+  //
+  // A entidade é o TASK_QUOTE, não a TASK: o descritor de TASK_QUOTE já aponta para
+  // Orçamento/Faturamento (`entities.ts`), que são as duas telas onde o campo existe, enquanto o
+  // de TASK aponta para Agenda/Cronograma, onde ninguém preenche pedido. Registrar como TASK
+  // também deixaria a página de detalhe da tarefa dar ack (e calar) um alerta financeiro que o
+  // usuário de produção nem viu.
+  //
+  // `task.status` vem do objeto que as listas de Orçamento/Faturamento registram (o quote acrescido
+  // de `task: { id, status }`), e não de um include invertido quote → task: assim o caminho fica
+  // idêntico ao `where: { task: { status } }` do espelho no servidor.
+  //
+  // `isNull` trata "" como vazio, então "sem número" cobre tanto null quanto string vazia.
   {
-    id: "task-quote.expired-pending",
-    name: "Orçamento vencido sem aprovação",
+    id: "task-quote.ibipora-missing-order-number",
+    name: "Faturamento Ibiporã sem N° do Pedido",
     entityType: "TASK_QUOTE",
     enabled: true,
-    priority: 30,
-    targetSectors: [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL],
+    // Abaixo de billing-customer-incomplete (22): sem os dados do cliente a nota não sai para
+    // NINGUÉM, enquanto o pedido trava só a Ibiporã. A falta do número continua piscando no
+    // próprio campo, que é onde ela se resolve.
+    priority: 20,
+    // Quem pode resolver: FINANCIAL e COMMERCIAL editam o orçamento (canEditQuote). ACCOUNTING
+    // abre a página em modo somente-leitura, e alerta para quem não pode agir é o que ensina o
+    // time a ignorar o sistema. ADMIN herda automaticamente.
+    targetSectors: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL],
     predicate: {
       op: "and",
       nodes: [
-        { op: "eq", field: "status", value: TASK_QUOTE_STATUS.PENDING },
-        { op: "lt", field: "expiresAt", value: NOW_SENTINEL },
+        { op: "eq", field: "task.status", value: TASK_STATUS.COMPLETED },
+        notYetInvoiced(),
+        {
+          op: "some",
+          field: "customerConfigs",
+          node: {
+            op: "and",
+            nodes: [
+              // Mesmo papel do `notNull customer.id` da R7 e pela mesma razão: `isNull` não
+              // distingue "coluna vazia" de "caminho ausente no objeto", então um config trazido
+              // por um select sem `orderNumber` leria como SEM número e a regra acenderia a lista
+              // inteira. O id do config está em todos os includes que alimentam o engine.
+              { op: "notNull", field: "id" },
+              { op: "eq", field: "customerId", value: PINNED_CUSTOMERS.IBIPORA },
+              // Sem nota não há onde imprimir o pedido de compra. Um config com
+              // `generateInvoice: false` é justamente o caso "essa parte não vai ter NF".
+              { op: "isTrue", field: "generateInvoice" },
+              { op: "isNull", field: "orderNumber" },
+            ],
+          },
+        },
       ],
     },
-    target: { level: "row" },
+    target: { level: "field", field: "orderNumber" },
     ack: "onExitCooldown",
-    cadence: cadence({ tone: "harsh" }),
+    // Soft: é pendência de dado, não emergência. Cooldown de 4h em vez dos 30min padrão — o número
+    // depende de o cliente responder, então re-armar a cada meia hora cobra algo que ninguém
+    // consegue resolver naquele intervalo.
+    cadence: cadence({ tone: "soft", cooldownMs: 4 * 60 * 60 * 1000 }),
   },
+
+  // R7 — Tarefa entregue, orçamento aprovado, e o CADASTRO do cliente não permite emitir a nota.
+  //
+  // O par da R6, e pela mesma razão: é dinheiro parado por causa de um campo. `validateCustomerData`
+  // (nas duas páginas de detalhe) já RECUSA salvar como BILLING_APPROVED enquanto faltar qualquer
+  // um destes campos — a regra só antecipa essa recusa para a lista, em vez de deixar o usuário
+  // descobrir no fim do wizard. Por isso a lista de campos vem de `lib/billing-customer-data.ts`,
+  // a mesma que o gate de salvamento e os selos "Dados completos/incompletos" consomem: se um dia
+  // a NFS-e exigir outro campo, muda-se num lugar só e as quatro superfícies concordam.
+  //
+  // O recorte é BUDGET_APPROVED, não "qualquer status": antes disso o orçamento ainda pode nem ser
+  // aprovado, e depois disso a nota JÁ SAIU — logo o cadastro já estava bom. É o que torna a regra
+  // finita: ela existe exatamente na janela em que o dado bloqueia alguém.
+  //
+  // Resolve-se por CLIENTE, não por orçamento: preencher o CNPJ de um cliente apaga o alerta de
+  // todos os orçamentos dele de uma vez.
   {
-    id: "task-quote.due",
-    name: "Parcela vencendo",
+    id: "task-quote.billing-customer-incomplete",
+    name: "Faturamento sem cadastro completo do cliente",
     entityType: "TASK_QUOTE",
     enabled: true,
-    priority: 25,
-    targetSectors: [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL],
-    predicate: { op: "eq", field: "status", value: TASK_QUOTE_STATUS.DUE },
-    target: { level: "row" },
+    priority: 22,
+    targetSectors: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL],
+    predicate: {
+      op: "and",
+      nodes: [
+        { op: "eq", field: "task.status", value: TASK_STATUS.COMPLETED },
+        { op: "eq", field: "status", value: TASK_QUOTE_STATUS.BUDGET_APPROVED },
+        {
+          op: "some",
+          field: "customerConfigs",
+          node: {
+            op: "and",
+            nodes: [
+              // Só quem vai receber NFS-e precisa do cadastro completo.
+              { op: "isTrue", field: "generateInvoice" },
+              customerMissingBillingData("customer"),
+            ],
+          },
+        },
+      ],
+    },
+    // Endereço de GRUPO: o alvo é o bloco "Dados do cliente" do passo do cliente, e o passo pinta
+    // individualmente cada input que está vazio (ver `billing-step-customer.tsx`). Um alvo único
+    // por campo exigiria nove regras que sobem e descem juntas.
+    target: { level: "field", field: "customerData" },
     ack: "onExitCooldown",
-    cadence: cadence({ tone: "soft" }),
+    cadence: cadence({ tone: "soft", cooldownMs: 4 * 60 * 60 * 1000 }),
   },
 
   // ── Every sector ────────────────────────────────────────────────────────────

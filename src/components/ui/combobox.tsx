@@ -262,6 +262,10 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
     }
   }, [async]);
 
+  // Freshest `value` for the async option-merge effect below, which must not re-run on selection.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
   // Reset pagination when search changes
   useEffect(() => {
     // console.log('[Combobox] Search changed, resetting pagination. debouncedSearch:', debouncedSearch);
@@ -297,8 +301,13 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
         });
       }
 
-      // Get current selected values
-      const currentSelectedValues = Array.isArray(value) ? value : (value ? [value] : []);
+      // Get current selected values. Read through a ref, NOT the prop: `value` used to be a dep of
+      // this effect, and since the effect unconditionally replaces the option list with page 1,
+      // every selection threw away the pages the user had scrolled in — while `currentPage` kept
+      // its count, so the next "carregar mais" skipped a page outright and those rows became
+      // unreachable. Selecting must not reset paging.
+      const latestValue = valueRef.current;
+      const currentSelectedValues = Array.isArray(latestValue) ? latestValue : (latestValue ? [latestValue] : []);
 
       // Merge in selected items from cache that aren't in the current response
       // ONLY when there's no active search - this ensures selected items show when dropdown opens
@@ -333,7 +342,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
       setAllAsyncOptions([]);
       setHasMore(false);
     }
-  }, [asyncResponse, debouncedSearch, value]); // Removed getOptionValue and initialOptions - using refs instead
+  }, [asyncResponse, debouncedSearch]); // getOptionValue, initialOptions and value are read via refs
 
   // Load more function
   const loadMore = useCallback(async () => {

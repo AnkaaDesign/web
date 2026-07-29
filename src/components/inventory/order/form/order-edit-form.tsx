@@ -590,6 +590,15 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     }
   }, [currentStep, setSearchParams]);
 
+  const goToStep = useCallback(
+    (step: number) => {
+      const clamped = Math.max(1, Math.min(steps.length, step));
+      setCurrentStep(clamped);
+      setSearchParams((prevParams) => setStepInUrl(prevParams, clamped), { replace: true });
+    },
+    [setSearchParams, steps.length],
+  );
+
   // File change handlers
   const handleReceiptFilesChange = useCallback((files: FileWithPreview[]) => {
     setReceiptFiles(files);
@@ -739,6 +748,21 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       nextStep();
     }
   }, [validateCurrentStep, nextStep]);
+
+  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
+  // the SAME gate as "Próximo", so a click can never skip a validation the button
+  // enforces. FormSteps only offers steps already reached (plus the next one).
+  const handleStepClick = useCallback(
+    (step: number) => {
+      if (step === currentStep) return;
+      if (step < currentStep) {
+        goToStep(step);
+        return;
+      }
+      if (validateCurrentStep()) goToStep(step);
+    },
+    [currentStep, goToStep, validateCurrentStep],
+  );
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.orders?.list || "/inventory/orders");
@@ -1052,7 +1076,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
             <form className="flex flex-col h-full">
               {/* Step Indicator */}
               <div className="flex-shrink-0 mb-6">
-                <FormSteps steps={steps} currentStep={currentStep} />
+                <FormSteps steps={steps} currentStep={currentStep} onStepClick={handleStepClick} disabled={isSubmitting} />
               </div>
 
               {/* Step Content */}

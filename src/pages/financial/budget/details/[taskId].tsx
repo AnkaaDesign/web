@@ -48,6 +48,16 @@ import { BudgetStepServices } from "@/components/financial/budget/steps/budget-s
 import { BudgetStepCustomerPayment } from "@/components/financial/budget/steps/budget-step-customer-payment";
 import { BudgetStepReview } from "@/components/financial/budget/steps/budget-step-review";
 import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
+// Imported from the filters module rather than the table barrel so the detail route does not pull
+// the whole list page into its bundle.
+import { BUDGET_FALLBACK_LIST_QUERY } from "@/components/financial/budget/table/budget-table-filters";
+import { readQuoteSiblingState, useQuoteSiblingIds } from "@/components/financial/shared/quote-sibling-nav";
+import { toAttentionQuoteEntityFromParts } from "@/components/financial/shared/quote-attention";
+import { useAttentionEntity, useAttentionField } from "@/lib/attention";
+import { hasCompleteBillingCustomerData } from "@/lib/billing-customer-data";
+import { PINNED_CUSTOMERS } from "@/config/company";
+import { useRecordNavigation } from "@/components/ui/detailpage/use-record-navigation";
+import { RecordPager } from "@/components/ui/detailpage/record-pager-action";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -56,12 +66,37 @@ function getDefaultExpiresAt() {
   return date;
 }
 
+/**
+ * Remount the wizard whenever the record changes.
+ *
+ * Prev/next paging swaps `:taskId` under a component that would otherwise stay mounted, and this
+ * page carries a LOT of per-record state that is seeded by "if the new record has some, replace
+ * mine" effects: `form.reset(..., { keepDirtyValues })`, the responsáveis rows, the layout files
+ * and their DRAFT/APPROVED statuses, the base files, the wizard step, and the unsaved-changes
+ * guard's durable bypass. Every one of those is correct for a background REFETCH of the same
+ * record and wrong for a different record — a task with no layouts would have kept the previous
+ * task's, and `handleSubmit` builds its payload from `dirtyFields`, so pressing Salvar would have
+ * written record A's edits onto record B.
+ *
+ * A `key` is the whole fix: React tears the subtree down and every one of those states is seeded
+ * from scratch, which is exactly what "a different record" means.
+ */
 export const FinancialBudgetDetailPage = () => {
+  const { taskId } = useParams<{ taskId: string }>();
+  return <FinancialBudgetDetailPageInner key={taskId ?? "novo"} />;
+};
+
+const FinancialBudgetDetailPageInner = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   // Where to return after save/cancel — set by whoever sent the user here.
   const returnTo = readReturnTo(location.state);
+  // Prev/next pager context. `ids` is a fast path (the list handed it over on row click); when it
+  // is absent or is only the loaded page, the sibling hook rebuilds the list from `listQuery`, so
+  // the pager renders no matter how the user got here — refresh, Back, direct URL, new tab,
+  // notification, deep link, the reconciliation badge, or the task detail's "Editar".
+  const siblingState = readQuoteSiblingState(location.state);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -228,6 +263,38 @@ export const FinancialBudgetDetailPage = () => {
     isSubmitting,
   });
 
+  // Ordered sibling ids + the prev/next widget. Routed through `guardedNavigate` so paging away
+  // from a dirty wizard prompts (the guard's pushState patch would catch a bare navigate too, but
+  // it replays only the URL and would drop the id list).
+  const { ids: siblingIds, complete: siblingIdsComplete } = useQuoteSiblingIds(BUDGET_FALLBACK_LIST_QUERY, taskId ?? "", siblingState);
+  const recordNav = useRecordNavigation({
+    ids: siblingIds,
+    currentId: taskId ?? "",
+    toRoute: (rid) => routes.financial.budget.details(rid),
+    // Carried forward on every hop so the pager, the "voltar" target and the reconstructed list
+    // all survive paging.
+    state: { returnTo, listQuery: siblingState.listQuery, idsComplete: siblingIdsComplete },
+    // No ←/→ here: this is a form. The hook's guard only skips a FOCUSED input, so an arrow key
+    // pressed with focus on the page body would page away mid-edit.
+    keyboard: false,
+    enabled: !!taskId,
+    onNavigate: guardedNavigate,
+  });
+
+  // Attention: register this quote so its rules evaluate and honour their ack policy — the same
+  // entity the Orçamento list registers, in the same shape, so a record behaves identically
+  // whether it was loaded here or there. Task and quote arrive from two separate queries on this
+  // page, hence the "from parts" builder.
+  const quoteAttentionEntity = useMemo(
+    () => toAttentionQuoteEntityFromParts(existingQuote, task ? { id: task.id, status: task.status } : null),
+    [existingQuote, task],
+  );
+  // Deliberately gated on BOTH queries having landed. Task and quote load independently here, and
+  // the quote usually wins; registering on the quote alone would hand the engine a bare `{ id }`
+  // stub, which it reads as "this record is locally observed and no longer matches" — i.e. as
+  // RESOLVED. That clears the ack, so a rule the user snoozed re-arms and bips a moment later.
+  useAttentionEntity("TASK_QUOTE", quoteAttentionEntity ? existingQuote?.id : undefined, quoteAttentionEntity);
+
   // Populate form when task or quote data loads
   useEffect(() => {
     if (!task) return;
@@ -322,6 +389,7 @@ export const FinancialBudgetDetailPage = () => {
             zipCode: c.customer?.zipCode || "",
             stateRegistration: c.customer?.stateRegistration || "",
             streetType: c.customer?.streetType || null,
+            registrationStatus: c.customer?.registrationStatus || null,
           },
           installments:
             c.installments?.map((inst: any) => ({
@@ -633,6 +701,42 @@ export const FinancialBudgetDetailPage = () => {
     }
   }, [totalSteps, currentStep]);
 
+  // Attention: open on the customer step that a rule is asking about.
+  //
+  // Without this the signal is unreachable. Both fields it can point at — the N° do Pedido and the
+  // cadastro for the NFS-e — are editable only on a customer step; every customer step is mounted
+  // but `display: none` unless it is the current one, and the page opens on step 1. So the user
+  // would follow a blinking row into a page with nothing highlighted anywhere, and leaving acks
+  // the rule for four hours. Runs once per record (the page is keyed by `:taskId`, so a prev/next
+  // hop remounts and this ref starts false again).
+  const orderNumberAttention = useAttentionField("TASK_QUOTE", existingQuote?.id, "orderNumber");
+  const orderNumberAttentionActive = !!orderNumberAttention?.active;
+  const customerDataAttention = useAttentionField("TASK_QUOTE", existingQuote?.id, "customerData");
+  const customerDataAttentionActive = !!customerDataAttention?.active;
+  const attentionStepChosen = useRef(false);
+  useEffect(() => {
+    if (attentionStepChosen.current) return;
+    if (!orderNumberAttentionActive && !customerDataAttentionActive) return;
+    // Wait for the configs to hydrate — latching on an empty list would spend the one-shot before
+    // there is anything to point at.
+    if (!customerConfigs?.length) return;
+    // Latch FIRST, unconditionally. `customerConfigs` is a `form.watch`, so it is a fresh array on
+    // every keystroke; leaving the latch inside the `idx >= 0` branch meant that while nothing
+    // matched, the effect stayed live forever — and the moment the user cleared a field to retype
+    // it, `idx` flipped and this teleported them off the step mid-edit.
+    attentionStepChosen.current = true;
+    // First config the active rule(s) actually name — a multi-customer quote must land on the
+    // one with the gap, not on whichever customer happens to be first.
+    const idx = customerConfigs.findIndex((c: any) => {
+      if (c?.generateInvoice === false) return false; // no nota, so neither rule applies to it
+      if (orderNumberAttentionActive && c?.customerId === PINNED_CUSTOMERS.IBIPORA && !c?.orderNumber) return true;
+      return customerDataAttentionActive && !hasCompleteBillingCustomerData(c?.customerData);
+    });
+    if (idx < 0) return;
+    // Customer steps start at 4 (Tarefa, Informações, Serviços, then one per customer).
+    setCurrentStep(4 + idx);
+  }, [orderNumberAttentionActive, customerDataAttentionActive, customerConfigs]);
+
   // Step validation
   const validateCurrentStep = useCallback((): boolean => {
     const data = form.getValues();
@@ -684,6 +788,21 @@ export const FinancialBudgetDetailPage = () => {
   const prevStep = useCallback(() => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   }, []);
+
+  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
+  // the SAME gate as "Próximo", so a click can never skip a validation the button
+  // enforces. FormSteps only offers steps already reached (plus the next one).
+  const handleStepClick = useCallback(
+    (step: number) => {
+      if (step === currentStep) return;
+      if (step < currentStep) {
+        setCurrentStep(step);
+        return;
+      }
+      if (validateCurrentStep()) setCurrentStep(Math.min(step, totalSteps));
+    },
+    [currentStep, validateCurrentStep, totalSteps],
+  );
 
   // Handle form submission
   const handleSubmit = useCallback(async () => {
@@ -1003,6 +1122,11 @@ export const FinancialBudgetDetailPage = () => {
         if (config.customerData && config.customerId) {
           try {
             await customerService.updateCustomer(config.customerId, {
+              // `fantasyName` is the FIRST entry of NFSE_REQUIRED_CUSTOMER_FIELDS and the step has
+              // always rendered an input for it — but it was never in this payload, so filling it
+              // was silently discarded and `billing-customer-incomplete` kept firing for a field
+              // the user had already typed. Same omission existed on the Faturamento wizard.
+              fantasyName: config.customerData.fantasyName || undefined,
               corporateName: config.customerData.corporateName || undefined,
               cnpj: config.customerData.cnpj || undefined,
               cpf: config.customerData.cpf || undefined,
@@ -1018,6 +1142,7 @@ export const FinancialBudgetDetailPage = () => {
               stateRegistration:
                 config.customerData.stateRegistration || undefined,
               streetType: config.customerData.streetType || undefined,
+              registrationStatus: config.customerData.registrationStatus ?? undefined,
             });
           } catch {
             // Error toast is emitted by the axios error interceptor.
@@ -1319,19 +1444,26 @@ export const FinancialBudgetDetailPage = () => {
         ]}
         onBreadcrumbNavigate={(path) => guardedNavigate(path)}
         headerExtra={
-          publicBudgetUrl ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 whitespace-nowrap"
-              onClick={() => window.open(publicBudgetUrl, "_blank")}
-            >
-              <IconExternalLink className="h-4 w-4" />
-              Ver Orçamento
-            </Button>
-          ) : undefined
+          <>
+            {/* Left of "Ver Orçamento" on purpose: as a PageAction it lands beside the wizard's own
+                "Anterior / Próximo", and two adjacent pairs of arrows read as one control. */}
+            <RecordPager nav={recordNav} keyboard={false} />
+            {publicBudgetUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 whitespace-nowrap"
+                onClick={() => window.open(publicBudgetUrl, "_blank")}
+              >
+                <IconExternalLink className="h-4 w-4" />
+                Ver Orçamento
+              </Button>
+            )}
+          </>
         }
         actions={[
+          // The record pager is NOT here — it renders in `headerExtra`, left of "Ver Orçamento", so
+          // it never sits shoulder to shoulder with the wizard's own "Anterior / Próximo".
           ...(currentStep > 1
             ? [
                 {
@@ -1370,7 +1502,7 @@ export const FinancialBudgetDetailPage = () => {
         ]}
       />
 
-      <FormSteps steps={steps} currentStep={currentStep} />
+      <FormSteps steps={steps} currentStep={currentStep} onStepClick={handleStepClick} disabled={isSubmitting} />
 
       <div className="flex-1 overflow-y-auto pb-6">
         <FormProvider {...form}>
@@ -1429,6 +1561,7 @@ export const FinancialBudgetDetailPage = () => {
                   configIndex={configIndex}
                   customer={customer}
                   disabled={isSubmitting || !canEdit}
+                  quoteId={existingQuote?.id}
                 />
               </div>
             );

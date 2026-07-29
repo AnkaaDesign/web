@@ -137,11 +137,41 @@ export type DataTableFilterType =
   | "boolean"
   | "text"
   | "number-range"
-  | "date-range";
+  | "date-range"
+  | "entity-select"
+  | "entity-multiselect";
 
 export interface DataTableFilterOption {
   value: string;
   label: string;
+}
+
+/**
+ * Server-searched picker for the `entity-*` filter types.
+ *
+ * `select`/`multiselect` need the whole option set up front, which only works while it fits
+ * inside one request. Most entity lists don't: the customer endpoint caps `limit` at 100 and
+ * there are ~400 customers, so a static list silently loses everything past the cap — the user
+ * simply cannot filter by those customers, with no indication anything is missing. This kind
+ * keeps the paginated search that the hand-rolled filter sheets used.
+ *
+ * The stored filter VALUE is still just the id (or array of ids), so URL serialization,
+ * `countActiveFilters` and the chips work unchanged. `selectedOptions` is what turns those ids
+ * back into names — without it a cold page load (ids arriving from the URL, nothing fetched yet)
+ * would render raw uuids in the chip and in the closed combobox.
+ */
+export interface DataTableAsyncFilterConfig<TOption = any> {
+  /** react-query key for the search; must be stable per filter. */
+  queryKey: unknown[];
+  queryFn: (search: string, page?: number) => Promise<{ data: TOption[]; hasMore?: boolean; total?: number }>;
+  getOptionValue: (option: TOption) => string;
+  getOptionLabel: (option: TOption) => string;
+  renderOption?: (option: TOption, isSelected: boolean) => ReactNode;
+  /** Entities already selected — seeds the closed-combobox label and the filter chip. */
+  selectedOptions?: TOption[];
+  /** Characters before the first search fires; 0 = list on open (default 0). */
+  minSearchLength?: number;
+  emptyText?: string;
 }
 
 export interface DataTableFilterDef<TData = unknown> {
@@ -152,6 +182,8 @@ export interface DataTableFilterDef<TData = unknown> {
   icon?: ReactNode;
   /** Options for select / multiselect. */
   options?: DataTableFilterOption[];
+  /** Required for `entity-select` / `entity-multiselect`; ignored by every other type. */
+  async?: DataTableAsyncFilterConfig;
   placeholder?: string;
   /** For `number-range`: render currency (R$) inputs and format the chip as currency. */
   currency?: boolean;

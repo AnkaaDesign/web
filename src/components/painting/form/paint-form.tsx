@@ -386,60 +386,83 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     }
   }, [currentStep, form, paintType]);
 
+  // Single move: set the step, notify the parent, and mirror it into the URL. The step SET is
+  // filtered (no "Fundo" when the type needs no ground), so ids are not contiguous — callers
+  // pass a real step id, never an index.
+  const goToStep = useCallback(
+    (newStep: number) => {
+      setCurrentStep(newStep);
+      onStepChange?.(newStep);
+
+      // Immediately update URL with new step
+      if (mode === "create") {
+        const params = serializeFormToUrlParams(form.getValues() as Partial<PaintCreateFormData>, formulas, newStep);
+        setSearchParams(params, { replace: true });
+      } else if (mode === "update") {
+        const params = new URLSearchParams(searchParams);
+        params.set("step", newStep.toString());
+        setSearchParams(params, { replace: true });
+      }
+    },
+    [onStepChange, mode, form, formulas, searchParams, setSearchParams],
+  );
+
+  // Capture color preview when leaving step 2 — the canvas is unmounted once the
+  // step changes, so the export has to happen before the move, on ANY way out.
+  const captureColorPreview = useCallback(() => {
+    if (currentStep !== 2 || !previewGeneratorRef.current) return;
+    const imageDataUrl = previewGeneratorRef.current.exportImage();
+    if (imageDataUrl) {
+      setColorPreviewData(imageDataUrl);
+      // Mark as modified in create mode, or if different from original in update mode
+      if (mode === "create") {
+        setPreviewModified(true);
+      }
+    }
+  }, [currentStep, mode]);
+
   const nextStep = useCallback(async () => {
     const isValid = await validateCurrentStep();
     if (!isValid) {
       return;
     }
 
-    // Capture color preview when leaving step 2
-    if (currentStep === 2 && previewGeneratorRef.current) {
-      const imageDataUrl = previewGeneratorRef.current.exportImage();
-      if (imageDataUrl) {
-        setColorPreviewData(imageDataUrl);
-        // Mark as modified in create mode, or if different from original in update mode
-        if (mode === "create") {
-          setPreviewModified(true);
-        }
-      }
-    }
+    captureColorPreview();
 
     const currentIndex = availableSteps.findIndex((step) => step.id === currentStep);
     if (currentIndex < availableSteps.length - 1) {
-      const newStep = availableSteps[currentIndex + 1].id;
-      setCurrentStep(newStep);
-      onStepChange?.(newStep);
-
-      // Immediately update URL with new step
-      if (mode === "create") {
-        const params = serializeFormToUrlParams(form.getValues() as Partial<PaintCreateFormData>, formulas, newStep);
-        setSearchParams(params, { replace: true });
-      } else if (mode === "update") {
-        const params = new URLSearchParams(searchParams);
-        params.set("step", newStep.toString());
-        setSearchParams(params, { replace: true });
-      }
+      goToStep(availableSteps[currentIndex + 1].id);
     }
-  }, [validateCurrentStep, availableSteps, currentStep, onStepChange, mode, form, formulas, searchParams, setSearchParams]);
+  }, [validateCurrentStep, captureColorPreview, availableSteps, currentStep, goToStep]);
 
   const prevStep = useCallback(() => {
     const currentIndex = availableSteps.findIndex((step) => step.id === currentStep);
     if (currentIndex > 0) {
-      const newStep = availableSteps[currentIndex - 1].id;
-      setCurrentStep(newStep);
-      onStepChange?.(newStep);
-
-      // Immediately update URL with new step
-      if (mode === "create") {
-        const params = serializeFormToUrlParams(form.getValues() as Partial<PaintCreateFormData>, formulas, newStep);
-        setSearchParams(params, { replace: true });
-      } else if (mode === "update") {
-        const params = new URLSearchParams(searchParams);
-        params.set("step", newStep.toString());
-        setSearchParams(params, { replace: true });
-      }
+      // Also capture on the way BACK. Now that a step marker can jump straight from
+      // step 1 to an already-visited step past 2, "Voltar" is a real exit from the
+      // canvas — leaving it uncaptured would submit a stale preview.
+      captureColorPreview();
+      goToStep(availableSteps[currentIndex - 1].id);
     }
-  }, [availableSteps, currentStep, onStepChange, mode, form, formulas, searchParams, setSearchParams]);
+  }, [availableSteps, currentStep, captureColorPreview, goToStep]);
+
+  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
+  // the SAME gate as "Próximo", so a click can never skip a validation the button
+  // enforces. FormSteps only offers steps already reached (plus the next one).
+  const handleStepClick = useCallback(
+    async (step: number) => {
+      if (step === currentStep) return;
+      if (step < currentStep) {
+        captureColorPreview();
+        goToStep(step);
+        return;
+      }
+      if (!(await validateCurrentStep())) return;
+      captureColorPreview();
+      goToStep(step);
+    },
+    [currentStep, captureColorPreview, validateCurrentStep, goToStep],
+  );
 
   // Expose functions through ref
   useImperativeHandle(
@@ -462,7 +485,7 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
 
           <div className="space-y-8">
             {/* Step Indicator */}
-            <FormSteps steps={availableSteps} currentStep={currentStep} />
+            <FormSteps steps={availableSteps} currentStep={currentStep} onStepClick={handleStepClick} disabled={props.isSubmitting} />
 
           {/* Step Content */}
           {currentStep === 1 && (

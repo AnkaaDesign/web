@@ -175,7 +175,8 @@ export function usePresenceVersion(): number {
  *
  *   • `onView`         → acked on ENTER. Opening the record is the acknowledgement.
  *   • `onExitCooldown` → acked on EXIT, so the targeted field keeps blinking while you are
- *                        on the page and you can see WHICH one needs attention.
+ *                        on the page and you can see WHICH one needs attention. Subject to
+ *                        `MIN_DWELL_MS` below.
  *
  * Both then stay quiet for the rule's `cadence.cooldownMs` and re-arm together (see
  * `markViewed`), so nav + row + detail always agree.
@@ -192,6 +193,21 @@ export function usePresenceVersion(): number {
  * depended on how you got there. Nothing is hidden for long: step off the record and the
  * indicator is back, unchanged.
  */
+/**
+ * How long a record has to stay open before LEAVING it counts as having looked at it.
+ *
+ * `onExitCooldown` reads "you saw which field it was and you are leaving anyway" — that
+ * inference only holds if you were there long enough to read anything. Since the Orçamento and
+ * Faturamento detail pages gained a prev/next pager, one click is a full mount + unmount, so
+ * skimming forty records with `›` would silence forty alerts for four hours with nothing fixed —
+ * quietly undoing the very triage the rules exist to enforce. Below the threshold the record was
+ * paged THROUGH, not read, and the alert survives untouched.
+ *
+ * `onView` is deliberately NOT gated: those rules mean "opening it is the acknowledgement", and
+ * a hop does open it.
+ */
+const MIN_DWELL_MS = 2500;
+
 export function useAttentionEntity(
   type: AttentionEntityType | undefined,
   id: string | undefined,
@@ -218,6 +234,7 @@ export function useAttentionEntity(
 
   useEffect(() => {
     if (!type || !id) return;
+    const openedAt = Date.now();
     register(sourceId, type, [latest.current ?? { id }]);
     // Opening the record answers the rules that ack on view (and any manual warning on it).
     markViewed(type, id, { snapshot: latest.current, policies: ["onView"] });
@@ -225,7 +242,9 @@ export function useAttentionEntity(
       const snapshot = latest.current;
       unregister(sourceId, type);
       // Leaving answers the rest — evaluated against the snapshot, so it does not matter
-      // that the record is already unregistered by the time this runs.
+      // that the record is already unregistered by the time this runs. Paged THROUGH rather
+      // than read (see MIN_DWELL_MS) leaves the alert exactly as it was.
+      if (Date.now() - openedAt < MIN_DWELL_MS) return;
       markViewed(type, id, { snapshot, policies: ["onExitCooldown"] });
     };
   }, [register, unregister, sourceId, type, id]);

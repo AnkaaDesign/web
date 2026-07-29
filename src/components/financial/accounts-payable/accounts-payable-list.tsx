@@ -19,7 +19,7 @@ import type { ClearanceState, PayableRow, PayableState } from "../../../types";
 import { routes, SECTOR_PRIVILEGES, AIRBRUSHING_PAYMENT_STATUS, PAYMENT_METHOD, PAYMENT_METHOD_LABELS } from "../../../constants";
 import { useOrderPayables, useOrderMutations, useSettlePayrollMonth, useTriggerOrderSchedule } from "../../../hooks";
 import { MonthNav, monthKey, parseMonthKey } from "@/components/financial/reconciliation/month-nav";
-import { useAirbrushingMutations } from "../../../hooks/production/use-airbrushing";
+import { useAirbrushingMutations, useAttachAirbrushingReceipts } from "../../../hooks/production/use-airbrushing";
 import { usePrivileges } from "../../../hooks/common/use-privileges";
 import { useToast } from "@/hooks/common/use-toast";
 import { formatCurrency, formatDate, formatCNPJ, formatPixKey } from "../../../utils";
@@ -35,7 +35,7 @@ import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdo
 import { FinancialKpiCard } from "../common/financial-kpi-card";
 import { PaymentAmountDialog } from "./payment-amount-dialog";
 import { MarkPaidDialog } from "./mark-paid-dialog";
-import { createOrderFormData } from "@/utils/form-data-helper";
+import { createAirbrushingFormData, createOrderFormData } from "@/utils/form-data-helper";
 import { useRecurrentPayableMutations } from "@/hooks/financial/use-recurrent-payable";
 
 // --- Per-row payment-state badge. EXPECTED (previstos/recorrentes) is a forecast,
@@ -232,6 +232,15 @@ function isOverdueRow(row: PayableRow): boolean {
   return new Date(row.dueDate).getTime() + OVERDUE_GRACE_MS < Date.now();
 }
 
+// A row is payable TODAY: an open obligation whose payment has already been
+// released (aerografia concluída, pedido requisitado, recorrente materializada).
+// EXPECTED forecasts, PENDING orders awaiting "Requisitar Pagamento", ignored
+// occurrences and settled rows are not — they are not money that can leave now.
+function isPayableNow(row: PayableRow): boolean {
+  if (row.ignored || row.paymentRequested === false) return false;
+  return row.paymentState === "AWAITING_PAYMENT" || row.paymentState === "PARTIALLY_PAID" || row.paymentState === "OVERDUE";
+}
+
 // Sort key for the "Pagamento" column — a row vencida by date always leads
 // (even if the server hasn't flipped its state to OVERDUE yet), then the same
 // rank the default ordering uses (overdue < aguardando/parcial < pago < previsto).
@@ -409,9 +418,19 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // A row's month is its competence (payroll/tax/recurring), else its paidAt for
   // already-settled rows, else its due date. Undated, non-competence rows have no
   // natural month, so they stay visible across every period.
+  //
+  // EXCEPTION — anything payable TODAY also belongs to the CURRENT month, whatever
+  // its vencimento says, and keeps showing in its own due month as well:
+  //   · uma aerografia concluída em 27/07 vence 03/08 (prazo de 7 dias) mas já pode
+  //     ser paga agora — some do mês em que o financeiro está trabalhando se ficar
+  //     só em Agosto;
+  //   · uma conta que já venceu continua devida — não pode sumir do mês corrente só
+  //     porque o vencimento ficou para trás.
   const monthRows = useMemo(() => {
     const key = monthKey(month);
+    const currentKey = monthKey(new Date());
     return allRows.filter((row) => {
+      if (key === currentKey && isPayableNow(row)) return true;
       if (row.competence) return row.competence === key;
       if (row.paymentState === "PAID") return row.paidAt ? monthKey(new Date(row.paidAt)) === key : false;
       if (row.dueDate) return monthKey(new Date(row.dueDate)) === key;
@@ -448,6 +467,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
   // refetch the list manually afterward.
   const { markAwaitingPaymentAsync, markPaidAsync, markInstallmentPaidAsync, attachReceiptsAsync } = useOrderMutations();
   const { updateAsync: updateAirbrushingAsync } = useAirbrushingMutations();
+  const { mutateAsync: attachAirbrushingReceiptsAsync } = useAttachAirbrushingReceipts();
   const settlePayrollMonth = useSettlePayrollMonth();
   const triggerSchedule = useTriggerOrderSchedule();
   // Recorrentes: pay one materialized occurrence (the payables query is keyed
@@ -560,8 +580,6 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     }
   };
 
-  const settleAirbrushing = (id: string, paymentStatus: AIRBRUSHING_PAYMENT_STATUS) => updateAirbrushingAsync({ id, data: { paymentStatus } }).then(() => refetch());
-
   // Mark a recurrent occurrence paid. VARIABLE bills (isEstimate) collect the
   // real value via PaymentAmountDialog; FIXED bills settle with the known value.
   const handleRecurrentPay = (row: PayableRow) => {
@@ -584,41 +602,51 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
     runAction(() => unignoreRecurrentAsync(row.id));
   };
 
-  // Order payables settle through a dialog that collects an optional comprovante.
+  // Order AND airbrushing payables settle through the same dialog, which collects an
+  // optional comprovante. Both are entities with their own receipts relation, so the
+  // comprovante is indexed on the thing that was actually paid.
   const openMarkPaid = (row: PayableRow) => {
     setContextMenu(null);
     setMarkPaidRow(row);
   };
 
-  // Confirm an order payable as paid. The two steps (flip status + attach receipt)
-  // are not a single transaction, so we flip the PAYMENT STATUS FIRST: a validation
-  // failure on mark-paid then aborts before any receipt is attached (the comprovante
-  // does not need to precede the payment, and categorization is deferred to the
-  // Conciliação flow). The receipt goes through the dedicated payment-side receipts
-  // endpoint (attachReceipts) — NOT the generic order update, which is WAREHOUSE/ADMIN
-  // only and would 403 for accounting/financial. If the receipt upload fails AFTER the
-  // payment is recorded, we surface a clear warning instead of letting the generic
-  // error imply the payment didn't go through.
+  // Confirm a payable as paid. The two steps (flip status + attach receipt) are not a
+  // single transaction, so we flip the PAYMENT STATUS FIRST: a validation failure on
+  // settle then aborts before any receipt is attached (the comprovante does not need to
+  // precede the payment, and categorization is deferred to the Conciliação flow). The
+  // receipt goes through the dedicated payment-side receipts endpoint of each entity —
+  // NOT the generic update: on orders that one is WAREHOUSE/ADMIN only (403 for
+  // accounting/financial), and on aerografias it REPLACES the receipts relation, which
+  // from here — holding only a PayableRow, never the job's current file list — would
+  // detach every comprovante already attached. If the upload fails AFTER the payment is
+  // recorded, we surface a clear warning instead of letting the generic error imply the
+  // payment didn't go through.
   const confirmMarkPaid = async (receipts: File[]) => {
     const row = markPaidRow;
     if (!row) return;
+    const isAirbrushing = row.source === "AIRBRUSHING";
     setMarkPaidPending(true);
     try {
-      if (row.installmentId) {
+      if (isAirbrushing) {
+        await updateAirbrushingAsync({ id: row.id, data: { paymentStatus: AIRBRUSHING_PAYMENT_STATUS.PAID } });
+      } else if (row.installmentId) {
         await markInstallmentPaidAsync(row.installmentId);
       } else {
         await markPaidAsync(row.id);
       }
       if (receipts.length > 0) {
         try {
-          const formData = createOrderFormData({}, { receipts });
-          await attachReceiptsAsync({ id: row.id, data: formData });
+          if (isAirbrushing) {
+            await attachAirbrushingReceiptsAsync({ id: row.id, data: createAirbrushingFormData({}, { receipts }) });
+          } else {
+            await attachReceiptsAsync({ id: row.id, data: createOrderFormData({}, { receipts }) });
+          }
         } catch {
           // Payment is already recorded — don't let the receipt failure look like a
           // failed payment. Tell the user exactly what happened.
           toast({
             title: "Pagamento registrado, comprovante não anexado",
-            description: "O pagamento foi marcado como pago, mas o comprovante não pôde ser anexado. Anexe-o novamente pelo pedido.",
+            description: `O pagamento foi marcado como pago, mas o comprovante não pôde ser anexado. Anexe-o novamente ${isAirbrushing ? "pela aerografia" : "pelo pedido"}.`,
             variant: "warning",
           });
         }
@@ -626,7 +654,7 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
       setMarkPaidRow(null);
       refetch();
     } catch {
-      // mark-paid failed before any side effect — error toasted by the API client.
+      // The settle failed before any side effect — error toasted by the API client.
     } finally {
       setMarkPaidPending(false);
     }
@@ -888,7 +916,8 @@ export function AccountsPayableList({ className }: AccountsPayableListProps) {
               )}
 
               {ctxRow.source === "AIRBRUSHING" && ctxRow.paymentState !== "PAID" && ctxRow.paymentRequested !== false && (
-                <DropdownMenuItem onClick={() => runAction(() => settleAirbrushing(ctxRow.id, AIRBRUSHING_PAYMENT_STATUS.PAID))}>
+                // Same dialog as orders — settle + optionally index the comprovante.
+                <DropdownMenuItem onClick={() => openMarkPaid(ctxRow)}>
                   <IconCash className="mr-2 h-4 w-4" />
                   Marcar como pago
                 </DropdownMenuItem>

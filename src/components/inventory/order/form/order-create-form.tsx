@@ -673,6 +673,21 @@ export const OrderCreateForm = () => {
     }
   }, [validateCurrentStep, nextStep]);
 
+  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
+  // the SAME gate as "Próximo", so a click can never skip a validation the button
+  // enforces. `setCurrentStep` is the URL-state setter, which clamps the range.
+  const handleStepClick = useCallback(
+    async (step: number) => {
+      if (step === currentStep) return;
+      if (step < currentStep) {
+        setCurrentStep(step);
+        return;
+      }
+      if (await validateCurrentStep()) setCurrentStep(step);
+    },
+    [currentStep, setCurrentStep, validateCurrentStep],
+  );
+
   // Check if we're on the last step (review step is always step 3)
   const isLastStep = currentStep === 3 || (currentStep === steps[steps.length - 1]?.id);
   const isFirstStep = currentStep === 1;
@@ -856,7 +871,7 @@ export const OrderCreateForm = () => {
             >
               {/* Step Indicator */}
               <div className="flex-shrink-0 mb-6">
-                <FormSteps steps={steps} currentStep={currentStep} />
+                <FormSteps steps={steps} currentStep={currentStep} onStepClick={handleStepClick} disabled={isSubmitting} />
               </div>
 
               {/* Step Content */}

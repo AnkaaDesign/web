@@ -15,6 +15,8 @@ import {
   IconAlertTriangle,
 } from "@tabler/icons-react";
 import { DataTablePage } from "@/components/ui/datatable";
+import { attentionRowClassFor, presenceRowClassFor, useAttentionVersion, usePresenceVersion, useRegisterAttentionEntities } from "@/lib/attention";
+import { cn } from "@/lib/utils";
 import type { DataTableRowAction, DataTableFilterDef, DataTableRowClickMeta } from "@/components/ui/datatable";
 import {
   AlertDialog,
@@ -147,6 +149,19 @@ export function OrderTablePage() {
   const { data: response, isLoading, error } = useOrders(query as never);
   const orders = useMemo(() => (response as { data?: Order[] } | undefined)?.data ?? [], [response]);
   const totalRecords = (response as { meta?: { totalRecords?: number } } | undefined)?.meta?.totalRecords ?? 0;
+
+  // Attention. `order.forecast-overdue` has existed for a while and the sidebar has been lighting
+  // "Estoque › Pedidos" for it, but this page never registered anything with the engine and never
+  // read a row class — so following the blink landed on a table with nothing marked on it. The
+  // signal has to be visible where the work is, exactly as it is for tarefas and recortes.
+  useRegisterAttentionEntities("ORDER", orders);
+  // The row class is resolved imperatively per row, so re-render on any attention/presence flip.
+  useAttentionVersion();
+  usePresenceVersion();
+  const getRowClassName = useCallback(
+    (order: Order) => cn(attentionRowClassFor("ORDER", order.id), presenceRowClassFor("ORDER", order.id)),
+    [],
+  );
 
   // Export "all": refetch every order matching the current search/filters/sort (the table only holds
   // the current page). The API caps `limit` at 100 (order schema), so page through the full set rather
@@ -455,6 +470,7 @@ export function OrderTablePage() {
           rowActions,
           getRowId: (o) => o.id,
           onRowClick,
+          getRowClassName,
           isLoading,
           mode: "server",
           rowCount: totalRecords,

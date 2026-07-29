@@ -20,6 +20,7 @@ import { IconLoader } from "@tabler/icons-react";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { hasPrivilege } from "../../../../../utils";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { useAttentionEntity } from "@/lib/attention";
 
 const EPIDeliveryDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -84,6 +85,10 @@ const EPIDeliveryDetails = () => {
   });
 
   const ppeDelivery = response?.data;
+
+  // Attention: same as the almoxarifado copy of this page — the PPE rules ack `onView`, and this
+  // page is a hand-rolled layout rather than a `<DetailPage>`, so the hook is called directly.
+  useAttentionEntity("PPE_DELIVERY", ppeDelivery?.id, ppeDelivery);
 
   // Handlers
   const handleEdit = () => {

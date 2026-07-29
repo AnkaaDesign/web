@@ -63,7 +63,26 @@ export type PredicateNode =
   | { op: "not"; node: PredicateNode }
   | { op: "eq" | "ne" | "gt" | "lt" | "gte" | "lte"; field: string; value: PredicatePrimitive | typeof NOW_SENTINEL }
   | { op: "isNull" | "notNull"; field: string }
-  | { op: "isTrue" | "isFalse"; field: string };
+  | { op: "isTrue" | "isFalse"; field: string }
+  /**
+   * Quantifiers over an ARRAY-valued field (a to-many relation). `field` names the collection and
+   * `node` is evaluated with EACH ITEM as the entity, so the inner paths are relative to the item
+   * (`field: "customerConfigs"` + `{ eq, field: "customerId" }`, not `customerConfigs.customerId`).
+   *
+   * A missing, non-array or EMPTY collection is FALSE for BOTH. An absent collection is usually
+   * just an include the caller left out, and that must never read as evidence.
+   *
+   * `some` therefore mirrors Prisma's `some` exactly, which is what keeps the server's hand-written
+   * `where` a mechanical rewrite rather than an invention.
+   *
+   * **`every` DOES NOT mirror Prisma.** Prisma's `every` over zero related rows is vacuously TRUE;
+   * this one is false, deliberately — a quote with no customerConfigs is not "all of them are
+   * wrong", and here an empty collection is as likely to mean "not included" as "genuinely empty".
+   * So a rule using `every` must NOT be mirrored as a bare Prisma `every`: pair it with a
+   * `{ rel: { some: {} } }` to require at least one row, or the nav will match rows the row itself
+   * never blinks for — permanently, since nothing will ever clear them. No rule uses `every` today.
+   */
+  | { op: "some" | "every"; field: string; node: PredicateNode };
 
 /** Where the blink is applied. `field` names the DetailFieldDef id / column id. */
 export type AttentionTarget = { level: "row" } | { level: "detail" } | { level: "field"; field: string };

@@ -77,6 +77,21 @@ export class AirbrushingService {
     return response.data;
   }
 
+  /**
+   * Attach the comprovante(s) de pagamento to an airbrushing. Payment-side endpoint
+   * (financial roles) — separate from updateAirbrushing because it APPENDS: the
+   * generic PUT replaces the whole receipts relation when it receives receiptIds,
+   * so a caller without the current file list (Contas a Pagar) would detach them.
+   * `data` is a multipart FormData.
+   */
+  async attachReceipts(id: string, data: FormData, query?: AirbrushingQueryFormData): Promise<AirbrushingUpdateResponse> {
+    const response = await apiClient.put<AirbrushingUpdateResponse>(`${this.basePath}/${id}/receipts`, data, {
+      params: query,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
   async deleteAirbrushing(id: string): Promise<AirbrushingDeleteResponse> {
     const response = await apiClient.delete<AirbrushingDeleteResponse>(`${this.basePath}/${id}`);
     return response.data;
@@ -127,6 +142,7 @@ export const getAirbrushingById = (id: string, params?: Omit<AirbrushingGetByIdF
 export const createAirbrushing = (data: AirbrushingCreateFormData | FormData, query?: AirbrushingQueryFormData) => airbrushingService.createAirbrushing(data, query);
 export const updateAirbrushing = (id: string, data: AirbrushingUpdateFormData | FormData, query?: AirbrushingQueryFormData) => airbrushingService.updateAirbrushing(id, data, query);
 export const deleteAirbrushing = (id: string) => airbrushingService.deleteAirbrushing(id);
+export const attachAirbrushingReceipts = (id: string, data: FormData, query?: AirbrushingQueryFormData) => airbrushingService.attachReceipts(id, data, query);
 
 // Batch Operations
 export const batchCreateAirbrushings = (data: AirbrushingBatchCreateFormData, query?: AirbrushingQueryFormData) => airbrushingService.batchCreateAirbrushings(data, query);

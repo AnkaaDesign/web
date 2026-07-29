@@ -267,6 +267,21 @@ export const OrderScheduleCreateForm = () => {
     }
   }, [validateCurrentStep, nextStep]);
 
+  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
+  // the SAME gate as "Próximo", so a click can never skip a validation the button
+  // enforces. FormSteps only offers steps already reached (plus the next one).
+  const handleStepClick = useCallback(
+    async (step: number) => {
+      if (step === currentStep) return;
+      if (step < currentStep) {
+        setCurrentStep(step);
+        return;
+      }
+      if (await validateCurrentStep()) setCurrentStep(Math.min(step, steps.length));
+    },
+    [currentStep, validateCurrentStep, steps.length],
+  );
+
   const handleSubmit = useCallback(async () => {
     try {
       const isValid = await validateCurrentStep();
@@ -390,7 +405,7 @@ export const OrderScheduleCreateForm = () => {
             <form className="flex flex-col h-full" onSubmit={(e) => e.preventDefault()}>
               {/* Step Indicator */}
               <div className="flex-shrink-0 mb-6">
-                <FormSteps steps={steps} currentStep={currentStep} />
+                <FormSteps steps={steps} currentStep={currentStep} onStepClick={handleStepClick} disabled={isSubmitting} />
               </div>
 
               {/* Step Content */}

@@ -558,6 +558,9 @@ export function AirbrushingDetailPage() {
     <>
       <DetailPage<Airbrushing>
         detailKey="airbrushing-detail"
+        // Attention: `airbrushing.waiting-production` acks `onView`, so opening this page is the
+        // acknowledgement and the queue row goes quiet until the record matches again.
+        attention={{ entityType: "AIRBRUSHING" }}
         data={airbrushing}
         isLoading={isLoading}
         error={error ? "Aerografia não encontrada" : undefined}

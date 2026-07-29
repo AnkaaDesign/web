@@ -260,6 +260,15 @@ export const ExternalOperationCreateForm = () => {
     }
   }, [currentStep, searchParams, setSearchParams]);
 
+  const goToStep = useCallback(
+    (step: number) => {
+      const clamped = Math.max(1, Math.min(steps.length, step));
+      setCurrentStep(clamped);
+      setSearchParams(setStepInUrl(searchParams, clamped), { replace: true });
+    },
+    [steps.length, searchParams, setSearchParams],
+  );
+
   // Stage validation
   const validateCurrentStep = useCallback((): boolean => {
     switch (currentStep) {
@@ -550,6 +559,21 @@ export const ExternalOperationCreateForm = () => {
       nextStep();
     }
   }, [validateCurrentStep, nextStep]);
+
+  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
+  // the SAME gate as "Próximo", so a click can never skip a validation the button
+  // enforces. FormSteps only offers steps already reached (plus the next one).
+  const handleStepClick = useCallback(
+    (step: number) => {
+      if (step === currentStep) return;
+      if (step < currentStep) {
+        goToStep(step);
+        return;
+      }
+      if (validateCurrentStep()) goToStep(step);
+    },
+    [currentStep, goToStep, validateCurrentStep],
+  );
 
   const isLastStep = currentStep === steps.length;
   const isFirstStep = currentStep === 1;
@@ -1128,7 +1152,7 @@ export const ExternalOperationCreateForm = () => {
             <form className="flex flex-col h-full" onSubmit={(e) => e.preventDefault()}>
               {/* Step Indicator */}
               <div className="flex-shrink-0 mb-6">
-                <FormSteps steps={steps} currentStep={currentStep} />
+                <FormSteps steps={steps} currentStep={currentStep} onStepClick={handleStepClick} disabled={isSubmitting} />
               </div>
 
               {/* Step Content */}

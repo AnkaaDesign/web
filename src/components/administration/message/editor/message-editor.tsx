@@ -169,6 +169,18 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
     }
   };
 
+  // Step marker click. Back is free; forward runs the SAME gate as "Próximo"
+  // (step 1 must be valid), which `stepErrors` already surfaces on the marker.
+  const handleStepClick = (step: number) => {
+    if (step === currentStep) return;
+    if (step < currentStep) {
+      setCurrentStep(step);
+      return;
+    }
+    if (currentStep === 1 && !step1Valid) return;
+    setCurrentStep(Math.min(step, STEPS.length));
+  };
+
   // Expose getData and navigation methods for parent component
   useEffect(() => {
     const editorElement = document.querySelector('[data-message-editor]') as any;
@@ -188,7 +200,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
   return (
     <div data-message-editor className="space-y-6">
       {/* Step Indicator */}
-      <FormSteps steps={STEPS} currentStep={currentStep} stepErrors={stepErrors} />
+      <FormSteps steps={STEPS} currentStep={currentStep} stepErrors={stepErrors} onStepClick={handleStepClick} />
 
       {/* Step Content */}
       <Card>

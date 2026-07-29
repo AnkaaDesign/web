@@ -407,6 +407,15 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
     }
   }, [currentStep, setSearchParams]);
 
+  const goToStep = useCallback(
+    (step: number) => {
+      const clamped = Math.max(1, Math.min(STEPS.length, step));
+      setCurrentStep(clamped);
+      setSearchParams((prev) => setStepInUrl(prev, clamped), { replace: true });
+    },
+    [setSearchParams],
+  );
+
   // Mirror the DataTable's native (multi-)selection into form state. `taskId` tracks the FIRST
   // selected task purely to satisfy the schema; the actual create fans the config out over every id.
   const handleTaskSelectionChange = useCallback(
@@ -522,6 +531,21 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
   const handleNext = useCallback(async () => {
     if (await validateCurrentStep()) nextStep();
   }, [validateCurrentStep, nextStep]);
+
+  // Step marker click. Back is free (nothing is lost by revisiting); forward runs
+  // the SAME gate as "Próximo", so a click can never skip a validation the button
+  // enforces. FormSteps only offers steps already reached (plus the next one).
+  const handleStepClick = useCallback(
+    async (step: number) => {
+      if (step === currentStep) return;
+      if (step < currentStep) {
+        goToStep(step);
+        return;
+      }
+      if (await validateCurrentStep()) goToStep(step);
+    },
+    [currentStep, goToStep, validateCurrentStep],
+  );
 
   const handleCancel = useCallback(() => {
     if (onCancel) {
@@ -786,7 +810,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
               <form className="flex flex-col h-full" onSubmit={(e) => e.preventDefault()}>
                 {/* Stepper */}
                 <div className="flex-shrink-0 mb-6">
-                  <FormSteps steps={STEPS} currentStep={currentStep} />
+                  <FormSteps steps={STEPS} currentStep={currentStep} onStepClick={handleStepClick} disabled={isSubmitting} />
                 </div>
 
                 {/* Step content — step 2 (task table) takes full height. */}

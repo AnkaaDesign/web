@@ -48,8 +48,14 @@ import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { routes } from "@/constants";
 import { exportTaskDossiePdf } from "@/components/production/task/detail/sections/dossie-section";
+import { attentionFieldClass, useAttentionField } from "@/lib/attention";
+import { missingBillingCustomerKeys, missingBillingCustomerLabels, NFSE_DOCUMENT_KEY } from "@/lib/billing-customer-data";
+import { PINNED_CUSTOMERS } from "@/config/company";
 
-const STATUSES_REQUIRING_COMPLETE_DATA = ["BILLING_APPROVED"];
+// Must match the page's own list (`pages/financial/billing/details/[id].tsx`) — the two gates run
+// on the same transition, and disagreeing meant this dialog waved through a status the page then
+// refused. BUDGET_APPROVED is also the window `task-quote.billing-customer-incomplete` fires in.
+const STATUSES_REQUIRING_COMPLETE_DATA = ["BUDGET_APPROVED", "BILLING_APPROVED"];
 
 // Canonical label map for every quote status (used for the trigger-render fallback).
 const STATUS_LABELS: Record<string, string> = {
@@ -111,6 +117,27 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   const currentStatus = useWatch({ control, name: "status" }) || "";
   const services = useWatch({ control, name: "services" }) || [];
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
+
+  // Attention on the quote's `orderNumber`. The Resumo is where this page usually OPENS (it jumps
+  // here whenever invoices already exist), while the editable field lives on a customer step that
+  // is hidden at that moment — so without this the alert would be pointing at something the user
+  // cannot see. `attentionOrderNumberFor` narrows the quote-wide signal to the one config it is
+  // actually about, and returns "" for every other config so nothing else changes here.
+  const orderNumberAttention = useAttentionField("TASK_QUOTE", task?.quote?.id, "orderNumber");
+  const attentionOrderNumberFor = (config: any): string =>
+    orderNumberAttention?.active && config?.customerId === PINNED_CUSTOMERS.IBIPORA && !config?.orderNumber
+      ? attentionFieldClass(orderNumberAttention)
+      : "";
+
+  // Same idea for `task-quote.billing-customer-incomplete`: the Resumo is where the user lands
+  // once a nota exists, so the cadastro gap has to be visible here too. Each summary row asks
+  // about the keys IT renders, so only the row that is actually short of data lights up.
+  const customerDataAttention = useAttentionField("TASK_QUOTE", task?.quote?.id, "customerData");
+  const attentionCustomerFor = (config: any, keys: string[]): string => {
+    if (!customerDataAttention?.active || config?.generateInvoice === false) return "";
+    const missing = missingBillingCustomerKeys(config?.customerData);
+    return keys.some((k) => missing.includes(k)) ? attentionFieldClass(customerDataAttention) : "";
+  };
 
   // File viewer for dossiê images
   let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
@@ -271,16 +298,11 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     for (let i = 0; i < customerConfigs.length; i++) {
       const config = customerConfigs[i];
       const data = config.customerData || {};
-      const errors: string[] = [];
-      if (!data.cnpj && !data.cpf) errors.push("CNPJ ou CPF");
-      if (!data.fantasyName?.trim()) errors.push("Nome Fantasia");
-      if (!data.corporateName?.trim()) errors.push("Razão Social");
-      if (!data.zipCode?.trim()) errors.push("CEP");
-      if (!data.city?.trim()) errors.push("Cidade");
-      if (!data.state?.trim()) errors.push("Estado");
-      if (!data.address?.trim()) errors.push("Logradouro");
-      if (!data.addressNumber?.trim()) errors.push("Número");
-      if (!data.neighborhood?.trim()) errors.push("Bairro");
+      // From the SHARED list, not transcribed. This block used to spell all nine requirements out
+      // by hand — a fourth copy alongside the rule, the page's gate and the badges, which happened
+      // to agree today and would have drifted the first time the NFS-e needed another field.
+      // `generateInvoice === false` is skipped for the same reason the rule and the page skip it.
+      const errors: string[] = config.generateInvoice === false ? [] : missingBillingCustomerLabels(data);
       if (!config.paymentCondition && !(config.paymentConfig as any)?.type) errors.push("Condição de Pagamento");
       if (errors.length > 0) {
         const name = data.fantasyName || data.corporateName || `Cliente ${i + 1}`;
@@ -609,11 +631,13 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               total: configTotal,
             });
 
-            // Validate NFS-e data
+            // Validate NFS-e data — the SHARED requirement list, so this badge, the "Faturar Para"
+            // badge, the save gate and the attention rule all answer the same question. This block
+            // used to check three of the nine fields, which is how a customer could read "complete"
+            // here and still be rejected on save.
             const data = config.customerData || {};
-            const hasCnpj = !!data.cnpj || !!data.cpf;
-            const hasAddress = !!data.city && !!data.state && !!data.address;
-            const isComplete = hasCnpj && hasAddress && !!data.corporateName;
+            const missingCustomerLabels = missingBillingCustomerLabels(data);
+            const isComplete = missingCustomerLabels.length === 0;
 
             const docLabel = data.cnpj ? "CNPJ" : data.cpf ? "CPF" : "Documento";
             const docValue = data.cnpj ? formatCNPJ(data.cnpj) : data.cpf ? formatCPF(data.cpf) : "-";
@@ -628,17 +652,26 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                     <IconBuilding className="h-4 w-4 text-muted-foreground" />
                     {name}
                     {!isComplete && (
-                      <Badge variant="destructive" className="text-xs">Dados incompletos</Badge>
+                      <Badge variant="destructive" className="text-xs" title={missingCustomerLabels.join(", ")}>
+                        Dados incompletos
+                      </Badge>
                     )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-1">
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    {/* Nome Fantasia is in NFSE_REQUIRED_CUSTOMER_FIELDS, so the rule and the badge
+                        can both name it — but it had no row here, which meant the one field the
+                        card title falls back to was the one the Resumo could not point at. */}
+                    <div className={cn("flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5", attentionCustomerFor(config, ["fantasyName"]))}>
+                      <span className="text-sm text-muted-foreground">Nome Fantasia</span>
+                      <span className="text-sm font-medium">{data.fantasyName || "-"}</span>
+                    </div>
+                    <div className={cn("flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5", attentionCustomerFor(config, ["corporateName"]))}>
                       <span className="text-sm text-muted-foreground">Razão Social</span>
                       <span className="text-sm font-medium">{data.corporateName || "-"}</span>
                     </div>
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <div className={cn("flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5", attentionCustomerFor(config, [NFSE_DOCUMENT_KEY]))}>
                       <span className="text-sm text-muted-foreground">{docLabel}</span>
                       <span className="text-sm font-medium">{docValue}</span>
                     </div>
@@ -648,7 +681,12 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                         <span className="text-sm font-medium">{data.stateRegistration}</span>
                       </div>
                     )}
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <div
+                      className={cn(
+                        "flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5",
+                        attentionCustomerFor(config, ["address", "addressNumber", "neighborhood", "city", "state", "zipCode"]),
+                      )}
+                    >
                       <span className="text-sm text-muted-foreground">Endereço</span>
                       <span className="text-sm font-medium text-right max-w-[60%]">
                         {addressValue}{data.zipCode ? ` - CEP: ${data.zipCode}` : ""}
@@ -667,12 +705,24 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                         <span className="text-sm font-medium text-right max-w-[60%]">{paymentText}</span>
                       </div>
                     )}
-                    {config.orderNumber && (
-                      <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                        <span className="text-sm text-muted-foreground">N° do Pedido</span>
-                        <span className="text-sm font-medium">{config.orderNumber}</span>
-                      </div>
-                    )}
+                    {(() => {
+                      // Normally shown only when filled. When a rule is asking for it, the row is
+                      // rendered EMPTY and highlighted — a missing value with no DOM node is a
+                      // signal with nothing to point at.
+                      const attnCls = attentionOrderNumberFor(config);
+                      if (!config.orderNumber && !attnCls) return null;
+                      return (
+                        <div
+                          className={cn("flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5", attnCls)}
+                          title={attnCls ? orderNumberAttention?.match.rule.name : undefined}
+                        >
+                          <span className="text-sm text-muted-foreground">N° do Pedido</span>
+                          <span className={cn("text-sm font-medium", !config.orderNumber && "text-muted-foreground")}>
+                            {config.orderNumber || "Pendente"}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Installments / NFS-e */}

@@ -121,3 +121,21 @@ export const COMPANY_FISCAL = {
   /** Terceiros / Sistema S + salário-educação (%). Padrão 5,8% para o Lucro Presumido/Real. */
   terceirosPct: 5.8,
 } as const;
+
+/**
+ * Clientes com regra de negócio própria, referenciados pelo **id** (UUID imutável) e não pelo CNPJ.
+ * O CNPJ de um Customer já foi sobrescrito em produção uma vez — ver o aviso em
+ * `budget-step-customer-payment.tsx` sobre a Ibiporã ter virado "Sola" em 2026-07-13 — então ele
+ * não serve como chave estável.
+ *
+ * Espelhado em `api/src/config/company.ts`.
+ */
+export const PINNED_CUSTOMERS = {
+  /**
+   * Ibiporã Implementos Rodoviários — "Industria de Carrocerias Metalicas Ibipora LTDA",
+   * CNPJ 85.462.471/0001-74, tag "furgão ibiporã". Fatura contra pedido de compra: sem o
+   * `N° do Pedido` a nota não sai. Fixado no topo dos seletores de cliente de Orçamento e
+   * Faturamento e sujeito da regra de atenção `task-quote.ibipora-missing-order-number`.
+   */
+  IBIPORA: "93dfbeb1-aec0-4829-a297-6a2f09fcfe08",
+} as const;

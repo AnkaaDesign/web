@@ -26,6 +26,13 @@ export interface UseRecordNavigationParams {
   /** Enable ←/→ keyboard navigation (default true). */
   keyboard?: boolean;
   enabled?: boolean;
+  /**
+   * Navigate through something other than a bare `navigate` — e.g. a form page's
+   * `guardedNavigate`, so paging away from a dirty form prompts instead of discarding it.
+   * (The unsaved-changes guard's `history.pushState` patch does catch a bare `navigate`, but it
+   * replays only the URL and drops the state — which would silently lose the id list.)
+   */
+  onNavigate?: (to: string, options: { state: Record<string, unknown> }) => void;
 }
 
 export interface RecordNavigation {
@@ -43,7 +50,7 @@ export interface RecordNavigation {
 }
 
 export function useRecordNavigation(params: UseRecordNavigationParams): RecordNavigation {
-  const { ids, currentId, toRoute, state, onPrefetch, keyboard = true, enabled = true } = params;
+  const { ids, currentId, toRoute, state, onPrefetch, keyboard = true, enabled = true, onNavigate } = params;
   const navigate = useNavigate();
 
   const nav = useMemo(() => {
@@ -57,9 +64,15 @@ export function useRecordNavigation(params: UseRecordNavigationParams): RecordNa
   const go = useCallback(
     (id: string | null) => {
       if (!id) return;
-      navigate(toRoute(id), { state: { ...(state ?? {}), ids: nav.list } });
+      const to = toRoute(id);
+      // `replace` so a skim does not bury the list under one history entry per record — Back from
+      // the 20th record should reach the list, not walk back through all 19. The list is still
+      // reachable by the breadcrumb and by `returnTo`, which ride along in `state`.
+      const options = { state: { ...(state ?? {}), ids: nav.list }, replace: true };
+      if (onNavigate) onNavigate(to, options);
+      else navigate(to, options);
     },
-    [navigate, toRoute, state, nav.list],
+    [navigate, onNavigate, toRoute, state, nav.list],
   );
 
   const goPrev = useCallback(() => go(nav.prevId), [go, nav.prevId]);

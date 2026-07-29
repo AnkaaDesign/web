@@ -1,5 +1,6 @@
 // packages/hooks/src/useAirbrushing.ts
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createEntityHooks, createSpecializedQueryHook } from "../common/create-entity-hooks";
 import { airbrushingService } from "../../api-client";
 import type {
@@ -69,6 +70,23 @@ export const useAirbrushingBatchMutations = airbrushingHooks.useBatchMutations;
 // =====================================================
 // Specialized Hooks
 // =====================================================
+
+/**
+ * Attach the comprovante(s) de pagamento to an airbrushing (payment-side endpoint).
+ * APPENDS to the receipts relation, so Contas a Pagar can index a comprovante when
+ * settling a painter without holding — and therefore without wiping — the job's
+ * existing files. Mirrors the order side's attachReceipts mutation.
+ */
+export function useAttachAirbrushingReceipts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: FormData }) => airbrushingService.attachReceipts(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: airbrushingKeys.all });
+      queryClient.invalidateQueries({ queryKey: fileKeys.all });
+    },
+  });
+}
 
 // Hook for getting airbrushings by task
 export const useAirbrushingsByTask = createSpecializedQueryHook<{ taskId: string; params?: Partial<AirbrushingGetManyFormData> }, AirbrushingGetManyResponse>({

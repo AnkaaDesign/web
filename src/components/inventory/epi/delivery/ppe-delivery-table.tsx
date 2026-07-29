@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconChevronUp, IconChevronDown, IconRefresh, IconEdit, IconTrash, IconSelector, IconAlertTriangle, IconTruck, IconCheck, IconX, IconArrowBackUp } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { attentionRowClassFor, presenceRowClassFor, useAttentionVersion, usePresenceVersion, useRegisterAttentionEntities } from "@/lib/attention";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { usePpeDeliveries, useTeamStaffEpis } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
@@ -124,7 +125,16 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
   const teamQuery = useTeamStaffEpis(queryFilters, { enabled: useTeamStaffEndpoint });
   const { data, isLoading, error } = useTeamStaffEndpoint ? teamQuery : regularQuery;
 
-  const deliveries = data?.data || [];
+  // Memoized because `useRegisterAttentionEntities` keys on the ARRAY's identity: a fresh `[]`
+  // every render would re-register on every render, and each registration schedules a reconcile.
+  const deliveries = React.useMemo(() => data?.data || [], [data]);
+
+  // Attention: register what is on screen so the rules can be evaluated against live values, and
+  // re-render on any flip (the row class below is read imperatively, not through a hook).
+  useRegisterAttentionEntities("PPE_DELIVERY", deliveries);
+  useAttentionVersion();
+  usePresenceVersion();
+
   const totalPages = data?.meta ? Math.ceil(data.meta.totalRecords / pageSize) : 1;
   const totalRecords = data?.meta?.totalRecords || 0;
 
@@ -377,6 +387,12 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
                       index % 2 === 1 && "bg-muted/10",
                       "hover:bg-muted/20",
                       deliveryIsSelected && "bg-muted/30 hover:bg-muted/40",
+                      // Attention / presence, same vocabulary as every other table. Three rules
+                      // address PPE deliveries (almoxarifado: approved-not-delivered; contabilidade:
+                      // pending-review; every user: awaiting-my-signature) and all three lit a nav
+                      // entry that led to a table with nothing marked on it.
+                      attentionRowClassFor("PPE_DELIVERY", delivery.id),
+                      presenceRowClassFor("PPE_DELIVERY", delivery.id),
                     )}
                     onClick={() => handleRowClick(delivery)}
                     onContextMenu={(e) => handleContextMenu(e, delivery)}

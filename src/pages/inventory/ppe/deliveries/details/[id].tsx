@@ -20,6 +20,7 @@ import { IconLoader } from "@tabler/icons-react";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { hasPrivilege } from "../../../../../utils";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { useAttentionEntity } from "@/lib/attention";
 import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 const EPIDeliveryDetails = () => {
@@ -85,6 +86,11 @@ const EPIDeliveryDetails = () => {
   });
 
   const ppeDelivery = response?.data;
+
+  // Attention: this page is not a `<DetailPage>`, so the hook that DetailPage would have called is
+  // called directly. All three PPE rules ack `onView`, so simply opening the record is the
+  // acknowledgement — without this the list row blinked forever, since nothing else can ack it.
+  useAttentionEntity("PPE_DELIVERY", ppeDelivery?.id, ppeDelivery);
 
   // Handlers
 
