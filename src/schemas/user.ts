@@ -1340,6 +1340,20 @@ export const userUpdateSchema = z
   )
   .refine(
     (data) => {
+      // ...and the converse: a vínculo declared TERMINATED cannot be left without a
+      // termination date. The "Data de Demissão" field can be cleared by erasing its
+      // text (the picker's clear button is hidden, but the segmented input still
+      // accepts an empty value), so catch it here instead of saving an inconsistent
+      // contract. Only fires when both fields are present in the payload.
+      return !(data.contractStatus === CONTRACT_STATUS.TERMINATED && data.terminationDate === null);
+    },
+    {
+      message: "Um vínculo desligado precisa de uma data de demissão",
+      path: ["terminationDate"],
+    }
+  )
+  .refine(
+    (data) => {
       // An efetivado vínculo (INDETERMINATE) cannot have its modality changed.
       if (
         data.currentContractType === CONTRACT_TYPE.INDETERMINATE &&

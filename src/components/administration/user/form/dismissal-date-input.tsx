@@ -8,8 +8,24 @@ interface DismissalDateInputProps {
   disabled?: boolean;
 }
 
+/**
+ * Termination date of the current vínculo (EmploymentContract.terminationDate).
+ *
+ * Only rendered for an already-TERMINATED vínculo — this corrects a wrong date,
+ * it does not dismiss anyone (that is the desligamento flow, which also sets the
+ * termination type/reason).
+ *
+ * The clear button is hidden because a TERMINATED contract with no termination
+ * date is an inconsistent state — but that is presentation only: the segmented
+ * input still accepts an erased value, so the real guard is the userUpdateSchema
+ * refine ("um vínculo desligado precisa de uma data de demissão"), which surfaces
+ * the error on this field.
+ */
 export function DismissalDateInput({ disabled }: DismissalDateInputProps) {
   const form = useFormContext<UserCreateFormData | UserUpdateFormData>();
+
+  // The dismissal can never predate the admission of the vínculo being edited.
+  const admissionDate = form.watch("exp1StartAt") ?? form.watch("admissionDate");
 
   return (
     <FormField
@@ -32,6 +48,8 @@ export function DismissalDateInput({ disabled }: DismissalDateInputProps) {
           disabled={disabled}
           required={false}
           mode="date"
+          showClearButton={false}
+          constraints={{ minDate: (admissionDate as Date | null) || undefined }}
         />
       )}
     />

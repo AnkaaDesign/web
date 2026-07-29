@@ -21,7 +21,7 @@ import type {
   UserBatchDeleteResponse,
 } from "../../types";
 import type { User } from "../../types";
-import { changeLogKeys, positionKeys, sectorKeys, userKeys } from "../common/query-keys";
+import { changeLogKeys, employmentContractKeys, positionKeys, sectorKeys, userKeys } from "../common/query-keys";
 import { createEntityHooks } from "../common/create-entity-hooks";
 
 // =====================================================
@@ -62,7 +62,10 @@ const baseHooks = createEntityHooks<
   queryKeys: userKeys,
   service: userService,
   staleTime: 1000 * 60 * 5, // 5 minutes
-  relatedQueryKeys: [changeLogKeys, positionKeys, sectorKeys], // Invalidate related entities
+  // Invalidate related entities. `employmentContractKeys` matters because every vínculo field
+  // (admissão/efetivação/experiência/demissão) is written on the current EmploymentContract, not on
+  // the User row — without it the "Vínculos" history card keeps rendering the pre-update contract.
+  relatedQueryKeys: [changeLogKeys, positionKeys, sectorKeys, employmentContractKeys],
 });
 
 // Export base hooks with standard names

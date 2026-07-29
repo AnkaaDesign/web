@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useUserBatchMutations, usePositions, useSectors } from "../../../../hooks";
 import type { User } from "../../../../types";
 import type { UserGetManyFormData } from "../../../../schemas";
-import { routes, CONTRACT_TYPE, CONTRACT_STATUS } from "../../../../constants";
+import { routes, CONTRACT_STATUS } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -21,6 +21,7 @@ import { useTableState } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { UserMergeDialog } from "../merge/user-merge-dialog";
+import { UserDismissDialog, UserEffectDialog } from "../contract-action/user-contract-action-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { mergeUsers } from "../../../../api-client";
 import {
@@ -43,7 +44,7 @@ const DEFAULT_PAGE_SIZE = 40;
 
 export function UserList({ className, teamScope }: UserListProps) {
   const navigate = useNavigate();
-  const { batchDelete, batchUpdateAsync } = useUserBatchMutations();
+  const { batchDelete } = useUserBatchMutations();
   const queryClient = useQueryClient();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -485,50 +486,6 @@ export function UserList({ className, teamScope }: UserListProps) {
     }
   };
 
-  const confirmMarkAsContracted = async () => {
-    if (!contractDialog) return;
-
-    try {
-      const updateUsers = contractDialog.items.map((user) => ({
-        id: user.id,
-        data: {
-          // Efetivação (CLT art. 451): converts the bond to prazo indeterminado
-          // and flips its lifecycle status to ACTIVE.
-          contractType: CONTRACT_TYPE.INDETERMINATE,
-          contractStatus: CONTRACT_STATUS.ACTIVE,
-          effectedAt: new Date(),
-        },
-      }));
-
-      await batchUpdateAsync({ users: updateUsers });
-      setContractDialog(null);
-    } catch (error) {
-      // Error is handled by the API client with detailed message
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Error marking user(s) as effected:", error);
-      }
-    }
-  };
-
-  const confirmMarkAsDismissed = async () => {
-    if (!dismissDialog) return;
-
-    try {
-      const updateUsers = dismissDialog.items.map((user) => ({
-        id: user.id,
-        data: { contractStatus: CONTRACT_STATUS.TERMINATED, terminationDate: new Date() },
-      }));
-
-      await batchUpdateAsync({ users: updateUsers });
-      setDismissDialog(null);
-    } catch (error) {
-      // Error is handled by the API client with detailed message
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Error marking user(s) as dismissed:", error);
-      }
-    }
-  };
-
   // Handle merge action
   const handleMerge = useCallback((users: User[]) => {
     if (users.length < 2) {
@@ -634,45 +591,11 @@ export function UserList({ className, teamScope }: UserListProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Mark as Contracted Confirmation Dialog */}
-      <AlertDialog open={!!contractDialog} onOpenChange={(open) => !open && setContractDialog(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar contratação</AlertDialogTitle>
-            <AlertDialogDescription>
-              {contractDialog?.isBulk
-                ? `Tem certeza que deseja marcar ${contractDialog.items.length} usuários como contratados?`
-                : `Tem certeza que deseja marcar o usuário "${contractDialog?.items[0]?.name}" como contratado?`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmMarkAsContracted}>
-              Confirmar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Mark as Contracted — shared confirmation + (bulk) result report */}
+      <UserEffectDialog users={contractDialog?.items ?? null} onClose={() => setContractDialog(null)} />
 
-      {/* Mark as Dismissed Confirmation Dialog */}
-      <AlertDialog open={!!dismissDialog} onOpenChange={(open) => !open && setDismissDialog(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar desligamento</AlertDialogTitle>
-            <AlertDialogDescription>
-              {dismissDialog?.isBulk
-                ? `Tem certeza que deseja marcar ${dismissDialog.items.length} usuários como desligados?`
-                : `Tem certeza que deseja marcar o usuário "${dismissDialog?.items[0]?.name}" como desligado?`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmMarkAsDismissed}>
-              Confirmar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Mark as Dismissed — shared confirmation + (bulk) result report */}
+      <UserDismissDialog users={dismissDialog?.items ?? null} onClose={() => setDismissDialog(null)} />
 
       {/* Merge Dialog */}
       <UserMergeDialog

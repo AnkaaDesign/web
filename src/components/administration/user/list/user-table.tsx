@@ -22,6 +22,7 @@ import { createUserColumns } from "./user-table-columns";
 import type { UserColumn } from "./types";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { UserListSkeleton } from "./user-list-skeleton";
+import { UserDismissDialog, UserEffectDialog } from "../contract-action/user-contract-action-dialog";
 
 interface UserTableProps {
   visibleColumns: Set<string>;
@@ -39,8 +40,8 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
   // Opt-in flag (set by team-leader views) — strip before sending to API
   const useTeamStaffEndpoint = (filters as any)?._useTeamStaffEndpoint === true;
   const navigate = useNavigate();
-  const { delete: deleteUser, updateAsync: updateUser } = useUserMutations();
-  const { batchDelete, batchUpdateAsync: batchUpdate } = useUserBatchMutations();
+  const { delete: deleteUser } = useUserMutations();
+  const { batchDelete } = useUserBatchMutations();
 
   // Permission checks — team leaders viewing their team can never edit/delete
   const { user } = useAuth();
@@ -165,8 +166,12 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
     isBulk: boolean;
   } | null>(null);
 
+  // Vínculo-shortcut confirmations for the surfaces that don't hand the flow to a parent.
+  const [dismissDialog, setDismissDialog] = useState<User[] | null>(null);
+  const [contractDialog, setContractDialog] = useState<User[] | null>(null);
+
   // Use viewport boundary checking hook
-  
+
   // Define all available columns
   const allColumns: UserColumn[] = createUserColumns();
 
@@ -257,86 +262,40 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
     }
   };
 
-  const handleMarkAsContracted = async () => {
-    if (contextMenu) {
-      try {
-        if (onMarkAsContracted) {
-          onMarkAsContracted(contextMenu.users);
-        } else {
-          // Fallback to direct API calls
-          if (contextMenu.isBulk && contextMenu.users.length > 1) {
-            // Bulk mark as effected
-            const users = contextMenu.users.map((user) => ({
-              id: user.id,
-              data: { contractType: CONTRACT_TYPE.INDETERMINATE, contractStatus: CONTRACT_STATUS.ACTIVE, effectedAt: new Date() },
-            }));
-            await batchUpdate({ users });
-          } else {
-            // Single mark as effected
-            await updateUser({
-              id: contextMenu.users[0].id,
-              data: { contractType: CONTRACT_TYPE.INDETERMINATE, contractStatus: CONTRACT_STATUS.ACTIVE, effectedAt: new Date() },
-            });
-          }
-        }
-        setContextMenu(null);
-      } catch (error) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.error("Error marking user(s) as effected:", error);
-        }
-      }
+  // Both vínculo shortcuts act on the ELIGIBLE subset of the right-clicked selection,
+  // not on all of it — a mixed selection would otherwise send requests the server is
+  // bound to reject (a TERMINATED vínculo can't be revived, and an already-efetivado
+  // one has no experiência to close).
+  const canBeEffected = (user: User) =>
+    user.currentContractStatus === CONTRACT_STATUS.ACTIVE &&
+    (user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_1 ||
+      user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_2);
+  const isActiveBond = (user: User) => user.currentContractStatus === CONTRACT_STATUS.ACTIVE;
+
+  // Efetivação never fires straight from the menu either: either the parent owns the
+  // flow (it renders its own confirmation) or the shared UserEffectDialog below does.
+  const handleMarkAsContracted = () => {
+    if (!contextMenu) return;
+    const eligible = contextMenu.users.filter(canBeEffected);
+    if (eligible.length) {
+      if (onMarkAsContracted) onMarkAsContracted(eligible);
+      else setContractDialog(eligible);
     }
+    setContextMenu(null);
   };
 
-  const handleMarkAsDismissed = async () => {
-    if (contextMenu) {
-      try {
-        if (onMarkAsDismissed) {
-          onMarkAsDismissed(contextMenu.users);
-        } else {
-          // Fallback to direct API calls
-          if (contextMenu.isBulk && contextMenu.users.length > 1) {
-            // Bulk mark as dismissed
-            const users = contextMenu.users.map((user) => ({
-              id: user.id,
-              data: { contractStatus: CONTRACT_STATUS.TERMINATED, terminationDate: new Date() },
-            }));
-            await batchUpdate({ users });
-          } else {
-            // Single mark as dismissed — surface the Secullum sync result
-            // so the operator can see whether Demissao was set on the
-            // funcionario. Same shape as the edit page.
-            const response = (await updateUser({
-              id: contextMenu.users[0].id,
-              data: { contractStatus: CONTRACT_STATUS.TERMINATED, terminationDate: new Date() },
-            })) as { secullumSync?: { status: "synced" | "skipped" | "error"; reason?: string; funcionarioId?: number } };
-            const sync = response?.secullumSync;
-            if (sync) {
-              if (sync.status === "synced") {
-                toast.success(
-                  sync.reason === "demissão sincronizada"
-                    ? `Demissão sincronizada com Secullum (Funcionário #${sync.funcionarioId ?? "?"})`
-                    : `Atualização sincronizada com Secullum (Funcionário #${sync.funcionarioId ?? "?"})`,
-                );
-              } else if (sync.status === "skipped") {
-                toast.warning(
-                  `Sincronização Secullum ignorada: ${sync.reason ?? "motivo desconhecido"}`,
-                );
-              } else if (sync.status === "error") {
-                toast.error(
-                  `Falha ao sincronizar com Secullum: ${sync.reason ?? "erro desconhecido"}`,
-                );
-              }
-            }
-          }
-        }
-        setContextMenu(null);
-      } catch (error) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.error("Error marking user(s) as dismissed:", error);
-        }
-      }
+  // Dismissal never fires straight from the menu: either the parent owns the flow
+  // (it renders its own confirmation) or the shared UserDismissDialog below does.
+  // Before, the surfaces that pass no `onMarkAsDismissed` (setor/cargo detail,
+  // visualizadores) terminated the vínculo on a single unconfirmed click.
+  const handleMarkAsDismissed = () => {
+    if (!contextMenu) return;
+    const eligible = contextMenu.users.filter(isActiveBond);
+    if (eligible.length) {
+      if (onMarkAsDismissed) onMarkAsDismissed(eligible);
+      else setDismissDialog(eligible);
     }
+    setContextMenu(null);
   };
 
   const handleDelete = async () => {
@@ -601,12 +560,8 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             <>
               <DropdownMenuSeparator />
 
-              {/* Show efetivar option if any user is currently in experiência (modality) */}
-              {contextMenu?.users.some(
-                (user) =>
-                  user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_1 ||
-                  user.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_2,
-              ) && (
+              {/* Show efetivar option if any user has an ACTIVE bond still in experiência */}
+              {contextMenu?.users.some(canBeEffected) && (
                 <DropdownMenuItem onClick={handleMarkAsContracted}>
                   <IconUserCheck className="mr-2 h-4 w-4" />
                   {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Efetivar selecionados" : "Efetivar"}
@@ -614,8 +569,8 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
               )}
 
               {/* Show dismiss option if any user is still connected (active bond) */}
-              {contextMenu?.users.some((user) => user.currentContractStatus === CONTRACT_STATUS.ACTIVE) && (
-                <DropdownMenuItem onClick={handleMarkAsDismissed}>
+              {contextMenu?.users.some(isActiveBond) && (
+                <DropdownMenuItem onClick={handleMarkAsDismissed} className="text-destructive">
                   <IconUserX className="mr-2 h-4 w-4" />
                   {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Demitir selecionados" : "Demitir"}
                 </DropdownMenuItem>
@@ -633,6 +588,13 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
           )}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
+
+      <UserEffectDialog users={contractDialog} onClose={() => setContractDialog(null)} />
+      <UserDismissDialog
+        users={dismissDialog}
+        onClose={() => setDismissDialog(null)}
+        onCompleted={(ids) => removeFromSelection(ids)}
+      />
     </div>
   );
 }

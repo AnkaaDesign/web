@@ -16,7 +16,6 @@ import { DataTablePage } from "@/components/ui/datatable";
 import type { DataTableRowAction, DataTableRowClickMeta, DataTableFilterValues } from "@/components/ui/datatable";
 import { Combobox } from "@/components/ui/combobox";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/components/ui/sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +41,7 @@ import type { User } from "@/types";
 import { useNavBreadcrumbs } from "@/contexts/navigation-context";
 import { ThirteenthGenerateDialog } from "@/components/personnel-department/thirteenth/list/thirteenth-generate-dialog";
 import { UserMergeDialog } from "../merge/user-merge-dialog";
+import { UserDismissDialog, UserEffectDialog } from "../contract-action/user-contract-action-dialog";
 import { createUserColumns, USER_TABLE_SECTOR_DEFAULTS } from "./user-table-columns";
 import { buildUserFilterDefs } from "./user-table-filters";
 
@@ -73,8 +73,8 @@ export function UserTablePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { delete: deleteUser, updateAsync } = useUserMutations();
-  const { batchDelete, batchUpdateAsync } = useUserBatchMutations();
+  const { delete: deleteUser } = useUserMutations();
+  const { batchDelete } = useUserBatchMutations();
 
   const privileges = user?.sector?.privileges;
   const isAdmin = privileges === SECTOR_PRIVILEGES.ADMIN;
@@ -174,51 +174,6 @@ export function UserTablePage() {
     }
   }, [deleteDialog, deleteUser, batchDelete]);
 
-  const confirmContract = useCallback(async () => {
-    if (!contractDialog) return;
-    try {
-      // Efetivação (CLT art. 451): convert the bond to prazo indeterminado + flip status to ACTIVE.
-      const payload = {
-        contractType: CONTRACT_TYPE.INDETERMINATE,
-        contractStatus: CONTRACT_STATUS.ACTIVE,
-        effectedAt: new Date(),
-      };
-      await batchUpdateAsync({ users: contractDialog.items.map((u) => ({ id: u.id, data: payload })) });
-    } catch {
-      // handled by the api client.
-    } finally {
-      setContractDialog(null);
-    }
-  }, [contractDialog, batchUpdateAsync]);
-
-  const confirmDismiss = useCallback(async () => {
-    if (!dismissDialog) return;
-    try {
-      const items = dismissDialog.items;
-      const payload = { contractStatus: CONTRACT_STATUS.TERMINATED, terminationDate: new Date() };
-      if (items.length === 1) {
-        // Single dismiss — surface the Secullum sync outcome (Demissão set on the funcionário).
-        const res = (await updateAsync({ id: items[0].id, data: payload })) as {
-          secullumSync?: { status: "synced" | "skipped" | "error"; reason?: string; funcionarioId?: number };
-        };
-        const sync = res?.secullumSync;
-        if (sync?.status === "synced") {
-          toast.success(`Demissão sincronizada com Secullum (Funcionário #${sync.funcionarioId ?? "?"})`);
-        } else if (sync?.status === "skipped") {
-          toast.warning(`Sincronização Secullum ignorada: ${sync.reason ?? "motivo desconhecido"}`);
-        } else if (sync?.status === "error") {
-          toast.error(`Falha ao sincronizar com Secullum: ${sync.reason ?? "erro desconhecido"}`);
-        }
-      } else {
-        await batchUpdateAsync({ users: items.map((u) => ({ id: u.id, data: payload })) });
-      }
-    } catch {
-      // handled by the api client.
-    } finally {
-      setDismissDialog(null);
-    }
-  }, [dismissDialog, updateAsync, batchUpdateAsync]);
-
   const handleMergeConfirm = useCallback(
     async (targetId: string, resolutions: Record<string, unknown>) => {
       const sourceIds = mergeDialog.users.map((u) => u.id).filter((id) => id !== targetId);
@@ -234,6 +189,7 @@ export function UserTablePage() {
       u.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_1 ||
       u.currentContractType === CONTRACT_TYPE.EXPERIENCE_PERIOD_2;
     const isActiveBond = (u: User) => u.currentContractStatus === CONTRACT_STATUS.ACTIVE;
+    const canBeEffected = (u: User) => inExperience(u) && isActiveBond(u);
 
     const actions: DataTableRowAction<User>[] = [
       {
@@ -267,13 +223,17 @@ export function UserTablePage() {
         label: "Efetivar",
         icon: <IconUserCheck className="h-4 w-4" />,
         separatorBefore: true,
-        hidden: (rows) => !rows.some(inExperience),
-        onClick: (rows) => setContractDialog({ items: rows.filter(inExperience) }),
+        // A TERMINATED vínculo can't be revived (CONTRACT_STATUS_TRANSITIONS), so an
+        // ex-collaborator still typed as experiência must not be offered efetivação.
+        hidden: (rows) => !rows.some(canBeEffected),
+        onClick: (rows) => setContractDialog({ items: rows.filter(canBeEffected) }),
       });
       actions.push({
         key: "demitir",
         label: "Demitir",
         icon: <IconUserX className="h-4 w-4" />,
+        // Destructive: it ends the vínculo and drops the row out of "Ativos".
+        variant: "destructive",
         hidden: (rows) => !rows.some(isActiveBond),
         onClick: (rows) => setDismissDialog({ items: rows.filter(isActiveBond) }),
       });
@@ -408,41 +368,11 @@ export function UserTablePage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Efetivar confirmation */}
-      <AlertDialog open={!!contractDialog} onOpenChange={(open) => !open && setContractDialog(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar contratação</AlertDialogTitle>
-            <AlertDialogDescription>
-              {contractDialog && contractDialog.items.length > 1
-                ? `Tem certeza que deseja marcar ${contractDialog.items.length} usuários como contratados?`
-                : `Tem certeza que deseja marcar o usuário "${contractDialog?.items[0]?.name}" como contratado?`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmContract}>Confirmar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Efetivar — confirmation + (bulk) result report, shared with the other user tables. */}
+      <UserEffectDialog users={contractDialog?.items ?? null} onClose={() => setContractDialog(null)} />
 
-      {/* Demitir confirmation */}
-      <AlertDialog open={!!dismissDialog} onOpenChange={(open) => !open && setDismissDialog(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar desligamento</AlertDialogTitle>
-            <AlertDialogDescription>
-              {dismissDialog && dismissDialog.items.length > 1
-                ? `Tem certeza que deseja marcar ${dismissDialog.items.length} usuários como desligados?`
-                : `Tem certeza que deseja marcar o usuário "${dismissDialog?.items[0]?.name}" como desligado?`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDismiss}>Confirmar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Demitir — confirmation + (bulk) result report, shared with the other user tables. */}
+      <UserDismissDialog users={dismissDialog?.items ?? null} onClose={() => setDismissDialog(null)} />
     </>
   );
 }

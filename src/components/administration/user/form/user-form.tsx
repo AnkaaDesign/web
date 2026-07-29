@@ -21,6 +21,7 @@ import { HorarioSelector } from "./horario-selector";
 import { EmployeeTypeSelector, ContractTypeSelector, ContractStatusDisplay, ProviderFields } from "./status-selector";
 import { VerifiedSwitch } from "./verified-switch";
 import { StatusDatesSection } from "./status-dates-section";
+import { DismissalDateInput } from "./dismissal-date-input";
 import { FormAddressInput } from "@/components/ui/form-address-input";
 import { FormAddressNumberInput } from "@/components/ui/form-address-number-input";
 import { FormAddressComplementInput } from "@/components/ui/form-address-complement-input";
@@ -148,6 +149,11 @@ export function UserForm(props: UserFormProps) {
   const employeeType = useWatch({ control: form.control, name: "employeeType" as any }) as EMPLOYEE_TYPE | undefined;
   const isClt = !employeeType || employeeType === EMPLOYEE_TYPE.CLT;
   const isProvider = employeeType === EMPLOYEE_TYPE.PJ;
+
+  // Situação do vínculo — a TERMINATED contract exposes its termination date for
+  // correction (the desligamento flow is what sets it in the first place).
+  const contractStatus = useWatch({ control: form.control, name: "contractStatus" as any }) as CONTRACT_STATUS | undefined;
+  const isTerminated = contractStatus === CONTRACT_STATUS.TERMINATED;
 
   // Union membership gates the authorization-date picker.
   const unionMember = useWatch({ control: form.control, name: "unionMember" as any }) as boolean | undefined;
@@ -487,6 +493,14 @@ export function UserForm(props: UserFormProps) {
 
               {/* Situação do vínculo (somente leitura — definida pelo desligamento) */}
               {mode === "update" && <ContractStatusDisplay />}
+
+              {/* Data de demissão — editável apenas para corrigir um vínculo já
+                  desligado; o desligamento em si é feito pelo fluxo próprio. */}
+              {mode === "update" && isTerminated && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <DismissalDateInput disabled={isSubmitting} />
+                </div>
+              )}
 
               {/* Datas do período de experiência (apenas CLT) */}
               {isClt && <StatusDatesSection disabled={isSubmitting} />}
