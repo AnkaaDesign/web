@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -26,7 +26,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Badge } from "@/components/ui/badge";
 import { FileItem, FileUploadField, type FileWithPreview } from "@/components/common/file";
-import { GhsPictogramList } from "../ghs-pictogram";
+import { GhsPictogramImage, GhsPictogramList } from "../ghs-pictogram";
 
 interface CreateModeProps {
   mode: "create";
@@ -41,6 +41,14 @@ interface UpdateModeProps {
   onSubmit: (data: FispqUpdateFormData) => Promise<void>;
 }
 
+/**
+ * Imperative save exposed by the form when embedded in a host form (item form).
+ * Resolves `true` when there was nothing to persist or the save succeeded, and
+ * `false` when validation blocked the submit. `itemId` is injected at save time
+ * because the host may only learn the item id after creating the item.
+ */
+export type FispqFormSubmitFn = (overrides?: { itemId?: string }) => Promise<boolean>;
+
 type FispqFormProps = (CreateModeProps | UpdateModeProps) & {
   isSubmitting?: boolean;
   disabled?: boolean;
@@ -49,6 +57,12 @@ type FispqFormProps = (CreateModeProps | UpdateModeProps) & {
   isUploadingPdf?: boolean;
   /** Overrides the form id (and hidden submit-trigger id) when embedded. */
   formId?: string;
+  /** Receives the imperative save (and `null` on unmount) so a host form can save this section. */
+  registerSubmit?: (submit: FispqFormSubmitFn | null) => void;
+  /** Reports this section's dirty state so a host form can fold it into its own. */
+  onDirtyChange?: (isDirty: boolean) => void;
+  /** Read-only Produto / Marca / Fornecedor strip. Off when the host already shows those fields. */
+  showItemContext?: boolean;
 };
 
 const pictogramOptions = Object.entries(GHS_PICTOGRAM_LABELS).map(([value, label]) => ({ value, label }));
@@ -102,7 +116,7 @@ function buildUpdateDefaults(fispq: Fispq): FispqUpdateFormData {
  * external button clicking the hidden trigger by id.
  */
 export function FispqForm(props: FispqFormProps) {
-  const { isSubmitting, disabled, onUploadPdf, isUploadingPdf } = props;
+  const { isSubmitting, disabled, onUploadPdf, isUploadingPdf, registerSubmit, onDirtyChange, showItemContext = true } = props;
   const formId = props.formId ?? "fispq-form";
 
   const defaultValues = useMemo(
@@ -139,7 +153,7 @@ export function FispqForm(props: FispqFormProps) {
   // so we derive and show them read-only instead of re-typing them.
   const activeItemId = props.mode === "create" ? props.itemId : props.fispq.itemId;
   const { data: itemResponse } = useItem(activeItemId, {
-    enabled: !!activeItemId,
+    enabled: showItemContext && !!activeItemId,
     include: { brands: true, supplier: true },
   });
   const linkedItem = (itemResponse as any)?.data as Item | undefined;
@@ -186,6 +200,36 @@ export function FispqForm(props: FispqFormProps) {
     }
   };
 
+  // Keep the imperative save pointing at the latest props without re-registering.
+  const submitHandlerRef = useRef(handleSubmit);
+  submitHandlerRef.current = handleSubmit;
+
+  const isDirty = form.formState.isDirty;
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+
+  // Host-form integration: expose a validate-then-save that no-ops when untouched,
+  // so saving an item never writes an empty FISPQ.
+  useEffect(() => {
+    if (!registerSubmit) return;
+    const submit: FispqFormSubmitFn = async (overrides) => {
+      if (overrides?.itemId) {
+        form.setValue("itemId", overrides.itemId, { shouldValidate: false, shouldDirty: false });
+      }
+      if (!form.formState.isDirty) return true;
+      let saved = false;
+      await form.handleSubmit(async (data) => {
+        await submitHandlerRef.current(data);
+        saved = true;
+      })();
+      return saved;
+    };
+    registerSubmit(submit);
+    return () => registerSubmit(null);
+  }, [registerSubmit, form]);
+
   return (
     <FormProvider {...form}>
       <div id={formId}>
@@ -199,24 +243,28 @@ export function FispqForm(props: FispqFormProps) {
                 <IconBuildingFactory2 className="h-5 w-5 text-muted-foreground" />
                 Identificação
               </CardTitle>
-              <CardDescription>O produto, a marca (fabricante) e o fornecedor vêm do item de estoque</CardDescription>
+              <CardDescription>
+                {showItemContext ? "O produto, a marca (fabricante) e o fornecedor vêm do item de estoque" : "Contato de emergência e uso recomendado do produto"}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Read-only context derived from the linked stock item */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-lg border border-border bg-muted/30 p-3">
-                <div>
-                  <p className="text-xs font-medium uppercase text-muted-foreground">Produto</p>
-                  <p className="text-sm text-foreground">{linkedItem?.name ?? "—"}</p>
+              {showItemContext && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-lg border border-border bg-muted/30 p-3">
+                  <div>
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Produto</p>
+                    <p className="text-sm text-foreground">{linkedItem?.name ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Marca (fabricante)</p>
+                    <p className="text-sm text-foreground">{brandNames || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Fornecedor</p>
+                    <p className="text-sm text-foreground">{supplierName || "—"}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-medium uppercase text-muted-foreground">Marca (fabricante)</p>
-                  <p className="text-sm text-foreground">{brandNames || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium uppercase text-muted-foreground">Fornecedor</p>
-                  <p className="text-sm text-foreground">{supplierName || "—"}</p>
-                </div>
-              </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -276,6 +324,27 @@ export function FispqForm(props: FispqFormProps) {
                           emptyText="Nenhum pictograma"
                           searchable={false}
                           clearable
+                          renderOption={(option) => (
+                            <div className="flex items-center gap-2">
+                              <GhsPictogramImage code={option.value} size={28} className="shrink-0" />
+                              <span className="truncate">{option.label}</span>
+                            </div>
+                          )}
+                          renderValue={(selected) => {
+                            const options = Array.isArray(selected) ? selected : selected ? [selected] : [];
+                            if (options.length === 0) return <span className="opacity-70">Selecione os pictogramas</span>;
+                            // The trigger is a single fixed-height row — show a few glyphs and count the rest.
+                            const visible = options.slice(0, 5);
+                            const overflow = options.length - visible.length;
+                            return (
+                              <div className="flex items-center gap-1 overflow-hidden">
+                                {visible.map((option) => (
+                                  <GhsPictogramImage key={option.value} code={option.value} size={24} className="shrink-0" />
+                                ))}
+                                {overflow > 0 && <span className="text-sm text-muted-foreground">+{overflow}</span>}
+                              </div>
+                            );
+                          }}
                         />
                       </FormControl>
                       {selectedPictograms.length > 0 && <GhsPictogramList codes={selectedPictograms} size={44} className="pt-2" />}
@@ -671,7 +740,7 @@ export function FispqForm(props: FispqFormProps) {
                   <FileItem file={existingPdf} viewMode="list" />
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    {props.mode === "create" ? "Salve a FISPQ primeiro para anexar o PDF oficial." : "Nenhum PDF anexado."}
+                    {props.mode === "create" ? "Salve primeiro para anexar o PDF oficial." : "Nenhum PDF anexado."}
                   </p>
                 )}
 

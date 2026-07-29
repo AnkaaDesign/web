@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useForm, useFieldArray, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router-dom";
@@ -32,7 +32,15 @@ import { BorrowableToggle } from "./borrowable-toggle";
 import { StockModelSelector } from "./stock-model-selector";
 import { FixedTargetQuantityInput } from "./fixed-target-quantity-input";
 import { PpeConfigSection } from "./ppe-config-section";
-import { FispqItemCard } from "./fispq-item-card";
+import { FispqItemCard, type FispqCardSaveFn } from "./fispq-item-card";
+
+/**
+ * Persists the FISPQ card against the item the caller just saved. Handed to
+ * `onSubmit` so the page can create/update the item first (getting its id) and
+ * only then link the FISPQ — the FISPQ has no save button of its own.
+ * No-ops when the FISPQ card was never touched.
+ */
+export type ItemFormFispqSave = (itemId: string) => Promise<void>;
 
 interface BaseItemFormProps {
   isSubmitting?: boolean;
@@ -42,19 +50,19 @@ interface BaseItemFormProps {
   initialWarehouseLocation?: WarehouseLocation;
   initialBrands?: ItemBrand[];
   initialCategory?: ItemCategory;
-  /** Existing item id (update mode) — enables the FISPQ / Segurança Química card. */
+  /** Existing item id (update mode) — lets the FISPQ / Segurança Química card load the current FISPQ. */
   itemId?: string;
 }
 
 interface CreateItemFormProps extends BaseItemFormProps {
   mode: "create";
-  onSubmit: (data: ItemCreateFormData) => Promise<void>;
+  onSubmit: (data: ItemCreateFormData, saveFispq: ItemFormFispqSave) => Promise<void>;
   defaultValues?: Partial<ItemCreateFormData>;
 }
 
 interface UpdateItemFormProps extends BaseItemFormProps {
   mode: "update";
-  onSubmit: (data: ItemUpdateFormData) => Promise<void>;
+  onSubmit: (data: ItemUpdateFormData, saveFispq: ItemFormFispqSave) => Promise<void>;
   defaultValues?: Partial<ItemUpdateFormData>;
 }
 
@@ -215,7 +223,17 @@ export function ItemForm(props: ItemFormProps) {
   }, [form]);
 
   // Access formState properties during render for proper subscription
-  const { isValid, isDirty, errors } = form.formState;
+  const { isValid, isDirty: isItemDirty, errors } = form.formState;
+
+  // The FISPQ card is a nested entity form saved by this form's submit. Its dirty
+  // state has to count as this form's, or the page's save button stays disabled
+  // when only the FISPQ changed.
+  const fispqSaveRef = useRef<FispqCardSaveFn | null>(null);
+  const registerFispqSave = useCallback((save: FispqCardSaveFn | null) => {
+    fispqSaveRef.current = save;
+  }, []);
+  const [isFispqDirty, setIsFispqDirty] = useState(false);
+  const isDirty = isItemDirty || isFispqDirty;
 
   // Debug validation errors in development
   useEffect(() => {
@@ -297,10 +315,15 @@ export function ItemForm(props: ItemFormProps) {
         barcodes: Array.isArray(data.barcodes) ? data.barcodes : [],
         measures: measuresArray,
       };
+      // Handed to the page so the FISPQ is written after the item exists (create)
+      // and against the same id (update).
+      const saveFispq: ItemFormFispqSave = async (savedItemId: string) => {
+        await fispqSaveRef.current?.(savedItemId);
+      };
       if (mode === "create") {
-        await (props as CreateItemFormProps).onSubmit(processedData);
+        await (props as CreateItemFormProps).onSubmit(processedData, saveFispq);
       } else {
-        await (props as UpdateItemFormProps).onSubmit(processedData);
+        await (props as UpdateItemFormProps).onSubmit(processedData, saveFispq);
       }
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {
@@ -496,8 +519,8 @@ export function ItemForm(props: ItemFormProps) {
             </CardContent>
           </Card>
 
-          {/* FISPQ / Segurança Química — separate entity (create-on-first-save), update mode only */}
-          {mode === "update" && itemId && <FispqItemCard itemId={itemId} />}
+          {/* FISPQ / Segurança Química — separate entity, saved by this form's submit */}
+          <FispqItemCard itemId={itemId} registerSave={registerFispqSave} onDirtyChange={setIsFispqDirty} />
           </div>
         </form>
       </FormProvider>

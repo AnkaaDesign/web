@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { ItemEditForm } from "@/components/inventory/item/form/item-edit-form";
+import type { ItemFormFispqSave } from "@/components/inventory/item/form/item-form";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { ItemEditSkeleton } from "@/components/inventory/item/skeleton/item-edit-skeleton";
@@ -46,18 +47,22 @@ export const EditProductPage = () => {
     }
   }, [item]);
 
-  const handleFormSubmit = async (changedData: Partial<ItemUpdateFormData>) => {
+  const handleFormSubmit = async (changedData: Partial<ItemUpdateFormData>, saveFispq: ItemFormFispqSave) => {
     if (!id) return;
 
     try {
-      const result = await updateAsync({
-        id,
-        data: changedData,
-      });
-
-      if (result.success) {
-        navigate(routes.inventory.products.root);
+      // The FISPQ card lives in this form but is its own entity — it may also be
+      // the only thing that changed, in which case there is no item update to send.
+      if (Object.keys(changedData).length > 0) {
+        const result = await updateAsync({
+          id,
+          data: changedData,
+        });
+        if (!result.success) return;
       }
+
+      await saveFispq(id);
+      navigate(routes.inventory.products.root);
     } catch (error) {
       // Error handled by mutation hook
       if (process.env.NODE_ENV !== "production") {

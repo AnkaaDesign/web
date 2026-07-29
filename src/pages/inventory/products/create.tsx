@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { ItemForm } from "@/components/inventory/item/form";
+import type { ItemFormFispqSave } from "@/components/inventory/item/form/item-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { useItemMutations } from "../../../hooks";
 import { itemCreateSchema } from "../../../schemas";
@@ -23,7 +24,7 @@ export const CreateProductPage = () => {
   // Get default values from URL parameters
   const defaultValues = getDefaultItemFormValues(searchParams);
 
-  const handleSubmit = async (data: ItemCreateFormData) => {
+  const handleSubmit = async (data: ItemCreateFormData, saveFispq: ItemFormFispqSave) => {
     try {
       // Ensure barcodes is an array (fix for empty object issue)
       const sanitizedData = {
@@ -44,6 +45,15 @@ export const CreateProductPage = () => {
       }
       const result = await createAsync(validatedData);
       if (result?.success && result?.data) {
+        // The FISPQ card needs the brand-new item id; a failure there must not
+        // undo/hide the item that was just created, so it only warns.
+        try {
+          await saveFispq(result.data.id);
+        } catch (fispqError) {
+          if (process.env.NODE_ENV !== "production") {
+            console.error("Error saving FISPQ for the created item:", fispqError);
+          }
+        }
         // Clear URL parameters after successful submission
         navigate(routes.inventory.products.root, { replace: true });
       } else {

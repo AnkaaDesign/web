@@ -1,11 +1,11 @@
 import React from "react";
 import type { Item } from "../../../../types";
 import { type ItemUpdateFormData } from "../../../../schemas";
-import { ItemForm } from "./item-form";
+import { ItemForm, type ItemFormFispqSave } from "./item-form";
 
 interface ItemEditFormProps {
   item: Item;
-  onSubmit: (data: Partial<ItemUpdateFormData>) => Promise<void>;
+  onSubmit: (data: Partial<ItemUpdateFormData>, saveFispq: ItemFormFispqSave) => Promise<void>;
   isSubmitting?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
   onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
@@ -68,7 +68,7 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
     originalValuesRef.current = defaultValues;
   }, [defaultValues]);
 
-  const handleSubmit = async (data: ItemUpdateFormData) => {
+  const handleSubmit = async (data: ItemUpdateFormData, saveFispq: ItemFormFispqSave) => {
     // Compare with original values to find changed fields
     const changedFields: Partial<ItemUpdateFormData> = {};
     const original = originalValuesRef.current;
@@ -106,12 +106,9 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
       });
     }
 
-    // Only submit if there are changes
-    if (Object.keys(changedFields).length > 0) {
-      await onSubmit(changedFields);
-    } else {
-      // No changes, do nothing
-    }
+    // Always hand off: the FISPQ card may be the only thing that changed, and the
+    // page skips the item update when `changedFields` is empty.
+    await onSubmit(changedFields, saveFispq);
   };
 
   return (
