@@ -108,7 +108,10 @@ const FinancialBudgetDetailPageInner = () => {
     {
       include: {
         customer: true,
-        truck: true,
+        // `vinPlate` is a File relation, so a boolean `truck: true` would leave the Plaqueta field
+        // permanently empty (both here and in the Resumo) and let a save wipe a photo that was
+        // already there.
+        truck: { include: { vinPlate: true } },
         layouts: { include: { file: true } },
         baseFiles: true,
         responsibles: true,
@@ -159,6 +162,8 @@ const FinancialBudgetDetailPageInner = () => {
   const [layoutsInitialized, setLayoutsInitialized] = useState(false);
   const [layoutStatuses, setLayoutStatuses] = useState<Record<string, string>>({});
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
+  // Foto da plaqueta (VIN) — imagem única, espelhando o campo do formulário de Tarefa.
+  const [vinPlateFiles, setVinPlateFiles] = useState<FileWithPreview[]>([]);
   // Snapshots of the relation sets as loaded from the task. Used at submit time to
   // tell whether the user actually changed each set; if not, we OMIT the key so
   // the API preserves it (absence = preserve). Sending an empty array would WIPE
@@ -220,6 +225,9 @@ const FinancialBudgetDetailPageInner = () => {
       plate: "" as string,
       serialNumber: "" as string,
       chassisNumber: "" as string,
+      // Foto da plaqueta (VIN). `null` é o valor EXPLÍCITO de "removida" — `undefined` faria a
+      // API pular o campo e a foto antiga sobreviveria a uma remoção.
+      vinPlateId: null as string | null,
       category: "" as string,
       // Do NOT default to a concrete enum — an unset implementType must stay
       // empty so an untouched budget save never clobbers the truck's real value
@@ -256,6 +264,26 @@ const FinancialBudgetDetailPageInner = () => {
       ] as any[],
     },
   });
+
+  /**
+   * Foto da plaqueta — imagem única, só o ÚLTIMO arquivo vale (`maxFiles={1}` já limita a seleção,
+   * mas o estado é normalizado aqui de qualquer forma).
+   *
+   * Um arquivo JÁ ENVIADO viaja como `truck.vinPlateId`; um arquivo novo ainda não tem id, então
+   * `vinPlateId` fica `null` até o submit fazer o upload e preencher. Limpar o campo manda `null`
+   * explícito — é assim que a foto é removida.
+   */
+  const handleVinPlateFilesChange = useCallback(
+    (files: FileWithPreview[]) => {
+      const picked = files.slice(-1);
+      setVinPlateFiles(picked);
+      const existing = picked.find((f) => f.uploaded);
+      form.setValue("vinPlateId", (existing?.uploadedFileId || existing?.id || null) as never, {
+        shouldDirty: true,
+      });
+    },
+    [form],
+  );
 
   // Unsaved changes guard — prevents losing edits on back/cancel/breadcrumb/refresh
   const { showDialog, confirmNavigation, cancelNavigation, guardedNavigate, allowNavigation } = useUnsavedChangesGuard({
@@ -299,12 +327,33 @@ const FinancialBudgetDetailPageInner = () => {
   useEffect(() => {
     if (!task) return;
 
+    // Seed the Plaqueta photo from the persisted truck relation.
+    const persistedVinPlate = (task.truck as any)?.vinPlate;
+    setVinPlateFiles(
+      persistedVinPlate
+        ? [
+            {
+              id: persistedVinPlate.id,
+              name: persistedVinPlate.originalName || persistedVinPlate.filename || "plaqueta",
+              size: persistedVinPlate.size || 0,
+              type: persistedVinPlate.mimetype || "image/jpeg",
+              lastModified: Date.now(),
+              uploaded: true,
+              uploadProgress: 100,
+              uploadedFileId: persistedVinPlate.id,
+              thumbnailUrl: persistedVinPlate.thumbnailUrl,
+            } as FileWithPreview,
+          ]
+        : [],
+    );
+
     const taskFields = {
       name: task.name || "",
       customerId: task.customerId || "",
       plate: task.truck?.plate || "",
       serialNumber: task.serialNumber || "",
       chassisNumber: task.truck?.chassisNumber || "",
+      vinPlateId: (task.truck as any)?.vinPlateId || null,
       category: task.truck?.category || "",
       // Seed from the loaded truck; leave empty when absent. NEVER default to a
       // concrete enum here — that silently rewrites the truck's implementType to
@@ -881,6 +930,38 @@ const FinancialBudgetDetailPageInner = () => {
         }
       }
 
+      // 1a. Upload a newly picked Plaqueta photo, so the truck payload below can send its id. A
+      // failure here must NOT abort the save: the rest of the orçamento is what the user came for,
+      // and the interceptor already toasted. `vinPlateId` then stays at whatever it was.
+      let vinPlateId: string | null = (data as any).vinPlateId ?? null;
+      const pendingVinPlate = vinPlateFiles.find((f) => !f.uploaded);
+      if (pendingVinPlate) {
+        try {
+          const response = await uploadSingleFile(pendingVinPlate, {
+            fileContext: "truckVinPlate",
+          });
+          if (response.success && response.data) {
+            vinPlateId = response.data.id;
+            // Keep the File instance (blob intact) but mark it uploaded, so a retry after a later
+            // failure does not upload the same bytes twice.
+            const uploadedId = response.data.id;
+            setVinPlateFiles((prev) =>
+              prev.map((f) =>
+                f === pendingVinPlate
+                  ? (Object.assign(f, {
+                      uploaded: true,
+                      uploadedFileId: uploadedId,
+                      uploadProgress: 100,
+                    }) as FileWithPreview)
+                  : f,
+              ),
+            );
+          }
+        } catch (error: any) {
+          toast.error(`Erro ao enviar a foto da plaqueta: ${error.message}`);
+        }
+      }
+
       // 1b. Upload new base files (already-uploaded ones keep their id)
       const uploadedBaseFileIds: string[] = [];
       const baseLocalIdToRealFileId: Record<string, string> = {};
@@ -1063,6 +1144,13 @@ const FinancialBudgetDetailPageInner = () => {
         truckPayload.category = data.category || undefined;
       if (dirtyFields.implementType)
         truckPayload.implementType = data.implementType || undefined;
+      // Plaqueta: send an EXPLICIT null when the photo was cleared (undefined means "don't touch",
+      // so the old photo would survive a removal). `dirtyFields.vinPlateId` misses the
+      // pick-a-brand-new-photo case — setValue writes null there, which equals the default when
+      // there was no photo before — hence the `pendingVinPlate` arm.
+      if (dirtyFields.vinPlateId || pendingVinPlate) {
+        truckPayload.vinPlateId = vinPlateId;
+      }
       if (Object.keys(truckPayload).length > 0) {
         taskUpdateData.truck = truckPayload;
       }
@@ -1329,6 +1417,7 @@ const FinancialBudgetDetailPageInner = () => {
     layoutFiles,
     layouts,
     layoutStatuses,
+    vinPlateFiles,
     responsibleRows,
     queryClient,
     createQuoteMutation,
@@ -1531,6 +1620,8 @@ const FinancialBudgetDetailPageInner = () => {
               layouts={layouts}
               onLayoutsChange={handleLayoutsChange}
               onLayoutStatusChange={handleLayoutStatusChange}
+              vinPlateFiles={vinPlateFiles}
+              onVinPlateFilesChange={handleVinPlateFilesChange}
             />
           </div>
 

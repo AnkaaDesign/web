@@ -37,7 +37,7 @@ import { GeneralPaintingSelector } from "@/components/production/task/form/gener
 import { ResponsibleManager } from "@/components/administration/customer/responsible";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FileCardUploadField } from "@/components/common/file";
+import { FileCardUploadField, FileUploadField } from "@/components/common/file";
 import { LayoutFileUploadField } from "@/components/production/task/form/layout-file-upload-field";
 import { MultiAirbrushingSelector } from "@/components/production/task/form/multi-airbrushing-selector";
 import { FileSuggestions, type FileWithPreview } from "@/components/common/file";
@@ -55,6 +55,9 @@ interface BudgetStepTaskProps {
   onLayoutsChange: (files: FileWithPreview[]) => void;
   onLayoutStatusChange: (fileId: string, status: string) => void;
   onPaintCreated?: (paint: any) => void;
+  /** Foto da plaqueta (VIN) já anexada ao caminhão, se houver. Edit mode only. */
+  vinPlateFiles?: FileWithPreview[];
+  onVinPlateFilesChange?: (files: FileWithPreview[]) => void;
 }
 
 export function BudgetStepTask({
@@ -69,6 +72,8 @@ export function BudgetStepTask({
   onLayoutsChange,
   onLayoutStatusChange,
   onPaintCreated,
+  vinPlateFiles,
+  onVinPlateFilesChange,
 }: BudgetStepTaskProps) {
   const { user } = useAuth();
   const { control } = useFormContext();
@@ -273,6 +278,36 @@ export function BudgetStepTask({
                         </FormItem>
                       )}
                     />
+                    {/* Plaqueta — FOTO da plaqueta de identificação (VIN), imagem única. Mesmo
+                        campo do formulário de Tarefa e do Faturamento: quem monta o orçamento é
+                        quem está com o caminhão à vista, e mandar abrir outra tela para anexar a
+                        foto é como ela deixa de ser anexada. Só no modo edição: no create ainda
+                        não existe caminhão gravado (e uma única foto não serve para N tarefas). */}
+                    {onVinPlateFilesChange && (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <IconId className="h-4 w-4" />
+                          Plaqueta
+                        </FormLabel>
+                        <FormControl>
+                          <FileUploadField
+                            onFilesChange={onVinPlateFilesChange}
+                            maxFiles={1}
+                            maxSize={20 * 1024 * 1024}
+                            disabled={disabled}
+                            showPreview={true}
+                            existingFiles={vinPlateFiles}
+                            variant="inline"
+                            placeholder="Fotografe ou anexe a plaqueta"
+                            label="Foto da plaqueta"
+                            acceptedFileTypes={{
+                              "image/*": [".jpeg", ".jpg", ".png", ".webp", ".heic"],
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
