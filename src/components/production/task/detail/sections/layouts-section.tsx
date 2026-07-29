@@ -75,7 +75,10 @@ export function LayoutsSection({ task, canViewBadges, view }: { task: Task; canV
       {filteredLayouts.map((artwork) => {
           const fileData = (artwork.file ?? artwork) as File;
           return (
-            <div key={artwork.id} className="relative">
+            // The badge wrapper must carry the card's grid width itself: as a shrink-to-fit flex item
+            // it would collapse the `w-full max-w-[200px]` FileItem down to the thumbnail's intrinsic
+            // aspect, making these cards a different shape from the (unwrapped) Arquivos ones.
+            <div key={artwork.id} className={cn("relative", view === "grid" && "w-full max-w-[200px]")}>
               <FileItem file={fileData} viewMode={view} onPreview={handlePreview} onDownload={handleDownload} showActions />
               {canViewBadges && artwork.status && (
                 <div className="pointer-events-none absolute left-1 top-1 max-w-[calc(100%-0.5rem)]">

@@ -85,7 +85,10 @@ export function CutsSection({ cuts, view }: { cuts: Cut[]; view: FileViewMode })
         // section — no separate origin badge. Each Cut row is its own item, so a plan created
         // with quantity N shows N thumbnails.
         return (
-          <div key={cut.id} className="relative">
+          // The badge wrapper must carry the card's grid width itself: as a shrink-to-fit flex item it
+          // would collapse the `w-full max-w-[200px]` FileItem down to the thumbnail's intrinsic
+          // aspect, making these cards a different shape from the (unwrapped) Arquivos ones.
+          <div key={cut.id} className={cn("relative", view === "grid" && "w-full max-w-[200px]")}>
             <FileItem file={cut.file} viewMode={view} onPreview={handlePreview} onDownload={handleDownload} showActions />
             {cut.status && (
               <div className="pointer-events-none absolute left-1 top-1 max-w-[calc(100%-0.5rem)]">
