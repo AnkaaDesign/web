@@ -28,6 +28,28 @@ const isPdfFile = (file: File): boolean =>
   file.type === "application/pdf" || (file.name || "").toLowerCase().endsWith(".pdf");
 
 /**
+ * Read an entry back as a `FileWithPreview` after an `instanceof File` check has ruled the
+ * File branch out.
+ *
+ * `FileWithPreview` is declared `extends File`, so TypeScript is certain every entry IS a real
+ * `File` and narrows the ELSE branch of `f instanceof File` to `never` — at which point reading
+ * `.preview` off it, or spreading it, is an error. At RUNTIME the distinction is real and this
+ * component depends on it in both directions:
+ *
+ *   · a dropped file is a genuine `File`;
+ *   · `backendFileToFileWithPreview` builds its entries with `Object.create(File.prototype)`, so
+ *     server-backed files are ALSO `instanceof File` (this is why `!(f instanceof File)` is never
+ *     a valid "is a server file" test anywhere in the app);
+ *   · anything this component rebuilds by spreading — see `handleStatusChange` — is a plain
+ *     object and is NOT.
+ *
+ * So the else branch is reachable and its value is a well-formed `FileWithPreview`; only the
+ * declared type says otherwise. Naming that conversion beats an inline `as any`, which is what
+ * hid the same confusion elsewhere.
+ */
+const asPlainEntry = (f: FileWithPreview): FileWithPreview => f;
+
+/**
  * Picker PADRÃO de arquivos do sistema — a tira horizontal de cards usada nos
  * layouts da tarefa. É o visual único de "anexar arquivos": arquivos base,
  * projetos, layouts, arquivos de airbrushing, evidências.
@@ -205,7 +227,7 @@ export function FileCardUploadField({
                   const patch = { preview: dataUrl || undefined, pdfPreviewLoading: false };
                   return (f instanceof File
                     ? Object.assign(f, patch)
-                    : { ...f, ...patch }) as FileWithPreview;
+                    : { ...asPlainEntry(f), ...patch }) as FileWithPreview;
                 }),
               );
             });
@@ -269,8 +291,8 @@ export function FileCardUploadField({
         // not the document itself), so the browser shows the real PDF/image.
         const url = URL.createObjectURL(clicked);
         window.open(url, "_blank");
-      } else if (clicked.preview) {
-        window.open(clicked.preview, "_blank");
+      } else if (asPlainEntry(clicked).preview) {
+        window.open(asPlainEntry(clicked).preview!, "_blank");
       }
     },
     [fileViewer, files],

@@ -50,7 +50,7 @@ import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { ImplementMeasureForm } from "@/components/production/implement-measure/implement-measure-form";
 import { ResponsibleManager, validateResponsibleRows, syncResponsibleRoles } from "@/components/administration/customer/responsible";
-import { FileUploadField, FileCardUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
+import { FileCardUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import { LayoutFileUploadField } from "./layout-file-upload-field";
 import { MultiAirbrushingSelector } from "./multi-airbrushing-selector";
 import { createAirbrushingsForTask } from "@/utils/airbrushing-submit";

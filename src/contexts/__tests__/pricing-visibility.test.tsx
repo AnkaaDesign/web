@@ -13,13 +13,22 @@
  * out of render, so React bails out at the reference-equal element and the toggle never
  * reaches the page.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, act, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { PricingProvider, usePricingVisible } from "../pricing-context";
 import { setPricingVisible, togglePricingVisible } from "@/utils/pricing-visibility";
 import { formatCurrency } from "@/utils";
+
+// `PricingProvider` reads the per-user "Mostrar valores por padrão" through `useMyPreferences`,
+// which needs an AuthProvider and a query client. None of that is what these tests are about —
+// they exercise how a TOGGLE propagates — and mounting the real auth stack would make them
+// depend on the network. Stub the preference at its default (masked), which is the state every
+// case below starts from anyway.
+vi.mock("@/dashboard/hooks/use-my-preferences", () => ({
+  useMyPreferences: () => ({ preferences: { pricesVisibleByDefault: false } }),
+}));
 
 /** A page that formats currency and holds unsaved local state (a typed-in draft). */
 function Page() {

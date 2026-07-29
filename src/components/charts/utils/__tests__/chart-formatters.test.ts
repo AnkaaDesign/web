@@ -7,26 +7,52 @@ import {
   formatCompactNumber,
   formatDuration,
 } from '../chart-formatters';
+import { withPricingVisible } from '@/utils/pricing-visibility';
+
+/**
+ * `Intl.NumberFormat('pt-BR', { style: 'currency' })` separates "R$" from the number with a
+ * NON-BREAKING space (U+00A0), and which of NBSP / NNBSP it picks has changed between ICU
+ * versions. Asserting on a literal space made these cases depend on the Node build rather than on
+ * the formatting, so normalise the whitespace and let the assertion be about the digits.
+ */
+const spaces = (value: string): string => value.replace(/[\u00a0\u202f]/g, ' ');
 
 describe('Chart Formatters', () => {
+  // `formatCurrency` is MASKED unless prices are visible, and the module default is hidden
+  // (see utils/pricing-visibility.ts). These cases are about the FORMATTING, so they run inside
+  // `withPricingVisible` — the same helper exports and share links use to get real values out of
+  // a masked screen. The masking itself is pinned by its own test below, so neither behaviour can
+  // regress unnoticed.
   describe('formatCurrency', () => {
     it('should format positive values correctly', () => {
-      expect(formatCurrency(1234.56)).toBe('R$ 1.234,56');
-      expect(formatCurrency(1000000)).toBe('R$ 1.000.000,00');
-      expect(formatCurrency(0.99)).toBe('R$ 0,99');
+      withPricingVisible(() => {
+        expect(spaces(formatCurrency(1234.56))).toBe('R$ 1.234,56');
+        expect(spaces(formatCurrency(1000000))).toBe('R$ 1.000.000,00');
+        expect(spaces(formatCurrency(0.99))).toBe('R$ 0,99');
+      });
     });
 
     it('should format negative values correctly', () => {
-      expect(formatCurrency(-1234.56)).toBe('-R$ 1.234,56');
-      expect(formatCurrency(-100)).toBe('-R$ 100,00');
+      withPricingVisible(() => {
+        expect(spaces(formatCurrency(-1234.56))).toBe('-R$ 1.234,56');
+        expect(spaces(formatCurrency(-100))).toBe('-R$ 100,00');
+      });
     });
 
     it('should handle zero', () => {
-      expect(formatCurrency(0)).toBe('R$ 0,00');
+      withPricingVisible(() => {
+        expect(spaces(formatCurrency(0))).toBe('R$ 0,00');
+      });
     });
 
     it('should handle very large numbers', () => {
-      expect(formatCurrency(999999999.99)).toBe('R$ 999.999.999,99');
+      withPricingVisible(() => {
+        expect(spaces(formatCurrency(999999999.99))).toBe('R$ 999.999.999,99');
+      });
+    });
+
+    it('masks the value when prices are hidden', () => {
+      expect(formatCurrency(1234.56)).toBe('R$ \u2022\u2022\u2022\u2022\u2022\u2022');
     });
   });
 
@@ -103,15 +129,22 @@ describe('Chart Formatters', () => {
     });
 
     it('should handle different date formats', () => {
-      const date = new Date('2024-12-31');
-      expect(formatDate(date)).toBe('31/12/2024');
+      // A DATE-ONLY string is UTC midnight per the ECMAScript spec, so `new Date('2024-12-31')`
+      // is already 30/12 21:00 in America/Sao_Paulo and formatting it locally must say 30/12.
+      // Passing the string straight in takes the `parseISO` branch, which reads a date-only value
+      // as LOCAL midnight — that is the path real callers use, and the one that shows the day the
+      // API meant.
+      expect(formatDate('2024-12-31')).toBe('31/12/2024');
+      expect(formatDate(new Date(2024, 11, 31))).toBe('31/12/2024');
     });
   });
 
   describe('formatDuration', () => {
     it('should format hours correctly', () => {
       expect(formatDuration(5)).toBe('5h');
-      expect(formatDuration(0.5)).toBe('0,5h');
+      // Under an hour reads as minutes rather than "0,5h" — deliberate, and what the function
+      // has done since it was written.
+      expect(formatDuration(0.5)).toBe('30 min');
     });
 
     it('should format days and hours', () => {

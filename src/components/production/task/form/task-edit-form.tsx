@@ -159,7 +159,10 @@ function planAirbrushingReconciliation(
   // which both marked the row as changed and sent `layoutIds: []` — the batch update then
   // detached every layout the airbrushing had. Anything that is not a pending browser
   // upload is already persisted, so key off that instead.
-  const isPendingUpload = (f: any): boolean => f instanceof File && !f.uploaded;
+  // Typed `FileWithPreview` rather than `any`: `instanceof File` narrows a plain `any` all the way
+  // down to the DOM `File`, which has no `uploaded` — so the flag read would be an error while the
+  // check it guards silently kept working.
+  const isPendingUpload = (f: FileWithPreview): boolean => f instanceof File && !f.uploaded;
   const uploadedIds = (files: any[]): string[] =>
     (files || [])
       .filter((f) => f && !isPendingUpload(f))

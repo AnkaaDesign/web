@@ -185,10 +185,14 @@ function DateEditor<TData>({ field, edit, row, onCommit, onCancel }: EditorProps
   return (
     // Force the inner control (a h-10 div, not a button) to h-8 so the row keeps its height.
     <div ref={ref} className="[&_.h-10]:!h-8" onKeyDown={(e) => e.key === "Escape" && onCancel()}>
+      {/* `DateTimeInput.onChange` is typed `Date | DateRange | null` because the same control also
+          serves range pickers. `mode` here is only date/time/datetime, so a DateRange cannot
+          arrive — collapse anything that is not a Date to null rather than forwarding a range
+          this editor (and the field it commits to) has no meaning for. */}
       {isDateTime ? (
-        <DateTimeInput mode={mode} value={draft} onChange={(d) => setDraft(d instanceof Date ? d : (d ?? null))} hideLabel />
+        <DateTimeInput mode={mode} value={draft} onChange={(d) => setDraft(d instanceof Date ? d : null)} hideLabel />
       ) : (
-        <DateTimeInput mode={mode} value={value} onChange={(d) => onCommit(d instanceof Date ? d : (d ?? null))} hideLabel />
+        <DateTimeInput mode={mode} value={value} onChange={(d) => onCommit(d instanceof Date ? d : null)} hideLabel />
       )}
     </div>
   );

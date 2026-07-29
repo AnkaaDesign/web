@@ -182,7 +182,12 @@ export function setUserPrivilege(privilege: string | undefined): void {
  * (a table page, a detail page). Multiple sources are merged by the caller
  * (the provider keeps a per-source registry) before calling this.
  */
-export function setEntities(type: AttentionEntityType, list: ReadonlyArray<{ id: string }>): void {
+// Generic rather than a plain `ReadonlyArray<{ id: string }>` parameter: `id` is the only field
+// the engine itself touches, but the RULES read arbitrary dotted paths off these objects, so the
+// rest of the shape must survive the call. With a fixed parameter type, an inline object literal
+// — which is how every test registers a fixture — trips excess-property checking and reports the
+// very fields the predicates exist to read as errors.
+export function setEntities<T extends { id: string }>(type: AttentionEntityType, list: ReadonlyArray<T>): void {
   const map = new Map<string, unknown>();
   for (const e of list) if (e && e.id != null) map.set(String(e.id), e);
   entities.set(type, map);
@@ -506,7 +511,7 @@ function reconcile(): void {
     const key = matchKey(match);
     let cycle = cycles.get(key);
     if (!cycle) {
-      cycle = { match, status: "idle", bipTimers: [], burstTimer: null, wakeTimer: null };
+      cycle = { match, status: "idle", wakeTimer: null };
       cycles.set(key, cycle);
     } else {
       cycle.match = match; // freshest entity snapshot

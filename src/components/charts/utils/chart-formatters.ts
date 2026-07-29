@@ -8,6 +8,23 @@ import { ptBR } from 'date-fns/locale';
 import { getPricingVisible } from "@/utils/pricing-visibility";
 
 /**
+ * One decimal at most, in pt-BR, with no trailing zero.
+ *
+ * The compact/duration formats used `toFixed`, which ALWAYS emits a dot — so a Brazilian screen
+ * showed "1.5K" and "1d 3.0h" right next to the "R$ 1.234,56" that `Intl.NumberFormat('pt-BR')`
+ * produces three lines above. `maximumFractionDigits: 1` with `minimumFractionDigits: 0` also
+ * drops the ".0" that `toFixed(1)` left on whole values.
+ */
+const compactDecimal = (value: number): string =>
+  new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+    // No thousand separator: the K/M/B suffix IS the grouping, and 999_999 rounds up to 1000 in
+    // the K branch — "1.000K" next to "1M" would read as a different magnitude entirely.
+    useGrouping: false,
+  }).format(value);
+
+/**
  * Format currency values
  */
 export function formatCurrency(value: number, options?: {
@@ -43,13 +60,13 @@ export function formatCompactCurrency(value: number): string {
   const sign = value < 0 ? '-' : '';
 
   if (absValue >= 1_000_000_000) {
-    return `${sign}R$ ${(absValue / 1_000_000_000).toFixed(1)}B`;
+    return `${sign}R$ ${compactDecimal(absValue / 1_000_000_000)}B`;
   }
   if (absValue >= 1_000_000) {
-    return `${sign}R$ ${(absValue / 1_000_000).toFixed(1)}M`;
+    return `${sign}R$ ${compactDecimal(absValue / 1_000_000)}M`;
   }
   if (absValue >= 1_000) {
-    return `${sign}R$ ${(absValue / 1_000).toFixed(1)}K`;
+    return `${sign}R$ ${compactDecimal(absValue / 1_000)}K`;
   }
 
   return formatCurrency(value);
@@ -131,16 +148,13 @@ export function formatCompactNumber(value: number): string {
   const sign = value < 0 ? '-' : '';
 
   if (absValue >= 1_000_000_000) {
-    const result = absValue / 1_000_000_000;
-    return `${sign}${result % 1 === 0 ? result.toFixed(0) : result.toFixed(1)}B`;
+    return `${sign}${compactDecimal(absValue / 1_000_000_000)}B`;
   }
   if (absValue >= 1_000_000) {
-    const result = absValue / 1_000_000;
-    return `${sign}${result % 1 === 0 ? result.toFixed(0) : result.toFixed(1)}M`;
+    return `${sign}${compactDecimal(absValue / 1_000_000)}M`;
   }
   if (absValue >= 1_000) {
-    const result = absValue / 1_000;
-    return `${sign}${result % 1 === 0 ? result.toFixed(0) : result.toFixed(1)}K`;
+    return `${sign}${compactDecimal(absValue / 1_000)}K`;
   }
 
   return value.toString();
@@ -195,7 +209,7 @@ export function formatDuration(hours: number): string {
     return `${Math.round(hours * 60)} min`;
   }
   if (hours < 24) {
-    return `${hours % 1 === 0 ? hours.toFixed(0) : hours.toFixed(1)}h`;
+    return `${compactDecimal(hours)}h`;
   }
 
   const days = Math.floor(hours / 24);
@@ -205,7 +219,7 @@ export function formatDuration(hours: number): string {
     return `${days}d`;
   }
 
-  return `${days}d ${remainingHours.toFixed(1)}h`;
+  return `${days}d ${compactDecimal(remainingHours)}h`;
 }
 
 /**

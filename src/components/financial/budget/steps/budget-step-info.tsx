@@ -21,6 +21,15 @@ import { formatCNPJ } from "@/utils";
 import { getCustomers } from "@/api-client";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 
+/**
+ * A File id that the SERVER already knows about. A persisted File id is a UUID; a file that has
+ * only been picked locally carries a temp id (`<timestamp>-<random>`), and the API rejects
+ * anything that is not a UUID (see the resolution loops in `budget/create.tsx` and
+ * `budget/details/[taskId].tsx`, which drop non-UUIDs for exactly this reason).
+ */
+const isPersistedFileId = (id?: string | null): id is string =>
+  !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
 interface BudgetStepInfoProps {
   disabled?: boolean;
   layoutFiles: FileWithPreview[];
@@ -278,13 +287,23 @@ export function BudgetStepInfo({
   // field. Raw File uploads (added via the picker's upload card) carry no id yet;
   // they are resolved to APPROVED task layouts on Save (parent uploads them +
   // backend syncTaskLayoutsFromQuote), so they must NOT be turned into ids here.
+  //
+  // The gate is "the id is already a real File UUID", NOT "this is not a File instance". The
+  // latter was the previous test and it is not a proxy for either half of the intent:
+  //   · a not-yet-uploaded pick carries a LOCAL temp id (`<timestamp>-<random>`) on a plain
+  //     object, so it passed the old filter and put a non-UUID into `layoutFileIds` — which
+  //     Step 3 then tried to render a thumbnail for and the API rejects outright;
+  //   · a server-backed file built by `backendFileToFileWithPreview` IS `instanceof File`
+  //     (Object.create(File.prototype)), so it failed the old filter and its perfectly good
+  //     UUID was thrown away.
+  // A UUID check is also exactly what both save paths already apply before sending
+  // (`create.tsx` / `details/[taskId].tsx`), so the form field and the submit now agree.
   const handleLayoutChange = useCallback(
     (files: FileWithPreview[]) => {
       onLayoutFilesChange(files);
       const ids = files
-        .filter((f) => !(f instanceof File))
-        .map((f) => (f as any).uploadedFileId || f.id)
-        .filter(Boolean)
+        .map((f) => f.uploadedFileId || f.id)
+        .filter(isPersistedFileId)
         .slice(0, 2);
       setValue("layoutFileIds", ids, { shouldDirty: true });
     },

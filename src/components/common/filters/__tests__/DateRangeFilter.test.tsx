@@ -197,11 +197,15 @@ describe('DateRangeFilter', () => {
     });
   });
 
+  // Dates are built with the numeric constructor, not `new Date('2024-01-15')`: a DATE-ONLY
+  // string is UTC midnight per the ECMAScript spec, so in America/Sao_Paulo (UTC-3) it is already
+  // the 14th, and `format(..., 'dd/MM/yyyy')` — which reads LOCAL fields — would render the day
+  // before. The component is right; the string literal is what was ambiguous.
   describe('Date Formatting', () => {
     it('should format dates in pt-BR locale (dd/MM/yyyy)', () => {
       const value: DateRange = {
-        from: new Date('2024-01-15'),
-        to: new Date('2024-02-20'),
+        from: new Date(2024, 0, 15),
+        to: new Date(2024, 1, 20),
       };
 
       render(<DateRangeFilter value={value} onChange={mockOnChange} />);
@@ -211,7 +215,7 @@ describe('DateRangeFilter', () => {
 
     it('should format single date correctly', () => {
       const value: DateRange = {
-        from: new Date('2024-03-10'),
+        from: new Date(2024, 2, 10),
       };
 
       render(<DateRangeFilter value={value} onChange={mockOnChange} />);

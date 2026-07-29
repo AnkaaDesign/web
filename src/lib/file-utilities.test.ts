@@ -266,7 +266,13 @@ describe('Filename Utilities', () => {
     });
 
     it('should return default name if everything removed', () => {
-      expect(sanitizeFilename('!!!')).toBe('arquivo');
+      // Under the default `allowUnicode: true`, "!" is a legal filename character and survives —
+      // only the filesystem-hostile set is replaced. What reaches the fallback is a name that
+      // collapses to nothing: separators, which are stripped leading and trailing.
+      expect(sanitizeFilename('___')).toBe('arquivo');
+      expect(sanitizeFilename('...')).toBe('arquivo');
+      // ASCII-only mode does strip "!", so there the punctuation-only name falls back too.
+      expect(sanitizeFilename('!!!', { allowUnicode: false })).toBe('arquivo');
     });
   });
 
@@ -375,32 +381,32 @@ describe('Validation', () => {
     it('should detect path traversal', () => {
       const result = checkFilenameSecurity('../../../etc/passwd');
       expect(result.safe).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('navegação de diretório'));
+      expect(result.issues).toEqual(expect.arrayContaining([expect.stringContaining('navegação de diretório')]));
     });
 
     it('should detect dangerous extensions', () => {
       const result = checkFilenameSecurity('malware.exe');
       expect(result.safe).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('perigosa'));
+      expect(result.issues).toEqual(expect.arrayContaining([expect.stringContaining('perigosa')]));
     });
 
     it('should detect null bytes', () => {
       const result = checkFilenameSecurity('file\0.pdf');
       expect(result.safe).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('bytes nulos'));
+      expect(result.issues).toEqual(expect.arrayContaining([expect.stringContaining('bytes nulos')]));
     });
 
     it('should detect control characters', () => {
       const result = checkFilenameSecurity('file\x01.pdf');
       expect(result.safe).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('caracteres de controle'));
+      expect(result.issues).toEqual(expect.arrayContaining([expect.stringContaining('caracteres de controle')]));
     });
 
     it('should detect overly long filenames', () => {
       const longName = 'a'.repeat(300) + '.pdf';
       const result = checkFilenameSecurity(longName);
       expect(result.safe).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('muito longo'));
+      expect(result.issues).toEqual(expect.arrayContaining([expect.stringContaining('muito longo')]));
     });
   });
 });

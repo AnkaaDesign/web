@@ -6,10 +6,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { socketService } from '@/lib/socket';
 
-// Mock socket.io-client
+// Mock socket.io-client.
+//
+// `connected` is READ THROUGH a mutable flag rather than fixed, because the suite needs it both
+// ways and `socketService` branches on it: `connect()` hands back the existing socket only when
+// that socket is ACTUALLY connected and the token matches — a dead one is deliberately replaced.
+// So the reuse case has to say the socket is up, while `isConnected()` starts from a socket that
+// is not. A single hard-coded value can only ever satisfy one of them.
+const socketState = vi.hoisted(() => ({ connected: false }));
+
 vi.mock('socket.io-client', () => ({
   io: vi.fn(() => ({
-    connected: false,
+    get connected() {
+      return socketState.connected;
+    },
     on: vi.fn(),
     off: vi.fn(),
     emit: vi.fn(),
@@ -22,6 +32,7 @@ vi.mock('socket.io-client', () => ({
 describe('SocketService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    socketState.connected = false;
   });
 
   afterEach(() => {
@@ -43,11 +54,21 @@ describe('SocketService', () => {
   });
 
   it('should return same socket for same token', () => {
+    // Reuse is conditional on the socket being live — see the mock note above.
+    socketState.connected = true;
     const token = 'test-token-123';
     const socket1 = socketService.connect(token);
     const socket2 = socketService.connect(token);
 
     expect(socket1).toBe(socket2);
+  });
+
+  it('replaces a socket that is no longer connected, even for the same token', () => {
+    const token = 'test-token-123';
+    const dead = socketService.connect(token); // socketState.connected === false
+    const fresh = socketService.connect(token);
+
+    expect(fresh).not.toBe(dead);
   });
 
   it('should disconnect and clean up', () => {

@@ -35,7 +35,6 @@ import {
 import { FinancialKpiCard } from "@/components/financial/common/financial-kpi-card";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { XmlImportDialog } from "@/components/financial/reconciliation/xml-import-dialog";
 import {
@@ -416,7 +415,7 @@ export const FiscalDocumentsListContent = () => {
       navigator.clipboard
         .writeText(accessKey)
         .then(() => toast({ title: "Chave copiada", variant: "success" }))
-        .catch(() => toast({ title: "Não foi possível copiar a chave", variant: "destructive" }));
+        .catch(() => toast({ title: "Não foi possível copiar a chave", variant: "error" }));
     },
     [toast],
   );

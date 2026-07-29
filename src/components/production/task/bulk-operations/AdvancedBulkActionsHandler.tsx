@@ -2,7 +2,6 @@ import React, { useState, forwardRef, useImperativeHandle, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -15,7 +14,7 @@ import { MultiCutSelector, type MultiCutSelectorRef } from "../form/multi-cut-se
 import { useTaskBatchMutations, taskKeys, serviceOrderKeys } from "../../../../hooks";
 import { taskService } from "../../../../api-client/task";
 import { fileService } from "../../../../api-client/file";
-import { IconPhoto, IconFileText, IconPalette, IconCut, IconLoader2, IconPlus, IconFileInvoice, IconLayout } from "@tabler/icons-react";
+import { IconPhoto, IconFileText, IconPalette, IconCut, IconLoader2, IconFileInvoice, IconLayout } from "@tabler/icons-react";
 import { CUT_TYPE, CUT_ORIGIN, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
 import { serviceOrderService } from "../../../../api-client/serviceOrder";
 import { ServiceSelectorAutoGrouped } from "../form/service-selector-auto-grouped";
@@ -82,7 +81,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
   const [layouts, setLayouts] = useState<FileWithPreview[]>([]);
   const [layoutStatuses, setLayoutStatuses] = useState<Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>>({});
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
-  const [cutsCount, setCutsCount] = useState(0);
+  // Write-only on purpose: nothing renders the count, but `MultiCutSelector` reports it through
+  // `onCutsCountChange` and the resulting re-render is what refreshes the cut section. Kept as a
+  // setter-only binding rather than deleted so that render still happens.
+  const [, setCutsCount] = useState(0);
 
   // States for layout editing - visual editor like task edit form
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");

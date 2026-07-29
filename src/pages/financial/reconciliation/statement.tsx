@@ -10,7 +10,6 @@ import {
 } from "@tabler/icons-react";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { IconBan, IconCategory } from "@tabler/icons-react";
 import { DataTable, type DataTableColumnDef } from "@/components/ui/datatable";

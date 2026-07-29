@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -118,7 +118,12 @@ const DOCUMENT_MAX_SIZE = 50 * 1024 * 1024;
 const LayoutThumbnail = ({ file }: { file: any }) => {
   const name: string = file?.name || file?.filename || "layout";
   const mimetype: string = file?.type || file?.mimetype || "";
-  const isLocal = file instanceof File && !file?.uploaded;
+  // Read the flag BEFORE the instanceof: that check narrows a plain `any` down to the DOM `File`,
+  // which carries no `uploaded`, so `file.uploaded` after it is an error even though the value is
+  // there at runtime. Hoisted alongside name/mimetype, which normalise the same two shapes
+  // (FileWithPreview vs. the server's File entity).
+  const uploaded: boolean = Boolean(file?.uploaded);
+  const isLocal = file instanceof File && !uploaded;
   const isImage = mimetype.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp)$/i.test(name);
   const isPdf = mimetype === "application/pdf" || /\.pdf$/i.test(name);
   const [thumb, setThumb] = useState<string | null>(null);
@@ -1052,7 +1057,7 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
                               <div className="space-y-3">
                                 {reviewConfigs.map((c, i) => {
                                   const layouts = (c.layouts ?? []) as any[];
-                                  const rows: Array<{ icon: JSX.Element; label: string; value: string }> = [
+                                  const rows: Array<{ icon: ReactNode; label: string; value: string }> = [
                                     { icon: <IconBrush className="h-4 w-4" />, label: "Pintor", value: (c.painterId && painterNameById.get(c.painterId)) || "-" },
                                     ...(canViewFinancials
                                       ? [{ icon: <IconCurrencyReal className="h-4 w-4" />, label: "Preço", value: c.price != null ? formatCurrency(Number(c.price)) : "-" }]

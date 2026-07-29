@@ -123,5 +123,18 @@ export default defineConfig(({ mode }) => {
         strict: false,
       },
     },
+    // Vitest. Without this block Vitest falls back to `environment: "node"` and never loads
+    // `src/test/setup.ts` — which is written for a browser (it mocks matchMedia,
+    // IntersectionObserver, URL.createObjectURL and registers the jest-dom matchers). Every
+    // component test therefore died inside `userEvent.setup()` on a missing `document`, taking
+    // 55 tests with it, while the pure-logic suites passed and hid it.
+    test: {
+      environment: "jsdom",
+      setupFiles: ["./src/test/setup.ts"],
+      // The suites import `describe`/`it`/`expect` from "vitest" explicitly; globals stay off so
+      // that convention keeps being enforced.
+      globals: false,
+      css: false,
+    },
   };
 });
