@@ -19,6 +19,10 @@ interface NotificationItemProps {
   onClick: (notification: Notification) => void;
   onRemindLater?: (notification: Notification) => void;
   onDismiss?: (notification: Notification) => void;
+  /** Computed by the list, which knows the current user. Read state is per-user
+   * (`seenBy[].userId`); deciding it here from `seenBy.length` alone marked every
+   * sector-wide notification as read for everyone the moment one colleague opened it. */
+  isUnread?: boolean;
 }
 
 const getNotificationIcon = (type: NOTIFICATION_TYPE) => {
@@ -59,8 +63,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   notification,
   onClick,
   onRemindLater,
+  isUnread = !notification.seenBy || notification.seenBy.length === 0,
 }) => {
-  const isUnread = !notification.seenBy || notification.seenBy.length === 0;
   const icon = getNotificationIcon(notification.type);
   const iconBgColor = getNotificationIconBgColor(notification.type);
 

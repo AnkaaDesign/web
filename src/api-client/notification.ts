@@ -115,6 +115,16 @@ export class NotificationService {
     return this.getNotifications({ ...params, userIds: [userId], unread: true });
   }
 
+  /**
+   * Authoritative unread count for a user — counts every unseen row server-side
+   * instead of only the page the client happens to have loaded.
+   * GET /notifications/user/:userId/unseen-count → { data: { count } }
+   */
+  async getUnseenCount(userId: string): Promise<number> {
+    const response = await apiClient.get<{ success: boolean; message: string; data: { count: number } }>(`${this.basePath}/user/${userId}/unseen-count`);
+    return response.data?.data?.count ?? 0;
+  }
+
   async markAsRead(notificationId: string, userId: string): Promise<SeenNotificationCreateResponse> {
     const response = await apiClient.post<SeenNotificationCreateResponse>(`${this.basePath}/${notificationId}/mark-as-read`, { userId });
     return response.data;
@@ -230,6 +240,7 @@ export const batchUpdateNotifications = (data: NotificationBatchUpdateFormData, 
 export const batchDeleteNotifications = (data: NotificationBatchDeleteFormData) => notificationService.batchDeleteNotifications(data);
 export const getNotificationsByUser = (userId: string, params?: NotificationGetManyFormData) => notificationService.getNotificationsByUser(userId, params || {});
 export const getUnreadNotifications = (userId: string, params?: NotificationGetManyFormData) => notificationService.getUnreadNotifications(userId, params || {});
+export const getUnseenNotificationCount = (userId: string) => notificationService.getUnseenCount(userId);
 export const markAsRead = (notificationId: string, userId: string) => notificationService.markAsRead(notificationId, userId);
 export const markAllAsRead = (userId: string) => notificationService.markAllAsRead(userId);
 export const sendNotification = (notificationId: string) => notificationService.sendNotification(notificationId);

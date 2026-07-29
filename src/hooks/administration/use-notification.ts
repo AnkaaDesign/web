@@ -13,6 +13,7 @@ import {
   batchDeleteNotifications,
   getNotificationsByUser,
   getUnreadNotifications,
+  getUnseenNotificationCount,
   markAsRead,
   markAllAsRead,
   sendNotification,
@@ -71,6 +72,7 @@ import type {
 } from "../../types";
 import { notificationKeys, seenNotificationKeys, userKeys } from "../common/query-keys";
 import { createEntityHooks, createSpecializedQueryHook } from "../common/create-entity-hooks";
+import { toast } from "@/components/ui/sonner";
 
 // =====================================================
 // Notification Service Adapter
@@ -138,6 +140,18 @@ export const useUnreadNotifications = createSpecializedQueryHook<{ userId: strin
   staleTime: 1000 * 30, // 30 seconds - very fresh data needed
 });
 
+/**
+ * Authoritative unread count. The notification center's badge used to count only the
+ * rows on the loaded page (20), so a user with 200 unread saw "20". This counts
+ * server-side. Kept fresh by socket pushes (`notification:count` writes straight into
+ * this key) and by the `["notifications"]` prefix invalidation every mutation performs.
+ */
+export const useUnseenNotificationCount = createSpecializedQueryHook<string, number>({
+  queryKeyFn: (userId) => notificationKeys.count(userId),
+  queryFn: (userId) => getUnseenNotificationCount(userId),
+  staleTime: 1000 * 30,
+});
+
 // =====================================================
 // Specialized Notification Mutation Hooks
 // =====================================================
@@ -159,12 +173,68 @@ export const useSendNotification = () => {
   });
 };
 
+// =====================================================
+// Optimistic read-state helpers
+// =====================================================
+//
+// Read state lives in the `seenBy[]` relation, and the notification center's list key
+// is parameterized (["notifications","list",{take,orderBy,include}]) — so patching a
+// single hard-coded key never matches. These helpers walk EVERY cached entry under the
+// ["notifications"] prefix and patch the ones shaped like a list response.
+
+type NotificationListCache = { data: Notification[] };
+
+function isNotificationListCache(value: unknown): value is NotificationListCache {
+  return !!value && typeof value === "object" && Array.isArray((value as { data?: unknown }).data);
+}
+
+/** A stand-in SeenNotification for the optimistic window. Only `userId` is read by the
+ * UI (`seen.userId === user.id`); the rest exists to satisfy the type. */
+function optimisticSeen(notificationId: string, userId: string): SeenNotification {
+  const now = new Date();
+  return {
+    id: `optimistic-${notificationId}-${userId}`,
+    userId,
+    notificationId,
+    seenAt: now,
+    createdAt: now,
+    updatedAt: now,
+  } as SeenNotification;
+}
+
+function markSeenInCaches(queryClient: ReturnType<typeof useQueryClient>, userId: string, notificationId?: string) {
+  queryClient.setQueriesData({ queryKey: notificationKeys.all }, (old: unknown) => {
+    if (!isNotificationListCache(old)) return old;
+    let changed = false;
+    const data = old.data.map((n) => {
+      if (notificationId && n.id !== notificationId) return n;
+      const seenBy = n.seenBy ?? [];
+      if (seenBy.some((seen) => seen.userId === userId)) return n;
+      changed = true;
+      return { ...n, seenBy: [...seenBy, optimisticSeen(n.id, userId)] };
+    });
+    return changed ? { ...old, data } : old;
+  });
+}
+
 // Mark notification as read
 export const useMarkAsRead = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ notificationId, userId }: { notificationId: string; userId: string }) => markAsRead(notificationId, userId),
+    // Optimistic: without this the row stays bold until a full refetch round-trip,
+    // which is the "marking does nothing" complaint.
+    onMutate: async ({ notificationId, userId }) => {
+      await queryClient.cancelQueries({ queryKey: notificationKeys.all });
+      const previous = queryClient.getQueriesData({ queryKey: notificationKeys.all });
+      markSeenInCaches(queryClient, userId, notificationId);
+      queryClient.setQueryData<number>(notificationKeys.count(userId), (count) => (typeof count === "number" && count > 0 ? count - 1 : count));
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      context?.previous?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+    },
     onSuccess: (_, { notificationId, userId }) => {
       // Invalidate notification queries
       queryClient.invalidateQueries({
@@ -201,7 +271,22 @@ export const useMarkAllAsRead = () => {
 
   return useMutation({
     mutationFn: (userId: string) => markAllAsRead(userId),
+    onMutate: async (userId) => {
+      await queryClient.cancelQueries({ queryKey: notificationKeys.all });
+      const previous = queryClient.getQueriesData({ queryKey: notificationKeys.all });
+      markSeenInCaches(queryClient, userId);
+      queryClient.setQueryData<number>(notificationKeys.count(userId), 0);
+      return { previous };
+    },
+    onError: (_error, _userId, context) => {
+      context?.previous?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+    },
     onSuccess: (_, userId) => {
+      // The axios success interceptor blanket-suppresses toasts for every
+      // `/notifications*` URL (so per-item marking stays silent). This is the one
+      // explicit, user-initiated bulk action, so it confirms itself here.
+      toast.success("Notificações", "Todas as notificações foram marcadas como lidas.");
+
       // Invalidate all notification queries
       queryClient.invalidateQueries({
         queryKey: notificationKeys.all,

@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
-import { useNotifications, useMarkAsRead, useMarkAllAsRead } from "../administration/use-notification";
+import { useNotifications, useMarkAsRead, useMarkAllAsRead, useUnseenNotificationCount } from "../administration/use-notification";
 import { toast } from "@/components/ui/sonner";
-import { socketService } from "@/lib/socket";
+import { socketService, type ConnectionState } from "@/lib/socket";
 import type { Notification } from "@/types";
 
 interface UseNotificationCenterReturn {
@@ -23,28 +23,32 @@ interface UseNotificationCenterReturn {
 export function useNotificationCenter(): UseNotificationCenterReturn {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(() => socketService.isConnected());
   const [take, setTake] = useState(20);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // Fetch recent notifications with pagination support
+  // Fetch recent notifications with pagination support.
+  // `seenBy: true` (not the nested `{ include: { user: true } }` it used to request):
+  // the only thing read off a seen-record is `seen.userId`, and the nested form shipped
+  // a full User object per seen-record per notification.
   const { data: notificationsData, isLoading } = useNotifications(
     {
       take,
       orderBy: { createdAt: "desc" },
       include: {
-        seenBy: {
-          include: {
-            user: true,
-          },
-        },
+        seenBy: true,
       },
     },
     {
       placeholderData: keepPreviousData,
     }
   );
+
+  // Authoritative unread count (counts ALL unseen rows server-side, not just the
+  // loaded page). Socket `notification:count` pushes write straight into this key.
+  const { data: serverUnseenCount } = useUnseenNotificationCount(user?.id ?? "", {
+    enabled: !!user?.id,
+  });
 
   const markAsReadMutation = useMarkAsRead();
   const markAllAsReadMutation = useMarkAllAsRead();
@@ -58,34 +62,29 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
     setIsLoadingMore(false);
   }, [notifications.length]);
 
-  // Calculate unread count
-  useEffect(() => {
-    if (!user) return;
-
-    const count = notifications.filter(
-      (notification) =>
-        !notification.seenBy ||
-        notification.seenBy.length === 0 ||
-        !notification.seenBy.some((seen) => seen.userId === user.id)
-    ).length;
-
-    setUnreadCount(count);
+  // Page-derived unread count — only a FALLBACK for when the server count hasn't
+  // arrived (first paint / offline). On its own it can never exceed `take`.
+  const pageUnreadCount = useMemo(() => {
+    if (!user) return 0;
+    return notifications.filter((notification) => !notification.seenBy?.some((seen) => seen.userId === user.id)).length;
   }, [notifications, user]);
 
-  // Socket connection status tracking
-  // Real-time events are handled by SocketNotificationsListener component
-  // to avoid duplicate listeners and toasts
+  const unreadCount = typeof serverUnseenCount === "number" ? serverUnseenCount : pageUnreadCount;
+
+  // Socket connection status tracking.
+  // Real-time events are handled by SocketNotificationsListener; this only mirrors the
+  // connection state (push-based — the old 5s polling interval ran forever for a value
+  // that changes a handful of times per session).
   useEffect(() => {
     if (!user) {
       setIsConnected(false);
       return;
     }
 
-    const checkConnection = () => setIsConnected(socketService.isConnected());
-    const interval = setInterval(checkConnection, 5000);
-    checkConnection();
-
-    return () => clearInterval(interval);
+    setIsConnected(socketService.isConnected());
+    return socketService.onConnectionStateChange((state: ConnectionState) => {
+      setIsConnected(state === "connected");
+    });
   }, [user]);
 
   const markAsRead = useCallback(
@@ -110,7 +109,8 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
 
     try {
       await markAllAsReadMutation.mutateAsync(user.id);
-      // Note: Toast is shown by axios interceptor based on API response message
+      // Success toast is raised by useMarkAllAsRead — the axios interceptor suppresses
+      // every /notifications* success toast, so it cannot come from there.
     } catch (error) {
       console.error("Failed to mark all notifications as read:", error);
       toast.error("Erro", "Não foi possível marcar todas as notificações como lidas");

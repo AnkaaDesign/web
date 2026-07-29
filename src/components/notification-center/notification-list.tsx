@@ -161,6 +161,7 @@ export const NotificationList: React.FC<NotificationListProps> = ({
               onClick={onNotificationClick}
               onRemindLater={onRemindLater}
               onDismiss={onDismiss}
+              isUnread={isNotificationUnread(notification, currentUserId)}
             />
           ))}
         </div>

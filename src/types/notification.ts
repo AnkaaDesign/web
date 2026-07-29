@@ -56,7 +56,10 @@ export interface Notification extends BaseEntity {
   // Computed fields (not in DB)
   typeOrder?: number;
   importanceOrder?: number;
-  isSeenByUser?: boolean; // Helper field to check if seen by specific user
+  // NOTE: no `isSeenByUser` flag. Read state is per-user and lives in `seenBy[]` —
+  // the UI derives it as `seenBy.some(s => s.userId === currentUser.id)`. The old
+  // boolean was never populated by the API and gave web a second, incompatible
+  // unread model that silently disagreed with the one actually rendered.
 }
 
 // =====================
