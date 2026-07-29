@@ -53,6 +53,7 @@ import {
   maskCpfCgu,
   parseCooldownSeconds,
 } from "@/components/public/signature/identity";
+import { QuoteChangeList } from "@/components/signature/quote-change-list";
 import {
   IconAlertCircle,
   IconCheck,
@@ -747,12 +748,36 @@ export default function PublicSignaturePage() {
             documento inteiro, não depois. */}
         {!state.canSign && step !== "done" && step !== "refused" && (
           <Card className="border-amber-500/30 bg-amber-500/10">
-            <CardContent className="flex items-center gap-3 py-4">
-              <IconAlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
-              <p className="text-sm text-foreground">
-                Esta coleta de assinaturas não está mais ativa. Se o orçamento foi alterado,
-                você receberá um novo link para revisão.
-              </p>
+            <CardContent className="space-y-3 py-4">
+              <div className="flex items-start gap-3">
+                <IconAlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">
+                    {envelope.status === "INVALIDATED"
+                      ? "O orçamento foi alterado e este link não vale mais"
+                      : "Esta coleta de assinaturas não está mais ativa"}
+                  </p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {envelope.status === "INVALIDATED"
+                      ? "Você receberá um novo link com a versão atualizada para revisar e assinar. Nada do que você assinou antes vincula você às novas condições."
+                      : "Se o orçamento foi alterado, você receberá um novo link para revisão."}
+                  </p>
+                </div>
+              </div>
+
+              {/* O QUE MUDOU — dito aqui, e não só no e-mail.
+                  Quem chega por um link morto quer duas respostas: por que ele
+                  morreu e o que mudou. A segunda estava disponível apenas na
+                  frase resumida do e-mail de anulação; quem apagou o e-mail
+                  ficava sem nada. */}
+              {envelope.changes && envelope.changes.length > 0 && (
+                <div className="rounded-lg border border-border bg-background/60 p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    O que mudou no orçamento
+                  </p>
+                  <QuoteChangeList changes={envelope.changes} variant="paper" />
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

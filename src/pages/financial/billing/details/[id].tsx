@@ -15,6 +15,7 @@ import { BillingStepTask } from "@/components/financial/billing/steps/billing-st
 import { BillingStepServices } from "@/components/financial/billing/steps/billing-step-services";
 import { BillingStepCustomer } from "@/components/financial/billing/steps/billing-step-customer";
 import { BillingStepReview } from "@/components/financial/billing/steps/billing-step-review";
+import { SignatureEnvelopeCard } from "@/components/financial/budget/signature-envelope-card";
 import { BillingStepBudgetInfo } from "@/components/financial/billing/steps/billing-step-budget-info";
 import { SECTOR_PRIVILEGES, IMPLEMENT_TYPE, routes } from "@/constants";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
@@ -1109,17 +1110,33 @@ const BillingDetailPageInner = () => {
             )}
 
             {(isReviewStep || reviewOnly) && (
-              <BillingStepReview
-                task={task}
-                customersCache={customersCache}
-                invoices={invoices}
-                userPrivilege={userPrivilege}
-                disabled={!canEdit}
-                isGenerating={isGenerating}
-                filterCustomerId={
-                  dossieCustomerId !== "all" ? dossieCustomerId : undefined
-                }
-              />
+              <>
+                <BillingStepReview
+                  task={task}
+                  customersCache={customersCache}
+                  invoices={invoices}
+                  userPrivilege={userPrivilege}
+                  disabled={!canEdit}
+                  isGenerating={isGenerating}
+                  filterCustomerId={
+                    dossieCustomerId !== "all" ? dossieCustomerId : undefined
+                  }
+                />
+
+                {/* ASSINATURA — só leitura.
+                    O faturamento não emite nem cancela coleta (isso é do
+                    orçamento, e oferecer o botão nos dois lugares convidaria a
+                    reemitir por engano um documento já assinado). O que ele
+                    PRECISA mostrar é o estado da assinatura e, sobretudo, se o
+                    orçamento andou depois de assinado: aprovar faturamento é
+                    irreversível, e emitir nota sobre condições que já não são as
+                    do documento assinado é justamente o erro caro. */}
+                {quote?.id && (
+                  <div className="mt-4">
+                    <SignatureEnvelopeCard quoteId={quote.id} canManage={false} />
+                  </div>
+                )}
+              </>
             )}
           </FormProvider>
         </div>

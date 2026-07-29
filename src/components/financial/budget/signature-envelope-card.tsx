@@ -27,10 +27,17 @@ import {
   IconLoader2,
   IconMail,
   IconLink,
+  IconPencilExclamation,
   IconSend,
   IconSignature,
   IconX,
 } from "@tabler/icons-react";
+import {
+  QuoteChangeList,
+  quoteChangesHeadline,
+  summarizeQuoteChanges,
+  type QuoteChange,
+} from "@/components/signature/quote-change-list";
 
 interface EnvelopeSigner {
   id: string;
@@ -64,6 +71,17 @@ interface Envelope {
   sentAt: string | null;
   completedAt: string | null;
   invalidatedReason: string | null;
+  /**
+   * Diferenças entre o documento congelado neste envelope e o orçamento como
+   * ele está agora — recalculadas pelo servidor a cada leitura.
+   *
+   * Não é só a explicação da invalidação: num envelope CONCLUÍDO esta lista
+   * chegando não-vazia é o aviso de que o registro se moveu DEPOIS da
+   * assinatura. Isso não invalida nada (o PDF assinado é imutável e continua
+   * valendo pelo que diz), mas quem vai emitir a nota ou mandar o dossiê
+   * precisa saber que o sistema e o documento não dizem mais a mesma coisa.
+   */
+  changes?: QuoteChange[];
   originalSha256: string;
   finalSha256: string | null;
   padesLevel: string | null;
@@ -138,6 +156,83 @@ function Meta({
 
 function fmtDateTime(v: string | null): string {
   return v ? new Date(v).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "";
+}
+
+/**
+ * O aviso de alteração do orçamento — a peça que faltava.
+ *
+ * Antes daqui saía uma linha: "Alteração em: valor total (12000.00 → 13500.00),
+ * serviços, desconto." Quem lia não tinha como saber QUAL serviço, nem se ele
+ * entrou, saiu ou mudou de preço, e o operador que precisava explicar isso ao
+ * cliente tinha de reconstruir a diferença de cabeça, comparando o PDF congelado
+ * com a tela.
+ *
+ * Três estados, três consequências diferentes — e é a diferença entre eles que o
+ * cabeçalho precisa comunicar antes de qualquer detalhe:
+ *
+ *   INVALIDADO   as assinaturas caíram por causa DESTAS alterações;
+ *   CONCLUÍDO    o documento assinado continua valendo, mas o orçamento andou
+ *                depois — atenção antes de faturar ou mandar o dossiê;
+ *   EM ANDAMENTO só houve deriva cosmética (material teria invalidado), então é
+ *                informação, não alarme.
+ */
+function ChangePanel({ envelope }: { envelope: Envelope }) {
+  const changes = envelope.changes ?? [];
+  const { materialCount } = summarizeQuoteChanges(changes);
+
+  // Sem lista e sem motivo não há nada a dizer. Com motivo e sem lista (envelope
+  // antigo, ou snapshot que o diff não entendeu) ainda se mostra a frase — é
+  // menos do que se quer, mas é o que existe e continua sendo verdade.
+  if (!changes.length && !envelope.invalidatedReason) return null;
+
+  const invalidated = envelope.status === "INVALIDATED";
+  const afterSigning = !invalidated && envelope.status === "COMPLETED" && materialCount > 0;
+  const alarming = invalidated || afterSigning;
+
+  const title = invalidated
+    ? "As assinaturas foram invalidadas porque o orçamento mudou"
+    : afterSigning
+      ? "O orçamento mudou depois de assinado"
+      : "O orçamento mudou desde o envio";
+
+  const explanation = invalidated
+    ? "Os signatários foram avisados por e-mail. Reenvie para colher as assinaturas novamente."
+    : afterSigning
+      ? "O documento assinado é imutável e continua valendo pelo que diz — mas ele não reflete mais o orçamento atual."
+      : "Nada aqui altera as condições comerciais, então a coleta em andamento segue válida.";
+
+  return (
+    <div
+      className={`rounded-lg border px-4 py-3 ${
+        alarming ? "border-amber-500/30 bg-amber-500/10" : "border-border bg-muted/40"
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        {alarming ? (
+          <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+        ) : (
+          <IconPencilExclamation className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <p className="text-sm font-semibold text-foreground">{title}</p>
+            {materialCount > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {quoteChangesHeadline(changes)}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">{explanation}</p>
+        </div>
+      </div>
+
+      {changes.length > 0 ? (
+        <QuoteChangeList changes={changes} className="mt-3" />
+      ) : (
+        <p className="mt-2 text-xs text-muted-foreground">{envelope.invalidatedReason}</p>
+      )}
+    </div>
+  );
 }
 
 export function SignatureEnvelopeCard({
@@ -313,15 +408,7 @@ export function SignatureEnvelopeCard({
       </div>
     ) : (
       <div className="space-y-3">
-        {current.invalidatedReason && (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs">
-            <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-            <span>
-              <strong>{current.invalidatedReason}</strong> As assinaturas coletadas foram
-              invalidadas e os signatários avisados. Reenvie para colher novamente.
-            </span>
-          </div>
-        )}
+        <ChangePanel envelope={current} />
 
         {current.signers.some(s => s.inviteState === "INVITATION_FAILED") && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs">

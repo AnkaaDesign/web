@@ -1,4 +1,5 @@
 import { apiClient } from "./axiosClient";
+import type { QuoteChange } from "@/components/signature/quote-change-list";
 
 /**
  * Cliente da assinatura eletrônica do orçamento.
@@ -17,6 +18,15 @@ export interface PublicSignerState {
     deadlineAt: string;
     verificationCode: string;
     acceptanceClause: string;
+    /** Preenchido quando a coleta caiu por alteração material do orçamento. */
+    invalidatedReason?: string | null;
+    /**
+     * O que mudou desde que este documento foi congelado.
+     *
+     * Vem para o signatário pela mesma razão que vem para o operador: quem foi
+     * desvinculado por uma alteração tem o direito de conferir qual foi.
+     */
+    changes?: QuoteChange[];
   };
   signer: {
     id: string;

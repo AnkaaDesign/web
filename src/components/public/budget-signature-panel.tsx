@@ -30,8 +30,9 @@
 
 import { useEffect, useState } from "react";
 import { signatureService } from "@/api-client/signature";
-import { IconCircleCheck, IconClock, IconShieldCheck, IconX } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCircleCheck, IconClock, IconShieldCheck, IconX } from "@tabler/icons-react";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
+import { QuoteChangeList, type QuoteChange } from "@/components/signature/quote-change-list";
 
 interface Summary {
   hasEnvelope: boolean;
@@ -42,6 +43,8 @@ interface Summary {
   sealedAt?: string | null;
   padesLevel?: string | null;
   invalidatedReason?: string | null;
+  /** O que mudou no orçamento desde que este documento foi congelado. */
+  changes?: QuoteChange[];
   signers?: Array<{
     name: string;
     cargo: string | null;
@@ -138,7 +141,9 @@ export function BudgetSignaturePanel({
   const hasEnvelope = !!data?.hasEnvelope;
   const completed = data?.status === "COMPLETED";
   const bad = ["REFUSED", "EXPIRED", "CANCELLED", "INVALIDATED"].includes(data?.status ?? "");
+  const invalidated = data?.status === "INVALIDATED";
   const signers = hasEnvelope ? data?.signers ?? [] : [];
+  const changes = hasEnvelope ? data?.changes ?? [] : [];
 
   // Sem coleta emitida (ou ainda carregando): linhas de assinatura em branco,
   // exatamente como no orçamento impresso.
@@ -206,7 +211,38 @@ export function BudgetSignaturePanel({
         </div>
       )}
 
-      {data?.invalidatedReason && (
+      {/* O QUE MUDOU — a peça que dava ao cliente o direito de conferir.
+          Antes daqui saía uma frase só ("Alteração em: valor total, serviços."),
+          e quem tivera a assinatura anulada não tinha como saber qual serviço,
+          nem de quanto para quanto. Esconder o detalhe de quem foi desvinculado
+          por causa dele é o oposto da boa-fé que sustenta a cerimônia.
+
+          A moldura é discreta de propósito: isto é um aviso dentro de uma folha
+          de orçamento, não um alerta de aplicativo. */}
+      {changes.length > 0 && (
+        <div className="mb-6 rounded border border-gray-200 bg-white px-4 py-3">
+          <div className="flex items-start gap-2">
+            <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-900">
+                {invalidated
+                  ? "O orçamento mudou e as assinaturas foram invalidadas"
+                  : "O orçamento mudou depois deste documento"}
+              </p>
+              <p className="mt-0.5 text-xs" style={{ color: GRAY }}>
+                {invalidated
+                  ? "Uma nova versão será enviada para sua revisão e assinatura. O documento abaixo continua sendo exatamente o que foi apresentado antes."
+                  : "O documento abaixo é o que foi apresentado e assinado; ele não muda. Estas são as diferenças em relação ao orçamento atual."}
+              </p>
+            </div>
+          </div>
+          <QuoteChangeList changes={changes} variant="paper" className="mt-3" />
+        </div>
+      )}
+
+      {/* Sem lista (envelope antigo, ou snapshot que o comparador não entende),
+          a frase de resumo ainda é melhor do que silêncio. */}
+      {!changes.length && data?.invalidatedReason && (
         <p className="mb-5 text-sm text-gray-700">
           {data.invalidatedReason} Uma nova versão será enviada para revisão.
         </p>
