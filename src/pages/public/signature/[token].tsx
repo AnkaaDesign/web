@@ -815,11 +815,14 @@ export default function PublicSignaturePage() {
         {identityVisible && (
           <SignerIdentityCard
             name={signer.name}
-            /* §5.9: `***.456.789-**`. Antes da conferência a página não conhece o
-               miolo do CPF — só as âncoras, que ficam no modal —, então a linha
-               mostra a forma inteiramente oculta. Depois, exibe os seis dígitos
-               que o próprio signatário confirmou. */
-            cpfDisplay={maskCpfCgu(confirmed?.cpf)}
+            /* §5.9: `***.456.789-**`.
+               Depois da conferência mostra o CPF que o próprio signatário
+               digitou; antes dela, o do CADASTRO — que o servidor manda já
+               mascarado. A linha exibia `***.***.***-**` mesmo para quem tem
+               CPF cadastrado desde a emissão, porque só olhava o confirmado, e
+               confirmado só existe depois de assinar. Sem CPF nenhum no
+               cadastro, aí sim cai na forma inteiramente oculta. */
+            cpfDisplay={confirmed?.cpf ? maskCpfCgu(confirmed.cpf) : (signer.cpfMasked ?? maskCpfCgu(null))}
             emailDisplay={signer.emailMasked}
             cargo={effectiveCargo || null}
             company={company.name}

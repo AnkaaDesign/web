@@ -41,6 +41,8 @@ export interface PublicSignerState {
      * informa o documento inteiro.
      */
     cpfParts: { prefix: string; hiddenLength: number; suffix: string } | null;
+    /** CPF do CADASTRO, já mascarado pelo servidor. Existe antes da conferência. */
+    cpfMasked: string | null;
     status: string;
     cargo: string | null;
     /** Cargo vindo do cadastro (Responsible.roles). Null quando não há função registrada. */
