@@ -1353,7 +1353,21 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           hasCutsToCreate,
           hasCutChanges,
         });
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasLayoutStatusChanges && !hasCutChanges && !hasNewResponsibles && !hasAirbrushingChanges) {
+        // Vincular/desvincular um contato JÁ CADASTRADO não passa pelo
+        // react-hook-form (as linhas são estado próprio) e não é "novo
+        // responsável", então nenhuma das outras bandeiras o enxerga. Sem esta,
+        // anexar um responsável existente caía no early-return abaixo — o envio
+        // dos `responsibleIds` (que os dois caminhos, JSON e FormData, já fazem
+        // corretamente mais adiante) nunca era alcançado.
+        const linkedRepIds = responsibleRows
+          .filter(row => !row.isNew && row.id && !row.id.startsWith('temp-'))
+          .map(row => row.id)
+          .sort()
+          .join(',');
+        const hasResponsibleLinkChange =
+          (task.responsibles || []).map(r => r.id).sort().join(',') !== linkedRepIds;
+
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasLayoutStatusChanges && !hasCutChanges && !hasNewResponsibles && !hasResponsibleLinkChange && !hasAirbrushingChanges) {
           console.log('[TaskEditForm] ❌ Early return: no changes detected');
           return;
         }
@@ -1474,8 +1488,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           (changedData as any)._onlyCuts = true; // Marker field to prevent empty body
         }
 
-        // If only new responsibles exist (no other changes), we still need to update the task
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasLayoutStatusChanges && !hasCutChanges && hasNewResponsibles) {
+        // If only responsibles changed (new rows OR a link added/removed), we still need to
+        // update the task — the body would otherwise be empty and the request rejected.
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasLayoutStatusChanges && !hasCutChanges && (hasNewResponsibles || hasResponsibleLinkChange)) {
           console.log('[TaskEditForm] Only new responsibles detected, adding marker field');
           (changedData as any)._onlyNewResponsibles = true; // Marker field to prevent empty body
         }
@@ -1483,7 +1498,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         // If only airbrushings changed (no other changes), we still need a non-empty task
         // update so the request succeeds and the post-update airbrushing reconciliation runs
         // (mirrors the _onlyCuts marker).
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasLayoutStatusChanges && !hasCutChanges && !hasNewResponsibles && hasAirbrushingChanges) {
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasLayoutStatusChanges && !hasCutChanges && !hasNewResponsibles && !hasResponsibleLinkChange && hasAirbrushingChanges) {
           console.log('[TaskEditForm] Only airbrushing changes detected, adding marker field');
           (changedData as any)._onlyAirbrushings = true; // Marker field to prevent empty body
         }
@@ -2868,6 +2883,19 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     return result;
   }, [responsibleRows]);
 
+  // Vincular ou desvincular um contato JÁ CADASTRADO (o caso comum: escolher um
+  // responsável existente no combobox). A linha não é nova e a função dele não
+  // mudou, então nem `hasNewResponsibles` nem `hasResponsibleRoleChanges`
+  // disparavam — e o Salvar continuava desabilitado depois de anexar alguém.
+  const hasResponsibleLinkChanges = useMemo(() => {
+    const linked = responsibleRows
+      .filter(row => !row.isNew && row.id && !row.id.startsWith('temp-'))
+      .map(row => row.id)
+      .sort()
+      .join(',');
+    return (task.responsibles || []).map(r => r.id).sort().join(',') !== linked;
+  }, [responsibleRows, task.responsibles]);
+
   // Edição inline da função de um contato JÁ CADASTRADO.
   //
   // `responsibleRows` é estado próprio, fora do react-hook-form, então esta
@@ -2889,7 +2917,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   }, [responsibleRows]);
 
   // Compute hasChanges including cuts to create, artwork status changes, and new responsibles
-  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasLayoutStatusChanges || hasCutsToCreate || hasNewResponsibles || hasResponsibleRoleChanges;
+  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasLayoutStatusChanges || hasCutsToCreate || hasNewResponsibles || hasResponsibleLinkChanges || hasResponsibleRoleChanges;
 
   console.log('[TaskEditForm] hasChanges calculation:', {
     hasChanges,
@@ -2974,7 +3002,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   useEffect(() => {
     if (onFormStateChange) {
       const changedFields = getChangedFields();
-      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges || hasLayoutStatusChanges || hasCutsToCreate || hasNewResponsibles || hasResponsibleRoleChanges;
+      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges || hasLayoutStatusChanges || hasCutsToCreate || hasNewResponsibles || hasResponsibleLinkChanges || hasResponsibleRoleChanges;
 
       // Check if form is valid (no blocking validation errors)
       // This matches the form's internal validation but WITHOUT the hasChanges check
@@ -3000,6 +3028,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     hasLayoutStatusChanges,
     hasCutsToCreate,
     hasNewResponsibles,
+    hasResponsibleLinkChanges,
     hasResponsibleRoleChanges,
     isSubmitting,
     hasCutsWithoutFiles,

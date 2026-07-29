@@ -52,6 +52,17 @@ const responsibleSchema = z.object({
   roles: z.array(z.nativeEnum(ResponsibleRole)).min(1, 'Selecione ao menos uma função'),
   isActive: z.boolean().default(true),
   hasSystemAccess: z.boolean().default(false),
+}).superRefine((data, ctx) => {
+  // O e-mail é opcional para o contato em geral (muito cadastro antigo não tem),
+  // mas é ELE o usuário do login — habilitar acesso sem e-mail cria uma conta
+  // em que ninguém consegue entrar.
+  if (data.hasSystemAccess && !(data.email || '').trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['email'],
+      message: 'Informe o e-mail para habilitar o acesso ao sistema',
+    });
+  }
 });
 
 type ResponsibleFormData = z.infer<typeof responsibleSchema>;
@@ -198,6 +209,7 @@ export function ResponsibleForm({
   }, [mode, initialData?.id]);
 
   const hasSystemAccess = form.watch('hasSystemAccess');
+  const watchedEmail = form.watch('email');
 
   // Track form state changes
   useEffect(() => {
@@ -209,10 +221,12 @@ export function ResponsibleForm({
     }
   }, [form.formState.isValid, form.formState.isDirty, onFormStateChange]);
 
-  // Handle system access toggle
+  // Desligar o acesso apaga a SENHA, não o e-mail. O e-mail deixou de ser
+  // credencial de login: é por ele que sai o convite e o código da assinatura
+  // eletrônica, e limpá-lo aqui apagava silenciosamente o contato do
+  // responsável ao mexer num interruptor que fala de outra coisa.
   useEffect(() => {
     if (!hasSystemAccess) {
-      form.setValue('email', '');
       form.setValue('password', '');
     }
   }, [hasSystemAccess, form]);
@@ -222,7 +236,7 @@ export function ResponsibleForm({
     const submitData: any = {
       ...data,
       // Convert empty strings to null for optional fields
-      email: hasSystemAccess && data.email ? data.email : null,
+      email: (data.email || '').trim() || null,
       // Dígitos puros: é assim que a API grava (e o `cpfNormalized` gerado indexa).
       cpf: (data.cpf || '').replace(/\D/g, '') || null,
       password: hasSystemAccess && data.password ? data.password : null,
@@ -242,7 +256,10 @@ export function ResponsibleForm({
 
   return (
     <Form {...form}>
-      <form id="responsible-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-4xl">
+      {/* max-w-6xl para casar com o cabeçalho da página: as fileiras deste
+          formulário são de três colunas, e a 4xl elas ficavam estreitas com meia
+          tela sobrando ao lado. */}
+      <form id="responsible-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-6xl">
         {/* Hidden submit button for programmatic form submission */}
         <button id="responsible-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
           Submit
@@ -258,16 +275,23 @@ export function ResponsibleForm({
               </CardTitle>
               <CardDescription>Dados fundamentais do responsável</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Nome + Telefone + CPF na mesma linha: os três identificam a
-                  PESSOA. O CPF é opcional, mas é o que permite a conferência
-                  parcial do documento na assinatura eletrônica. */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <CardContent>
+              {/* Uma grade só de 12 colunas para os seis campos, sempre 7 + 5.
+                  Cada fileira pareia o campo LONGO (nome, e-mail, empresa) com o
+                  de formato fixo ao lado (CPF, telefone, função), e a divisão
+                  repetida desenha duas colunas retas de cima a baixo do cartão —
+                  em vez de cada fileira quebrar num ponto diferente.
+
+                  `items-start`: a Função pendura os chips do que foi escolhido
+                  embaixo do campo. Alinhado por outro eixo, essa altura extra
+                  deslocaria a Empresa ao lado. */}
+              <div className="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-12">
+                {/* Fileira 1 — quem é a pessoa. */}
                 <FormField
                   control={form.control}
                   name="name"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="md:col-span-7">
                       <FormLabel>Nome <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Input
@@ -284,28 +308,9 @@ export function ResponsibleForm({
 
                 <FormField
                   control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Telefone <span className="text-destructive">*</span></FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="phone"
-                          placeholder="(00) 00000-0000"
-                          disabled={isSubmitting}
-                          className="bg-transparent"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
                   name="cpf"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="md:col-span-5">
                       <FormLabel>CPF</FormLabel>
                       <FormControl>
                         <Input
@@ -323,15 +328,58 @@ export function ResponsibleForm({
                     </FormItem>
                   )}
                 />
-              </div>
 
-              {/* Company and Role in same row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Fileira 2 — por onde se fala com ela. O e-mail vive AQUI, e
+                    não mais dentro de "Acesso ao Sistema": ele é o canal do
+                    convite e do código da assinatura eletrônica, coisa que todo
+                    responsável tem, com ou sem login. */}
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-7">
+                      <FormLabel>E-mail</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="email"
+                          placeholder="email@exemplo.com"
+                          disabled={isSubmitting}
+                          className="bg-transparent"
+                          value={field.value || ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-5">
+                      <FormLabel>Telefone <span className="text-destructive">*</span></FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="phone"
+                          placeholder="(00) 00000-0000"
+                          disabled={isSubmitting}
+                          className="bg-transparent"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Fileira 3 — o que ela representa. */}
                 <FormField
                   control={form.control}
                   name="companyId"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem className="flex flex-col md:col-span-7">
                       <FormLabel className="flex items-center gap-2">
                         <IconUser className="h-4 w-4" />
                         Empresa
@@ -397,7 +445,7 @@ export function ResponsibleForm({
                   control={form.control}
                   name="roles"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem className="flex flex-col md:col-span-5">
                       <FormLabel>Função <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Combobox
@@ -454,35 +502,27 @@ export function ResponsibleForm({
                 )}
               />
 
+              {/* O usuário do login é o e-mail das Informações Básicas — este
+                  cartão só decide SE há acesso e qual a senha. Repetir o campo
+                  aqui daria a entender que existe um segundo e-mail. */}
               {hasSystemAccess && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>E-mail <span className="text-destructive">*</span></FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="email"
-                            placeholder="email@exemplo.com"
-                            disabled={isSubmitting}
-                            className="bg-transparent"
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-12">
+                  <div className="md:col-span-7">
+                    <p className="text-sm text-muted-foreground">
+                      Entra com o e-mail{' '}
+                      <span className="font-medium text-foreground">
+                        {(watchedEmail || '').trim() || '— informe o e-mail acima'}
+                      </span>
+                      .
+                    </p>
+                  </div>
 
                   {mode === 'create' && (
                     <FormField
                       control={form.control}
                       name="password"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="md:col-span-5">
                           <FormLabel>Senha <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input

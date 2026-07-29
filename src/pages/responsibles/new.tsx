@@ -52,7 +52,7 @@ export default function NewResponsiblePage() {
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-      <div className="container mx-auto max-w-4xl flex-shrink-0">
+      <div className="container mx-auto max-w-6xl flex-shrink-0">
         <PageHeader
           title="Cadastrar Responsável"
           icon={IconUsers}

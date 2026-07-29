@@ -72,7 +72,7 @@ export default function EditResponsiblePage() {
 
   if (error || !responsible) {
     return (
-      <div className="container mx-auto max-w-4xl px-4 py-8">
+      <div className="container mx-auto max-w-6xl px-4 py-8">
         <Alert variant="destructive">
           <AlertDescription>
             {error?.message || 'Responsável não encontrado'}
@@ -84,7 +84,7 @@ export default function EditResponsiblePage() {
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-      <div className="container mx-auto max-w-4xl flex-shrink-0">
+      <div className="container mx-auto max-w-6xl flex-shrink-0">
         <PageHeader
           title="Editar Responsável"
           icon={IconUsers}

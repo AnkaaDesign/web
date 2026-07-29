@@ -2,7 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconUser, IconBuilding } from "@tabler/icons-react";
 import type { Responsible } from "@/types/responsible";
-import { RESPONSIBLE_ROLE_LABELS, RESPONSIBLE_ROLE_COLORS, getResponsibleRoles } from "@/types/responsible";
+import { getResponsibleRoles } from "@/types/responsible";
+import { ResponsibleRoleBadges } from "../responsible-role-badges";
 import { cn } from "@/lib/utils";
 
 interface BasicInfoCardProps {
@@ -39,17 +40,12 @@ export function BasicInfoCard({ responsible, className }: BasicInfoCardProps) {
 
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground">Função</span>
-                <div className="flex flex-wrap justify-end gap-1">
-                  {getResponsibleRoles(responsible).map((role) => (
-                    <Badge
-                      key={role}
-                      variant={RESPONSIBLE_ROLE_COLORS[role] as any}
-                      className="text-xs"
-                    >
-                      {RESPONSIBLE_ROLE_LABELS[role]}
-                    </Badge>
-                  ))}
-                </div>
+                {/* Sem `maxVisible`: é a tela onde os papéis TODOS têm de
+                    aparecer — a lista é que resume. */}
+                <ResponsibleRoleBadges
+                  roles={getResponsibleRoles(responsible)}
+                  className="justify-end"
+                />
               </div>
 
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">

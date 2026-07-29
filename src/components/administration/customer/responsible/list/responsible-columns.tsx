@@ -1,11 +1,8 @@
 import React from "react";
 import type { Responsible } from "@/types/responsible";
-import {
-  RESPONSIBLE_ROLE_LABELS,
-  RESPONSIBLE_ROLE_COLORS,
-  getResponsibleRoles,
-} from "@/types/responsible";
+import { getResponsibleRoles } from "@/types/responsible";
 import { Badge } from "@/components/ui/badge";
+import { ResponsibleRoleBadges } from "../responsible-role-badges";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { formatBrazilianPhone, formatCPF, formatDateTime } from "@/utils";
 
@@ -31,23 +28,17 @@ export function createResponsibleColumns(): ResponsibleColumn[] {
       align: "left",
     },
     {
+      // Um contato acumula papéis (aqui chegam a nove), e listar todos empilhava
+      // quatro fileiras de badges numa célula — a linha da tabela crescia junto e
+      // a lista deixava de ser varrível. Dois papéis + "+N" cabem numa linha só;
+      // o resto vive no title do "+N" e na tela de detalhe.
       key: "role",
       header: "FUNÇÃO",
       accessor: (responsible) => (
-        <div className="flex flex-wrap gap-1">
-          {getResponsibleRoles(responsible).map((role) => (
-            <Badge
-              key={role}
-              variant={RESPONSIBLE_ROLE_COLORS[role] as any}
-              className="text-xs"
-            >
-              {RESPONSIBLE_ROLE_LABELS[role]}
-            </Badge>
-          ))}
-        </div>
+        <ResponsibleRoleBadges roles={getResponsibleRoles(responsible)} maxVisible={2} />
       ),
       sortable: false,
-      className: "min-w-[120px]",
+      className: "min-w-[180px]",
       align: "left",
     },
     {

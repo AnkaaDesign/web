@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { RESPONSIBLE_ROLE_COLORS, RESPONSIBLE_ROLE_LABELS, type ResponsibleRole } from "@/types/responsible";
 import { cn } from "@/lib/utils";
 
@@ -30,20 +31,41 @@ export function ResponsibleRoleBadges({ roles, maxVisible, className }: Responsi
   const hidden = list.slice(visible.length);
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-1", className)}>
+    // Com `maxVisible` a linha NÃO quebra: a contagem de papéis varia de contato
+    // para contato, e uma célula que quebra faz a linha inteira da tabela crescer
+    // — cada responsável com altura diferente. Sem `maxVisible` (cartão de
+    // detalhe) a quebra é o comportamento certo, porque ali cabe.
+    <div className={cn("flex items-center gap-1", maxVisible ? "flex-nowrap" : "flex-wrap", className)}>
       {visible.map((role) => (
-        <Badge key={role} variant={RESPONSIBLE_ROLE_COLORS[role] as any} className="text-xs whitespace-nowrap">
+        <Badge
+          key={role}
+          variant={RESPONSIBLE_ROLE_COLORS[role] as any}
+          className={cn("text-xs whitespace-nowrap", maxVisible && "shrink-0")}
+        >
           {RESPONSIBLE_ROLE_LABELS[role] ?? role}
         </Badge>
       ))}
       {hidden.length > 0 && (
-        <Badge
-          variant="secondary"
-          className="text-xs whitespace-nowrap"
-          title={hidden.map((role) => RESPONSIBLE_ROLE_LABELS[role] ?? role).join(", ")}
-        >
-          +{hidden.length}
-        </Badge>
+        // Tooltip, e não o `title` nativo: o "+N" só vale se der para descobrir
+        // O QUE ele esconde, e o balão do sistema demora ~1s, some sozinho e não
+        // aceita uma lista legível.
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge
+              variant="secondary"
+              className={cn("cursor-default text-xs whitespace-nowrap", maxVisible && "shrink-0")}
+            >
+              +{hidden.length}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[240px]">
+            <div className="flex flex-col gap-0.5">
+              {hidden.map((role) => (
+                <span key={role}>{RESPONSIBLE_ROLE_LABELS[role] ?? role}</span>
+              ))}
+            </div>
+          </TooltipContent>
+        </Tooltip>
       )}
     </div>
   );

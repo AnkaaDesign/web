@@ -266,7 +266,13 @@ export function BudgetStepCustomerPayment({
               Same four-column grid as the Faturamento step: the two wizards edit the SAME Customer
               record with the same required-field gate, so a field that sits in a different place on
               each screen is just a way to miss it on one of them. */}
-          <div className="grid grid-cols-1 md:grid-cols-[auto_1fr_1fr_1fr] gap-4 items-end">
+          {/* `items-start`, NÃO `items-end`: a célula do Documento é a única que
+              ganha uma linha de aviso embaixo ("Buscando dados do CNPJ...",
+              "CNPJ já cadastrado..."). Alinhando pelo fim, essa linha extra
+              empurrava rótulo e campo do Documento ~20px para CIMA dos vizinhos —
+              o texto de aviso desalinhava a fileira inteira. Pelo início, rótulos
+              e campos ficam na mesma altura e o aviso apenas pende embaixo. */}
+          <div className="grid grid-cols-1 md:grid-cols-[auto_1fr_1fr_1fr] gap-4 items-start">
             <div className="space-y-2 md:col-span-2">
               <Label className="flex items-center gap-2 text-sm font-medium">
                 {docType === "cnpj" ? (
@@ -311,11 +317,13 @@ export function BudgetStepCustomerPayment({
                   />
                 )}
               </div>
+              {/* `block`: como filho inline o `space-y-2` do container não
+                  aplicava margem nenhuma, e o aviso colava no campo. */}
               {isLookingUpCnpj && (
-                <span className="text-xs text-primary animate-pulse">Buscando dados do CNPJ...</span>
+                <span className="block text-xs text-primary animate-pulse">Buscando dados do CNPJ...</span>
               )}
               {docType === "cnpj" && customerHasCnpj && !isLookingUpCnpj && (
-                <span className="text-xs text-muted-foreground">
+                <span className="block text-xs text-muted-foreground">
                   CNPJ já cadastrado — para corrigi-lo, edite o cliente no cadastro.
                 </span>
               )}

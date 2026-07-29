@@ -20,11 +20,8 @@ import {
   IconUser,
 } from "@tabler/icons-react";
 import type { Responsible } from "@/types/responsible";
-import {
-  RESPONSIBLE_ROLE_LABELS,
-  RESPONSIBLE_ROLE_COLORS,
-  getResponsibleRoles,
-} from "@/types/responsible";
+import { getResponsibleRoles } from "@/types/responsible";
+import { ResponsibleRoleBadges } from "../responsible-role-badges";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -93,22 +90,11 @@ export function createResponsibleColumns({
     {
       accessorKey: "role",
       header: () => <span className="font-bold uppercase text-xs">FUNÇÃO</span>,
-      cell: ({ row }) => {
-        const roles = getResponsibleRoles(row.original);
-        return (
-          <div className="flex flex-wrap gap-1">
-            {roles.map((role) => (
-              <Badge
-                key={role}
-                variant={RESPONSIBLE_ROLE_COLORS[role] as any}
-                className="text-xs"
-              >
-                {RESPONSIBLE_ROLE_LABELS[role]}
-              </Badge>
-            ))}
-          </div>
-        );
-      },
+      cell: ({ row }) => (
+        // Mesma regra da lista principal: no máximo dois papéis + "+N", para que
+        // a altura da linha não dependa de quantos papéis o contato acumula.
+        <ResponsibleRoleBadges roles={getResponsibleRoles(row.original)} maxVisible={2} />
+      ),
     },
     {
       id: "contact",
