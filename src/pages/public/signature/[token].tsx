@@ -209,7 +209,7 @@ export default function PublicSignaturePage() {
   /**
    * Geolocalização é OPCIONAL e a recusa é registrada como fato.
    * Nunca bloqueia a assinatura: exigir GPS destruiria conversão e a coordenada
-   * não é o que sustenta a autoria — o código no telefone cadastrado é.
+   * não é o que sustenta a autoria — o código no e-mail cadastrado é.
    */
   const collectGeo = (): Promise<{ lat: number; lon: number; accuracy?: number } | null> =>
     new Promise(resolve => {

@@ -74,6 +74,15 @@ interface AffixDigitsProps {
   /** Separador entre as caixas digitáveis e as finais do cadastro. */
   afterInput?: string;
   /**
+   * Texto que fecha a sequência, DEPOIS do sufixo do cadastro — o `@dominio`
+   * do e-mail.
+   *
+   * Não dá para reusar `afterInput` para isso: ele é renderizado ANTES do
+   * sufixo, então o domínio saía no meio e a última letra da parte local
+   * aparecia depois do `.com`, como se fizesse parte dele.
+   */
+  trailing?: string;
+  /**
    * `digits` para CPF/telefone; `text` para a parte local do e-mail.
    *
    * O componente nasceu só para dígitos e aplicava `onlyDigits` na entrada e
@@ -133,6 +142,7 @@ function AffixDigits({
   beforeInput,
   innerSeparators,
   afterInput,
+  trailing,
   mode = "digits",
 }: AffixDigitsProps) {
   const isText = mode === "text";
@@ -220,6 +230,12 @@ function AffixDigits({
           ))}
         </div>
       )}
+
+      {trailing ? (
+        <span className="shrink-0 whitespace-nowrap pl-1 text-base font-medium text-muted-foreground">
+          {trailing}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -340,7 +356,7 @@ export function IdentityConfirmationDialog({
       <DialogContent
         /* force-light: o Radix monta o conteúdo num portal preso ao <body>, fora
            do wrapper claro da página, então ele não herdaria o escopo. */
-        className="force-light max-h-[90vh] max-w-lg overflow-y-auto"
+        className="force-light max-h-[90vh] max-w-3xl overflow-y-auto"
         onPointerDownOutside={e => submitting && e.preventDefault()}
         onEscapeKeyDown={e => submitting && e.preventDefault()}
       >
@@ -427,7 +443,7 @@ export function IdentityConfirmationDialog({
                 value={emailHidden}
                 onChange={touch(setEmailHidden)}
                 disabled={submitting}
-                afterInput={`@${emailParts.domain}`}
+                trailing={`@${emailParts.domain}`}
               />
               <p className="text-xs text-muted-foreground">
                 Complete a parte oculta de {emailMasked}. O código vai para este endereço

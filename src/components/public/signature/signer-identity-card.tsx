@@ -2,7 +2,7 @@
  * Bloco de identificação do signatário — leitura, não formulário.
  *
  * Nome, CPF, e-mail e cargo vêm do cadastro do cliente e o signatário não os
- * escolhe: é isso que dá peso probatório ao código enviado ao telefone. Então
+ * escolhe: é isso que dá peso probatório ao código enviado ao e-mail. Então
  * eles aparecem como **dados do documento** (rótulo + valor, com fio pontilhado
  * entre as linhas), na mesma tipografia do resto da página, e não como campos
  * editáveis. A conferência dos dígitos que faltam acontece no modal disparado
@@ -101,7 +101,7 @@ export function SignerIdentityCard({
 
         <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
           <IconLock className="mt-0.5 h-3 w-3 shrink-0" />
-          O telefone que recebe o código vem do cadastro e não pode ser trocado por quem
+          O e-mail que recebe o código vem do cadastro e não pode ser trocado por quem
           assina — é o que liga esta assinatura a você.
         </p>
 

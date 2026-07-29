@@ -16,6 +16,7 @@ import { signatureService } from "@/api-client/signature";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/sonner";
 import {
   IconAlertTriangle,
@@ -47,6 +48,8 @@ interface EnvelopeSigner {
   phoneMasked: string | null;
   cpfMasked: string | null;
   cargo: string | null;
+  /** Mesma informação em lista, para mostrar os dois primeiros e um "+N". */
+  cargoList?: string[];
   cpfMatch: boolean | null;
   side: "ANKAA" | "CUSTOMER";
   status: string;
@@ -433,6 +436,11 @@ export function SignatureEnvelopeCard({
         <div className="space-y-1.5">
           {current.signers.map(s => {
             const st = SIGNER_LABEL[s.status] ?? { text: s.status, tone: "muted" as Tone };
+            // `cargoList` vem pronto do servidor. O fallback para `cargo` cobre
+            // envelopes lidos antes desta versão da API, sem quebrar a linha.
+            const roleList = s.cargoList?.length ? s.cargoList : s.cargo ? [s.cargo] : [];
+            const shownRoles = roleList.slice(0, 2);
+            const extraRoles = Math.max(0, roleList.length - 2);
             return (
               <div key={s.id} className="flex items-start gap-3 rounded-lg bg-muted/50 px-4 py-2.5">
                 {s.status === "SIGNED" ? (
@@ -457,15 +465,34 @@ export function SignatureEnvelopeCard({
                     )}
                   </div>
                   {/* Um contato pode acumular nove funções ("Comercial,
-                      Proprietário, Vendedor, Representante, ..."), o que empurra
-                      o e-mail para fora da linha. Trunca e deixa o texto inteiro
-                      no title. */}
-                  <p
-                    className="truncate text-xs text-muted-foreground"
-                    title={s.cargo ? `${s.cargo} · ${s.emailMasked}` : s.emailMasked}
-                  >
-                    {s.cargo ? `${s.cargo} · ` : ""}
-                    {s.emailMasked}
+                      Proprietário, Vendedor, ..."), o que empurrava o e-mail
+                      para fora da linha. Mostra as duas primeiras e conta o
+                      resto num "+N", como a seção de responsáveis da tarefa. */}
+                  <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+                    {shownRoles.length > 0 && (
+                      <span className="truncate" title={s.cargo ?? undefined}>
+                        {shownRoles.join(", ")}
+                      </span>
+                    )}
+                    {extraRoles > 0 && (
+                      // O "+N" precisa dizer o que esconde: o mouse abre o resto.
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="shrink-0 cursor-default rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">
+                            +{extraRoles}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[240px]">
+                          <div className="flex flex-col gap-0.5">
+                            {roleList.slice(2).map(role => (
+                              <span key={role}>{role}</span>
+                            ))}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {shownRoles.length > 0 && <span className="shrink-0">·</span>}
+                    <span className="truncate">{s.emailMasked}</span>
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {s.signedAt
@@ -600,22 +627,20 @@ export function SignatureEnvelopeCard({
                         </Button>
                       </div>
 
-                      {/* O motivo gravado à época é o que a trilha registrou e o
-                          que o cliente recebeu por e-mail — vale mesmo quando a
-                          lista abaixo já não bate, porque o orçamento seguiu
-                          mudando depois. */}
-                      {h.invalidatedReason && (
-                        <p className="mt-1.5 text-muted-foreground">{h.invalidatedReason}</p>
-                      )}
-
-                      {hChanges.length > 0 && (
+                      {/* A lista item a item ganha do texto corrido: ela diz o
+                          mesmo com mais detalhe e já formatada. O
+                          `invalidatedReason` fica só de reserva, para quando não
+                          há lista a mostrar — nunca os dois juntos. */}
+                      {hChanges.length > 0 ? (
                         <div className="mt-2 border-t border-border/60 pt-2">
                           <p className="mb-1 font-medium text-muted-foreground">
                             {quoteChangesHeadline(hChanges)} em relação ao orçamento atual
                           </p>
                           <QuoteChangeList changes={hChanges} />
                         </div>
-                      )}
+                      ) : h.invalidatedReason ? (
+                        <p className="mt-1.5 text-muted-foreground">{h.invalidatedReason}</p>
+                      ) : null}
                     </div>
                   );
                 })}
