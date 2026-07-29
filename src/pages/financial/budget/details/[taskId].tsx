@@ -998,7 +998,7 @@ const FinancialBudgetDetailPageInner = () => {
         .map((row) => ({
           name: row.name.trim(),
           phone: row.phone.trim(),
-          email: row.email?.trim() || undefined,
+          email: (row.email ?? '').trim().toLowerCase(),
           cpf: (row.cpf || '').replace(/\D/g, '') || undefined,
           roles: row.roles,
           isActive: row.isActive,

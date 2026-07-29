@@ -73,6 +73,14 @@ export function assembleCpf(parts: SignatureMaskParts, hiddenDigits: string): st
  * sem isso, todo contato de telefone fixo receberia "os dígitos não conferem" e
  * ficaria travado.
  */
+/** Espelha `emailMaskParts` da API. */
+export interface SignatureEmailMaskParts {
+  prefix: string;
+  hiddenLength: number;
+  suffix: string;
+  domain: string;
+}
+
 export function buildPhoneConfirm(parts: SignatureMaskParts | null, typed: string): string {
   const digits = onlyDigits(typed);
   if (!parts) return digits;

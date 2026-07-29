@@ -1,15 +1,15 @@
 /**
- * Modal de conferência de identidade — a porta do "Enviar código no WhatsApp".
+ * Modal de conferência de identidade — a porta do "Enviar código por e-mail".
  *
  * Por que modal, e não campos na página: a tela de assinatura é um documento, e
  * documento não tem formulário no meio. Aqui o signatário faz um ato único e
- * deliberado — completar os dígitos que faltam do CPF e do WhatsApp — e só então
+ * deliberado — completar os caracteres que faltam do CPF e do e-mail — e só então
  * o código é disparado. O erro da API (dígitos divergentes, cooldown de 60s,
  * prazo vencido) volta **para dentro deste modal**, sem limpar o que foi
  * digitado: quem errou um dígito precisa corrigir um dígito, não redigitar tudo.
  *
  * As âncoras do cadastro (3 primeiros e os 2 verificadores do CPF; DDD e os 4
- * finais do telefone) aparecem como afixos fixos ao redor do campo. Elas existem
+ * da parte local do e-mail) aparecem como afixos fixos ao redor do campo. Elas existem
  * para o signatário RECONHECER o registro; o que ele digita é o miolo, que é a
  * parte que a página não conhece — e é justamente por isso que digitá-la
  * corretamente vale como conferência.
@@ -31,25 +31,26 @@ import {
 import { Input } from "@/components/ui/input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
-  IconDeviceMobileMessage,
+  IconMail,
   IconLoader2,
   IconShieldLock,
 } from "@tabler/icons-react";
 import {
   assembleCpf,
-  buildPhoneConfirm,
   isCpfWellFormed,
   onlyDigits,
   type SignatureMaskParts,
+  type SignatureEmailMaskParts,
 } from "./identity";
 
 export interface IdentityConfirmation {
   /** 11 dígitos, sem pontuação. */
   cpf: string;
   cargo: string;
-  /** Dígitos ocultos do telefone, na forma que a API compara. */
-  phoneConfirm: string;
+  /** Caracteres ocultos da parte local do e-mail, na forma que a API compara. */
+  emailConfirm: string;
 }
 
 interface AffixDigitsProps {
@@ -72,12 +73,25 @@ interface AffixDigitsProps {
   innerSeparators?: Array<{ after: number; char: string }>;
   /** Separador entre as caixas digitáveis e as finais do cadastro. */
   afterInput?: string;
+  /**
+   * `digits` para CPF/telefone; `text` para a parte local do e-mail.
+   *
+   * O componente nasceu só para dígitos e aplicava `onlyDigits` na entrada e
+   * nos afixos — o que descartaria silenciosamente qualquer letra de um
+   * endereço de e-mail, deixando o campo impossível de preencher.
+   */
+  mode?: "digits" | "text";
 }
 
-/** Caixa de dígito que veio do cadastro: mesma forma das digitáveis, preenchida. */
-function FixedSlot({ char }: { char: string }) {
+/** Caixa que veio do cadastro: mesma forma das digitáveis, preenchida. */
+function FixedSlot({ char, wide }: { char: string; wide?: boolean }) {
   return (
-    <div className="relative flex h-11 w-5 items-center justify-center border border-l-0 border-border bg-muted text-base font-medium tabular-nums text-muted-foreground first:rounded-l-md first:border-l last:rounded-r-md sm:w-8">
+    <div
+      className={cn(
+        "relative flex h-11 w-5 items-center justify-center border border-l-0 border-border bg-muted text-base font-medium text-muted-foreground first:rounded-l-md first:border-l last:rounded-r-md sm:w-8",
+        wide ? "w-7 sm:w-8" : "tabular-nums",
+      )}
+    >
       {char}
     </div>
   );
@@ -104,8 +118,8 @@ function Separator({ char }: { char: string }) {
  * número se lê contínuo: 115. [_][_][_][_][_][_] -61.
  *
  * As caixas têm 44px de altura (alvo de toque mínimo) e fonte de 16px — abaixo
- * disso o Safari do iPhone dá zoom ao focar, e este link chega por WhatsApp,
- * quase sempre no celular.
+ * disso o Safari do iPhone dá zoom ao focar, e este link chega por e-mail,
+ * lido quase sempre no celular.
  */
 function AffixDigits({
   id,
@@ -119,10 +133,19 @@ function AffixDigits({
   beforeInput,
   innerSeparators,
   afterInput,
+  mode = "digits",
 }: AffixDigitsProps) {
-  const prefixDigits = onlyDigits(prefix);
-  const suffixDigits = onlyDigits(suffix);
-  const slotClass = "h-11 w-5 text-base font-medium tabular-nums sm:w-8";
+  const isText = mode === "text";
+  // Em modo texto aceita o que aparece numa parte local de e-mail e descarta
+  // espaco e "@" — colar o endereco inteiro nao deve poluir as caixas.
+  const sanitize = (raw: string) =>
+    isText ? raw.toLowerCase().replace(/[^a-z0-9._+-]/g, "") : onlyDigits(raw);
+  const prefixDigits = sanitize(prefix);
+  const suffixDigits = sanitize(suffix);
+  const slotClass = cn(
+    "h-11 text-base font-medium sm:w-8",
+    isText ? "w-7" : "w-5 tabular-nums",
+  );
 
   const inputSlots = (from: number, to: number) => (
     <InputOTPGroup>
@@ -160,7 +183,7 @@ function AffixDigits({
       {prefixDigits && (
         <div className="flex">
           {prefixDigits.split("").map((char, i) => (
-            <FixedSlot key={`p${i}`} char={char} />
+            <FixedSlot key={`p${i}`} char={char} wide={isText} />
           ))}
         </div>
       )}
@@ -173,10 +196,11 @@ function AffixDigits({
         id={id}
         maxLength={length}
         value={value}
-        onChange={next => onChange(onlyDigits(next).slice(0, length))}
+        onChange={next => onChange(sanitize(next).slice(0, length))}
         disabled={disabled}
         containerClassName="gap-0"
         className="text-base"
+        inputMode={isText ? "text" : "numeric"}
         autoComplete="off"
       >
         {segments.map(segment => (
@@ -192,7 +216,7 @@ function AffixDigits({
       {suffixDigits && (
         <div className="flex">
           {suffixDigits.split("").map((char, i) => (
-            <FixedSlot key={`s${i}`} char={char} />
+            <FixedSlot key={`s${i}`} char={char} wide={isText} />
           ))}
         </div>
       )}
@@ -206,8 +230,8 @@ export interface IdentityConfirmationDialogProps {
   signerName: string;
   /** Âncoras do CPF cadastrado. Null quando o cadastro não tem CPF. */
   cpfParts: SignatureMaskParts | null;
-  phoneParts: SignatureMaskParts | null;
-  phoneMasked: string;
+  emailParts: SignatureEmailMaskParts | null;
+  emailMasked: string;
   /** Cargo do cadastro. Quando existe, não se digita cargo nenhum. */
   registryCargo: string | null;
   initialCargo?: string | null;
@@ -228,8 +252,8 @@ export function IdentityConfirmationDialog({
   onOpenChange,
   signerName,
   cpfParts,
-  phoneParts,
-  phoneMasked,
+  emailParts,
+  emailMasked,
   registryCargo,
   initialCargo,
   intent = "sign",
@@ -241,13 +265,13 @@ export function IdentityConfirmationDialog({
   // que já foi digitado (o Radix desmonta só o conteúdo do portal).
   const [cpfHidden, setCpfHidden] = useState("");
   const [cpfFull, setCpfFull] = useState("");
-  const [phoneHidden, setPhoneHidden] = useState("");
+  const [emailHidden, setEmailHidden] = useState("");
   const [cargo, setCargo] = useState(initialCargo ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const cpfAnchored = !!cpfParts && cpfParts.hiddenLength > 0;
-  const phoneHiddenLength = phoneParts?.hiddenLength ?? 0;
+  const emailHiddenLength = emailParts?.hiddenLength ?? 0;
   const needsCargo = !registryCargo?.trim();
 
   const touch = <T,>(setter: (value: T) => void) => (value: T) => {
@@ -285,8 +309,8 @@ export function IdentityConfirmationDialog({
       }
     }
 
-    if (phoneHiddenLength > 0 && onlyDigits(phoneHidden).length !== phoneHiddenLength) {
-      setError(`Complete os ${phoneHiddenLength} dígitos ocultos do WhatsApp.`);
+    if (emailHiddenLength > 0 && emailHidden.trim().length !== emailHiddenLength) {
+      setError(`Complete os ${emailHiddenLength} caracteres ocultos do e-mail.`);
       return;
     }
 
@@ -303,7 +327,7 @@ export function IdentityConfirmationDialog({
     const message = await onConfirm({
       cpf: cpfDigits,
       cargo: effectiveCargo,
-      phoneConfirm: buildPhoneConfirm(phoneParts, phoneHidden),
+      emailConfirm: emailHidden.trim().toLowerCase(),
     });
     setSubmitting(false);
     if (message) setError(message);
@@ -386,25 +410,27 @@ export function IdentityConfirmationDialog({
             )}
           </div>
 
-          {/* WhatsApp */}
-          {phoneHiddenLength > 0 && phoneParts && (
+          {/* E-mail — canal do código. O domínio aparece inteiro: ele é da
+              própria empresa do signatário e escondê-lo custaria reconhecimento
+              sem proteger nada. O que se confirma é a parte local. */}
+          {emailHiddenLength > 0 && emailParts && (
             <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3">
-              <Label htmlFor="phone-confirm" className="text-sm">
-                WhatsApp <span className="text-destructive">*</span>
+              <Label htmlFor="email-confirm" className="text-sm">
+                E-mail <span className="text-destructive">*</span>
               </Label>
               <AffixDigits
-                id="phone-confirm"
-                prefix={phoneParts.prefix.replace(/^\+?55/, "")}
-                suffix={phoneParts.suffix}
-                length={phoneHiddenLength}
-                value={phoneHidden}
-                onChange={touch(setPhoneHidden)}
+                id="email-confirm"
+                mode="text"
+                prefix={emailParts.prefix}
+                suffix={emailParts.suffix}
+                length={emailHiddenLength}
+                value={emailHidden}
+                onChange={touch(setEmailHidden)}
                 disabled={submitting}
-                staticPrefix="+55"
-                afterInput="-"
+                afterInput={`@${emailParts.domain}`}
               />
               <p className="text-xs text-muted-foreground">
-                Complete os dígitos ocultos de {phoneMasked}. O código vai para este número
+                Complete a parte oculta de {emailMasked}. O código vai para este endereço
                 — ele não pode ser trocado aqui.
               </p>
             </div>
@@ -450,9 +476,9 @@ export function IdentityConfirmationDialog({
             {submitting ? (
               <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <IconDeviceMobileMessage className="mr-2 h-4 w-4" />
+              <IconMail className="mr-2 h-4 w-4" />
             )}
-            {cooldownSeconds > 0 ? `Aguarde ${cooldownSeconds}s` : "Enviar código no WhatsApp"}
+            {cooldownSeconds > 0 ? `Aguarde ${cooldownSeconds}s` : "Enviar código por e-mail"}
           </Button>
         </DialogFooter>
       </DialogContent>

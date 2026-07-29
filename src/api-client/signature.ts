@@ -22,9 +22,9 @@ export interface PublicSignerState {
     id: string;
     name: string;
     /** Sempre mascarado. O signatário confirma o número, nunca o escolhe. */
-    phoneMasked: string;
+    emailMasked: string;
     /** Partes da máscara, para o campo de confirmação parcial. */
-    phoneParts: { prefix: string; hiddenLength: number; suffix: string };
+    emailParts: { prefix: string; hiddenLength: number; suffix: string; domain: string };
     /**
      * Âncoras do CPF cadastrado (3 primeiros + 2 verificadores), para a
      * confirmação parcial. Null quando o cadastro não tem CPF — aí o signatário
@@ -49,7 +49,7 @@ export const signatureService = {
   documentUrl: (token: string) =>
     `${apiClient.defaults.baseURL ?? ""}/assinatura/publico/${token}/document.pdf`,
 
-  requestCode: (token: string, data: { cpf: string; cargo: string; phoneConfirm: string }) =>
+  requestCode: (token: string, data: { cpf: string; cargo: string; emailConfirm: string }) =>
     // `suppressToast`: o interceptor de sucesso do axiosClient toasta TODO write,
     // e esta rota não devolve `message` — então o cliente via um "Criado com
     // sucesso" genérico por cima do "Código enviado para +55 43 9****-2403" que
@@ -107,7 +107,7 @@ export const signatureService = {
 
   cancel: (envelopeId: string) => apiClient.post(`/signature-envelopes/${envelopeId}/cancel`),
 
-  /** Reenvia o convite pelo WhatsApp para um signatário. */
+  /** Reenvia o convite por e-mail para um signatário. */
   resendInvitation: (signerId: string) =>
     apiClient.post(`/signature-envelopes/signers/${signerId}/resend`),
 

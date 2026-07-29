@@ -52,18 +52,42 @@ const responsibleSchema = z.object({
   roles: z.array(z.nativeEnum(ResponsibleRole)).min(1, 'Selecione ao menos uma função'),
   isActive: z.boolean().default(true),
   hasSystemAccess: z.boolean().default(false),
-}).superRefine((data, ctx) => {
-  // O e-mail é opcional para o contato em geral (muito cadastro antigo não tem),
-  // mas é ELE o usuário do login — habilitar acesso sem e-mail cria uma conta
-  // em que ninguém consegue entrar.
-  if (data.hasSystemAccess && !(data.email || '').trim()) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['email'],
-      message: 'Informe o e-mail para habilitar o acesso ao sistema',
-    });
-  }
 });
+
+/**
+ * O schema depende do modo por causa do e-mail.
+ *
+ * Em CRIAÇÃO ele é obrigatório: a assinatura eletrônica de orçamento é enviada
+ * por e-mail (convite e código de uso único), então um contato novo sem e-mail
+ * nasce impedido de assinar. Barrar aqui evita criar a lacuna.
+ *
+ * Em EDIÇÃO segue opcional: muito cadastro antigo não tem e-mail, e exigi-lo
+ * impediria de corrigir um telefone enquanto ninguém descobre o endereço. Quem
+ * cobra de fato é a emissão do envelope, que recusa nominalmente quem está sem.
+ */
+const buildResponsibleSchema = (mode: 'create' | 'edit') =>
+  responsibleSchema.superRefine((data, ctx) => {
+    const email = (data.email || '').trim();
+
+    if (mode === 'create' && !email) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['email'],
+        message: 'E-mail é obrigatório — é por ele que a assinatura eletrônica é enviada',
+      });
+      return;
+    }
+
+    // O e-mail também é ELE o usuário do login — habilitar acesso sem e-mail
+    // cria uma conta em que ninguém consegue entrar.
+    if (data.hasSystemAccess && !email) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['email'],
+        message: 'Informe o e-mail para habilitar o acesso ao sistema',
+      });
+    }
+  });
 
 type ResponsibleFormData = z.infer<typeof responsibleSchema>;
 
@@ -180,8 +204,10 @@ export function ResponsibleForm({
     }));
   }, []);
 
+  const schema = useMemo(() => buildResponsibleSchema(mode), [mode]);
+
   const form = useForm<ResponsibleFormData>({
-    resolver: zodResolver(responsibleSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       name: initialData?.name || '',
       phone: initialData?.phone || '',
@@ -338,7 +364,9 @@ export function ResponsibleForm({
                   name="email"
                   render={({ field }) => (
                     <FormItem className="md:col-span-7">
-                      <FormLabel>E-mail</FormLabel>
+                      <FormLabel>
+                        E-mail{mode === 'create' && <span className="text-destructive"> *</span>}
+                      </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -349,6 +377,9 @@ export function ResponsibleForm({
                           value={field.value || ''}
                         />
                       </FormControl>
+                      <p className="text-xs text-muted-foreground">
+                        Recebe o convite e o código da assinatura eletrônica.
+                      </p>
                       <FormMessage />
                     </FormItem>
                   )}

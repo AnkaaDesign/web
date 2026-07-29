@@ -1,12 +1,12 @@
 /**
  * Bloco de identificação do signatário — leitura, não formulário.
  *
- * Nome, CPF, WhatsApp e cargo vêm do cadastro do cliente e o signatário não os
+ * Nome, CPF, e-mail e cargo vêm do cadastro do cliente e o signatário não os
  * escolhe: é isso que dá peso probatório ao código enviado ao telefone. Então
  * eles aparecem como **dados do documento** (rótulo + valor, com fio pontilhado
  * entre as linhas), na mesma tipografia do resto da página, e não como campos
  * editáveis. A conferência dos dígitos que faltam acontece no modal disparado
- * por "Enviar código no WhatsApp".
+ * por "Enviar código por e-mail".
  *
  * O CPF é impresso com a máscara do §5.9 (`***.456.789-**` — três primeiros e os
  * dois verificadores ocultos, PARECER 00001/2021/CONJUR-CGU/AGU). Antes da
@@ -54,7 +54,7 @@ export interface SignerIdentityCardProps {
   name: string;
   /** Já mascarado pela regra do §5.9. */
   cpfDisplay: string;
-  phoneDisplay: string;
+  emailDisplay: string;
   cargo: string | null;
   company: string | null;
   /** True depois que os dígitos foram aceitos pela API. */
@@ -66,7 +66,7 @@ export interface SignerIdentityCardProps {
 export function SignerIdentityCard({
   name,
   cpfDisplay,
-  phoneDisplay,
+  emailDisplay,
   cargo,
   company,
   confirmed,
@@ -91,8 +91,8 @@ export function SignerIdentityCard({
             confirmed={confirmed}
           />
           <IdentityRow
-            label="WhatsApp"
-            value={<span className="tabular-nums">{phoneDisplay}</span>}
+            label="E-mail"
+            value={<span className="break-all">{emailDisplay}</span>}
             confirmed={confirmed}
           />
           <IdentityRow label="Cargo na empresa" value={cargo?.trim() ? cargo : "—"} />

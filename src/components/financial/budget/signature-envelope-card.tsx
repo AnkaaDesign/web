@@ -25,7 +25,7 @@ import {
   IconEye,
   IconFileTypePdf,
   IconLoader2,
-  IconBrandWhatsapp,
+  IconMail,
   IconLink,
   IconSend,
   IconSignature,
@@ -35,7 +35,9 @@ import {
 interface EnvelopeSigner {
   id: string;
   name: string;
-  phoneMasked: string;
+  emailMasked: string;
+  email: string | null;
+  phoneMasked: string | null;
   cpfMasked: string | null;
   cargo: string | null;
   cpfMatch: boolean | null;
@@ -195,12 +197,14 @@ export function SignatureEnvelopeCard({
     }
   };
 
-  const openWhatsApp = (s: EnvelopeSigner) => {
-    // Fallback manual: abre a conversa já com o texto pronto. Útil sempre que o
-    // envio automático falha (sessão do WhatsApp não pareada, por exemplo).
-    const msg = `Olá, ${s.name}. Seu orçamento está pronto para revisão e assinatura eletrônica:\n\n${s.signingUrl}`;
+  const openMailClient = (s: EnvelopeSigner) => {
+    // Fallback manual: abre o cliente de e-mail com o texto pronto. Útil sempre
+    // que o envio automático falha (endereço errado, servidor recusando).
+    if (!s.email) return;
+    const subject = "Orçamento para assinatura eletrônica — Ankaa Design";
+    const body = `Olá, ${s.name}. Seu orçamento está pronto para revisão e assinatura eletrônica:\n\n${s.signingUrl}`;
     window.open(
-      `https://wa.me/55${s.phone.replace(/\D/g, "").replace(/^55/, "")}?text=${encodeURIComponent(msg)}`,
+      `mailto:${s.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
       "_blank",
       "noopener",
     );
@@ -292,7 +296,7 @@ export function SignatureEnvelopeCard({
           <p className="text-sm font-medium">Nenhuma coleta emitida</p>
           <p className="text-xs text-muted-foreground">
             Ao enviar, o documento é congelado e cada responsável recebe um link pessoal por
-            WhatsApp para revisar e assinar.
+            e-mail para revisar e assinar. O código de assinatura vai para o mesmo e-mail.
           </p>
         </div>
         {canManage && (
@@ -323,10 +327,9 @@ export function SignatureEnvelopeCard({
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs">
             <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
             <span>
-              <strong>O convite automático pelo WhatsApp falhou.</strong> A sessão do
-              WhatsApp provavelmente não está conectada. Use o ícone de link para copiar
-              o endereço pessoal de cada signatário, ou o ícone do WhatsApp para abrir a
-              conversa com a mensagem pronta.
+              <strong>Não foi possível enviar o e-mail do convite.</strong> Confira o
+              endereço cadastrado do responsável. Use o ícone de link para copiar o
+              endereço pessoal do signatário e enviá-lo manualmente.
             </span>
           </div>
         )}
@@ -372,7 +375,7 @@ export function SignatureEnvelopeCard({
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {s.cargo ?? "Cargo não informado"} · {s.phoneMasked}
+                    {s.cargo ?? "Cargo não informado"} · {s.emailMasked}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {s.cpfMasked ? `CPF ${s.cpfMasked}` : "CPF ainda não informado"}
@@ -408,16 +411,17 @@ export function SignatureEnvelopeCard({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
-                        title="Abrir WhatsApp com a mensagem pronta"
-                        onClick={() => openWhatsApp(s)}
+                        title="Abrir e-mail com a mensagem pronta"
+                        onClick={() => openMailClient(s)}
+                        disabled={!s.email}
                       >
-                        <IconBrandWhatsapp className="h-3.5 w-3.5" />
+                        <IconMail className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
-                        title="Reenviar convite automaticamente"
+                        title="Reenviar convite por e-mail"
                         disabled={busy}
                         onClick={() =>
                           run(() => signatureService.resendInvitation(s.id), "Convite reenviado.")

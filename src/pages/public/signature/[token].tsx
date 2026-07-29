@@ -1,7 +1,7 @@
 /**
  * Página pública de assinatura do orçamento.
  *
- * Autenticada pelo TOKEN pessoal do signatário, que chega por WhatsApp. Roda
+ * Autenticada pelo TOKEN pessoal do signatário, que chega por e-mail. Roda
  * FORA do AuthProvider, o que traz duas consequências concretas:
  *
  *  1. precisa do seu próprio `<Toaster />` — o único montado no App fica dentro do
@@ -12,14 +12,14 @@
  *     exatamente onde o cliente vai assinar.
  *
  * Fluxo: termo de aceite → revisar documento → conferir identidade (modal) →
- * código no WhatsApp → 4 declarações → assinar.
+ * código no e-mail → 4 declarações → assinar.
  *
- * A tela é um DOCUMENTO, não um painel: nome, CPF, telefone e cargo vêm do
+ * A tela é um DOCUMENTO, não um painel: nome, CPF, e-mail e cargo vêm do
  * cadastro e aparecem como linhas de leitura. Nada disso é editável — se o
- * signatário pudesse escolher o número que recebe o código, o OTP provaria
- * apenas que ele controla um telefone que ele mesmo digitou. A única coisa que
+ * signatário pudesse escolher o endereço que recebe o código, o OTP provaria
+ * apenas que ele controla uma caixa que ele mesmo digitou. A única coisa que
  * ele digita é o miolo que a máscara esconde, e isso acontece no modal disparado
- * por "Enviar código no WhatsApp", como ato deliberado e único.
+ * por "Enviar código por e-mail", como ato deliberado e único.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -61,6 +61,7 @@ import {
   IconClock,
   IconClockOff,
   IconDeviceMobileMessage,
+  IconMail,
   IconExternalLink,
   IconFileTypePdf,
   IconLoader2,
@@ -75,7 +76,7 @@ import { COMPANY_INFO } from "@/config/company";
  * Ela pedia o aceite antes de o signatário ter feito qualquer coisa — antes
  * mesmo de ver o documento — e reaparecia como um muro na frente do orçamento.
  * Agora o aceite é o último passo antes de assinar: abre sozinho depois que o
- * código sai no WhatsApp, junto das quatro declarações, que antes ficavam soltas
+ * código sai por e-mail, junto das quatro declarações, que antes ficavam soltas
  * num quadro cinza do cartão do código.
  */
 type Step = "review" | "code" | "done" | "refused";
@@ -243,7 +244,7 @@ export default function PublicSignaturePage() {
         const res: any = await signatureService.requestCode(token, {
           cpf: values.cpf,
           cargo: values.cargo,
-          phoneConfirm: values.phoneConfirm,
+          emailConfirm: values.emailConfirm,
         });
         const data = res?.data?.data ?? res?.data;
         setChallengeId(data.challengeId);
@@ -551,23 +552,31 @@ export default function PublicSignaturePage() {
                 caixas grandes. Espremido entre o rótulo e dois links de apoio ele
                 lia como campo acessório, competindo com o "Recusar" em vermelho
                 logo abaixo. */}
-            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4 text-center">
-              <div className="space-y-0.5">
-                <p className="text-sm font-medium text-foreground">Código de confirmação</p>
-                <p className="text-xs text-muted-foreground">
-                  Enviado para {destinationMask} · expira em 5 minutos
+            <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-5 text-center">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-center gap-2">
+                  <IconMail className="h-4 w-4 text-primary" aria-hidden />
+                  <p className="text-sm font-semibold text-foreground">Código de confirmação</p>
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Enviamos um código de 6 dígitos para{" "}
+                  <span className="font-medium text-foreground">{destinationMask}</span>.
+                  <br className="hidden sm:block" /> Ele expira em 10 minutos.
                 </p>
               </div>
 
               <div className="flex justify-center">
-                {/* Mesmas caixas do modal de identidade e do `verification-code-form`.
-                    O receio de colar do WhatsApp vale para SEIS <input> separados; o
-                    `input-otp` mantém UM input real por trás dos slots, com
-                    `one-time-code`, então colar e o autofill continuam funcionando. */}
+                {/* `input-otp` mantém UM input real por trás dos slots, então colar
+                    o código de uma vez continua funcionando.
+
+                    `autocomplete="one-time-code"` foi removido de propósito: é uma
+                    dica de SMS (WebOTP no Android, leitura da mensagem no iOS) e
+                    não faz nada para um código que chegou por e-mail. Deixá-la
+                    ali só promete um preenchimento automático que nunca vem. */}
                 <InputOTP
                   id="code"
                   maxLength={6}
-                  autoComplete="one-time-code"
+                  autoComplete="off"
                   disabled={busy}
                   value={code}
                   onChange={next => {
@@ -580,21 +589,45 @@ export default function PublicSignaturePage() {
                       <InputOTPSlot
                         key={index}
                         index={index}
-                        className="h-12 w-10 text-lg font-medium tabular-nums sm:w-12"
+                        className="h-14 w-11 text-xl font-semibold tabular-nums sm:w-14"
                       />
                     ))}
                   </InputOTPGroup>
                 </InputOTP>
               </div>
 
-              <button
-                type="button"
-                className="text-xs text-muted-foreground underline disabled:opacity-50"
-                disabled={secondsLeft > 0 || busy}
-                onClick={handleResend}
-              >
-                {secondsLeft > 0 ? `Reenviar em ${secondsLeft}s` : "Reenviar código"}
-              </button>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline disabled:opacity-50"
+                  disabled={secondsLeft > 0 || busy}
+                  onClick={handleResend}
+                >
+                  {secondsLeft > 0 ? `Reenviar em ${secondsLeft}s` : "Reenviar código"}
+                </button>
+
+                {/* E-mail não chega em segundos como o WhatsApp chegava: passa por
+                    fila do servidor, antispam e, no primeiro contato, greylisting.
+                    Sem esta orientação o signatário conclui que falhou e fica
+                    pedindo código novo — o que invalida o anterior e piora tudo. */}
+                <details className="text-left" open={secondsLeft > 0}>
+                  <summary className="cursor-pointer text-center text-xs text-muted-foreground underline">
+                    Não recebi o e-mail
+                  </summary>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-muted-foreground">
+                    <li>O envio pode levar alguns minutos. Vale esperar antes de pedir outro.</li>
+                    <li>
+                      Procure por <span className="font-medium">{COMPANY_INFO.name}</span> na caixa
+                      de spam ou lixo eletrônico.
+                    </li>
+                    <li>
+                      Confira se <span className="font-medium">{destinationMask}</span> está
+                      correto. Ele vem do cadastro e não pode ser alterado aqui — se estiver
+                      errado, fale com a {COMPANY_INFO.name}.
+                    </li>
+                  </ul>
+                </details>
+              </div>
             </div>
 
             {stepError && (
@@ -661,8 +694,8 @@ export default function PublicSignaturePage() {
             onOpenChange={setIdentityOpen}
             signerName={signer.name}
             cpfParts={signer.cpfParts ?? null}
-            phoneParts={signer.phoneParts ?? null}
-            phoneMasked={signer.phoneMasked}
+            emailParts={signer.emailParts ?? null}
+            emailMasked={signer.emailMasked}
             registryCargo={signer.registryCargo}
             initialCargo={signer.cargo}
             intent={refusing ? "refuse" : "sign"}
@@ -762,7 +795,7 @@ export default function PublicSignaturePage() {
                mostra a forma inteiramente oculta. Depois, exibe os seis dígitos
                que o próprio signatário confirmou. */
             cpfDisplay={maskCpfCgu(confirmed?.cpf)}
-            phoneDisplay={signer.phoneMasked}
+            emailDisplay={signer.emailMasked}
             cargo={effectiveCargo || null}
             company={company.name}
             confirmed={!!confirmed}
@@ -776,7 +809,7 @@ export default function PublicSignaturePage() {
                   <Alert variant="warning">
                     <AlertDescription>
                       Para registrar a recusa também é preciso confirmar sua identidade e
-                      receber o código no WhatsApp — é o que prova que a recusa é sua. O
+                      receber o código por e-mail — é o que prova que a recusa é sua. O
                       motivo você descreve logo depois.
                     </AlertDescription>
                   </Alert>
@@ -805,7 +838,7 @@ export default function PublicSignaturePage() {
                     ) : (
                       <IconDeviceMobileMessage className="mr-2 h-4 w-4" />
                     )}
-                    Enviar código no WhatsApp
+                    Enviar código por e-mail
                     <IconChevronRight className="ml-1 h-4 w-4" />
                   </Button>
                 </div>

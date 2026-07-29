@@ -21,13 +21,16 @@ export function validateResponsibleRows(rows: ResponsibleRowData[]): boolean {
     // applies to already-registered contacts too, whose roles are editable
     // inline -- otherwise clearing every role would silently save nothing.
     if (isInlineCreate) {
-      // CPF e e-mail são opcionais, mas quando preenchidos têm de ser válidos:
-      // a API valida CPF por mod-11 e devolve uma mensagem genérica, então
-      // deixar passar aqui só troca um erro de campo por um 400 sem contexto.
+      // CPF é opcional, mas quando preenchido tem de ser válido: a API valida
+      // mod-11 e devolve uma mensagem genérica, então deixar passar aqui só
+      // troca um erro de campo por um 400 sem contexto.
+      //
+      // E-mail é obrigatório — é o canal da assinatura eletrônica (convite e
+      // código de uso único). Sem ele o contato não consegue assinar orçamento.
       const cpfDigits = (row.cpf || '').replace(/\D/g, '');
       const cpfOk = cpfDigits.length === 0 || isValidCPF(cpfDigits);
       const email = row.email?.trim() || '';
-      const emailOk = email.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const emailOk = email.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
       return (
         !!row.name?.trim() &&
         !!row.phone?.trim() &&

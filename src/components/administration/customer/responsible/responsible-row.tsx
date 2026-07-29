@@ -56,16 +56,22 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     const nameError = nameEmpty && (touched.name || showErrors);
     const phoneError = phoneEmpty && (touched.phone || showErrors);
 
-    // CPF e e-mail são OPCIONAIS — só erram quando preenchidos e inválidos.
-    // O CPF vai para o mesmo campo que a cerimônia de assinatura consulta, e o
-    // servidor recusa mod-11 inválido com uma mensagem genérica; conferir aqui
-    // é o que dá ao usuário um erro no campo certo.
+    // O CPF é OPCIONAL — só erra quando preenchido e inválido. Ele vai para o
+    // mesmo campo que a cerimônia de assinatura consulta, e o servidor recusa
+    // mod-11 inválido com uma mensagem genérica; conferir aqui é o que dá ao
+    // usuário um erro no campo certo.
     const cpfDigits = (value.cpf || '').replace(/\D/g, '');
     const cpfInvalid = showCreateInputs && cpfDigits.length > 0 && !isValidCPF(cpfDigits);
     const cpfError = cpfInvalid && (touched.cpf || showErrors);
+
+    // O e-mail é OBRIGATÓRIO: é por ele que sai o convite e o código da
+    // assinatura eletrônica. Um contato cadastrado sem e-mail trava o envio do
+    // orçamento lá na frente, com o erro aparecendo longe daqui.
+    const emailValue = value.email?.trim() || '';
+    const emailEmpty = showCreateInputs && !emailValue;
     const emailInvalid =
-      showCreateInputs && !!value.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim());
-    const emailError = emailInvalid && (touched.email || showErrors);
+      showCreateInputs && !!emailValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
+    const emailError = (emailEmpty || emailInvalid) && (touched.email || showErrors);
 
     // Async query function for the Combobox
     const queryFn = useCallback(async (searchTerm: string, page?: number) => {
@@ -307,11 +313,12 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                 {cpfError && <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">CPF inválido</p>}
               </div>
 
-              {/* E-mail — já existia em `ResponsibleRowData` e já era enviado no
+              {/* E-mail — obrigatório: é o canal da assinatura eletrônica.
+                  Já existia em `ResponsibleRowData` e já era enviado no
                   payload, mas não tinha campo: era impossível preencher pela
                   linha. */}
               <div className="relative space-y-2">
-                {isFirstRow && <FormLabel>E-mail</FormLabel>}
+                {isFirstRow && <FormLabel>E-mail <span className="text-destructive">*</span></FormLabel>}
                 <Input
                   type="email"
                   value={value.email || ''}
@@ -326,7 +333,11 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                   disabled={disabled || readOnly}
                   className={cn("bg-transparent", emailError && "border-destructive")}
                 />
-                {emailError && <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">E-mail inválido</p>}
+                {emailError && (
+                  <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">
+                    {emailEmpty ? 'E-mail é obrigatório' : 'E-mail inválido'}
+                  </p>
+                )}
               </div>
 
               {/* Role Selection */}

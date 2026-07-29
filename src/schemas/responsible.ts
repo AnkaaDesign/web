@@ -19,10 +19,23 @@ const rolesSchema = z.preprocess(
     .transform(normalizeResponsibleRoles),
 );
 
-// Email validation
+// Email validation.
+//
+// Obrigatório no cadastro: o e-mail é o canal da assinatura eletrônica de
+// orçamento (convite + código de uso único). Um contato sem e-mail não
+// consegue assinar, e o erro só apareceria no envio do orçamento.
+const emailRequiredSchema = z
+  .string()
+  .min(1, 'E-mail é obrigatório')
+  .email('E-mail inválido')
+  .transform(value => value.trim().toLowerCase());
+
+// Na atualização continua opcional: um PATCH parcial que não mexe no contato
+// não deve ser obrigado a reenviar o e-mail. A obrigatoriedade de existir um
+// e-mail é garantida na criação e pela API.
 const emailSchema = z
   .string()
-  .email('Email inválido')
+  .email('E-mail inválido')
   .optional()
   .or(z.literal(''));
 
@@ -35,7 +48,7 @@ const passwordSchema = z
 
 // Responsible create schema
 export const responsibleCreateSchema = z.object({
-  email: emailSchema,
+  email: emailRequiredSchema,
   phone: z
     .string()
     .min(1, 'Telefone é obrigatório')
@@ -58,15 +71,12 @@ export const responsibleCreateSchema = z.object({
     .default(true),
 });
 
-// Responsible inline create schema (companyId is optional for inline context)
-// Email and password are optional for inline creation as they can be set later
+// Responsible inline create schema (companyId is optional for inline context).
+// A senha continua opcional (o acesso ao sistema pode ser configurado depois),
+// mas o e-mail não: sem ele o contato criado pela linha inline entra no
+// cadastro já impedido de assinar orçamento.
 export const responsibleCreateInlineSchema = z.object({
-  email: z
-    .string()
-    .email('Email inválido')
-    .optional()
-    .or(z.literal(''))
-    .transform(val => val === '' ? undefined : val),
+  email: emailRequiredSchema,
   phone: z
     .string()
     .min(1, 'Telefone é obrigatório')

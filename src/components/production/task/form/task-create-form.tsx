@@ -422,7 +422,7 @@ export const TaskCreateForm = () => {
           .map(row => ({
             name: row.name.trim(),
             phone: row.phone.trim(),
-            email: row.email?.trim() || undefined,
+            email: (row.email ?? '').trim().toLowerCase(),
             // Dígitos puros — o Input `type="cpf"` já entrega limpo. Vazio vira
             // `undefined` para o schema opcional da API não receber "".
             cpf: (row.cpf || '').replace(/\D/g, '') || undefined,

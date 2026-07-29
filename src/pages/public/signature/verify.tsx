@@ -62,6 +62,9 @@ interface VerificationData {
 
 /** Rótulos legíveis — não vaze o enum cru para quem verifica o documento. */
 const AUTH_LABEL: Record<string, string> = {
+  EMAIL_OTP: "Código de uso único via e-mail",
+  // WHATSAPP_OTP e SMS_OTP ficam para sempre: documentos assinados antes da
+  // troca de canal precisam continuar exibindo o método que de fato os autenticou.
   WHATSAPP_OTP: "Código de uso único via WhatsApp",
   SMS_OTP: "Código de uso único via SMS",
   INTERNAL_SESSION: "Sessão autenticada Ankaa",
