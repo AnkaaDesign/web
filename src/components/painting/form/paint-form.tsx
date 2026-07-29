@@ -336,8 +336,10 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     return steps.filter((step) => step.id !== 4);
   }, [paintType?.data?.needGround]);
 
-  const validateCurrentStep = useCallback(async (): Promise<boolean> => {
-    switch (currentStep) {
+  // Parameterized by step id (not read off `currentStep`) so a jump can run every
+  // gate between here and the target — see handleStepClick.
+  const validateStep = useCallback(async (stepId: number): Promise<boolean> => {
+    switch (stepId) {
       case 1:
         // Validate basic information fields (hex moved to step 2)
         const step1Valid = await form.trigger(["name", "paintTypeId", "paintBrandId", "finish"]);
@@ -384,7 +386,9 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
       default:
         return true;
     }
-  }, [currentStep, form, paintType]);
+  }, [form, paintType]);
+
+  const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
 
   // Single move: set the step, notify the parent, and mirror it into the URL. The step SET is
   // filtered (no "Fundo" when the type needs no ground), so ids are not contiguous — callers
@@ -447,21 +451,35 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
   }, [availableSteps, currentStep, captureColorPreview, goToStep]);
 
   // Step marker click. Back is free (nothing is lost by revisiting); forward runs
-  // the SAME gate as "Próximo", so a click can never skip a validation the button
-  // enforces. FormSteps only offers steps already reached (plus the next one).
+  // EVERY gate between here and the target, exactly as pressing "Próximo" that
+  // many times would — the first refusal parks the user on the offending step,
+  // which already surfaced its own reason. That is what lets any marker be
+  // clickable: no jump can skip a validation the button enforces.
   const handleStepClick = useCallback(
     async (step: number) => {
       if (step === currentStep) return;
-      if (step < currentStep) {
+      // Walk the VISIBLE set by position: ids are not contiguous (no "Fundo" when
+      // the type needs no ground), so id arithmetic would gate the wrong steps.
+      const fromIdx = availableSteps.findIndex((s) => s.id === currentStep);
+      const toIdx = availableSteps.findIndex((s) => s.id === step);
+      if (fromIdx < 0 || toIdx < 0) return;
+      if (toIdx < fromIdx) {
         captureColorPreview();
         goToStep(step);
         return;
       }
-      if (!(await validateCurrentStep())) return;
+      for (let i = fromIdx; i < toIdx; i++) {
+        if (await validateStep(availableSteps[i].id)) continue;
+        if (availableSteps[i].id !== currentStep) {
+          captureColorPreview();
+          goToStep(availableSteps[i].id);
+        }
+        return;
+      }
       captureColorPreview();
       goToStep(step);
     },
-    [currentStep, captureColorPreview, validateCurrentStep, goToStep],
+    [currentStep, availableSteps, captureColorPreview, validateStep, goToStep],
   );
 
   // Expose functions through ref

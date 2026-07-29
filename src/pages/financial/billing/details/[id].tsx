@@ -488,9 +488,10 @@ const BillingDetailPageInner = () => {
     "BILLING_APPROVED",
   ];
 
-  // Step validation
-  const validateCurrentStep = useCallback(() => {
-    if (currentStep === 1) {
+  // Step validation. Parameterized by step (not read off `currentStep`) so a
+  // jump can run every gate between here and the target — see handleStepClick.
+  const validateStep = useCallback((step: number) => {
+    if (step === 1) {
       const configs = form.getValues("customerConfigs") || [];
       if (configs.length === 0) {
         toast.error("Selecione pelo menos um cliente para faturamento");
@@ -498,7 +499,7 @@ const BillingDetailPageInner = () => {
       }
       return true;
     }
-    if (currentStep === servicesStepIdx) {
+    if (step === servicesStepIdx) {
       const services = form.getValues("services") || [];
       const validServices = services.filter((s: any) => s.description?.trim());
       if (validServices.length === 0) {
@@ -508,7 +509,9 @@ const BillingDetailPageInner = () => {
       return true;
     }
     return true;
-  }, [currentStep, form, servicesStepIdx]);
+  }, [form, servicesStepIdx]);
+
+  const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
 
   // Validate customer required fields — only called when status requires it
   const validateCustomerData = useCallback((): boolean => {
@@ -579,19 +582,27 @@ const BillingDetailPageInner = () => {
   }, []);
 
   // Step marker click. Back is free (nothing is lost by revisiting); forward runs
-  // the SAME gate as "Próximo" — including its read-only bypass, since a user who
-  // cannot edit has nothing to validate. FormSteps only offers steps already
-  // reached (plus the next one).
+  // EVERY gate between here and the target, exactly as pressing "Próximo" that
+  // many times would — the first refusal parks the user on the offending step,
+  // which already surfaced its own reason. A user who cannot edit skips the gates
+  // entirely: there is nothing to validate on a read-only form.
   const handleStepClick = useCallback(
     (step: number) => {
       if (step === currentStep) return;
-      if (step < currentStep || !canEdit) {
-        setCurrentStep(Math.min(step, totalSteps));
+      const target = Math.min(step, totalSteps);
+      if (target < currentStep || !canEdit) {
+        setCurrentStep(target);
         return;
       }
-      if (validateCurrentStep()) setCurrentStep(Math.min(step, totalSteps));
+      for (let s = currentStep; s < target; s++) {
+        if (!validateStep(s)) {
+          setCurrentStep(s);
+          return;
+        }
+      }
+      setCurrentStep(target);
     },
-    [currentStep, canEdit, validateCurrentStep, totalSteps],
+    [currentStep, canEdit, validateStep, totalSteps],
   );
 
   /**

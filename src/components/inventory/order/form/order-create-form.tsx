@@ -309,9 +309,10 @@ export const OrderCreateForm = () => {
     }
   }, [currentStep, setCurrentStep]);
 
-  // Stage validation
-  const validateCurrentStep = useCallback(async (): Promise<boolean> => {
-    switch (currentStep) {
+  // Stage validation. Parameterized by step (not read off `currentStep`) so a
+  // jump can run every gate between here and the target — see handleStepClick.
+  const validateStep = useCallback(async (step: number): Promise<boolean> => {
+    switch (step) {
       case 1:
         // Trigger form validation for step 1 fields first to show errors in UI
         const step1Valid = await form.trigger(["description", "supplierId", "forecast", "notes"]);
@@ -404,7 +405,9 @@ export const OrderCreateForm = () => {
       default:
         return true;
     }
-  }, [currentStep, form, selectedItems, prices, temporaryItems]);
+  }, [form, selectedItems, prices, temporaryItems]);
+
+  const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
 
   // Consolidate filters for ItemSelectorTable.
   // The item selector/drawer speak `isActive` (the canonical status field): true = "Ativo",
@@ -674,8 +677,11 @@ export const OrderCreateForm = () => {
   }, [validateCurrentStep, nextStep]);
 
   // Step marker click. Back is free (nothing is lost by revisiting); forward runs
-  // the SAME gate as "Próximo", so a click can never skip a validation the button
-  // enforces. `setCurrentStep` is the URL-state setter, which clamps the range.
+  // EVERY gate between here and the target, exactly as pressing "Próximo" that
+  // many times would — the first refusal parks the user on the offending step,
+  // which already surfaced its own reason. That is what lets any marker be
+  // clickable: no jump can skip a validation the button enforces.
+  // `setCurrentStep` is the URL-state setter, which clamps the range.
   const handleStepClick = useCallback(
     async (step: number) => {
       if (step === currentStep) return;
@@ -683,9 +689,15 @@ export const OrderCreateForm = () => {
         setCurrentStep(step);
         return;
       }
-      if (await validateCurrentStep()) setCurrentStep(step);
+      for (let s = currentStep; s < step; s++) {
+        if (!(await validateStep(s))) {
+          setCurrentStep(s);
+          return;
+        }
+      }
+      setCurrentStep(step);
     },
-    [currentStep, setCurrentStep, validateCurrentStep],
+    [currentStep, setCurrentStep, validateStep],
   );
 
   // Check if we're on the last step (review step is always step 3)

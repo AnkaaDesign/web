@@ -687,9 +687,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     );
   }, [description, watchedStatus, selectedPaymentStatus, supplierId, forecast, localNotes, watchedFreight, watchedDiscount, watchedTotalOverride, selectedItems, quantities, prices, icmses, ipis, temporaryItems, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedPaymentFirstDueDate, watchedInstallmentCount, watchedPaymentResponsibleId]);
 
-  // Stage validation
-  const validateCurrentStep = useCallback((): boolean => {
-    switch (currentStep) {
+  // Stage validation. Parameterized by step (not read off `currentStep`) so a
+  // jump can run every gate between here and the target — see handleStepClick.
+  const validateStep = useCallback((step: number): boolean => {
+    switch (step) {
       case 1:
         // Validate basic information using URL state
         if (!description?.trim()) {
@@ -740,7 +741,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       default:
         return false;
     }
-  }, [currentStep, description, selectionCount, selectedItems, quantities, prices, temporaryItems]);
+  }, [description, selectionCount, selectedItems, quantities, prices, temporaryItems]);
+
+  const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
 
   // Handle navigation with validation
   const handleNext = useCallback(() => {
@@ -750,8 +753,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   }, [validateCurrentStep, nextStep]);
 
   // Step marker click. Back is free (nothing is lost by revisiting); forward runs
-  // the SAME gate as "Próximo", so a click can never skip a validation the button
-  // enforces. FormSteps only offers steps already reached (plus the next one).
+  // EVERY gate between here and the target, exactly as pressing "Próximo" that
+  // many times would — the first refusal parks the user on the offending step,
+  // which already surfaced its own reason. That is what lets any marker be
+  // clickable: no jump can skip a validation the button enforces.
   const handleStepClick = useCallback(
     (step: number) => {
       if (step === currentStep) return;
@@ -759,9 +764,15 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         goToStep(step);
         return;
       }
-      if (validateCurrentStep()) goToStep(step);
+      for (let s = currentStep; s < step; s++) {
+        if (!validateStep(s)) {
+          goToStep(s);
+          return;
+        }
+      }
+      goToStep(step);
     },
-    [currentStep, goToStep, validateCurrentStep],
+    [currentStep, goToStep, validateStep],
   );
 
   const handleCancel = useCallback(() => {

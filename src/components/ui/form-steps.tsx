@@ -23,10 +23,11 @@ interface FormStepsProps {
    */
   onStepClick?: (stepId: number) => void;
   /**
-   * Overrides which steps accept a click. The default rule is the linear-wizard
-   * one: every step up to the furthest one reached so far, plus the immediate
-   * next. A step beyond that has never had the steps before it validated, so it
-   * stays inert (rendered exactly as it is today).
+   * Restricts which steps accept a click. By default EVERY step is offered —
+   * the gate lives in `handleStepClick`, which walks the validations between
+   * here and the target and parks the user on the first one that refuses. A
+   * marker that looks inert instead teaches "you can't get there from here",
+   * which is false: the wizard decides that, not the indicator.
    */
   canNavigateToStep?: (stepId: number) => boolean;
   /** Freezes every marker — e.g. while a submit is in flight. */
@@ -34,31 +35,16 @@ interface FormStepsProps {
 }
 
 export function FormSteps({ steps, currentStep, className, stepErrors = {}, onStepClick, canNavigateToStep, disabled = false }: FormStepsProps) {
-  const currentIndex = steps.findIndex((step) => step.id === currentStep);
-
-  // Steps already reached stay reachable: walking out to step 5 and back to 2
-  // must not re-lock 3–5 — their gates passed already, so making the user click
-  // "Próximo" through them again is the exact friction this feature removes.
-  const [furthestIndex, setFurthestIndex] = React.useState(currentIndex);
-  React.useEffect(() => {
-    if (currentIndex > furthestIndex) setFurthestIndex(currentIndex);
-  }, [currentIndex, furthestIndex]);
-
-  // Clamp: a dynamic step list can SHRINK under us (a budget/billing customer
-  // being removed drops a step), which would otherwise leave the reach index
-  // pointing past the end.
-  const reachIndex = Math.max(currentIndex, Math.min(furthestIndex, steps.length - 1));
-
-  const isClickable = (step: FormStep, index: number): boolean => {
+  const isClickable = (step: FormStep): boolean => {
     if (disabled || !onStepClick || step.id === currentStep) return false;
     if (canNavigateToStep) return canNavigateToStep(step.id);
-    return index <= reachIndex + 1;
+    return true;
   };
 
   return (
     <div className={cn("flex items-center justify-between", className)}>
       {steps.map((step, index) => {
-        const clickable = isClickable(step, index);
+        const clickable = isClickable(step);
 
         const containerClassName = cn(
           "flex items-center space-x-2 text-left",

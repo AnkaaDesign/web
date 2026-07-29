@@ -480,9 +480,11 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
     setLayoutStatuses((prev) => ({ ...prev, [fileId]: status }));
   }, []);
 
-  // Per-step validation gate (mirrors the order wizard's validateCurrentStep switch).
-  const validateCurrentStep = useCallback(async (): Promise<boolean> => {
-    switch (currentStep) {
+  // Per-step validation gate (mirrors the order wizard's validateStep switch).
+  // Parameterized by step (not read off `currentStep`) so a jump can run every
+  // gate between here and the target — see handleStepClick.
+  const validateStep = useCallback(async (step: number): Promise<boolean> => {
+    switch (step) {
       case 1: {
         // Create — at least one airbrushing config must carry real data (mirrors the cut wizard's
         // "add at least one cut with a file" gate).
@@ -531,15 +533,19 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
       default:
         return true;
     }
-  }, [currentStep, form, selectedTasks]);
+  }, [mode, form, selectedTasks]);
+
+  const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
 
   const handleNext = useCallback(async () => {
     if (await validateCurrentStep()) nextStep();
   }, [validateCurrentStep, nextStep]);
 
   // Step marker click. Back is free (nothing is lost by revisiting); forward runs
-  // the SAME gate as "Próximo", so a click can never skip a validation the button
-  // enforces. FormSteps only offers steps already reached (plus the next one).
+  // EVERY gate between here and the target, exactly as pressing "Próximo" that
+  // many times would — the first refusal parks the user on the offending step,
+  // which already surfaced its own reason. That is what lets any marker be
+  // clickable: no jump can skip a validation the button enforces.
   const handleStepClick = useCallback(
     async (step: number) => {
       if (step === currentStep) return;
@@ -547,9 +553,15 @@ export const AirbrushingForm = ({ airbrushingId, mode, initialTaskId, onSuccess,
         goToStep(step);
         return;
       }
-      if (await validateCurrentStep()) goToStep(step);
+      for (let s = currentStep; s < step; s++) {
+        if (!(await validateStep(s))) {
+          goToStep(s);
+          return;
+        }
+      }
+      goToStep(step);
     },
-    [currentStep, goToStep, validateCurrentStep],
+    [currentStep, goToStep, validateStep],
   );
 
   const handleCancel = useCallback(() => {

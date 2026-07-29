@@ -269,9 +269,10 @@ export const ExternalOperationCreateForm = () => {
     [steps.length, searchParams, setSearchParams],
   );
 
-  // Stage validation
-  const validateCurrentStep = useCallback((): boolean => {
-    switch (currentStep) {
+  // Stage validation. Parameterized by step (not read off `currentStep`) so a
+  // jump can run every gate between here and the target — see handleStepClick.
+  const validateStep = useCallback((step: number): boolean => {
+    switch (step) {
       case 1: {
         // Validate basic information using URL state
         const trimmedName = withdrawerName?.trim() || "";
@@ -412,7 +413,9 @@ export const ExternalOperationCreateForm = () => {
       default:
         return true;
     }
-  }, [currentStep, withdrawerName, selectedItems, quantities, prices, withdrawalType, notes, services, validServices, operationMode, customerId]);
+  }, [withdrawerName, selectedItems, quantities, prices, withdrawalType, notes, services, validServices, operationMode, customerId]);
+
+  const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
 
   // Handle item selection
   const handleSelectItem = useCallback(
@@ -561,8 +564,10 @@ export const ExternalOperationCreateForm = () => {
   }, [validateCurrentStep, nextStep]);
 
   // Step marker click. Back is free (nothing is lost by revisiting); forward runs
-  // the SAME gate as "Próximo", so a click can never skip a validation the button
-  // enforces. FormSteps only offers steps already reached (plus the next one).
+  // EVERY gate between here and the target, exactly as pressing "Próximo" that
+  // many times would — the first refusal parks the user on the offending step,
+  // which already surfaced its own reason. That is what lets any marker be
+  // clickable: no jump can skip a validation the button enforces.
   const handleStepClick = useCallback(
     (step: number) => {
       if (step === currentStep) return;
@@ -570,9 +575,15 @@ export const ExternalOperationCreateForm = () => {
         goToStep(step);
         return;
       }
-      if (validateCurrentStep()) goToStep(step);
+      for (let s = currentStep; s < step; s++) {
+        if (!validateStep(s)) {
+          goToStep(s);
+          return;
+        }
+      }
+      goToStep(step);
     },
-    [currentStep, goToStep, validateCurrentStep],
+    [currentStep, goToStep, validateStep],
   );
 
   const isLastStep = currentStep === steps.length;

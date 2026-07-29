@@ -211,8 +211,10 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
     }));
   }, []);
 
-  const validateCurrentStep = useCallback(async (): Promise<boolean> => {
-    switch (currentStep) {
+  // Parameterized by step (not read off `currentStep`) so a jump can run every
+  // gate between here and the target — see handleStepClick.
+  const validateStep = useCallback(async (step: number): Promise<boolean> => {
+    switch (step) {
       case 1: {
         // Validate the base fields first.
         const baseValid = await form.trigger(["frequency", "frequencyCount"]);
@@ -281,7 +283,9 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
       default:
         return true;
     }
-  }, [currentStep, form, frequencyGroups]);
+  }, [form, frequencyGroups]);
+
+  const validateCurrentStep = useCallback(() => validateStep(currentStep), [validateStep, currentStep]);
 
   const nextStep = useCallback(() => {
     if (currentStep < steps.length) {
@@ -303,8 +307,10 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
   }, [validateCurrentStep, nextStep]);
 
   // Step marker click. Back is free (nothing is lost by revisiting); forward runs
-  // the SAME gate as "Próximo", so a click can never skip a validation the button
-  // enforces. FormSteps only offers steps already reached (plus the next one).
+  // EVERY gate between here and the target, exactly as pressing "Próximo" that
+  // many times would — the first refusal parks the user on the offending step,
+  // which already surfaced its own reason. That is what lets any marker be
+  // clickable: no jump can skip a validation the button enforces.
   const handleStepClick = useCallback(
     async (step: number) => {
       if (step === currentStep) return;
@@ -312,9 +318,16 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
         setCurrentStep(step);
         return;
       }
-      if (await validateCurrentStep()) setCurrentStep(Math.min(step, steps.length));
+      const target = Math.min(step, steps.length);
+      for (let s = currentStep; s < target; s++) {
+        if (!(await validateStep(s))) {
+          setCurrentStep(s);
+          return;
+        }
+      }
+      setCurrentStep(target);
     },
-    [currentStep, validateCurrentStep, steps.length],
+    [currentStep, validateStep, steps.length],
   );
 
   const handleSubmit = useCallback(async () => {
