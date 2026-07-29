@@ -123,7 +123,10 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
                 <IconCurrencyDollar className="h-4 w-4 text-primary" />
                 Valor em Estoque
               </div>
-              <p className="text-3xl font-bold text-primary">{formatCurrency(item.totalPrice || metrics.stockValue)}</p>
+              {/* Derived from the same quantity/price pair as the caption below, never from the
+                  denormalized item.totalPrice — a stale cache used to render a total that
+                  contradicted the very line explaining it (e.g. "R$ 1.020,00" over "1 × R$ 170,00"). */}
+              <p className="text-3xl font-bold text-primary">{formatCurrency(metrics.stockValue)}</p>
               <p className="text-sm text-muted-foreground mt-1">
                 {fmtQty(item.quantity)} unidades × {formatCurrency(metrics.currentPrice)}
               </p>
