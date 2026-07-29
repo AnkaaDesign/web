@@ -46,8 +46,6 @@ interface EnvelopeSigner {
   email: string | null;
   phoneMasked: string | null;
   cpfMasked: string | null;
-  /** CPF que veio do CADASTRO. Existe desde a emissão, antes de qualquer assinatura. */
-  declaredCpfMasked: string | null;
   cargo: string | null;
   cpfMatch: boolean | null;
   side: "ANKAA" | "CUSTOMER";
@@ -450,11 +448,6 @@ export function SignatureEnvelopeCard({
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate text-sm font-medium">{s.name}</span>
-                    {s.side === "ANKAA" && (
-                      <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                        Ankaa
-                      </Badge>
-                    )}
                     {/* Divergência entre o CPF que a Ankaa cadastrou e o que o
                         signatário informou é fato auditável, não bloqueio. */}
                     {s.cpfMatch === false && (
@@ -463,21 +456,16 @@ export function SignatureEnvelopeCard({
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {s.cargo ?? "Cargo não informado"} · {s.emailMasked}
-                  </p>
-                  {/* Dois fatos diferentes, e a linha precisa dizer qual é:
-                      o CPF CONFERIDO pelo signatário no ato, ou o que está no
-                      cadastro enquanto ele ainda não assinou. Antes só o
-                      primeiro era lido, então um signatário que ainda não abriu
-                      o link aparecia como "CPF ainda não informado" mesmo com o
-                      documento gravado no cadastro desde a emissão. */}
-                  <p className="text-xs text-muted-foreground">
-                    {s.cpfMasked
-                      ? `CPF ${s.cpfMasked} · conferido`
-                      : s.declaredCpfMasked
-                        ? `CPF ${s.declaredCpfMasked} · do cadastro`
-                        : "Sem CPF no cadastro"}
+                  {/* Um contato pode acumular nove funções ("Comercial,
+                      Proprietário, Vendedor, Representante, ..."), o que empurra
+                      o e-mail para fora da linha. Trunca e deixa o texto inteiro
+                      no title. */}
+                  <p
+                    className="truncate text-xs text-muted-foreground"
+                    title={s.cargo ? `${s.cargo} · ${s.emailMasked}` : s.emailMasked}
+                  >
+                    {s.cargo ? `${s.cargo} · ` : ""}
+                    {s.emailMasked}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {s.signedAt
@@ -586,28 +574,48 @@ export function SignatureEnvelopeCard({
               <div className="mt-2 space-y-1">
                 {history.map(h => {
                   const hl = ENVELOPE_LABEL[h.status] ?? { text: h.status, tone: "muted" as Tone };
+                  // O que separa ESTA versão do orçamento atual. Antes a linha
+                  // trazia só status e código: para saber por que uma versão
+                  // caiu era preciso abrir o PDF e comparar à mão.
+                  const hChanges = h.changes ?? [];
                   return (
-                    <div
-                      key={h.id}
-                      className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-2 text-xs"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${toneClass[hl.tone]}`}>
-                          {hl.text}
-                        </Badge>
-                        <span className="text-muted-foreground">
-                          v{h.version} · {h.verificationCode}
+                    <div key={h.id} className="rounded-lg bg-muted/30 px-4 py-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${toneClass[hl.tone]}`}>
+                            {hl.text}
+                          </Badge>
+                          <span className="text-muted-foreground">
+                            v{h.version} · {h.verificationCode}
+                          </span>
                         </span>
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 gap-1.5"
-                        onClick={() => openPdf(h.id)}
-                      >
-                        <IconFileTypePdf className="h-3.5 w-3.5" />
-                        PDF
-                      </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 shrink-0 gap-1.5"
+                          onClick={() => openPdf(h.id)}
+                        >
+                          <IconFileTypePdf className="h-3.5 w-3.5" />
+                          PDF
+                        </Button>
+                      </div>
+
+                      {/* O motivo gravado à época é o que a trilha registrou e o
+                          que o cliente recebeu por e-mail — vale mesmo quando a
+                          lista abaixo já não bate, porque o orçamento seguiu
+                          mudando depois. */}
+                      {h.invalidatedReason && (
+                        <p className="mt-1.5 text-muted-foreground">{h.invalidatedReason}</p>
+                      )}
+
+                      {hChanges.length > 0 && (
+                        <div className="mt-2 border-t border-border/60 pt-2">
+                          <p className="mb-1 font-medium text-muted-foreground">
+                            {quoteChangesHeadline(hChanges)} em relação ao orçamento atual
+                          </p>
+                          <QuoteChangeList changes={hChanges} />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
