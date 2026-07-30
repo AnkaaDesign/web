@@ -342,13 +342,18 @@ const BillingDetailPageInner = () => {
       customForecastDays: quote.customForecastDays ?? null,
       simultaneousTasks: quote.simultaneousTasks ?? null,
       layoutFileIds: (quote.layoutFiles || []).map((f: any) => f.id),
-      services: (quote.services || []).map((s: any) => ({
-        id: s.id,
-        description: s.description || "",
-        observation: s.observation || null,
-        amount: Number(s.amount) || 0,
-        invoiceToCustomerId: s.invoiceToCustomerId || null,
-      })),
+      // Sort by `position` explicitly: this page's custom `quote.include` replaces the
+      // repository default that carried `orderBy: { position: "asc" }`, so the rows would
+      // otherwise arrive in arbitrary DB order and defeat the drag-to-reorder step.
+      services: [...(quote.services || [])]
+        .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+        .map((s: any) => ({
+          id: s.id,
+          description: s.description || "",
+          observation: s.observation || null,
+          amount: Number(s.amount) || 0,
+          invoiceToCustomerId: s.invoiceToCustomerId || null,
+        })),
       customerConfigs: (quote.customerConfigs || []).map((config: any) => ({
         id: config.id,
         customerId: config.customerId,

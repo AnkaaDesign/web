@@ -12,7 +12,10 @@ import { computeConfigDiscount, computeCustomerConfigTotals } from "@/utils/task
 import { SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { Label } from "@/components/ui/label";
 import { ServiceAutocomplete } from "@/components/production/task/form/service-autocomplete";
-import { IconPlus, IconTrash, IconNote, IconCurrencyReal, IconAlertTriangle } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconNote, IconCurrencyReal, IconAlertTriangle, IconGripVertical } from "@tabler/icons-react";
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface BillingStepServicesProps {
   disabled?: boolean;
@@ -20,7 +23,7 @@ interface BillingStepServicesProps {
 
 export function BillingStepServices({ disabled }: BillingStepServicesProps) {
   const { control, setValue: setFormValue, getValues } = useFormContext();
-  const { fields, append, remove } = useFieldArray({ control, name: "services" });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: "services" });
   const services = useWatch({ control, name: "services" }) || [];
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
   const hasMultipleCustomers = customerConfigs.length >= 2;
@@ -93,6 +96,40 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
   // Validate: any service with amount but no description
   const hasValidationIssue = services.some((s: any) => s.amount > 0 && !s.description?.trim());
 
+  // Grid class — the leading 24px column is the drag handle (empty on the header row)
+  const gridClass = hasMultipleCustomers
+    ? "grid-cols-[24px_minmax(100px,1fr)_minmax(90px,1fr)_180px_36px]"
+    : "grid-cols-[24px_minmax(100px,1fr)_180px_36px]";
+
+  // Drag-and-drop sensors for reordering services
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // Reorder services on drag end — array order is the persisted order on submit
+  // (the API stamps TaskQuoteService.position from the array index).
+  const handleDragEnd = useCallback(
+    (event: any) => {
+      const { active, over } = event;
+      if (!active || !over || active.id === over.id) return;
+
+      const oldIndex = fields.findIndex((f) => f.id === active.id);
+      const newIndex = fields.findIndex((f) => f.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const current = getValues("services") || [];
+      const reordered = arrayMove(current, oldIndex, newIndex);
+      replace(reordered);
+      // A pure reorder doesn't flip RHF's dirty state (each item's dirty flag
+      // moves along with it), which would let a background refetch revert the
+      // order. Stamp the array dirty so keepDirtyValues preserves it.
+      setFormValue("services", reordered, { shouldDirty: true });
+      setTimeout(recalculateTotals, 0);
+    },
+    [fields, getValues, replace, setFormValue, recalculateTotals],
+  );
+
   return (
     <div className="space-y-6">
       <Card>
@@ -113,104 +150,49 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
           )}
 
           {/* Header */}
-          <div className={`grid gap-2 text-xs font-semibold text-muted-foreground uppercase ${
-            hasMultipleCustomers
-              ? "grid-cols-[minmax(100px,1fr)_minmax(90px,1fr)_180px_36px]"
-              : "grid-cols-[minmax(100px,1fr)_180px_36px]"
-          }`}>
+          <div className={`grid gap-2 text-xs font-semibold text-muted-foreground uppercase ${gridClass}`}>
+            <span />
             <span className="px-2">Descrição</span>
             {hasMultipleCustomers && <span className="px-2">Cliente</span>}
             <span className="px-2">Valor</span>
             <span />
           </div>
 
-          {/* Service rows */}
-          {fields.map((field, index) => {
-            const service = services[index];
+          {/* Service rows — draggable to reorder */}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={fields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+              {fields.map((field, index) => {
+                const service = services[index];
 
-            return (
-              <div
-                key={field.id}
-                className={`grid gap-2 items-center ${
-                  hasMultipleCustomers
-                    ? "grid-cols-[minmax(100px,1fr)_minmax(90px,1fr)_180px_36px]"
-                    : "grid-cols-[minmax(100px,1fr)_180px_36px]"
-                }`}
-              >
-                {/* Description */}
-                <div className="flex items-center gap-1 min-w-0">
-                  <div className="flex-1 min-w-0 [&>.space-y-2]:space-y-0">
-                    <ServiceAutocomplete
-                      control={control}
-                      name={`services.${index}.description`}
-                      disabled={disabled}
-                      placeholder="Selecione ou digite"
-                      showLabel={false}
-                      type={SERVICE_ORDER_TYPE.PRODUCTION}
-                      className="w-full h-9"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setObservationModal({ index, value: service?.observation || "" })}
-                    className="relative flex items-center justify-center h-9 w-9 rounded border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors flex-shrink-0"
-                  >
-                    <IconNote className="h-3.5 w-3.5" />
-                    {service?.observation && (
-                      <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
-                        !
-                      </span>
-                    )}
-                  </button>
-                </div>
-
-                {/* Invoice To Customer */}
-                {hasMultipleCustomers && (
-                  <Combobox
-                    value={service?.invoiceToCustomerId || ""}
-                    onValueChange={(v) => {
+                return (
+                  <SortableServiceRow
+                    key={field.id}
+                    id={field.id}
+                    index={index}
+                    control={control}
+                    service={service}
+                    disabled={disabled}
+                    hasMultipleCustomers={hasMultipleCustomers}
+                    customerOptions={customerOptions}
+                    gridClass={gridClass}
+                    onObservationClick={() => setObservationModal({ index, value: service?.observation || "" })}
+                    onCustomerChange={(v) => {
                       setFormValue(`services.${index}.invoiceToCustomerId`, v || null, { shouldDirty: true });
                       setTimeout(recalculateTotals, 0);
                     }}
-                    options={customerOptions}
-                    placeholder="Cliente"
-                    searchable={false}
-                    clearable
-                    disabled={disabled}
-                    className="h-9"
-                  />
-                )}
-
-                {/* Amount */}
-                <Input
-                  type="currency"
-                  value={service?.amount || 0}
-                  onChange={(val) => {
-                    setFormValue(`services.${index}.amount`, val, { shouldDirty: true });
-                    setTimeout(recalculateTotals, 0);
-                  }}
-                  disabled={disabled}
-                  className="h-9"
-                />
-
-                {/* Remove */}
-                {!disabled && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
+                    onAmountChange={(val) => {
+                      setFormValue(`services.${index}.amount`, val, { shouldDirty: true });
+                      setTimeout(recalculateTotals, 0);
+                    }}
+                    onRemove={() => {
                       remove(index);
                       setTimeout(recalculateTotals, 0);
                     }}
-                    className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                  >
-                    <IconTrash className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            );
-          })}
+                  />
+                );
+              })}
+            </SortableContext>
+          </DndContext>
 
           {/* Add button */}
           {!disabled && (
@@ -356,6 +338,123 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+interface SortableServiceRowProps {
+  id: string;
+  index: number;
+  control: any;
+  service: any;
+  disabled?: boolean;
+  hasMultipleCustomers: boolean;
+  customerOptions: Array<{ value: string; label: string }>;
+  gridClass: string;
+  onObservationClick: () => void;
+  onCustomerChange: (value: string | null) => void;
+  onAmountChange: (value: any) => void;
+  onRemove: () => void;
+}
+
+function SortableServiceRow({
+  id,
+  index,
+  control,
+  service,
+  disabled,
+  hasMultipleCustomers,
+  customerOptions,
+  gridClass,
+  onObservationClick,
+  onCustomerChange,
+  onAmountChange,
+  onRemove,
+}: SortableServiceRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className={`grid gap-2 items-center ${gridClass}`}>
+      {/* Drag Handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        className={`flex items-center justify-center ${disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing"}`}
+      >
+        <IconGripVertical className="h-5 w-5 text-muted-foreground" />
+      </div>
+
+      {/* Description */}
+      <div className="flex items-center gap-1 min-w-0">
+        <div className="flex-1 min-w-0 [&>.space-y-2]:space-y-0">
+          <ServiceAutocomplete
+            control={control}
+            name={`services.${index}.description`}
+            disabled={disabled}
+            placeholder="Selecione ou digite"
+            showLabel={false}
+            type={SERVICE_ORDER_TYPE.PRODUCTION}
+            className="w-full h-9"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={onObservationClick}
+          className="relative flex items-center justify-center h-9 w-9 rounded border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors flex-shrink-0"
+        >
+          <IconNote className="h-3.5 w-3.5" />
+          {service?.observation && (
+            <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+              !
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Invoice To Customer */}
+      {hasMultipleCustomers && (
+        <Combobox
+          value={service?.invoiceToCustomerId || ""}
+          onValueChange={(v) => onCustomerChange(Array.isArray(v) ? v[0] ?? null : v ?? null)}
+          options={customerOptions}
+          placeholder="Cliente"
+          searchable={false}
+          clearable
+          disabled={disabled}
+          className="h-9"
+        />
+      )}
+
+      {/* Amount */}
+      <Input
+        type="currency"
+        value={service?.amount || 0}
+        onChange={onAmountChange}
+        disabled={disabled}
+        className="h-9"
+      />
+
+      {/* Remove */}
+      {!disabled && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onRemove}
+          className="h-9 w-9 text-muted-foreground hover:text-destructive"
+        >
+          <IconTrash className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 }

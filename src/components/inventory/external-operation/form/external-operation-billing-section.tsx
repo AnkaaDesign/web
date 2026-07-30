@@ -1,4 +1,7 @@
-import { IconCurrencyReal, IconFileInvoice, IconLock, IconPlus, IconReceipt, IconTrash, IconUserDollar } from "@tabler/icons-react";
+import { IconCurrencyReal, IconFileInvoice, IconGripVertical, IconLock, IconPlus, IconReceipt, IconTrash, IconUserDollar } from "@tabler/icons-react";
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +17,18 @@ export interface BillingServiceRow {
   id?: string;
   description: string;
   amount: number;
+  /**
+   * Client-only stable key for rows that haven't been persisted yet, so drag-to-reorder
+   * and React keys survive edits. Stripped by the submit mappers in the create/edit forms.
+   */
+  _uid?: string;
 }
+
+/** Monotonic counter backing `_uid` — only ever compared for equality. */
+let newServiceRowSeq = 0;
+
+/** Leading 24px column is the drag handle (empty on the header row). */
+const SERVICE_ROW_GRID = "grid-cols-[24px_minmax(150px,1fr)_200px_36px]";
 
 interface ExternalOperationBillingSectionProps {
   customerId: string | null;
@@ -63,11 +77,31 @@ export function ExternalOperationBillingSection({
   };
 
   const handleAddService = () => {
-    onServicesChange([...services, { description: "", amount: 0 }]);
+    onServicesChange([...services, { description: "", amount: 0, _uid: `new-${++newServiceRowSeq}` }]);
   };
 
   const handleRemoveService = (index: number) => {
     onServicesChange(services.filter((_, i) => i !== index));
+  };
+
+  // Stable per-row drag id: persisted rows use their uuid, new rows their `_uid`.
+  const rowIds = services.map((service, index) => service.id ?? service._uid ?? `row-${index}`);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // Array order is the persisted order — the submit mappers stamp `position` from the index.
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (!active || !over || active.id === over.id) return;
+
+    const oldIndex = rowIds.indexOf(String(active.id));
+    const newIndex = rowIds.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    onServicesChange(arrayMove(services, oldIndex, newIndex));
   };
 
   return (
@@ -154,45 +188,29 @@ export function ExternalOperationBillingSection({
         </CardHeader>
         <CardContent className="space-y-3">
           {services.length > 0 && (
-            <div className="grid grid-cols-[minmax(150px,1fr)_200px_36px] gap-2 text-xs font-semibold text-muted-foreground uppercase">
+            <div className={`grid ${SERVICE_ROW_GRID} gap-2 text-xs font-semibold text-muted-foreground uppercase`}>
+              <span />
               <span className="px-2">Descrição</span>
               <span className="px-2">Valor</span>
               <span />
             </div>
           )}
 
-          {services.map((service, index) => (
-            <div key={service.id ?? index} className="grid grid-cols-[minmax(150px,1fr)_200px_36px] gap-2 items-center">
-              <Input
-                value={service.description}
-                onChange={(value: string | number | null) => handleServiceChange(index, { description: typeof value === "string" ? value : String(value ?? "") })}
-                placeholder="Descrição do serviço"
-                disabled={disabled}
-                maxLength={500}
-                className="h-9"
-              />
-              <Input
-                type="currency"
-                value={service.amount || 0}
-                onChange={(val: any) => handleServiceChange(index, { amount: Number(val) || 0 })}
-                disabled={disabled}
-                className="h-9"
-              />
-              {!disabled ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleRemoveService(index)}
-                  className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                >
-                  <IconTrash className="h-4 w-4" />
-                </Button>
-              ) : (
-                <span />
-              )}
-            </div>
-          ))}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={rowIds} strategy={verticalListSortingStrategy}>
+              {services.map((service, index) => (
+                <SortableServiceRow
+                  key={rowIds[index]}
+                  id={rowIds[index]}
+                  service={service}
+                  disabled={disabled}
+                  onDescriptionChange={(value) => handleServiceChange(index, { description: value })}
+                  onAmountChange={(value) => handleServiceChange(index, { amount: value })}
+                  onRemove={() => handleRemoveService(index)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
 
           {services.length === 0 && (
             <p className="text-sm text-muted-foreground">
@@ -217,6 +235,70 @@ export function ExternalOperationBillingSection({
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+interface SortableServiceRowProps {
+  id: string;
+  service: BillingServiceRow;
+  disabled?: boolean;
+  onDescriptionChange: (value: string) => void;
+  onAmountChange: (value: number) => void;
+  onRemove: () => void;
+}
+
+function SortableServiceRow({ id, service, disabled, onDescriptionChange, onAmountChange, onRemove }: SortableServiceRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className={`grid ${SERVICE_ROW_GRID} gap-2 items-center`}>
+      {/* Drag Handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        className={`flex items-center justify-center ${disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing"}`}
+      >
+        <IconGripVertical className="h-5 w-5 text-muted-foreground" />
+      </div>
+
+      <Input
+        value={service.description}
+        onChange={(value: string | number | null) => onDescriptionChange(typeof value === "string" ? value : String(value ?? ""))}
+        placeholder="Descrição do serviço"
+        disabled={disabled}
+        maxLength={500}
+        className="h-9"
+      />
+      <Input
+        type="currency"
+        value={service.amount || 0}
+        onChange={(val: any) => onAmountChange(Number(val) || 0)}
+        disabled={disabled}
+        className="h-9"
+      />
+      {!disabled ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onRemove}
+          className="h-9 w-9 text-muted-foreground hover:text-destructive"
+        >
+          <IconTrash className="h-4 w-4" />
+        </Button>
+      ) : (
+        <span />
+      )}
     </div>
   );
 }
