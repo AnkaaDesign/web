@@ -131,6 +131,11 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: "jsdom",
       setupFiles: ["./src/test/setup.ts"],
+      // Run tests in the timezone the app is actually used in. The CI/dev box is UTC,
+      // where a whole class of calendar-date bugs simply does not reproduce: a bare
+      // "2026-07-30" formatted in UTC is the 30th, but in São Paulo (UTC-3) it is the
+      // 29th. Pinning this is what makes those assertions mean anything.
+      env: { TZ: "America/Sao_Paulo" },
       // The suites import `describe`/`it`/`expect` from "vitest" explicitly; globals stay off so
       // that convention keeps being enforced.
       globals: false,

@@ -6,9 +6,29 @@ import { WEEK_DAY, MONTH } from "../constants";
 // Date Formatting
 // =====================
 
+/**
+ * Parse a date string without letting a CALENDAR DATE drift a day.
+ *
+ * `new Date("2026-07-30")` is read as UTC midnight, which is 2026-07-29 21:00 in São
+ * Paulo — so a bare date rendered in local time comes out one day EARLIER. That is how
+ * NFS-e nº 3185, emitted on 30/07, displayed as "Emissão 29/07/2026".
+ *
+ * A date-only string carries no time and no zone: it means that calendar day everywhere.
+ * Build it as local midnight so it formats as itself. Strings that DO carry a time are
+ * genuine instants and keep the normal parse.
+ */
+const parseDateValue = (date: Date | string): Date => {
+  if (typeof date !== "string") return date;
+  const dateOnly = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  }
+  return new Date(date);
+};
+
 export const formatDate = (date: Date | string | null | undefined, _locale: string = "pt-BR"): string => {
   if (!date) return "-";
-  const d = typeof date === "string" ? new Date(date) : date;
+  const d = parseDateValue(date);
   if (isNaN(d.getTime())) return "Data inválida";
 
   // Fix dates with malformed years (e.g., year 2 instead of 2025)
