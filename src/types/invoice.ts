@@ -110,8 +110,16 @@ export interface ElotechNfseListItem {
   emitida: boolean;
   tomadorCnpjCpf: string;
   tomadorRazaoNome: string;
+  /** Gross value of the note, BEFORE discount. */
   valorDoc: number;
   valorServico: number;
+  /**
+   * Net value of the note, AFTER discount — this is the figure that matches the
+   * invoice total and the parcela. With a discount it differs from `valorDoc`, so the
+   * two must be shown separately; showing only `valorDoc` made the note look like it
+   * disagreed with its own installment.
+   */
+  valorLiquidoNota?: number | null;
   valorISS: number;
   issRetido: string;
   // Enriched from local DB

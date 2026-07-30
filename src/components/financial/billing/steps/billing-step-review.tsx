@@ -837,8 +837,13 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                   <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-36">Status</th>
                                   <th className="px-3 py-2 text-left font-medium whitespace-nowrap w-44">Emissão</th>
                                   <th aria-hidden />
-                                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-40">ISS</th>
-                                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-40">Valor</th>
+                                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-32">ISS</th>
+                                  {/* Bruto and Líquido are separate because a discount makes
+                                      them differ, and only the LÍQUIDO figure matches the
+                                      parcela below. A single "Valor" carrying the gross made
+                                      the note read as if it disagreed with its own parcela. */}
+                                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-36">Valor Bruto</th>
+                                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-40">Valor Líquido</th>
                                   <th className="px-3 py-2 text-right font-medium whitespace-nowrap w-56">Ações</th>
                                 </tr>
                               </thead>
@@ -846,7 +851,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                 {/* No NFS-e at all — single row with emit button */}
                                 {!activeNfse && canceledNfses.length === 0 && (
                                   <tr>
-                                    <td colSpan={6} className="px-3 py-2 text-muted-foreground">Não emitida</td>
+                                    <td colSpan={7} className="px-3 py-2 text-muted-foreground">Não emitida</td>
                                     <td className="px-3 py-2">
                                       <div className="flex justify-end">
                                         <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} canManage={!disabled} />
@@ -1396,7 +1401,15 @@ function NfseTableRow({
   const detail: any = data?.data;
   const numero = detail?.formDadosNFSe?.numeroNfse ?? doc.nfseNumber ?? null;
   const emissao = detail?.formDadosNFSe?.dataEmissao ?? null;
-  const valor = detail?.formTotal?.totalNfse ?? null;
+  // Mind the naming: in this DETAIL payload `totalNfse` is the GROSS value and
+  // `valorLiquidoNfse` is the net one — the inverse of the list endpoint's
+  // `valorDoc`/`valorLiquidoNota`. Only the NET figure equals the invoice total and the
+  // parcela; showing `totalNfse` alone as "Valor" is what made a note with a discount
+  // look like it disagreed with its own parcela (R$ 33.255,00 vs R$ 31.592,25).
+  const valorBruto = detail?.formTotal?.totalNfse ?? null;
+  const valorLiquido = detail?.formTotal?.valorLiquidoNfse ?? valorBruto;
+  const temDesconto =
+    valorBruto != null && valorLiquido != null && Math.abs(valorBruto - valorLiquido) >= 0.01;
   const iss = detail?.formImposto?.valorIss ?? null;
   const clickable = !!doc.elotechNfseId;
 
@@ -1416,11 +1429,17 @@ function NfseTableRow({
         {emissao ? formatDate(emissao) : "-"}
       </td>
       <td aria-hidden />
-      <td className="px-3 py-2 text-right whitespace-nowrap">
+      <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums text-muted-foreground">
         {iss != null ? formatCurrency(iss) : "-"}
       </td>
-      <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
-        {valor != null ? formatCurrency(valor) : "-"}
+      <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums text-muted-foreground">
+        {valorBruto != null ? formatCurrency(valorBruto) : "-"}
+      </td>
+      <td
+        className="px-3 py-2 text-right font-medium whitespace-nowrap tabular-nums"
+        title={temDesconto ? "Valor com desconto — é este que confere com a parcela" : undefined}
+      >
+        {valorLiquido != null ? formatCurrency(valorLiquido) : "-"}
       </td>
       <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1">

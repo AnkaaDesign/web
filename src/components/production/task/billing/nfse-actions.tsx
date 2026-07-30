@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { IconSend, IconX } from '@tabler/icons-react';
+import { IconRefresh, IconSend, IconX } from '@tabler/icons-react';
 import { toast } from '@/components/ui/sonner';
-import { useEmitNfse, useCancelNfse } from '@/hooks/production/use-invoice';
+import { useEmitNfse, useCancelNfse, useReconcileNfse } from '@/hooks/production/use-invoice';
 import type { NfseDocument } from '@/types/invoice';
 import {
   Dialog,
@@ -42,6 +42,7 @@ export function NfseActions({ invoiceId, nfseDocuments, canManage = true }: Nfse
   const [cancelSubstituteNumber, setCancelSubstituteNumber] = useState('');
   const emitNfse = useEmitNfse();
   const cancelNfse = useCancelNfse();
+  const reconcileNfse = useReconcileNfse();
 
   // Substitute NF number is required by the prefeitura for Duplicidade (code 4)
   const substituteRequired = cancelReasonCode === '4';
@@ -62,6 +63,18 @@ export function NfseActions({ invoiceId, nfseDocuments, canManage = true }: Nfse
   const hasAnyNfse = (nfseDocuments?.length ?? 0) > 0;
   const canEmit = !hasAnyNfse || !!errorOrPendingNfse || allCancelled;
   const canCancel = !!authorizedNfse;
+
+  // A doc left in PROCESSING is the one state with no way out: emission is a
+  // non-transactional POST, so a crash between the request and the response leaves the
+  // note possibly live at the prefeitura with no local link. "Emitir" refuses a
+  // PROCESSING doc on purpose (it must never double-emit), so before this button the
+  // panel rendered no actions at all and the invoice was stuck. Reconciling reads the
+  // prefeitura's live state and links or rewinds — it never emits.
+  const stuckNfse =
+    nfseDocuments?.find((d) => d.status === 'PROCESSING') ??
+    nfseDocuments?.find((d) => d.status === 'ERROR') ??
+    null;
+  const canReconcile = !!stuckNfse;
 
   const handleEmit = () => {
     emitNfse.mutate(invoiceId);
@@ -108,11 +121,48 @@ export function NfseActions({ invoiceId, nfseDocuments, canManage = true }: Nfse
     );
   };
 
-  if (!canManage || (!canEmit && !canCancel)) return null;
+  const handleReconcile = () => {
+    reconcileNfse.mutate(invoiceId, {
+      onSuccess: (result: any) => {
+        const message = result?.message ?? result?.data?.message;
+        // AMBIGUOUS comes back success=false: two live notes tie and a human must pick,
+        // so it must not read as "resolved".
+        if (result?.success === false) {
+          toast.error(message ?? 'A reconciliação precisa de conferência manual.');
+        } else {
+          toast.success(message ?? 'NFS-e reconciliada.');
+        }
+      },
+      onError: (error: any) => {
+        toast.error(
+          error?.response?.data?.message ?? 'Não foi possível reconciliar a NFS-e.',
+        );
+      },
+    });
+  };
+
+  if (!canManage || (!canEmit && !canCancel && !canReconcile)) return null;
 
   return (
     <>
       <div className="flex items-center gap-1">
+        {canReconcile && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleReconcile}
+            disabled={reconcileNfse.isPending}
+            title={
+              stuckNfse?.status === 'PROCESSING'
+                ? 'Verificar na prefeitura e destravar (não emite nota nova)'
+                : 'Reconciliar NFS-e com a prefeitura'
+            }
+            className="h-7 w-7 p-0"
+          >
+            <IconRefresh className={`h-4 w-4 ${reconcileNfse.isPending ? 'animate-spin' : ''}`} />
+          </Button>
+        )}
+
         {canEmit && (
           <Button
             variant="ghost"

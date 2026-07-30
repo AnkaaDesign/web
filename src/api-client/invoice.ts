@@ -61,6 +61,15 @@ export const invoiceService = {
   emitNfse: (invoiceId: string) =>
     apiClient.post(`/invoices/${invoiceId}/nfse/emit`),
 
+  // Reconcile an NFS-e stranded in PROCESSING/ERROR against the prefeitura's live state.
+  // Links a note that already exists, or rewinds to pending — never emits.
+  reconcileNfse: (invoiceId: string) =>
+    apiClient.post(`/invoices/${invoiceId}/nfse/reconcile`),
+
+  // Register this invoice's still-unregistered (CREATING/ERROR) bank slips at Sicredi now.
+  registerInvoiceBoletos: (invoiceId: string) =>
+    apiClient.post(`/invoices/${invoiceId}/boletos/register`),
+
   // Get NFS-e PDF
   getNfsePdf: (invoiceId: string) =>
     apiClient.get(`/invoices/${invoiceId}/nfse/pdf`, { responseType: 'blob' }),

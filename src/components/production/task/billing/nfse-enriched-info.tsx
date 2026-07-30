@@ -68,10 +68,31 @@ export function NfseEnrichedInfo({ elotechNfseId, showPdfLink = false }: NfseEnr
             <p className="text-xs font-semibold">{formatDate(formDados.dataEmissao)}</p>
           </div>
         )}
-        {formTotal.totalNfse != null && (
+        {/* Gross and net split out: with a discount they differ, and only the NET value
+            matches the invoice total and the parcela. A single "Valor" showing the gross
+            made the note read as if it disagreed with its own installment.
+            Careful with the naming — this DETAIL payload inverts the list's convention:
+            `totalNfse` is the GROSS figure and `valorLiquidoNfse` is the net. Gross is
+            only rendered when it actually differs, so notes without a discount stay
+            uncluttered. */}
+        {formTotal.totalNfse != null &&
+          formTotal.valorLiquidoNfse != null &&
+          Math.abs(Number(formTotal.totalNfse) - Number(formTotal.valorLiquidoNfse)) >= 0.01 && (
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Valor Bruto</p>
+              <p className="text-xs font-semibold text-muted-foreground tabular-nums">
+                {formatCurrency(formTotal.totalNfse)}
+              </p>
+            </div>
+          )}
+        {(formTotal.valorLiquidoNfse ?? formTotal.totalNfse) != null && (
           <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-medium">Valor</p>
-            <p className="text-xs font-semibold">{formatCurrency(formTotal.totalNfse)}</p>
+            <p className="text-[10px] text-muted-foreground uppercase font-medium">
+              Valor Líquido
+            </p>
+            <p className="text-xs font-semibold tabular-nums">
+              {formatCurrency(formTotal.valorLiquidoNfse ?? formTotal.totalNfse)}
+            </p>
           </div>
         )}
         {formImposto.valorIss != null && (

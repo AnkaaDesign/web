@@ -181,12 +181,32 @@ const nfseColumns: StandardizedColumn<ElotechNfseListItem>[] = [
       </div>
     ),
   },
+  // Gross and net are separate columns because a discount makes them differ, and only
+  // the NET figure matches the invoice total and the parcela. A single "Valor" column
+  // carrying `valorDoc` made the note read as if it disagreed with its own installment.
   {
     key: "valorDoc",
-    header: "Valor",
+    header: "Valor Bruto",
     accessor: (item) => (
-      <span className="font-medium">{formatCurrency(item.valorDoc)}</span>
+      <span className="text-muted-foreground tabular-nums">
+        {formatCurrency(item.valorDoc)}
+      </span>
     ),
+    align: "right",
+  },
+  {
+    key: "valorLiquidoNota",
+    header: "Valor Líquido",
+    accessor: (item) => {
+      const net = item.valorLiquidoNota ?? item.valorServico ?? item.valorDoc;
+      const hasDiscount =
+        item.valorDoc != null && net != null && Math.abs(item.valorDoc - net) >= 0.01;
+      return (
+        <span className="font-semibold tabular-nums" title={hasDiscount ? 'Valor com desconto — é este que confere com a parcela' : undefined}>
+          {formatCurrency(net)}
+        </span>
+      );
+    },
     align: "right",
   },
   {

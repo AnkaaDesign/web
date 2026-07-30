@@ -138,6 +138,34 @@ export function useEmitNfse() {
   });
 }
 
+// Reconcile an NFS-e stuck in PROCESSING/ERROR against the prefeitura's live state.
+// Emission is a non-transactional POST, so a crash mid-flight can leave a live note with
+// no local link. This asks the prefeitura what actually exists and resolves accordingly —
+// it never emits, so it cannot mint a duplicate note.
+export function useReconcileNfse() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (invoiceId: string) => invoiceService.reconcileNfse(invoiceId),
+    onSuccess: () => {
+      invalidateAllBillingCaches(queryClient);
+    },
+  });
+}
+
+// Register the invoice's still-unregistered bank slips at Sicredi now, instead of waiting
+// for the sweep that only runs within 5 days of the due date.
+export function useRegisterInvoiceBoletos() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (invoiceId: string) => invoiceService.registerInvoiceBoletos(invoiceId),
+    onSuccess: () => {
+      invalidateAllBillingCaches(queryClient);
+    },
+  });
+}
+
 // Cancel NFS-e — registers an async cancellation request at the prefeitura.
 // `substituteNfseNumber` is forwarded through (required when reasonCode=4 / Duplicidade).
 // Returns the CancelNfseResult so callers can surface result.message and the pending/rejected flags.
