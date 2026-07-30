@@ -524,6 +524,8 @@ const EmployeeCostCalculatorPage = lazy(() => import("@/pages/tools/employee-cos
 const NotesPage = lazy(() => import("@/pages/tools/notes"));
 const PaintMixCalculatorPage = lazy(() => import("@/pages/tools/paint-mix-calculator"));
 const WasteCertificateToolPage = lazy(() => import("@/pages/tools/waste-certificate").then((module) => ({ default: module.WasteCertificateToolPage })));
+// Truck Studio — unlisted, under construction (no menu entry, no hub card)
+const TruckStudioPage = lazy(() => import("@/pages/tools/truck-studio").then((module) => ({ default: module.TruckStudioPage })));
 
 function App() {
   // Initialize web notifications
@@ -3669,6 +3671,15 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <NotesPage />
+                    </Suspense>
+                  }
+                />
+                {/* Truck Studio — unlisted URL, ADMIN only (see route-privileges) */}
+                <Route
+                  path={routes.tools.truckStudio.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <TruckStudioPage />
                     </Suspense>
                   }
                 />

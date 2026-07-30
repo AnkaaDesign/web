@@ -821,6 +821,11 @@ export const routes = {
     notes: {
       root: "/ferramentas/notas",
     },
+    // Truck Studio — 3D configurator under construction. Deliberately NOT in
+    // the navigation menu nor on the Ferramentas hub: reachable by URL only.
+    truckStudio: {
+      root: "/ferramentas/teste",
+    },
   },
 
   // Users - Alias for administration users (collaborators) for backward compatibility

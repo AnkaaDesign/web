@@ -335,6 +335,8 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/ferramentas/paleta": ["ADMIN"],
   // Certificado de Resíduos — ADMIN + ACCOUNTING
   "/ferramentas/certificado-residuos": ["ADMIN", "ACCOUNTING"],
+  // Truck Studio (unlisted, under construction) — ADMIN only
+  "/ferramentas/teste": ["ADMIN"],
 
   // Fallback patterns (for broader route matching)
   "/administracao/*": "ADMIN",

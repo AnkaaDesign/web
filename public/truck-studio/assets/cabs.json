@@ -1,0 +1,12 @@
+{ "cabs": [
+  { "id": "scania", "name": "Scania S730", "file": "assets/scania.glb",
+    "paintMaterials": ["carpaint"], "wheelMeshRegex": "tire|rim",
+    "dims": {"height": 3.98, "length": 6.007, "width": 2.932},
+    "fifthwheel": {"z": 1.335, "topY": 1.151},
+    "rearBodyZ": 3.22 },
+  { "id": "volvo", "name": "Volvo FH16 750", "file": "assets/volvo.glb",
+    "paintMaterials": ["carpaint"], "wheelMeshRegex": "tire|rim",
+    "dims": {"height": 4.02, "length": 6.006, "width": 2.791},
+    "fifthwheel": {"z": 1.664, "topY": 1.089},
+    "rearBodyZ": 3.285 }
+] }
