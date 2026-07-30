@@ -53,6 +53,11 @@ const LIST_INCLUDE = {
 // Payment workflow (contas a pagar) — financial-only; WAREHOUSE never settles payments.
 const PAYMENT_MANAGERS = [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ACCOUNTING];
 
+// Statuses an order can be received from: it must already be marked as done (fulfilled).
+// OVERDUE is included because it's a timing flag — its items can be fulfilled while the
+// order-level status stays OVERDUE; the API re-checks fulfilledAt per item either way.
+const RECEIVABLE_STATUSES: ORDER_STATUS[] = [ORDER_STATUS.FULFILLED, ORDER_STATUS.PARTIALLY_RECEIVED, ORDER_STATUS.OVERDUE];
+
 // The API caps `limit` at 100, so the list is server-paginated (page/limit/sort/filters all go to the
 // server). Page + sort ride the URL the DataTable writes in server mode; search + filters arrive via
 // `onParamsChange`.
@@ -281,7 +286,8 @@ export function OrderTablePage() {
         key: "mark-fulfilled",
         label: "Marcar como feito",
         icon: <IconCheck className="h-4 w-4" />,
-        requiredPrivilege: SECTOR_PRIVILEGES.WAREHOUSE,
+        // ADMIN gate: fulfillment is the purchasing-side confirmation with the supplier.
+        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
         // Shown whenever at least one selected order can still be fulfilled (CREATED).
         hidden: (rows) => !rows.some((o) => o.status === ORDER_STATUS.CREATED),
         onClick: (rows) =>
@@ -295,14 +301,11 @@ export function OrderTablePage() {
         label: "Marcar como recebido",
         icon: <IconChecks className="h-4 w-4" />,
         requiredPrivilege: SECTOR_PRIVILEGES.WAREHOUSE,
-        // Shown whenever at least one selected order is not already received/cancelled.
-        hidden: (rows) =>
-          !rows.some((o) => o.status !== ORDER_STATUS.RECEIVED && o.status !== ORDER_STATUS.CANCELLED),
-        onClick: (rows) =>
-          void runStatusUpdate(
-            rows.filter((o) => o.status !== ORDER_STATUS.RECEIVED && o.status !== ORDER_STATUS.CANCELLED),
-            ORDER_STATUS.RECEIVED,
-          ),
+        // Only orders already marked as done can be received — a CREATED draft has no
+        // fulfilled items and the API rejects it. Previously this targeted every
+        // non-received/non-cancelled row, so selecting a draft produced a per-row failure.
+        hidden: (rows) => !rows.some((o) => RECEIVABLE_STATUSES.includes(o.status)),
+        onClick: (rows) => void runStatusUpdate(rows.filter((o) => RECEIVABLE_STATUSES.includes(o.status)), ORDER_STATUS.RECEIVED),
       },
       {
         key: "cancel",

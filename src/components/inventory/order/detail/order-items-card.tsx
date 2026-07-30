@@ -71,7 +71,7 @@ interface SelectedItems {
 
 export function OrderItemsCard({ order, className, onOrderUpdate, orderActions = [], embedded = false }: OrderItemsCardProps) {
   const canViewPrices = useCanViewPrices();
-  const { isWarehouse } = usePrivileges();
+  const { isAdmin } = usePrivileges();
   const { batchUpdate } = useOrderItemBatchMutations({
     onBatchUpdateSuccess: () => {
       toast.success("Quantidades recebidas atualizadas com sucesso!");
@@ -98,8 +98,10 @@ export function OrderItemsCard({ order, className, onOrderUpdate, orderActions =
 
   // Check if order allows inline editing
   const canEditItems = [ORDER_STATUS.CREATED, ORDER_STATUS.PARTIALLY_FULFILLED, ORDER_STATUS.FULFILLED, ORDER_STATUS.PARTIALLY_RECEIVED].includes(order.status);
-  // WAREHOUSE can mark items as fulfilled but cannot mark them as received (close the order).
-  const canReceiveItems = canEditItems && !isWarehouse;
+  // WAREHOUSE receives items into stock; marking them as done (fulfilled) is the
+  // purchasing-side confirmation and is ADMIN-only, matching the API's role gates.
+  const canReceiveItems = canEditItems;
+  const canFulfillItems = canEditItems && isAdmin;
 
   // Check if there are unsaved changes
   const hasChanges = useMemo(() => {
@@ -473,10 +475,12 @@ export function OrderItemsCard({ order, className, onOrderUpdate, orderActions =
             <>
               {selectedCount > 0 && (
                 <>
-                  <Button size="sm" className={ACTION_TONE_CLASS.blue} onClick={handleBatchMarkFulfilled} disabled={isSaving}>
-                    <IconShoppingCart className="mr-2 h-4 w-4" />
-                    Marcar Selecionados como Feito ({selectedCount})
-                  </Button>
+                  {canFulfillItems && (
+                    <Button size="sm" className={ACTION_TONE_CLASS.blue} onClick={handleBatchMarkFulfilled} disabled={isSaving}>
+                      <IconShoppingCart className="mr-2 h-4 w-4" />
+                      Marcar Selecionados como Feito ({selectedCount})
+                    </Button>
+                  )}
                   {canReceiveItems && (
                     <Button size="sm" className={ACTION_TONE_CLASS.green} onClick={handleBatchMarkReceived} disabled={isSaving}>
                       <IconTruck className="mr-2 h-4 w-4" />

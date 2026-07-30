@@ -190,7 +190,8 @@ export function OrderDetailPage() {
     }
 
     const list: Array<{ key: string; label: string; icon?: any; tone?: "blue" | "green"; onClick: () => void }> = [];
-    if (canManageWarehouse && isInFulfillmentPhase && order.status !== ORDER_STATUS.CANCELLED) {
+    // Fulfilling confirms the order with the supplier — ADMIN only (the API 403s WAREHOUSE).
+    if (isAdmin && isInFulfillmentPhase && order.status !== ORDER_STATUS.CANCELLED) {
       list.push({
         key: "fulfill",
         label: "Marcar como Feito",
@@ -211,12 +212,14 @@ export function OrderDetailPage() {
         },
       });
     }
+    // Receiving takes the goods into stock — the warehouse's job. `isInReceivingPhase` already
+    // requires the order to be fulfilled first, which the API now enforces server-side too.
     if (canManageWarehouse && isInReceivingPhase && order.status !== ORDER_STATUS.RECEIVED && order.status !== ORDER_STATUS.CANCELLED) {
       list.push({ key: "complete", label: "Marcar como Recebido", icon: IconCheck, tone: "green", onClick: () => setShowCompleteDialog(true) });
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order, canManageWarehouse, updateAsync]);
+  }, [order, canManageWarehouse, isAdmin, updateAsync]);
 
   // Main-field inline edits are available to order managers (WAREHOUSE/ADMIN) only while the order is
   // still open — a RECEIVED or CANCELLED order is read-only. Financial fields are gated separately by
