@@ -63,11 +63,13 @@ export const MessageDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteMessage.mutateAsync(id!);
+      setShowDeleteDialog(false);
       navigate(routes.administration.messages.root);
     } catch (error) {
+      // The axios interceptor already shows the API error as a toast; keep the
+      // dialog open so the user can retry instead of it closing as if it worked.
       console.error("Error deleting message:", error);
     }
-    setShowDeleteDialog(false);
   };
 
   const handleRefresh = () => {
@@ -372,21 +374,34 @@ export const MessageDetailsPage = () => {
       )}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          if (!open && deleteMessage.isPending) return;
+          setShowDeleteDialog(open);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Mensagem</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir esta mensagem? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir a mensagem "{message.title}"? Esta ação não pode ser
+              desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMessage.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={(e) => {
+                // Keep the dialog mounted while the request is in flight so a
+                // failure doesn't dismiss it as if the delete had succeeded.
+                e.preventDefault();
+                void handleDelete();
+              }}
+              disabled={deleteMessage.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Excluir
+              {deleteMessage.isPending ? "Excluindo..." : "Excluir"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

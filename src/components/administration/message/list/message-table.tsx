@@ -17,6 +17,16 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   IconChevronUp,
   IconChevronDown,
   IconSelector,
@@ -73,13 +83,27 @@ const STATUS_VARIANTS: Record<string, "secondary" | "active" | "pending" | "expi
   ARCHIVED: "muted",
 };
 
+/** API returns uppercase statuses (DRAFT/SCHEDULED/ACTIVE/EXPIRED/ARCHIVED) while the
+ *  local `MessageStatus` type is lowercase — normalise before comparing. */
+const statusOf = (message: Message) => String(message.status ?? "").toUpperCase();
+
+type ConfirmAction = {
+  type: "delete" | "archive" | "activate";
+  items: Message[];
+};
+
 export function MessageTable({
   filters,
   onDataChange,
   className,
 }: MessageTableProps) {
   const navigate = useNavigate();
-  const { delete: deleteMessage, archive: archiveMessage, activate: activateMessage } = useMessageMutations();
+  const {
+    delete: deleteMessage,
+    batchDelete: batchDeleteMessages,
+    archive: archiveMessage,
+    activate: activateMessage,
+  } = useMessageMutations();
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -114,6 +138,11 @@ export function MessageTable({
     items: Message[];
     isBulk: boolean;
   } | null>(null);
+
+  // Confirmation dialog state for destructive / status-changing actions.
+  // Replaces the browser's native confirm() so the prompt matches the app's UI.
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   // Memoize query parameters
   const queryParams = useMemo(() => {
@@ -315,35 +344,90 @@ export function MessageTable({
     }
   };
 
-  const handleArchive = async () => {
+  const handleArchive = () => {
     if (contextMenu?.items[0]) {
-      if (confirm("Deseja arquivar esta mensagem?")) {
-        await archiveMessage.mutateAsync(contextMenu.items[0].id);
-      }
+      setConfirmAction({ type: "archive", items: [contextMenu.items[0]] });
       setContextMenu(null);
     }
   };
 
-  const handleActivate = async () => {
+  const handleActivate = () => {
     if (contextMenu?.items[0]) {
-      if (confirm("Deseja ativar esta mensagem?")) {
-        await activateMessage.mutateAsync(contextMenu.items[0].id);
-      }
+      setConfirmAction({ type: "activate", items: [contextMenu.items[0]] });
       setContextMenu(null);
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (contextMenu) {
-      const count = contextMenu.items.length;
-      if (confirm(`Tem certeza que deseja excluir ${count > 1 ? `${count} mensagens` : "esta mensagem"}?`)) {
-        for (const item of contextMenu.items) {
-          await deleteMessage.mutate(item.id);
-        }
-      }
+      setConfirmAction({ type: "delete", items: contextMenu.items });
       setContextMenu(null);
     }
   };
+
+  const runConfirmedAction = async () => {
+    if (!confirmAction || isConfirming) return;
+
+    setIsConfirming(true);
+    try {
+      if (confirmAction.type === "delete") {
+        // Multiple messages go through the batch endpoint (one request, one toast)
+        // instead of firing N independent DELETEs.
+        if (confirmAction.items.length > 1) {
+          await batchDeleteMessages.mutateAsync({
+            ids: confirmAction.items.map((item) => item.id),
+          });
+        } else {
+          await deleteMessage.mutateAsync(confirmAction.items[0].id);
+        }
+      } else if (confirmAction.type === "archive") {
+        await archiveMessage.mutateAsync(confirmAction.items[0].id);
+      } else {
+        await activateMessage.mutateAsync(confirmAction.items[0].id);
+      }
+      setConfirmAction(null);
+    } catch (error) {
+      // The axios interceptor already surfaces the API error as a toast; keep the
+      // dialog open so the user can retry or cancel.
+      console.error("Erro ao executar ação na mensagem:", error);
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const confirmDialogCopy = (() => {
+    if (!confirmAction) return null;
+    const count = confirmAction.items.length;
+    const title = confirmAction.items[0]?.title ?? "";
+
+    if (confirmAction.type === "delete") {
+      return {
+        title: "Confirmar exclusão",
+        description:
+          count > 1
+            ? `Tem certeza que deseja excluir ${count} mensagens? Esta ação não pode ser desfeita.`
+            : `Tem certeza que deseja excluir a mensagem "${title}"? Esta ação não pode ser desfeita.`,
+        actionLabel: "Excluir",
+        destructive: true,
+      };
+    }
+
+    if (confirmAction.type === "archive") {
+      return {
+        title: "Arquivar mensagem",
+        description: `Tem certeza que deseja arquivar a mensagem "${title}"? Ela deixará de ser exibida aos usuários.`,
+        actionLabel: "Arquivar",
+        destructive: false,
+      };
+    }
+
+    return {
+      title: "Ativar mensagem",
+      description: `Tem certeza que deseja ativar a mensagem "${title}"? Ela passará a ser exibida aos usuários.`,
+      actionLabel: "Ativar",
+      destructive: false,
+    };
+  })();
 
   // Close context menu when clicking outside
   React.useEffect(() => {
@@ -550,21 +634,21 @@ export function MessageTable({
             Abrir em nova guia
           </DropdownMenuItem>
 
-          {contextMenu?.items.length === 1 && contextMenu.items[0].status !== 'archived' && (
+          {contextMenu?.items.length === 1 && statusOf(contextMenu.items[0]) !== 'ARCHIVED' && (
             <DropdownMenuItem onClick={handleEdit}>
               <IconEdit className="mr-2 h-4 w-4" />
               Editar
             </DropdownMenuItem>
           )}
 
-          {contextMenu?.items.length === 1 && contextMenu.items[0].status !== 'active' && (
+          {contextMenu?.items.length === 1 && statusOf(contextMenu.items[0]) !== 'ACTIVE' && (
             <DropdownMenuItem onClick={handleActivate}>
               <IconCheck className="mr-2 h-4 w-4" />
               Ativar
             </DropdownMenuItem>
           )}
 
-          {contextMenu?.items.length === 1 && contextMenu.items[0].status === 'active' && (
+          {contextMenu?.items.length === 1 && statusOf(contextMenu.items[0]) === 'ACTIVE' && (
             <DropdownMenuItem onClick={handleArchive}>
               <IconArchive className="mr-2 h-4 w-4" />
               Arquivar
@@ -581,6 +665,39 @@ export function MessageTable({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Confirmation Dialog (delete / archive / activate) */}
+      <AlertDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => {
+          if (!open && !isConfirming) setConfirmAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialogCopy?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmDialogCopy?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isConfirming}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                // Keep the dialog mounted while the request is in flight so a
+                // failure doesn't dismiss it silently.
+                e.preventDefault();
+                void runConfirmedAction();
+              }}
+              disabled={isConfirming}
+              className={cn(
+                confirmDialogCopy?.destructive &&
+                  "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              )}
+            >
+              {isConfirming ? "Aguarde..." : confirmDialogCopy?.actionLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
