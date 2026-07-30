@@ -142,12 +142,38 @@ export const signatureService = {
     const win = window.open(url, "_blank", "noopener");
     if (!win) {
       // Bloqueador de pop-up: cai para download.
+      //
+      // O nome vem do `Content-Disposition` que a rota manda (razão social +
+      // "Orçamento" + número), e NÃO é remontado aqui: quem chama esta função
+      // tem o id do envelope e mais nada — era por isso que o fallback gravava
+      // `orcamento-assinado-3f2a1b8c.pdf`, um nome que não dizia de quem era o
+      // orçamento nem qual era o número.
       const a = document.createElement("a");
       a.href = url;
-      a.download = `orcamento-assinado-${envelopeId.slice(0, 8)}.pdf`;
+      a.download = filenameFromDisposition(res?.headers?.["content-disposition"]) ?? "Orçamento.pdf";
       a.click();
     }
     // Revoga depois que o navegador teve tempo de carregar.
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   },
 };
+
+/**
+ * Nome de arquivo anunciado pelo servidor no `Content-Disposition`.
+ *
+ * `filename*` primeiro: é o parâmetro que carrega UTF-8 (RFC 5987), e razão
+ * social brasileira tem acento. O `filename=` puro é o recuo, e vem sem acento
+ * por construção — a especificação o define como ISO-8859-1.
+ */
+function filenameFromDisposition(header: unknown): string | null {
+  if (typeof header !== "string") return null;
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (utf8?.[1]) {
+    try {
+      return decodeURIComponent(utf8[1].trim());
+    } catch {
+      /* cai para o filename simples */
+    }
+  }
+  return /filename="([^"]+)"/i.exec(header)?.[1] ?? null;
+}

@@ -6,6 +6,7 @@ import { getApiBaseUrl } from "@/utils/file";
 import { setPricingVisible } from "@/utils/pricing-visibility";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { projectInstallments } from "@/utils/installment-projection";
+import { dossierArchiveFilename, dossierPdfFilename } from "@/utils/document-filename";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -14,6 +15,7 @@ import { IconLoader2, IconAlertCircle, IconBrandWhatsapp, IconCopy, IconPhoto, I
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
+import { BudgetSignaturePanel } from "@/components/public/budget-signature-panel";
 
 const COMPANY = { ...COMPANY_INFO, ...BRAND_COLORS };
 
@@ -121,7 +123,6 @@ export function PublicServiceReportPage() {
   }
 
   // Derived data
-  const corporateName = quote.task?.customer?.corporateName || quote.task?.customer?.fantasyName || "Cliente";
   const activeConfig = quote.customerConfigs?.find((c: any) => configCustomerId(c) === selectedCustomerId) || quote.customerConfigs?.[0];
   const budgetNumber = quote.budgetNumber ? String(quote.budgetNumber).padStart(4, "0") : "0000";
   const ownerResponsible = quote.task?.responsibles?.find((r: any) => r.roles?.includes('OWNER'));
@@ -312,7 +313,11 @@ export function PublicServiceReportPage() {
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = href;
-      a.download = `${corporateName} - ${quote.task?.serialNumber || budgetNumber}.pdf`;
+      // O número é o do ORÇAMENTO, não o `serialNumber`: a série identifica o
+      // implemento, e usá-la aqui fazia dois documentos do mesmo cliente
+      // chegarem numerados por sistemas diferentes. O .zip logo abaixo leva o
+      // MESMO nome, só com outra extensão.
+      a.download = dossierPdfFilename(quote.task?.customer, quote.budgetNumber);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -388,7 +393,7 @@ export function PublicServiceReportPage() {
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `dossie-${budgetNumber}.zip`;
+      a.download = dossierArchiveFilename(quote.task?.customer, quote.budgetNumber);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -452,19 +457,25 @@ export function PublicServiceReportPage() {
                     </button>
                   </PopoverContent>
                 </Popover>
+                {/* Mesmo cabeçalho do documento assinado: número em VERDE da
+                    marca, datas em cinza com rótulo em negrito escuro. */}
                 <div className="text-right">
-                  <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+                  <h1
+                    className="text-xl md:text-2xl font-bold"
+                    style={{ color: COMPANY.primaryGreen }}
+                  >
                     Dossiê Nº {budgetNumber}
                   </h1>
-                  <p className="text-sm text-gray-600 mt-1">
-                    <span className="font-semibold">Emissão:</span> {formatDate(new Date())}
+                  <p className="text-sm mt-1 leading-relaxed" style={{ color: COMPANY.textGray }}>
+                    <span className="font-semibold" style={{ color: COMPANY.textDark }}>Emissão:</span>{' '}
+                    {formatDate(new Date())}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Green divider */}
-            <div className="h-px mb-8" style={{ background: `linear-gradient(to right, #888 0%, ${COMPANY.primaryGreen} 30%)` }} />
+            {/* Régua de 2 px verde maciço, como `.header-line` no PDF. */}
+            <div className="mb-8" style={{ height: 2, backgroundColor: COMPANY.primaryGreen }} />
 
             {/* Title */}
             <h2 className="text-xl font-bold underline underline-offset-4 mb-6" style={{ color: COMPANY.primaryGreen }}>
@@ -473,12 +484,14 @@ export function PublicServiceReportPage() {
 
             {/* Customer + Vehicle Info */}
             <div className="mb-6">
+              {/* "À Fulano" em PRETO semibold, como `.customer-name` no PDF —
+                  em verde ele lia como título de seção. */}
               {contactName && (
-                <p className="font-bold mb-1" style={{ color: COMPANY.primaryGreen }}>
+                <p className="font-semibold mb-1" style={{ color: COMPANY.textDark }}>
                   À {contactName}
                 </p>
               )}
-              <p className="text-gray-700">
+              <p className="text-gray-700 text-justify">
                 Prezado(a) cliente, segue o dossiê referente aos serviços realizados
                 {invoiceCustomers.length > 0 && (
                   <>
@@ -540,8 +553,15 @@ export function PublicServiceReportPage() {
                       const invoiceToName =
                         svc.invoiceToCustomer?.corporateName || svc.invoiceToCustomer?.fantasyName;
 
+                      // Filete pontilhado sob cada serviço, exceto o último —
+                      // mesma regra de `.service-row` no PDF.
+                      const isLast = i === services.length - 1;
                       return (
-                        <tr key={svc.id || i} className="align-top">
+                        <tr
+                          key={svc.id || i}
+                          className="align-top"
+                          style={isLast ? undefined : { borderBottom: "0.5px dotted #ccc" }}
+                        >
                           <td className="text-gray-800 py-1 pr-2">
                             {i + 1} - {displayDesc}
                           </td>
@@ -550,7 +570,7 @@ export function PublicServiceReportPage() {
                               {invoiceToName || '-'}
                             </td>
                           )}
-                          <td className="text-gray-800 font-normal whitespace-nowrap text-right py-1">
+                          <td className="text-gray-800 font-semibold whitespace-nowrap text-right py-1">
                             {formatCurrency(amount)}
                           </td>
                         </tr>
@@ -570,8 +590,11 @@ export function PublicServiceReportPage() {
                       <span className="text-gray-800 font-medium">{formatCurrency(c.total)}</span>
                     </div>
                   ))}
-                  <div className="flex justify-between items-baseline pt-2 border-t border-gray-200">
-                    <span className="font-bold text-gray-900">Total</span>
+                  <div
+                    className="flex justify-between items-baseline pt-2"
+                    style={{ borderTop: `1.5px solid ${COMPANY.primaryGreen}` }}
+                  >
+                    <span className="font-bold" style={{ color: COMPANY.primaryGreen }}>Total</span>
                     <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
                       {formatCurrency(total)}
                     </span>
@@ -585,21 +608,25 @@ export function PublicServiceReportPage() {
                         <span className="text-gray-700">Subtotal</span>
                         <span className="text-gray-800">{formatCurrency(subtotal)}</span>
                       </div>
-                      <div className="flex justify-between items-baseline text-red-600">
-                        <span>
+                      {/* Rótulo em cor normal, só o VALOR em vermelho — é o que
+                          `.total-row-discount .total-value` faz no PDF. */}
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-gray-700">
                           {configDiscountType === 'PERCENTAGE' && configDiscountValue
                             ? `Desconto (${configDiscountValue}%)`
                             : 'Desconto'}
-                          {activeConfig?.discountReference && (
-                            <span className="text-gray-500 text-sm"> — {activeConfig.discountReference}</span>
-                          )}
+                          {activeConfig?.discountReference && <> — {activeConfig.discountReference}</>}
                         </span>
-                        <span>- {formatCurrency(discountAmount)}</span>
+                        <span className="text-red-600">- {formatCurrency(discountAmount)}</span>
                       </div>
                     </>
                   )}
-                  <div className={`flex justify-between items-baseline ${hasDiscount ? 'pt-2 border-t border-gray-200' : ''}`}>
-                    <span className="font-bold text-gray-900">Total</span>
+                  {/* Régua VERDE sobre o Total, como `.total-row-final` no PDF. */}
+                  <div
+                    className="flex justify-between items-baseline pt-2"
+                    style={{ borderTop: `1.5px solid ${COMPANY.primaryGreen}` }}
+                  >
+                    <span className="font-bold" style={{ color: COMPANY.primaryGreen }}>Total</span>
                     <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
                       {formatCurrency(total)}
                     </span>
@@ -654,24 +681,45 @@ export function PublicServiceReportPage() {
               </div>
             )}
 
-            {/* Layout Image(s) — the layoutFiles array */}
+            {/* Layout Image(s) — the layoutFiles array. Título "Layout" e
+                imagens sem moldura, como `.layout-section` no PDF (105 mm de
+                altura máxima ≈ 397 px). */}
             {layoutImageUrls.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
-                  Layout aprovado
+                  Layout
                 </h3>
-                <div className="w-full space-y-4">
+                <div className="flex w-full flex-col items-center gap-4">
                   {layoutImageUrls.map((url, i) => (
-                    <img key={i} src={url} alt="Layout aprovado" className="w-full h-auto rounded-lg shadow-md" />
+                    <img
+                      key={i}
+                      src={url}
+                      alt="Layout"
+                      className="max-w-full h-auto object-contain"
+                      style={{ maxHeight: 397 }}
+                    />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Footer */}
+            {/* Assinaturas — a seção que faltava.
+                O dossiê embute, como primeiro componente, o PDF do orçamento,
+                que SEMPRE traz a folha de assinaturas (com selo quando houve
+                coleta e com as linhas em branco quando não houve). Esta página
+                era o único lugar do fluxo que a omitia: o cliente lia o dossiê
+                na tela, baixava o PDF e encontrava uma seção que a tela nunca
+                mostrou. É o mesmo componente da página do orçamento porque, nos
+                dois casos, o documento por baixo é o mesmo. */}
+            <BudgetSignaturePanel
+              quoteId={quote.id}
+              customerName={invoiceCustomers[0]?.name || undefined}
+            />
+
+            {/* Rodapé: régua de 2 px verde maciço, espelhando a do cabeçalho. */}
             <div
-              className="pt-4 mt-8 border-t"
-              style={{ borderImage: `linear-gradient(to right, #888 0%, ${COMPANY.primaryGreen} 30%) 1` }}
+              className="pt-4 mt-8"
+              style={{ borderTop: `2px solid ${COMPANY.primaryGreen}` }}
             >
               <p className="font-bold" style={{ color: COMPANY.primaryGreen }}>{COMPANY.name}</p>
               <p className="text-sm text-gray-600">{COMPANY.address}</p>
@@ -702,7 +750,7 @@ export function PublicServiceReportPage() {
                   <p className="text-sm text-gray-600 mt-1"><span className="font-semibold">Emissão:</span> {formatDate(new Date())}</p>
                 </div>
               </div>
-              <div className="h-px mb-8" style={{ background: `linear-gradient(to right, #888 0%, ${COMPANY.primaryGreen} 30%)` }} />
+              <div className="mb-8" style={{ height: 2, backgroundColor: COMPANY.primaryGreen }} />
 
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: COMPANY.primaryGreen }}>
                 <IconPhoto className="h-5 w-5" />
@@ -751,7 +799,7 @@ export function PublicServiceReportPage() {
               </div>
 
               {/* Footer */}
-              <div className="pt-4 mt-8 border-t" style={{ borderImage: `linear-gradient(to right, #888 0%, ${COMPANY.primaryGreen} 30%) 1` }}>
+              <div className="pt-4 mt-8" style={{ borderTop: `2px solid ${COMPANY.primaryGreen}` }}>
                 <p className="font-bold" style={{ color: COMPANY.primaryGreen }}>{COMPANY.name}</p>
                 <p className="text-sm text-gray-600">{COMPANY.address}</p>
                 <p className="text-sm"><a href={whatsappLink} target="_blank" rel="noopener noreferrer" style={{ color: COMPANY.primaryGreen }} className="hover:underline">{COMPANY.phone.startsWith('(') ? COMPANY.phone : COMPANY.phone.replace(/^(\d{2})\s/, '($1) ')}</a></p>

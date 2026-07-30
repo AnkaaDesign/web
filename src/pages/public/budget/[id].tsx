@@ -5,6 +5,7 @@ import { formatCurrency, formatDate, toTitleCase, formatCNPJ } from "@/utils";
 import { getApiBaseUrl } from "@/utils/file";
 import { setPricingVisible } from "@/utils/pricing-visibility";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
+import { budgetPdfFilename } from "@/utils/document-filename";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -202,10 +203,16 @@ export function PublicBudgetPage() {
   const budgetNumber = quote.budgetNumber
     ? String(quote.budgetNumber).padStart(4, '0')
     : quote.task?.serialNumber || "0000";
-  // Calculate validity in days (budget expiration, NOT delivery time)
-  const validityDays = quote.expiresAt
-    ? Math.max(0, Math.round((new Date(quote.expiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
-    : 30;
+  /**
+   * Validade como DATA ABSOLUTA, igual ao documento assinado.
+   *
+   * Aqui se imprimia "Validade: N dias", recalculado contra `new Date()` a cada
+   * carregamento, virando um "Vencido" vermelho quando N chegava a zero — ou
+   * seja, a página dizia uma coisa hoje e outra amanhã enquanto o PDF que ela
+   * oferece para download dizia "Válido até DD/MM/AAAA" e não se movia. Ver a
+   * decisão 2 no cabeçalho de `api/.../document/quote-html.builder.ts`.
+   */
+  const validUntil = quote.expiresAt ? formatDate(quote.expiresAt) : "";
   const termDate = quote.task?.term ? formatDate(quote.task.term) : "";
   // Custom delivery days (production time) - used when no term date is set
   const customDeliveryDays = quote.customForecastDays || null;
@@ -269,7 +276,7 @@ export function PublicBudgetPage() {
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement("a");
       a.href = url;
-      a.download = `orcamento-${quote?.budgetNumber ?? ""}.pdf`;
+      a.download = budgetPdfFilename(quote?.task?.customer, quote?.budgetNumber);
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
@@ -337,30 +344,33 @@ export function PublicBudgetPage() {
                     )}
                   </PopoverContent>
                 </Popover>
+                {/* Cabeçalho idêntico ao do PDF: número em VERDE da marca e as
+                    duas datas empilhadas em cinza, com os rótulos em negrito
+                    escuro. Antes o número saía cinza-escuro e as datas na mesma
+                    linha. */}
                 <div className="text-right">
-                  <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+                  <h1
+                    className="text-xl md:text-2xl font-bold"
+                    style={{ color: COMPANY.primaryGreen }}
+                  >
                     Orçamento Nº {budgetNumber}
                   </h1>
-                  <p className="text-sm text-gray-600 mt-1 flex flex-wrap justify-end gap-x-4">
-                    <span><span className="font-semibold">Emissão:</span> {formatDate(quote.createdAt)}</span>
-                    <span>
-                      <span className="font-semibold">Validade:</span>{' '}
-                      {validityDays <= 0
-                        ? <span className="font-semibold text-red-600">Vencido</span>
-                        : <>{validityDays} dias</>}
-                    </span>
+                  <p className="text-sm mt-1 leading-relaxed" style={{ color: COMPANY.textGray }}>
+                    <span className="font-semibold" style={{ color: COMPANY.textDark }}>Emissão:</span>{' '}
+                    {formatDate(quote.createdAt)}
+                    <br />
+                    <span className="font-semibold" style={{ color: COMPANY.textDark }}>Válido até:</span>{' '}
+                    {validUntil}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Green divider */}
-            <div
-              className="h-px mb-8"
-              style={{
-                background: `linear-gradient(to right, #888 0%, ${COMPANY.primaryGreen} 30%)`,
-              }}
-            />
+            {/* Régua do cabeçalho: 2 px VERDE MACIÇO, como `.header-line` no PDF.
+                O degradê cinza→verde de 1 px que existia aqui não tem par
+                nenhum no documento — e o rodapé abaixo espelha esta régua,
+                de modo que a folha tem exatamente duas divisórias. */}
+            <div className="mb-8" style={{ height: 2, backgroundColor: COMPANY.primaryGreen }} />
 
             {/* Title */}
             <h2
@@ -370,12 +380,15 @@ export function PublicBudgetPage() {
               ORÇAMENTO
             </h2>
 
-            {/* Customer Info */}
+            {/* Customer Info — "À Fulano" em PRETO semibold, como `.customer-name`
+                no PDF. Em verde ele lia como um título de seção, que não é. */}
             <div className="mb-6">
-              <p className="font-bold mb-1" style={{ color: COMPANY.primaryGreen }}>
-                {contactName ? `À ${contactName}` : ''}
-              </p>
-              <p className="text-gray-700">
+              {contactName && (
+                <p className="font-semibold mb-1" style={{ color: COMPANY.textDark }}>
+                  À {contactName}
+                </p>
+              )}
+              <p className="text-gray-700 text-justify">
                 Conforme solicitado, apresentamos nossa proposta de preço
                 {invoiceName ? (
                   <>
@@ -437,8 +450,16 @@ export function PublicBudgetPage() {
                     const amount = Number(service.amount) || 0;
                     const svc = service as any;
                     const invoiceToName = svc.invoiceToCustomer?.corporateName || svc.invoiceToCustomer?.fantasyName;
+                    // Filete pontilhado sob cada serviço, exceto o último — a
+                    // mesma regra de `.service-row` no PDF, onde a última linha
+                    // o dispensa porque logo abaixo vem a régua dos totais.
+                    const isLast = index === filteredServices.length - 1;
                     return (
-                      <tr key={service.id} className="align-top">
+                      <tr
+                        key={service.id}
+                        className="align-top"
+                        style={isLast ? undefined : { borderBottom: "0.5px dotted #ccc" }}
+                      >
                         <td className="text-gray-800 py-1 pr-2">
                           {index + 1} - {displayText}
                         </td>
@@ -447,7 +468,7 @@ export function PublicBudgetPage() {
                             {invoiceToName || '-'}
                           </td>
                         )}
-                        <td className="text-gray-800 font-normal whitespace-nowrap text-right py-1">
+                        <td className="text-gray-800 font-semibold whitespace-nowrap text-right py-1">
                           {formatCurrency(amount)}
                         </td>
                       </tr>
@@ -471,8 +492,11 @@ export function PublicBudgetPage() {
                       </div>
                     );
                   })}
-                  <div className="flex justify-between items-baseline pt-2 border-t border-gray-200">
-                    <span className="font-bold text-gray-900">Total</span>
+                  <div
+                    className="flex justify-between items-baseline pt-2"
+                    style={{ borderTop: `1.5px solid ${COMPANY.primaryGreen}` }}
+                  >
+                    <span className="font-bold" style={{ color: COMPANY.primaryGreen }}>Total</span>
                     <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
                       {formatCurrency(displayTotal)}
                     </span>
@@ -486,21 +510,29 @@ export function PublicBudgetPage() {
                         <span className="text-gray-700">Subtotal</span>
                         <span className="text-gray-800">{formatCurrency(displaySubtotal)}</span>
                       </div>
-                      <div className="flex justify-between items-baseline text-red-600">
-                        <span>
+                      {/* Rótulo em cor NORMAL e só o valor em vermelho — é o que
+                          `.total-row-discount .total-value` faz no PDF. A linha
+                          inteira vermelha lia como um erro, e não como um abatimento.
+                          O rótulo também segue a forma do documento:
+                          `Desconto (5%) — ESPECIAL`, percentual no parêntese e
+                          referência depois do travessão. */}
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-gray-700">
                           {activeConfig?.discountType === 'PERCENTAGE' && activeConfig?.discountValue
                             ? `Desconto (${activeConfig.discountValue}%)`
                             : 'Desconto'}
-                          {activeConfig?.discountReference && (
-                            <span className="text-gray-500 text-sm"> — {activeConfig.discountReference}</span>
-                          )}
+                          {activeConfig?.discountReference && <> — {activeConfig.discountReference}</>}
                         </span>
-                        <span>- {formatCurrency(computedDiscountAmount)}</span>
+                        <span className="text-red-600">- {formatCurrency(computedDiscountAmount)}</span>
                       </div>
                     </>
                   )}
-                  <div className={`flex justify-between items-baseline ${hasDiscount ? 'pt-2 border-t border-gray-200' : ''}`}>
-                    <span className="font-bold text-gray-900">Total</span>
+                  {/* Régua VERDE sobre o Total, como `.total-row-final` no PDF. */}
+                  <div
+                    className="flex justify-between items-baseline pt-2"
+                    style={{ borderTop: `1.5px solid ${COMPANY.primaryGreen}` }}
+                  >
+                    <span className="font-bold" style={{ color: COMPANY.primaryGreen }}>Total</span>
                     <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
                       {formatCurrency(displayTotal)}
                     </span>
@@ -517,10 +549,14 @@ export function PublicBudgetPage() {
                 <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
                   Prazo de entrega
                 </h3>
-                <p className="text-gray-700">
+                {/* Frase LITERAL do documento assinado — o PDF diz "Neste
+                    período, N tarefas poderão ser produzidas simultaneamente."
+                    e a página dizia "Capacidade de produção: N tarefas
+                    simultâneas.", que é outra afirmação. */}
+                <p className="text-gray-700 text-justify">
                   O prazo de entrega é de {customDeliveryDays} dias úteis a partir da data de liberação.
                   {quote.simultaneousTasks && quote.simultaneousTasks > 1 && (
-                    <> Capacidade de produção: {quote.simultaneousTasks} tarefas simultâneas.</>
+                    <> Neste período, {quote.simultaneousTasks} tarefas poderão ser produzidas simultaneamente.</>
                   )}
                 </p>
               </div>
@@ -529,7 +565,12 @@ export function PublicBudgetPage() {
                 <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
                   Prazo de entrega
                 </h3>
-                <p className="text-gray-700">
+                {/* O PDF não tem este ramo: `task.term` não entra no snapshot do
+                    orçamento, então o documento assinado só sabe imprimir o
+                    prazo em dias (`customForecastDays`). Mantido aqui porque
+                    suprimi-lo tiraria do cliente uma informação que ele precisa
+                    e que nenhum outro lugar da página dá. */}
+                <p className="text-gray-700 text-justify">
                   O prazo de entrega é de {termDate}, desde que o implemento esteja nas condições
                   previamente informada e não haja alterações nos serviços descritos.
                 </p>
@@ -611,18 +652,23 @@ export function PublicBudgetPage() {
             )}
 
             {/* Layout Image(s) - Full Width (layoutFiles array) */}
+            {/* Título "Layout" e imagens SEM moldura — `.layout-section` do PDF
+                não arredonda nem sombreia nada, e chamava a seção de "Layout".
+                As imagens são centralizadas e limitadas em altura (105 mm no
+                PDF ≈ 397 px), em vez de esticadas na largura da folha. */}
             {layoutImageUrls.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
-                  Layout referência
+                  Layout
                 </h3>
-                <div className="w-full space-y-4">
+                <div className="flex w-full flex-col items-center gap-4">
                   {layoutImageUrls.map((url, i) => (
                     <img
                       key={i}
                       src={url}
-                      alt="Layout referência"
-                      className="w-full h-auto rounded-lg shadow-md"
+                      alt="Layout"
+                      className="max-w-full h-auto object-contain"
+                      style={{ maxHeight: 397 }}
                     />
                   ))}
                 </div>
@@ -641,12 +687,11 @@ export function PublicBudgetPage() {
               onEnvelope={handleEnvelope}
             />
 
-            {/* Footer */}
+            {/* Rodapé: régua de 2 px VERDE MACIÇO, espelhando a do cabeçalho —
+                exatamente o que `.footer` faz no PDF. */}
             <div
-              className="pt-4 mt-8 border-t"
-              style={{
-                borderImage: `linear-gradient(to right, #888 0%, ${COMPANY.primaryGreen} 30%) 1`,
-              }}
+              className="pt-4 mt-8"
+              style={{ borderTop: `2px solid ${COMPANY.primaryGreen}` }}
             >
               <p className="font-bold" style={{ color: COMPANY.primaryGreen }}>
                 {COMPANY.name}

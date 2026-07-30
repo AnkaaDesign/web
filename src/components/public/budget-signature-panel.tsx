@@ -16,8 +16,12 @@
  *
  *   • título "Assinaturas" em verde da marca com filete verde embaixo;
  *   • grade de caixas de 50% de largura, centralizada;
- *   • área reservada ao selo (26 mm no PDF ≈ h-24 aqui), vazia no original;
- *   • linha de assinatura (filete escuro) com nome e cargo centralizados abaixo.
+ *   • área reservada ao selo (26 mm no PDF ≈ 98 px aqui), vazia no original;
+ *   • linha de assinatura (filete escuro) com nome e cargo centralizados abaixo;
+ *   • o próprio selo, com as MESMAS nove linhas que `drawSeal` carimba.
+ *
+ * É o mesmo bloco no orçamento e no dossiê (`pages/public/service-report/[id].tsx`),
+ * porque nos dois casos o documento por baixo é o mesmo orçamento.
  *
  * As caixas cinza arredondadas que existiam aqui antes eram vocabulário de
  * aplicação colado numa folha de orçamento: cor, raio, sombra e escala
@@ -45,9 +49,19 @@ interface Summary {
   invalidatedReason?: string | null;
   /** O que mudou no orçamento desde que este documento foi congelado. */
   changes?: QuoteChange[];
+  /**
+   * Um signatário, com EXATAMENTE os campos que o selo do PDF imprime — ver
+   * `drawSeal` em `api/.../document/quote-assembler.service.ts`. O resumo
+   * público os devolve mascarados, e só para quem de fato assinou.
+   */
   signers?: Array<{
     name: string;
     cargo: string | null;
+    companyLabel: string | null;
+    cpfMasked: string | null;
+    phoneMasked: string | null;
+    authMethodLabel: string | null;
+    ipAddress: string | null;
     side: "ANKAA" | "CUSTOMER";
     status: string;
     signedAt: string | null;
@@ -98,7 +112,28 @@ interface SignatureBox {
   subtitle: string;
   state: SealState;
   signedAt: string | null;
+  /** Conteúdo do selo — as mesmas linhas, na mesma ordem, que `drawSeal` desenha. */
+  seal: SealLines;
 }
+
+/** Linhas do selo, na ordem em que `drawSeal` as empilha dentro da moldura. */
+interface SealLines {
+  cargo: string | null;
+  companyLabel: string | null;
+  cpfMasked: string | null;
+  phoneMasked: string | null;
+  authMethodLabel: string | null;
+  ipAddress: string | null;
+}
+
+const EMPTY_SEAL: SealLines = {
+  cargo: null,
+  companyLabel: null,
+  cpfMasked: null,
+  phoneMasked: null,
+  authMethodLabel: null,
+  ipAddress: null,
+};
 
 export function BudgetSignaturePanel({
   quoteId,
@@ -145,32 +180,53 @@ export function BudgetSignaturePanel({
   const signers = hasEnvelope ? data?.signers ?? [] : [];
   const changes = hasEnvelope ? data?.changes ?? [] : [];
 
+  // O SUBTÍTULO sob a linha é o do documento, não o da tela: no PDF o lado
+  // CUSTOMER recebe a razão social pura e o lado ANKAA recebe
+  // "Diretor Comercial — Ankaa Design" (ver `signerSeeds` e
+  // `renderUnsignedQuoteDocument` na API). Antes daqui saía
+  // "Gestor de Frota · TRANSPORTES XYZ" de um lado e o cargo informado no ato do
+  // outro — dois textos que o documento nunca imprime. O cargo não se perde: ele
+  // é linha do SELO, logo acima, exatamente como no PDF.
+  const ankaaSubtitle = `${COMPANY_INFO.directorTitle} — ${COMPANY_INFO.name}`;
+
   // Sem coleta emitida (ou ainda carregando): linhas de assinatura em branco,
-  // exatamente como no orçamento impresso.
+  // exatamente como no orçamento impresso. A ordem é a do PDF — os responsáveis
+  // do cliente (orderGroup 0) primeiro, a Ankaa (orderGroup 1) por último.
   const boxes: SignatureBox[] = signers.length
     ? signers.map(s => ({
         name: s.name,
-        subtitle:
-          s.side === "ANKAA"
-            ? `${s.cargo || COMPANY_INFO.directorTitle} — ${COMPANY_INFO.name}`
-            : [s.cargo, customerName].filter(Boolean).join(" · ") || "Cliente",
+        subtitle: s.side === "ANKAA" ? ankaaSubtitle : customerName ?? "",
         state: sealState(s.status),
         signedAt: s.signedAt,
+        seal: {
+          cargo: s.cargo ?? null,
+          companyLabel: s.companyLabel ?? null,
+          cpfMasked: s.cpfMasked ?? null,
+          phoneMasked: s.phoneMasked ?? null,
+          authMethodLabel: s.authMethodLabel ?? null,
+          ipAddress: s.ipAddress ?? null,
+        },
       }))
     : [
-        {
-          name: COMPANY_INFO.directorName,
-          subtitle: `${COMPANY_INFO.directorTitle} — ${COMPANY_INFO.name}`,
-          state: "BLANK",
-          signedAt: null,
-        },
         {
           name: "Responsável — Cliente",
           subtitle: customerName ?? "",
           state: "BLANK",
           signedAt: null,
+          seal: EMPTY_SEAL,
+        },
+        {
+          name: COMPANY_INFO.directorName,
+          subtitle: ankaaSubtitle,
+          state: "BLANK",
+          signedAt: null,
+          seal: EMPTY_SEAL,
         },
       ];
+
+  // Três colunas a partir de 4 signatários — a MESMA regra do `.signature-grid`
+  // do PDF, que passa a `cols-3` quando duas colunas empilhariam três fileiras.
+  const cols3 = boxes.length > 3;
 
   return (
     <section className="mt-10 mb-8">
@@ -253,14 +309,28 @@ export function BudgetSignaturePanel({
           tomada no `.signature-grid` do PDF. */}
       <div className="flex flex-wrap justify-center gap-x-8 gap-y-10">
         {boxes.map((box, i) => (
-          <div key={i} className="w-full sm:w-[calc(50%-1rem)]">
-            {/* Área reservada ao selo: 26 mm no PDF ≈ 96 px aqui. */}
-            <div className="mb-2 flex h-24 items-end justify-center">
+          <div
+            key={i}
+            className={
+              cols3
+                ? "w-full sm:w-[calc(50%-1rem)] lg:w-[calc(33.333%-1.34rem)]"
+                : "w-full sm:w-[calc(50%-1rem)]"
+            }
+          >
+            {/* Área reservada ao selo: 26 mm no PDF ≈ 98 px aqui (96 dpi). */}
+            <div className="mb-2 flex h-[98px] items-stretch justify-center">
               {box.state === "SIGNED" ? (
-                <Seal signedAt={box.signedAt} code={data?.verificationCode} muted={bad} />
+                <Seal
+                  name={box.name}
+                  lines={box.seal}
+                  signedAt={box.signedAt}
+                  code={data?.verificationCode}
+                  muted={bad}
+                  compact={cols3}
+                />
               ) : box.state === "BLANK" ? null : (
                 <p
-                  className={`pb-1 text-xs italic ${
+                  className={`self-end pb-1 text-xs italic ${
                     box.state === "REFUSED" ? "text-red-500" : "text-gray-400"
                   }`}
                 >
@@ -269,8 +339,10 @@ export function BudgetSignaturePanel({
               )}
             </div>
             <div className="border-t border-gray-900 pt-3 text-center">
-              <p className="text-sm font-semibold text-gray-900">{box.name}</p>
-              <p className="text-xs" style={{ color: GRAY }}>
+              <p className={`font-semibold text-gray-900 ${cols3 ? "text-xs" : "text-sm"}`}>
+                {box.name}
+              </p>
+              <p className={cols3 ? "text-[10px] leading-snug" : "text-xs"} style={{ color: GRAY }}>
                 {box.subtitle || " "}
               </p>
             </div>
@@ -299,47 +371,107 @@ export function BudgetSignaturePanel({
 }
 
 /**
- * Selo visual — o gêmeo na tela do retângulo que o montador carimba no PDF
- * (`drawSeal`): moldura verde fina, fundo quase branco esverdeado, chamada em
- * versalete e os metadados da coleta em cinza.
+ * Selo visual — o gêmeo na tela do retângulo que o montador carimba no PDF.
  *
- * Nome e cargo NÃO se repetem aqui: na tela eles já estão logo abaixo, na linha
- * de assinatura. No PDF a repetição existe porque o selo é sobreposto ao papel
- * depois, sem saber o que foi impresso.
+ * PARIDADE LINHA A LINHA com `drawSeal`
+ * (`api/.../document/quote-assembler.service.ts`), na MESMA ordem:
+ *
+ *   1. ASSINADO ELETRONICAMENTE   (negrito, versalete)
+ *   2. Nome do signatário          (negrito)
+ *   3. Cargo                       (cinza)
+ *   4. Empresa                     (cinza)
+ *   5. CPF mascarado + telefone mascarado, na mesma linha  (cinza)
+ *   6. Data e hora da assinatura   (cinza)
+ *   7. Método de autenticação      (cinza)
+ *   8. IP                          (cinza)
+ *   9. Envelope <código>           (cinza)
+ *
+ * Antes daqui saíam TRÊS linhas — a chamada, a data e o código — enquanto o PDF
+ * que a mesma página oferece para download carimbava nove. Quem conferisse a
+ * tela contra o documento via dois selos diferentes para o mesmo ato, e o que
+ * sustenta o valor probatório (quem, com qual CPF, por qual canal, de qual IP)
+ * só existia no PDF. A repetição de nome e cargo, que antes se justificava
+ * evitar "porque a linha de assinatura logo abaixo já os mostra", é justamente o
+ * que o selo faz no papel: ele é uma marca aposta AO documento e se descreve
+ * inteiro, sem depender do que está impresso embaixo.
+ *
+ * O selo real corta o que não couber na moldura em vez de vazar (o `cutoff` de
+ * `drawSeal`); aqui o equivalente é `overflow-hidden` — nada escapa do
+ * retângulo, e as linhas menos importantes são as últimas a entrar.
  */
 function Seal({
+  name,
+  lines,
   signedAt,
   code,
   muted,
+  compact,
 }: {
+  name: string;
+  lines: SealLines;
   signedAt: string | null;
   code?: string;
   muted?: boolean;
+  /** Grade de 3 colunas: a caixa é ~1/3 mais estreita, como no PDF. */
+  compact?: boolean;
 }) {
+  const ink = muted ? GRAY : DARK;
+  // Mesma composição da linha de identidade do selo: CPF e telefone juntos,
+  // separados por espaço duplo.
+  const identity = [lines.cpfMasked && `CPF ${lines.cpfMasked}`, lines.phoneMasked]
+    .filter(Boolean)
+    .join("  ");
+
+  const meta = [
+    lines.cargo,
+    lines.companyLabel,
+    identity || null,
+    signedAt
+      ? new Date(signedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+      : null,
+    lines.authMethodLabel,
+    lines.ipAddress ? `IP ${lines.ipAddress}` : null,
+    code ? `Envelope ${code}` : null,
+  ].filter(Boolean) as string[];
+
   return (
     <div
-      className="flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-sm border px-2 text-center"
+      /* py-0.5 + entrelinha apertada nas linhas de metadado: as NOVE linhas
+         precisam caber nos 26 mm da moldura sem serem cortadas — é o mesmo
+         problema que `drawSeal` resolve derivando o `leading` da altura
+         disponível, e lá as duas últimas (IP e código do envelope) já sumiram
+         em silêncio uma vez por causa de um espaçamento fixo. */
+      className="flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-sm border px-1.5 py-0.5 text-center"
       /* Moldura preta e sem fundo, igual ao selo que o `drawSeal` carimba no
          PDF: o carimbo é aposto AO documento e precisa se distinguir do
          impresso, em vez de parecer parte da identidade visual da Ankaa. */
       style={{ borderColor: muted ? "#d1d5db" : DARK }}
     >
       <span
-        className="text-[10px] font-bold uppercase leading-tight tracking-[0.12em]"
-        style={{ color: muted ? GRAY : DARK }}
+        className={`font-bold uppercase leading-tight tracking-[0.12em] ${
+          compact ? "text-[7px]" : "text-[8px]"
+        }`}
+        style={{ color: ink }}
       >
         Assinado eletronicamente
       </span>
-      {signedAt && (
-        <span className="text-[11px] leading-tight" style={{ color: GRAY }}>
-          {new Date(signedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+      <span
+        className={`w-full truncate font-semibold leading-tight ${
+          compact ? "text-[9px]" : "text-[10px]"
+        }`}
+        style={{ color: ink }}
+      >
+        {name}
+      </span>
+      {meta.map((line, i) => (
+        <span
+          key={i}
+          className={`w-full truncate leading-[1.15] ${compact ? "text-[7px]" : "text-[8px]"}`}
+          style={{ color: GRAY }}
+        >
+          {line}
         </span>
-      )}
-      {code && (
-        <span className="font-mono text-[10px] leading-tight" style={{ color: GRAY }}>
-          Envelope {code}
-        </span>
-      )}
+      ))}
     </div>
   );
 }

@@ -5,20 +5,12 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { SERVICE_ORDER_TYPE } from "@/constants";
 import { getApiBaseUrl } from "@/utils/file";
 import { signatureService } from "@/api-client/signature";
+import { dossierPdfFilename } from "@/utils/document-filename";
 import { toast } from "@/components/ui/sonner";
 import type { Task } from "@/types";
 
 type DossieServiceOrder = NonNullable<Task["serviceOrders"]>[number];
 type DossieFile = NonNullable<DossieServiceOrder["checkinFiles"]>[number];
-
-/** Mirrors the legacy detail-page `getTaskDisplayName` so the PDF header matches. */
-function getTaskDisplayName(task: Task): string {
-  if (task.name) return task.name;
-  if (task.customer?.corporateName) return task.customer.corporateName;
-  if (task.serialNumber) return `Série ${task.serialNumber}`;
-  if (task.truck?.plate) return task.truck.plate;
-  return "Sem nome";
-}
 
 /** The PRODUCTION service orders that carry check-in/check-out photos, in display order. */
 export function getDossieServiceOrders(task: Task): DossieServiceOrder[] {
@@ -70,7 +62,11 @@ export async function exportTaskDossiePdf(task: Task): Promise<void> {
     const href = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = href;
-    a.download = `${getTaskDisplayName(task)} - dossie.pdf`;
+    // Razão social + "Dossiê" + número do orçamento — o mesmo nome que o
+    // servidor anuncia no `Content-Disposition`. Antes era o nome de EXIBIÇÃO da
+    // tarefa (que cai na placa do caminhão, ou em "Sem nome") e sem número
+    // nenhum: dois dossiês do mesmo cliente colidiam na pasta de Downloads.
+    a.download = dossierPdfFilename(task.customer, task.quote?.budgetNumber);
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
