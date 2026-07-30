@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
 import { useNotifications, useMarkAsRead, useMarkAllAsRead, useUnseenNotificationCount } from "../administration/use-notification";
@@ -31,7 +31,11 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
   // `seenBy: true` (not the nested `{ include: { user: true } }` it used to request):
   // the only thing read off a seen-record is `seen.userId`, and the nested form shipped
   // a full User object per seen-record per notification.
-  const { data: notificationsData, isLoading } = useNotifications(
+  const {
+    data: notificationsData,
+    isLoading,
+    isFetching,
+  } = useNotifications(
     {
       take,
       orderBy: { createdAt: "desc" },
@@ -53,14 +57,41 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
   const markAsReadMutation = useMarkAsRead();
   const markAllAsReadMutation = useMarkAllAsRead();
 
-  const notifications = notificationsData?.data || [];
-  const totalRecords = notificationsData?.meta?.totalRecords || 0;
+  // "Load more" grows `take`, which makes a NEW query key rather than appending to
+  // an existing page. If that request errors, `data` is undefined, so the naive
+  // `data?.data || []` collapsed the list to [] — the list component renders its
+  // empty state at length 0, and because `totalRecords` fell to 0 as well `hasMore`
+  // went false, so the cards stayed gone until a full page reload.
+  //
+  // Retain the last successful payload and fall back to it ONLY when the current
+  // result is not an array (error / not-yet-loaded). A successful empty response is
+  // still an array, so a genuinely empty inbox correctly shows the empty state.
+  const lastGoodRef = useRef<{ data: Notification[]; totalRecords: number } | null>(null);
+  const fetchedData = notificationsData?.data;
+  const fetchedTotal = notificationsData?.meta?.totalRecords;
+
+  useEffect(() => {
+    if (Array.isArray(fetchedData)) {
+      lastGoodRef.current = {
+        data: fetchedData,
+        totalRecords: fetchedTotal ?? fetchedData.length,
+      };
+    }
+  }, [fetchedData, fetchedTotal]);
+
+  const hasFresh = Array.isArray(fetchedData);
+  const notifications = hasFresh ? fetchedData : (lastGoodRef.current?.data ?? []);
+  const totalRecords = hasFresh ? (fetchedTotal ?? 0) : (lastGoodRef.current?.totalRecords ?? 0);
   const hasMore = notifications.length < totalRecords;
 
-  // Reset loading more state when notifications data changes
+  // Clear the "Carregando..." footer whenever the query settles. Keying this off
+  // `notifications.length` used to hang the spinner forever when a page failed and
+  // the length did not change.
   useEffect(() => {
-    setIsLoadingMore(false);
-  }, [notifications.length]);
+    if (!isFetching) {
+      setIsLoadingMore(false);
+    }
+  }, [isFetching]);
 
   // Page-derived unread count — only a FALLBACK for when the server count hasn't
   // arrived (first paint / offline). On its own it can never exceed `take`.

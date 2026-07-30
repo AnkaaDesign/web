@@ -139,7 +139,10 @@ export const NotificationList: React.FC<NotificationListProps> = ({
     [hasMore, onLoadMore, isLoadingMore]
   );
 
-  if (notifications.length === 0) {
+  // Don't swap the list for the empty state while a page is still in flight —
+  // otherwise a slow or failed "load more" flashes/strands the empty state and the
+  // already-rendered cards disappear.
+  if (notifications.length === 0 && !isLoadingMore) {
     return <NotificationEmpty />;
   }
 
