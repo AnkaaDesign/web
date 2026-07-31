@@ -6,6 +6,7 @@ import { toast } from "@/components/ui/sonner";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { formatDate } from "@/utils";
 
+import { BRAND_ASSETS } from '@/config/assets';
 export interface DayExportRow {
   id: string;
   userName: string;
@@ -421,7 +422,7 @@ export function buildControlePontoDayHtml({ date, rows }: BuildDayHtmlOptions): 
 <body>
   <div class="page">
     <header class="header">
-      <img src="/logo.png" alt="Ankaa Design" class="logo" />
+      <img src="${BRAND_ASSETS.logo}" alt="Ankaa Design" class="logo" />
       <div class="header-right">
         <div class="document-title">Controle de Ponto · Visão Diária</div>
         <div class="header-meta">

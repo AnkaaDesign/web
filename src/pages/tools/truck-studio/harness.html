@@ -1,0 +1,41 @@
+<!doctype html>
+<!--
+  Truck Studio dev harness — mounts the engine on a bare page, with no Ankaa
+  around it. Open it in the dev server:
+
+      pnpm dev  →  http://localhost:5173/src/pages/tools/truck-studio/harness.html
+
+  Useful for working on the engine without the app's auth, routing or layout in
+  the way, and for driving it from a headless browser: `window.__harnessReady`
+  flips true once mountStudio() resolves, and `window.__harnessError` carries the
+  message if boot failed. The console handle `window.__studio` is the same one
+  the real page installs.
+
+  This lived at the repo root as __studio-harness.html after the port, referenced
+  by nothing and with every path stale. It is co-located with the engine now so
+  the two move together.
+-->
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Truck Studio harness</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0d1017; }
+      #host { height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <div id="host"></div>
+    <script type="module">
+      import './engine/core/studio.css';
+      import './engine/ui/selector.css';
+      import './engine/ui/loader.css';
+      import './engine/ui/hud.css';
+      import { mountStudio } from './engine/index.ts';
+      window.__harnessReady = false;
+      mountStudio(document.getElementById('host'))
+        .then(() => { window.__harnessReady = true; })
+        .catch(e => { window.__harnessError = String(e && e.message || e); console.error(e); });
+    </script>
+  </body>
+</html>

@@ -8,6 +8,7 @@ import { formatDate } from "@/utils";
 import type { SecullumAbsenceDayRow } from "@/types";
 import { getJustificativaMeta } from "@/constants";
 
+import { BRAND_ASSETS } from '@/config/assets';
 export interface AbsenceExportRow {
   id: string;
   date: string; // ISO YYYY-MM-DD
@@ -414,7 +415,7 @@ export function buildAbsenceOverviewHtml({
 <body>
   <div class="page">
     <header class="header">
-      <img src="/logo.png" alt="Ankaa Design" class="logo" />
+      <img src="${BRAND_ASSETS.logo}" alt="Ankaa Design" class="logo" />
       <div class="header-right">
         <div class="document-title">Controle de Ponto · Ausências</div>
         <div class="header-meta">

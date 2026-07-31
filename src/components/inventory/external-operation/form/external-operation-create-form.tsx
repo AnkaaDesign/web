@@ -28,6 +28,7 @@ import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { createWithdrawalFormData } from "@/utils/form-data-helper";
 
+import { BRAND_ASSETS } from '@/config/assets';
 // UI-only operation mode (not persisted): item withdrawal vs. ad-hoc service billing
 type OperationMode = "WITHDRAWAL" | "SERVICE";
 
@@ -883,7 +884,7 @@ export const ExternalOperationCreateForm = () => {
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <div class="header-info">
             <h1 class="title">Operação Externa</h1>
             <p class="subtitle">Documento de controle de operação externa</p>

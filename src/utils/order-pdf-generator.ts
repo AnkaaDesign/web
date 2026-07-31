@@ -2,6 +2,7 @@
 import { formatCurrencyUnmasked as formatCurrency, formatDate } from "./index";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 
+import { BRAND_ASSETS } from '@/config/assets';
 /**
  * Shared, branded PDF generator for a single purchase order ("Pedido de Compra").
  *
@@ -315,7 +316,7 @@ export function buildOrderPdfHtml(data: OrderPdfData): string {
 <body>
   <div class="sheet">
     <div class="header">
-      <img src="/logo.png" alt="${escapeHtml(COMPANY_INFO.name)}" class="logo" />
+      <img src="${BRAND_ASSETS.logo}" alt="${escapeHtml(COMPANY_INFO.name)}" class="logo" />
     </div>
     <div class="header-line"></div>
 

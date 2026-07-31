@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { pdfjs } from "react-pdf";
 import { IconLoader2 } from "@tabler/icons-react";
 
-pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+import { VENDOR_ASSETS } from '@/config/assets';
+pdfjs.GlobalWorkerOptions.workerSrc = VENDOR_ASSETS.pdfWorker;
 
 type PDFDocumentProxy = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
 

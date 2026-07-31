@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Trash2, Sun, ArrowDownRight, Eclipse } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 
+import { PAINT_TEXTURE_ASSETS } from '@/config/assets';
 // =====================
 // Types
 // =====================
@@ -90,8 +91,8 @@ const DEFAULT_SETTINGS: PaintPreviewSettings = {
 // =====================
 
 const TEXTURE_URLS = {
-  metallicNormal: "/metallic-normal-map.jpg",
-  pearlNormal: "/pearl-normal-map.jpg",
+  metallicNormal: PAINT_TEXTURE_ASSETS.metallicNormal,
+  pearlNormal: PAINT_TEXTURE_ASSETS.pearlNormal,
 };
 
 // =====================

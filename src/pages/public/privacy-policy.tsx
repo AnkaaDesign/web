@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { BRAND_ASSETS } from '@/config/assets';
 import {
   IconShieldLock,
   IconDatabase,
@@ -44,7 +45,7 @@ export function PrivacyPolicyPage() {
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-6 py-5">
-          <img src="/logo.png" alt="Ankaa Design" className="h-9 w-auto" />
+          <img src={BRAND_ASSETS.logo} alt="Ankaa Design" className="h-9 w-auto" />
         </div>
       </header>
 

@@ -4,22 +4,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import type { DecoratorBlock, DecoratorVariant } from '../types';
 import { HEADER_LOGO_MAX_WIDTH_PX, HEADER_LOGO_WIDTH_PCT } from '@/components/messaging/render-constants';
+import { MESSAGE_DECORATOR_ASSETS } from '@/config/assets';
 
 interface DecoratorBlockEditorProps {
   block: DecoratorBlock;
   onUpdate: (updates: Partial<DecoratorBlock>) => void;
 }
 
-export const DECORATOR_IMAGES: Record<DecoratorVariant, string> = {
-  // Compact cropped logo (575×226) — canonical header-logo asset (spec §6)
-  'header-logo': '/header-logo-compact.webp',
-  'header-logo-stripes': '/header-logo-stripes.webp',
-  'footer-wave-dark': '/footer-wave-dark.webp',
-  'footer-wave-logo': '/footer-wave-logo.webp',
-  'footer-diagonal-stripes': '/footer-diagonal-stripes.webp',
-  'footer-wave-gold': '/footer-wave-gold.webp',
-  'footer-geometric': '/footer-geometric.webp',
-};
+export const DECORATOR_IMAGES: Record<DecoratorVariant, string> = MESSAGE_DECORATOR_ASSETS;
 
 const HEADER_VARIANTS: DecoratorVariant[] = ['header-logo', 'header-logo-stripes'];
 const FOOTER_VARIANTS: DecoratorVariant[] = [

@@ -19,6 +19,7 @@ import { formatCurrencyUnmasked as formatCurrency } from "./number";
 import { formatDate } from "./date";
 import { formatCPF } from "./formatters";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
+import { BRAND_ASSETS } from '@/config/assets';
 import {
   CONTRACT_TYPE_LABELS,
   CONTRACT_STATUS_LABELS,
@@ -232,7 +233,7 @@ export function buildEmploymentContractPdfHtml(data: EmploymentContractPdfData):
 <body>
   <div class="sheet">
     <div class="header">
-      <img src="/logo.png" alt="${escapeHtml(COMPANY_INFO.name)}" class="logo" />
+      <img src="${BRAND_ASSETS.logo}" alt="${escapeHtml(COMPANY_INFO.name)}" class="logo" />
     </div>
     <div class="header-line"></div>
 

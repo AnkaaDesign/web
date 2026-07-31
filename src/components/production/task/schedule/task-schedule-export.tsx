@@ -6,6 +6,7 @@ import { TASK_STATUS, TASK_STATUS_LABELS, PAINT_FINISH_LABELS, TRUCK_MANUFACTURE
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 
+import { BRAND_ASSETS } from '@/config/assets';
 interface TaskScheduleExportProps {
   className?: string;
   filters?: Partial<TaskGetManyFormData>;
@@ -461,7 +462,7 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <div class="header-info">
             <h1 class="header-title">Cronograma de Produção</h1>
             <div class="info">

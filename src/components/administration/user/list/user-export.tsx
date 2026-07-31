@@ -7,6 +7,7 @@ import { CONTRACT_TYPE_LABELS } from "../../../../constants";
 import type { User } from "../../../../types";
 import type { UserGetManyFormData } from "../../../../schemas";
 
+import { BRAND_ASSETS } from '@/config/assets';
 interface UserExportProps {
   className?: string;
   filters?: Partial<UserGetManyFormData>;
@@ -445,7 +446,7 @@ export function UserExport({ className, filters, currentUsers = [], totalRecords
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Logo" class="logo" />
           <div class="header-info">
             <div class="info">
               <p><strong>Data:</strong> ${formatDate(new Date())}</p>

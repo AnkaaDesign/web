@@ -3,7 +3,8 @@ import { Document, Page, pdfjs } from "react-pdf";
 import { IconLoader2, IconFileText } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
-pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+import { VENDOR_ASSETS } from '@/config/assets';
+pdfjs.GlobalWorkerOptions.workerSrc = VENDOR_ASSETS.pdfWorker;
 
 // A4 aspect ratio (width / height) in points.
 const A4_RATIO = 595.28 / 841.89;

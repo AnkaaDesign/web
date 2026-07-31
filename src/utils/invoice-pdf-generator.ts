@@ -4,6 +4,7 @@ import { generatePaymentText } from "./quote-text-generators";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { getApiBaseUrl } from "@/lib/utils";
 
+import { BRAND_ASSETS } from '@/config/assets';
 interface ServiceReportPdfOptions {
   task: any;
   invoice: any;
@@ -289,7 +290,7 @@ export function exportInvoicePdf(options: ServiceReportPdfOptions): void {
   function buildHeader(number: string, showDate: boolean): string {
     return `
       <header class="header">
-        <img src="/logo.png" alt="${COMPANY_INFO.name}" class="logo" />
+        <img src="${BRAND_ASSETS.logo}" alt="${COMPANY_INFO.name}" class="logo" />
         <div class="header-right">
           <div class="header-title">RELATÓRIO Nº ${number}</div>
           ${showDate ? `<div class="header-info"><span class="header-info-label">Data:</span> ${formatDate(new Date())}</div>` : ""}

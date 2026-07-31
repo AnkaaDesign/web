@@ -8,6 +8,7 @@ import { MEASURE_UNIT_LABELS } from "../../../../constants";
 import { itemService } from "../../../../api-client";
 import { useCanViewPrices } from "../../../../hooks";
 
+import { BRAND_ASSETS } from '@/config/assets';
 // Export column ids that expose monetary information (hidden from warehouse users)
 const PRICE_EXPORT_COLUMN_IDS = new Set(["price", "totalPrice", "icms", "ipi"]);
 
@@ -457,7 +458,7 @@ export function ItemExport({ className, filters = {}, currentItems = [], totalRe
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <div class="header-info">
             <div class="info">
               <p><strong>Data:</strong> ${formatDate(new Date())}</p>

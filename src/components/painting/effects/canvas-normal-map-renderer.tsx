@@ -15,7 +15,6 @@ interface CanvasNormalMapRendererProps {
 // Cache for gradients and processed data
 const gradientCache = new Map<string, CanvasGradient>();
 const processedNormalCache = new Map<string, ImageData>();
-const flakeOverlayCache = new Map<string, HTMLCanvasElement>();
 
 export function CanvasNormalMapRenderer({
   baseColor,
@@ -28,9 +27,7 @@ export function CanvasNormalMapRenderer({
 }: CanvasNormalMapRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const normalMapRef = useRef<HTMLImageElement | null>(null);
-  const flakeTextureRef = useRef<HTMLImageElement | null>(null);
   const [isTextureLoading, setIsTextureLoading] = useState(true);
-  const [flakeTextureLoaded, setFlakeTextureLoaded] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [hasRendered, setHasRendered] = useState(false);
   const renderTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -39,12 +36,12 @@ export function CanvasNormalMapRenderer({
   const qualitySettings = useMemo(() => {
     switch (quality) {
       case "low":
-        return { particleMultiplier: 0.2, normalMapIntensity: 0.1, skipFlakes: true };
+        return { particleMultiplier: 0.2, normalMapIntensity: 0.1 };
       case "medium":
-        return { particleMultiplier: 0.5, normalMapIntensity: 0.12, skipFlakes: false };
+        return { particleMultiplier: 0.5, normalMapIntensity: 0.12 };
       case "high":
       default:
-        return { particleMultiplier: 1, normalMapIntensity: 0.15, skipFlakes: false };
+        return { particleMultiplier: 1, normalMapIntensity: 0.15 };
     }
   }, [quality]);
 
@@ -115,36 +112,6 @@ export function CanvasNormalMapRenderer({
       normalMapRef.current = null;
     };
   }, [finish, config.normalMap]);
-
-  // Load flake texture for metallic/pearl finishes
-  useEffect(() => {
-    if (qualitySettings.skipFlakes || (finish !== PAINT_FINISH.METALLIC && finish !== PAINT_FINISH.PEARL)) {
-      setFlakeTextureLoaded(false);
-      return;
-    }
-
-    const flakeTexture = new Image();
-    flakeTexture.crossOrigin = "anonymous";
-
-    flakeTexture.onload = () => {
-      flakeTextureRef.current = flakeTexture;
-      setFlakeTextureLoaded(true);
-    };
-
-    flakeTexture.onerror = () => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn(`Failed to load flake texture`);
-      }
-      setFlakeTextureLoaded(false);
-    };
-
-    flakeTexture.src = "/flake.jpg";
-
-    return () => {
-      flakeTextureRef.current = null;
-      setFlakeTextureLoaded(false);
-    };
-  }, [finish, qualitySettings.skipFlakes]);
 
   // Convert hex to RGB
   const hexToRgb = useCallback((hex: string): { r: number; g: number; b: number } => {
@@ -240,67 +207,6 @@ export function CanvasNormalMapRenderer({
     },
     [lightPosition, width, height, finish, config, baseColor, qualitySettings],
   );
-
-  // Pre-create flake overlay
-  const createFlakeOverlay = useCallback(() => {
-    const cacheKey = `${finish}_${width}_${height}`;
-
-    if (flakeOverlayCache.has(cacheKey)) {
-      return flakeOverlayCache.get(cacheKey)!;
-    }
-
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = width;
-    tempCanvas.height = height;
-    const tempCtx = tempCanvas.getContext("2d", { willReadFrequently: false });
-
-    if (tempCtx && flakeTextureRef.current) {
-      tempCtx.drawImage(flakeTextureRef.current, 0, 0, width, height);
-
-      if (finish === PAINT_FINISH.PEARL) {
-        const colors = [
-          { h: 280, s: 20, l: 80 },
-          { h: 200, s: 25, l: 82 },
-          { h: 340, s: 20, l: 80 },
-        ];
-
-        colors.forEach((color, index) => {
-          tempCtx.save();
-          tempCtx.globalCompositeOperation = "overlay";
-          tempCtx.globalAlpha = 0.1;
-
-          const angle = ((index * 120 + 30) * Math.PI) / 180;
-          const gradient = tempCtx.createLinearGradient(
-            width / 2 + (Math.cos(angle) * width) / 2,
-            height / 2 + (Math.sin(angle) * height) / 2,
-            width / 2 - (Math.cos(angle) * width) / 2,
-            height / 2 - (Math.sin(angle) * height) / 2,
-          );
-
-          gradient.addColorStop(0, "transparent");
-          gradient.addColorStop(0.3, `hsla(${color.h}, ${color.s}%, ${color.l}%, 0.3)`);
-          gradient.addColorStop(0.5, `hsla(${color.h}, ${color.s}%, ${color.l}%, 0.4)`);
-          gradient.addColorStop(0.7, `hsla(${color.h}, ${color.s}%, ${color.l}%, 0.3)`);
-          gradient.addColorStop(1, "transparent");
-
-          tempCtx.fillStyle = gradient;
-          tempCtx.fillRect(0, 0, width, height);
-          tempCtx.restore();
-        });
-      }
-
-      flakeOverlayCache.set(cacheKey, tempCanvas);
-      // Limit cache size
-      if (flakeOverlayCache.size > 5) {
-        const firstKey = flakeOverlayCache.keys().next().value;
-        if (firstKey !== undefined) {
-          flakeOverlayCache.delete(firstKey);
-        }
-      }
-    }
-
-    return tempCanvas;
-  }, [finish, width, height]);
 
   // Optimized sparkle particles
   const addSparkleParticles = useCallback(
@@ -497,17 +403,11 @@ export function CanvasNormalMapRenderer({
         break;
     }
 
-    // Add flake texture effect
-    if ((finish === PAINT_FINISH.METALLIC || finish === PAINT_FINISH.PEARL) && flakeTextureLoaded && !qualitySettings.skipFlakes) {
-      const flakeOverlay = createFlakeOverlay();
-      if (flakeOverlay) {
-        ctx.save();
-        ctx.globalCompositeOperation = "screen";
-        ctx.globalAlpha = finish === PAINT_FINISH.METALLIC ? 0.3 : 0.2;
-        ctx.drawImage(flakeOverlay, 0, 0);
-        ctx.restore();
-      }
-    } else if (finish === PAINT_FINISH.METALLIC || finish === PAINT_FINISH.PEARL) {
+    /* Cintilância de metálico/perolizado. Era um overlay a partir de uma textura
+       de flake servida (`/flake.jpg`); a textura foi descartada em 2026-07-31 e
+       o caminho procedural, que já era o fallback quando ela não carregava,
+       virou o único. */
+    if (finish === PAINT_FINISH.METALLIC || finish === PAINT_FINISH.PEARL) {
       addSparkleParticles(ctx);
     }
 
@@ -557,11 +457,9 @@ export function CanvasNormalMapRenderer({
     applyNormalMapping,
     addSparkleParticles,
     config,
-    flakeTextureLoaded,
     hexToRgb,
     getLighterColor,
     lightPosition,
-    createFlakeOverlay,
     qualitySettings,
   ]);
 

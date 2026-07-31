@@ -1,0 +1,937 @@
+/* Truck Studio — the floating lighting HUD (#ts-hud).
+   engine/ui/hud.ts owns the markup and the wiring; this file owns the look.
+
+   This panel replaces the sidebar's "Iluminação" block. It floats over the 3D render in the
+   top-left of #canvas-holder, directly under the scene card (.ts-mapbadge), and it is
+   deliberately NOT built from the sidebar's solid --panel / --panel-2 surfaces. The brief was
+   explicit: "not this solid background of the current selector, but a black transparent /
+   blurred, and on hover increase the effect". So the whole panel is one sheet of dark glass
+   whose opacity AND blur radius both step up while the pointer — or keyboard focus — is on it.
+
+   Conventions inherited from the rest of the studio, all load-bearing:
+   - EVERY selector starts with .truck-studio-root. Ankaa's Tailwind must not leak in, and
+     these very generic names must not leak out.
+   - Class prefix `ts-hud`, single id `ts-hud`, keyframes namespaced `ts-hud-`. Tailwind
+     defines global keyframes and the LAST definition of a name wins — that is why studio.css
+     already had to rename `spin`.
+   - `.hidden { display:none !important }` comes from studio.css. showHud() uses it on the
+     panel and applyCollapsed() uses it on the body; nothing here invents a second hiding
+     mechanism, it only adds the chrome that goes with the collapsed state.
+   - `.truck-studio-root * { box-sizing:border-box; margin:0; padding:0 }` — the studio ships
+     its own reset, so nothing below re-zeroes margins.
+   - Never `transition: all`. Every transition names its properties.
+   - Hover is BORDER + SURFACE ONLY. No lift, no scale, anywhere. These controls sit over a
+     live render, where a tile that jumps 2px reads as a rendering glitch, and the motion was
+     rejected outright for .ts-card and the badges already.
+   - ONE crisp solid selection ring, carried by `outline`, with any border pinned back to
+     --stroke-2 so no second concentric line is drawn just inside it. Same standing rule
+     .ts-card and .ts-badge follow in selector.css.
+
+   z-index 8 — the badge layer. The full stack under .truck-studio-root, top down:
+     #editor-modal 9999 · .ts-selector 500 · #ts-loader 400 · #loading 10 ·
+     #cab-switching 9 · .ts-badge / .ts-mapbadge / #ts-hud 8.
+   The HUD is a sibling of the badges in every sense: same gutter, same shadow, same hover
+   language, and it must disappear under the selector overlay and the loading curtain exactly
+   as they do.
+
+   Every design token used here (--panel, --stroke, --stroke-2, --text, --muted, --accent)
+   comes from the .truck-studio-root block in studio.css. This file defines nothing but the
+   four --ts-hud-* layout knobs in section 1.
+
+   ONE VALUE CROSSES THE FILE BOUNDARY: hud.ts publishes `--ts-hud-fill` (a percentage string)
+   inline on every range input, because CSS cannot read an input's value. Section 4 drops it
+   straight into a gradient stop. Its `0%` fallback is declared here so an input that has not
+   been painted yet still renders a coherent rail.
+
+   SPECIFICITY NOTE: there is deliberately no blanket `#ts-hud svg { width: … }` rule. An id
+   selector scores (1,0,1) there and would out-rank every `.ts-hud-cap svg` (0,1,1) override
+   in the file. Icon sizing therefore lives on the SLOT — the span or the dial — and every
+   svg is simply told to fill it. */
+
+/* ============================================================
+   1. Panel shell — position, glass, and the hover intensification
+   ============================================================ */
+
+/* --ts-hud-top / --ts-hud-reserve are the two numbers that keep this panel out of the
+   badges' way, and they are the ONLY things the responsive blocks in section 8 retune:
+
+     --ts-hud-top      the .ts-mapbadge bottom edge plus a ~10px gap.
+     --ts-hud-reserve  the vertical band kept clear at the bottom for .ts-badge.
+
+   .ts-mapbadge is 200px wide at top:14px and 158.4px tall (a 16:9 thumb over a two-line body
+   with explicit line-heights), so it ends at ~172.4px — hence 184px here. .ts-badge is the
+   taller card and reaches ~188.8px up from the bottom, hence 202px of reserve. Both were
+   recomputed against every breakpoint selector.css defines; see section 8.
+
+   The `max()` floor is a safety net, not a layout: if #canvas-holder is ever shorter than
+   top + reserve the calc goes negative, max-height clamps to 0 and the panel VANISHES.
+   Better to keep 96px of scrollable panel and risk brushing the truck badge on a viewport
+   that small than to have the lighting controls silently disappear. A percentage max-height
+   also needs a definite height on #canvas-holder; it has one (flex:1 inside a 100%-height
+   column), and if that ever stops being true the calc resolves to `none` and the panel
+   simply grows — a graceful failure either way. */
+.truck-studio-root #ts-hud {
+  --ts-hud-w: 200px;
+  --ts-hud-top: 184px;
+  --ts-hud-reserve: 202px;
+  --ts-hud-gutter: 14px;
+
+  /* The 06:00 → 24:00 rail, on the real hour scale: 6h=0%, 12h=33%, 18h=67%, 24h=100%.
+     Declared on the panel rather than on the track pseudo-element because custom properties
+     inherit into pseudo-elements, and the WebKit and Firefox track rules — which can never
+     share a selector list, see section 4 — both have to read the same value. */
+  --ts-hud-daynight: linear-gradient(
+    to right,
+    #f7b267 0%,
+    #7fb6ee 11%,
+    #a8d4ff 33%,
+    #8dbdf0 55%,
+    #f2955a 67%,
+    #5b4b8a 75%,
+    #1c2545 83%,
+    #0a0f1e 100%
+  );
+
+  position: absolute;
+  left: var(--ts-hud-gutter);
+  top: var(--ts-hud-top);
+  z-index: 8;
+  width: var(--ts-hud-w);
+  max-height: max(96px, calc(100% - var(--ts-hud-top) - var(--ts-hud-reserve)));
+
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+
+  border: 1px solid var(--stroke-2);
+  border-radius: 14px;
+  color: var(--text);
+  font-family: inherit;
+
+  /* THE look. Near-black rather than a tinted --panel: the scene behind it is the subject,
+     and a neutral smoked sheet reads as glass over the render instead of as another opaque
+     card sitting on it. saturate() above 1 puts a little of the scene's colour back after
+     the blur has washed it out. */
+  background-color: rgba(8, 10, 14, 0.42);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+
+  /* A real drop shadow — the panel has to read as floating over the 3D render, not as part
+     of it. Matched to the badges' shadow so the column reads as one material. */
+  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.85), 0 2px 8px rgba(0, 0, 0, 0.5);
+
+  /* Both filter lists name the same functions in the same order, which is what makes
+     backdrop-filter interpolable — swap blur/saturate around between the two states and it
+     snaps instead of animating. The -webkit- longhand is transitioned separately because in
+     an engine that only understands the prefixed property the unprefixed name is not a known
+     animatable property at all. Never `all`. */
+  transition:
+    background-color 220ms ease,
+    backdrop-filter 220ms ease,
+    -webkit-backdrop-filter 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+
+  /* Corner clipping for the scrolling body. The rule below hands the scroll to .ts-hud__body
+     when that node exists. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--stroke-2) transparent;
+}
+
+/* Give the scroll to the body so the header stays pinned while the controls move under it.
+   Deliberately expressed as "opt IN to a clipped root" rather than `:not(:has(…))`: if :has()
+   is ever unavailable the selector is simply dropped and the ROOT keeps scrolling, which is
+   merely redundant. The inverse would fail closed and silently clip the bottom control off a
+   short viewport with no way to reach it. (selector.css already relies on :has() too.) */
+.truck-studio-root #ts-hud:has(.ts-hud__body) {
+  overflow-y: hidden;
+}
+
+/* hud.ts publishes the scene's derived time of day on the root, and the panel has to work
+   over BOTH scenes. Smoked glass is a contrast device: it darkens a bright sky so pale text
+   stays readable. At night there is nothing left to darken — the render behind is already
+   near-black — and the same 42% film only flattens the panel into the scene until its edge
+   disappears. So night trades opacity away and spends it on the border instead.
+
+   Source order here is load-bearing. This rule and the :hover rule below both score (1,1,0),
+   so the ONLY reason hover still wins over the night surface is that it comes second; the
+   night hover rule after it scores (1,2,0) and wins on specificity from anywhere. */
+.truck-studio-root #ts-hud[data-tod="noite"] {
+  background-color: rgba(10, 13, 20, 0.34);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* "On hover increase the effect": more opacity AND more blur, plus a touch more saturation,
+   so the glass gains presence rather than just getting darker. :focus-within is in the same
+   rule on purpose — a keyboard user tabbing into a slider needs the readable state a mouse
+   user gets, and it also holds the panel legible while a pointer drag wanders off the box
+   mid-gesture (the dial takes pointer capture, so :hover is genuinely lost there). */
+.truck-studio-root #ts-hud:hover,
+.truck-studio-root #ts-hud:focus-within {
+  background-color: rgba(8, 10, 14, 0.66);
+  backdrop-filter: blur(20px) saturate(1.25);
+  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 18px 46px -12px rgba(0, 0, 0, 0.9), 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+.truck-studio-root #ts-hud[data-tod="noite"]:hover,
+.truck-studio-root #ts-hud[data-tod="noite"]:focus-within {
+  background-color: rgba(10, 13, 20, 0.6);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+/* Without this the panel is a 42%-opaque black film over a bright daylit render — legible
+   only because of the blur. Take the blur away and the whole thing is very nearly invisible
+   and the labels sit unreadable on top of the sky. So the unsupported branch trades the
+   translucency away and goes almost solid.
+
+   Written as `not ((unprefixed) or (-webkit-))` rather than the single unprefixed test:
+   Safari shipped -webkit-backdrop-filter for years without the unprefixed name, and the
+   plain test would have wrongly demoted a browser that blurs perfectly well. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .truck-studio-root #ts-hud {
+    background-color: rgba(10, 13, 19, 0.9);
+  }
+  .truck-studio-root #ts-hud:hover,
+  .truck-studio-root #ts-hud:focus-within {
+    background-color: rgba(10, 13, 19, 0.97);
+  }
+  /* The night surfaces have to be restated INSIDE this block, not merely overridden by it.
+     @supports adds no specificity, so the (1,1,0) `#ts-hud[data-tod="noite"]` rules above
+     would otherwise out-rank this (1,0,0) fallback and hand an engine with no blur at all
+     the most transparent surface in the file — the exact failure this branch exists to
+     prevent. Night keeps a touch less opacity than day; without a blur it is the border, not
+     the fill, that has to hold the edge. */
+  .truck-studio-root #ts-hud[data-tod="noite"] {
+    background-color: rgba(10, 13, 19, 0.88);
+  }
+  .truck-studio-root #ts-hud[data-tod="noite"]:hover,
+  .truck-studio-root #ts-hud[data-tod="noite"]:focus-within {
+    background-color: rgba(10, 13, 19, 0.97);
+  }
+}
+
+.truck-studio-root #ts-hud::-webkit-scrollbar,
+.truck-studio-root .ts-hud__body::-webkit-scrollbar { width: 7px; }
+.truck-studio-root #ts-hud::-webkit-scrollbar-track,
+.truck-studio-root .ts-hud__body::-webkit-scrollbar-track { background: transparent; }
+.truck-studio-root #ts-hud::-webkit-scrollbar-thumb,
+.truck-studio-root .ts-hud__body::-webkit-scrollbar-thumb {
+  background: var(--stroke-2);
+  border-radius: 8px;
+}
+
+/* Button reset. The UA sheet would otherwise paint a grey bevel over the glass, centre the
+   text and drop it to 13.333px system font; studio.css restates font-family and cursor on
+   `button` but not the rest. Kept neutral rather than given a chip look, because it has to
+   be equally correct for the header row and for a weather tile — the tiles opt in to their
+   own surface in section 6. */
+.truck-studio-root #ts-hud button {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.truck-studio-root #ts-hud button:disabled {
+  opacity: 0.42;
+  cursor: default;
+  pointer-events: none;
+}
+/* hud.ts builds its icons with innerHTML, so every glyph is an inline <svg> inside a sized
+   span. `display:block` kills the inline baseline gap that would otherwise make every icon
+   slot ~3px taller than the icon in it. Sizing happens on the slot, never here. */
+.truck-studio-root #ts-hud svg { display: block; }
+
+/* ============================================================
+   2. Header — title, summary, collapse chevron
+   ============================================================ */
+
+/* The whole header IS the collapse button. The eyebrow treatment — 10.5px, 700, uppercase,
+   wide tracking — is the one .panel-title uses in studio.css and .ts-mapbadge__label uses in
+   selector.css, which is what ties this panel to the family rather than to a generic
+   floating widget.
+
+   flex-wrap exists for one reason: .ts-hud__hint drops onto a second line when the panel is
+   collapsed. `order` is what keeps the chevron OUT of that wrap — see both rules below. */
+.truck-studio-root .ts-hud__head {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 11px;
+  border: none;
+  border-bottom: 1px solid var(--stroke);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  text-align: left;
+  user-select: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.2s ease;
+}
+.truck-studio-root .ts-hud__head:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+/* One ring. The header has no border of its own to pin, so the outline is the only thing
+   drawn. The offset is NEGATIVE because the header meets the panel's rounded corners and a
+   positive one would be clipped by the shell's `overflow:hidden`. */
+.truck-studio-root .ts-hud__head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.truck-studio-root .ts-hud__head:focus:not(:focus-visible) { outline: none; }
+
+/* The bulb. The panel's one piece of colour when nothing is selected — the same job
+   studio.css's .logo-dot does for the topbar, and the thing that says "lighting" at a glance
+   on a collapsed panel. */
+.truck-studio-root .ts-hud__head-ico {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+.truck-studio-root .ts-hud__head-ico svg { width: 100%; height: 100%; }
+
+.truck-studio-root .ts-hud__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "07:15 · Ensolarado" — the summary hud.ts keeps painted. Hidden while the panel is open,
+   because the rows below already say all of it and there is no room for it beside a 10.5px
+   uppercase title in a 200px column. Collapsed it is the ONLY state left on screen, so it
+   appears then — on its own line (flex-basis:100% is what the header's flex-wrap is for),
+   indented to the title's left edge (16px icon + 8px gap).
+
+   `order: 3` puts it AFTER the chevron in visual order even though it precedes it in the
+   DOM. Without that the full-width hint wraps first and shoves the chevron down onto a
+   third line of its own, leaving the disclosure glyph stranded below the summary instead
+   of sitting beside the title where it is when the panel is open.
+
+   text-transform and letter-spacing are inherited from the uppercase header and must both be
+   undone, or "Ensolarado" arrives as "E N S O L A R A D O". */
+.truck-studio-root .ts-hud__hint {
+  display: none;
+  order: 3;
+  flex: 1 1 100%;
+  min-width: 0;
+  padding-left: 24px;
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.truck-studio-root #ts-hud.is-collapsed .ts-hud__hint { display: block; }
+
+/* Disclosure idiom: the glyph hud.ts draws points DOWN, at the body it opens. Collapsed it
+   turns to point right, at content that is no longer there. `rotate` rather than a transform,
+   so the flip can never collide with a transform another rule needs to own on the same node.
+   -90deg is counter-clockwise, which takes a down-pointing chevron to right-pointing. */
+.truck-studio-root .ts-hud__chev {
+  order: 2;                 /* stays on the title's line; see .ts-hud__hint */
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+  rotate: 0deg;
+  transition: rotate 0.2s cubic-bezier(0.22, 0.7, 0.3, 1), color 0.15s ease;
+}
+.truck-studio-root .ts-hud__chev svg { width: 100%; height: 100%; }
+.truck-studio-root .ts-hud__head:hover .ts-hud__chev { color: var(--text); }
+.truck-studio-root #ts-hud.is-collapsed .ts-hud__chev { rotate: -90deg; }
+
+/* hud.ts hides the body with the global `.hidden`, so all that is left here is the chrome
+   that goes with it: release the scroll box (a collapsed panel must shrink to its header,
+   not keep reserving height) and drop the divider, which would otherwise hang under the
+   header as a stray hairline with nothing beneath it. */
+.truck-studio-root #ts-hud.is-collapsed { max-height: none; }
+.truck-studio-root #ts-hud.is-collapsed .ts-hud__head { border-bottom-color: transparent; }
+
+/* ============================================================
+   3. Body and rows
+   ============================================================ */
+
+/* min-height:0 is load-bearing: a flex item's default min-height is its content size, so
+   without it the body refuses to shrink and the panel's max-height is quietly ignored on a
+   short viewport — the controls would run off the bottom of the render instead of scrolling.
+
+   overflow-x is pinned to `hidden` rather than left at `visible`: when one axis is `auto` the
+   other computes from `visible` to `auto` too, and a selected weather tile's outline would
+   then earn the panel a spurious horizontal scrollbar. The 11px side padding is what keeps
+   that outline (2px wide at a 2px offset, 3px when hovered) inside the padding box, so
+   nothing is clipped by the choice. */
+.truck-studio-root .ts-hud__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 11px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--stroke-2) transparent;
+}
+
+/* Three of the five rows are a <label> wrapping their own input, so a click anywhere in the
+   row lands on the control. user-select stops that click from painting a text selection
+   across the label and readout on the way. */
+.truck-studio-root .ts-hud-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  user-select: none;
+}
+
+/* Label line: name hard left, live value hard right. */
+.truck-studio-root .ts-hud-row__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+.truck-studio-root .ts-hud-row__label {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The readout — "07:15", "52°", "100 %", "Ensolarado". tabular-nums is not cosmetic here:
+   this string is rewritten on every `input` event while a slider is dragged, and
+   proportional digits make the whole thing shuffle sideways a pixel per frame. It is a
+   SIBLING of the uppercase label, not a child, so nothing needs undoing. */
+.truck-studio-root .ts-hud-row__val {
+  flex: none;
+  color: var(--text);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  /* Older engines that do not implement font-variant-numeric still get fixed-width digits
+     straight from the OpenType feature. */
+  font-feature-settings: "tnum" 1;
+}
+
+/* Control line: end-cap icon, rail, end-cap icon. */
+.truck-studio-root .ts-hud-row__ctl {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.truck-studio-root .ts-hud-row__ctl--dial {
+  justify-content: center;
+  padding-top: 1px;
+}
+
+/* ---------- end-cap icons ----------
+   Equal fixed slots on both ends are what keep the rails of the three sliders aligned to the
+   same left and right edges, however wide the glyphs inside them are. */
+.truck-studio-root .ts-hud-cap {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+  transition: color 0.2s ease, filter 0.2s ease;
+}
+.truck-studio-root .ts-hud-cap svg { width: 100%; height: 100%; }
+
+/* hud.ts puts `.is-on` on whichever of the hour row's two caps matches the scene's derived
+   'dia'/'noite', so the caps report state instead of merely labelling the ends. Warm for the
+   sun, cool for the moon — the same two temperatures the day/night rail runs between, and a
+   readable cue for anyone who cannot tell a 15px sun from a 15px moon at a glance. The other
+   four caps (low/high, dim/bright) never get `.is-on` and stay muted. */
+.truck-studio-root .ts-hud-cap.is-on { color: var(--text); }
+.truck-studio-root .ts-hud-cap--sun.is-on {
+  color: #ffc978;
+  filter: drop-shadow(0 0 4px rgba(255, 201, 120, 0.5));
+}
+.truck-studio-root .ts-hud-cap--moon.is-on {
+  color: #bcd2f7;
+  filter: drop-shadow(0 0 4px rgba(188, 210, 247, 0.45));
+}
+
+/* ============================================================
+   4. Range inputs — track and thumb, both engines
+   ============================================================ */
+
+/* The default UA slider is a grey bevelled rail with a platform thumb; dropped onto dark
+   glass it looks like a control someone forgot to style. Everything below is the custom
+   replacement.
+
+   THE RULE THAT MUST NOT BE BROKEN HERE: a -webkit- and a -moz- pseudo-element may never
+   share a selector list. Each engine drops the ENTIRE rule the moment it meets a
+   pseudo-element it does not recognise, so one grouped rule would style neither. Every
+   track/thumb declaration below is therefore written out twice, once per engine. */
+.truck-studio-root .ts-hud-range {
+  /* hud.ts's setFill() overwrites this inline on every paint; the declaration here is what
+     keeps an unpainted input from resolving `var(--ts-hud-fill)` to nothing and dropping the
+     whole gradient (an invalid var() makes the property compute to unset, not to a partial
+     value — the rail would disappear rather than degrade). */
+  --ts-hud-fill: 0%;
+
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 16px;
+  background: transparent;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.truck-studio-root .ts-hud-range:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* One ring. The input has no border to pin, so the outline is the only thing drawn. */
+.truck-studio-root .ts-hud-range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+.truck-studio-root .ts-hud-range:focus:not(:focus-visible) { outline: none; }
+
+/* ---------- track ----------
+   The filled portion is a hard-stop gradient driven by hud.ts's --ts-hud-fill rather than by
+   ::-moz-range-progress, because WebKit has no ::-*-progress equivalent at all and one engine
+   showing a filled rail while the other showed a bare one would be worse than neither. The
+   two colour stops meet at exactly the same position, so the boundary is a crisp edge and not
+   a fade. */
+.truck-studio-root .ts-hud-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--ts-hud-fill),
+    rgba(255, 255, 255, 0.14) var(--ts-hud-fill),
+    rgba(255, 255, 255, 0.14) 100%
+  );
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+.truck-studio-root .ts-hud-range::-moz-range-track {
+  height: 6px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--ts-hud-fill),
+    rgba(255, 255, 255, 0.14) var(--ts-hud-fill),
+    rgba(255, 255, 255, 0.14) 100%
+  );
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* Firefox paints ::-moz-range-progress OVER the track with a UA-default fill, so leaving it
+   alone would put a stock blue bar on top of the gradient above — on Firefox only. Made
+   transparent so the track shows through unchanged and both engines render identically. */
+.truck-studio-root .ts-hud-range::-moz-range-progress {
+  height: 6px;
+  border: none;
+  background: transparent;
+}
+
+/* ---------- the 06:00 → 24:00 rail ----------
+   The hour slider is the one control whose track carries information, so it gets the real
+   day/night gradient instead of a fill: the whole point of the slider is that it drives the
+   scene from dawn through golden hour into night, and painting that arc onto the rail says so
+   before the user has moved anything. Deliberately NOT also filled — a progress bar drawn
+   over the gradient would hide most of the very thing it is meant to show. The thumb's
+   position against the colour is the readout, backed by the HH:MM above it. */
+.truck-studio-root .ts-hud-row--hour .ts-hud-range::-webkit-slider-runnable-track {
+  background: var(--ts-hud-daynight);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.truck-studio-root .ts-hud-row--hour .ts-hud-range::-moz-range-track {
+  background: var(--ts-hud-daynight);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- thumb ----------
+   WebKit lays the thumb out relative to the runnable track's top edge, so it needs an
+   explicit margin-top of (track - thumb) / 2 = (6 - 14) / 2 = -4px to sit centred. Firefox
+   centres ::-moz-range-thumb on the track by itself and must NOT be given that margin. That
+   asymmetry is the other reason the two engines cannot share a rule. */
+.truck-studio-root .ts-hud-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  border: 1px solid rgba(6, 9, 14, 0.9);
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff, #d5dfef);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.truck-studio-root .ts-hud-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(6, 9, 14, 0.9);
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff, #d5dfef);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Hovered / grabbed thumb. Surface only — the thumb never grows, because a thumb that
+   changes size under the finger drifts away from the value the pointer is actually on. */
+.truck-studio-root .ts-hud-range:hover::-webkit-slider-thumb,
+.truck-studio-root .ts-hud-range:active::-webkit-slider-thumb {
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.65), 0 0 0 3px rgba(255, 255, 255, 0.14);
+}
+.truck-studio-root .ts-hud-range:hover::-moz-range-thumb,
+.truck-studio-root .ts-hud-range:active::-moz-range-thumb {
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.65), 0 0 0 3px rgba(255, 255, 255, 0.14);
+}
+
+/* ============================================================
+   5. Posição da luz — the azimuth dial
+   ============================================================ */
+
+/* hud.ts draws the dial as a plan view of the scene: a ring, four cardinal ticks, a truck
+   glyph at the centre and a ray out to the handle. The dial box therefore carries NO border
+   of its own — the SVG's own ring is the circle, and a second one on the div would sit
+   concentric to it and read as a mistake. What the box contributes is a faint plate that
+   fades out before its edge (so it never draws that second circle), the pointer, and the
+   focus ring.
+
+   All feedback here is colour, not motion: the svg's strokes are `currentColor`, so changing
+   the div's colour repaints the whole instrument for free. */
+.truck-studio-root .ts-hud-dial {
+  position: relative;
+  flex: none;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 42%,
+      rgba(255, 255, 255, 0.075),
+      rgba(255, 255, 255, 0.02) 58%,
+      transparent 74%);
+  color: var(--muted);
+  cursor: grab;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.truck-studio-root .ts-hud-dial:hover {
+  color: var(--text);
+  background-color: rgba(255, 255, 255, 0.045);
+}
+.truck-studio-root .ts-hud-dial:active,
+.truck-studio-root .ts-hud-dial.is-dragging { cursor: grabbing; }
+.truck-studio-root .ts-hud-dial.is-dragging { color: var(--text); }
+/* One ring. `outline` follows border-radius, so this is a circle, not a box around a circle. */
+.truck-studio-root .ts-hud-dial:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.truck-studio-root .ts-hud-dial:focus:not(:focus-visible) { outline: none; }
+
+/* hud.ts hard-codes width/height attributes on this svg so it renders sanely before the
+   stylesheet arrives; 100% lets the responsive blocks in section 8 shrink the dial by
+   changing only the box. Presentation attributes lose to any CSS declaration, so this wins
+   without !important. */
+.truck-studio-root .ts-hud-dial__svg { width: 100%; height: 100%; }
+
+/* The ray and the handle are the VALUE; the ring, ticks and truck are the frame. Pulling the
+   value onto --accent is what separates the two at a glance, and it is the same accent the
+   filled slider tracks use, so "where the light is" reads consistently down the whole panel.
+   These override the elements' own stroke/fill presentation attributes. */
+.truck-studio-root .ts-hud-dial__ray {
+  stroke: var(--accent);
+  stroke-opacity: 0.5;
+  transition: stroke-opacity 0.15s ease;
+}
+.truck-studio-root .ts-hud-dial__handle {
+  fill: var(--accent);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+  transition: fill 0.15s ease;
+}
+.truck-studio-root .ts-hud-dial:hover .ts-hud-dial__ray,
+.truck-studio-root .ts-hud-dial.is-dragging .ts-hud-dial__ray { stroke-opacity: 0.85; }
+.truck-studio-root .ts-hud-dial:hover .ts-hud-dial__handle,
+.truck-studio-root .ts-hud-dial.is-dragging .ts-hud-dial__handle { fill: #7dc0ff; }
+
+/* ============================================================
+   6. Clima — the weather tile picker
+   ============================================================ */
+
+/* Six presets (ensolarado, nublado, chuvoso, dourado, neblina, estúdio) on a 3 x 2 grid.
+   Three columns is what the 200px panel affords — 176px of content less two 5px gaps is
+   ~55px a tile, enough for an 18px glyph over "Ensolarado" at 8.5px — and it is also what
+   the panel can afford VERTICALLY: two columns would be three rows and ~50px taller, on a
+   panel that already has to fit between two badges. Section 8 retunes the columns and the
+   label size wherever that arithmetic stops working.
+   minmax(0, 1fr) rather than 1fr: a grid track's default min-width is auto, and one long
+   preset name would otherwise widen its column and push the row off the panel. */
+.truck-studio-root .ts-hud-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.truck-studio-root .ts-hud-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 7px 2px 6px;
+  border: 1px solid var(--stroke-2);
+  border-radius: 10px;
+  /* A hair lighter than the glass behind it, never an opaque plate: the tiles have to stay
+     part of the same sheet. */
+  background-color: rgba(255, 255, 255, 0.045);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 8.5px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+  text-align: center;
+  overflow: hidden;
+  /* Explicit list, never `all`: `all` would also animate the selection outline and smear the
+     ring across the tile as it is picked. */
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* Hover: BORDER + SURFACE ONLY — no lift, no scale, exactly like .ts-card and the badges. */
+.truck-studio-root .ts-hud-tile:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+/* THE selection ring. Crisp, solid, exactly one — carried by `outline`, which is painted
+   outside the border box and so is not clipped by the tile's own `overflow:hidden`. The
+   border is deliberately held at --stroke-2: tinting it as well would draw a SECOND
+   concentric ring 2px inside the outline. One accent ring per tile, never two, never a
+   low-alpha halo.
+
+   hud.ts writes `.is-on` and `aria-pressed`; both are matched so the ring cannot desync from
+   the accessibility state. Placed after :hover at matching specificity, so it also wins on a
+   hovered selected tile. */
+.truck-studio-root .ts-hud-tile.is-on,
+.truck-studio-root .ts-hud-tile[aria-pressed="true"] {
+  border-color: var(--stroke-2);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  background-color: rgba(77, 163, 255, 0.16);
+  color: var(--accent);
+}
+
+/* Keyboard focus gets exactly the ring a mouse user sees when selecting. */
+.truck-studio-root .ts-hud-tile:focus-visible {
+  border-color: var(--stroke-2);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.truck-studio-root .ts-hud-tile:focus:not(:focus-visible) { outline: none; }
+
+/* Hovering the ALREADY-SELECTED tile still has to say something. Its border is pinned
+   neutral by the one-ring rule, so the feedback is the ring brightening and thickening —
+   still a single ring, just a louder one. The same answer .ts-card gives in selector.css.
+   3px at a 2px offset stays inside the body's 11px padding, so nothing is clipped. */
+.truck-studio-root .ts-hud-tile.is-on:hover,
+.truck-studio-root .ts-hud-tile[aria-pressed="true"]:hover {
+  outline-width: 3px;
+  background-color: rgba(77, 163, 255, 0.22);
+}
+
+.truck-studio-root .ts-hud-tile__ico {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+.truck-studio-root .ts-hud-tile__ico svg { width: 100%; height: 100%; }
+
+/* Every tile also carries a `title`, so a name clipped at the narrowest breakpoint is still
+   readable on hover rather than lost. */
+.truck-studio-root .ts-hud-tile__name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   7. Entry animation
+   ============================================================ */
+
+/* Mirrors .ts-mapbadge's entry exactly: this panel is anchored to the TOP of the viewport, so
+   it settles DOWNWARD out of its own edge. Rising up into place from below would read as the
+   same object having drifted across the render. Namespaced `ts-hud-` because Tailwind defines
+   global keyframes and the last definition of a name wins.
+   `translate`, not `transform`, so `animation-fill-mode: both` can never pin a transform
+   value another rule needs to own. */
+@keyframes ts-hud-in {
+  from { opacity: 0; translate: 0 -10px; }
+  to   { opacity: 1; translate: none; }
+}
+
+.truck-studio-root #ts-hud {
+  animation: ts-hud-in 260ms cubic-bezier(0.22, 0.7, 0.3, 1) both;
+}
+
+/* ============================================================
+   8. Responsive
+   Media queries, not container queries: the HUD lives in #canvas-holder, which we do not own
+   and must not turn into a query container — `container-type: inline-size` there would apply
+   layout containment to the very box three.js sizes the renderer from. selector.css makes the
+   same call for the badges and documents it, and this file has to agree with it, because
+   these blocks exist purely to track the badge geometry that file defines.
+
+   Block order mirrors selector.css exactly (width first, then the two height blocks): where
+   two of them match, the LATER one wins there too, so keeping the same order is what keeps
+   these top offsets in step with the badge sizes they were computed from.
+   ============================================================ */
+
+/* .ts-mapbadge → 152px at top:10px, ~128px tall, bottom edge ~138px.
+   .ts-badge    → 168px, ~142px tall, reaching ~152px up from the bottom.
+   Three tile columns cannot hold "Ensolarado" at this width, so the grid drops to two. */
+@media (max-width: 680px) {
+  .truck-studio-root #ts-hud {
+    --ts-hud-w: 152px;
+    --ts-hud-top: 148px;
+    --ts-hud-reserve: 164px;
+    --ts-hud-gutter: 10px;
+    border-radius: 12px;
+  }
+  .truck-studio-root .ts-hud__head { padding: 8px 9px; gap: 7px; }
+  .truck-studio-root .ts-hud__hint { padding-left: 23px; }
+  .truck-studio-root .ts-hud__body { gap: 9px; padding: 9px; }
+  .truck-studio-root .ts-hud-dial { width: 70px; height: 70px; }
+  .truck-studio-root .ts-hud-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Short viewports. Height is what runs out first: the two badges and this panel share one
+   column, and a ~620px window leaves #canvas-holder around 480px once Ankaa's chrome and the
+   studio topbar are gone. .ts-mapbadge → 172px wide, ~139px tall, bottom edge ~149px;
+   .ts-badge reaches ~166px up. The panel keeps all five rows and simply scrolls — which is
+   precisely what the max-height in section 1 and the body's own overflow are there for, and
+   why the collapse toggle is worth having.
+   The tile grid stays at three columns (two would be TALLER, which is the wrong trade here);
+   the label shrinks instead, since ~47px of tile cannot hold "Ensolarado" at 8.5px. */
+@media (max-height: 620px) {
+  .truck-studio-root #ts-hud {
+    --ts-hud-w: 172px;
+    --ts-hud-top: 158px;
+    --ts-hud-reserve: 178px;
+    --ts-hud-gutter: 10px;
+  }
+  .truck-studio-root .ts-hud__head { padding: 8px 9px; }
+  .truck-studio-root .ts-hud__hint { padding-left: 24px; }
+  .truck-studio-root .ts-hud__body { gap: 8px; padding: 9px; }
+  .truck-studio-root .ts-hud-row { gap: 4px; }
+  .truck-studio-root .ts-hud-dial { width: 66px; height: 66px; }
+  .truck-studio-root .ts-hud-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .truck-studio-root .ts-hud-tile { padding: 6px 2px 5px; font-size: 7.5px; }
+  .truck-studio-root .ts-hud-tile__ico { width: 16px; height: 16px; }
+}
+
+/* Shorter still. selector.css turns .ts-mapbadge on its side here — a 52px thumb beside its
+   text, ~54px tall instead of ~158px — which frees a full 100px and lets the panel start at
+   74px. That reclaimed height is the whole reason this breakpoint is worth having: without
+   it the panel's max-height would collapse onto its 96px floor and every control would be
+   behind a scrollbar. */
+@media (max-height: 470px) {
+  .truck-studio-root #ts-hud {
+    --ts-hud-w: 186px;
+    --ts-hud-top: 74px;
+    --ts-hud-reserve: 166px;
+    --ts-hud-gutter: 10px;
+  }
+  .truck-studio-root .ts-hud__head { padding: 7px 9px; }
+  .truck-studio-root .ts-hud-dial { width: 62px; height: 62px; }
+  .truck-studio-root .ts-hud-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .truck-studio-root .ts-hud-tile { font-size: 8px; }
+}
+
+/* ============================================================
+   9. Reduced motion
+   Everything animated above is decoration; none of it carries meaning. The entry animation
+   goes (`animation:none` also drops the fill-mode, so the panel keeps its final opacity) and
+   every transition is SHORTENED rather than removed — never set `transition: none` on the
+   shell, because the hover state is what makes the panel readable over a bright render and
+   it must still apply, just instantly.
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root #ts-hud {
+    animation: none;
+  }
+  .truck-studio-root #ts-hud,
+  .truck-studio-root .ts-hud__head,
+  .truck-studio-root .ts-hud__chev,
+  .truck-studio-root .ts-hud-cap,
+  .truck-studio-root .ts-hud-range,
+  .truck-studio-root .ts-hud-dial,
+  .truck-studio-root .ts-hud-dial__ray,
+  .truck-studio-root .ts-hud-dial__handle,
+  .truck-studio-root .ts-hud-tile {
+    transition-duration: 0.01ms;
+  }
+  /* Separate rules, one engine each: a shared list would be dropped whole by both. */
+  .truck-studio-root .ts-hud-range::-webkit-slider-thumb { transition-duration: 0.01ms; }
+  .truck-studio-root .ts-hud-range::-moz-range-thumb { transition-duration: 0.01ms; }
+}

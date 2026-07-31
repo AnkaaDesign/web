@@ -3,6 +3,7 @@ import { COMPANY_INFO } from "@/config/company";
 import { columnHeaderText, rawColumnValue, valueToString } from "./data-table-utils";
 import type { DataTableColumnDef } from "./data-table-types";
 
+import { BRAND_ASSETS } from '@/config/assets';
 const BRAND_GREEN: [number, number, number] = [10, 92, 30]; // #0a5c1e
 const TEXT_DARK: [number, number, number] = [26, 26, 26]; // #1a1a1a
 const TEXT_GRAY: [number, number, number] = [102, 102, 102]; // #666666
@@ -27,7 +28,7 @@ function formatPhone(phone: string): string {
 
 async function loadLogo(): Promise<{ dataUrl: string; w: number; h: number } | null> {
   try {
-    const res = await fetch("/logo.png");
+    const res = await fetch(BRAND_ASSETS.logo);
     if (!res.ok) return null;
     const blob = await res.blob();
     const dataUrl = await new Promise<string>((resolve, reject) => {

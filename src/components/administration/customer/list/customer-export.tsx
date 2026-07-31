@@ -5,6 +5,7 @@ import type { CustomerGetManyFormData } from "../../../../schemas";
 import { formatCNPJ, formatCPF, formatPhone, formatDate, formatDateTime } from "../../../../utils";
 import { customerService } from "../../../../api-client";
 
+import { BRAND_ASSETS } from '@/config/assets';
 interface CustomerExportProps {
   className?: string;
   filters?: Partial<CustomerGetManyFormData>;
@@ -417,7 +418,7 @@ export function CustomerExport({ className, filters = {}, currentCustomers = [],
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <div class="header-info">
             <div class="info">
               <p><strong>Data:</strong> ${formatDate(new Date())}</p>

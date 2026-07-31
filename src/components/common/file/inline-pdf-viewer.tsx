@@ -4,9 +4,10 @@ import { IconLoader2, IconAlertTriangle, IconDownload } from "@tabler/icons-reac
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { VENDOR_ASSETS } from '@/config/assets';
 // Configure PDF.js worker
 // Use .js extension instead of .mjs to avoid MIME type issues (browsers may reject .mjs with application/octet-stream)
-pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+pdfjs.GlobalWorkerOptions.workerSrc = VENDOR_ASSETS.pdfWorker;
 
 type PDFDocumentProxy = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
 type RenderTask = ReturnType<Awaited<ReturnType<PDFDocumentProxy["getPage"]>>["render"]>;

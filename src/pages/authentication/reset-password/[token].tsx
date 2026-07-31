@@ -4,13 +4,14 @@ import { IconArrowLeft } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 import { routes } from "../../../constants";
 
+import { BRAND_ASSETS } from '@/config/assets';
 export function ResetPasswordTokenPage() {
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <img src="/logo.png" alt="Ankaa Logo" className="w-40 h-16 object-contain" />
+            <img src={BRAND_ASSETS.logo} alt="Ankaa Logo" className="w-40 h-16 object-contain" />
           </div>
           <CardTitle className="text-2xl text-center">Redefinir senha</CardTitle>
           <CardDescription className="text-center">Sistema atualizado para verificação por código</CardDescription>

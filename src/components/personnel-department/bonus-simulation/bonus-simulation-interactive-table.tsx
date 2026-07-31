@@ -40,6 +40,7 @@ import { usePersistedState } from "@/hooks/common/use-persisted-state";
 import { toast } from "@/components/ui/sonner";
 import { BonusSimulationFilters } from "./bonus-simulation-filters";
 
+import { BRAND_ASSETS } from '@/config/assets';
 // localStorage keys — persist filters/sort/task config so the user returns to
 // exactly where they left off after navigating away.
 const FILTERS_STORAGE_KEY = "bonus-simulation-filters";
@@ -1020,7 +1021,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <h1 class="header-title">Simulação de Bônus</h1>
           <div class="header-info">
             <div class="info">

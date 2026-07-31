@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { CompanyAssetBlock, ImageSizePreset } from '../types';
+import { BRAND_ASSETS, ICON_ASSETS } from '@/config/assets';
 
 interface CompanyAssetBlockEditorProps {
   block: CompanyAssetBlock;
@@ -18,8 +19,8 @@ interface CompanyAssetBlockEditorProps {
 }
 
 const ASSETS = [
-  { key: 'logo' as const, label: 'Logo', description: 'Logotipo da empresa', path: '/logo.png', defaultSize: '75%' as ImageSizePreset },
-  { key: 'icon' as const, label: 'Ícone', description: 'Ícone da empresa', path: '/android-chrome-192x192.png', defaultSize: '128px' as ImageSizePreset },
+  { key: 'logo' as const, label: 'Logo', description: 'Logotipo da empresa', path: BRAND_ASSETS.logo, defaultSize: '75%' as ImageSizePreset },
+  { key: 'icon' as const, label: 'Ícone', description: 'Ícone da empresa', path: ICON_ASSETS.androidChrome192, defaultSize: '128px' as ImageSizePreset },
 ];
 
 const SIZE_OPTIONS = [

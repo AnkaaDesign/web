@@ -4,6 +4,7 @@ import { toast } from "@/components/ui/sonner";
 import { formatCurrencyUnmasked as formatCurrency, formatDate } from "../../../../utils";
 import { formatCPF } from "../../../../utils/formatters";
 
+import { BRAND_ASSETS } from '@/config/assets';
 // Bonus row interface matching the list page
 interface BonusRow {
   id: string;
@@ -504,7 +505,7 @@ export function BonusExport({
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <h1 class="header-title">Relatório de Bonificação</h1>
           <div class="header-info">
             <div class="info">

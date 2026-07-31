@@ -6,6 +6,7 @@ import { getApiBaseUrl } from "./file";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 
+import { BRAND_ASSETS } from '@/config/assets';
 interface BudgetPdfOptions {
   task: Task;
 }
@@ -1008,7 +1009,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
   <div class="page">
     <!-- Header -->
     <header class="header">
-      <img src="/logo.png" alt="Ankaa Design" class="logo" />
+      <img src="${BRAND_ASSETS.logo}" alt="Ankaa Design" class="logo" />
       <div class="header-right">
         <div class="budget-number">Orçamento Nº ${escapeHtml(data.budgetNumber)}</div>
         <div class="header-info">
@@ -1104,7 +1105,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
   <div class="page">
     <!-- Header -->
     <header class="header">
-      <img src="/logo.png" alt="Ankaa Design" class="logo" />
+      <img src="${BRAND_ASSETS.logo}" alt="Ankaa Design" class="logo" />
       <div class="header-right">
         <div class="budget-number">Orçamento Nº ${escapeHtml(data.budgetNumber)}</div>
         <div class="header-info">
@@ -1125,7 +1126,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     <div class="signature-section">
       <div class="signature-box">
         <div class="signature-image-container">
-          <img src="/sergio-signature.webp" alt="Assinatura Sergio Rodrigues" class="signature-image" style="margin-top: 12mm;" />
+          <img src="${BRAND_ASSETS.directorSignature}" alt="Assinatura Sergio Rodrigues" class="signature-image" style="margin-top: 12mm;" />
         </div>
         <div class="signature-line">
           <div class="signature-name">${PDF_CONFIG.directorName}</div>

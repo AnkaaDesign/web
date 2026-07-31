@@ -21,6 +21,7 @@ import { OrderItemSelector } from "./order-item-selector";
 import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
+import { BRAND_ASSETS } from '@/config/assets';
 export const OrderBatchCreateForm = () => {
   const navigate = useNavigate();
   const canViewPrices = useCanViewPrices();
@@ -599,7 +600,7 @@ export const OrderBatchCreateForm = () => {
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="${COMPANY_INFO.name}" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="${COMPANY_INFO.name}" class="logo" />
           <div class="header-info">
             <h1 class="title">Pedidos de Compra (Lote)</h1>
             <p class="subtitle">Documento de controle de múltiplos pedidos de materiais</p>

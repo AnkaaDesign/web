@@ -3,7 +3,11 @@
  * Shared by the web block renderer (src/components/messaging/*) and the
  * PDF exporter (src/utils/message-pdf-export.ts). Keep in sync with the
  * Flutter implementation.
+ *
+ * Asset URLs are NOT declared here — they come from `@/config/assets`, the
+ * single place that knows the layout of `public/`.
  */
+import { BRAND_ASSETS, ICON_ASSETS, MESSAGE_DECORATOR_ASSETS } from '@/config/assets';
 
 /** Canvas (spec §1) */
 export const CANVAS_MAX_WIDTH = 672;
@@ -66,8 +70,8 @@ export const IMAGE_CAPTION_GAP = 4;
 
 /** Company assets (spec §5) */
 export const COMPANY_ASSET_SRCS: Record<string, string> = {
-  logo: '/logo.png',
-  icon: '/android-chrome-192x192.png',
+  logo: BRAND_ASSETS.logo,
+  icon: ICON_ASSETS.androidChrome192,
 };
 
 /** Known intrinsic aspect ratios (w/h) of the company assets. */
@@ -91,15 +95,7 @@ export function companyAssetCapWidthPct(asset: string): number {
 }
 
 /** Decorators (spec §6) — header-logo uses the compact trimmed 394×156 asset. */
-export const DECORATOR_IMAGES: Record<string, string> = {
-  'header-logo': '/header-logo-compact.webp',
-  'header-logo-stripes': '/header-logo-stripes.webp',
-  'footer-wave-dark': '/footer-wave-dark.webp',
-  'footer-wave-logo': '/footer-wave-logo.webp',
-  'footer-diagonal-stripes': '/footer-diagonal-stripes.webp',
-  'footer-wave-gold': '/footer-wave-gold.webp',
-  'footer-geometric': '/footer-geometric.webp',
-};
+export const DECORATOR_IMAGES: Record<string, string> = { ...MESSAGE_DECORATOR_ASSETS };
 
 /**
  * header-logo: left-aligned, width = min(0.60 × C, 340px), natural aspect

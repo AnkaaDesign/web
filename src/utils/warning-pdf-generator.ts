@@ -9,6 +9,7 @@ import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { WARNING_SEVERITY_LABELS, WARNING_CATEGORY_LABELS } from "../constants";
 import type { WARNING_SEVERITY, WARNING_CATEGORY } from "../constants";
 
+import { BRAND_ASSETS } from '@/config/assets';
 export interface WarningPdfData {
   collaboratorName: string;
   collaboratorPosition?: string | null;
@@ -258,7 +259,7 @@ export function buildWarningPdfHtml(data: WarningPdfData): string {
 <body>
   <div class="sheet">
     <div class="header">
-      <img src="/logo.png" alt="${escapeHtml(COMPANY_INFO.name)}" class="logo" />
+      <img src="${BRAND_ASSETS.logo}" alt="${escapeHtml(COMPANY_INFO.name)}" class="logo" />
     </div>
     <div class="header-line"></div>
 

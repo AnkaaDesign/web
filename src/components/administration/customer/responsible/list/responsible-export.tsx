@@ -6,6 +6,7 @@ import { formatResponsibleRoles, getResponsibleRoles } from "@/types/responsible
 import { formatBrazilianPhone, formatCPF, formatDate, formatDateTime } from "@/utils";
 import { responsibleService } from "@/services/responsibleService";
 
+import { BRAND_ASSETS } from '@/config/assets';
 interface ResponsibleExportProps {
   className?: string;
   filters?: Partial<ResponsibleGetManyFormData>;
@@ -362,7 +363,7 @@ export function ResponsibleExport({ className, filters = {}, currentResponsibles
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <div class="header-info">
             <div class="info">
               <p><strong>Data:</strong> ${formatDate(new Date())}</p>

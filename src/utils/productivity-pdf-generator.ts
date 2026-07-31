@@ -9,6 +9,7 @@ import type { EChartsOption } from 'echarts';
 import { COMPANY_INFO, BRAND_COLORS } from '@/config/company';
 import { formatDate } from '@/utils/date';
 
+import { BRAND_ASSETS } from '@/config/assets';
 export interface ProductivityPdfOptions {
   /** Document title (top-right of header). */
   title: string;
@@ -224,7 +225,7 @@ async function drawHeader(
   let y = H - MT;
 
   // Logo (left)
-  const logoBytes = await fetchImageBytes('/logo.png');
+  const logoBytes = await fetchImageBytes(BRAND_ASSETS.logo);
   if (logoBytes) {
     const logo = await embedImage(doc, logoBytes);
     if (logo) {

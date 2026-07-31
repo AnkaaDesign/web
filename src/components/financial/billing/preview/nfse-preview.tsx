@@ -1,5 +1,6 @@
 import { NFSE_ISSUER } from "@/config/company";
 
+import { BRAND_ASSETS } from '@/config/assets';
 /**
  * Faithful pre-emission preview of the NFS-e (Nota Fiscal de Serviços
  * eletrônica) that the Elotech OXY integration emits via the Prefeitura de
@@ -272,7 +273,7 @@ export function NfsePreview({ data }: { data: NfsePreviewData }) {
               padding: 4,
             }}
           >
-            <img src="/logo.png" alt="logo" style={{ maxWidth: 52, maxHeight: 52, objectFit: "contain" }} />
+            <img src={BRAND_ASSETS.logo} alt="logo" style={{ maxWidth: 52, maxHeight: 52, objectFit: "contain" }} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", borderBottom: `1px solid ${C.line}` }}>

@@ -38,6 +38,7 @@ import {
 } from "@tabler/icons-react";
 import { COMPANY_INFO } from "@/config/company";
 
+import { BRAND_ASSETS } from '@/config/assets';
 interface VerificationData {
   verificationCode: string;
   status: string;
@@ -170,7 +171,7 @@ export default function PublicSignatureVerifyPage() {
             {/* ── Timbre + busca ─────────────────────────────────────────── */}
             <header className="px-4 py-5 sm:px-7 sm:py-6">
               <img
-                src="/logo.png"
+                src={BRAND_ASSETS.logo}
                 alt={COMPANY_INFO.name}
                 className="h-12 object-contain sm:h-14"
               />

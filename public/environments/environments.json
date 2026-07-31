@@ -1,0 +1,499 @@
+{
+  "environments": [
+    {
+      "id": "rodovia",
+      "name": "Rodovia",
+      "subtitle": "Asfalto entre campos, sol de meio-dia",
+      "thumb": "/environments/rodovia/thumb.webp",
+      "hdri": "/environments/rodovia/sky.hdr",
+      "backgroundImage": "/environments/rodovia/sky.jpg",
+      "grounded": {
+        "enabled": true,
+        "height": 2.1,
+        "radius": 150,
+        "resolution": 192
+      },
+      "nearGround": {
+        "enabled": true,
+        "material": "asphalt",
+        "verge": "grass",
+        "radius": 26,
+        "fade": 18,
+        "tint": "#ffffff",
+        "tintRgb": [0.211, 0.213, 0.173],
+        "repeat": 4.0,
+        "vergeTint": "#ffffff",
+        "vergeTintRgb": [0.091, 0.184, 0.090],
+        "vergeRepeat": 2.0,
+        "tintNote": "Multiplicadores LINEARES resolvidos em radiancia scene-referred, DEPOIS da funcao de transferencia da placa (scene.js preparePlateMaterial). Metodo: linhas do equirect cujo chao cai entre 6,5 e 44 m (0,25*radius ate radius+fade, alturas 0,5152-0,5995), classificadas em chao vs vegetacao por G>1,25*B e G>1,02*R, media em linear, ACES inverso a exposicao 1 -> radiancia da foto; dividida pelo albedo medio da textura vezes o fator de iluminacao da cena (key+rim+hemi+ambiente+irradiancia do HDRI vezes AO), menos o especular estimado. Foto: asfalto [0,2436 0,1986 0,1375], grama [0,0943 0,1356 0,0174]. Sem correcao o asfalto CG saia 3,0/3,4/4,7x mais claro que a foto e a grama 7,6/5,3/28x. Os campos `tint`/`vergeTint` em hex ficam neutros de proposito: tintColor() nao consegue exprimir um multiplicador abaixo de 0,62.",
+        "edgeNoise": {
+          "amplitude": 1.1,
+          "scale": 8.5
+        },
+        "wear": 0.55,
+        "undulation": {
+          "amplitude": 0.05,
+          "scale": 16.0
+        },
+        "maps": {
+          "diffuse": "/textures/asphalt_diff.webp",
+          "rough": "/textures/asphalt_rough.webp",
+          "normal": "/textures/asphalt_nor.jpg",
+          "ao": "/textures/asphalt_ao.webp",
+          "disp": "/textures/asphalt_disp.webp"
+        },
+        "vergeMaps": {
+          "diffuse": "/textures/grass_diff.webp",
+          "rough": "/textures/grass_rough.webp",
+          "normal": "/textures/grass_nor.jpg",
+          "ao": "/textures/grass_ao.webp",
+          "disp": "/textures/grass_disp.webp"
+        },
+        "mapsNote": "A chave e `diffuse`, nao `diff` — environment.js le SET_MAPS[0][0]='diffuse' e um `diff` era silenciosamente ignorado. O caminho e o 2k de propria: a banda proxima pede sozinha a variante `_4k` (HIRES_MAPS) e cai neste arquivo se ela nao existir."
+      },
+      "shadowCatcher": {
+        "size": 44,
+        "opacity": 0.48
+      },
+      "lamps": {
+        "enabled": true,
+        "layout": "roadside",
+        "spacing": 20,
+        "offset": 5.2,
+        "count": 2,
+        "height": 9.0,
+        "modelNote": "SEM `model`: o unico poste CC0 do acervo (street_lamp_01) e uma luminaria ornamentada de ferro fundido de 3,87 m — um poste de praca. Esticado para 9 m numa rodovia virava um lampiao vitoriano de tres andares. Aqui entra o mastro rodoviario procedural do scene.js (coluna conica, braco em curva, luminaria cutoff de vidro plano)."
+      },
+      "ground": {
+        "type": "asphalt",
+        "diffuse": "/textures/asphalt_diff.webp",
+        "rough": "/textures/asphalt_rough.webp",
+        "normal": "/textures/asphalt_nor.jpg",
+        "ao": "/textures/asphalt_ao.webp",
+        "disp": "/textures/asphalt_disp.webp",
+        "repeat": [
+          3,
+          84
+        ]
+      },
+      "showRoad": true,
+      "showSkyDome": false,
+      "envRotation": 4.7124,
+      "backgroundBlur": 0.0,
+      "preset": "ensolarado",
+      "timeOfDay": "dia",
+      "exposure": 1.05,
+      "envIntensity": 1.0,
+      "credit": {
+        "source": "Poly Haven",
+        "asset": "rural_asphalt_road",
+        "url": "https://polyhaven.com/a/rural_asphalt_road",
+        "author": "Alexander Scholten",
+        "license": "CC0"
+      },
+      "scatter": [
+        {
+          "prop": "grass_bermuda_01",
+          "count": 420,
+          "zone": "verge",
+          "scale": [
+            0.8,
+            1.6
+          ],
+          "tiltDeg": 6,
+          "jitter": 1.0,
+          "why": "meadow rasteira do lado direito da foto; 498 tri, o mais barato do acervo"
+        },
+        {
+          "prop": "grass_medium_01",
+          "count": 280,
+          "zone": "verge",
+          "scale": [
+            0.75,
+            1.4
+          ],
+          "tiltDeg": 10,
+          "jitter": 0.9,
+          "why": "capim alto do lado esquerdo — a foto tem grama CONTINUA, nao tufos isolados"
+        },
+        {
+          "prop": "grass_medium_02",
+          "count": 70,
+          "zone": "edge",
+          "scale": [
+            0.7,
+            1.25
+          ],
+          "tiltDeg": 12,
+          "jitter": 0.9,
+          "why": "capim seco na margem do acostamento de saibro"
+        },
+        {
+          "prop": "weed_plant_02",
+          "count": 44,
+          "zone": "edge",
+          "scale": [
+            0.8,
+            1.3
+          ],
+          "tiltDeg": 14,
+          "jitter": 1.0,
+          "why": "erva de folha larga na junta asfalto/saibro, que e onde ela nasce"
+        },
+        {
+          "prop": "dandelion_01",
+          "count": 26,
+          "zone": "verge",
+          "scale": [
+            0.85,
+            1.25
+          ],
+          "tiltDeg": 8,
+          "jitter": 0.9,
+          "why": "fim de primavera na Alemanha: o mato da banqueta esta florido"
+        },
+        {
+          "prop": "stone_01",
+          "count": 90,
+          "zone": "edge",
+          "scale": [
+            0.6,
+            1.8
+          ],
+          "tiltDeg": 20,
+          "jitter": 1.0,
+          "why": "saibro do acostamento derramado sobre a borda do asfalto"
+        }
+      ],
+      "roadside": [
+        {
+          "prop": "modular_electricity_poles",
+          "spacing": 30.0,
+          "offset": 8.5,
+          "sides": [
+            -1
+          ],
+          "why": "a foto tem linha de postes no horizonte; 8,5 m ja esta na lavoura, fora da banqueta de 5,2 m"
+        }
+      ],
+      "scatterNote": "SEM pedras na banqueta: a foto nao tem nenhuma. O unico mineral visivel e o saibro do acostamento, que entra como stone_01 na zona edge."
+    },
+    {
+      "id": "patio-logistico",
+      "name": "Pátio logístico",
+      "subtitle": "Terminal de cargas ao entardecer",
+      "thumb": "/environments/patio-logistico/thumb.webp",
+      "hdri": "/environments/patio-logistico/sky.hdr",
+      "backgroundImage": "/environments/patio-logistico/sky.jpg",
+      "grounded": {
+        "enabled": true,
+        "height": 1.2,
+        "radius": 150,
+        "resolution": 192
+      },
+      "nearGround": {
+        "enabled": true,
+        "material": "gravel",
+        "verge": null,
+        "radius": 18,
+        "fade": 14,
+        "tint": "#ffffff",
+        "tintRgb": [0.197, 0.324, 0.554],
+        "tintNote": "Mesmo metodo da rodovia. Faixa 4,5-32 m (linhas 0,5119-0,5830, camera a 1,20 m), 3,1% de vegetacao descartada. Foto do terrapleno [0,1010 0,0706 0,0461] linear; o gravel CG sem correcao saia 5,0/4,0/2,8x mais claro. O multiplicador SOBE de vermelho para azul porque a textura gravel e muito mais saturada (albedo [0,296 0,165 0,079]) do que o po compactado do panorama ao entardecer.",
+        "repeat": 2.5,
+        "edgeNoise": {
+          "amplitude": 2.2,
+          "scale": 9.0
+        },
+        "wear": 0.7,
+        "undulation": {
+          "amplitude": 0.09,
+          "scale": 11.0
+        },
+        "maps": {
+          "diffuse": "/textures/gravel_diff.webp",
+          "rough": "/textures/gravel_rough.webp",
+          "normal": "/textures/gravel_nor.jpg",
+          "ao": "/textures/gravel_ao.webp",
+          "disp": "/textures/gravel_disp.webp"
+        }
+      },
+      "shadowCatcher": {
+        "size": 40,
+        "opacity": 0.18
+      },
+      "lamps": {
+        "enabled": true,
+        "layout": "yard",
+        "spacing": 14,
+        "offset": 8.0,
+        "count": 6,
+        "height": 10.0,
+        "modelNote": "SEM `model`, pelo mesmo motivo da rodovia — e um terminal de cargas, nao um jardim. Mastro procedural a 10 m, que e a altura real de um poste de patio; scene.js recalibra a intensidade por (10/9)^2 para o pool no chao continuar onde os presets foram ajustados."
+      },
+      "ground": {
+        "type": "gravel",
+        "diffuse": "/textures/gravel_diff.webp",
+        "rough": "/textures/gravel_rough.webp",
+        "normal": "/textures/gravel_nor.jpg",
+        "ao": "/textures/gravel_ao.webp",
+        "disp": "/textures/gravel_disp.webp",
+        "repeat": [
+          4.8,
+          137
+        ]
+      },
+      "showRoad": false,
+      "showSkyDome": false,
+      "envRotation": 3.1416,
+      "backgroundBlur": 0.0,
+      "preset": "dourado",
+      "timeOfDay": "dia",
+      "exposure": 0.9,
+      "envIntensity": 1.25,
+      "credit": {
+        "source": "Poly Haven",
+        "asset": "freight_station",
+        "url": "https://polyhaven.com/a/freight_station",
+        "author": "Sergej Majboroda",
+        "license": "CC0"
+      },
+      "scatter": [
+        {
+          "prop": "stone_01",
+          "count": 120,
+          "zone": "all",
+          "scale": [
+            0.6,
+            2.0
+          ],
+          "tiltDeg": 20,
+          "jitter": 1.0,
+          "why": "o terrapleno esta cheio de pedrisco claro — sao os pontos claros do panorama"
+        },
+        {
+          "prop": "grass_medium_02",
+          "count": 46,
+          "zone": "all",
+          "scale": [
+            0.65,
+            1.2
+          ],
+          "tiltDeg": 14,
+          "jitter": 1.0,
+          "why": "SO a touceira SECA. Nada de verde: e um patio de carga, nao um jardim"
+        },
+        {
+          "prop": "weed_plant_02",
+          "count": 34,
+          "zone": "all",
+          "scale": [
+            0.75,
+            1.2
+          ],
+          "tiltDeg": 16,
+          "jitter": 1.0,
+          "why": "mato furando o po compactado"
+        },
+        {
+          "prop": "rock_moss_set_02",
+          "count": 8,
+          "zone": "all",
+          "scale": [
+            0.2,
+            0.55
+          ],
+          "tiltDeg": 12,
+          "jitter": 1.0,
+          "why": "entulho graudo"
+        },
+        {
+          "prop": "old_tyre",
+          "count": 7,
+          "zone": "all",
+          "scale": [
+            0.9,
+            1.1
+          ],
+          "tiltDeg": 6,
+          "jitter": 1.0,
+          "why": "pneu descartado, o classico do patio"
+        },
+        {
+          "prop": "trashbag",
+          "count": 5,
+          "zone": "all",
+          "scale": [
+            0.85,
+            1.2
+          ],
+          "tiltDeg": 8,
+          "jitter": 1.0,
+          "why": "lixo"
+        },
+        {
+          "prop": "concrete_road_barrier",
+          "count": 4,
+          "zone": "all",
+          "scale": [
+            0.95,
+            1.05
+          ],
+          "tiltDeg": 3,
+          "jitter": 1.0,
+          "why": "blocos soltos largados no terrapleno"
+        }
+      ],
+      "roadside": [
+        {
+          "prop": "concrete_road_barrier",
+          "spacing": 3.2,
+          "offset": 12.5,
+          "sides": [
+            -1
+          ],
+          "why": "fila de blocos delimitando o patio"
+        },
+        {
+          "prop": "modular_chainlink_fence",
+          "spacing": 0.934,
+          "offset": 15.0,
+          "sides": [
+            1
+          ],
+          "why": "alambrado de perimetro; spacing = o passo exato do modulo (0,934 m)"
+        },
+        {
+          "prop": "modular_electricity_poles",
+          "spacing": 26.0,
+          "offset": 15.5,
+          "sides": [
+            1
+          ],
+          "why": "os postes aparecem na borda do patio na propria foto"
+        }
+      ],
+      "scatterNote": "ZERO grama verde. grass_medium_01, grass_bermuda_01 e dandelion_01 estao deliberadamente ausentes deste cenario."
+    },
+    {
+      "id": "urbano",
+      "name": "Urbano",
+      "subtitle": "Avenida larga da cidade, sol a pino",
+      "thumb": "/environments/urbano/thumb.webp",
+      "hdri": "/environments/urbano/sky.hdr",
+      "backgroundImage": "/environments/urbano/sky.jpg",
+      "grounded": {
+        "enabled": true,
+        "height": 2.25,
+        "radius": 160,
+        "resolution": 192
+      },
+      "nearGround": {
+        "enabled": true,
+        "material": "asphalt",
+        "verge": null,
+        "radius": 22,
+        "fade": 16,
+        "tint": "#ffffff",
+        "tintRgb": [0.156, 0.167, 0.170],
+        "tintNote": "Mesmo metodo. Faixa 5,5-38 m (linhas 0,5188-0,6236, camera a 2,25 m). Foto do asfalto [0,2266 0,2032 0,1782] linear; o asfalto CG sem correcao saia 3,6/3,9/4,4x mais claro. O multiplicador e MENOR que o da rodovia porque este HDRI e bem mais luminoso (irradiancia do hemisferio superior 8,80 contra 6,28), logo a mesma textura recebe mais luz. Quase neutro em croma, como manda uma avenida cinza.",
+        "repeat": 4.0,
+        "edgeNoise": {
+          "amplitude": 0.35,
+          "scale": 12.0
+        },
+        "wear": 0.62,
+        "undulation": {
+          "amplitude": 0.03,
+          "scale": 20.0
+        },
+        "maps": {
+          "diffuse": "/textures/asphalt_diff.webp",
+          "rough": "/textures/asphalt_rough.webp",
+          "normal": "/textures/asphalt_nor.jpg",
+          "ao": "/textures/asphalt_ao.webp",
+          "disp": "/textures/asphalt_disp.webp"
+        }
+      },
+      "shadowCatcher": {
+        "size": 44,
+        "opacity": 0.55
+      },
+      "lamps": {
+        "enabled": true,
+        "layout": "roadside",
+        "spacing": 16,
+        "offset": 11.0,
+        "count": 2,
+        "height": 5.0,
+        "model": "street_lamp_01",
+        "modelNote": "O UNICO cenario que fica com o GLB: street_lamp_01 e uma luminaria ornamentada de 3,87 m, ou seja, exatamente um poste de avenida/praca. Montado a 5,0 m (1,29x o tamanho nativo — plausivel para o tipo) em vez dos 9 m do mastro rodoviario. scene.js compensa a intensidade do spot por (5/9)^2 = 0,309 para o pool no chao nao ficar 3,2x forte demais."
+      },
+      "ground": {
+        "type": "asphalt",
+        "diffuse": "/textures/asphalt_diff.webp",
+        "rough": "/textures/asphalt_rough.webp",
+        "normal": "/textures/asphalt_nor.jpg",
+        "ao": "/textures/asphalt_ao.webp",
+        "disp": "/textures/asphalt_disp.webp",
+        "repeat": [
+          3,
+          84
+        ]
+      },
+      "showRoad": true,
+      "showSkyDome": false,
+      "envRotation": 0.7505,
+      "backgroundBlur": 0.0,
+      "preset": "ensolarado",
+      "timeOfDay": "dia",
+      "exposure": 1.05,
+      "envIntensity": 1.0,
+      "credit": {
+        "source": "Poly Haven",
+        "asset": "wide_street_01",
+        "url": "https://polyhaven.com/a/wide_street_01",
+        "author": "Sergej Majboroda",
+        "license": "CC0"
+      },
+      "scatter": [
+        {
+          "prop": "stone_01",
+          "count": 38,
+          "zone": "all",
+          "scale": [
+            0.5,
+            1.3
+          ],
+          "tiltDeg": 20,
+          "jitter": 1.0,
+          "why": "granulado e cascalho solto na pista — nada alem disso cresce em avenida"
+        },
+        {
+          "prop": "trashbag",
+          "count": 2,
+          "zone": "all",
+          "scale": [
+            0.85,
+            1.15
+          ],
+          "tiltDeg": 8,
+          "jitter": 1.0,
+          "why": "lixo urbano, e so"
+        }
+      ],
+      "roadside": [
+        {
+          "prop": "fire_hydrant",
+          "spacing": 52.0,
+          "offset": 11.6,
+          "sides": [
+            -1
+          ],
+          "why": "a linha de meio-fio medida na foto e 10,6 m; 11,6 poe o hidrante logo atras dela"
+        }
+      ],
+      "scatterNote": "SEM vegetacao nenhuma: a foto nao tem um fio de mato na pista. Tambem sem postes de energia — avenida urbana tem cabo enterrado. O disco CG de 22 m COBRE o meio-fio fotografado a 11,6 m; a fila de roadside (hidrante) e os postes de luz em offset 11,0 sao o que devolve a leitura da linha de meio-fio como geometria."
+    }
+  ]
+}

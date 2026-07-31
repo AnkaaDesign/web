@@ -16,6 +16,7 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { routes } from "../../constants";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
+import { BRAND_ASSETS } from '@/config/assets';
 // Create a schema that matches the form structure
 const registerFormSchema = z
   .object({
@@ -90,7 +91,7 @@ export function RegisterPage() {
       <Card className={cn(authCardVariants({ elevation: "elevated" }))}>
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <img src="/logo.png" alt="Ankaa Logo" className={styles.logo} />
+            <img src={BRAND_ASSETS.logo} alt="Ankaa Logo" className={styles.logo} />
           </div>
           <CardTitle className={styles.title}>Criar conta</CardTitle>
           <CardDescription className={styles.description}>Preencha os dados abaixo para criar sua conta</CardDescription>

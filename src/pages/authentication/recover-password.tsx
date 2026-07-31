@@ -15,6 +15,7 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { routes } from "../../constants";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
+import { BRAND_ASSETS } from '@/config/assets';
 export function RecoverPasswordPage() {
   const navigate = useNavigate();
   const { recoverPassword } = useAuth();
@@ -53,7 +54,7 @@ export function RecoverPasswordPage() {
       <Card className={cn(authCardVariants({ elevation: "elevated" }))}>
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <img src="/logo.png" alt="Ankaa Logo" className={styles.logo} />
+            <img src={BRAND_ASSETS.logo} alt="Ankaa Logo" className={styles.logo} />
           </div>
           <CardTitle className={styles.title}>Recuperar senha</CardTitle>
           <CardDescription className={styles.description}>Digite seu email ou telefone e enviaremos um código para redefinir sua senha</CardDescription>

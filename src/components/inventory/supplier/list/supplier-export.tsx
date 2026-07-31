@@ -5,6 +5,7 @@ import { formatCNPJ, formatDate, formatDateTime } from "../../../../utils";
 import type { Supplier } from "../../../../types";
 import type { SupplierGetManyFormData } from "../../../../schemas";
 
+import { BRAND_ASSETS } from '@/config/assets';
 interface SupplierExportProps {
   className?: string;
   filters?: Partial<SupplierGetManyFormData>;
@@ -410,7 +411,7 @@ export function SupplierExport({ className, filters = {}, currentSuppliers = [],
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <div class="header-info">
             <div class="info">
               <p><strong>Data:</strong> ${formatDate(new Date())}</p>

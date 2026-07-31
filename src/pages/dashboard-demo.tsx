@@ -11,6 +11,7 @@
 // with size chip "1/2 × 2" / cog / trash, Largura × Altura popover.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BRAND_ASSETS } from '@/config/assets';
 import {
   IconPencil,
   IconPlus,
@@ -1012,7 +1013,7 @@ function FauxHeader() {
     <header className="border-b border-border px-4 py-3 w-full h-16 flex items-center justify-between transition-colors bg-card shrink-0">
       <div className="flex items-center gap-4">
         <img
-          src="/logo.png"
+          src={BRAND_ASSETS.logo}
           alt="Ankaa Logo"
           className="h-12"
           onError={(e) => {

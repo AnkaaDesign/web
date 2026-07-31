@@ -14,6 +14,7 @@ import { formatCPF, formatPIS } from "@/utils/formatters";
 import { formatDate } from "@/utils";
 import type { BuildHtmlOptions } from "@/components/personnel-department/time-clock-entry/time-clock-entry-edit-export";
 
+import { BRAND_ASSETS } from '@/config/assets';
 type RGB = [number, number, number];
 
 const GREEN: RGB = [10, 92, 30]; // #0a5c1e
@@ -45,7 +46,7 @@ function formatPhoneWithDDD(phone: string): string {
 
 async function loadLogo(): Promise<{ dataUrl: string; w: number; h: number } | null> {
   try {
-    const res = await fetch("/logo.png");
+    const res = await fetch(BRAND_ASSETS.logo);
     if (!res.ok) return null;
     const blob = await res.blob();
     const dataUrl = await new Promise<string>((resolve, reject) => {

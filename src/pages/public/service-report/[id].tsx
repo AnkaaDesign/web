@@ -17,6 +17,7 @@ import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-l
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
 import { BudgetSignaturePanel } from "@/components/public/budget-signature-panel";
 
+import { BRAND_ASSETS } from '@/config/assets';
 const COMPANY = { ...COMPANY_INFO, ...BRAND_COLORS };
 
 export function PublicServiceReportPage() {
@@ -428,7 +429,7 @@ export function PublicServiceReportPage() {
 
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
-              <img src="/logo.png" alt={COMPANY.name} className="h-16 md:h-20" />
+              <img src={BRAND_ASSETS.logo} alt={COMPANY.name} className="h-16 md:h-20" />
               <div className="flex flex-col items-end gap-2">
                 <Popover open={menuOpen} onOpenChange={setMenuOpen}>
                   <PopoverTrigger asChild>
@@ -744,7 +745,7 @@ export function PublicServiceReportPage() {
           <div className="bg-white shadow-lg rounded-lg overflow-hidden mt-8 print-page-break dossie-card">
             <div className="p-6 md:p-8">
               <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
-                <img src="/logo.png" alt={COMPANY.name} className="h-16 md:h-20" />
+                <img src={BRAND_ASSETS.logo} alt={COMPANY.name} className="h-16 md:h-20" />
                 <div className="text-right">
                   <h1 className="text-xl md:text-2xl font-bold text-gray-900">Dossiê Nº {budgetNumber}</h1>
                   <p className="text-sm text-gray-600 mt-1"><span className="font-semibold">Emissão:</span> {formatDate(new Date())}</p>

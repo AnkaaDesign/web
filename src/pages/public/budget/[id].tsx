@@ -17,6 +17,7 @@ import type { TaskQuote } from "@/types/task-quote";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 
+import { BRAND_ASSETS } from '@/config/assets';
 // Company constants assembled from centralized config
 const COMPANY = {
   ...COMPANY_INFO,
@@ -292,7 +293,7 @@ export function PublicBudgetPage() {
           <div className="p-6 md:p-8">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
-              <img src="/logo.png" alt="Ankaa Design" className="h-16 md:h-20" />
+              <img src={BRAND_ASSETS.logo} alt="Ankaa Design" className="h-16 md:h-20" />
               <div className="flex flex-col items-end gap-2">
                 <Popover open={menuOpen} onOpenChange={setMenuOpen}>
                   <PopoverTrigger asChild>

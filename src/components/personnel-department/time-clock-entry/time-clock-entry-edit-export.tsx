@@ -8,6 +8,7 @@ import { formatDate } from "@/utils";
 import { createEspelhoRenderer } from "@/utils/espelho-ponto-pdf-generator";
 import type { User } from "@/types";
 
+import { BRAND_ASSETS } from '@/config/assets';
 export interface EditExportRow {
   id: string;
   date: string;
@@ -905,7 +906,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
 <body>
   <div class="page">
     <header class="header">
-      <img src="/logo.png" alt="Ankaa Design" class="logo" />
+      <img src="${BRAND_ASSETS.logo}" alt="Ankaa Design" class="logo" />
       <div class="header-right">
         <div class="document-title">Espelho de Ponto</div>
         <div class="header-meta">

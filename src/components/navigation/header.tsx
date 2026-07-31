@@ -4,6 +4,7 @@ import { useTheme } from "@/contexts/theme-context";
 import { cn } from "@/lib/utils";
 import { IconMenu2 } from "@tabler/icons-react";
 
+import { BRAND_ASSETS } from '@/config/assets';
 export const Header: React.FC = () => {
   const { toggle } = useSidebar();
   const { theme } = useTheme();
@@ -18,7 +19,7 @@ export const Header: React.FC = () => {
     >
       {/* Left side - App title */}
       <div className="flex items-center gap-4">
-        <img src="/logo.png" alt="Ankaa Logo" className="h-12" />
+        <img src={BRAND_ASSETS.logo} alt="Ankaa Logo" className="h-12" />
       </div>
 
       {/* Right side - Hamburger menu */}

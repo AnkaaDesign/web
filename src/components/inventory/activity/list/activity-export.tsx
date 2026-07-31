@@ -6,6 +6,7 @@ import { ACTIVITY_REASON_LABELS, ACTIVITY_OPERATION_LABELS, ACTIVITY_OPERATION }
 import type { Activity } from "../../../../types";
 import type { ActivityGetManyFormData } from "../../../../schemas";
 
+import { BRAND_ASSETS } from '@/config/assets';
 interface ActivityExportProps {
   className?: string;
   filters?: Partial<ActivityGetManyFormData>;
@@ -268,7 +269,7 @@ export function ActivityExport({ className, filters, currentActivities = [], tot
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <div class="header-info">
             <div class="info">
               <p><strong>Data:</strong> ${formatDateTime(new Date())}</p>

@@ -1,0 +1,433 @@
+/* Truck Studio styles — a port of truck-studio/webapp/css/style.css, with every
+   selector scoped to .truck-studio-root so the studio's dark chrome and its
+   generic class names (.panel, .tool, .chip, .tab, .hidden…) cannot leak into
+   Ankaa, and Ankaa's Tailwind cannot restyle the studio.
+
+   Changes vs upstream:
+   - :root / html / body rules folded into .truck-studio-root
+   - #app height 100vh -> 100% (the studio fills the page area, not the screen)
+   - @keyframes spin renamed (Tailwind owns the global "spin" keyframes)
+   - the editor modal's z-index raised above Ankaa's chrome */
+
+.truck-studio-root {
+  --bg: #0d1017;
+  --panel: #131722;
+  --panel-2: #181d2b;
+  --stroke: rgba(255, 255, 255, 0.07);
+  --stroke-2: rgba(255, 255, 255, 0.13);
+  --text: #e8ebf3;
+  --muted: #8b93a7;
+  --accent: #4da3ff;
+  --accent-2: #c8102e;
+
+  position: relative;
+  height: 100%;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+.truck-studio-root * { box-sizing: border-box; margin: 0; padding: 0; }
+.truck-studio-root #app { display: flex; height: 100%; }
+.truck-studio-root .hidden { display: none !important; }
+
+/* ---------- viewport ---------- */
+.truck-studio-root #viewport { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.truck-studio-root #topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-bottom: 1px solid var(--stroke);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+}
+.truck-studio-root .brand { display: flex; align-items: center; gap: 10px; }
+.truck-studio-root .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+.truck-studio-root .brand h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
+.truck-studio-root .brand p { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; }
+.truck-studio-root .top-actions { display: flex; gap: 8px; align-items: center; }
+.truck-studio-root .chk {
+  display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted);
+  border: 1px solid var(--stroke-2); border-radius: 9px; padding: 6px 10px; cursor: pointer; user-select: none;
+}
+.truck-studio-root .chk input { accent-color: var(--accent); }
+.truck-studio-root button { font-family: inherit; cursor: pointer; }
+.truck-studio-root .ghost,
+.truck-studio-root .primary {
+  padding: 7px 13px; border-radius: 9px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--stroke-2); background: rgba(255, 255, 255, 0.05); color: var(--text);
+  transition: background 0.15s;
+}
+.truck-studio-root .ghost:hover { background: rgba(255, 255, 255, 0.1); }
+.truck-studio-root .ghost.on { background: var(--accent); border-color: transparent; color: #08101f; }
+.truck-studio-root .primary { background: var(--accent); border-color: transparent; color: #08101f; }
+.truck-studio-root .primary:hover { filter: brightness(1.1); }
+
+.truck-studio-root #canvas-holder { flex: 1; position: relative; min-height: 0; }
+.truck-studio-root #canvas-holder canvas { display: block; outline: none; }
+/* ============================================================
+   VIEW CONTROLS — enquadrar / girar / capturar, no canto superior
+   direito do render (a markup está em core/template.ts).
+   ============================================================
+   MESMO VIDRO DO HUD DE ILUMINAÇÃO (ui/hud.css seção 1), e não por gosto: estes
+   botões flutuam SOBRE um render vivo, do outro lado do mesmo canvas, e são o
+   par simétrico do #ts-hud no canto oposto. Se os dois cantos usam materiais
+   diferentes o olho lê duas UIs empilhadas na cena em vez de uma. Um preto quase
+   neutro em vez de um --panel tingido: a cena atrás é o assunto, e uma lâmina
+   fumê lê como vidro sobre o render em vez de mais um card opaco em cima dele. O
+   saturate() acima de 1 devolve um pouco da cor da cena que o blur lavou.
+
+   Os quatro números — 0.42/14px em repouso, 0.66/20px no hover — são os MESMOS
+   do painel, incluindo a duração de 220ms. Qualquer ajuste aqui tem de ser feito
+   lá também, ou os dois cantos saem de sincronia.
+
+   As duas listas de filtro nomeiam as mesmas funções na mesma ordem: é isso que
+   torna o backdrop-filter interpolável (trocar blur/saturate de lugar entre os
+   estados faz ele saltar em vez de animar). A longhand -webkit- entra na
+   transição em separado porque num motor que só entende a versão prefixada o
+   nome sem prefixo não é sequer uma propriedade animável. Nunca `all`.
+
+   A sombra externa é o que separa o cluster do render atrás dele — casada com a
+   do painel e a dos badges, para que tudo que flutua sobre a cena seja um só
+   material.
+
+   Hover/active mexem só em SUPERFÍCIE e BORDA. Nada de translate ou scale: são
+   controles sobre uma imagem em movimento, e um botão que pula 1px lê como
+   glitch de renderização — a mesma regra que ui/hud.css e os cards do seletor
+   já seguem. */
+.truck-studio-root #view-controls {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 8;              /* mesma camada dos badges; abaixo do curtain (400) */
+  display: flex;
+  gap: 7px;
+}
+
+.truck-studio-root .ts-vbtn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--stroke-2);
+  border-radius: 9px;
+  color: var(--text);
+  cursor: pointer;
+
+  /* THE look — idêntico a #ts-hud em repouso. */
+  background-color: rgba(8, 10, 14, 0.42);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.85), 0 2px 8px rgba(0, 0, 0, 0.5);
+
+  transition:
+    background-color 220ms ease,
+    backdrop-filter 220ms ease,
+    -webkit-backdrop-filter 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    color 220ms ease;
+}
+.truck-studio-root .ts-vbtn svg { display: block; }
+
+/* "No hover aumenta o efeito": mais opacidade E mais blur, exatamente como o
+   painel. O ícone sobe para branco puro porque aqui ele é o único conteúdo — não
+   há rótulo para carregar o estado. */
+.truck-studio-root .ts-vbtn:hover {
+  background-color: rgba(8, 10, 14, 0.66);
+  backdrop-filter: blur(20px) saturate(1.25);
+  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  box-shadow: 0 18px 46px -12px rgba(0, 0, 0, 0.9), 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+/* Pressionado: o vidro fecha — mais denso que o hover, com a sombra externa
+   recolhida e uma sombra interna no lugar dela. É o mesmo gesto do metal que
+   afundava, dito no material novo: o botão deixa de flutuar por um instante.
+   Depois do :hover na ordem do arquivo e com a mesma especificidade, então
+   ganha enquanto o ponteiro está em cima — que é sempre. */
+.truck-studio-root .ts-vbtn:active {
+  background-color: rgba(4, 6, 10, 0.78);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.55),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.truck-studio-root .ts-vbtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Auto-rotate ligado. `.on` é escrito por ui/sidebar.ts. Continua sendo vidro —
+   só o TINGIMENTO muda, herdando o backdrop-filter da regra base — mas com um
+   accent forte o bastante para ser lido de relance sobre céu claro ou asfalto,
+   apoiado pelo halo accent na sombra. É a linguagem que .ts-hud-tile.is-on usa
+   no painel, com a alfa mais alta porque estes 34px estão sobre o render nu, sem
+   uma lâmina de vidro por trás para escurecer o fundo primeiro. */
+.truck-studio-root .ts-vbtn.on {
+  background-color: rgba(77, 163, 255, 0.34);
+  border-color: rgba(140, 200, 255, 0.5);
+  color: #eaf4ff;
+  box-shadow:
+    0 16px 40px -12px rgba(0, 0, 0, 0.85),
+    0 2px 12px rgba(77, 163, 255, 0.35);
+}
+.truck-studio-root .ts-vbtn.on:hover {
+  background-color: rgba(77, 163, 255, 0.46);
+  border-color: rgba(170, 215, 255, 0.62);
+  color: #ffffff;
+  box-shadow:
+    0 18px 46px -12px rgba(0, 0, 0, 0.9),
+    0 2px 14px rgba(77, 163, 255, 0.45);
+}
+.truck-studio-root .ts-vbtn.on:active {
+  background-color: rgba(58, 132, 214, 0.6);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* ui/sidebar.ts desabilita "Baixar imagem" enquanto a captura em alta resolução
+   roda — ela para o loop de render e segura a thread principal, e um segundo
+   clique no meio disso pegaria o renderer já redimensionado.
+   DEPOIS de `.on` de propósito: com a mesma especificidade (0,3,0) a ordem é o
+   desempate, e "desabilitado" tem de vencer "ligado" e não o contrário.
+   `pointer-events:none` também mata o :hover, então o vidro não continua aceso
+   sob um botão que não responde. Mesma regra de #ts-hud button:disabled. */
+.truck-studio-root .ts-vbtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Sem blur o botão é só um filme preto a 42% sobre um render claro — legível
+   apenas por causa do blur. Tire o blur e ele quase some e o ícone fica solto no
+   céu. Então o ramo sem suporte troca a translucidez por uma superfície quase
+   sólida, exatamente como #ts-hud faz.
+
+   Escrito como `not ((sem prefixo) or (-webkit-))` e não só o teste sem prefixo:
+   o Safari embarcou -webkit-backdrop-filter por anos sem o nome sem prefixo, e o
+   teste simples rebaixaria um motor que borra perfeitamente bem. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .truck-studio-root .ts-vbtn { background-color: rgba(10, 13, 19, 0.9); }
+  .truck-studio-root .ts-vbtn:hover { background-color: rgba(10, 13, 19, 0.97); }
+  .truck-studio-root .ts-vbtn:active { background-color: rgba(6, 8, 13, 0.98); }
+  /* O accent tem de ser restabelecido DENTRO do bloco: @supports não soma
+     especificidade, então o `.ts-vbtn.on` (0,2,0) acima venceria este (0,1,0) e
+     entregaria a um motor sem blur nenhum justamente a superfície mais
+     transparente do arquivo. */
+  .truck-studio-root .ts-vbtn.on { background-color: rgba(45, 106, 173, 0.95); }
+  .truck-studio-root .ts-vbtn.on:hover { background-color: rgba(58, 128, 204, 0.97); }
+  /* Depois do :hover e com a mesma especificidade (0,4,0), então ganha enquanto o
+     botão está pressionado — que é sempre com o ponteiro em cima. */
+  .truck-studio-root .ts-vbtn.on:active { background-color: rgba(34, 82, 138, 0.97); }
+}
+
+/* Telas estreitas: o cluster desce um pouco para não brigar com o badge do
+   cenário quando #canvas-holder fica curto. */
+@media (max-width: 720px) {
+  .truck-studio-root #view-controls { top: 10px; right: 10px; gap: 5px; }
+  .truck-studio-root .ts-vbtn { width: 31px; height: 31px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-vbtn { transition: none; }
+}
+
+.truck-studio-root #view-hint {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; color: var(--muted); letter-spacing: 0.04em; pointer-events: none;
+  background: rgba(13, 16, 23, 0.55); padding: 5px 12px; border-radius: 20px; backdrop-filter: blur(4px);
+}
+.truck-studio-root #loading {
+  position: absolute; inset: 0; display: flex; flex-direction: column; gap: 14px;
+  align-items: center; justify-content: center; background: var(--bg); z-index: 10;
+  transition: opacity 0.4s;
+}
+.truck-studio-root #loading.hide { opacity: 0; pointer-events: none; }
+.truck-studio-root .spinner {
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.12); border-top-color: var(--accent);
+  animation: truck-studio-spin 1s linear infinite;
+}
+.truck-studio-root .spinner.small { width: 18px; height: 18px; border-width: 2px; }
+@keyframes truck-studio-spin { to { transform: rotate(360deg); } }
+.truck-studio-root .load-text { font-size: 12px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.truck-studio-root .load-bar { width: 220px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.truck-studio-root .load-bar i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 0.2s; }
+/* Duas pílulas, um desenho: a troca de veículo (studio.ts) e a captura em alta
+   resolução (ui/sidebar.ts + scene/capture.ts). Nós separados, dono separado,
+   mesma aparência — nunca estão no ar ao mesmo tempo, e se um dia estiverem,
+   ficarão empilhadas em vez de brigar pelo mesmo elemento. */
+.truck-studio-root #cab-switching,
+.truck-studio-root #ts-shot {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 9;
+  display: flex; align-items: center; gap: 9px; font-size: 12px; color: var(--text);
+  background: rgba(13, 16, 23, 0.8); border: 1px solid var(--stroke-2);
+  padding: 8px 16px; border-radius: 22px; backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* ---------- sidebar ---------- */
+.truck-studio-root #sidebar {
+  width: 340px; display: flex; flex-direction: column; gap: 12px;
+  border-left: 1px solid var(--stroke); background: var(--panel);
+  padding: 14px; overflow-y: auto;
+}
+.truck-studio-root .panel {
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--panel-2); border: 1px solid var(--stroke);
+  border-radius: 13px; padding: 12px;
+}
+.truck-studio-root .panel-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); display: flex; align-items: center; justify-content: space-between;
+}
+.truck-studio-root .select {
+  flex: 1; max-width: 200px;
+  background: var(--panel); color: var(--text); border: 1px solid var(--stroke-2);
+  border-radius: 9px; padding: 7px 9px; font-size: 12.5px; font-family: inherit;
+}
+.truck-studio-root .select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.truck-studio-root .ctl { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+.truck-studio-root .ctl input[type="color"] {
+  width: 34px; height: 26px; border: none; padding: 0; background: none; cursor: pointer; border-radius: 6px;
+}
+.truck-studio-root .ctl.range { flex-direction: column; align-items: stretch; gap: 5px; }
+.truck-studio-root .ctl.range span { display: flex; justify-content: space-between; }
+.truck-studio-root .ctl.range b { color: var(--text); font-weight: 600; }
+.truck-studio-root .ctl.range input { accent-color: var(--accent); width: 100%; }
+.truck-studio-root .mini { padding: 3px 8px; border-radius: 6px; font-size: 11px; border: 1px solid var(--stroke-2); background: rgba(255, 255, 255, 0.05); color: var(--muted); }
+.truck-studio-root .mini.primary { background: var(--accent); border-color: transparent; color: #08101f; font-weight: 700; }
+
+.truck-studio-root .ctl-off { opacity: 0.4; pointer-events: none; }
+.truck-studio-root .ctl.range i { font-style: normal; color: var(--muted); }
+.truck-studio-root .panel-hint { font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; color: var(--accent); }
+
+/* segmented control — finish type, day/night */
+.truck-studio-root .seg {
+  display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--stroke);
+  border-radius: 10px; padding: 3px;
+}
+.truck-studio-root .seg-btn {
+  flex: 1; padding: 7px 6px; border: none; border-radius: 8px; background: transparent;
+  color: var(--muted); font-size: 11.5px; font-weight: 600; font-family: inherit;
+  white-space: nowrap; transition: background 0.15s, color 0.15s;
+}
+.truck-studio-root .seg-btn:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+.truck-studio-root .seg-btn.on { background: rgba(77, 163, 255, 0.16); color: var(--accent); }
+
+/* preset chip rows — paint swatches and weather presets */
+.truck-studio-root .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.truck-studio-root .chip {
+  border: 1px solid var(--stroke-2); border-radius: 10px; background: rgba(255, 255, 255, 0.04);
+  color: var(--muted); font-family: inherit; font-size: 11px; font-weight: 600;
+  padding: 6px 9px; transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.truck-studio-root .chip:hover { background: rgba(255, 255, 255, 0.09); color: var(--text); }
+.truck-studio-root .chip.on {
+  color: var(--accent); background: rgba(77, 163, 255, 0.12); border-color: transparent;
+  box-shadow: 0 0 0 1.5px var(--accent);
+}
+/* finish-specific control groups: shown only for the active finish */
+.truck-studio-root .paint-group { display: none; flex-direction: column; gap: 10px; }
+.truck-studio-root .paint-group.on { display: flex; }
+
+/* paint-to-trailer toggle */
+.truck-studio-root .wide-chk {
+  justify-content: flex-start; border: 1px dashed var(--stroke-2);
+  color: var(--text); font-size: 12.5px; padding: 8px 10px;
+}
+.truck-studio-root .wide-chk:hover { background: rgba(255, 255, 255, 0.04); }
+
+/* preview cards */
+.truck-studio-root .preview-card {
+  border: 1px solid var(--stroke-2); border-radius: 11px; overflow: hidden; cursor: pointer;
+  background: #20242f; transition: border-color 0.15s;
+}
+.truck-studio-root .preview-card:hover { border-color: var(--accent); }
+.truck-studio-root .preview-frame {
+  position: relative; width: 100%;
+  background:
+    linear-gradient(45deg, #262b38 25%, transparent 25%, transparent 75%, #262b38 75%),
+    linear-gradient(45deg, #262b38 25%, transparent 25%, transparent 75%, #262b38 75%);
+  background-size: 14px 14px;
+  background-position: 0 0, 7px 7px;
+}
+.truck-studio-root .preview-frame canvas { display: block; width: 100%; height: auto; }
+.truck-studio-root .preview-frame.square canvas { max-height: 180px; width: auto; margin: 0 auto; }
+.truck-studio-root .preview-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 10px; font-size: 11.5px; color: var(--text); border-top: 1px solid var(--stroke);
+}
+.truck-studio-root .preview-foot small { color: var(--muted); }
+
+.truck-studio-root .side-foot { margin-top: auto; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; padding: 4px 2px; }
+
+/* ---------- editor modal ---------- */
+.truck-studio-root #editor-modal {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(5, 7, 12, 0.72); backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center;
+}
+.truck-studio-root .modal-card {
+  width: 92vw; height: 90vh; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--stroke-2); border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6); overflow: hidden;
+}
+.truck-studio-root .modal-head {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 14px; border-bottom: 1px solid var(--stroke);
+}
+.truck-studio-root .tabs { display: flex; gap: 6px; background: var(--panel-2); border-radius: 11px; padding: 4px; }
+.truck-studio-root .tab {
+  padding: 8px 18px; border: none; border-radius: 8px; background: transparent;
+  color: var(--muted); font-size: 12px; font-weight: 600;
+}
+.truck-studio-root .tab.active { background: rgba(77, 163, 255, 0.16); color: var(--accent); }
+.truck-studio-root .editor-caption { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; flex: 1; }
+.truck-studio-root .modal-toolbar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px 14px; border-bottom: 1px solid var(--stroke); background: var(--panel-2);
+}
+.truck-studio-root .tool {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 11px; border-radius: 9px; border: 1px solid var(--stroke-2);
+  background: rgba(255, 255, 255, 0.04); color: var(--text); font-size: 11.5px;
+}
+.truck-studio-root .tool span { font-size: 13px; }
+.truck-studio-root .tool:hover { background: rgba(255, 255, 255, 0.09); }
+.truck-studio-root .tool.on { background: rgba(77, 163, 255, 0.18); border-color: var(--accent); color: var(--accent); }
+.truck-studio-root .tb-sep { width: 1px; height: 22px; background: var(--stroke-2); margin: 0 4px; }
+.truck-studio-root .tb-ctl { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.truck-studio-root .tb-ctl input[type="color"] { width: 30px; height: 24px; border: none; padding: 0; background: none; cursor: pointer; }
+.truck-studio-root .tb-ctl input[type="range"] { width: 90px; accent-color: var(--accent); }
+
+.truck-studio-root .modal-stage {
+  flex: 1; min-height: 0; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    linear-gradient(45deg, #1a1e29 25%, transparent 25%, transparent 75%, #1a1e29 75%),
+    linear-gradient(45deg, #1a1e29 25%, transparent 25%, transparent 75%, #1a1e29 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  padding: 16px;
+}
+.truck-studio-root .stage-panel { position: relative; box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45); }
+.truck-studio-root .stage-panel .canvas-container { background: #fff0; }
+.truck-studio-root .guide-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 20;
+}
+.truck-studio-root #drop-hint {
+  position: absolute; inset: 14px; z-index: 30; pointer-events: none;
+  display: none; align-items: center; justify-content: center;
+  border: 2px dashed var(--accent); border-radius: 14px;
+  background: rgba(77, 163, 255, 0.12); color: var(--accent);
+  font-size: 15px; font-weight: 700; letter-spacing: 0.03em;
+}
+.truck-studio-root .modal-stage.dragging #drop-hint { display: flex; }
+.truck-studio-root .modal-foot {
+  padding: 8px 14px; font-size: 11px; color: var(--muted);
+  border-top: 1px solid var(--stroke); text-align: center; letter-spacing: 0.03em;
+}

@@ -8,6 +8,7 @@ import { MEASURE_UNIT_LABELS, MEASURE_TYPE_LABELS, PPE_TYPE_LABELS } from "../..
 import { itemService } from "../../../../api-client";
 import { useCanViewPrices } from "../../../../hooks";
 
+import { BRAND_ASSETS } from '@/config/assets';
 interface PpeExportProps {
   className?: string;
   filters?: Partial<ItemGetManyFormData>;
@@ -417,7 +418,7 @@ export function PpeExport({ className, filters = {}, currentItems = [], totalRec
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <div class="header-info">
             <div class="info">
               <p><strong>Data:</strong> ${formatDate(new Date())}</p>

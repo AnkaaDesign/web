@@ -1,5 +1,6 @@
 import { PAINT_FINISH } from "../../../constants";
 
+import { PAINT_TEXTURE_ASSETS } from '@/config/assets';
 export interface FinishConfig {
   label: string;
   description: string;
@@ -92,7 +93,7 @@ export const PAINT_FINISH_CONFIG: Record<PAINT_FINISH, FinishConfig> = {
   [PAINT_FINISH.METALLIC]: {
     label: "Metálico",
     description: "Partículas metálicas com reflexão direcional",
-    normalMap: "/metallic-normal-map.jpg",
+    normalMap: PAINT_TEXTURE_ASSETS.metallicNormal,
     roughness: 0.12,
     metalness: 0.85,
     clearCoat: 1.0,
@@ -129,7 +130,7 @@ export const PAINT_FINISH_CONFIG: Record<PAINT_FINISH, FinishConfig> = {
   [PAINT_FINISH.PEARL]: {
     label: "Perolizado",
     description: "Efeito iridescente com mudança de cor",
-    normalMap: "/pearl-normal-map.jpg",
+    normalMap: PAINT_TEXTURE_ASSETS.pearlNormal,
     roughness: 0.18,
     metalness: 0.25,
     clearCoat: 1.0,

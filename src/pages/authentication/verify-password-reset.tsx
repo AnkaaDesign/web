@@ -15,6 +15,7 @@ import { getAuthStyles, authLayoutVariants, authCardVariants, inputVariants } fr
 import { cn } from "@/lib/utils";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
+import { BRAND_ASSETS } from '@/config/assets';
 // Schema for the new password form
 const newPasswordSchema = z
   .object({
@@ -132,7 +133,7 @@ export function VerifyPasswordResetPage() {
       <Card className={cn(authCardVariants({ elevation: "elevated" }))}>
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <img src="/logo.png" alt="Ankaa Logo" className={styles.logo} />
+            <img src={BRAND_ASSETS.logo} alt="Ankaa Logo" className={styles.logo} />
           </div>
           {step === "verification" ? (
             <>

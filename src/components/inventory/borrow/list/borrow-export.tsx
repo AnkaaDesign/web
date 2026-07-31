@@ -6,6 +6,7 @@ import { BORROW_STATUS_LABELS } from "../../../../constants";
 import { formatDate, formatDateTime } from "../../../../utils";
 import { borrowService } from "../../../../api-client";
 
+import { BRAND_ASSETS } from '@/config/assets';
 interface BorrowExportProps {
   className?: string;
   filters?: Partial<BorrowGetManyFormData>;
@@ -400,7 +401,7 @@ export function BorrowExport({ className, filters = {}, currentItems = [], total
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <div class="header-info">
             <div class="info">
               <p><strong>Data:</strong> ${formatDate(new Date())}</p>

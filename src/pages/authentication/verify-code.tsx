@@ -7,6 +7,7 @@ import { IconArrowLeft } from "@tabler/icons-react";
 import { routes } from "../../constants";
 import { maskPhone } from "../../utils";
 
+import { BRAND_ASSETS } from '@/config/assets';
 export function VerifyCodePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -103,7 +104,7 @@ export function VerifyCodePage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <img src="/logo.png" alt="Ankaa Logo" className="w-40 h-16 object-contain" />
+            <img src={BRAND_ASSETS.logo} alt="Ankaa Logo" className="w-40 h-16 object-contain" />
           </div>
           <CardTitle className="text-2xl text-center">Verificar conta</CardTitle>
           <CardDescription className="text-center">

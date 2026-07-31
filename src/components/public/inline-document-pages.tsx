@@ -17,7 +17,8 @@ import { IconAlertCircle, IconLoader2 } from "@tabler/icons-react";
 import "react-pdf/dist/Page/TextLayer.css";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 
-pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+import { VENDOR_ASSETS } from '@/config/assets';
+pdfjs.GlobalWorkerOptions.workerSrc = VENDOR_ASSETS.pdfWorker;
 
 export function InlineDocumentPages({
   url,

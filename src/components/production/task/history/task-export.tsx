@@ -7,6 +7,7 @@ import { formatDate, formatDateTime, getDurationBetweenDates, formatCurrencyUnma
 import { TASK_STATUS, BONIFICATION_STATUS_LABELS, BONIFICATION_STATUS, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS, TASK_QUOTE_STATUS_LABELS, TASK_QUOTE_STATUS } from "../../../../constants";
 import { taskService } from "../../../../api-client";
 
+import { BRAND_ASSETS } from '@/config/assets';
 // Format date as dd/mm/yy for PDF export
 const formatShortDate = (date: Date | string | null | undefined): string => {
   if (!date) return "-";
@@ -624,7 +625,7 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="${BRAND_ASSETS.logo}" alt="Ankaa Logo" class="logo" />
           <h1 class="header-title">Histórico de Tarefas</h1>
           <div class="header-info">
             <div class="info">

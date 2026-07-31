@@ -1,4 +1,5 @@
 import { formatDate, formatDateTime } from "../utils";
+import { BRAND_ASSETS } from "@/config/assets";
 
 interface ExportToExcelOptions {
   sheetName?: string;
@@ -105,7 +106,7 @@ export const exportToPDF = (data: any[], _filename: string, options: ExportToPDF
   const headers = Object.keys(data[0]).filter((key) => key !== "isSectorHeader" && key !== "sectorName");
 
   // Get the logo URL (relative to the base URL)
-  const logoUrl = `${window.location.origin}/logo.png`;
+  const logoUrl = `${window.location.origin}${BRAND_ASSETS.logo}`;
 
   // Generate HTML content
   const htmlContent = `

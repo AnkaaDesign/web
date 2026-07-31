@@ -4,8 +4,9 @@ import type { File as AnkaaFile } from "../types";
 import { getApiBaseUrl } from "@/config/api";
 import { rewriteCdnUrl } from "./file";
 
+import { VENDOR_ASSETS } from '@/config/assets';
 // Reuse the locally-hosted worker already shipped for the inline PDF viewer.
-pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+pdfjs.GlobalWorkerOptions.workerSrc = VENDOR_ASSETS.pdfWorker;
 
 /**
  * Render the first page of a local PDF (a File/Blob picked in a form, BEFORE any

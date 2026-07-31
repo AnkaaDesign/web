@@ -71,6 +71,7 @@ import {
 } from "@tabler/icons-react";
 import { COMPANY_INFO } from "@/config/company";
 
+import { BRAND_ASSETS } from '@/config/assets';
 /**
  * A porta de consentimento NÃO abre mais no carregamento.
  *
@@ -918,7 +919,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <Toaster />
       <div className="mx-auto mb-5 max-w-5xl">
         {/* Logo maior e alinhada à esquerda, na mesma coluna dos cartões. */}
-      <img src="/logo.png" alt={COMPANY_INFO.name} className="h-16 object-contain" />
+      <img src={BRAND_ASSETS.logo} alt={COMPANY_INFO.name} className="h-16 object-contain" />
       </div>
       {children}
     </div>

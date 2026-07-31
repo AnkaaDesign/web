@@ -1,0 +1,442 @@
+/* Truck Studio — the loading curtain (#ts-loader).
+   engine/ui/loader.ts owns the markup and the choreography; this file owns the look.
+
+   Conventions, all load-bearing:
+   - EVERY selector starts with .truck-studio-root. Ankaa's Tailwind must not leak
+     in and the studio's generic names must not leak out.
+   - Class prefix `ts-load-`, single id `ts-loader`, keyframes namespaced
+     `ts-load-*`. Tailwind defines global keyframes and the LAST definition of a
+     name wins, which is why studio.css already had to rename `spin`.
+   - Only opacity / transform / background-color are ever transitioned. Never
+     `all`, never width/left/top — the outro FLIPs a 420 px element and a layout
+     property would relayout the column on every frame.
+   - `.hidden { display: none !important }` comes from studio.css; nothing here
+     invents a second hiding mechanism.
+
+   z-index 400. The stack under .truck-studio-root, from the top:
+     #editor-modal 9999 · .ts-selector 500 · #ts-loader 400 · #loading 10 ·
+     #cab-switching 9 · .ts-badge 8.
+   400 puts the curtain above every piece of studio chrome (including the legacy
+   #loading it replaces) while staying under the selector overlay, which can be
+   re-opened from the badge while the curtain is still coming down. */
+
+/* ============================================================
+   1. Curtain shell
+   ============================================================ */
+
+/* The root's background-color is what actually hides the 3D scene, and it is
+   transitioned (not the root's opacity) so the flying hero can stay fully opaque
+   while everything behind it dissolves. */
+.truck-studio-root .ts-load {
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-color: var(--bg);
+  opacity: 0;
+  /* The curtain owns the pointer while it is up: OrbitControls underneath must
+     not react to a drag the user aimed at the loading screen. */
+  cursor: progress;
+  user-select: none;
+  transition: opacity 240ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.truck-studio-root .ts-load.is-in {
+  opacity: 1;
+}
+
+/* The chosen scene's thumbnail: context, not content. Blurred to abstraction and
+   pulled down to about a third of its brightness, so it is felt rather than
+   looked at. `inset: -60px` is sized against the 26 px blur radius plus the
+   ken-burns scale — without it the blur would sample transparency and draw a
+   soft frame around the viewport. */
+.truck-studio-root .ts-load-bg {
+  position: absolute;
+  inset: -60px;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  filter: blur(26px) saturate(0.78) brightness(0.34);
+  opacity: 0;
+  transform: scale(1);
+  transition: opacity 900ms ease-out;
+}
+.truck-studio-root .ts-load.is-in .ts-load-bg {
+  opacity: 1;
+  /* Only `transform` comes from the keyframe. Opacity stays on a transition on
+     purpose: an animation with fill:both would pin it and the outro's fade-out
+     would silently do nothing. */
+  animation: ts-load-kenburns 20000ms cubic-bezier(0.33, 0, 0.2, 1) both;
+}
+
+/* Vignette. With envThumb null the .ts-load-bg layer stays empty and this, over
+   the flat --bg, IS the backdrop — a deliberate composition rather than a hole. */
+.truck-studio-root .ts-load-scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 92% at 50% 42%,
+    rgba(13, 16, 23, 0.22) 0%,
+    rgba(13, 16, 23, 0.84) 62%,
+    rgba(8, 10, 15, 0.97) 100%
+  );
+}
+
+.truck-studio-root .ts-load-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  max-width: 520px;
+  padding: 24px;
+  text-align: center;
+}
+
+/* ============================================================
+   2. Scene label
+   ============================================================ */
+
+.truck-studio-root .ts-load-env {
+  padding: 5px 12px;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   3. The hero — the chosen truck
+   ============================================================ */
+
+/* Fixed box on purpose: the photo and the lettered placeholder both sit inside
+   it at inset:0, so the column never reflows when an image fails, and the FLIP's
+   "first" rect is the same one the browser painted. */
+.truck-studio-root .ts-load-stage {
+  position: relative;
+  width: min(420px, 76vw);
+  height: clamp(140px, 30vh, 236px);
+  filter: drop-shadow(0 26px 34px rgba(0, 0, 0, 0.62));
+}
+.truck-studio-root .ts-load.is-flying .ts-load-stage {
+  will-change: transform, opacity;
+}
+.truck-studio-root .ts-load-photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+/* Rhymes with .ts-badge__fallback in selector.css — same hatch, same gradient,
+   same initials — so a missing photo flies into a matching tile instead of
+   morphing into a different-looking object. */
+.truck-studio-root .ts-load-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.028) 0 12px, transparent 12px 24px),
+    linear-gradient(160deg, var(--panel-2), var(--panel));
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 54px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-indent: 0.08em;
+}
+
+/* ============================================================
+   4. Lane dashes — the only moving decoration
+   Very low contrast by design: this must be felt, not looked at. Its real job is
+   to keep the curtain alive during the FBX parse, when the progress bar has
+   nothing honest to say.
+   ============================================================ */
+
+/* ============================================================
+   5. Brand + type
+   ============================================================ */
+
+.truck-studio-root .ts-load-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.truck-studio-root .ts-load-logo {
+  display: block;
+  width: 62px;
+  height: 34px;
+  object-fit: contain;
+  object-position: center;
+  opacity: 0.92;
+}
+/* Shown instead of the logo when there is no mark, or when it 404s. */
+.truck-studio-root .ts-load-brand {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.truck-studio-root .ts-load-type {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+.truck-studio-root .ts-load-name {
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+.truck-studio-root .ts-load-sub {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   6. Progress
+   ============================================================ */
+
+.truck-studio-root .ts-load-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 260px;
+  max-width: 76vw;
+}
+.truck-studio-root .ts-load-track {
+  position: relative;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--stroke-2);
+  overflow: hidden;
+}
+/* Full-width layer slid in from the left rather than a growing `width`: pure
+   transform, no layout, and — unlike scaleX — it does not squash the shimmer
+   inside it. --ts-p (0..1) is written by loader.ts's rAF loop onto #ts-loader. */
+.truck-studio-root .ts-load-fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: translateX(calc((var(--ts-p, 0) - 1) * 100%));
+  will-change: transform;
+}
+/* Exactly cancels the fill's translation, which puts the glint back into TRACK
+   space: it therefore crosses the bar at a constant speed regardless of the
+   progress value, while the fill's overflow:hidden clips it to the filled part.
+   That is the whole trick — the shimmer sweeps the FILL, not the track. */
+.truck-studio-root .ts-load-shine {
+  position: absolute;
+  inset: 0;
+  transform: translateX(calc((1 - var(--ts-p, 0)) * 100%));
+}
+.truck-studio-root .ts-load-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 26%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.85) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+.truck-studio-root .ts-load.is-in .ts-load-shine::after {
+  animation: ts-load-shimmer 2200ms linear 700ms infinite;
+}
+
+.truck-studio-root .ts-load-status {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.truck-studio-root .ts-load-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Tabular figures: without them the percentage jitters left and right as the
+   digits change, which is exactly the kind of noise this screen must not have. */
+.truck-studio-root .ts-load-pct {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ============================================================
+   7. Intro cascade
+   Gated on .is-in so removing the class and re-adding it replays the whole
+   sequence on a second showLoader().
+   The keyframes animate the individual `translate` / `scale` properties instead
+   of `transform`, for two reasons: an `animation-fill-mode: both` on `transform`
+   would permanently outrank the outro's inline FLIP transform, and this way the
+   two compose instead of fighting.
+   ============================================================ */
+
+.truck-studio-root .ts-load.is-in .ts-load-env {
+  animation: ts-load-rise 340ms cubic-bezier(0.2, 0.7, 0.3, 1) 40ms both;
+}
+.truck-studio-root .ts-load.is-in .ts-load-stage {
+  animation: ts-load-hero 420ms cubic-bezier(0.2, 0.7, 0.3, 1) 80ms both;
+}
+.truck-studio-root .ts-load.is-in .ts-load-logo,
+.truck-studio-root .ts-load.is-in .ts-load-brand {
+  animation: ts-load-rise 340ms cubic-bezier(0.2, 0.7, 0.3, 1) 160ms both;
+}
+.truck-studio-root .ts-load.is-in .ts-load-name {
+  animation: ts-load-rise 340ms cubic-bezier(0.2, 0.7, 0.3, 1) 200ms both;
+}
+.truck-studio-root .ts-load.is-in .ts-load-sub {
+  animation: ts-load-rise 340ms cubic-bezier(0.2, 0.7, 0.3, 1) 240ms both;
+}
+.truck-studio-root .ts-load.is-in .ts-load-meter {
+  animation: ts-load-rise 340ms cubic-bezier(0.2, 0.7, 0.3, 1) 280ms both;
+}
+
+/* ============================================================
+   8. Outro
+   These rules MUST stay after section 7: they have identical specificity to the
+   .is-in cascade, so they win on source order alone.
+   ============================================================ */
+
+/* The shimmer stops the moment the bar is told to complete. */
+.truck-studio-root .ts-load.is-done .ts-load-shine {
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+/* Everything except the hero leaves together. `animation: none` is not optional:
+   the intro keyframes fill `both`, and their held opacity:1 would outrank this
+   transition entirely. */
+.truck-studio-root .ts-load.is-out .ts-load-env,
+.truck-studio-root .ts-load.is-out .ts-load-info,
+.truck-studio-root .ts-load.is-out .ts-load-meter {
+  animation: none;
+  opacity: 0;
+  transition: opacity 180ms cubic-bezier(0.4, 0, 1, 1);
+}
+/* The backdrop dissolves LAST, on a 220 ms delay, so it finishes at the same
+   instant the hero lands: handoff(60) + flight(460) - 300 = 220. Fading it any
+   earlier would reveal the already-populated badge underneath and make the
+   flight look pointless. */
+.truck-studio-root .ts-load.is-out {
+  background-color: rgba(13, 16, 23, 0);
+  transition: background-color 300ms ease 220ms;
+}
+.truck-studio-root .ts-load.is-out .ts-load-bg,
+.truck-studio-root .ts-load.is-out .ts-load-scrim {
+  animation: none;
+  opacity: 0;
+  transition: opacity 300ms ease 220ms;
+}
+
+/* ============================================================
+   9. Keyframes — all namespaced ts-load-*
+   None of them needs continuous time to land in a sane state: the finite ones
+   fill `both` and the two loops look identical at every phase, so the multi-
+   second main-thread stall during the FBX parse cannot leave anything stuck.
+   ============================================================ */
+
+@keyframes ts-load-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes ts-load-rise {
+  from { opacity: 0; translate: 0 8px; }
+  to   { opacity: 1; translate: none; }
+}
+@keyframes ts-load-hero {
+  from { opacity: 0; translate: 0 12px; scale: 0.97; }
+  to   { opacity: 1; translate: none; scale: none; }
+}
+@keyframes ts-load-kenburns {
+  from { transform: scale(1); }
+  to   { transform: scale(1.08); }
+}
+@keyframes ts-load-shimmer {
+  from { transform: translateX(-120%); }
+  to   { transform: translateX(500%); }
+}
+
+/* ============================================================
+   10. Reduced motion
+   Everything decorative goes; the progress fill stays, because its position is
+   information rather than decoration. loader.ts branches the FLIP separately via
+   matchMedia — a transform driven from JS is invisible to a CSS override.
+   Overriding only `animation-name` keeps each element's duration, delay and
+   fill-mode, so the cascade still staggers, just without any movement.
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .truck-studio-root .ts-load-shine {
+    display: none;
+  }
+  .truck-studio-root .ts-load.is-in .ts-load-bg {
+    animation: none;
+  }
+  .truck-studio-root .ts-load.is-in .ts-load-env,
+  .truck-studio-root .ts-load.is-in .ts-load-stage,
+  .truck-studio-root .ts-load.is-in .ts-load-logo,
+  .truck-studio-root .ts-load.is-in .ts-load-brand,
+  .truck-studio-root .ts-load.is-in .ts-load-name,
+  .truck-studio-root .ts-load.is-in .ts-load-sub,
+  .truck-studio-root .ts-load.is-in .ts-load-meter {
+    animation-name: ts-load-fade;
+  }
+}
+
+/* ============================================================
+   11. Narrow viewports
+   ============================================================ */
+
+@media (max-width: 720px) {
+  .truck-studio-root .ts-load-inner {
+    gap: 14px;
+    padding: 16px;
+  }
+  .truck-studio-root .ts-load-stage {
+    height: clamp(112px, 24vh, 180px);
+  }
+  .truck-studio-root .ts-load-fallback {
+    font-size: 40px;
+  }
+  .truck-studio-root .ts-load-name {
+    font-size: 18px;
+  }
+  .truck-studio-root .ts-load-logo {
+    width: 52px;
+    height: 28px;
+  }
+}
