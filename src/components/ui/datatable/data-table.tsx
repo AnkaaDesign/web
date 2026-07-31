@@ -168,6 +168,16 @@ export interface DataTableProps<TData> {
   /** Return a row's child rows (e.g. a name-cluster's hidden siblings). Required for expansion. */
   getSubRows?: (row: TData) => TData[] | undefined;
   /**
+   * Map a targeted row to the entities a context-menu action should actually act on. Only matters
+   * for expandable rows whose DATA stands in for more than itself (e.g. a collapsed name-cluster
+   * parent that aggregates its hidden siblings): a COLLAPSED parent legitimately represents its
+   * whole subtree, but once it is EXPANDED the children are on screen as their own rows and the
+   * parent must represent ONLY itself — otherwise right-clicking the first row of an expanded group
+   * silently applies the action to every sibling. Receives the TanStack `Row` so expansion state is
+   * available. Defaults to `[row.original]`; results are de-duplicated by `getRowId`.
+   */
+  resolveActionRows?: (row: Row<TData>) => TData[];
+  /**
    * Search-prune hook for grouped rows. When a search is active, a parent (group) row is kept as
    * long as ANY descendant matches — but by default the WHOLE subtree renders, so a day group leaks
    * in its non-matching siblings. Provide this to rebuild the parent around just the matching
@@ -281,6 +291,7 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
     autoHeight = false,
     enableExpansion = false,
     getSubRows,
+    resolveActionRows,
     pruneSubRows,
     getRowCanExpand,
     defaultExpanded,
@@ -713,16 +724,32 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   const handleRowContext = useCallback(
     (e: ReactMouseEvent, row: Row<TData>) => {
       e.preventDefault();
+      // Resolve each targeted row to what it actually stands for (see `resolveActionRows`), then
+      // de-dupe by id: a selected collapsed parent and its selected children can otherwise resolve
+      // to the same entity twice.
+      const resolve = (rows: Row<TData>[]) => {
+        const seen = new Set<string>();
+        const out: TData[] = [];
+        for (const r of rows) {
+          for (const t of resolveActionRows?.(r) ?? [r.original]) {
+            const id = getId(t);
+            if (seen.has(id)) continue;
+            seen.add(id);
+            out.push(t);
+          }
+        }
+        return out;
+      };
       // `.flatRows` (not `.rows`) so a bulk right-click still sees selected sub-rows/cluster children
       // whose parent isn't selected — otherwise `.rows` is empty and this silently acts on one row.
       const sel = table.getSelectedRowModel().flatRows;
       if (sel.length > 0 && row.getIsSelected()) {
-        setContextMenu({ x: e.clientX, y: e.clientY, rows: sel.map((r) => r.original), isBulk: true });
+        setContextMenu({ x: e.clientX, y: e.clientY, rows: resolve(sel), isBulk: true });
       } else {
-        setContextMenu({ x: e.clientX, y: e.clientY, rows: [row.original], isBulk: false });
+        setContextMenu({ x: e.clientX, y: e.clientY, rows: resolve([row]), isBulk: false });
       }
     },
-    [table],
+    [table, resolveActionRows, getId],
   );
 
   const pinnedTop = table.getState().rowPinning.top ?? [];

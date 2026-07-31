@@ -57,9 +57,13 @@ export function DataTableContextMenu<TData>({ state, onClose, actions }: DataTab
   return (
     <DropdownMenu open={open} onOpenChange={(o) => !o && onClose()}>
       <PositionedDropdownMenuContent position={state ? { x: state.x, y: state.y } : null} isOpen={open} className="w-auto min-w-56 max-w-md">
-        {state?.isBulk && (
+        {/* A non-bulk right-click can still target more than one entity when the row stands in for a
+            collapsed group (see `resolveActionRows`) — say so, or the menu reads as "this row only". */}
+        {(state?.isBulk || rows.length > 1) && (
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-            {rows.length} {rows.length === 1 ? "item selecionado" : "itens selecionados"}
+            {state?.isBulk
+              ? `${rows.length} ${rows.length === 1 ? "item selecionado" : "itens selecionados"}`
+              : `Ação em ${rows.length} itens agrupados`}
           </DropdownMenuLabel>
         )}
         {visible.map((action) => {

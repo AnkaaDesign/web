@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import type { Row } from "@tanstack/react-table";
 import {
   IconClipboardList,
   IconPlus,
@@ -70,7 +71,7 @@ import {
   IMPLEMENT_TYPE_LABELS,
 } from "@/constants";
 import type { Task } from "@/types";
-import { clusterTasks, expandClusterTasks, expandClusterTaskIds, type ClusteredTask } from "./cluster-tasks";
+import { clusterTasks, expandClusterTasks, expandClusterTaskIds, resolveClusterActionRows, type ClusteredTask } from "./cluster-tasks";
 import { cn } from "@/lib/utils";
 import { useRegisterAttentionEntities, useAttentionVersion, usePresenceVersion, attentionRowClassFor, presenceRowClassFor, useSendWarning, useAnnouncePresenceForIds, hasOtherEditors } from "@/lib/attention";
 import { createTaskPreparationColumns, TASK_PREP_SECTOR_DEFAULTS } from "./task-prep-columns";
@@ -249,6 +250,7 @@ const EMPTY_TASKS: Task[] = [];
 const EMPTY_ROW_ACTIONS: DataTableRowAction<ClusteredTask>[] = [];
 const getRowId = (t: ClusteredTask) => t.id;
 const getSubRows = (t: ClusteredTask) => t.__children;
+const resolveActionRows = (row: Row<ClusteredTask>) => resolveClusterActionRows(row);
 
 // When a global search matches only SOME tasks inside a name-cluster, the DataTable narrows the
 // cluster to those matches and calls this to rebuild the parent — otherwise it keeps the WHOLE
@@ -885,6 +887,7 @@ export function TaskPreparationPage() {
     enableExpansion: true,
     persistExpansion: true,
     getSubRows,
+    resolveActionRows,
     pruneSubRows: pruneClusterToMatches,
     estimateRowHeight: 44,
     // Every table flows at its natural height and windows against the ONE page scroll container below
