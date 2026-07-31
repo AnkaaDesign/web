@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   useEffect,
+  useLayoutEffect,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -326,6 +327,13 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   const scrollRef = windowed ? scrollContainerRef : (scrollContainerRef ?? internalScrollRef);
   // The body tbody, whose offset within the shared container is measured as the scrollMargin (windowed).
   const listRef = useRef<HTMLTableSectionElement | null>(null);
+  // Windowed mode owns its HORIZONTAL scroll (see the sync effect below): the column header, the rows
+  // and the bottom rail each get their own x-scroller so a too-wide table scrolls sideways INSIDE its
+  // card — like every normal-mode table — instead of spilling out and making the whole page (title,
+  // toolbar, search box and all) slide under a page-level horizontal scrollbar.
+  const headerScrollRef = useRef<HTMLDivElement | null>(null);
+  const bodyScrollRef = useRef<HTMLDivElement | null>(null);
+  const railScrollRef = useRef<HTMLDivElement | null>(null);
 
   // --- Privilege gating: drop columns / filters / row-actions the user may not see BEFORE
   //     the table is built, so a gated item never reaches the render, the column-visibility
@@ -889,6 +897,44 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
   }
   const pinnedBar = pinnedTopPx !== null ? { top: pinnedTopPx, height: pinnedBottomPx - pinnedTopPx } : null;
 
+  // --- windowed horizontal scroll -------------------------------------------------------------------
+  // Normal mode puts the header AND the body in one inner scroller, so a too-wide table just scrolls
+  // sideways inside its frame. Windowed mode can't do that: the header has to sit in a sticky block that
+  // scrolls VERTICALLY with the page, and an `overflow-x` ancestor would become that block's scrollport
+  // and kill the stickiness. So the header, the body and a bottom rail are three separate x-scrollers
+  // kept in lockstep here. Assigning a scrollLeft that already matches fires no scroll event, so the
+  // propagation settles in one hop — no re-entrancy guard needed.
+  const [hasXOverflow, setHasXOverflow] = useState(false);
+  useLayoutEffect(() => {
+    const body = bodyScrollRef.current;
+    if (!windowed || !body) {
+      setHasXOverflow((prev) => (prev ? false : prev));
+      return;
+    }
+    const measure = () => setHasXOverflow(body.scrollWidth - body.clientWidth > 1);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(body);
+    return () => ro.disconnect();
+  }, [windowed, rowWidth]);
+
+  useEffect(() => {
+    if (!windowed) return;
+    const els = [headerScrollRef.current, bodyScrollRef.current, railScrollRef.current].filter(
+      (el): el is HTMLDivElement => !!el,
+    );
+    if (els.length < 2) return;
+    const onScroll = (e: Event) => {
+      const src = e.currentTarget as HTMLDivElement;
+      for (const el of els) if (el !== src && el.scrollLeft !== src.scrollLeft) el.scrollLeft = src.scrollLeft;
+    };
+    for (const el of els) el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      for (const el of els) el.removeEventListener("scroll", onScroll);
+    };
+    // `hasXOverflow` mounts/unmounts the rail — re-bind so it joins (or leaves) the group.
+  }, [windowed, hasXOverflow]);
+
   // --- shared render fragments (composed into the normal single-table OR the windowed split layout) ---
   const tableStyle = { ...columnSizeVars, width: rowWidth, minWidth: "100%" } as CSSProperties;
 
@@ -1076,24 +1122,44 @@ export function DataTable<TData>(props: DataTableProps<TData>) {
             <div className="sticky top-0 z-30 bg-card">
               <div className="px-4 pb-3 pt-3">{headerBar}</div>
               <div className="px-4">
-                <table className="grid border-collapse text-sm" style={tableStyle}>
-                  <thead className="m-0 grid bg-muted">{headerRowEls}</thead>
-                </table>
+                {/* The header's x-scroller mirrors the body's (see the sync effect). Its own scrollbar is
+                    hidden — the visible one is the rail pinned to the bottom of the viewport below. */}
+                <div ref={headerScrollRef} className="invisible-scrollbar overflow-x-auto">
+                  <table className="grid border-collapse text-sm" style={tableStyle}>
+                    <thead className="m-0 grid bg-muted">{headerRowEls}</thead>
+                  </table>
+                </div>
               </div>
             </div>
             <div className="relative px-4 pb-4">
-              <table className="grid border-collapse text-sm" style={tableStyle}>
-                <tbody
-                  ref={listRef}
-                  className="relative grid overflow-clip"
-                  // Reorder mode renders rows in flow (position:relative) → let their own height define the
-                  // tbody; the virtualizer's getTotalSize only governs the absolute-positioned layout.
-                  style={{ height: reorderEnabled ? "auto" : rowVirtualizer.getTotalSize(), width: rowWidth, minWidth: "100%" } as CSSProperties}
-                >
-                  {bodyContent}
-                </tbody>
-              </table>
+              <div ref={bodyScrollRef} className="invisible-scrollbar overflow-x-auto">
+                <table className="grid border-collapse text-sm" style={tableStyle}>
+                  <tbody
+                    ref={listRef}
+                    className="relative grid overflow-clip"
+                    // Reorder mode renders rows in flow (position:relative) → let their own height define the
+                    // tbody; the virtualizer's getTotalSize only governs the absolute-positioned layout.
+                    style={{ height: reorderEnabled ? "auto" : rowVirtualizer.getTotalSize(), width: rowWidth, minWidth: "100%" } as CSSProperties}
+                  >
+                    {bodyContent}
+                  </tbody>
+                </table>
+              </div>
               {stateOverlay}
+              {hasXOverflow && (
+                // The horizontal scrollbar users actually grab. A windowed table flows at its full natural
+                // height, so the body's own scrollbar would sit hundreds of rows below the fold; this rail
+                // sticks to the bottom of the page viewport for as long as the table is on screen.
+                <div
+                  ref={railScrollRef}
+                  aria-hidden
+                  // No padding of its own: the rail must share the body scroller's exact box so both
+                  // reach the same maximum scrollLeft and stay in step at the far right.
+                  className="sticky bottom-0 z-20 overflow-x-auto border-t border-border/60 bg-card"
+                >
+                  <div style={{ width: rowWidth, height: 1 }} />
+                </div>
+              )}
             </div>
           </>
         ) : (
