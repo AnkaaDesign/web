@@ -263,6 +263,10 @@ export const FinancialBudgetCreatePage = () => {
           state: customerData?.state || "",
           zipCode: customerData?.zipCode || "",
           stateRegistration: customerData?.stateRegistration || "",
+          municipalRegistration: customerData?.municipalRegistration || "",
+          // Contato só para a pré-visualização da NFS-e — não é editado nem reenviado no save.
+          email: customerData?.email || "",
+          phones: customerData?.phones || [],
           streetType: customerData?.streetType || null,
         },
       };
@@ -779,6 +783,7 @@ export const FinancialBudgetCreatePage = () => {
                     state: config.customerData.state || undefined,
                     zipCode: config.customerData.zipCode || undefined,
                     stateRegistration: config.customerData.stateRegistration || undefined,
+                    municipalRegistration: config.customerData.municipalRegistration || undefined,
                     streetType: config.customerData.streetType || undefined,
                   });
                 } catch {

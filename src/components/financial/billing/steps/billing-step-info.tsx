@@ -141,6 +141,11 @@ export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoPro
             state: cached?.state || "",
             zipCode: cached?.zipCode || "",
             stateRegistration: cached?.stateRegistration || "",
+            municipalRegistration: cached?.municipalRegistration || "",
+            // Contato só para a pré-visualização da NFS-e (Fone/Fax e E-Mail do tomador):
+            // não é editado aqui nem reenviado no save.
+            email: cached?.email || "",
+            phones: cached?.phones || [],
             streetType: cached?.streetType || null,
           },
         };

@@ -437,6 +437,10 @@ const FinancialBudgetDetailPageInner = () => {
             state: c.customer?.state || "",
             zipCode: c.customer?.zipCode || "",
             stateRegistration: c.customer?.stateRegistration || "",
+            municipalRegistration: c.customer?.municipalRegistration || "",
+            // Contato só para a pré-visualização da NFS-e — não é editado nem reenviado no save.
+            email: c.customer?.email || "",
+            phones: c.customer?.phones || [],
             streetType: c.customer?.streetType || null,
             registrationStatus: c.customer?.registrationStatus || null,
           },
@@ -552,6 +556,10 @@ const FinancialBudgetDetailPageInner = () => {
                     zipCode: d.zipCode || full.zipCode || "",
                     stateRegistration:
                       d.stateRegistration || full.stateRegistration || "",
+                    municipalRegistration:
+                      d.municipalRegistration || full.municipalRegistration || "",
+                    email: d.email || full.email || "",
+                    phones: d.phones || full.phones || [],
                     streetType: d.streetType || full.streetType || null,
                   },
                 );
@@ -1241,6 +1249,8 @@ const FinancialBudgetDetailPageInner = () => {
               zipCode: config.customerData.zipCode || undefined,
               stateRegistration:
                 config.customerData.stateRegistration || undefined,
+              municipalRegistration:
+                config.customerData.municipalRegistration || undefined,
               streetType: config.customerData.streetType || undefined,
               registrationStatus: config.customerData.registrationStatus ?? undefined,
             });

@@ -30,6 +30,7 @@ export interface Customer extends BaseEntity {
   economicActivityId: string | null;
   registrationStatus: string | null;
   stateRegistration: string | null;
+  municipalRegistration: string | null;
   streetType: string | null;
 
   // Relations
@@ -92,6 +93,7 @@ export interface CustomerOrderBy {
   site?: ORDER_BY_DIRECTION;
   registrationStatus?: ORDER_BY_DIRECTION;
   stateRegistration?: ORDER_BY_DIRECTION;
+  municipalRegistration?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
 }

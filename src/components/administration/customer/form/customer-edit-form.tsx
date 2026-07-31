@@ -34,6 +34,7 @@ export function CustomerEditForm({ customer, onSubmit, isSubmitting, onDirtyChan
       tags: customer.tags || [],
       logoId: customer.logoId,
       stateRegistration: customer.stateRegistration,
+      municipalRegistration: customer.municipalRegistration,
     }),
     [customer],
   );

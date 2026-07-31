@@ -91,6 +91,7 @@ export function CustomerForm(props: CustomerFormProps) {
       logoId: null,
       registrationStatus: null,
       stateRegistration: null,
+      municipalRegistration: null,
       ...defaultValues,
     };
   }, [mode, searchParams, defaultValues]);
@@ -333,6 +334,17 @@ export function CustomerForm(props: CustomerFormProps) {
                   type="text"
                   label="Inscrição Estadual"
                   placeholder="Ex: 123.456.789.012"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Vai para a NFS-e (campo "Insc. Municipal" do tomador na DANFSe). */}
+                <FormInput<CustomerCreateFormData | CustomerUpdateFormData>
+                  name="municipalRegistration"
+                  type="text"
+                  label="Inscrição Municipal"
+                  placeholder="Ex: 123456"
                   disabled={isSubmitting}
                 />
               </div>

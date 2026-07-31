@@ -57,10 +57,11 @@ export interface TaskQuoteCustomerConfig extends BaseEntity {
     state?: string | null;
     zipCode?: string | null;
     stateRegistration?: string | null;
+    municipalRegistration?: string | null;
     streetType?: string | null;
     registrationStatus?: string | null;
   };
-  responsible?: { id: string; name: string; role: string };
+  responsible?: { id: string; name: string; role?: string; email?: string | null; phone?: string | null };
   installments?: Installment[];
 }
 

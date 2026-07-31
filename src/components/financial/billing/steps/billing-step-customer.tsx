@@ -301,14 +301,26 @@ export function BillingStepCustomer({ configIndex, customer, disabled, quoteId }
                 disabled={disabled}
               />
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Inscrição Estadual</Label>
-              <Input
-                value={customerData.stateRegistration || ""}
-                onChange={(value) => setCustomerField("stateRegistration", String(value ?? ""))}
-                placeholder="Ex: 123.456.789.012"
-                disabled={disabled}
-              />
+            {/* As duas inscrições dividem a célula que era só da Estadual — metade cada. */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Inscrição Estadual</Label>
+                <Input
+                  value={customerData.stateRegistration || ""}
+                  onChange={(value) => setCustomerField("stateRegistration", String(value ?? ""))}
+                  placeholder="Ex: 123.456.789.012"
+                  disabled={disabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Inscrição Municipal</Label>
+                <Input
+                  value={customerData.municipalRegistration || ""}
+                  onChange={(value) => setCustomerField("municipalRegistration", String(value ?? ""))}
+                  placeholder="Ex: 123456"
+                  disabled={disabled}
+                />
+              </div>
             </div>
           </div>
 

@@ -4,6 +4,7 @@ import { routes } from "@/constants";
 import { projectInstallments } from "@/utils/installment-projection";
 import { NfsePreview, type NfsePreviewData, type NfsePreviewItem } from "./nfse-preview";
 import { BoletoPreview, type BoletoPreviewData } from "./boleto-preview";
+import { resolveTomadorContact } from "@/lib/nfse-tomador-contact";
 
 /**
  * Computes — entirely client-side, from the billing form data — the NFS-e and
@@ -234,6 +235,8 @@ function buildCustomerDoc(
   const endereco = [enderecoParts, cd.addressComplement, cd.neighborhood].filter(Boolean).join(" - ");
   const municipioUf = [cd.city, cd.state].filter(Boolean).join("-");
   const cnpjCpf = formatCnpjCpf(cd.cnpj, cd.cpf);
+  // Mesma precedência da emissão (cadastro → responsável do faturamento); `phones` é array.
+  const tomadorContact = resolveTomadorContact(cd, (config as any)?.responsible);
   const cep = formatCep(cd.zipCode);
 
   const now = new Date();
@@ -244,12 +247,13 @@ function buildCustomerDoc(
           razao: customerName,
           cnpjCpf,
           isJuridica: !!cd.cnpj,
+          inscricaoMunicipal: cd.municipalRegistration || "",
           inscricaoEstadual: cd.stateRegistration || "",
           endereco,
           municipioUf,
           cep,
-          telefone: formatPhone(cd.phone),
-          email: cd.email || "",
+          telefone: formatPhone(tomadorContact.phone),
+          email: tomadorContact.email,
         },
         competencia: `${now.getMonth() + 1}/${now.getFullYear()}`,
         discriminacao,

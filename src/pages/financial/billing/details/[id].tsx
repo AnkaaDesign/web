@@ -370,6 +370,18 @@ const BillingDetailPageInner = () => {
         generateBankSlip: config.generateBankSlip !== false,
         orderNumber: config.orderNumber || null,
         responsibleId: config.responsibleId || null,
+        // Contato do responsável escolhido para ESTE faturamento — é o que a emissão usa
+        // quando o cadastro do cliente não tem telefone/e-mail, então o Resumo e a
+        // pré-visualização precisam dele para não mostrarem contato vazio numa nota que
+        // sai preenchida. Não é reenviado no save (o payload lista os campos um a um).
+        responsible: config.responsible
+          ? {
+              id: config.responsible.id,
+              name: config.responsible.name,
+              email: config.responsible.email ?? null,
+              phone: config.responsible.phone ?? null,
+            }
+          : null,
         customerData: {
           corporateName: config.customer?.corporateName || "",
           fantasyName: config.customer?.fantasyName || "",
@@ -383,6 +395,10 @@ const BillingDetailPageInner = () => {
           state: config.customer?.state || "",
           zipCode: config.customer?.zipCode || "",
           stateRegistration: config.customer?.stateRegistration || "",
+          municipalRegistration: config.customer?.municipalRegistration || "",
+          // Contato só para a pré-visualização da NFS-e — não é editado nem reenviado no save.
+          email: config.customer?.email || "",
+          phones: config.customer?.phones || [],
           streetType: config.customer?.streetType || null,
           registrationStatus: config.customer?.registrationStatus || null,
         },
@@ -696,6 +712,7 @@ const BillingDetailPageInner = () => {
               state: config.customerData.state || undefined,
               zipCode: config.customerData.zipCode || undefined,
               stateRegistration: config.customerData.stateRegistration || undefined,
+              municipalRegistration: config.customerData.municipalRegistration || undefined,
               streetType: config.customerData.streetType || undefined,
               registrationStatus: config.customerData.registrationStatus ?? undefined,
             });

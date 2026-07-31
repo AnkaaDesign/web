@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
-import { formatCurrency, formatDate, formatChassis, formatCNPJ, formatCPF, formatPaidInstallmentLabel, formatInstallmentPaymentForm } from "@/utils";
+import { formatCurrency, formatDate, formatChassis, formatCNPJ, formatCPF, formatPhone, formatPaidInstallmentLabel, formatInstallmentPaymentForm } from "@/utils";
+import { resolveTomadorContact } from "@/lib/nfse-tomador-contact";
 import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 import type { TRUCK_CATEGORY, IMPLEMENT_TYPE } from "@/constants/enums";
 import { generatePaymentText } from "@/utils/quote-text-generators";
@@ -644,6 +645,11 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             const addressValue = data.address
               ? `${data.address}, ${data.addressNumber || "s/n"} - ${data.neighborhood ? data.neighborhood + ", " : ""}${data.city}/${data.state}`
               : "-";
+            // Fone/Fax e E-Mail que a prefeitura vai imprimir no tomador. `phones` é ARRAY:
+            // a nota leva o primeiro, o Resumo mostra todos. Cai para o responsável do
+            // faturamento quando o cadastro do cliente não tem contato — mesma precedência
+            // da emissão, senão o Resumo diria "sem telefone" numa nota que sai com um.
+            const tomadorContact = resolveTomadorContact(data, (config as any).responsible);
 
             return (
               <Card key={config.customerId}>
@@ -681,6 +687,12 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                         <span className="text-sm font-medium">{data.stateRegistration}</span>
                       </div>
                     )}
+                    {data.municipalRegistration && (
+                      <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                        <span className="text-sm text-muted-foreground">Inscrição Municipal</span>
+                        <span className="text-sm font-medium">{data.municipalRegistration}</span>
+                      </div>
+                    )}
                     <div
                       className={cn(
                         "flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5",
@@ -692,6 +704,24 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                         {addressValue}{data.zipCode ? ` - CEP: ${data.zipCode}` : ""}
                       </span>
                     </div>
+                    {tomadorContact.phones.length > 0 && (
+                      <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                        <span className="text-sm text-muted-foreground">
+                          {tomadorContact.phones.length > 1 ? "Telefones" : "Telefone"}
+                        </span>
+                        <span className="text-sm font-medium text-right max-w-[60%]">
+                          {tomadorContact.phones.map((p) => formatPhone(p)).join(" / ")}
+                        </span>
+                      </div>
+                    )}
+                    {tomadorContact.email && (
+                      <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                        <span className="text-sm text-muted-foreground">E-mail</span>
+                        <span className="text-sm font-medium text-right max-w-[60%] break-all">
+                          {tomadorContact.email}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                       <span className="text-sm text-muted-foreground font-bold">Total</span>
                       <span className="text-sm font-bold text-primary">{formatCurrency(configTotal)}</span>

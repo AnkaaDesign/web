@@ -715,6 +715,10 @@ export function serializeCustomerFormToUrlParams(formData: Partial<CustomerCreat
   // State Registration
   if (formData.stateRegistration && formData.stateRegistration.trim()) params.set("stateRegistration", formData.stateRegistration);
 
+  // Municipal Registration
+  if (formData.municipalRegistration && formData.municipalRegistration.trim())
+    params.set("municipalRegistration", formData.municipalRegistration);
+
   // Serialize arrays
   if (formData.phones && formData.phones.length > 0) {
     params.set("phones", JSON.stringify(formData.phones));
@@ -782,6 +786,9 @@ export function deserializeUrlParamsToCustomerForm(searchParams: URLSearchParams
   const stateRegistration = searchParams.get("stateRegistration");
   if (stateRegistration) formData.stateRegistration = stateRegistration;
 
+  const municipalRegistration = searchParams.get("municipalRegistration");
+  if (municipalRegistration) formData.municipalRegistration = municipalRegistration;
+
   // Parse arrays
   try {
     const phonesParam = searchParams.get("phones");
@@ -835,6 +842,7 @@ export function getDefaultCustomerFormValues(searchParams: URLSearchParams, base
     tags: [],
     logoId: null,
     stateRegistration: null,
+    municipalRegistration: null,
     ...baseDefaults,
     ...urlFormData,
   };
