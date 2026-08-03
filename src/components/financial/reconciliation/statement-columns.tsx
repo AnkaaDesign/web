@@ -6,11 +6,31 @@
  */
 import type { DataTableColumnDef } from "@/components/ui/datatable";
 import { CategoryChips, MatchStatusBadge, getAccountingTypeLabel, STATUS_LABEL } from "./match-status-badge";
+import { LinkedDocCell } from "./transaction-buckets";
 import { formatCnpjCpf, formatCurrency, formatDate } from "@/utils";
 import type { BankTransaction } from "@/types/reconciliation";
 
 const counterpartyText = (t: BankTransaction): string =>
   t.counterpartyName || (t.counterpartyCnpjCpf ? formatCnpjCpf(t.counterpartyCnpjCpf) : t.memo || "");
+
+/** What a reconciled transaction is linked TO — NF, boleto, parcela or tarefa. */
+const linkedText = (t: BankTransaction): string => {
+  const matches = (t.matches ?? []).filter((m) => !m.reversedAt);
+  const doc = matches.find((m) => m.fiscalDocument)?.fiscalDocument;
+  if (doc) return doc.emitName || (doc.emitCnpj ? formatCnpjCpf(doc.emitCnpj) : "NF");
+  const slip = matches.find((m) => m.bankSlip)?.bankSlip;
+  if (slip) return `Boleto ${slip.nossoNumero}`;
+  const inst = matches.map((m) => m.installment ?? m.bankSlip?.installment).find(Boolean);
+  if (inst) {
+    const task = inst.invoice?.task;
+    return (
+      [task?.serialNumber, task?.name].filter(Boolean).join(" · ") ||
+      inst.invoice?.customer?.fantasyName ||
+      `Parcela ${inst.number}`
+    );
+  }
+  return "";
+};
 
 export const STATEMENT_COLUMNS: DataTableColumnDef<BankTransaction>[] = [
   {
@@ -114,6 +134,23 @@ export const STATEMENT_COLUMNS: DataTableColumnDef<BankTransaction>[] = [
         </div>
       );
     },
+  },
+  {
+    // What the transaction is conciliated against. The Extrato had no such
+    // column, so an entrada matched to a parcela/tarefa looked identical to an
+    // unmatched one at a glance.
+    id: "vinculo",
+    header: "Vínculo",
+    size: 220,
+    enableSorting: false,
+    accessorFn: linkedText,
+    meta: {
+      headerLabel: "Vínculo",
+      // Mandatory for an accessorFn-only column: this is what the toolbar
+      // search matches on and what lands in the XLSX/PDF export.
+      exportValue: linkedText,
+    },
+    cell: ({ row }) => <LinkedDocCell tx={row.original} />,
   },
   {
     id: "reconciliationStatus",

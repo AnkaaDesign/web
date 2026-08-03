@@ -111,5 +111,36 @@ export function LinkedDocCell({ tx }: { tx: BankTransaction }) {
       </Badge>
     );
   }
+  // Entrada conciliada contra parcelas a receber — inclusive as conciliadas
+  // por tarefa, cujo orçamento foi criado no momento da conciliação. Sem este
+  // ramo toda conciliação de crédito aparecia como "—" no extrato.
+  const instMatches = (tx.matches ?? []).filter(
+    (m) => m.installment ?? m.bankSlip?.installment,
+  );
+  const firstInst = instMatches[0]?.installment ?? instMatches[0]?.bankSlip?.installment;
+  if (firstInst) {
+    const task = firstInst.invoice?.task;
+    const label =
+      [task?.serialNumber, task?.name].filter(Boolean).join(" · ") ||
+      firstInst.invoice?.customer?.fantasyName ||
+      `Parcela ${firstInst.number}`;
+    const to = task?.id
+      ? routes.financial.billing.details(task.id)
+      : routes.financial.accountsReceivable.root;
+    return (
+      <Link
+        to={to}
+        onClick={(e) => e.stopPropagation()}
+        className="inline-flex items-center gap-1 text-xs hover:underline max-w-[13rem]"
+        title={label}
+      >
+        <span className="truncate">{label}</span>
+        {instMatches.length > 1 && (
+          <span className="text-muted-foreground">(+{instMatches.length - 1})</span>
+        )}
+        <IconArrowUpRight className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+      </Link>
+    );
+  }
   return <span className="text-muted-foreground text-xs">—</span>;
 }
