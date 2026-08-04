@@ -7,6 +7,29 @@
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
 
+    <!--
+      Warm the socket to the API before any module runs.
+
+      %VITE_API_URL% is substituted by the html-env-replace plugin in
+      vite.config.ts (same token the bootstrap script below reads), so this is a
+      build-time value, not a runtime one.
+
+      Why it earns its place: the API now also serves the Truck Studio asset
+      tree (~300 MB of geometry/HDRI/PBR maps) under /studio-assets/. The very
+      first thing the studio does is fetch environments.json + brands.json +
+      cabs.json, and those three block the whole scene. Without this the user
+      pays DNS + TCP + TLS on the critical path. It is also the first request of
+      every session for the REST API itself, so the hint is never wasted.
+
+      Two links on purpose: `crossorigin` opens a CORS-mode connection (what
+      axios and three.js — which sets crossOrigin="anonymous" by default — will
+      actually use), while dns-prefetch covers the plain-mode case in browsers
+      that keep the two pools separate. When the base is same-origin (the dev
+      proxy, or nginx in production) both are simply no-ops.
+    -->
+    <link rel="preconnect" href="%VITE_API_URL%" crossorigin />
+    <link rel="dns-prefetch" href="%VITE_API_URL%" />
+
     <!-- App Icons and Manifest -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />

@@ -1,23 +1,26 @@
-/* Livery editing: THREE independent fabric canvases (left side, right side,
-   rear) + CanvasTextures on the trailer's LiveryUV (TEXCOORD_1), large modal
-   editor, panel-outline guides, previews, drag&drop. */
+/* Plotagem do implemento: TRÊS telas do fabric independentes (lateral esquerda,
+   lateral direita, traseira) + CanvasTextures no LiveryUV da carreta
+   (TEXCOORD_1), editor grande em modal, guias de silhueta do painel, prévias e
+   arrastar-e-soltar. */
 import * as THREE from 'three';
 import * as fabric from 'fabric';
 import { root, $, $$, isMounted, evTarget } from '../core/dom';
 import { VEHICLES_DIR } from '../core/paths';
+import { assetUrl } from '../catalog/catalog';
+import { invalidate } from '../scene/scene';
 import { setPaintTarget } from './models';
 import { setStatus } from '../ui/chrome';
 
-/** The three paintable trailer panels. Every per-surface map is keyed by this. */
-export type SurfaceKey = 'left' | 'right' | 'rear';
+/** Os três painéis pintáveis do implemento. Toda tabela por superfície usa isto como chave. */
+type SurfaceKey = 'left' | 'right' | 'rear';
 
-/** The subset of trailer_meta.json this module reads. */
+/** O pedaço de trailer_meta.json que este módulo lê. */
 export interface OutlineMeta {
   outlineSide?: number[][];
   outlineRear?: number[][];
 }
 
-/* ---------------- fabric canvases (live in the modal, always exist) -------- */
+/* ---------------- telas do fabric (moram no modal, existem sempre) -------- */
 /* TRANSPARENTE por padrão, e não mais branco.
    O branco existia para imitar o painel do baú num retângulo vazio. Agora o
    painel de verdade está ali atrás — a foto da lateral e a das portas, POR BAIXO
@@ -33,9 +36,9 @@ const DEFAULT_BG = '';
 function makeFab(el: HTMLCanvasElement) {
   return new fabric.Canvas(el, { preserveObjectStacking: true, backgroundColor: DEFAULT_BG });
 }
-export const fabLeft = makeFab($<HTMLCanvasElement>('fabric-left'));
-export const fabRight = makeFab($<HTMLCanvasElement>('fabric-right'));
-export const fabRear = makeFab($<HTMLCanvasElement>('fabric-rear'));
+const fabLeft = makeFab($<HTMLCanvasElement>('fabric-left'));
+const fabRight = makeFab($<HTMLCanvasElement>('fabric-right'));
+const fabRear = makeFab($<HTMLCanvasElement>('fabric-rear'));
 
 const surfaces: Record<SurfaceKey, fabric.Canvas> = { left: fabLeft, right: fabRight, rear: fabRear };
 const SURFACE_KEYS: SurfaceKey[] = ['left', 'right', 'rear'];
@@ -48,42 +51,42 @@ const CAPTIONS: Record<SurfaceKey, string> = {
   rear: 'Portas traseiras · pintura fica dentro da silhueta tracejada',
 };
 
-/* ---------------- textures ---------------- */
+/* ---------------- texturas ---------------- */
 function makeTex(el: HTMLCanvasElement) {
   const t = new THREE.CanvasTexture(el);
-  t.flipY = false;                      // matches glTF-exported LiveryUV orientation
+  t.flipY = false;                      // casa com a orientação do LiveryUV exportado em glTF
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
 }
-export const texLeft = makeTex(fabLeft.lowerCanvasEl);
-export const texRight = makeTex(fabRight.lowerCanvasEl);
-export const texRear = makeTex(fabRear.lowerCanvasEl);
+const texLeft = makeTex(fabLeft.lowerCanvasEl);
+const texRight = makeTex(fabRight.lowerCanvasEl);
+const texRear = makeTex(fabRear.lowerCanvasEl);
 const textures: Record<SurfaceKey, THREE.CanvasTexture> = { left: texLeft, right: texRight, rear: texRear };
 
-/* ---------------- 3D overlays ---------------- */
-export const liveryMeshes: Record<SurfaceKey, THREE.Mesh[]> = { left: [], right: [], rear: [] };
+/* ---------------- overlays 3D ---------------- */
 
-/* NO polygonOffset. It was here to win the depth test against the panel this
-   overlay sits on, and it is not needed for that: the overlay SHARES the panel's
-   geometry and is drawn later (renderOrder 2, and the transparent pass runs after
-   the opaque one), so at equal depth three's default LessEqualDepth already lets
-   it through.
- *
- * What the bias did instead was leak. `polygonOffsetFactor: -1` is SLOPE-SCALED:
- * the steeper the surface runs away from the camera, the further forward the
- * fragment is pushed. Sighting along the flank — which is the whole point of a
- * 15 m trailer — that slope is enormous, and the overlay was being pulled far
- * enough forward to pass the depth test IN FRONT OF THE PERIMETER RAIL that runs
- * along its bottom edge. The rail then read as a wide band of body colour that
- * snapped back to metal when the camera moved a few degrees.
- *
- * Kennedy's own observation is what identifies it, and it is decisive: the defect
- * is there in WHITE and gone when the implement is PAINTED. Painting changes two
- * things, and only one of them touches this overlay — `setBackgroundsForPaint()`
- * clears the canvas background to transparent, so the overlay stops covering
- * anything. The bias was still there; there was simply nothing left to draw with
- * it. Everything else about the two states is identical. */
+/* SEM polygonOffset. Ele estava aqui para ganhar o teste de profundidade contra
+   o painel sobre o qual este overlay se apoia, e não é preciso para isso: o
+   overlay COMPARTILHA a geometria do painel e é desenhado depois (renderOrder 2,
+   e a passada transparente roda depois da opaca), então, em profundidade igual,
+   o LessEqualDepth padrão do three já o deixa passar.
+
+   O que o viés fazia, em vez disso, era vazar. `polygonOffsetFactor: -1` é
+   ESCALADO PELA INCLINAÇÃO: quanto mais a superfície foge da câmera, mais para a
+   frente o fragmento é empurrado. Olhando ao longo da lateral — que é o ponto
+   inteiro de uma carreta de 15 m — essa inclinação é enorme, e o overlay era
+   puxado para a frente o bastante para passar no teste de profundidade NA FRENTE
+   DA LONGARINA que corre pela borda de baixo. A longarina então aparecia como uma
+   faixa larga da cor do baú, que voltava a ser metal quando a câmera girava
+   alguns graus.
+
+   A observação do próprio Kennedy é o que identifica isso, e é decisiva: o
+   defeito existe no BRANCO e some quando o implemento está PINTADO. Pintar muda
+   duas coisas, e só uma delas toca este overlay — `setBackgroundsForPaint()`
+   limpa o fundo da tela para transparente, e aí o overlay deixa de cobrir
+   qualquer coisa. O viés continuava lá; simplesmente não sobrou nada para
+   desenhar com ele. Todo o resto dos dois estados é idêntico. */
 function makeLiveryOverlay(mesh: THREE.Mesh, texture: THREE.CanvasTexture) {
   texture.channel = 1;
   const mat = new THREE.MeshStandardMaterial({
@@ -97,20 +100,24 @@ function makeLiveryOverlay(mesh: THREE.Mesh, texture: THREE.CanvasTexture) {
   overlay.renderOrder = 2;
   mesh.add(overlay);
   overlay.position.set(0, 0, 0);
-  return overlay;
 }
 
+/* O overlay é FILHO do painel que ele cobre, e é só isso que precisa ser
+   verdade: a textura já é compartilhada e viva, e o descarte vem junto com o
+   descarte do baú. Havia aqui um registro `liveryMeshes` que colecionava os três
+   arrays — nada nunca o leu, e um índice que só é escrito é uma referência que
+   segura geometria depois de a carreta ter sido trocada. */
 export function attachOverlays(trailerRoot: THREE.Object3D) {
   trailerRoot.traverse(node => {
     const o = node as THREE.Mesh;
     if (!o.isMesh) return;
-    if (o.name === 'SIDE_L') liveryMeshes.left.push(makeLiveryOverlay(o, texLeft));
-    else if (o.name === 'SIDE_R') liveryMeshes.right.push(makeLiveryOverlay(o, texRight));
-    else if (o.name === 'REAR') liveryMeshes.rear.push(makeLiveryOverlay(o, texRear));
+    if (o.name === 'SIDE_L') makeLiveryOverlay(o, texLeft);
+    else if (o.name === 'SIDE_R') makeLiveryOverlay(o, texRight);
+    else if (o.name === 'REAR') makeLiveryOverlay(o, texRear);
   });
 }
 
-/* ---------------- panel outline guides ---------------- */
+/* ---------------- guias de silhueta do painel ---------------- */
 const FALLBACK_OUTLINE = [[0.015, 0.015], [0.985, 0.015], [0.985, 0.985], [0.015, 0.985]];
 const outlines: Record<SurfaceKey, number[][]> =
   { left: FALLBACK_OUTLINE, right: FALLBACK_OUTLINE, rear: FALLBACK_OUTLINE };
@@ -151,7 +158,7 @@ export function setOutlines(meta: OutlineMeta | null) {
   for (const k of SURFACE_KEYS) { installGuide(k); drawPreview(k); }
 }
 
-/* ---------------- sidebar previews ---------------- */
+/* ---------------- prévias dos cards de design (#ts-panels) ---------------- */
 const prevEls: Record<SurfaceKey, HTMLCanvasElement> = {
   left: $<HTMLCanvasElement>('prev-left'),
   right: $<HTMLCanvasElement>('prev-right'),
@@ -187,9 +194,33 @@ function schedulePreview(key: SurfaceKey) {
   requestAnimationFrame(() => { prevPending[key] = false; drawPreview(key); });
 }
 
+/* O ÚNICO ponto em que a textura da plotagem é marcada como suja, e por isso
+   também o único de onde o laço de render precisa ser avisado.
+
+   As duas metades andam juntas e é de propósito que estejam na mesma linha:
+   - `needsUpdate` manda a CanvasTexture inteira para a GPU (as três somam ~13 MB,
+     mais a regeneração dos mipmaps), então marcar sem necessidade é caro;
+   - `invalidate()` diz ao laço sob demanda de scene/scene.ts que o quadro mudou.
+     Sem isso, com o laço ligado, desenhar no baú NÃO chegaria ao 3D: o fabric
+     dispara este evento a partir dos próprios handlers de ponteiro e do próprio
+     rAF dele, que o laço não observa. Um quadro só bastaria; invalidate() já
+     compra três, o que cobre um upload que aterrisse no quadro seguinte.
+
+   A passada do watchdog é a exceção — ela se anuncia por `watchdogPass` para não
+   fazer nem um nem outro, porque normalmente repinta pixels idênticos. Ver o
+   bloco do watchdog no fim do arquivo.
+   A bandeira é declarada AQUI, e não junto do watchdog: ela é lida por este
+   ouvinte, que é registrado na avaliação do módulo. */
+let watchdogPass = false;
+
+function publishSurface(k: SurfaceKey) {
+  textures[k].needsUpdate = true;
+  invalidate();
+}
+
 for (const k of SURFACE_KEYS) {
   surfaces[k].on('after:render', () => {
-    textures[k].needsUpdate = true;
+    if (!watchdogPass) publishSurface(k);
     schedulePreview(k);
   });
 }
@@ -219,10 +250,18 @@ interface PanelWindow {
   x: number; y: number; w: number; h: number;
 }
 
+/* URL SERVÍVEL, não caminho de manifesto: a árvore do studio mora na API sob
+   `STUDIO_BASE`, e `core/paths.ts` só entrega o pedaço relativo. Um
+   `VEHICLES_DIR + 'panels/lateral.png'` cru resolveria contra a origem do WEB,
+   que não tem mais os arquivos — e o sintoma seria um 404 mudo, porque as duas
+   coisas que consomem isto (o `url()` da variável CSS e o `new Image()` da
+   medição) degradam em silêncio.
+   `assetUrl()` é idempotente por contrato, então resolver AQUI, uma vez, é o
+   suficiente; os dois consumidores usam o valor como está. */
 const PANEL_IMAGE: Record<SurfaceKey, string> = {
-  left: VEHICLES_DIR + 'panels/lateral.png',
-  right: VEHICLES_DIR + 'panels/lateral.png',
-  rear: VEHICLES_DIR + 'panels/traseira.png',
+  left: assetUrl(VEHICLES_DIR + 'panels/lateral.png'),
+  right: assetUrl(VEHICLES_DIR + 'panels/lateral.png'),
+  rear: assetUrl(VEHICLES_DIR + 'panels/traseira.png'),
 };
 
 /* Sem medida ainda (ou foto sem janela): a tela ocupa a caixa inteira e a foto
@@ -322,6 +361,18 @@ function publishWindow(key: SurfaceKey, win: PanelWindow) {
 function loadImage(url: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
+    /* NÃO é cortesia de CORS: esta imagem é DESENHADA num canvas que findWindow()
+       lê de volta com getImageData() para medir a janela vazada. Uma imagem de
+       outra origem carregada sem CORS CONTAMINA o canvas, o getImageData lança
+       SecurityError, e o `catch { return null }` de lá engole o erro — a medida
+       simplesmente não acontece e o editor cai no fallback sem nada no console
+       dizendo por quê.
+       Não aparece em dev: o proxy do Vite faz a requisição same-origin. Só morde
+       quando VITE_STUDIO_ASSETS_BASE aponta para a origem da API — produção. A
+       API responde `Access-Control-Allow-Origin: *`, então isto basta.
+       Antes de `src`, sempre: o atributo só vale se estiver posto quando a
+       requisição parte. */
+    img.crossOrigin = 'anonymous';
     img.addEventListener('load', () => resolve(img), { once: true });
     img.addEventListener('error', () => resolve(null), { once: true });
     img.src = url;
@@ -383,7 +434,7 @@ export function setCabPaintColor(hex: string | null | undefined) {
   syncImplementColor();
 }
 
-/* ---------------- modal ---------------- */
+/* ---------------- editor em modal ---------------- */
 const modal = $('editor-modal');
 const stage = $('modal-stage');
 const stagePanels: Record<SurfaceKey, HTMLElement> =
@@ -422,11 +473,11 @@ function showSurface(key: SurfaceKey) {
   sizeModalCanvas(key);
 }
 
-export function openEditor(key?: SurfaceKey) {
+function openEditor(key?: SurfaceKey) {
   modal.classList.remove('hidden');
   showSurface(key || activeSurface);
 }
-export function closeEditor() {
+function closeEditor() {
   for (const c of Object.values(surfaces)) {
     c.isDrawingMode = false;
     c.discardActiveObject();
@@ -436,7 +487,7 @@ export function closeEditor() {
   modal.classList.add('hidden');
 }
 
-/* ---------------- tools ---------------- */
+/* ---------------- ferramentas ---------------- */
 const colorInput = $<HTMLInputElement>('color');
 const currentColor = () => colorInput.value;
 
@@ -564,15 +615,16 @@ function bindTools() {
   });
 }
 
-/* When the trailer panels are painted with the cab color, the livery canvases'
-   solid white default background would hide the paint — switch backgrounds to
-   transparent while painted, and restore the previous background after. */
-/* The stashed background lives in a WeakMap rather than on the canvas: fabric's
-   Canvas has no slot for it, and a side table keeps the "was it stashed at all?"
-   question (which DEFAULT_BG vs. restore turns on) explicit. */
+/* Com os painéis do baú pintados da cor do cavalo, o fundo branco opaco das
+   telas do fabric esconderia a tinta — então o fundo vira transparente enquanto
+   está pintado, e volta ao que era depois.
+   O fundo guardado mora num WeakMap, e não na própria tela: o Canvas do fabric
+   não tem campo para isso, e uma tabela ao lado mantém explícita a pergunta
+   "chegou a ser guardado?", que é justamente a que decide entre DEFAULT_BG e
+   restaurar. */
 const bgBeforePaint = new WeakMap<fabric.Canvas, string | fabric.TFiller | undefined>();
 
-export function setBackgroundsForPaint(painted: boolean) {
+function setBackgroundsForPaint(painted: boolean) {
   for (const c of Object.values(surfaces)) {
     if (painted) {
       bgBeforePaint.set(c, c.backgroundColor);
@@ -614,7 +666,7 @@ function bindTrailerPaint() {
   });
 }
 
-/* ---------------- drag & drop images onto the modal canvas ---------------- */
+/* ---------------- arrastar imagens para a tela do modal ---------------- */
 function bindDnD() {
   let depth = 0;
   stage.addEventListener('dragenter', e => {
@@ -645,6 +697,117 @@ function bindDnD() {
   });
 }
 
+/* ---------------- watchdog ----------------
+   Por que ele existe: um buffer de canvas 2D pode ser descartado sob pressão de
+   memória de GPU (os modelos são grandes), e `requestRenderAll` depende de rAF,
+   que para quando a página não está compondo. Uma repintura SÍNCRONA periódica
+   redesenha a partir do modelo de objetos do fabric, que é a fonte de verdade.
+
+   O que ele NÃO pode fazer é marcar a textura como suja em toda passada. Cada
+   `needsUpdate` reenvia a CanvasTexture inteira para a GPU e regenera os mipmaps
+   — as três somam ~13 MB — e, num estúdio parado, a repintura periódica produz
+   exatamente os mesmos pixels. Era isso que acontecia: 13 MB de upload a cada 4
+   segundos, pela vida inteira da aba, sem nada ter mudado.
+
+   Então a passada se anuncia (`watchdogPass`, lido pelo `after:render` lá em
+   cima) e depois compara uma ASSINATURA do que foi pintado. Só sobe o que
+   mudou. As edições de verdade continuam subindo na hora, pelo caminho normal:
+   elas não passam por aqui. */
+let watchdogTimer: ReturnType<typeof setInterval> | null = null;
+
+/* Recorte minúsculo, e é o bastante: a assinatura só precisa distinguir "a
+   repintura devolveu o que já estava lá" de "o buffer tinha sido descartado e
+   voltou diferente" — e um buffer perdido volta em branco ou em lixo, que 24×24
+   pixels denunciam de sobra. O que ela NÃO precisa detectar é edição fina; essa
+   chega pelo after:render, que não é gated por nada disto. */
+const PROBE = 24;
+const probeCanvas = document.createElement('canvas');
+probeCanvas.width = PROBE;
+probeCanvas.height = PROBE;
+const probeCtx = probeCanvas.getContext('2d', { willReadFrequently: true });
+const probeSig: Partial<Record<SurfaceKey, number>> = {};
+
+/** FNV-1a sobre os 2304 bytes do recorte. null = não deu para ler. */
+function contentSignature(key: SurfaceKey): number | null {
+  if (!probeCtx) return null;
+  probeCtx.clearRect(0, 0, PROBE, PROBE);
+  probeCtx.drawImage(surfaces[key].lowerCanvasEl, 0, 0, PROBE, PROBE);
+  let data: Uint8ClampedArray;
+  try { data = probeCtx.getImageData(0, 0, PROBE, PROBE).data; }
+  catch { return null; }                       // canvas contaminado por outra origem
+  let h = 0x811c9dc5;
+  for (let i = 0; i < data.length; i++) {
+    h = Math.imul(h ^ data[i], 0x01000193);
+  }
+  return h >>> 0;
+}
+
+function watchdogTick() {
+  if (!isMounted()) return;                    // a rota saiu do estúdio — nada a repintar
+  watchdogPass = true;
+  try {
+    for (const k of SURFACE_KEYS) {
+      surfaces[k].renderAll();
+      const sig = contentSignature(k);
+      /* null = a leitura falhou: marcar é o lado seguro do erro. Uma textura
+         velha no caminhão é pior que um upload a mais. */
+      if (sig === null || sig !== probeSig[k]) {
+        probeSig[k] = sig ?? undefined;
+        publishSurface(k);
+      }
+    }
+  } catch { /* ignora */ }
+  finally { watchdogPass = false; }
+}
+
+/* ---------------- ciclo de vida ----------------
+   O DOM do engine sobrevive à rota (ver core/dom.ts), e é por isso que estes
+   dois precisam de um par: um ouvinte em `document` e um `setInterval` ficariam
+   vivos em TODAS as outras telas do Ankaa. Os dois já eram inertes lá — o
+   keydown sai cedo por `isMounted()`, o intervalo também —, mas uma ferramenta
+   3D não tem por que manter uma captura global em `document` numa página que
+   não a mostra, e "inerte" é uma promessa que a próxima edição pode quebrar sem
+   ninguém perceber. */
+function onDocKeyDown(e: KeyboardEvent) {
+  if (!isMounted() || modal.classList.contains('hidden')) return;
+  if (e.key === 'Escape') { closeEditor(); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    const c = active();
+    const o = c.getActiveObject();
+    if (o && (o as fabric.IText).isEditing) return;   // digitando dentro de um IText
+    c.getActiveObjects().forEach((obj) => c.remove(obj));
+    c.discardActiveObject(); c.requestRenderAll();
+  }
+}
+
+function onWindowResize() {
+  if (!modal.classList.contains('hidden')) sizeModalCanvas(activeSurface);
+}
+
+/**
+ * Liga os ouvintes globais e o watchdog. Idempotente — chame de mountStudio().
+ * `initLivery()` já chama no fim, então o primeiro boot não precisa dela.
+ */
+export function resumeLivery() {
+  document.addEventListener('keydown', onDocKeyDown);
+  window.addEventListener('resize', onWindowResize);
+  if (watchdogTimer === null) watchdogTimer = setInterval(watchdogTick, 4000);
+}
+
+/**
+ * Desliga os dois. Idempotente — chame de unmountStudio().
+ * Não desmonta nada do editor: as telas, as texturas e o que o usuário desenhou
+ * continuam vivos, que é o ponto de o subárvore do engine sobreviver à rota.
+ */
+export function teardownLivery() {
+  document.removeEventListener('keydown', onDocKeyDown);
+  window.removeEventListener('resize', onWindowResize);
+  if (watchdogTimer !== null) {
+    clearInterval(watchdogTimer);
+    watchdogTimer = null;
+  }
+}
+
 /* ---------------- init ---------------- */
 export function initLivery() {
   bindTools();
@@ -664,34 +827,12 @@ export function initLivery() {
   $('modal-close').addEventListener('click', closeEditor);
   modal.addEventListener('pointerdown', e => { if (e.target === modal) closeEditor(); });
 
-  document.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (!isMounted() || modal.classList.contains('hidden')) return;
-    if (e.key === 'Escape') { closeEditor(); return; }
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      const c = active();
-      const o = c.getActiveObject();
-      if (o && (o as fabric.IText).isEditing) return;   // typing inside IText
-      c.getActiveObjects().forEach((obj) => c.remove(obj));
-      c.discardActiveObject(); c.requestRenderAll();
-    }
-  });
-
-  window.addEventListener('resize', () => {
-    if (!modal.classList.contains('hidden')) sizeModalCanvas(activeSurface);
-  });
-
   for (const k of SURFACE_KEYS) {
     installGuide(k);
     surfaces[k].requestRenderAll();
     drawPreview(k);
+    probeSig[k] = contentSignature(k) ?? undefined;
   }
 
-  /* Watchdog: 2D canvas buffers can be discarded under GPU memory pressure
-     (big models) and requestRenderAll depends on rAF, which stalls when the
-     page isn't compositing. A periodic SYNCHRONOUS renderAll repaints from
-     fabric's object model and re-fires after:render (texture + previews). */
-  setInterval(() => {
-    if (!isMounted()) return;                     // route left the studio — nothing to repaint
-    try { for (const c of Object.values(surfaces)) c.renderAll(); } catch { /* ignore */ }
-  }, 4000);
+  resumeLivery();
 }

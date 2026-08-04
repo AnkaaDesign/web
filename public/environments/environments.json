@@ -1,22 +1,22 @@
 {
-  "removedNote": "2026-08-03 — OS TRES CENARIOS SO-HDRI FORAM REMOVIDOS: `rodovia`, `patio-logistico` e `urbano`. Eram uma foto equirect mais um chao procedural (disco de asfalto com fade, orla de grama, tufos espalhados, postes gerados em codigo), e o olho rejeita essa transicao por quatro motivos que nenhum ajuste de cor resolve — o disco e redondo, o chao e plano, os tufos nao tem arranjo, e NADA oclui o horizonte: o caminhao fica sobre um disco dentro de uma foto infinita. O acervo agora e so cenario com geometria de verdade (`set`). ATENCAO AO PORTE DOS ASSETS: as pastas /environments/rodovia/ e /environments/patio-logistico/ NAO podem ser apagadas — os dois cenarios que sobraram usam os .hdr delas como ceu e fonte de reflexo (`distrito-industrial` -> rodovia/sky.hdr, `armazem` -> patio-logistico/sky.hdr). O que ficou sem uso e /environments/urbano/ inteiro, mais os sky.jpg e thumb.webp de rodovia e patio-logistico (os dois cenarios com set trazem `backgroundImage: null`). O maquinario que so estes tres usavam continua no engine e vira codigo morto: nearGround/setNearGround, o scatter e o roadside, o shadowCatcher e o dominio projetado (GroundedSkybox / bloco `grounded`). Nao foi arrancado junto de proposito — e uma remocao de conteudo, nao uma cirurgia no engine — mas se ninguem voltar a usar foto-como-cenario, esse e o proximo corte, e ele e grande.",
+  "removedNote": "2026-08-03 — OS TRES CENARIOS SO-HDRI FORAM REMOVIDOS: `rodovia`, `patio-logistico` e `urbano`. Eram uma foto equirect mais um chao procedural (disco de asfalto com fade, orla de grama, tufos espalhados, postes gerados em codigo), e o olho rejeita essa transicao por quatro motivos que nenhum ajuste de cor resolve — o disco e redondo, o chao e plano, os tufos nao tem arranjo, e NADA oclui o horizonte: o caminhao fica sobre um disco dentro de uma foto infinita. O acervo agora e so cenario com geometria de verdade (`set`). ATUALIZACAO 2026-08-03 (mesma data, mais tarde): a versao anterior desta nota mandava PRESERVAR /environments/patio-logistico/ porque `armazem` usaria o sky.hdr de la. ISSO ESTAVA ERRADO — `armazem` declara `hdri: null` e e iluminado pelas faixas Emissive da propria casca, como o setNote dele sempre disse. A pasta inteira foi apagada. O QUE CONTINUA VALENDO: /environments/rodovia/sky.hdr NAO pode ser apagado, porque `distrito-industrial` o usa como ceu e fonte de reflexo. O resto de rodovia/ (sky.jpg, thumb.webp) e /environments/urbano/ inteiro ja foram removidos. O maquinario que so estes tres cenarios usavam TAMBEM ja foi arrancado do engine: nearGround, scatter/roadside, shadowCatcher, o domo projetado (GroundedSkybox) e todo o carregador de conjuntos PBR de chão por manifesto sairam de scene.ts e environment.ts, junto com props/ e as texturas _4k/_disp/dirt_*/macro_noise. Nao ha mais caminho de foto-como-cenario: um cenario novo PRECISA trazer um bloco `set`.",
   "environments": [
     {
       "id": "distrito-industrial",
       "name": "Distrito Industrial",
       "subtitle": "Rua interna de planta industrial, geometria 3D real",
-      "thumb": "/environments/distrito-industrial/thumb.webp",
-      "hdri": "/environments/rodovia/sky.hdr",
+      "thumb": "environments/distrito-industrial/thumb.webp",
+      "hdri": "environments/rodovia/sky.hdr",
       "backgroundImage": null,
       "set": {
-        "url": "/environments/distrito-industrial/set.glb",
+        "url": "environments/distrito-industrial/set.glb",
         "materials": {
           "repeatNote": "TODO `repeat` DESTE SET MUDOU DE SIGNIFICADO em 2026-08-03, junto com o set.glb. Antes as superficies de chao saiam do export com as UV proprias do PlaneGeometry, que vao 0..1 de ponta a ponta seja qual for o tamanho — entao `repeat` queria dizer 'ladrilhe N vezes na superficie inteira'. Medido no que estava no ar: rua interna 12,0 x 190,4 m com repeat 4,2 = ladrilho de 2,9 x 45,3 m; via de passagem 1400 x 13 m = 333 x 3,1 m; patio 178,7 x 164 m com repeat 9 = 20 x 18 m; grama num disco de 2,4 km com repeat 11 = 218 m por ladrilho. Um asfalto 4K esticado em 45 m nao tem mais graniro nenhum, e um concreto esticado em 20 m nao tem mais superficie — foi isso, e nao o envMapIntensity, que fazia a laje parecer polida: sem microdetalhe no albedo e na normal nada quebra o lobo especular, entao so sobra o reflexo. viewer/src/exportSet.js agora reescreve a TEXCOORD_0 a partir de METROS DE MUNDO (groundUV), uv = metros / UV_M com UV_M 8 no sitio e 64 no disco distante. Logo o periodo do ladrilho passa a ser UV_M / repeat metros, e os dois lados tem de mudar juntos: mexer aqui sem reexportar, ou reexportar sem mexer aqui, quebra a escala do chao inteiro.",
           "GROUND_CONCRETE": {
-            "diffuse": "/textures/concrete_diff.webp",
-            "rough": "/textures/concrete_rough.webp",
-            "normal": "/textures/concrete_nor.jpg",
-            "ao": "/textures/concrete_ao.webp",
+            "diffuse": "textures/concrete_diff.webp",
+            "rough": "textures/concrete_rough.webp",
+            "normal": "textures/concrete_nor.jpg",
+            "ao": "textures/concrete_ao.webp",
             "repeat": 1,
             "tintRgb": [
               0.5,
@@ -35,10 +35,10 @@
             "envNote": "0.35, INALTERADO de proposito. A causa do 'chao extremamente reflexivo' nao era este numero: com o ladrilho esticado em 20 m o concreto nao tinha microdetalhe nenhum no albedo nem na normal, e sem microdetalhe nada quebra o lobo especular — sobra so o reflexo do ceu, que e exatamente a leitura de superficie polida. Corrigidas as UV, a superficie volta a existir e o brilho deve cair sozinho. A tentacao seguinte e subir o envIntensity de volta agora que o especular esta quebrado (0.45 seria a leitura fisica mais honesta para um patio a ceu aberto); NAO faca isso sem olhar um render do app, porque e mexer para cima justamente no eixo da reclamacao. Se depois de ver a cena o patio parecer chapado demais, ai sim suba — e meça antes e depois. tintRgb continua em 0.5 porque o desgaste em vertex color chega a 1.05 em alguns pontos e a laje estourava para branco em 0.58."
           },
           "ASPHALT_ROAD": {
-            "diffuse": "/textures/asphalt_diff.webp",
-            "rough": "/textures/asphalt_rough.webp",
-            "normal": "/textures/asphalt_nor.jpg",
-            "ao": "/textures/asphalt_ao.webp",
+            "diffuse": "textures/asphalt_diff.webp",
+            "rough": "textures/asphalt_rough.webp",
+            "normal": "textures/asphalt_nor.jpg",
+            "ao": "textures/asphalt_ao.webp",
             "repeat": 1.333,
             "envIntensity": 0.28,
             "normalScale": 1.7,
@@ -56,10 +56,10 @@
             "repeatNote": "UV_M 8 / repeat 1.333 = ladrilho de 6 m, isotropico. Era repeat 4.2 sobre UV 0..1: 2,9 m de largura por 45,3 m de comprimento na rua interna e 333 x 3,1 m na via de passagem — a mesma textura esticada em duas direcoes diferentes na mesma cena."
           },
           "CONCRETE_APRON": {
-            "diffuse": "/textures/concrete_diff.webp",
-            "rough": "/textures/concrete_rough.webp",
-            "normal": "/textures/concrete_nor.jpg",
-            "ao": "/textures/concrete_ao.webp",
+            "diffuse": "textures/concrete_diff.webp",
+            "rough": "textures/concrete_rough.webp",
+            "normal": "textures/concrete_nor.jpg",
+            "ao": "textures/concrete_ao.webp",
             "repeat": 2,
             "tintRgb": [
               0.72,
@@ -68,10 +68,10 @@
             ]
           },
           "KERB_CONCRETE": {
-            "diffuse": "/textures/concrete_diff.webp",
-            "rough": "/textures/concrete_rough.webp",
-            "normal": "/textures/concrete_nor.jpg",
-            "ao": "/textures/concrete_ao.webp",
+            "diffuse": "textures/concrete_diff.webp",
+            "rough": "textures/concrete_rough.webp",
+            "normal": "textures/concrete_nor.jpg",
+            "ao": "textures/concrete_ao.webp",
             "repeat": 1,
             "tintRgb": [
               0.84,
@@ -90,10 +90,10 @@
             "metalness": 0
           },
           "GRASS_VERGE": {
-            "diffuse": "/textures/grass_diff.webp",
-            "rough": "/textures/grass_rough.webp",
-            "normal": "/textures/grass_nor.jpg",
-            "ao": "/textures/grass_ao.webp",
+            "diffuse": "textures/grass_diff.webp",
+            "rough": "textures/grass_rough.webp",
+            "normal": "textures/grass_nor.jpg",
+            "ao": "textures/grass_ao.webp",
             "repeat": 16,
             "tintRgb": [
               0.42,
@@ -105,10 +105,10 @@
             "repeatNote": "ESTE usa UV_M_FAR 64, nao 8: o disco tem 2,4 km e com UV_M 8 as UV chegariam a +/-150, onde um varying mediump (o que uma GPU de celular da a uma UV interpolada) tem passo de ~12 cm e a grama quantiza visivelmente. 64 / 16 = ladrilho de 4 m. Era repeat 11 sobre UV 0..1, ou seja 218 m por ladrilho — um lencol verde chapado, que e metade do motivo de o campo distante nao ler como campo."
           },
           "GRAVEL_SHOULDER": {
-            "diffuse": "/textures/gravel_diff.webp",
-            "rough": "/textures/gravel_rough.webp",
-            "normal": "/textures/gravel_nor.jpg",
-            "ao": "/textures/gravel_ao.webp",
+            "diffuse": "textures/gravel_diff.webp",
+            "rough": "textures/gravel_rough.webp",
+            "normal": "textures/gravel_nor.jpg",
+            "ao": "textures/gravel_ao.webp",
             "repeat": 2.667,
             "tintRgb": [
               0.5,
@@ -118,20 +118,7 @@
             "roughness": 0.93,
             "repeatNote": "UV_M 8 / repeat 2.667 = ladrilho de 3 m. Era repeat 14 sobre UV 0..1 num acostamento de 1400 x 1,1 m: 100 m por 8 cm."
           },
-          "DIRT_WORN": {
-            "diffuse": "/textures/dirt_diff.webp",
-            "rough": "/textures/dirt_rough.webp",
-            "normal": "/textures/dirt_nor.jpg",
-            "ao": "/textures/dirt_ao.webp",
-            "repeat": 1.333,
-            "tintRgb": [
-              0.46,
-              0.4,
-              0.33
-            ],
-            "roughness": 0.95,
-            "repeatNote": "UV_M 8 / repeat 1.333 = 6 m. SEM USO no set atual: o unico consumidor era o talude de terra em r=240 m, removido — ver hazeNote. Mantido porque o material nomeado nao custa nada e um proximo build pode voltar a precisar de terra batida."
-          }
+          "_DIRT_WORN_removido": "2026-08-03: o material DIRT_WORN foi retirado deste bloco JUNTO com os quatro arquivos /textures/dirt_* que ele nomeava. O unico consumidor era o talude de terra em r=240 m, removido antes — ver hazeNote —, e o material nao existe em nenhum dos dois set.glb, entao bindMaterials nunca chegava a buscar nada. Ficar declarado 'porque um proximo build pode precisar' deixou de ser gratis no momento em que as texturas sairam do disco: seria um 404 no dia em que um set exportasse esse nome. Para voltar a usar terra batida, restaure os quatro arquivos E este bloco na mesma mudanca."
         },
         "bounds": {
           "halfX": 60,
@@ -181,18 +168,17 @@
       "id": "armazem",
       "name": "Armazém",
       "subtitle": "Centro de distribuicao, porta-paletes carregados e piso demarcado",
-      "thumb": "/environments/armazem/thumb.webp",
+      "thumb": "environments/armazem/thumb.webp",
       "hdri": null,
       "backgroundImage": null,
       "set": {
-        "url": "/environments/armazem/set.glb",
+        "url": "environments/armazem/set.glb",
         "interior": true,
         "materials": {
           "GROUND_CONCRETE": {
-            "diffuse": "/textures/concrete_diff.webp",
-            "rough": "/textures/concrete_rough.webp",
-            "normal": "/textures/concrete_nor.jpg",
-            "ao": "/textures/concrete_ao.webp",
+            "diffuse": "textures/concrete_diff.webp",
+            "rough": "textures/concrete_rough.webp",
+            "normal": "textures/concrete_nor.jpg",
             "repeat": 1,
             "tintRgb": [
               0.56,
@@ -203,7 +189,8 @@
             "envIntensity": 0.25,
             "normalScale": 1.4,
             "repeatNote": "UV_M 8 / repeat 1 = laje de 8 m, que e o que uma baia de piso industrial concretado mede de verdade. build_armazem.py autora a UV do piso EM METROS (build_floor); mexer aqui sem reexportar, ou reexportar sem mexer aqui, quebra a escala — mesmo contrato do distrito-industrial.",
-            "envNote": "0.25 e nao 1.0 porque aqui NAO ha HDRI: a unica luz e a das luminarias do proprio galpao, e um piso que integra o ambiente inteiro num interior fica cinza-leitoso e chapado. normalScale 1.4 mantem o relevo do concreto quebrando o reflexo das faixas de luz, que e o que faz a laje ler como laje e nao como linoleo."
+            "envNote": "0.25 e nao 1.0 porque aqui NAO ha HDRI: a unica luz e a das luminarias do proprio galpao, e um piso que integra o ambiente inteiro num interior fica cinza-leitoso e chapado. normalScale 1.4 mantem o relevo do concreto quebrando o reflexo das faixas de luz, que e o que faz a laje ler como laje e nao como linoleo.",
+            "aoNote": "2026-08-03 — SEM mapa de AO, de proposito. armazem/set.glb nao tem TEXCOORD_1 (so COLOR_0, NORMAL, POSITION, TEXCOORD_0 — verificado no chunk JSON do glb), e set.ts atribui mat.aoMap sem tocar em texture.channel, que e 0 por padrao. O AO acabava montado sobre a MESMA UV do albedo ladrilhado a cada 8 m, ou seja repetindo oclusao de micro-relevo como se fosse padrao de superficie — nao e o que um mapa de AO significa. Custava 2048² = 22,4 MB de VRAM num cenario cuja geometria inteira tem 3,5 MB. envIntensity e normalScale FICAM: sao eles que dao leitura a laje."
           }
         },
         "setNote": "REESCRITO DO ZERO em 2026-08-03 (tools/env-build/build_armazem.py) — o anterior era warehouse6.blend escalado 4x em XY e 2,3x em Z, e escalar um predio modelado por quatro e exatamente por que ele nunca ficou certo ao lado de um caminhao: cada porta, terca e guarda-corpo dele tinha quatro vezes o tamanho que dizia ter, entao o unico objeto da cena com tamanho conhecido — o conjunto — fazia o galpao ler como brinquedo.\n\nTRES FONTES, e a regra que decide tudo e que PROP NENHUM E ESCALADO. (1) CASCA: warehouse-fbx-model-free/source/Warehouse.fbx, malha unica de 11k tris, abobada, dois topos fechados. E a UNICA coisa escalada, 2x, de 16,0 x 46,1 m com 4,97 m na cumeeira para 32,0 x 92,5 m com 10,05 m — a 1:1 um cavalo de 4,0 m so passava colado na linha de centro e um vao de 16 m nao deixa a camera ver um conjunto de 19 m. A excecao e segura porque esta casca nao tem detalhe de escala humana para denunciar: sem portas, escadas, guarda-corpos ou janelas, so nervura de telha e uma porta de enrolar. (2) PALETE E TRANSPALETE: NotAnotherApocalypticCo/01-Euro.Pallet.Trolley, ja 1:1 (o palete mede 0,800 x 1,201 x 0,144 m, EUR-1 ao milimetro), PBR 4K, usados como vieram. (3) GIIMANN 03-Warehouse: SO AS SUPERFICIES. Os props dele foram renderizados em clay antes de qualquer coisa ser construida com eles e sao placeholders — `shelving` e uma chapa lisa sobre quatro pernas, `box` e um bloco liso de 3,6 x 7,8 x 3,4 m, `ChamferCyl` e um disco. Funcionavam no jogo de origem porque a TEXTURA os carregava de longe; num configurador, encostado num caminhao, um bloco liso com mapa de papelao e um bloco liso. Entao o porta-paletes e as caixas sao AUTORADOS em medida real (baia 2,70 m, quadro 1,10 m, niveis de 1,80 m, caixas que paletizam sobre 800 x 1200 mm) e vestidos com os atlas card1..card4 do proprio pacote — os `cardboard2_*` ficaram de fora porque tem um risco preto duro de rip atravessado, que numa face de caixa le como rasgo.\n\nSEM HDRI de proposito (`hdri: null`): o interior e iluminado pelas faixas Emissive da propria casca, 4000 K, que e o que um galpao fechado tem. Conteudo: 4 fileiras de 12 baias de 5 niveis, 303 cargas paletizadas, 15 paletes de piso, 3 transpaletes, juntas serradas de laje numa malha de 6 m, rodape de concreto de 1,15 m em volta das paredes, faixas de circulacao e passeio pintadas em geometria (o engine religa GROUND_CONCRETE as texturas dele e joga fora qualquer mapa do glb, entao marcacao pintada no albedo nao sobreviveria ao port). 645 objetos, 176 mil triangulos, 2,9 MB depois de resize 1024 + webp q92 + draco.\n\nSEGUNDA RODADA (mesmo dia): a primeira ficou 'muito falsa e tudo perto demais'. Cinco mudancas. (1) Casca de 2,0x para 2,8x — 9,9 m de cumeeira sobre um caminhao de 4,0 m e so 6 m de ar e le como garagem; agora sao 14,07 m. (2) Porta-paletes de x +-11,6 para +-17,2, vao livre entre as faces de 22 m para 33,3 m. (3) Niveis de 4 para 5, aproveitando o pe-direito. (4) DESGASTE DE VERDADE no piso em COLOR_0 — rastros polidos de roda no corredor, apron sujo na frente de cada fileira, manchas de oleo, borda escura junto as paredes: faixa 0,53..1,00 contra os 0,95..1,00 quase planos de antes. (5) Aco do porta-palete de um azul saturado chapado (0,06/0,13/0,32 rough 0,55) para aco pintado escuro e dessaturado (0,035/0,062/0,135, rough 0,72, metal 0,55) — cor pura sem textura sempre le como plastico.\n\nARMADILHA QUE COMEU TUDO ISSO NA PRIMEIRA VEZ: `export_vertex_color` padrao e 'MATERIAL', que so exporta COLOR_0 se o node tree do material referenciar — e ligar um no Color Attribute na Base Color por um MixRGB NAO e um arranjo que esse exportador reconhece. Ele avisava 314 vezes ('The active Vertex Color will not be exported') no meio de centenas de linhas INFO, e o campo de desgaste inteiro era calculado, guardado, logado e descartado. Agora e 'ACTIVE'. Conferido no .glb ja compactado: o piso traz 8448 valores de canto, faixa 0,527..1,000.\n\nTERCEIRA RODADA: 'ainda nao esta tao grande, quase tudo tem a mesma cor, nada tem profundidade'. As tres coisas tinham a mesma raiz e nao era tamanho. (1) PROFUNDIDADE: a casca e um tubo liso de 11k tris — duas paredes e um teto curvo, com NADA entre eles. Nada se projeta, entao nada faz sombra em nada, entao toda superficie recebe a mesma luz e o olho nao ganha nem paralaxe nem oclusao. Escalar isso so faz um tubo maior. Foi autorada a estrutura que falta, sempre A 1:1 para nao perder escala humana: pilares de portico nos dois lados a cada 8 m com misula, tercas correndo o comprimento, telhas translucidas a cada tres vaos, rede de sprinkler sob a cumeeira, e doca de 5 portas com batentes, para-choques e faixas pintadas na parede sul — que era 51 x 16 m de branco liso e e a maior superficie do quadro. (2) COR: porta-palete agora tem LONGARINA LARANJA sobre MONTANTE AZUL, que e como todo porta-palete europeu de verdade e como o olho separa a estrutura horizontal da vertical; mais guarda-corpos e balizadores amarelos e o tubo de sprinkler vermelho. Antes eram tres cores no predio inteiro. A telha tambem ganhou variacao de tom por PAINEL em COLOR_0, porque chapa de galpao nunca e um cinza so. (3) TAMANHO: 2,8x -> 3,2x, 51,2 x 148,1 m com 16,08 m na cumeeira; porta-paletes de x +-17,2 para +-20,4 e corredor livre de 38,9 m.\n\nE A LICAO DE ILUMINACAO, que quase virou uma correcao errada: o piso aparecia estourado de branco nos previews e a conclusao obvia era 'ha luz demais', entao a emissao caiu de 18 para 7,5 e depois para 3,2 e a sala ficou escura. A causa nunca foi a luz — era o PREVIEW renderizando o cinza 0,42 de placeholder do GROUND_CONCRETE, porque o engine so religa esse material em runtime. Com shot_armazem.py passando a vestir o piso com o concreto real do engine (dress_floor), a mesma cena com emissao 6,0 fica correta. Nao ajuste a luz deste set olhando um preview que nao religou o piso.",

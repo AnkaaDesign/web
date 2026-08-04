@@ -19,14 +19,14 @@
     {
       "id": "scania",
       "name": "Scania",
-      "logo": "/brands/trucks/scania/logo-light.webp",
+      "logo": "brands/trucks/scania/logo-light.webp",
       "accent": "#041E42",
       "models": [
         {
           "id": "scania-r500",
           "name": "R500",
           "subtitle": "Highline · 6x2",
-          "image": "/brands/trucks/scania/models/s730.webp",
+          "image": "brands/trucks/scania/models/s730.webp",
           "cab": "scania",
           "available": false
         },
@@ -34,7 +34,7 @@
           "id": "scania-s730",
           "name": "S730 V8",
           "subtitle": "Highline · 6x4",
-          "image": "/brands/trucks/scania/models/s730.webp",
+          "image": "brands/trucks/scania/models/s730.webp",
           "cab": "scania",
           "available": true
         },
@@ -42,7 +42,7 @@
           "id": "scania-r450",
           "name": "R450",
           "subtitle": "Highline · 4x2",
-          "image": "/brands/trucks/scania/models/s730.webp",
+          "image": "brands/trucks/scania/models/s730.webp",
           "cab": "scania",
           "available": false
         }
@@ -51,14 +51,14 @@
     {
       "id": "volvo",
       "name": "Volvo",
-      "logo": "/brands/trucks/volvo/logo.webp",
+      "logo": "brands/trucks/volvo/logo.webp",
       "accent": "#1E3A8A",
       "models": [
         {
           "id": "volvo-fh540",
           "name": "FH 540",
           "subtitle": "Globetrotter · 6x2",
-          "image": "/brands/trucks/volvo/models/fh16.webp",
+          "image": "brands/trucks/volvo/models/fh16.webp",
           "cab": "volvo",
           "available": false
         },
@@ -66,7 +66,7 @@
           "id": "volvo-fh16-750",
           "name": "FH16 750",
           "subtitle": "Globetrotter XL · 6x4",
-          "image": "/brands/trucks/volvo/models/fh16.webp",
+          "image": "brands/trucks/volvo/models/fh16.webp",
           "cab": "volvo",
           "available": true
         },
@@ -74,7 +74,7 @@
           "id": "volvo-fh460",
           "name": "FH 460",
           "subtitle": "Globetrotter · 4x2",
-          "image": "/brands/trucks/volvo/models/fh16.webp",
+          "image": "brands/trucks/volvo/models/fh16.webp",
           "cab": "volvo",
           "available": false
         }
@@ -83,28 +83,28 @@
     {
       "id": "daf",
       "name": "DAF",
-      "logo": "/brands/trucks/daf/logo-light.webp",
+      "logo": "brands/trucks/daf/logo-light.webp",
       "accent": "#0072CE",
       "models": [
         {
           "id": "daf-xf480",
           "name": "XF 480",
           "subtitle": "Space Cab · 6x2",
-          "image": "/brands/trucks/daf/models/xf530.webp",
+          "image": "brands/trucks/daf/models/xf530.webp",
           "available": false
         },
         {
           "id": "daf-xf530",
           "name": "XF 530",
           "subtitle": "Super Space Cab · 6x4",
-          "image": "/brands/trucks/daf/models/xf530.webp",
+          "image": "brands/trucks/daf/models/xf530.webp",
           "available": false
         },
         {
           "id": "daf-xg530",
           "name": "XG 530",
           "subtitle": "Super Space Cab · 4x2",
-          "image": "/brands/trucks/daf/models/xf530.webp",
+          "image": "brands/trucks/daf/models/xf530.webp",
           "available": false
         }
       ]
@@ -112,21 +112,21 @@
     {
       "id": "iveco",
       "name": "IVECO",
-      "logo": "/brands/trucks/iveco/logo.webp",
+      "logo": "brands/trucks/iveco/logo.webp",
       "accent": "#003D7D",
       "models": [
         {
           "id": "iveco-s-way-480",
           "name": "S-Way 480",
           "subtitle": "Cavalo mecânico · 6x2",
-          "image": "/brands/trucks/iveco/models/s-way.webp",
+          "image": "brands/trucks/iveco/models/s-way.webp",
           "available": false
         },
         {
           "id": "iveco-s-way-440",
           "name": "S-Way 440",
           "subtitle": "AS Highway · 4x2",
-          "image": "/brands/trucks/iveco/models/s-way.webp",
+          "image": "brands/trucks/iveco/models/s-way.webp",
           "cab": "iveco",
           "available": true
         },
@@ -134,7 +134,7 @@
           "id": "iveco-s-way-540",
           "name": "S-Way 540",
           "subtitle": "Cavalo mecânico · 6x4",
-          "image": "/brands/trucks/iveco/models/s-way.webp",
+          "image": "brands/trucks/iveco/models/s-way.webp",
           "available": false
         }
       ]
@@ -142,28 +142,28 @@
     {
       "id": "mb",
       "name": "Mercedes-Benz",
-      "logo": "/brands/trucks/mb/logo-light.webp",
+      "logo": "brands/trucks/mb/logo-light.webp",
       "accent": "#00ADEF",
       "models": [
         {
           "id": "mb-actros-2548s",
           "name": "Actros 2548 S",
           "subtitle": "Cavalo mecânico · 6x2",
-          "image": "/brands/trucks/mb/models/actros2653.webp",
+          "image": "brands/trucks/mb/models/actros2653.webp",
           "available": false
         },
         {
           "id": "mb-actros-2653s",
           "name": "Actros 2653 S",
           "subtitle": "Cavalo mecânico · 6x4",
-          "image": "/brands/trucks/mb/models/actros2653.webp",
+          "image": "brands/trucks/mb/models/actros2653.webp",
           "available": false
         },
         {
           "id": "mb-actros-2546s",
           "name": "Actros 2546 S",
           "subtitle": "Cavalo mecânico · 4x2",
-          "image": "/brands/trucks/mb/models/actros2653.webp",
+          "image": "brands/trucks/mb/models/actros2653.webp",
           "available": false
         }
       ]
@@ -171,28 +171,28 @@
     {
       "id": "vw",
       "name": "Volkswagen",
-      "logo": "/brands/trucks/vw/logo.webp",
+      "logo": "brands/trucks/vw/logo.webp",
       "accent": "#001E50",
       "models": [
         {
           "id": "vw-meteor-28460",
           "name": "Meteor 28.460",
           "subtitle": "Cavalo mecânico · 6x2",
-          "image": "/brands/trucks/vw/models/meteor29530.webp",
+          "image": "brands/trucks/vw/models/meteor29530.webp",
           "available": false
         },
         {
           "id": "vw-meteor-29530",
           "name": "Meteor 29.530",
           "subtitle": "Cavalo mecânico · 6x4",
-          "image": "/brands/trucks/vw/models/meteor29530.webp",
+          "image": "brands/trucks/vw/models/meteor29530.webp",
           "available": false
         },
         {
           "id": "vw-meteor-24460",
           "name": "Meteor 24.460",
           "subtitle": "Cavalo mecânico · 4x2",
-          "image": "/brands/trucks/vw/models/meteor29530.webp",
+          "image": "brands/trucks/vw/models/meteor29530.webp",
           "available": false
         }
       ]

@@ -1,13 +1,13 @@
-/* The studio's own markup.
+/* A markup do próprio estúdio.
 
-   The engine builds and owns this DOM (see core/dom.ts); React only hosts the
-   container. Keeping the ids/classes stable is what lets every engine module
-   (scene/models/livery/ui) bind by id without knowing where the node lives.
+   O engine constrói e é dono deste DOM (ver core/dom.ts); o React só hospeda o
+   container. Manter os ids/classes estáveis é o que permite a cada módulo do
+   engine (scene/models/livery/ui) ligar por id sem saber onde o nó mora.
 
-   The selector overlay (#ts-selector) and the viewport badges (#ts-badge,
-   #ts-mapbadge, #ts-colorbadge) are deliberately NOT here: ui/selector.ts builds
-   and injects them itself, because their markup is data-driven (one card per
-   manifest entry).
+   O overlay do seletor (#ts-selector) e os badges do render (#ts-badge,
+   #ts-mapbadge, #ts-colorbadge) NÃO estão aqui de propósito: ui/selector.ts os
+   constrói e injeta sozinho, porque a markup deles é orientada a dados (um card
+   por entrada do manifesto).
 
    NÃO EXISTE MAIS SIDEBAR. A coluna da direita carregava duas coisas, e as duas
    mudaram de lugar:
@@ -22,7 +22,7 @@
    Com isso o render ocupa a largura inteira, que é o assunto da tela. */
 export const STUDIO_HTML = /* html */ `
   <div id="app">
-    <!-- 3D VIEWPORT -->
+    <!-- O RENDER 3D -->
     <section id="viewport">
       <!-- NÃO EXISTE MAIS TOPBAR. Ela carregava a marca, a linha de estado e os
            dois checkboxes de visibilidade, e tomava ~56 px da altura do render
@@ -38,7 +38,7 @@ export const STUDIO_HTML = /* html */ `
              topbar: são ações sobre a CENA, e o lugar onde o olho já está é o
              render, não a barra. O canto esquerdo é do HUD de iluminação e dos
              badges do seletor.
-             Os ids são os mesmos de quando isto morava na topbar — ui/sidebar.ts
+             Os ids são os mesmos de quando isto morava na topbar — ui/chrome.ts
              liga por id e não precisou mudar.
              Ícones: SVG inline, 24x24, traço em currentColor, mesma convenção
              de ui/hud.ts (nunca emoji: a plataforma escolheria a fonte e o
@@ -139,10 +139,20 @@ export const STUDIO_HTML = /* html */ `
           </button>
         </div>
 
+        <!-- O indicador de BOOTSTRAP: o que se vê entre a página abrir e o
+             catálogo responder, antes de existir seletor, cortina ou 3D.
+             Spinner + linha de texto, e nada mais. Havia aqui uma barra de
+             progresso (.load-bar / #load-fill) que ninguém escrevia: este painel
+             ganha a classe .hide assim que o catálogo termina, então qualquer
+             escrita posterior caía num elemento invisível. O que ela mostrava, na
+             prática, era um trilho de 220px parado em zero embaixo de
+             "CARREGANDO CATÁLOGO…" — pior do que não ter barra nenhuma, porque
+             uma barra parada lê como travado e um spinner lê como trabalhando.
+             O progresso de verdade tem dois donos, os dois com barra própria: a
+             cortina (ui/loader.ts) e a pílula de troca de veículo. -->
         <div id="loading">
           <div class="spinner"></div>
           <div class="load-text" id="load-text">Carregando modelos…</div>
-          <div class="load-bar"><i id="load-fill"></i></div>
         </div>
         <div id="cab-switching" class="hidden">
           <div class="spinner small"></div><span id="cab-switching-text">Trocando veículo…</span>
@@ -159,14 +169,16 @@ export const STUDIO_HTML = /* html */ `
              emocional da escolha do caminhão e dura segundos; isto dura menos
              de um. role=status + aria-live para quem não vê o spinner. -->
         <div id="ts-shot" class="hidden" role="status" aria-live="polite">
-          <div class="spinner small"></div><span id="ts-shot-text">Gerando imagem…</span>
+          <!-- Sem id: o rótulo é fixo, ninguém o reescreve, e um id que só
+               existe na markup é um contrato que o tsc não confere. -->
+          <div class="spinner small"></div><span>Gerando imagem…</span>
         </div>
         <div id="view-hint">Arraste para girar · scroll para zoom · botão direito para mover</div>
       </div>
     </section>
   </div>
 
-  <!-- LARGE LIVERY EDITOR MODAL -->
+  <!-- O EDITOR GRANDE DE PLOTAGEM, EM MODAL -->
   <div id="editor-modal" class="hidden">
     <div class="modal-card">
       <header class="modal-head">

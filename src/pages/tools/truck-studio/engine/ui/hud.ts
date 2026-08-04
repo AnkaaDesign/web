@@ -31,10 +31,10 @@
    --ts-hud-fill custom property (the filled portion of a range track, which CSS
    cannot compute on its own) and the dial's `touch-action: none`, without which
    a touch drag scrolls the page instead of turning the light. */
-import { root, $opt } from '../core/dom';
+import { root, $opt, el, num } from '../core/dom';
 import {
   sceneState, LIGHT_PRESETS, applyPreset, setLightParams,
-  setHourOfDay, getHourOfDay, HOUR_MIN, HOUR_MAX,
+  setHourOfDay, getHourOfDay, HOUR_MIN, HOUR_MAX, beginLightScrub,
 } from '../scene/scene';
 
 /* Same ranges the sidebar shipped, so nothing about the light's reachable set
@@ -97,15 +97,9 @@ const ICON_BODY: Record<string, string> = {
   /* --- weather --- */
   cloud: '<path d="' + CLOUD + '"/>',
   rain: '<path d="' + CLOUD + '"/><path d="M8.6 19.8 7.6 22M12.5 19.8l-1 2.2M16.4 19.8l-1 2.2"/>',
-  /* golden hour: half a sun over the horizon, rays and a broken ground line */
-  golden: '<path d="M12 4.2v1.8M5.4 7.4 6.7 8.7M18.6 7.4 17.3 8.7"/>'
-    + '<path d="M6.6 15a5.4 5.4 0 0 1 10.8 0"/><path d="M3 15h18"/><path d="M4 19h5M12 19h8"/>',
   /* fog: a smaller cloud sitting on drifting mist bands */
   fog: '<path d="M7.5 12.6h7.6a3 3 0 0 0 .3-6 4.4 4.4 0 0 0-8.4-.8A3 3 0 0 0 7.5 12.6Z"/>'
     + '<path d="M4 16.5h16M7 20h12"/>',
-  /* studio: a softbox on a stand, throwing light to the right */
-  studio: '<rect x="3" y="4" width="13" height="9.4" rx="1.8" transform="rotate(-11 9.5 8.7)"/>'
-    + '<path d="M10.6 13.6v6.2M7.2 20.6h6.8"/><path d="M18.6 6.6 21.4 5.2M18.9 9.8h2.9M18.6 13 21.4 14.4"/>',
 };
 
 /* Which presets the picker OFFERS. Deliberately a subset of scene/scene.ts's
@@ -116,27 +110,22 @@ const ICON_BODY: Record<string, string> = {
    still names itself in the row's readout; it simply lights no tile. */
 const HUD_PRESETS = ['ensolarado', 'nublado', 'chuvoso', 'neblina'];
 
-/* Weather id → icon. Anything unmapped falls back to the sun glyph and still
-   renders as a usable tile. */
+/* Weather id → icon. One entry per HUD_PRESETS id and no more: `dourado` and
+   `estudio` used to be mapped here too, and since neither is ever OFFERED as a
+   tile, their glyphs were two shapes nothing could reach. Anything unmapped
+   falls back to the sun and still renders as a usable tile, which is what makes
+   adding a preset a one-line change here rather than a requirement. */
 const PRESET_ICON: Record<string, string> = {
   ensolarado: 'sun',
   nublado: 'cloud',
   chuvoso: 'rain',
-  dourado: 'golden',
   neblina: 'fog',
-  estudio: 'studio',
 };
 
-/* ---------------- tiny DOM helpers (house style: build it in JS) ---------------- */
-
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K, cls?: string, text?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text != null) node.textContent = text;
-  return node;
-}
+/* ---------------- tiny DOM helpers (house style: build it in JS) ----------------
+   `el` and `num` live in core/dom.ts — ui/selector.ts and ui/loader.ts build
+   their DOM exactly the same way, and scene/environment.ts wants the same
+   number coercion. */
 
 /* The markup is a module constant, never user input, so innerHTML is the cheap
    way to get the HTML parser to build foreign (SVG) content for us. */
@@ -148,8 +137,6 @@ function iconSpan(name: string, cls?: string, size?: number) {
 }
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
-const num = (v: unknown, fallback: number) =>
-  (Number.isFinite(+(v as number)) ? +(v as number) : fallback);
 
 /* 7.25 → "07:15". The top of the range stays "24:00" rather than wrapping to
    "00:00", which at the RIGHT end of the slider would read as the left one. */
@@ -347,6 +334,9 @@ function buildWeatherRow() {
     /* Discrete switch, so this one DOES animate — the crossfade between two
        preset faces is the whole point of the control. */
     tile.addEventListener('click', () => {
+      /* Um clique de preset abre um tween de 0,8 s ≈ 48 quadros, cada um
+         redesenhando o mapa de sombra inteiro. */
+      beginLightScrub();
       applyPreset(id);
       syncHud();                            // applyPreset resets az/el/brightness
     });
@@ -404,6 +394,9 @@ function build() {
   hourMoonCap = hour.capHi;
   hourInput.setAttribute('aria-label', 'Hora do dia');
   hourInput.addEventListener('input', () => {
+    /* Arrastar a luz redesenha o mapa de sombra 3072² a cada evento; ver
+       beginLightScrub() em scene/scene.ts. */
+    beginLightScrub();
     const h = num(hourInput.value, HOUR_MIN);
     setHourOfDay(h);                        // no tween: must track the thumb
     paintHour(h);
@@ -423,6 +416,9 @@ function build() {
   elVal = elev.val;
   elInput.setAttribute('aria-label', 'Altura da luz');
   elInput.addEventListener('input', () => {
+    /* Arrastar a luz redesenha o mapa de sombra 3072² a cada evento; ver
+       beginLightScrub() em scene/scene.ts. */
+    beginLightScrub();
     const v = num(elInput.value, EL_MIN);
     setLightParams({ el: v });
     paintElevation(v);
@@ -437,6 +433,9 @@ function build() {
   brightVal = bright.val;
   brightInput.setAttribute('aria-label', 'Intensidade da luz');
   brightInput.addEventListener('input', () => {
+    /* Arrastar a luz redesenha o mapa de sombra 3072² a cada evento; ver
+       beginLightScrub() em scene/scene.ts. */
+    beginLightScrub();
     const v = num(brightInput.value, 100);
     setLightParams({ brightness: v / 100 });
     paintBrightness(v);
@@ -476,6 +475,7 @@ function azFromEvent(e: PointerEvent) {
 }
 
 function commitAz(a: number | null) {
+  beginLightScrub();
   if (a == null) return;
   setLightParams({ az: a });                 // no tween: must track the pointer
   paintAzimuth(a);
@@ -649,10 +649,4 @@ export function syncHud() {
   paintAzimuth(sceneState.az);
   paintBrightness(num(sceneState.brightness, 1) * 100);
   paintPresets();
-}
-
-/** @param {boolean} visible */
-export function showHud(visible: boolean) {
-  initHud();
-  hudRoot.classList.toggle('hidden', !visible);
 }

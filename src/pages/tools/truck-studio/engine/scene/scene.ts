@@ -1,5 +1,25 @@
-/* Renderer, scene, camera, controls, the procedural road environment, the
-   weather/time-of-day light rig, and the render loop.
+/* Renderer, scene, camera, controls, the procedural sky, the weather/time-of-day
+   light rig, and the render loop.
+   ---------------------------------------------------------------------------
+   THIS MODULE IS THE ROOT OF THE ENGINE'S IMPORT GRAPH. KEEP IT ACYCLIC.
+
+   Everything below module scope here RUNS AT IMPORT TIME: `new WebGLRenderer()`,
+   the `$('canvas-holder')` DOM lookup, the mountSky() IIFE, the restore() IIFE
+   and a resize(). So this module cannot tolerate a cycle — with one, a partially
+   initialised binding is not a lint warning, it is a `ReferenceError` on boot,
+   before a single pixel exists.
+
+   The graph is acyclic today for exactly one reason: `vehicle/paint.ts` is a
+   DEPENDENCY SINK. It imports `three` and nothing else — no `scene`, no
+   `onFrame`, no `onRig` — and receives the only thing it needs from this module,
+   the key light, BY INJECTION: we import `setKeyLight` FROM it and push. Adding
+   `import { renderer } from '../scene/scene'` to paint.ts inverts that edge and
+   closes the loop. Do not. The same rule already has a second instance:
+   `weather.ts` needs `scene`, `camera` and the frame loop, so it registers
+   through onFrame()/onRig() rather than being imported here (see the hooks
+   section). If a module ever needs to be CALLED from here, give it a
+   registration hook; do not import it.
+
    ---------------------------------------------------------------------------
    LIGHT RIG DESIGN
 
@@ -57,9 +77,9 @@
    cannot flip it back and forth.
 
    ---------------------------------------------------------------------------
-   EXTERNAL ENVIRONMENTS (environment.js)
+   EXTERNAL ENVIRONMENTS (environment.ts)
 
-   environment.js can hand this module a photoreal HDRI. When it does, ONE
+   environment.ts can hand this module a photoreal HDRI. When it does, ONE
    module-level flag (`externalEnv`) flips and the procedural path stops writing
    `scene.background` / `scene.environment` — and ONLY those two. Everything
    else the rig drives (lights, fog, exposure, wetness, lamps, stars, the paint
@@ -69,92 +89,30 @@
    `setExternalEnvironment(null)`, which also rebuilds the procedural PMREM.
 
    ---------------------------------------------------------------------------
-   NEAR FIELD OVER A PHOTOGRAPH
+   WHAT THE 2026-08-03 CONTENT CUT TOOK OUT OF THIS FILE
 
-   Once environment.js ground-projects the HDRI, the ground under the truck is
-   a photograph, and three things follow that this module has to provide:
+   Three photo-backed environments (`rodovia`, `patio-logistico`, `urbano`) left
+   the catalogue. Both survivors — `distrito-industrial` and `armazem` — stand on
+   REAL MODELLED GEOMETRY (`set.glb`, owned by scene/set.ts), and that geometry
+   IS the ground. Everything this module used to build in order to fake a floor
+   under a photograph went with them: the ground-projected dome, the CG near-field
+   band, the two-band radial dissolve, the macro variation, the shadow catcher
+   and the 340 m procedural road strip. `setNearGround()`, `setGroundMaps()`,
+   `setMacroVariation()`, `setShadowCatcher()` and `setRoadVisible()` DO NOT
+   EXIST — if a comment elsewhere still names one, it is the comment that is
+   wrong.
 
-   * `setShadowCatcher()` — a ShadowMaterial plane at y = 0, because a photo
-     cannot receive a shadow and a truck without one is a cut-out.
-   * the key light's shadow camera had to grow from ±14 m to ±24 m to cover
-     that plane; the resolution note is at the declaration.
-   * `setLamps()` — poles are the one bit of CG furniture every scene still
-     wants, so they are no longer road furniture that `setRoadVisible(false)`
-     takes away. The SpotLight pool is a FIXED size; see that section for why
-     the count can never become per-environment data.
+   Two things they left behind are still load-bearing, and both are documented at
+   their own declaration rather than here:
 
-   ---------------------------------------------------------------------------
-   TWO GROUND BANDS, AND THE SEAM BETWEEN THEM
-
-   Projecting a panorama onto a floor has a hard resolution ceiling. A texel
-   row covers Δd = Δθ·(h² + d²)/h metres of ground at distance d, so for a
-   1.7 m camera height and a 4k background that is 1.1 cm/texel at 3 m but
-   35 cm/texel at 20 m — and the rig is 16 m long. Pushed close enough to be
-   sharp, the projection also smears every vertical surface radially. Pushed
-   far enough not to smear, everything near the truck is mush. There is no
-   radius that solves both, which is why the first attempt at "closer" came
-   back as "now the scenes are blurred close".
-
-   The standard split is therefore two bands:
-
-     far field   the projected photograph, at a radius where its angular
-                 resolution is genuinely adequate (environment.js owns it)
-     near field  REAL CG GROUND — `setNearGround()` below — tiled 2k PBR,
-                 which at a 3 m tile carries far more detail per metre than
-                 any panorama can
-     the seam    a radial alpha dissolve from the CG band into the projected
-                 floor
-
-   The seam is the whole trick, and its blend state is not negotiable:
-
-     * the near ground is `transparent: true`, so it lands in the TRANSPARENT
-       queue and is therefore drawn after every opaque object — including the
-       dome, which environment.js parks at renderOrder −1.
-     * `depthWrite: false`, so the faded band cannot punch a hole in the photo
-       behind it. This costs nothing that was not already lost: GroundedSkybox
-       is itself `depthWrite: false`, so a grounded scene's ground has never
-       written depth.
-     * no fragment is ever blended twice. The bands used to guarantee that by
-       being disjoint in x, with one deliberate 45 cm strip of overlap where
-       the asphalt dissolves laterally into the verge. `edgeNoise` widened that
-       overlap to metres, so the guarantee is now an identity in the shader
-       instead: the verge carries the exact complement of the road's coverage,
-       and the two composite to precisely the radial alpha at every fragment.
-       See the near-field section for the algebra.
-     * `fog: false`, for the same reason the dome sets it: the CG band ends
-       55–80 m out, where Neblina's fog would be 40–60 % of the way to a flat
-       preset grey while the unfogged photo two millimetres beyond it is not.
-       Any fog at all IS the visible ring.
-
-   `setMacroVariation()` used to be an assetless-fallback nicety. It is now
-   load-bearing: a 3 m tile across a 55 m disc is 18 repeats, which the eye
-   locks onto as a checkerboard long before the fade hides it.
-
-   There are no instanced "grass blade" quads any more; see makeGrassCanvas()
-   for what replaced them and why.
-
-   ---------------------------------------------------------------------------
-   ORGANIC, NOT STATIC
-
-   A perfectly flat plane with a perfectly straight material boundary reads as
-   CG however good the texture on it is, because the giveaway is the SHAPE, not
-   the pixels. Three things answer that, and setNearGround() takes all three as
-   manifest data:
-
-     edgeNoise   the asphalt/verge boundary wanders with a 1-D fbm in z instead
-                 of being a line. It is the highest-impact of the three, and it
-                 forced the band overlap to grow — see the near-field section
-                 for the complement alpha that repays the double blend.
-     wear        verge grit creeping onto the asphalt, and darkened, polished
-                 wheel tracks on the same RUTS lanes the puddle mask uses.
-     undulation  a few centimetres of low-frequency height, baked into a
-                 subdivided grid. Zero under the rig's footprint, because
-                 models.js grounds the truck at y = 0 and knows nothing about
-                 this surface, and zero across the dissolve, because the
-                 photographed floor it hands over to is flat.
-
-   Real geometry standing on the ground (grass tufts, rocks, debris) is the
-   fourth and biggest answer, and it is scatter.js's, not this module's.
+   * the key light's shadow camera stays at ±24 m (SHADOW_HALF). It grew for a
+     photographed floor and it is still right for a modelled one — a set's ground
+     receives the truck's shadow across the whole yard, and a frustum that stops
+     14 m from the origin cuts a dead-straight line across it.
+   * the wetness bookkeeping (dryColors / dryRough / dryEnv / puddleSpec) is now
+     fed by set.ts through registerGroundMaterials(), instead of being seeded
+     with the procedural materials it was written for. See that function for why
+     the old seeding left `Chuvoso` raining on a road that never darkened.
 
    ---------------------------------------------------------------------------
    THE LAMPS: A MODEL WHERE ONE FITS, A MAST WHERE NONE DOES
@@ -168,11 +126,17 @@
    column on a door compartment, a cubic-Bezier outreach arm that leaves the
    column vertically and reaches the lantern horizontally, and a flat-glass
    cutoff luminaire with the lens on its underside. It is not a fallback of last
-   resort — it is what `rodovia` and `patio-logistico` ship, because the only
-   CC0 street lamp available is a 3.87 m ornate cast-iron park lantern and
+   resort — it is the DEFAULT fixture, and it was modelled because the only CC0
+   street lamp available is a 3.87 m ornate cast-iron park lantern and
    stretching it to a 9 m motorway mounting height is exactly the artefact the
    user reported. Height is per-scene data with an inverse-square intensity
    compensation; see the street-lamp section for all of it.
+
+   Neither shipped scenario currently draws it: both set `lamps.enabled: false`,
+   because the industrial estate models its own poles and the warehouse lights
+   itself with emissive strips on the shell. The pool and the mast stay because
+   `lamps: null` means "the built-in row", not "none" — the next scene that wants
+   street lighting and has no modelled poles gets it for free.
 */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -180,23 +144,20 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { setKeyLight } from '../vehicle/paint';
 import { $ } from '../core/dom';
 import {
-  canvasTex, ctx2d, makeAsphaltCanvas, makePuddleCanvas, makeGrassCanvas,
-  makeGravelCanvas, makeMacroCanvas,
+  canvasTex, ctx2d, makePuddleCanvas,
 } from './textures';
 import { skyU, makeSkyDome, makeStars } from './sky';
 import {
   lampUnits, lampModelEmissive, makeLamps, applyLampLayout, setLampRigRefresh,
-  getLampLensMat, getLampIntensityScale, getLampInfo,
+  getLampLensMat, getLampIntensityScale,
 } from './lamps';
 import { LIGHT_PRESETS, RIG_BASE, COLOR_FIELDS, NUM_FIELDS, makeRig } from './presets';
 import type { Rig } from './presets';
-import { getPlateExposure } from './plate';
 
 /* Re-exported so the engine's public surface is unchanged by the split:
    environment.ts and ui/hud.ts import all of these from this module. */
 export { LIGHT_PRESETS, PRESET_ORDER } from './presets';
 export { setLamps, setLampModel } from './lamps';
-export { preparePlateMaterial } from './plate';
 
 export const holder = $('canvas-holder');
 
@@ -224,7 +185,24 @@ export const holder = $('canvas-holder');
    order of magnitude finer than anything defight.js left coincident. */
 export const renderer = new THREE.WebGLRenderer({
   antialias: true,
-  preserveDrawingBuffer: true,
+  /* THE DISCRETE GPU, EXPLICITLY. Unset, this is `'default'`, and on a dual-GPU
+     laptop `'default'` is where the browser is free to hand back the integrated
+     adapter — which for a 9–10 M triangle scene with a 3072² shadow pass is the
+     difference between 60 fps and a slideshow, for free. ui/preview.ts asks for
+     `'low-power'` for exactly the symmetric reason: its thumbnails are twelve
+     512² offscreen frames and do not deserve to spin up the dGPU. Only ever a
+     HINT — a single-GPU machine ignores it, which is why nothing downstream may
+     assume it took. */
+  powerPreference: 'high-performance',
+  /* NOT preserveDrawingBuffer. It was here for the screenshot, and it is not
+     needed for one: scene/capture.ts calls `renderer.render()` and then
+     `canvas.toBlob()` in the SAME task (encodePng's promise executor runs
+     synchronously), so the buffer has not been composited and cleared yet and
+     the readback is well defined without the flag. Keeping it costs an extra
+     full-size buffer allocation plus a copy on every single present, forever,
+     to serve a button pressed a handful of times a session. If capture ever
+     grows an `await` between the render and the readback, this has to come
+     back. */
 });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
@@ -252,12 +230,167 @@ renderer.shadowMap.autoUpdate = false;
 renderer.shadowMap.needsUpdate = true;
 
 /** Redraw the shadow map on the next frame. Call after moving/showing a caster. */
-export function invalidateShadows() { renderer.shadowMap.needsUpdate = true; }
+export function invalidateShadows() {
+  renderer.shadowMap.needsUpdate = true;
+  /* A caster moved, so by definition the picture changed. Folding the repaint in
+     here rather than asking every caller to pair the two is what makes the whole
+     class of "invalidated the shadow, forgot the frame" bug unrepresentable —
+     and it is what lets studio.ts's warmUp() cover every asynchronous model,
+     set and probe load in the engine without a line of new wiring. */
+  invalidate();
+}
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 holder.appendChild(renderer.domElement);
 
+/* ---------------- FRAME SCHEDULING: A DIRTY-DRIVEN LOOP ----------------
+   In both shipped scenarios the steady-state scene is bit-for-bit identical from
+   one frame to the next. Neither manifest turns the procedural dome on, rain is
+   off unless `chuvoso` is picked, and nothing else in the graph animates — yet
+   the loop redraws ~2200-2900 draw calls and ~9-10 M triangles sixty times a
+   second to produce the same image. That is a hot GPU, a loud fan and a flat
+   battery bought with nothing.
+
+   So the loop is dirty-driven: draw when something changed, and when nothing
+   has, don't. `invalidate()` is the signal, and it is EXPORTED because most of
+   the things that change the picture live in other modules.
+
+   A MISSED INVALIDATION IS A FROZEN SCREEN, which is far worse than a warm GPU.
+   Two defences, both deliberate:
+
+     * `invalidate()` marks INVALIDATE_FRAMES frames dirty, not one. A texture
+       upload that lands the frame after the call, an off-by-one in the damping
+       settle, a `needsUpdate` three defers to the next render — none of them can
+       leave a stale image on screen. Three frames out of the sixty a second this
+       used to spend is still ~95 % of the saving.
+     * anything CONTINUOUS pins the loop on for as long as it runs: a preset
+       crossfade, rain, the animated dome, OrbitControls damping still settling,
+       autoRotate. See wantsFrame(), which is the whole predicate in one place.
+
+   ---------------------------------------------------------------------------
+   IT SHIPS OFF, AND THIS IS EXACTLY WHY.
+
+   Every mutation point inside THIS file is covered. The engine's other modules
+   are not, and three of the gaps are shipped controls that would look BROKEN,
+   not merely stale:
+
+     1. vehicle/livery.ts — the fabric plotting editor. The three livery
+        CanvasTextures are marked `needsUpdate` from ONE place, a fabric
+        `after:render` handler, and fabric fires that from its own pointer
+        handlers and its own rAF. Nothing in this repo calls it. With no
+        invalidate there, drawing on the trailer never reaches the 3D view.
+     2. vehicle/models.ts `setPaintTarget()`, reached from livery.ts's "pintar o
+        implemento" checkbox. It swaps the trailer's materials and flips the
+        front-wall overlays without passing through any scene.ts entry point.
+     3. studio.ts `applyChoice()`'s colour-only fast path (`runColor`). It skips
+        the load pipeline on purpose — and with it warmUp(), which is what
+        invalidates on every other path — so picking a new colour would change
+        the materials and not the picture.
+
+   Wire those three to `invalidate()` and this can be flipped to `true`. Nothing
+   else in the engine is unreachable: every other external mutation either ends
+   in a scene.ts setter (environment.ts, hud.ts, chrome.ts, lamps.ts, set.ts) or
+   is awaited by studio.ts's runApply(), which finishes on warmUp() →
+   invalidateShadows() → invalidate(). `controls.autoRotate`, which chrome.ts
+   writes directly with no wrapper, is read by wantsFrame() rather than pushed,
+   so it needs no wiring at all. */
+const ON_DEMAND_RENDERING = false;
+
+/* Live override for A/B-ing the two loops from the console
+   (`__studio.lighting.setOnDemandRendering(true)`) without a rebuild. The
+   constant above is what SHIPS; this is what is running. */
+let onDemand = ON_DEMAND_RENDERING;
+
+/** How many frames one invalidate() buys. See the belt-and-braces note above. */
+const INVALIDATE_FRAMES = 3;
+/* Seeded dirty so the very first frame after module load always draws, whatever
+   the flag says. */
+let dirtyFrames = INVALIDATE_FRAMES;
+
+/**
+ * Mark the picture as changed: the loop will draw the next few frames.
+ *
+ * Call it from ANYWHERE that mutates something the camera can see — a material,
+ * a uniform, a transform, a visibility flag, `scene.background`, an exposure.
+ * It is idempotent, allocation-free and costs one comparison, so calling it too
+ * often is free and calling it too rarely freezes the screen. When in doubt,
+ * call it.
+ */
+export function invalidate(frames = INVALIDATE_FRAMES) {
+  if (frames > dirtyFrames) dirtyFrames = frames;
+}
+
+/** Swap the frame policy at runtime. Always leaves the screen repainted. */
+export function setOnDemandRendering(v: boolean) {
+  onDemand = !!v;
+  invalidate();
+}
+export const isOnDemandRendering = () => onDemand;
+
+/* DRAW SUSPENSION — for the windows where the scene graph is deliberately WRONG.
+   ---------------------------------------------------------------------------
+   warmLightPrograms() mounts the light configuration we are NOT about to render
+   (eight spotlights on, in daylight) so the driver compiles it now instead of
+   under the user's thumb at dusk. That used to be safe for free: `renderer
+   .compile()` is synchronous, so the flip and the restore lived in one task and
+   no frame could ever be presented between them. `compileAsync` breaks exactly
+   that guarantee — it yields, and the loop is running.
+
+   A counter rather than a boolean so nested or overlapping suspensions cannot
+   have one release re-enable drawing for the other. */
+let drawSuspended = 0;
+
 export const scene = new THREE.Scene();
+
+/* THE SCENE ROOT DOES NOT DIRTY ITSELF, and this is the other half of
+   models.ts's matrix freeze rather than a separate optimisation.
+   ---------------------------------------------------------------------------
+   `Object3D.updateMatrix()` sets `matrixWorldNeedsUpdate = true`
+   UNCONDITIONALLY, and `updateMatrixWorld()` turns that into `force = true` for
+   every descendant (three r179, Object3D.js:1126-1162). So a Scene left on the
+   default `matrixAutoUpdate` recomposes its own identity matrix once per frame
+   and then makes the renderer rebuild `matrixWorld` for EVERY node in the graph
+   — ~5852 in the implement alone — however many of them have frozen their local
+   matrix. Freezing the leaves without freezing the root removes the compose and
+   leaves the whole multiply cascade standing.
+
+   Safe because the Scene is never transformed: it sits at identity for the
+   lifetime of the page, and nothing in the engine writes its position, rotation
+   or scale (checked). `matrixWorldAutoUpdate` stays ON — that is the flag
+   WebGLRenderer.render() tests before calling `scene.updateMatrixWorld()`, and
+   turning it off would stop the traversal entirely instead of merely stopping it
+   from forcing.
+
+   THE INVARIANT THIS CREATES, and it is a graph-wide one, not a local one:
+
+     a node's world matrix is refreshed only if IT or one of its ANCESTORS is
+     dirty — so anything that moves must dirty itself.
+
+   Everything already does, by two different routes, which is why this composes
+   with the freeze instead of fighting it:
+
+     * nodes that keep `matrixAutoUpdate` on — the lights, the sky dome, the
+       stars, the haze shell, the lamp poles, the weather meshes, every overlay
+       and prop added after a subtree was frozen — call `updateMatrix()` on
+       themselves each traversal and dirty themselves for free.
+     * frozen nodes are only ever moved through setRigPlacement(), placeTrailer()
+       and groundAndCenter(), all of which pair the write with `updateMatrix()`
+       (which dirties) or `updateWorldMatrix()` (which recomputes on the spot).
+
+   The camera is not affected either way: it is not a child of the scene, and
+   WebGLRenderer.render() updates it on its own line.
+
+   The measurement paths are likewise independent — `Box3.expandByObject()` calls
+   `updateWorldMatrix(false, false)` on every node it visits, so frameAll(),
+   focusOnRig() and the probe read live numbers whether or not a frame has been
+   drawn since the rig moved.
+
+   WHAT BREAKS IT: reparenting a FROZEN node (`add()` does not dirty the child,
+   so its world matrix would silently keep the old parent's transform), or
+   writing `.position` on one from the console. Both are loud — the object
+   renders in the wrong place — rather than subtle. */
+scene.matrixAutoUpdate = false;
+
 /* Held as a module-level instance rather than an anonymous literal: applyRig()
    mutates it in place, and setExternalEnvironment(null) has to be able to hand
    `scene.background` back to it after an HDRI (a Texture) has been released. */
@@ -275,16 +408,33 @@ export const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
 controls.maxPolarAngle = Math.PI / 2 - 0.02;      // never orbit below the horizon
+/* Belt and braces over the `controls.update()` return value the loop already
+   reads. In r179 the two are the same signal — 'change' is dispatched from
+   exactly two places, inside update() and inside reset(), and reset() calls
+   update() straight afterwards — so this is redundant TODAY. It is here because
+   the loop's version is an implementation detail of a library that can add a
+   third dispatch site in any minor release, and the failure mode of missing one
+   is a frozen viewport rather than an exception.
+   Wrapped, not passed by reference: the listener receives an Event, which would
+   land in invalidate()'s `frames` parameter and make the comparison NaN-false —
+   i.e. a listener that silently does nothing. */
+controls.addEventListener('change', () => invalidate());
 
 const CAM_MIN_Y = 0.15;                            // pan guard: camera stays above ground
 
 /* ---------------- frame / rig hooks ----------------
-   weather.js registers here instead of scene.js importing it, which would be a
+   weather.ts registers here instead of scene.ts importing it, which would be a
    cycle (weather needs `scene`, `camera` and the render loop). */
 const frameHooks: ((dt: number) => void)[] = [];
 const rigHooks: ((rig: Rig) => void)[] = [];
 export function onFrame(fn: (dt: number) => void) { frameHooks.push(fn); }
-export function onRig(fn: (rig: Rig) => void) { rigHooks.push(fn); if (rigCur) fn(rigCur); }
+export function onRig(fn: (rig: Rig) => void) {
+  rigHooks.push(fn);
+  /* Fired immediately so a late subscriber is not one preset change behind —
+     and that first call can change the picture (weather.ts sizes its rain field
+     here, models.ts its wetness and probe gain), so it is an invalidation. */
+  if (rigCur) { fn(rigCur); invalidate(); }
+}
 
 /* ---------------- light rig ---------------- */
 const key = new THREE.DirectionalLight(0xffefe1, 3.1);
@@ -338,378 +488,55 @@ scene.add(ambient);
 
 
 
-/* ---------------- road environment ---------------- */
-/* The manifest authors ground `repeat` for the road strip and nothing else, so
-   these are the numbers setGroundMaps() re-derives every other tiling from. */
-const ROAD_W = 12, ROAD_L = 340;
-const PLANE_W = 700;
+/* ---------------- céu e postes ----------------
+   O QUE ERA "road environment" ATÉ 2026-08-03. Este bloco construía, no load do
+   módulo, um plano de grama de 700 m, duas orlas de brita e uma faixa de asfalto
+   procedurais — o chão dos cenários que eram uma FOTO equirretangular com CG por
+   baixo. Esses cenários saíram do catálogo, e todo cenário que restou traz
+   geometria de verdade (`set.glb`), que É o chão: os planos procedurais ficaram
+   permanentemente invisíveis (`setSetGround(true)` os desligava em todo apply) e
+   foram removidos.
 
-/* `blades` is kept as a permanently-null slot rather than deleted: it is part
-   of getRoadMaterials()'s published shape and callers destructure it. */
-/* `asphalt` and `grass` are seeded null but written by buildRoad() — the IIFE
-   immediately below — before anything can read them, so they are typed non-null
-   rather than `| null`; the alternative is a guard on every ground-material
-   loop in the module for a state no reader can observe. */
-const road = {
-  asphalt: null! as THREE.MeshStandardMaterial,
-  shoulders: [] as THREE.MeshStandardMaterial[],
-  grass: null! as THREE.MeshStandardMaterial,
-  blades: null,
-};
-/* Object handles kept for the visibility toggles environment.js drives. They
-   used to be anonymous locals inside buildRoad(). */
-/* Same argument as `road` above: every one of these is written by buildRoad()
-   at module load, so they carry definite assignment instead of `| null`. */
-let roadGroup!: THREE.Group, skyDome!: THREE.Mesh, starsMesh!: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>, lampGroup!: THREE.Group;
-let roadStrip!: THREE.Mesh, groundPlane!: THREE.Mesh;
-const shoulderMeshes: THREE.Mesh[] = [];
-/* [width, length] in metres of each retexturable ground surface, keyed by its
-   material — setGroundMaps() re-derives tiling from these */
-const groundSize = new Map<THREE.MeshStandardMaterial, [number, number]>();
-/* built once, on the first wet preset; see puddleSpec */
+   O que sobrou aqui é o que nunca dependeu daquilo: o domo de céu procedural, as
+   estrelas e a fileira de postes. */
+/* Escritos por `mountSky()` no load do módulo, antes que qualquer leitor exista
+   — daí a asserção de atribuição definida em vez de `| null`. */
+let skyDome!: THREE.Mesh;
+let starsMesh!: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
+let lampGroup!: THREE.Group;
+/* construído uma vez, no primeiro preset molhado; ver puddleSpec */
 let puddleCanvas: HTMLCanvasElement | null = null;
 
-(function buildRoad() {
-  const g = new THREE.Group();
-
-  /* 700 m instead of 400: the old plane's 283 m corners were only ~86 % fogged
-     and the diagonal edge could be spotted; at 700 the corners (495 m) sit well
-     behind the 340 m dome, which occludes them. It is still two triangles. */
-  const grassMat = new THREE.MeshStandardMaterial({
-    map: canvasTex(makeGrassCanvas(), 88, 88), roughness: 1, metalness: 0,
-  });
-  const grass = new THREE.Mesh(new THREE.PlaneGeometry(PLANE_W, PLANE_W), grassMat);
-  grass.rotation.x = -Math.PI / 2;
-  grass.position.y = -0.03;
-  grass.receiveShadow = true;
-  g.add(grass);
-  road.grass = grassMat;
-  groundPlane = grass;
-  groundSize.set(grassMat, [PLANE_W, PLANE_W]);
-
-  for (const side of [-1, 1]) {
-    const mat = new THREE.MeshStandardMaterial({
-      map: canvasTex(makeGravelCanvas(), 2, 160), roughness: 1, metalness: 0,
-    });
-    const shoulder = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 340), mat);
-    shoulder.rotation.x = -Math.PI / 2;
-    shoulder.position.set(side * 7.0, -0.02, 0);
-    shoulder.receiveShadow = true;
-    g.add(shoulder);
-    road.shoulders.push(mat);
-    shoulderMeshes.push(shoulder);
-    groundSize.set(mat, [2.2, ROAD_L]);
-  }
-
-  const asphaltMat = new THREE.MeshStandardMaterial({
-    map: canvasTex(makeAsphaltCanvas(true), 1, 28), roughness: 0.95, metalness: 0,
-  });
-  const strip = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, ROAD_L), asphaltMat);
-  strip.rotation.x = -Math.PI / 2;
-  strip.position.y = -0.01;
-  strip.receiveShadow = true;
-  g.add(strip);
-  road.asphalt = asphaltMat;
-  roadStrip = strip;
-  groundSize.set(asphaltMat, [ROAD_W, ROAD_L]);
-
+(function mountSky() {
   skyDome = makeSkyDome();
-  g.add(skyDome);
+  scene.add(skyDome);
   starsMesh = makeStars();
-  g.add(starsMesh);
-  scene.add(g);
-  roadGroup = g;
+  scene.add(starsMesh);
 
-  /* Lamps hang off the SCENE, not the road group. They stopped being road
-     furniture the moment the yard scene needed poles without a road, and the
-     structural split is what guarantees setRoadVisible() can never reach
-     them again by accident. */
+  /* Os postes penduram na CENA, não num grupo de estrada. Deixaram de ser
+     mobiliário de via no momento em que o pátio precisou de poste sem via. */
   lampGroup = makeLamps();
   scene.add(lampGroup);
   applyLampLayout();
 })();
 
-/* ---------------- near-field CG ground ----------------
-   The band between the truck and the projected photograph. See the module
-   header for why it exists and what the blend state has to be; this section is
-   the geometry and the material set.
 
-   SHAPE. It is not a disc. Three axis-aligned quads —
-
-       verge-left | road | verge-right          (or ONE quad when verge is null)
-
-   — spanning a square of side 2·(radius + fade), and the radial alpha term
-   `1 − smoothstep(radius, radius + fade, |xz|)` carves the disc out of them at
-   shading time. Three reasons that beats a CircleGeometry + RingGeometry pair:
-
-     * the bands are DISJOINT in x, so no fragment is blended twice. Stacking a
-       fading grass ring under a fading asphalt strip would tint the road's
-       dissolve green at a(1−a) — peaking at 25 % right in the middle of the
-       seam, which is exactly where nothing may be wrong.
-     * a quad's varyings interpolate exactly, so the radial fade is per-fragment
-       correct with FOUR vertices per band. Tessellating a ring buys nothing.
-     * the square's corners (|xz| = 1.41·R) are outside the fade, so they cost
-       one alpha-zero fragment each and draw nothing. 21 % overdraw at the very
-       edge of the frame is cheaper than the vertex count and the UV seam a
-       circle+ring would need.
-
-   UVs ARE WORLD METRES, written straight from the position attribute. The
-   tiling is then a plain texture.repeat of 1/metresPerTile, identical on every
-   band, so the grain runs continuously from the road across the verge instead
-   of stepping at the boundary — which is what PlaneGeometry's 0..1 UVs would
-   have done. It also means the geometry has to be rebuilt when the radius
-   changes (baked UVs cannot be scaled), which is fine: it is one grid, once per
-   environment switch.
-
+/* O ALBEDO SECO de cada material de chão, para a molhagem ser reversível.
    ---------------------------------------------------------------------------
-   THE BOUNDARY WANDERS, AND THE DISJOINTNESS ARGUMENT ABOVE HAD TO BE REPAID
+   VAZIO NO LOAD DO MÓDULO, e isso é a correção de 2026-08-03. Até aqui estes
+   três mapas eram semeados com os materiais procedurais (asfalto, grama, orlas
+   e as duas faixas do near ground) — que deixaram de ser desenhados quando os
+   cenários viraram geometria de verdade. O resultado é que `Chuvoso` continuava
+   soltando chuva e ondulação, mas sobre um chão que NUNCA escurecia: os únicos
+   materiais registrados eram invisíveis, e o chão real do set jamais entrava
+   aqui, porque o único caminho que registrava material novo — resnapshotGround()
+   — só era chamado de setGroundMaps()/setNearGround(), as duas funções do
+   caminho de foto que morreu junto.
 
-   A dead-straight asphalt/verge line is the most CG thing left in the near
-   field, so `edgeNoise` moves the boundary back and forth with a 1-D fbm in z.
-   The consequence is structural: the road band's geometry has to reach
-   `amplitude + blend` PAST the nominal edge to cover the outward excursions,
-   and the verge has to start the same distance INSIDE it to cover the inward
-   ones, so the deliberate 45 cm overlap becomes a 2·(amplitude + blend) one.
-
-   That is exactly the double-blend the shape note above rules out — two
-   partially transparent layers stacked inside the dissolve ring composite to
-   f + f·s·(1 − f) of CG coverage instead of f, i.e. a denser arc where the road
-   edge crosses the seam. So the verge does not simply fade: it carries the
-   EXACT COMPLEMENT. With the road at alpha f·s, the only verge alpha that makes
-   src-over land on exactly f is
-
-       a_verge = f·(1 − s) / (1 − f·s)
-
-   which is 1 wherever the band is opaque (f = 1, any s), 0 where the road fully
-   covers it, and reduces to f where there is no road strip at all. The
-   invariant the disjoint bands used to give for free is now an identity in the
-   shader, and it holds for ANY overlap width — which is what buys the wander.
-
-   ---------------------------------------------------------------------------
-   UNDULATION, AND THE TWO PLACES IT MUST BE EXACTLY ZERO
-
-   The band is displaced by a low-frequency value fbm, baked into the vertices
-   at build time (not a vertex-shader displacement: normals have to follow, and
-   computeVertexNormals() on a 7 k-vertex grid once per environment switch is
-   cheaper and more correct than deriving them per frame). Two masks:
-
-     * THE RIG FOOTPRINT. Displacement is forced to 0 inside a box around the
-       origin big enough for the whole tractor-trailer, ramping in over
-       RIG_FLAT_RAMP metres. The truck is grounded at y = 0 by models.js and
-       knows nothing about this surface — lift the ground under it and the
-       wheels float, which is worse than a flat plane by any measure.
-     * THE SEAM. It also goes to 0 across the dissolve band, so where the CG
-       ground hands over to the projected photograph the two floors are the same
-       flat y = 0 plane. The shadow catcher is flat too, and this is what keeps
-       all three in agreement. */
-const NEAR_Y = 0.002;                 // 2 mm: see setNearGround()
-const NEAR_TILE_DEFAULT = 3;          // metres per texture tile
-const NEAR_EDGE_BLEND = 0.45;         // metres of asphalt → verge lateral dissolve
-const NEAR_ANISO = Math.min(16, renderer.capabilities.getMaxAnisotropy() || 8);
-
-/* THE FLAT ZONE. models.js parks the cab at z ∈ [0, ~6] and hangs the trailer
-   back toward −Z from a kingpin at z ≈ 2.65, so the rig lives inside roughly
-   x ∈ ±1.4, z ∈ [−12, 6]. These are those numbers rounded outward — a metre of
-   margin on the widest tyre and a symmetric z so nothing depends on which way
-   the trailer was hitched — and they are deliberately generous: a few extra
-   square metres of flat ground costs nothing, a floating wheel costs the shot.
-   The ramp is long (7 m) because the eye reads a crease far more easily than it
-   reads a slope. */
-const RIG_FLAT_X = 2.6, RIG_FLAT_Z = 12.5, RIG_FLAT_RAMP = 7;
-
-/* Shared by every patched near-ground material. Parked so the fade is a no-op
-   and there is NO road strip until setNearGround() writes real numbers — the
-   edge sits at −1e4, i.e. every fragment is verge (see tsRoadDist). */
-const nearU = {
-  uNearIn: { value: 1e6 },
-  uNearOut: { value: 1e6 + 1 },
-  /* x = half the carriageway width in metres, y = the lateral blend. A
-     NEGATIVE x means "there is no road strip", which is how tsRoadDist() is
-     switched off; −1e4 rather than −1e6 because the far edge of the biggest
-     legal disc is ~570 m out and a driver forced to mediump would overflow on
-     the larger sentinel. */
-  uNearEdge: { value: new THREE.Vector2(-1e4, NEAR_EDGE_BLEND) },
-  /* x = metres the boundary wanders (0 disables), y = 1/period in metres */
-  uEdgeNoise: { value: new THREE.Vector2(0, 1 / 7) },
-  /* x = wear strength 0..1, y = metres of verge grime creeping onto the road */
-  uWear: { value: new THREE.Vector2(0, 2.2) },
-};
-
-/* The baked-undulation manifest displaceNear()/nearBand() take: `amp` metres of
-   height, `inv` 1/period, `cell` the grid step, `inner`/`outer` the dissolve. */
-interface NearUndul {
-  amp: number; inv: number; cell: number; inner: number; outer: number;
-}
-
-/* Written by buildNearGround() below, an IIFE at module load — definite
-   assignment for the same reason the road handles carry it. */
-let nearGroup!: THREE.Group;
-let nearBaseMat!: THREE.MeshStandardMaterial, nearRoadMat!: THREE.MeshStandardMaterial;
-const nearMeshes: THREE.Mesh[] = [];  // every mesh currently in nearGroup
-let nearOn = false;                   // is the band on screen?
-let setGroundOn = false;              // is a 3D set supplying the floor? (setSetGround)
-let nearOpaqueR = 0;                  // metres of FULLY opaque CG ground
-let nearGeoKey = '';                  // rebuild guard
-let nearUndulation: { amplitude: number; scale: number } | null = null;            // { amplitude, scale } | null, for the debug handle
-
-function makeNearMaterial() {
-  return new THREE.MeshStandardMaterial({
-    color: 0xffffff, roughness: 1, metalness: 0,
-    /* THE SEAM, in four flags. transparent ⇒ the transparent queue, i.e. after
-       every opaque object including the dome. depthWrite:false ⇒ the faded band
-       cannot punch a hole in the photograph behind it (and matches
-       GroundedSkybox, which is depthWrite:false too, so nothing regresses).
-       depthTest stays ON so the truck still occludes the ground. fog:false
-       because a fogged CG band meeting an unfogged photo IS the visible ring —
-       same call environment.js makes for the dome, for the same reason. */
-    transparent: true, depthWrite: false, fog: false,
-  });
-}
-
-(function buildNearGround() {
-  nearGroup = new THREE.Group();
-  nearGroup.position.y = NEAR_Y;
-  nearGroup.visible = false;
-  nearBaseMat = makeNearMaterial();
-  nearRoadMat = makeNearMaterial();
-  scene.add(nearGroup);
-})();
-
-/* Rewrite a flat geometry's UVs as WORLD METRES of x/z. Called after the
-   rotate+translate, so position.xz already is world xz (the group only offsets
-   y and is never scaled). */
-function uvWorldMetres(geo: THREE.BufferGeometry) {
-  const p = geo.attributes.position;
-  const uv = geo.attributes.uv;
-  for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i), p.getZ(i));
-  uv.needsUpdate = true;
-  return geo;
-}
-
-/* Deterministic value noise for the undulation. It is the CPU twin of the
-   shader's tsNoise/tsFbm in spirit but NOT bit-identical to it, and nothing
-   compares the two: this one shapes geometry, that one shapes a mask. What it
-   does have to be is seedless-deterministic — the same environment must rebuild
-   to the same hills, so `Math.random()` is not an option here any more than it
-   is in the scatter module. */
-function nHash(ix: number, iz: number) {
-  const s = Math.sin(ix * 127.1 + iz * 311.7) * 43758.5453123;
-  return s - Math.floor(s);
-}
-function nVal(x: number, z: number) {
-  const ix = Math.floor(x), iz = Math.floor(z);
-  let fx = x - ix, fz = z - iz;
-  fx = fx * fx * (3 - 2 * fx);
-  fz = fz * fz * (3 - 2 * fz);
-  const a = nHash(ix, iz), b = nHash(ix + 1, iz);
-  const c = nHash(ix, iz + 1), d = nHash(ix + 1, iz + 1);
-  const lo = a + (b - a) * fx;
-  return lo + ((c + (d - c) * fx) - lo) * fz;
-}
-function nFbm(x: number, z: number) {
-  return nVal(x, z) * 0.58
-    + nVal(x * 2.17 + 5.3, z * 2.17 - 1.7) * 0.28
-    + nVal(x * 4.31 - 3.1, z * 4.31 + 7.9) * 0.14;
-}
-const smooth01 = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
-
-/* Bake the undulation into a band's vertices, then rebuild its normals.
-   `u` is { amp, inv, inner, outer } — see the section header for the two masks
-   and why each one has to reach exactly zero. */
-function displaceNear(geo: THREE.BufferGeometry, u: NearUndul) {
-  const p = geo.attributes.position;
-  const span = Math.max(u.outer - u.inner, 0.001);
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), z = p.getZ(i);
-    /* flat under the rig, or the wheels float */
-    let w = smooth01((Math.max(Math.abs(x) - RIG_FLAT_X, Math.abs(z) - RIG_FLAT_Z)) / RIG_FLAT_RAMP);
-    if (w > 0) {
-      /* flat again at the seam, so the CG floor and the photographed floor meet
-         on exactly the same plane */
-      w *= 1 - smooth01((Math.hypot(x, z) - u.inner) / span);
-      if (w > 0) p.setY(i, u.amp * (nFbm(x * u.inv, z * u.inv) - 0.5) * 2 * w);
-    }
-  }
-  p.needsUpdate = true;
-  /* The bands are separate meshes, so their vertex normals are averaged within
-     a band only. The displacement is a pure function of world xz and every band
-     shares the same z lattice, so the worst disagreement across the overlap is
-     the interpolation error of the fbm over one cell — sub-centimetre at these
-     amplitudes, inside a cross-fade, at 10 m+. */
-  geo.computeVertexNormals();
-}
-
-function nearBand(width: number, length: number, cx: number, u: NearUndul | null) {
-  /* One quad unless the surface is actually being displaced. The radial and
-     lateral dissolves are per-fragment and a quad's varyings interpolate
-     exactly, so tessellation buys NOTHING for them — it is bought here only to
-     carry the undulation, and its cell size follows the undulation's period so
-     a short wavelength is not sampled into a faceted mess. */
-  const segX = u ? THREE.MathUtils.clamp(Math.round(width / u.cell), 1, 200) : 1;
-  const segZ = u ? THREE.MathUtils.clamp(Math.round(length / u.cell), 1, 200) : 1;
-  const g = new THREE.PlaneGeometry(width, length, segX, segZ);
-  g.rotateX(-Math.PI / 2);
-  g.translate(cx, 0, 0);
-  uvWorldMetres(g);
-  if (u) displaceNear(g, u);
-  return g;
-}
-
-/** The shape argument of rebuildNearGeometry(), spelled out for the checker. */
-interface NearShape {
-  outer: number; hasVerge: boolean; roadW: number; overlap: number;
-  undul: NearUndul | null;
-}
-
-/* Tear the bands down and rebuild them for a new shape.
- * @param {{outer, hasVerge, roadW, overlap, undul}} shape
- *        `overlap` is how far the road band reaches past its nominal edge and
- *        how far the verge reaches inside it — amplitude + blend, so the noisy
- *        boundary always has real geometry on both sides of every excursion.
- */
-function rebuildNearGeometry(shape: NearShape) {
-  for (const m of nearMeshes) {
-    nearGroup.remove(m);
-    m.geometry.dispose();               // the MATERIALS are module-owned; keep
-  }
-  nearMeshes.length = 0;
-
-  const { outer, hasVerge, roadW, overlap, undul } = shape;
-  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, order: number) => {
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.renderOrder = order;           // road always over verge; both after the dome
-    mesh.receiveShadow = true;          // re-decided by syncGroundReceivers()
-    /* castShadow deliberately untouched (Mesh defaults to false): ground that
-       casts onto itself is shadow acne, and the key light's castShadow is the
-       one flag this module never flips. */
-    mesh.frustumCulled = false;         // the camera is always standing on it
-    nearGroup.add(mesh);
-    nearMeshes.push(mesh);
-  };
-
-  if (!hasVerge) {
-    add(nearBand(outer * 2, outer * 2, 0, undul), nearBaseMat, 1);
-    return;
-  }
-  const halfW = roadW / 2;
-  /* The verge reaches `overlap` under the road and the road reaches `overlap`
-     over the verge, so wherever the noisy boundary lands there is opaque verge
-     under it and road geometry over it. The double-coverage that creates is
-     paid for exactly by the complement alpha — see the section header. */
-  const inner = Math.max(0.05, halfW - overlap);
-  const roadHalf = Math.min(outer, halfW + overlap);
-  const vw = Math.max(0.1, outer - inner);
-  add(nearBand(vw, outer * 2, inner + vw / 2, undul), nearBaseMat, 1);
-  add(nearBand(vw, outer * 2, -(inner + vw / 2), undul), nearBaseMat, 1);
-  add(nearBand(roadHalf * 2, outer * 2, 0, undul), nearRoadMat, 2);
-}
-
-/* remember the dry albedo of every ground material so wetness is reversible */
-const GROUND_MATS = [
-  road.asphalt, road.grass, ...road.shoulders, nearBaseMat, nearRoadMat,
-];
+   Agora quem registra é o próprio dono do chão: set.ts chama
+   registerGroundMaterials() logo depois de bindMaterials(), com o material e a
+   família de superfície de cada um. */
 const dryColors = new Map<THREE.MeshStandardMaterial, THREE.Color>();
-for (const m of GROUND_MATS) dryColors.set(m, m.color.clone());
 
 /* Dry end of the roughness lerp, per material. applyWetness() used to hard-code
    0.95; it is a Map now for exactly one reason: setGroundMaps() has to raise it
@@ -718,7 +545,6 @@ for (const m of GROUND_MATS) dryColors.set(m, m.color.clone());
    off an authored map. Seeded with 0.95 everywhere so behaviour is unchanged
    until an environment overrides it. */
 const dryRough = new Map<THREE.MeshStandardMaterial, number>();
-for (const m of GROUND_MATS) dryRough.set(m, 0.95);
 
 /* O reflexo de ambiente do material COM TEMPO SECO. Existe pelo mesmo motivo de
    dryColors e dryRough: applyWetness() é chamada de novo a cada mudança de clima
@@ -727,7 +553,6 @@ for (const m of GROUND_MATS) dryRough.set(m, 0.95);
    cenário. Materiais que entram depois (o chão do set) são registrados em
    resnapshotGround(), que roda DEPOIS de bindMaterials. */
 const dryEnv = new Map<THREE.MeshStandardMaterial, number>();
-for (const m of GROUND_MATS) dryEnv.set(m, m.envMapIntensity);
 
 /* Roughness map to fall back to when the road is DRY. null for the procedural
    asphalt (it has none); an environment's PBR roughness map otherwise. Without
@@ -768,13 +593,6 @@ const WET_PROFILE = {
 /** The surface kinds a manifest may name; the keys of WET_PROFILE. */
 type NearSurface = keyof typeof WET_PROFILE;
 const wetProfile = new Map<THREE.MeshStandardMaterial, WetProfile>();
-wetProfile.set(road.asphalt, WET_PROFILE.asphalt);
-for (const s of road.shoulders) wetProfile.set(s, WET_PROFILE.gravel);
-wetProfile.set(road.grass, WET_PROFILE.grass);
-/* Overwritten by setNearGround() from the manifest's material keys; these are
-   the neutral defaults for a band that never gets one. */
-wetProfile.set(nearBaseMat, WET_PROFILE.gravel);
-wetProfile.set(nearRoadMat, WET_PROFILE.asphalt);
 
 /* Materials that take the PUDDLE MASK while wet, and the tiling each one needs
    for it. The mask's rut positions are authored as fractions of one tile, so
@@ -787,8 +605,6 @@ wetProfile.set(nearRoadMat, WET_PROFILE.asphalt);
    writers on one slot would race. */
 interface PuddleSpec { u: number; v: number; ox: number; tex: THREE.CanvasTexture | null; }
 const puddleSpec = new Map<THREE.MeshStandardMaterial, PuddleSpec>();
-puddleSpec.set(road.asphalt, { u: 1, v: 5, ox: 0, tex: null });
-puddleSpec.set(nearRoadMat, { u: 1 / ROAD_W, v: 1 / 68, ox: 0.5, tex: null });
 
 function applyWetness(w: number) {
   curWetness = w;
@@ -838,6 +654,10 @@ function applyWetness(w: number) {
       m.needsUpdate = true;
     }
   }
+  /* Ground albedo/roughness/envMapIntensity just moved. Covers the two callers
+     that do NOT come through applyRig(): resnapshotGround() and, through it,
+     registerGroundMaterials() when set.ts finishes binding a scenario's floor. */
+  invalidate();
 }
 
 /* Re-baseline the dry albedo of materials whose maps were just swapped, then
@@ -858,330 +678,64 @@ function resnapshotGround(mats: THREE.MeshStandardMaterial[]) {
   applyWetness(curWetness);
 }
 
-/* ---------------- macro variation + the near-ground dissolve ----------------
-   A tiled texture is uniform BY CONSTRUCTION: the asphalt repeats every ~12 m
-   and the grass every ~8 m, which the eye locks onto long before the fog hides
-   it. That is the "chão consistente demais" complaint, and no amount of
-   retexturing fixes it, because the problem is the period, not the pixels.
-   The cheap professional answer is a second lookup at a very low frequency in
-   WORLD space that MULTIPLIES the albedo: the same 12 m tile is now darker
-   here and lighter thirty metres on, and the repeat stops resolving.
+/** Uma família de superfície conhecida por WET_PROFILE. */
+export type GroundSurface = NearSurface;
 
-   It is no longer a fallback-only nicety. The near ground tiles at 3 m across a
-   55 m radius — 18 repeats edge to edge, every one of them inside the frame at
-   the distance the user is actually looking. Without this the CG band reads as
-   a checkerboard and earns the same verdict the canvas ground did.
-
-   Gated by a uniform, not a #define, so the strength can go to 0 and back
-   without a recompile. Each material is patched exactly once.
-
-   ON THE SCALE. "1/40th the detail frequency" is the rule of thumb, but taken
-   literally against a 4 m ground tile it gives a 160 m macro tile, and the near
-   band is only ~44 m in radius — less than half a cycle across the whole thing,
-   i.e. a gradient, not variation. The criterion that actually works is that
-   SEVERAL FEATURES must fit inside the visible patch while each stays several
-   times the detail tile. The shipped macro_noise is three band-limited octaves
-   at 2/4/8 cycles per tile, so a 70 m tile puts features at 35 / 17.5 / 8.75 m:
-   against a 4 m detail tile that is 2–9x, and across the near band's ~88 m span
-   you see 1.3 cycles of the coarsest and ten of the finest. The 340 m
-   procedural road gets 4.9 cycles of the coarsest, which is if anything better
-   than the 2.8 it had at 120 m.
-
-   ON THE STRENGTH. The shader is exactly `1 + strength · 0.76 · (n − 0.5)`.
-   The built-in canvas noise is near-binary (blobs at 22 and 232 of 255), so
-   0.55 there is already a strong modulation. The shipped macro_noise.webp is
-   band-limited Gaussian-ish with σ = 0.115, which at the same strength would be
-   ±4.8 % at 1σ — invisible. Hence two different numbers: the module-load call
-   passes 0.55 explicitly for the canvas, and MACRO_DEFAULT (the value used when
-   a caller supplies a texture and omits the strength) is tuned for the real
-   asset at ±7.9 % at 1σ and ±20 % at its clipped extremes.
-
-   THE SAME PATCH CARRIES THE SEAM. A material has exactly one onBeforeCompile,
-   so the near-ground dissolve cannot be a second, independent patch — it is a
-   variant of this one, selected by `kind` and separated in the program cache by
-   customProgramCacheKey. */
-const MACRO_METRES = 70;                  // world metres per macro tile
-const MACRO_CANVAS_STRENGTH = 0.55;       // for the high-contrast built-in noise
-const MACRO_DEFAULT = 0.90;               // for a supplied σ≈0.115 macro_noise
-const macroU = {
-  uMacroMap: { value: null as THREE.Texture | null },
-  uMacroStr: { value: 0 },
-  uMacroScale: { value: 1 / MACRO_METRES },
-};
-/* Patch variants. 0 is the procedural ground (macro only); 1 and 2 are the two
-   near-ground bands — 1 is the base/verge band, which carries the radial
-   dissolve, the COMPLEMENT of the road strip's lateral coverage and the dust
-   blown off the carriageway; 2 is the road strip, which carries the radial
-   dissolve, the noisy lateral edge and the wear.
-   These are the only two consumers, they are always used in that pairing, and
-   each material is patched once and forever — so the variant is a property of
-   the band, not a per-call option. */
-const PATCH_MACRO = 0, PATCH_NEAR = 1, PATCH_NEAR_ROAD = 2;
-const patchedGround = new Set<THREE.Material>();
-let macroTex: THREE.Texture | null = null;
-
-/* Shared GLSL for both near variants: the uniforms, a value-noise fbm in the
-   same shape the sky dome already uses, and the two functions that define where
-   the carriageway is. Everything downstream — the edge, the grime, the wheel
-   tracks, the complement alpha — is derived from tsRoadDist(), so there is
-   exactly ONE definition of "where the road ends" and the two bands cannot
-   disagree about it. */
-const NEAR_FRAG_HEAD = /* glsl */`
-uniform float uNearIn;
-uniform float uNearOut;
-uniform vec2 uNearEdge;
-uniform vec2 uEdgeNoise;
-uniform vec2 uWear;
-varying vec2 vNearXZ;
-vec2 tsWear = vec2( 0.0 );
-
-float tsHash( vec2 p ) {
-  return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 );
+/** O que set.ts entrega por material de chão do cenário. */
+export interface GroundMatEntry {
+  mat: THREE.MeshStandardMaterial;
+  /** família de molhagem; `road: true` marca quem recebe a máscara de poça */
+  surface: GroundSurface;
+  road?: boolean;
+  /** metros cobertos por [u, v] do material, para casar a poça com o ladrilho */
+  tile?: [number, number];
 }
-float tsNoise( vec2 p ) {
-  vec2 i = floor( p ), f = fract( p );
-  f = f * f * ( 3.0 - 2.0 * f );
-  return mix( mix( tsHash( i ), tsHash( i + vec2( 1.0, 0.0 ) ), f.x ),
-              mix( tsHash( i + vec2( 0.0, 1.0 ) ), tsHash( i + vec2( 1.0 ) ), f.x ), f.y );
-}
-float tsFbm( vec2 p ) {
-  return tsNoise( p ) * 0.60 + tsNoise( p * 2.13 ) * 0.26 + tsNoise( p * 4.31 ) * 0.14;
-}
-
-/* Metres INTO the carriageway from its edge: positive on the road, negative on
-   the verge. The edge is uNearEdge.x displaced by a 1-D fbm in z — a road edge
-   is a curve x(z), not a 2-D blob — sampled on a DIFFERENT LANE of the noise
-   per side, because one shared lookup would slide the whole strip sideways and
-   leave it exactly as constant-width as it was before.
-   The fbm's practical spread is about ±0.19 around 0.5, so the 2.6 scale plus
-   the clamp is what makes the manifest's amplitude mean PEAK metres rather than
-   roughly a third of them. */
-float tsRoadDist( vec2 xz ) {
-  float e = uNearEdge.x;
-  if ( uEdgeNoise.x > 0.001 ) {
-    float lane = xz.x < 0.0 ? 41.7 : 7.3;
-    float n = clamp( ( tsFbm( vec2( xz.y * uEdgeNoise.y, lane ) ) - 0.5 ) * 2.6, -1.0, 1.0 );
-    e += uEdgeNoise.x * n;
-  }
-  return e - abs( xz.x );
-}
-/* 1 on the carriageway, 0 on the verge, crossing over uNearEdge.y metres. With
-   the edge parked negative (no verge authored ⇒ no road strip) this is 0
-   everywhere, which is what makes the base band cover the whole disc. */
-float tsRoadMask( vec2 xz ) {
-  return smoothstep( 0.0, uNearEdge.y, tsRoadDist( xz ) );
-}
-`;
-
-/* Road-strip wear. Two mechanisms, both anchored to real road behaviour:
-     GRIME — dust and grit thrown off the verge by traffic, which lands within a
-       metre or two of the edge, is LIGHTER and warmer than asphalt (it is dry
-       soil, not oil) and is blotchy rather than a clean band.
-     WHEEL TRACKS — the RUTS positions the puddle mask already uses, mirrored
-       about the centreline so two gaussians cover all four. Tyres both darken
-       (rubber, oil) and POLISH (lower roughness), which is why the tracks are
-       the first thing to shine when the road is wet — and why the puddle mask
-       pins its blobs to these same lanes. */
-const NEAR_FRAG_WEAR_ROAD = /* glsl */`
-  {
-    float tsD = tsRoadDist( vNearXZ );
-    float tsGrime = uWear.x * ( 1.0 - smoothstep( 0.0, max( uWear.y, 0.05 ), tsD ) );
-    tsGrime *= clamp( 0.35 + 1.05 * tsFbm( vNearXZ * 0.42 ), 0.0, 1.0 );
-    tsGrime = clamp( tsGrime, 0.0, 0.85 );
-    diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 1.46, 1.34, 1.10 ), tsGrime );
-
-    float tsA = clamp( abs( vNearXZ.x ) / max( 2.0 * uNearEdge.x, 0.5 ), 0.0, 1.0 );
-    float tsTrk = max( exp( -pow2( ( tsA - 0.13 ) / 0.045 ) ),
-                       exp( -pow2( ( tsA - 0.34 ) / 0.045 ) ) );
-    tsTrk *= smoothstep( 0.0, 1.2, tsD );                 // tracks stop at the edge
-    tsTrk *= 0.55 + 0.60 * tsFbm( vec2( vNearXZ.x * 0.11, vNearXZ.y * 0.042 ) );
-    tsTrk = clamp( tsTrk, 0.0, 1.0 ) * uWear.x;
-    diffuseColor.rgb *= 1.0 - 0.30 * tsTrk;
-    tsWear = vec2( tsGrime, tsTrk );
-  }`;
-
-/* The verge's half of the same story: road dust settles on the first metre or
-   so of the shoulder. TWO gates, and both are load-bearing: the outer one fades
-   the dust out with distance from the edge (and, on a band with no road strip,
-   kills it outright — there tsOut is ~+1e4 and the term is 0), the inner one
-   kills it under the road, where the band is covered anyway and dusting it
-   would only tint what the road strip is dissolving into. */
-const NEAR_FRAG_WEAR_VERGE = /* glsl */`
-  {
-    float tsOut = -tsRoadDist( vNearXZ );
-    float tsDust = uWear.x * smoothstep( -0.4, 0.0, tsOut )
-      * ( 1.0 - smoothstep( 0.0, 1.4, max( tsOut, 0.0 ) ) );
-    tsDust *= clamp( 0.30 + 1.10 * tsFbm( vNearXZ * 0.5 + 19.0 ), 0.0, 1.0 );
-    tsDust = clamp( tsDust, 0.0, 0.7 );
-    diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 1.30, 1.24, 1.08 ), tsDust );
-    tsWear = vec2( tsDust, 0.0 );
-  }`;
-
-/* Wear moves roughness as well as albedo, or it reads as a decal. Dust is matte
-   (toward 1), a polished wheel track is not (down 20 %). Injected after
-   <roughnessmap_fragment> so it composes with both the authored roughness map
-   and the puddle mask applyWetness() swaps in — a wet rut ends up smoother
-   still, which is exactly what a wet rut is. */
-const NEAR_FRAG_ROUGH = /* glsl */`#include <roughnessmap_fragment>
-  roughnessFactor = clamp( mix( roughnessFactor, 1.0, tsWear.x * 0.75 ) * ( 1.0 - 0.20 * tsWear.y ), 0.04, 1.0 );`;
-
 
 /**
- * Inject the macro multiply — and, for the near-ground variants, the alpha
- * dissolve — into a MeshStandardMaterial. Idempotent: a material is patched at
- * most once, so setMacroVariation() cannot clobber the near ground's variant.
+ * REGISTRA O CHÃO DO CENÁRIO NO SISTEMA DE MOLHAGEM.
  *
- * @param {THREE.Material} m
- * @param {number} kind PATCH_MACRO | PATCH_NEAR | PATCH_NEAR_ROAD
+ * Chamado por set.ts DEPOIS de bindMaterials(), quando cada material já está com
+ * os valores do manifesto — que é exatamente o estado "seco" que a chuva tem de
+ * modular. Chamar antes gravaria os padrões do three como valor seco e o
+ * cenário perderia o próprio `envIntensity`/`roughness` na primeira chuva.
+ *
+ * Substitui o registro anterior por completo: os materiais do cenário que saiu
+ * já foram descartados, e mantê-los aqui vazaria material morto para dentro de
+ * `applyWetness`, que percorre este mapa todo quadro de tween.
  */
-function patchGround(m: THREE.MeshStandardMaterial, kind: number) {
-  if (!m || patchedGround.has(m)) return;
-  const near = kind !== PATCH_MACRO;
-  m.onBeforeCompile = (shader: THREE.WebGLProgramParametersWithUniforms) => {
-    shader.uniforms.uMacroMap = macroU.uMacroMap;
-    shader.uniforms.uMacroStr = macroU.uMacroStr;
-    shader.uniforms.uMacroScale = macroU.uMacroScale;
+export function registerGroundMaterials(entries: GroundMatEntry[]) {
+  /* Solta a máscara de poça do cenário anterior antes de perder a referência —
+     é uma CanvasTexture por consumidor, e ninguém mais a alcança depois daqui. */
+  for (const spec of puddleSpec.values()) if (spec.tex) spec.tex.dispose();
+  wetProfile.clear();
+  puddleSpec.clear();
+  dryColors.clear();
+  dryRough.clear();
+  dryEnv.clear();
+  baseRoughMap.clear();
 
-    let vHead = '#include <common>\nuniform float uMacroScale;\nvarying vec2 vMacroUv;';
-    /* After <project_vertex> so `transformed` is final. The instance matrix has
-       to be applied by hand — three only folds it in inside that chunk — and
-       the branch is kept even though no ground material is instanced today,
-       because it costs nothing and the alternative is a silent wrong answer. */
-    let vBody = `#include <project_vertex>
-  vec4 tsMacroWorld = vec4( transformed, 1.0 );
-  #ifdef USE_INSTANCING
-    tsMacroWorld = instanceMatrix * tsMacroWorld;
-  #endif
-  tsMacroWorld = modelMatrix * tsMacroWorld;
-  vMacroUv = tsMacroWorld.xz * uMacroScale;`;
-    let fHead = '#include <common>\nuniform sampler2D uMacroMap;\nuniform float uMacroStr;\nvarying vec2 vMacroUv;';
-    /* rgb only: alpha is the seam's, and it is written further down the chain.
-       The wear block is appended for the near variants, so albedo goes
-       texture → macro → wear in one replacement of one chunk. */
-    let fMacro = `#include <map_fragment>
-  {
-    float tsMacro = texture2D( uMacroMap, vMacroUv ).g;
-    diffuseColor.rgb *= mix( 1.0, 0.62 + 0.76 * tsMacro, uMacroStr );
-  }`;
-
-    if (near) {
-      shader.uniforms.uNearIn = nearU.uNearIn;
-      shader.uniforms.uNearOut = nearU.uNearOut;
-      shader.uniforms.uNearEdge = nearU.uNearEdge;
-      shader.uniforms.uEdgeNoise = nearU.uEdgeNoise;
-      shader.uniforms.uWear = nearU.uWear;
-      vHead += '\nvarying vec2 vNearXZ;';
-      /* World xz in METRES, unscaled — the radial distance has to be a real
-         distance for `radius`/`fade` to mean what the manifest says. */
-      vBody += '\n  vNearXZ = tsMacroWorld.xz;';
-      fHead += NEAR_FRAG_HEAD;
-      fMacro += kind === PATCH_NEAR_ROAD ? NEAR_FRAG_WEAR_ROAD : NEAR_FRAG_WEAR_VERGE;
+  const mats: THREE.MeshStandardMaterial[] = [];
+  for (const e of entries) {
+    if (!e || !e.mat) continue;
+    wetProfile.set(e.mat, WET_PROFILE[e.surface] || WET_PROFILE.concrete);
+    /* O mapa de rugosidade do cenário é o estado SECO ao qual a poça volta.
+       Sem isto, o primeiro preset seco depois de um molhado jogaria fora o mapa
+       autorado — applyWetness() atribuiria `null`. */
+    if (e.mat.roughnessMap) baseRoughMap.set(e.mat, e.mat.roughnessMap);
+    if (e.road) {
+      /* As calhas da máscara são autoradas como fração de UM ladrilho, então a
+         poça só cai na trilha do pneu se o `repeat` do material entrar aqui. */
+      const [u, v] = e.tile || [1, 1];
+      puddleSpec.set(e.mat, { u, v, ox: 0, tex: null });
     }
-
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', vHead)
-      .replace('#include <project_vertex>', vBody);
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', fHead)
-      .replace('#include <map_fragment>', fMacro);
-
-    if (near) {
-      /* AFTER <alphatest_fragment>, so a cutout threshold (there is none on the
-         ground, but a future one) still tests the material's own alpha rather
-         than the seam's, and BEFORE <opaque_fragment>, which is where
-         diffuseColor.a becomes gl_FragColor.a. The material is transparent, so
-         three does not #define OPAQUE and the alpha survives.
-         smoothstep's edges are written low-to-high in both terms: GLSL leaves
-         smoothstep(hi, lo, x) undefined, and it silently works on desktop and
-         returns garbage on some mobile drivers. */
-      const fFade = kind === PATCH_NEAR_ROAD
-        ? `#include <alphatest_fragment>
-  diffuseColor.a *= ( 1.0 - smoothstep( uNearIn, uNearOut, length( vNearXZ ) ) )
-    * tsRoadMask( vNearXZ );`
-        /* THE COMPLEMENT. The road strip is drawn over this band at alpha f·s,
-           so src-over leaves the photograph a weight of (1 − f·s)(1 − a). The
-           only `a` that makes the total CG coverage exactly f — no denser arc
-           where the road edge crosses the dissolve, no gap — is
-           f(1 − s)/(1 − f·s). It is 1 wherever the band is opaque, 0 where the
-           road covers it completely, and collapses to plain f when there is no
-           road strip (s ≡ 0). Degenerate only at f = s = 1, where the numerator
-           vanishes with the denominator; the max() resolves it to 0, which is
-           the right answer there. */
-        : `#include <alphatest_fragment>
-  {
-    float tsF = 1.0 - smoothstep( uNearIn, uNearOut, length( vNearXZ ) );
-    float tsS = tsRoadMask( vNearXZ );
-    diffuseColor.a *= tsF * ( 1.0 - tsS ) / max( 1.0 - tsF * tsS, 1e-3 );
-  }`;
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <alphatest_fragment>', fFade)
-        .replace('#include <roughnessmap_fragment>', NEAR_FRAG_ROUGH);
-    }
-  };
-  /* Programs are shared by cache key, and the default key knows nothing about
-     onBeforeCompile — without this an unpatched MeshStandardMaterial with the
-     same parameters could be handed the patched program, or the reverse. The
-     three variants must not share either. */
-  m.customProgramCacheKey = () => 'ts-ground-' + kind;
-  m.needsUpdate = true;
-  patchedGround.add(m);
+    mats.push(e.mat);
+  }
+  /* Fotografa o seco e reproduz a molhagem corrente na hora: trocar de cenário
+     no meio de `Chuvoso` tem de entregar o chão já molhado, não seco até o
+     próximo tween. */
+  resnapshotGround(mats);
 }
 
-/* The near-ground bands need their dissolve whether or not macro variation is
-   ever switched on, so they are patched eagerly and setMacroVariation()'s lazy
-   pass then skips them (patchGround is idempotent). */
-patchGround(nearBaseMat, PATCH_NEAR);
-patchGround(nearRoadMat, PATCH_NEAR_ROAD);
-
-/**
- * Large-scale albedo break-up for every ground material: the procedural road,
- * shoulders and 700 m plane, AND both near-ground bands including the verge.
- * Has no effect on a ground-projected photograph, whose ground is not this
- * geometry.
- *
- * @param {THREE.Texture|null} texture  greyscale, tileable; null uses the
- *        built-in blob noise
- * @param {number} [strength] 0..1. OMITTED ⇒ MACRO_DEFAULT, i.e. supplying a
- *        texture turns it ON — a 4 m tile repeated 13 times across a 26 m
- *        radius is not an opt-in problem. Pass 0 explicitly to disable. See the
- *        section header for why the right number depends on the texture's
- *        contrast.
- * @param {number} [metresPerTile] world metres per macro tile; defaults to
- *        MACRO_METRES. Exposed because the right value follows the SIZE OF THE
- *        VISIBLE PATCH, which is manifest data (`nearGround.radius` has already
- *        moved from 55 to 26 once).
- */
-export function setMacroVariation(
-  texture: THREE.Texture | null, strength?: number, metresPerTile?: number,
-) {
-  const s = THREE.MathUtils.clamp(
-    strength === undefined ? MACRO_DEFAULT : (Number.isFinite(+strength) ? +strength : 0), 0, 1);
-  const mpt = Number.isFinite(+metresPerTile!) && +metresPerTile! > 0
-    ? THREE.MathUtils.clamp(+metresPerTile!, 4, 2000) : MACRO_METRES;
-  macroU.uMacroScale.value = 1 / mpt;
-  let tex = (texture && texture.isTexture) ? texture : null;
-  if (!tex && s > 0) {
-    if (!macroTex) macroTex = canvasTex(makeMacroCanvas(), 1, 1, THREE.NoColorSpace);
-    tex = macroTex;
-  }
-  if (s > 0) for (const m of GROUND_MATS) patchGround(m, PATCH_MACRO);
-  if (tex) {
-    /* We sample with our own world-space UV, so texture.repeat/offset are
-       bypassed entirely — only the wrap mode matters. */
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    macroU.uMacroMap.value = tex;
-  }
-  macroU.uMacroStr.value = macroU.uMacroMap.value ? s : 0;
-}
-
-/* ON BY DEFAULT, at module load, with the built-in blob noise — so it is
-   already running before any environment is applied and there is no first-frame
-   state where the ground tiles visibly. environment.js may hand over the real
-   macro_noise.webp later; that is a texture swap, not an enable, and it should
-   omit the strength so MACRO_DEFAULT (tuned for that asset's contrast, which is
-   much lower than this canvas's) applies. */
-setMacroVariation(null, MACRO_CANVAS_STRENGTH);
 
 
 /* ---------------- the clock ----------------
@@ -1373,7 +927,7 @@ function presetDefaults(id: string, tod: TimeOfDay) {
    rejected: the flags would become invisible sticky state, and the first user
    who nudged "altura" and forgot would find the time slider dead from then on.
    The cost of this choice is that the HUD must repaint those two controls after
-   an hour change; hud.js does. */
+   an hour change; hud.ts does. */
 function syncSunToHour() {
   const preset = LIGHT_PRESETS[sceneState.preset] || LIGHT_PRESETS.ensolarado;
   const a = preset.solar === false
@@ -1385,7 +939,7 @@ function syncSunToHour() {
 
 /* Write the clock and re-derive the binary face from it. `timeOfDay` is never
    set directly any more: resolveRig() has stopped reading it, but envKey(),
-   presetDefaults() and every pre-clock caller still do, and hud.js lights its
+   presetDefaults() and every pre-clock caller still do, and hud.ts lights its
    sun/moon end-caps from it. The flip lands where the crossfade is half done
    (altitude 4°, i.e. 05:50 and 18:10). */
 function setHourInternal(h: number) {
@@ -1444,14 +998,30 @@ addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); }
    equirectangular and deliberately CLOUDLESS — the PMREM mip chain destroys
    high-frequency detail for irradiance anyway, and a blurry reflection cannot
    be told from a gradient. */
-/* Exported so environment.js can PMREM its HDRIs through the SAME generator: a
+/* Exported so environment.ts can PMREM its HDRIs through the SAME generator: a
    second PMREMGenerator on one renderer duplicates the whole blur/lod-plane
    scratch setup for nothing. */
 export const pmrem = new THREE.PMREMGenerator(renderer);
-const envCache = new Map<string, THREE.Texture>();
-let roomEnv: THREE.Texture | null = null;
 
-/* ---------------- external environment (environment.js) ----------------
+/* THE CACHE HOLDS RENDER TARGETS, NOT TEXTURES, and that is the difference
+   between this being disposable and not. `pmrem.fromEquirectangular()` returns a
+   WebGLRenderTarget; keeping only its `.texture` — which is what this did —
+   leaves the framebuffer and its colour attachment allocated with no handle left
+   to free them. environment.ts's disposeEntry() makes the same point about its
+   own HDRI targets, and for the same reason.
+
+   BOUNDED, because the engine is a singleton that outlives the React page: with
+   six presets x (ENV_NIGHT_STEPS + 1) keys plus 'room' the ceiling is ~25 live
+   PMREM chains, and a 512x256 equirect bakes to a 128 cube at ~1.5 MB, so a user
+   who explores the presets across the clock accumulates tens of megabytes that
+   are never released for the rest of the browser session. Eight entries is the
+   working set of one exploration session — a preset and its dusk band, plus the
+   one before it — and a miss is a canvas draw plus one PMREM bake, i.e. the
+   10-40 ms this module already schedules behind a 380 ms debounce. */
+const ENV_CACHE_MAX = 8;
+const envCache = new Map<string, THREE.WebGLRenderTarget>();
+
+/* ---------------- external environment (environment.ts) ----------------
    `externalEnv` is THE flag. Non-null ⇒ a photoreal HDRI owns scene.background
    and scene.environment and the procedural path must not write either one.
    Nothing else changes: lights, fog, exposure, wetness, lamps and the paint
@@ -1462,7 +1032,6 @@ let externalBg: THREE.Texture | null = null;           // texture bound to scene
 let extEnvIntensity = 1;         // envDef.envIntensity
 let exposureBase = 1;            // envDef.exposure, composed with rig.exposure
 let skyDomeOn = true;            // procedural dome (and therefore the stars)
-let roadOn = true;               // procedural asphalt strip + shoulders
 
 /* Cache granularity for the procedural IBL along the clock. buildSkyEnv() reads
    the rig, and the rig is now a continuous crossfade, so keying the cache on
@@ -1470,9 +1039,12 @@ let roadOn = true;               // procedural asphalt strip + shoulders
    through dusk — the single place in the transition where a snap is visible,
    since the road is a mirror the moment it is wet. Four steps of nightness is
    the compromise. It cannot be per-frame: each entry is a canvas plus a full
-   PMREM mip chain. The cost is bounded — a 512x256 equirect lands on a 128 cube
-   (~2 MB), so all six presets fully explored is ~48 MB against the previous
-   ~24 MB, and only the dusk band ever builds more than one entry per preset. */
+   PMREM mip chain (~1.5 MB for a 512x256 equirect on a 128 cube), and only the
+   dusk band ever builds more than one entry per preset.
+
+   DO NOT LOWER THIS TO SAVE MEMORY. Coarser steps put the snap back, which is
+   the artefact the whole scheme exists to remove; the number of entries is
+   ENV_CACHE_MAX's problem and it is solved there, by eviction. */
 const ENV_NIGHT_STEPS = 3;
 
 function envKey(st: SceneState) {
@@ -1563,7 +1135,39 @@ function buildSkyEnv(rig: Rig) {
   tex.mapping = THREE.EquirectangularReflectionMapping;
   const rt = pmrem.fromEquirectangular(tex);
   tex.dispose();
-  return rt.texture;
+  /* The TARGET, not `rt.texture` — see the note at envCache. */
+  return rt;
+}
+
+/* Insert-or-touch, then evict from the front. A Map iterates in insertion order,
+   so delete-then-set is the whole LRU. Never frees the one currently bound to
+   `scene.environment`: that would leave the renderer sampling a released target,
+   which is a black scene rather than a stale one. */
+function cacheEnv(k: string, rt: THREE.WebGLRenderTarget) {
+  envCache.delete(k);
+  envCache.set(k, rt);
+  while (envCache.size > ENV_CACHE_MAX) {
+    const oldest = envCache.keys().next().value!;
+    const victim = envCache.get(oldest)!;
+    envCache.delete(oldest);
+    if (victim !== rt && victim.texture !== scene.environment) victim.dispose();
+  }
+}
+
+/**
+ * Free every cached procedural IBL except the one on screen.
+ *
+ * Not called from the render path — this is deferred-teardown material (see
+ * scheduleIdleRelease). Safe at any time: a later refreshEnvironment() simply
+ * misses and rebakes, which is the same 10-40 ms a first visit to that preset
+ * already pays.
+ */
+export function releaseProceduralEnvCache() {
+  for (const [k, rt] of [...envCache]) {
+    if (rt.texture === scene.environment) continue;
+    rt.dispose();
+    envCache.delete(k);
+  }
 }
 
 let envTimer: ReturnType<typeof setTimeout> | 0 = 0;   // 0 = nothing pending
@@ -1578,20 +1182,53 @@ function refreshEnvironment(rig: Rig, immediate: boolean) {
   const k = envKey(sceneState);
   const run = () => {
     envTimer = 0;
-    if (envCache.has(k)) { scene.environment = envCache.get(k)!; return; }
-    let tex: THREE.Texture;
-    if (k === 'room') {
-      if (!roomEnv) roomEnv = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-      tex = roomEnv;
-    } else {
-      tex = buildSkyEnv(rig);
+    const hit = envCache.get(k);
+    if (hit) {
+      scene.environment = hit.texture;
+      cacheEnv(k, hit);                              // a hit is a use: refresh the LRU
+      invalidate();
+      return;
     }
-    envCache.set(k, tex);
-    scene.environment = tex;
+    let rt: THREE.WebGLRenderTarget;
+    if (k === 'room') {
+      /* RoomEnvironment is a whole Scene — a lathe of BoxGeometries, two
+         MeshStandardMaterials and a PointLight — built for one purpose: to be
+         PHOTOGRAPHED by the PMREM. Nothing samples it afterwards, and dropping it
+         on the floor leaked every one of those buffers for the tab's lifetime.
+         The addon ships its own dispose() (it walks the tree and frees each
+         geometry and material once); call it the moment the bake is done. */
+      const room = new RoomEnvironment();
+      try {
+        rt = pmrem.fromScene(room, 0.04);
+      } finally {
+        room.dispose();
+      }
+    } else {
+      rt = buildSkyEnv(rig);
+    }
+    /* Bind BEFORE caching: cacheEnv() refuses to evict whatever `scene
+       .environment` currently points at, and the thing it must never evict is
+       the one we just built. */
+    scene.environment = rt.texture;
+    cacheEnv(k, rt);
+    invalidate();
   };
   if (immediate) { if (envTimer) { clearTimeout(envTimer); envTimer = 0; } run(); return; }
   if (envTimer) clearTimeout(envTimer);
-  envTimer = setTimeout(run, 120);
+  /* 380 ms, não 120, E um quadro cedido antes de assar.
+     ---------------------------------------------------------------------------
+     `run()` faz `pmrem.fromEquirectangular()` — 10 a 40 ms de thread principal
+     travada — e este caminho só é alcançado quando NÃO há HDRI externo, que é
+     precisamente o caso do `armazem` (`hdri: null`). Com 120 ms, arrastar o
+     controle de hora disparava e cancelava o timer sem parar e, ao soltar,
+     entregava a travada 120 ms DEPOIS: tarde demais para o usuário associar ao
+     que fez, o que faz parecer defeito e não trabalho.
+
+     380 ms é longo o bastante para nunca disparar durante um arrasto contínuo.
+     O rAF extra garante que o quadro com a luz nova seja APRESENTADO antes de a
+     thread travar — sem ele, o assado e a atualização visual competem pelo
+     mesmo quadro e o usuário vê a travada antes de ver o resultado. */
+  envTimer = setTimeout(() => { requestAnimationFrame(() => run()); }, 380);
 }
 
 /* ---------------- tween ---------------- */
@@ -1664,11 +1301,55 @@ function gradePlateColor(out: THREE.Color, src: THREE.Color, rig: Rig) {
   );
 }
 
+/* ---- MODO ARRASTO DO MAPA DE SOMBRA ----
+   `shadowMap.autoUpdate = false` (linha 251) já resolveu METADE do problema: o
+   mapa parou de ser redesenhado quando só a CÂMERA se move. O que ficou de fora
+   é o caso em que a LUZ se move — que é exatamente "aplicar uma configuração de
+   iluminação", e é onde o travamento aparece.
+
+   A conta: applyRig() roda a cada quadro de tween (0,8 s ≈ 48 quadros) e a cada
+   evento `input` do controle de hora (~60/s). Cada quadro sujo redesenha TODO
+   caster dentro de ±24 m num alvo de profundidade de 3072² — o set, mais as
+   2151 malhas do implemento, mais a cabine. É a geometria inteira desenhada
+   DUAS vezes por quadro, ~18 M de triângulos.
+
+   A correção NÃO baixa a qualidade do resultado: enquanto o usuário arrasta,
+   redesenha a cada 4º quadro; assim que ele solta, o quadro seguinte redesenha
+   em cheio, na resolução cheia. O que se perde é sombra defasada em ~50 ms
+   DURANTE o arrasto, e o que se ganha é o arrasto responder. */
+let scrubUntil = 0;
+let shadowFrame = 0;
+/* "Um applyRig() pulou o redesenho e ninguém o repôs ainda."
+   O bloco acima promete que "assim que ele solta, o quadro seguinte redesenha em
+   cheio" — e não redesenhava. applyRig() só roda por evento do controle ou por
+   quadro de tween, então o ÚLTIMO applyRig de um arrasto é quase sempre um dos
+   pulados: o mapa fica até três quadros de luz atrasado, e fica assim para
+   sempre, porque nada chama applyRig depois que o dedo sai. Um bool paga a
+   promessa; o laço o cobra quando a janela do arrasto expira. */
+let shadowStale = false;
+
+/** Sinaliza que a luz está sendo arrastada AGORA. Ver o bloco acima. */
+export function beginLightScrub() {
+  scrubUntil = performance.now() + 220;
+  /* Deliberately WIDER than one invalidation, and it is the shadow settle that
+     needs it: the drag's last applyRig() is almost always one of the skipped
+     ones, so the frame that repays it (see shadowStale, in the loop) can only
+     happen AFTER this 220 ms window expires. 30 frames is half a second at
+     60 Hz — comfortably past it — and it costs nothing on a control the user
+     has their finger on. */
+  invalidate(30);
+}
+
 function applyRig(rig: Rig) {
-  /* The light is about to move, so the depth map is stale. This is the hot path
-     for it — every tween frame lands here — and marking it is one boolean; the
-     redraw itself only happens on frames where the pose actually changed. */
-  renderer.shadowMap.needsUpdate = true;
+  /* A luz vai se mexer, então o mapa de profundidade está velho. Este é o
+     caminho quente — todo quadro de tween cai aqui. */
+  shadowFrame++;
+  if (performance.now() > scrubUntil || (shadowFrame & 3) === 0) {
+    renderer.shadowMap.needsUpdate = true;
+    shadowStale = false;
+  } else {
+    shadowStale = true;
+  }
   const azr = rig.keyAz * Math.PI / 180;
   const elr = rig.keyEl * Math.PI / 180;
   const r = 26;
@@ -1820,6 +1501,13 @@ function applyRig(rig: Rig) {
   setKeyLight(_dirV, _keyCol, rig.glintBoost);
 
   for (const fn of rigHooks) fn(rig);
+
+  /* THE broadest invalidation in the module: everything the rig owns — key/rim/
+     hemi/ambient, fog, background, exposure, the sky uniforms, the lamps, the
+     wetness, the paint's view-space key — was just written. Every public setter
+     in this file reaches here through beginTween(), so covering applyRig()
+     covers the whole lighting API in one place. */
+  invalidate();
 }
 
 /* Discrete state cannot be interpolated, so: grow early, shrink late. The lamp
@@ -1854,6 +1542,7 @@ function setLampsEnabled(on: boolean) {
   for (const u of lampUnits) {
     if (u.spot.visible !== on) u.spot.visible = on;
   }
+  invalidate();
 }
 
 /**
@@ -1878,21 +1567,65 @@ function setLampsEnabled(on: boolean) {
  * the set, the cab, the implement and the paint are all mounted. Restoring the
  * flag afterwards matters: this is a warm-up, not a state change, and
  * setLampsEnabled() remains the single writer of SpotLight.visible.
+ *
+ * AWAITABLE, and callers should await it. It used to be two synchronous
+ * `renderer.compile()` calls, each of which blocks the main thread for the
+ * whole compile AND the whole driver link with the full scene mounted; r179's
+ * `compileAsync` hands the link back to the driver's parallel compiler
+ * (KHR_parallel_shader_compile) and polls, so the curtain's progress bar can
+ * still animate through it. The synchronous call stays as the fallback for a
+ * driver without the extension. The returned promise is what keeps the loading
+ * curtain over the work — resolve it before lifting the curtain or the stall
+ * simply moves to the first visible frame, which is the bug this exists to fix.
  */
-export function warmLightPrograms() {
+export async function warmLightPrograms(): Promise<void> {
   const was = lampsOn;
+  /* The scene is about to be deliberately wrong for as long as the compile
+     takes, and unlike the old synchronous compile() that window now contains
+     real frames. See drawSuspended. */
+  drawSuspended++;
   try {
     setLampsEnabled(!was);
-    renderer.compile(scene, camera);
+    await compilePrograms();
   } catch (err) {
     console.warn('[truck-studio] pré-compilação da configuração de luz alternativa falhou'
       + ' — a primeira passagem por 18:00 pode engasgar.', err);
   } finally {
+    /* Restored only after the await settles, which is the point: three gathers
+       lights with traverseVisible() inside compile(), so the alternative pool
+       has to be MOUNTED for the duration of that call. */
     setLampsEnabled(was);
+    drawSuspended--;
+    invalidate();
   }
   /* And the configuration we are actually about to render, so the first frame
      after the loader is not a compile either. */
-  try { renderer.compile(scene, camera); } catch (_) { /* ignore */ }
+  try { await compilePrograms(); } catch (_) { /* ignore */ }
+  invalidate();
+}
+
+/* EVERY WAIT HERE IS BOUNDED — the same discipline, and the same 8 s, as
+   studio.ts's warmUp(). A backgrounded tab does not fire requestAnimationFrame,
+   and three's parallel-compile polling stalls with it, so a bare `await` would
+   hang the loading curtain forever if the user switched tab mid-load. Warming up
+   is an optimisation; it is never allowed to be why the studio fails to open. */
+const COMPILE_TIMEOUT_MS = 8000;
+
+function compilePrograms(): Promise<unknown> {
+  /* Feature-detected rather than assumed: `compileAsync` is r152+, and this is
+     the one place a three downgrade would turn into a silent hang instead of a
+     type error. */
+  const r = renderer as THREE.WebGLRenderer & {
+    compileAsync?: (s: THREE.Object3D, c: THREE.Camera) => Promise<unknown>;
+  };
+  if (typeof r.compileAsync !== 'function') {
+    renderer.compile(scene, camera);
+    return Promise.resolve();
+  }
+  return Promise.race([
+    r.compileAsync(scene, camera),
+    new Promise<void>((res) => setTimeout(res, COMPILE_TIMEOUT_MS)),
+  ]);
 }
 
 function beginTween(animate: boolean) {
@@ -1920,6 +1653,11 @@ function beginTween(animate: boolean) {
     if (lampsWanted(next.lampIntensity)) setLampsEnabled(true);   // grow early
   }
   refreshEnvironment(next, false);
+  /* Redundant on every branch — applyRig() already invalidated, and the animated
+     branch will be held open by isTransitioning() — but this is the funnel every
+     public lighting entry point passes through, so it is the cheapest place to
+     be sure. */
+  invalidate();
 }
 
 export const isTransitioning = () => tweenT < 1;
@@ -2005,7 +1743,7 @@ export function applyPreset(id: string, opts?: { animate?: boolean }) {
 
 /**
  * The pre-clock binary control, kept working for every caller that still speaks
- * it (environment.js applies `envDef.timeOfDay` through it). It is now a
+ * it (environment.ts applies `envDef.timeOfDay` through it). It is now a
  * shortcut for two canonical hours, chosen so the resulting rig is EXACTLY the
  * one this function produced before the clock existed: n(12:00) = 0 and
  * n(21:30) = 1, so 'dia' is the undiluted `dia` face and 'noite' the undiluted
@@ -2048,31 +1786,6 @@ export function setLightParams(
   return sceneState;
 }
 
-/* ---------------- environment hooks (environment.js only) ----------------
-   Deliberately thin: environment.js owns the *policy* (which HDRI, which
-   textures, caching, disposal); everything here is the minimum mechanism to
-   let it drive objects and materials that are private to this module. */
-
-/** Debug/inspection handle for the procedural environment objects + state. */
-export function getEnvironmentObjects() {
-  return {
-    group: roadGroup, skyDome, stars: starsMesh, lamps: lampGroup,
-    roadStrip, groundPlane, shadowCatcher, nearGround: nearGroup,
-    skyDomeVisible: skyDomeOn, roadVisible: roadOn, external: !!externalEnv,
-    nearGroundVisible: nearOn, nearGroundRadius: nearOpaqueR,
-    nearGroundFade: Math.max(0, nearU.uNearOut.value - nearU.uNearIn.value),
-    nearGroundBands: nearMeshes.length,
-    nearGroundVerts: nearMeshes.reduce((n, m) => n + m.geometry.attributes.position.count, 0),
-    nearEdgeWander: nearU.uEdgeNoise.value.x,
-    nearWear: nearU.uWear.value.x,
-    nearUndulation: nearUndulation,
-    rigFlatZone: { x: RIG_FLAT_X, z: RIG_FLAT_Z, ramp: RIG_FLAT_RAMP },
-    ...getLampInfo(),
-    plateExposure: getPlateExposure(),
-    shadowHalfExtent: SHADOW_HALF, shadowMapSize: SHADOW_MAP_SIZE,
-    macroStrength: macroU.uMacroStr.value,
-  };
-}
 
 /**
  * Show/hide the procedural gradient dome. An HDRI background is drawn by
@@ -2086,29 +1799,9 @@ export function setSkyDomeVisible(v: boolean) {
   if (skyDome) skyDome.visible = skyDomeOn;
   if (starsMesh && !skyDomeOn) starsMesh.visible = false;
   if (starsMesh && skyDomeOn && rigCur) starsMesh.visible = rigCur.starOpacity > 0.01;
+  invalidate();
 }
 
-/**
- * Show/hide the procedural ROAD. The split, deliberately:
- *   hidden  — asphalt strip (the lane markings are painted into its albedo, so
- *             they go with it) and both gravel shoulders.
- *   kept    — the 700 m ground plane, unless setShadowCatcher() or
- *             setNearGround() has taken the floor over: `showRoad:false` on the
- *             procedural path still needs a shadow receiver or the truck
- *             floats. Retexture it with setGroundMaps({ target:'grass' }).
- *   kept    — the LAMPS, entirely. They used to be hidden here as road
- *             furniture, which is exactly why the yard scene had no poles: a
- *             hardstanding has no road and still has lighting. Poles are
- *             setLamps()'s business now, spotlights are setLampsEnabled()'s,
- *             and neither belongs to the road.
- *
- * NOTE this is the PROCEDURAL road, not the near-ground band. The two are
- * mutually exclusive surfaces: a grounded scene wants setRoadVisible(false)
- * plus setNearGround({...}), because the near band's own road strip is the road
- * and the procedural strip would show through its dissolve. setNearGround()
- * warns if both end up on.
- * @param {boolean} v
- */
 /* ---------------- horizon haze ----------------
    THE SEAM BETWEEN 3D AND PHOTOGRAPH, AND WHY FOG ALONE CANNOT CLOSE IT.
 
@@ -2177,6 +1870,7 @@ let horizonTint: THREE.Color | null = null;
  * @param {number | string | null} c hex (0x5a633f) or css string, sRGB
  */
 export function setHorizonTint(c: number | string | null) {
+  invalidate();
   if (c === null || c === undefined || c === '') {
     horizonTint = null;
     return;
@@ -2227,6 +1921,7 @@ function makeHaze(): THREE.Mesh {
  *        horizon). null removes it.
  */
 export function setHorizonHaze(opts: null | { strength?: number; low?: number; high?: number }) {
+  invalidate();
   if (!opts) {
     hazeU.uStrength.value = 0;
     if (hazeMesh) hazeMesh.visible = false;
@@ -2283,6 +1978,9 @@ export function setInteriorBounds(
     hx: Math.max(1, b.halfX), hz: Math.max(1, b.halfZ),
     minY: b.minY, maxY: Math.max(b.minY + 0.5, b.maxY),
   } : null;
+  /* The clamp runs in a frame hook, so a new box only bites on the next drawn
+     frame — which under the dirty loop is a frame that has to be asked for. */
+  invalidate();
   if (!interiorBox || interiorHooked) return;
   interiorHooked = true;
   frameHooks.push(() => {
@@ -2334,6 +2032,8 @@ const _fv = new THREE.Vector3();
 
 /** Lock the orbit to a rig. Pass null to release it (no limits). */
 export function setVehicleFocus(box: THREE.Box3 | null) {
+  /* Same reason as setInteriorBounds(): the ejection runs in a frame hook. */
+  invalidate();
   if (!box || box.isEmpty()) {
     vehicleFocus = null;
     controls.minDistance = 0;
@@ -2367,213 +2067,8 @@ export function setVehicleFocus(box: THREE.Box3 | null) {
   });
 }
 
-export function setRoadVisible(v: boolean) {
-  roadOn = !!v;
-  if (roadStrip) roadStrip.visible = roadOn;
-  for (const m of shoulderMeshes) m.visible = roadOn;
-  warnRoadOverlap();
-}
 
 
-/* ---------------- shadow catcher ----------------
-   A ground-projected HDRI puts a PHOTOGRAPH under the truck, and a photograph
-   cannot receive a shadow — the tyres end up hovering on someone else's
-   asphalt. This plane can: ShadowMaterial emits only the shadow term, so where
-   nothing occludes the key light it is fully transparent and the photo shows
-   through untouched. Built lazily; the procedural fallback never needs it.
-
-   IT IS NOT EXCLUSIVE WITH THE NEAR GROUND ANY MORE, and the manifest is why.
-   `nearGround.radius` is 26 / 18 / 22 m in the three shipped scenes while the
-   key light's shadow frustum is ±24 m and a 4 m cab at Dourado's 8° elevation
-   throws its shadow ~28 m. So a shadow REACHES PAST the CG band's opaque core
-   in two scenes out of three: hand the whole job to the band and the shadow
-   stops dead at a circle; hand it to the catcher and the band gets a flat black
-   overlay instead of a real shaded PBR surface.
-
-   Both, complementary. The band receives for real inside its own alpha, and the
-   catcher's opacity is multiplied by EXACTLY the band's inverse —
-   `smoothstep(uCatchIn, uCatchOut, r)` against the band's
-   `1 − smoothstep(uNearIn, uNearOut, r)` — so the two sum to one everywhere:
-   zero catcher inside the opaque core, zero band outside the fade, a crossfade
-   between. That is a stronger invariant than "only one receiver": the shadow is
-   applied exactly ONCE at every point, and it is continuous across the seam,
-   which a hard handover could never be.
-   With the ramp deciding WHERE the catcher applies, its `size` only has to
-   cover where shadows can exist at all — see setShadowCatcher(). */
-/* Genuinely nullable: built lazily by the first setShadowCatcher() that wants
-   one, and the procedural fallback never asks. */
-let shadowCatcher: THREE.Mesh<THREE.PlaneGeometry, THREE.ShadowMaterial> | null = null;
-let catcherWanted = false;      // resolved by syncGroundReceivers(), below
-let catcherSize = SHADOW_HALF * 2;
-
-/* Parked so that smoothstep(-2, -1, r) is 1 for every r >= 0, i.e. a uniform
-   full-strength catcher — bit-for-bit the behaviour before the near ground
-   existed, and what the procedural path still gets. */
-const catchU = {
-  uCatchIn: { value: -2 },
-  uCatchOut: { value: -1 },
-};
-
-/* ShadowMaterial's shader is tiny and has no chunk to hook the way
-   meshphysical does, so the anchor is the single line that writes the output.
-   Verified against three 0.179.1 ShaderLib.shadow: the fragment ends in
-   `gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );`. */
-function patchShadowCatcher(mat: THREE.ShadowMaterial) {
-  mat.onBeforeCompile = (shader: THREE.WebGLProgramParametersWithUniforms) => {
-    shader.uniforms.uCatchIn = catchU.uCatchIn;
-    shader.uniforms.uCatchOut = catchU.uCatchOut;
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vCatchXZ;')
-      .replace('#include <project_vertex>', `#include <project_vertex>
-  vCatchXZ = ( modelMatrix * vec4( transformed, 1.0 ) ).xz;`);
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>',
-        '#include <common>\nuniform float uCatchIn;\nuniform float uCatchOut;\nvarying vec2 vCatchXZ;')
-      .replace(
-        'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );',
-        'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) * smoothstep( uCatchIn, uCatchOut, length( vCatchXZ ) ) );');
-  };
-  mat.customProgramCacheKey = () => 'ts-catcher';
-  mat.needsUpdate = true;
-}
-
-function makeShadowCatcher() {
-  const geo = new THREE.PlaneGeometry(1, 1);
-  geo.rotateX(-Math.PI / 2);                     // baked, so scale.xz is metres
-  const mat = new THREE.ShadowMaterial({
-    color: 0x000000, opacity: 0.42, transparent: true,
-    /* An overlay on someone else's floor: it must never occlude anything. */
-    depthWrite: false,
-    /* Kept at exactly y = 0 and nudged in DEPTH-BUFFER units instead of world
-       units. A fixed 1 mm lift is ~8 depth units at 3 m and under one at 40 m —
-       precisely where the grazing angles that cause fighting are — whereas
-       polygonOffset is applied after projection and stays one "just in front"
-       step at every distance. Staying at y = 0 also keeps the shadow on the
-       true contact point rather than sliding it lift/tan(elevation) sideways
-       under a low sun. In practice GroundedSkybox draws with depthWrite:false
-       so the dome cannot fight anyone; this earns its keep against the
-       procedural strip at y = −0.01 if both are ever up at once. */
-    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4,
-  });
-  patchShadowCatcher(mat);
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.receiveShadow = true;
-  mesh.castShadow = false;
-  mesh.visible = false;
-  /* AFTER the near ground's bands (renderOrder 1 and 2). It is a multiply over
-     whatever is already there, so drawing it first would let the band paint
-     over its own contact shadow. */
-  mesh.renderOrder = 4;
-  scene.add(mesh);
-  return mesh;
-}
-
-/**
- * Catch the truck's shadow on a ground-projected photograph. `null` disables it
- * and hands the job back to the 700 m procedural plane.
- *
- * The plane is invisible except where the key light is occluded, and it obeys
- * the preset through the same `shadowIntensity` uniform every other receiver
- * uses — so an overcast preset softens the contact shadow for free.
- *
- * @param {null|{size?: number, opacity?: number}} opts
- *        `size` in metres square, `opacity` 0..1 (match the photo's own shadow
- *        density: hard midday sun wants more than an overcast sky).
- */
-export function setShadowCatcher(opts: null | { size?: number; opacity?: number }) {
-  if (!opts) {
-    catcherWanted = false;
-    syncGroundReceivers();
-    return;
-  }
-  if (!shadowCatcher) shadowCatcher = makeShadowCatcher();
-  /* `+v!` is a type-only assertion: `+undefined` is NaN, Number.isFinite says
-     no and the default wins, which is the whole point of the helper. */
-  const num = (v: number | undefined, d: number) => (Number.isFinite(+v!) ? +v! : d);
-  /* Clamped to the shadow camera. Ground past ±SHADOW_HALF is outside the
-     shadow frustum and can never darken, so a wider plane buys nothing but
-     transparent fragments that each still pay a shadow-map lookup. A manifest
-     asking for 60 m is not wrong — it is describing a frustum we deliberately
-     did not buy (see the SHADOW_HALF note in the light rig). */
-  catcherSize = THREE.MathUtils.clamp(num(opts.size, SHADOW_HALF * 2), 4, SHADOW_HALF * 2);
-  shadowCatcher.material.opacity = THREE.MathUtils.clamp(num(opts.opacity, 0.42), 0, 1);
-  catcherWanted = true;
-  syncGroundReceivers();
-}
-
-/* WHO CATCHES THE SHADOW — the single writer of groundPlane.visible,
-   shadowCatcher.visible, the catcher's ramp/scale and the near band's
-   receiveShadow.
-
-   There used to be two candidate receivers (the 700 m procedural plane and the
-   ShadowMaterial catcher) and setShadowCatcher() arbitrated between them
-   directly. There are three now, and they no longer arbitrate — the near band
-   and the catcher SPLIT the job by the complementary radial ramp documented at
-   makeShadowCatcher(), which keeps the shadow continuous across the seam
-   instead of handing it over at a hard circle. The invariant is stronger than
-   before: the shadow is applied exactly once at every point.
-
-   setShadowCatcher() is still the only thing that decides whether a catcher is
-   WANTED and how dense it is; this resolves the geometry of who applies it
-   where, and it is the only place any of these flags is written.
-
-   The 700 m plane is the exception that stays exclusive: it is opaque and
-   drawn in the opaque queue, so it would paint straight over the projected dome
-   and must be off whenever anything else owns the floor. */
-function syncGroundReceivers() {
-  for (const m of nearMeshes) m.receiveShadow = nearOn;
-  if (shadowCatcher) {
-    shadowCatcher.visible = catcherWanted;
-    /* EXACTLY the band's inverse. Off (-2, -1) the smoothstep is 1 for every
-       r >= 0, which is the uniform catcher the procedural path has always had. */
-    catchU.uCatchIn.value = nearOn ? nearU.uNearIn.value : -2;
-    catchU.uCatchOut.value = nearOn ? nearU.uNearOut.value : -1;
-    /* With the ramp deciding where it applies, the plane only has to cover
-       where a shadow can exist at all — the key light's frustum. Growing it to
-       that is free (the ramp zeroes it inside the band) and stops a manifest
-       `size` smaller than the frustum from cutting the outer part of a long
-       low-sun shadow off the photograph. */
-    const s = nearOn ? SHADOW_HALF * 2 : catcherSize;
-    shadowCatcher.scale.set(s, 1, s);
-  }
-  if (groundPlane) groundPlane.visible = !nearOn && !catcherWanted && !setGroundOn;
-}
-
-/* A 3D SET BRINGS ITS OWN FLOOR — see scene/set.ts.
-   This flag exists because the line above is the SINGLE WRITER of
-   groundPlane.visible and must stay that way: a set that reached in and set
-   `.visible = false` itself would be silently undone by the next
-   setShadowCatcher() call, which runs on every environment swap. So the set
-   declares its floor here and the existing rule absorbs it.
-
-   Without this the 700 m procedural grass plane sits at y=0, coplanar with the
-   set's own yard, and the pair z-fight across the entire view.
-   (The `let` itself lives up with `nearOn` — declaring it here would leave
-   syncGroundReceivers() reading it from the temporal dead zone.) */
-
-/**
- * Declare that a 3D set is supplying the ground plane.
- * @param {boolean} v
- */
-export function setSetGround(v: boolean) {
-  const next = !!v;
-  if (next === setGroundOn) return;
-  setGroundOn = next;
-  if (groundPlane) groundPlane.visible = !nearOn && !catcherWanted && !setGroundOn;
-}
-
-/** The ground materials, for anything that needs to read their state.
- *  `blades` is permanently null — the instanced grass quads were removed; see
- *  makeGrassCanvas(). The key stays so destructuring callers do not break. */
-export function getRoadMaterials() {
-  return {
-    asphalt: road.asphalt,
-    shoulders: road.shoulders.slice(),
-    grass: road.grass,
-    blades: null,
-    near: { base: nearBaseMat, road: nearRoadMat },
-  };
-}
 
 /**
  * Hand scene.background / scene.environment over to a photoreal HDRI (or take
@@ -2583,7 +2078,7 @@ export function getRoadMaterials() {
  * @param {THREE.Texture|null} tex  PMREM'd equirect for scene.environment
  * @param {{background?: THREE.Texture, rotation?: number,
  *          blurriness?: number, intensity?: number}} [opts]
- *        `background` defaults to `tex` (see environment.js for why binding the
+ *        `background` defaults to `tex` (see environment.ts for why binding the
  *        PMREM to both is the cheap option). `rotation` is radians about +Y and
  *        is applied to BOTH scene.backgroundRotation and
  *        scene.environmentRotation so what you see and what the paint reflects
@@ -2629,6 +2124,7 @@ export function setExternalEnvironment(
   /* Re-drive the guarded values (intensities, background) from the live rig
      right now — applyRig() is otherwise only called during a tween. */
   if (rigCur) applyRig(rigCur);
+  else invalidate();          // no rig yet: applyRig() did not cover us
 }
 
 /**
@@ -2641,662 +2137,11 @@ export function setExposureBase(v: number) {
   const n = +v;
   exposureBase = THREE.MathUtils.clamp(Number.isFinite(n) ? n : 1, 0.05, 8);
   if (rigCur) renderer.toneMappingExposure = Math.max(0.05, rigCur.exposure * exposureBase);
+  invalidate();
 }
 
 
-/* Original procedural maps of every material setGroundMaps() has overridden,
-   so switching to an environment without ground textures can put them back.
-   The PBR textures themselves belong to environment.js (it caches them per
-   environment id) — this module never disposes them. */
-/** What restoreGround() puts back: every slot setGroundMaps() may overwrite. */
-interface GroundOverride {
-  map: THREE.Texture | null;
-  roughnessMap: THREE.Texture | null;
-  normalMap: THREE.Texture | null;
-  aoMap: THREE.Texture | null;
-  dryColor: THREE.Color;
-  dryRough: number;
-}
-const groundOverride = new Map<THREE.MeshStandardMaterial, GroundOverride>();
 
-function groundTargets(target: string | undefined) {
-  if (target === 'grass' || target === 'plane') return [road.grass];
-  if (target === 'shoulders') return road.shoulders.slice();
-  return [road.asphalt];
-}
-
-/* Put the listed materials back on their procedural canvas maps. The saved
-   colour is the DRY one (never the live, possibly wet-multiplied value) and the
-   replay of the current wetness happens in resnapshotGround(). */
-function restoreGround(list: THREE.MeshStandardMaterial[]) {
-  const restored: THREE.MeshStandardMaterial[] = [];
-  for (const m of list) {
-    const o = groundOverride.get(m);
-    if (!o) continue;
-    m.map = o.map;
-    m.roughnessMap = o.roughnessMap;
-    m.normalMap = o.normalMap;
-    m.aoMap = o.aoMap;
-    m.color.copy(o.dryColor);
-    dryRough.set(m, o.dryRough);
-    baseRoughMap.delete(m);
-    m.needsUpdate = true;
-    groundOverride.delete(m);
-    restored.push(m);
-  }
-  if (restored.length) resnapshotGround(restored);
-}
-
-/* colorSpace / wrap / anisotropy are GL-level parameters: changing one forces a
-   re-upload of the whole texture. These textures are cached per environment and
-   re-applied on every switch back, so only flag it when something really
-   changed. `repeat` is a uniform (texture.matrix) and is always free.
-
-   `aniso` is a parameter because the two consumers want different answers. The
-   procedural road is background dressing and 8 is plenty; the near-ground band
-   is the surface the camera sits three metres above and looks along at a
-   grazing angle — the one case where 16x anisotropy buys real sharpness rather
-   than bandwidth. */
-function prepGroundTex(
-  t: THREE.Texture | null | undefined, colorSpace: THREE.ColorSpace,
-  ru: number, rv: number, aniso?: number,
-) {
-  if (!t) return null;
-  const a = aniso || 8;
-  if (t.colorSpace !== colorSpace
-    || t.wrapS !== THREE.RepeatWrapping || t.wrapT !== THREE.RepeatWrapping
-    || t.anisotropy !== a) {
-    t.colorSpace = colorSpace;
-    t.wrapS = THREE.RepeatWrapping;
-    t.wrapT = THREE.RepeatWrapping;
-    t.anisotropy = a;
-    t.needsUpdate = true;
-  }
-  t.repeat.set(ru, rv);
-  return t;
-}
-
-/* ---------------- ground tint ----------------
-   G1 samples the panorama's own ground in the band where the CG patch meets it
-   and puts the hex in the manifest. It is a COLOUR SAMPLE, not a multiplier,
-   and treating it as one is how you get a black road: an sRGB #8d8b84 is 0.27
-   in linear, and 0.27 x an albedo map that already averages ~0.30 is 0.08.
-
-   So it is decomposed:
-
-     chroma  the sample divided by its own luminance, i.e. pure hue/saturation
-             at unit brightness, then pulled 20 % back toward white. A neutral
-             grey sample is EXACTLY white and the tint is a no-op, which is the
-             property that makes this safe to apply unconditionally.
-             THE HUE IS THE LOAD-BEARING HALF, and not only for the seam. Poly
-             Haven has no tileable green lawn — the shipped `grass` set
-             (leafy_grass) is khaki, and the tint is the only thing that makes
-             it read as meadow. So the damping is deliberately light: at 0.20 a
-             #5a7a3a sample still asks for roughly 0.58 / 0.99 / 0.35, an
-             unmistakable green pull. It is not zero because the CG albedo
-             already carries the surface's own colour, and a full match on an
-             already-coloured texture multiplies hue by hue.
-             Luminance is preserved exactly by the damping, because both ends
-             of the mix have unit luminance, so `level` below stays honest.
-     level   how far the sample sits from a neutral reference (sRGB 50 %),
-             applied through a 0.6 power so it pulls toward the photograph
-             without ever landing on it, and clamped. A dark asphalt sample
-             would otherwise ask for a 0.19x multiply on an albedo that is
-             already asphalt-dark.
-
-   THE UPPER LEVEL CLAMP IS THE GUARD THAT MATTERS. `tint` is authored by
-   sampling the panorama in the band where the blend happens, and that band is
-   near the horizon, where an equirect's rows contain as much sky as ground —
-   it is very easy to sample haze instead of asphalt. A haze sample is both far
-   too bright and far too blue: rodovia currently ships #b3e8e7, which raw would
-   ask for a 1.16 / 1.66 / 1.65 multiply and turn the road cyan. 1.25 bounds
-   that to something recoverable rather than letting a mis-sample destroy the
-   scene; a real ground sample brighter than +25 % essentially does not exist.
-
-   Channels are clamped to 2 as a last resort against a wildly saturated hand-
-   edited hex; a real ground sample never gets near it. */
-const TINT_REF_LUM = 0.2159;        // linear luminance of sRGB 50 % grey
-const TINT_CHROMA = 0.80;           // 1 = match the sample's hue exactly
-const TINT_LEVEL_POW = 0.6;
-const TINT_LEVEL_MIN = 0.62, TINT_LEVEL_MAX = 1.25;
-const TINT_WHITE = new THREE.Color(1, 1, 1);
-
-const TINT_HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
-
-/** A `tint` as a manifest may author it: a hex string, a packed number, or a
- *  ready-made Color. Anything else is rejected below. */
-type TintSource = string | number | THREE.Color | null | undefined;
-
-function tintColor(v: TintSource) {
-  const c = new THREE.Color(1, 1, 1);
-  if (v === null || v === undefined || v === '') return c;
-  /* Manifests are external data. THREE.Color.set() does NOT throw on a bad
-     string — it console.warns and leaves the colour untouched, which here would
-     be white and would then ask for the maximum brighten. Validate instead. */
-  if (typeof v === 'string' && !TINT_HEX.test(v.trim())) return c;
-  try { c.set(typeof v === 'string' ? v.trim() : v); } catch (_) { return new THREE.Color(1, 1, 1); }
-  /* '#ffffff' is what an author writes to mean "no tint". Taken literally it is
-     a legitimate sample of a blown-out white ground and would brighten the CG
-     band by the full clamp; the sentinel reading is overwhelmingly more likely
-     and is the safe one. */
-  if (c.r >= 1 && c.g >= 1 && c.b >= 1) return new THREE.Color(1, 1, 1);
-  const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-  if (!(lum > 1e-4)) return new THREE.Color(1, 1, 1);
-  const level = THREE.MathUtils.clamp(
-    Math.pow(lum / TINT_REF_LUM, TINT_LEVEL_POW), TINT_LEVEL_MIN, TINT_LEVEL_MAX);
-  c.multiplyScalar(1 / lum);                  // unit-luminance chroma
-  c.lerp(TINT_WHITE, 1 - TINT_CHROMA);        // damped, luminance-preserving
-  c.multiplyScalar(level);
-  c.r = Math.min(c.r, 2); c.g = Math.min(c.g, 2); c.b = Math.min(c.b, 2);
-  return c;
-}
-
-/* ---------------- the tint as a MEASURED MULTIPLIER ----------------
-   tintColor() above takes a COLOUR SAMPLE and defends itself against it: it
-   throws the sample's luminance away, damps its chroma 20 % toward white and
-   clamps a level derived from a power of that luminance. Every one of those
-   steps is right for a hand-picked hex and WRONG for a number that was solved
-   rather than eyeballed — it cannot express one. Demonstrated on the shipped
-   manifest: a measured grass correction of #b3e8e7 comes out of tintColor() as
-   0.867 / 1.354 / 1.344, i.e. it BRIGHTENS the verge, which is why it renders
-   as washed-out khaki instead of grass.
-
-   So there is a second, unambiguous form. `tintRgb` / `vergeTintRgb` are three
-   LINEAR MULTIPLIERS applied straight to material.color with nothing in
-   between, and when present they win over the hex. Both forms stay live: the
-   hex is still the right thing for an author eyeballing a sample, the array is
-   the right thing for a solved number.
-
-   THE RANGE. 0.02 rather than the 0.05 a first pass would pick, because the
-   floor genuinely binds: solving `rodovia`'s verge against its own panorama
-   asks for 0.090 in blue, and the same solve on a scene whose plate is greener
-   would ask for less — chlorophyll absorbs blue, so a real grass diffuse albedo
-   in blue is a couple of per cent and the shipped `leafy_grass` carries 0.111.
-   A floor that clips a correct measurement is worse than no floor. The ceiling
-   is 4 rather than 2 for the mirror reason: a correction that has to BRIGHTEN a
-   dark texture toward a bright plate is legitimate, and nothing here divides by
-   it. Both ends exist only so a hand-edited manifest cannot produce a black or
-   a blown ground; a solved value never approaches either. */
-const TINT_RGB_MIN = 0.02, TINT_RGB_MAX = 4.0;
-
-/** @returns {THREE.Color|null} null ⇒ not a usable triple, fall back to the hex */
-function tintRgb(v: number[] | null | undefined) {
-  if (!Array.isArray(v) || v.length < 3) return null;
-  const n = [+v[0], +v[1], +v[2]];
-  /* Manifests are external data: one NaN would reach material.color and render
-     the band black, so the whole triple is rejected rather than half-used. */
-  if (!n.every(Number.isFinite)) return null;
-  return new THREE.Color(
-    THREE.MathUtils.clamp(n[0], TINT_RGB_MIN, TINT_RGB_MAX),
-    THREE.MathUtils.clamp(n[1], TINT_RGB_MIN, TINT_RGB_MAX),
-    THREE.MathUtils.clamp(n[2], TINT_RGB_MIN, TINT_RGB_MAX));
-}
-
-/** The measured triple if there is one, the decoded sample otherwise, white if
- *  there is neither. */
-function resolveTint(rgb: number[] | null | undefined, hex: TintSource) {
-  return tintRgb(rgb) || tintColor(hex);
-}
-
-/** setGroundMaps()'s argument, exactly as the JSDoc below spells it out. */
-interface GroundMapsOpts {
-  diffuse?: THREE.Texture | null;
-  rough?: THREE.Texture | null;
-  normal?: THREE.Texture | null;
-  ao?: THREE.Texture | null;
-  disp?: THREE.Texture | null;
-  tint?: TintSource;
-  tintRgb?: number[] | null;
-  repeat?: [number, number] | number[];
-  target?: 'asphalt' | 'shoulders' | 'grass';
-}
-
-/**
- * Replace a ground material's procedural canvas maps with an environment's PBR
- * set. Call with `null` to restore every material this has ever overridden.
- *
- * colorSpace is not negotiable: albedo is sRGB, roughness, normal and AO are
- * raw data (NoColorSpace). Tagging a normal map sRGB bends every normal.
- *
- * `repeat` is always authored for the 12 x 340 m road strip — that is what the
- * environments manifest documents. Applied to any other surface we keep the *u*
- * density (metres per tile) and use it on BOTH axes: the v stretch is an
- * artistic choice for asphalt grain along the road and reads as a smear on a
- * 700 m field. (setNearGround() takes metres-per-tile directly instead; a
- * near-field disc has no long axis to stretch along.)
- *
- * Adding or removing a normalMap/roughnessMap/aoMap flips USE_NORMALMAP /
- * USE_ROUGHNESSMAP / USE_AOMAP and recompiles that material's program — same
- * trade-off applyWetness() already makes for the puddle mask, and for the same
- * reason: once, on an explicit change, never per frame.
- *
- * `disp` IS ACCEPTED AND DELIBERATELY NOT BOUND. three's displacementMap moves
- * VERTICES, and every ground surface here is two triangles (the near band is
- * four); making a 3 m-tiled height field read would need ~10 cm tessellation,
- * i.e. of the order of a million vertices over the near disc, for mesostructure
- * the normal map already delivers at zero cost. Binding it as a bumpMap instead
- * would double-count that same detail against the normal map rather than add
- * to it. It stays in the signature so a manifest may carry it and a future
- * parallax-occlusion path can pick it up without another API change.
- *
- * @param {null|{diffuse?: THREE.Texture|null, rough?: THREE.Texture|null,
- *               normal?: THREE.Texture|null, ao?: THREE.Texture|null,
- *               disp?: THREE.Texture|null, tint?: string|number|THREE.Color,
- *               tintRgb?: number[], repeat?: [number, number],
- *               target?: 'asphalt'|'shoulders'|'grass'}} opts
- *        `tintRgb` is three LINEAR multipliers and wins over `tint`; see the
- *        tint section for why a solved number cannot go through the hex path.
- */
-export function setGroundMaps(opts: GroundMapsOpts | null) {
-  const mats = opts ? groundTargets(opts.target).filter(Boolean) : [];
-  const diffuse = (opts && opts.diffuse) || null;
-  const rough = (opts && opts.rough) || null;
-  const normal = (opts && opts.normal) || null;
-  const ao = (opts && opts.ao) || null;
-  const wanted = mats.length && (diffuse || rough || normal || ao) ? mats : [];
-
-  /* Whatever the PREVIOUS environment overrode and this one does not cover goes
-     back to its procedural maps FIRST. environment.js disposes cached textures
-     when an environment falls out of its LRU, and a material still pointing at
-     a disposed texture renders black — this is the only place that link is
-     broken. */
-  restoreGround([...groundOverride.keys()].filter(m => !wanted.includes(m)));
-  if (!wanted.length) return;
-
-  /* `opts!`: `wanted` is non-empty only when `mats` was, which only happens on
-     the `opts ? …` branch above — a chain the checker cannot follow. */
-  const rep = Array.isArray(opts!.repeat) ? opts!.repeat : [1, 28];
-  const ru = Math.max(0.001, +rep[0] || 1);
-  const rv = Math.max(0.001, +rep[1] || 1);
-  const metresPerTile = ROAD_W / ru;
-  const tint = resolveTint(opts!.tintRgb, opts!.tint);
-
-  for (const m of wanted) {
-    if (!groundOverride.has(m)) {
-      groundOverride.set(m, {
-        map: m.map, roughnessMap: m.roughnessMap, normalMap: m.normalMap,
-        aoMap: m.aoMap,
-        /* dryColors, NOT m.color: the live colour may be wet-multiplied right
-           now, and restoring that would bake the multiplier in permanently. */
-        dryColor: (dryColors.get(m) || m.color).clone(),
-        dryRough: dryRough.get(m) ?? 0.95,
-      });
-    }
-    const o = groundOverride.get(m)!;    // set() above, on the miss
-    /* The puddle-mask materials own their .roughnessMap through applyWetness();
-       see puddleSpec. */
-    const wetOwned = puddleSpec.has(m);
-    const [sw, sl] = groundSize.get(m) || [ROAD_W, ROAD_L];
-    /* The road strip gets the authored numbers verbatim; anything else is
-       re-tiled at the same metres-per-tile so the grain size matches across
-       surfaces instead of jumping at the shoulder line. */
-    const isRoad = m === road.asphalt;
-    const u = isRoad ? ru : sw / metresPerTile;
-    const v = isRoad ? rv : sl / metresPerTile;
-
-    /* Every slot is written on EVERY call — never "only if supplied". Switching
-       from an environment with a normal map to one without would otherwise
-       leave the old (soon-disposed) texture bound. */
-    if (diffuse) {
-      m.map = prepGroundTex(diffuse, THREE.SRGBColorSpace, u, v);
-      /* A real albedo map must not be tinted by whatever the wet multiplier
-         left in m.color, so the DRY colour is the manifest tint — white when
-         there is none. */
-      m.color.copy(tint);
-    } else {
-      m.map = o.map;
-      m.color.copy(o.dryColor);
-    }
-
-    m.normalMap = normal ? prepGroundTex(normal, THREE.NoColorSpace, u, v) : o.normalMap;
-    /* aoMap reads UV channel 0 by default (three r151+ made the second UV set
-       opt-in via texture.channel), which is the only set these planes have. */
-    m.aoMap = ao ? prepGroundTex(ao, THREE.NoColorSpace, u, v) : o.aoMap;
-
-    if (rough) {
-      baseRoughMap.set(m, prepGroundTex(rough, THREE.NoColorSpace, u, v));
-      /* the map now carries the roughness detail — stop scaling it by 0.95 */
-      dryRough.set(m, 1.0);
-    } else {
-      baseRoughMap.delete(m);
-      dryRough.set(m, o.dryRough);
-    }
-    /* .roughnessMap on the road is written by applyWetness() alone (puddle mask
-       while wet, baseRoughMap while dry) — two writers would race. Everywhere
-       else nothing else touches it, so bind it here. */
-    if (!wetOwned) m.roughnessMap = baseRoughMap.get(m) || o.roughnessMap;
-
-    m.needsUpdate = true;
-  }
-  /* m.color now holds the intended DRY albedo for every material in `wanted`,
-     which is the precondition resnapshotGround() documents. It replays the
-     current wetness for the whole ground set, which the dryRough/baseRoughMap
-     changes above also need. */
-  resnapshotGround(wanted);
-}
-
-/* ---------------- near ground ----------------
-   The CG band that covers the near field over a projected photograph. Geometry
-   and blend state are up in the "near-field CG ground" section; this is the
-   public control surface.
-
-   Zero-asset safety net: a band with no diffuse falls back to the SAME canvas
-   generators the procedural road uses, so setNearGround() is never the thing
-   that puts a flat grey slab under the truck. It is not the intended path —
-   environment.js should pass 2k PBR — but it is the difference between a
-   degraded scene and a broken one. */
-const nearFallbackTex = new Map<NearSurface, THREE.Texture>();
-
-function nearFallbackAlbedo(type: NearSurface) {
-  if (!nearFallbackTex.has(type)) {
-    const c = type === 'grass' ? makeGrassCanvas()
-      : (type === 'asphalt' || type === 'concrete') ? makeAsphaltCanvas(false)
-        : makeGravelCanvas();
-    /* repeat is overwritten by prepGroundTex on every apply */
-    nearFallbackTex.set(type, canvasTex(c, 1, 1));
-  }
-  return nearFallbackTex.get(type)!;   // just built above if it was missing
-}
-
-/** One band's PBR set, shared by the primary manifest and its `verge`. */
-interface NearBandSet {
-  diffuse?: THREE.Texture | null;
-  rough?: THREE.Texture | null;
-  normal?: THREE.Texture | null;
-  ao?: THREE.Texture | null;
-  disp?: THREE.Texture | null;
-  /* A NearSurface in practice, but manifest data reaches here as a plain
-     string — the lookup below treats an unknown one as it treats an absent one. */
-  type?: string | null;
-  tint?: TintSource;
-  tintRgb?: number[] | null;
-  repeat?: number;
-}
-
-/** Bind one band's PBR set. `set` is { diffuse, rough, normal, ao, tint, type,
- *  repeat }. `repeat` is METRES PER TILE and is PER BAND — see setNearGround(). */
-function applyNearBand(m: THREE.MeshStandardMaterial, set: NearBandSet, metresPerTile: number) {
-  /* The cast is the lookup asking "is this one of the five kinds?"; anything
-     that misses — absent, null, misspelt — falls to 'gravel' as it always did. */
-  const type: NearSurface = WET_PROFILE[set.type as NearSurface]
-    ? set.type as NearSurface : 'gravel';
-  const r = 1 / metresPerTile;
-  const diffuse = set.diffuse || nearFallbackAlbedo(type);
-
-  m.map = prepGroundTex(diffuse, THREE.SRGBColorSpace, r, r, NEAR_ANISO);
-  m.normalMap = set.normal ? prepGroundTex(set.normal, THREE.NoColorSpace, r, r, NEAR_ANISO) : null;
-  m.aoMap = set.ao ? prepGroundTex(set.ao, THREE.NoColorSpace, r, r, NEAR_ANISO) : null;
-
-  if (set.rough) {
-    baseRoughMap.set(m, prepGroundTex(set.rough, THREE.NoColorSpace, r, r, NEAR_ANISO));
-    dryRough.set(m, 1.0);          // the map carries the detail; do not scale it
-  } else {
-    baseRoughMap.delete(m);
-    dryRough.set(m, 0.95);
-  }
-  /* Same rule as setGroundMaps(): applyWetness() owns .roughnessMap for the
-     puddle materials and nothing else may write it. */
-  if (!puddleSpec.has(m)) m.roughnessMap = baseRoughMap.get(m) || null;
-
-  /* THE TRAP. m.color is the DRY albedo and applyWetness() recomputes the live
-     colour from dryColors on every call, so writing a tint without
-     re-snapshotting would leave a stale dry value that every later wet preset
-     multiplies against. resnapshotGround() at the end of setNearGround() is the
-     re-baseline; this only has to leave the intended DRY colour in m.color. */
-  m.color.copy(resolveTint(set.tintRgb, set.tint));
-  wetProfile.set(m, WET_PROFILE[type]);
-  m.needsUpdate = true;
-}
-
-/* A band that this environment does not use must not keep pointing at the
-   previous environment's textures: environment.js disposes them when an entry
-   falls out of its LRU, and a material holding a disposed texture renders black
-   the moment the band comes back. Its colour is deliberately NOT re-snapshotted
-   — see setNearGround() — because an unrendered material's live colour may be
-   wet-multiplied, and baking that into dryColors is the exact bug
-   resnapshotGround() exists to prevent. applyNearBand() rewrites every slot on
-   the way back in. */
-function clearNearBand(m: THREE.MeshStandardMaterial) {
-  m.map = null;
-  m.normalMap = null;
-  m.aoMap = null;
-  baseRoughMap.delete(m);
-  if (!puddleSpec.has(m)) m.roughnessMap = null;
-  m.needsUpdate = true;
-}
-
-/* One warning, not one per call: environment.js drives both flags on every
-   environment switch and a per-switch console line would be noise. */
-let roadOverlapWarned = false;
-function warnRoadOverlap() {
-  if (!nearOn || !roadOn || roadOverlapWarned) return;
-  roadOverlapWarned = true;
-  console.warn('[truck-studio] chão próximo e estrada procedural visíveis juntos: '
-    + 'a estrada aparece através da dissolução do chão próximo. Chame setRoadVisible(false).');
-}
-
-/** setNearGround()'s argument: one band set, plus the shape and the three
- *  "organic, not static" fields, plus the verge's own band set. */
-interface NearGroundOpts extends NearBandSet {
-  radius?: number;
-  fade?: number;
-  width?: number;
-  wear?: number;
-  edgeNoise?: null | { amplitude?: number; scale?: number };
-  undulation?: null | { amplitude?: number; scale?: number };
-  verge?: null | NearBandSet;
-}
-
-/**
- * The near-field CG ground: real PBR geometry between the truck and the
- * projected photograph, dissolving radially into it.
- *
- * `null` removes it and hands the floor back to the procedural plane / shadow
- * catcher. Call it for every environment, including with `null`, so a scene
- * without one cannot inherit the previous scene's band.
- *
- * THE SEAM, which is the only thing here that has to be perfect:
- *   - alpha is `1 − smoothstep(radius, radius + fade, |xz|)`, evaluated per
- *     fragment from an exactly-interpolated world position;
- *   - the material is `transparent` (⇒ drawn after the dome, which sits in the
- *     opaque queue at renderOrder −1) and `depthWrite: false`, so the faded
- *     band cannot punch a hole in the photograph;
- *   - the bands are disjoint in x, so nothing is blended twice;
- *   - `fog: false`, because a fogged CG band against an unfogged photo IS the
- *     visible ring;
- *   - `tint` pulls the CG albedo onto the photograph's own hue — see
- *     tintColor(), and note that a wrong hue makes the ring visible however
- *     good the fade is.
- *
- * y = 2 mm, not 0. GroundedSkybox writes no depth so there is nothing to fight,
- * but the lift also wins the depth test against the procedural strip at
- * y = −0.01 if an integration leaves both on, and 2 mm at the tyre contact is
- * sub-pixel (it shifts the shadow by 2 mm / tan(8°) ≈ 14 mm at the lowest sun
- * any preset uses).
- *
- * ORGANIC, NOT STATIC — the three fields that stop it reading as a slab, in
- * descending order of how much they matter:
- *
- *   `edgeNoise` { amplitude, scale } — metres the asphalt/verge boundary
- *     wanders and the metres per period it wanders over. A dead-straight
- *     material boundary is the single most CG thing a near field can have.
- *     Requires a `verge`: with no boundary there is nothing to displace, and
- *     the field is ignored rather than half-applied.
- *   `wear` 0..1 — dust and grit thrown off the verge onto the first metres of
- *     asphalt, plus darkened and polished wheel tracks on the RUTS lanes the
- *     puddle mask already uses. 0 disables. Needs a road strip for the same
- *     reason `edgeNoise` does.
- *   `undulation` { amplitude, scale } — metres of low-frequency height and its
- *     period. Baked into the vertices, which are subdivided to suit; forced to
- *     zero under the rig's footprint (or the wheels float) and across the
- *     dissolve (or the CG floor and the photographed floor stop agreeing).
- *
- * @param {null|{diffuse?: THREE.Texture|null, rough?: THREE.Texture|null,
- *               normal?: THREE.Texture|null, ao?: THREE.Texture|null,
- *               disp?: THREE.Texture|null,
- *               type?: 'asphalt'|'grass'|'gravel'|'concrete'|'dirt',
- *               tint?: string|number|THREE.Color, tintRgb?: number[],
- *               radius?: number, fade?: number, repeat?: number,
- *               width?: number, wear?: number,
- *               edgeNoise?: null|{amplitude?: number, scale?: number},
- *               undulation?: null|{amplitude?: number, scale?: number},
- *               verge?: null|{diffuse?, rough?, normal?, ao?, disp?, type?,
- *                             tint?, tintRgb?}}} opts
- *        `radius` metres of fully opaque CG ground, `fade` metres of dissolve,
- *        `repeat` METRES PER TEXTURE TILE (not tiles — setGroundMaps() takes
- *        the other convention and they must not be confused), `width` the road
- *        strip's width in metres, `type` the surface kind, which only drives
- *        how the material behaves when wet. `verge` is the shoulder material
- *        either side of the road strip; omit it (or pass null) for a yard, and
- *        the primary set covers the whole band with no strip at all.
- *        `verge.repeat` IS ITS OWN NUMBER and should be that set's real-world
- *        tile size — the shipped sets are asphalt 4.04 m, grass 2.00 m,
- *        gravel 2.48 m, dirt 1.30 m, concrete 2.00 m, so a scene with an
- *        asphalt road and a grass verge needs two different values or the
- *        grass comes out at twice its true scale. It falls back to the
- *        primary's `repeat` only because one number is better than none.
- *        `verge.tint` is likewise its own: on the shipped grass set the tint is
- *        LOAD-BEARING (Poly Haven has no tileable green lawn; the chosen
- *        `leafy_grass` is khaki and the tint is what makes it meadow green),
- *        so a scene-level tint sampled from the road cannot serve both bands.
- *        `tintRgb` (and `verge.tintRgb`) is the MEASURED form of the same
- *        thing — three linear multipliers written straight onto material.color
- *        — and WINS over the hex when present. Use it for anything solved
- *        rather than eyeballed; tintColor()'s chroma damping and level clamp
- *        cannot express a solved number. See the tint section.
- *        `disp` is accepted and not bound — see setGroundMaps().
- */
-export function setNearGround(opts: NearGroundOpts | null) {
-  if (!opts) {
-    nearOn = false;
-    nearOpaqueR = 0;
-    if (nearGroup) nearGroup.visible = false;
-    /* Drop the texture references on the way out. A hidden material is never
-       uploaded, so this is belt-and-braces against environment.js disposing a
-       cached set while we still point at it — but it is the cheap half of the
-       pair and the expensive half is a black ground. */
-    clearNearBand(nearBaseMat);
-    clearNearBand(nearRoadMat);
-    /* Park the surface modifiers too, so nothing an environment authored can
-       survive into a scene that has no band at all. */
-    nearU.uNearEdge.value.set(-1e4, NEAR_EDGE_BLEND);
-    nearU.uEdgeNoise.value.set(0, 1 / 7);
-    nearU.uWear.value.set(0, 2.2);
-    nearUndulation = null;
-    syncGroundReceivers();
-    return;
-  }
-  /* `+v!` is a type-only assertion — see setShadowCatcher()'s copy. Takes null
-     as well because the callers below pass `en && en.amplitude`. */
-  const num = (v: number | null | undefined, d: number) => (Number.isFinite(+v!) ? +v! : d);
-  const radius = THREE.MathUtils.clamp(num(opts.radius, 55), 8, 400);
-  const fade = THREE.MathUtils.clamp(num(opts.fade, 25), 1, 400);
-  const tile = THREE.MathUtils.clamp(num(opts.repeat, NEAR_TILE_DEFAULT), 0.25, 60);
-  const roadW = THREE.MathUtils.clamp(num(opts.width, ROAD_W), 2, radius * 2);
-  const verge = (opts.verge && typeof opts.verge === 'object') ? opts.verge : null;
-  const hasVerge = !!(verge && (verge.diffuse || verge.rough || verge.normal
-    || verge.ao || verge.type));
-  /* PER-BAND TILE. The two bands are usually different PBR sets with different
-     REAL-WORLD tile sizes — `asphalt` is 4.04 m and `grass` is 2.00 m in the
-     shipped set — so a single scene-level number cannot be right for both.
-     Driving the grass verge off the asphalt's 4 m makes it exactly 2x too
-     coarse, which at a 26 m radius is very visible. Falls back to the primary's
-     value so an author who genuinely wants one number can still write one. */
-  const vergeTile = verge
-    ? THREE.MathUtils.clamp(num(verge.repeat, tile), 0.25, 60) : tile;
-  const outer = radius + fade;
-  const blend = Math.min(NEAR_EDGE_BLEND, roadW * 0.25);
-
-  /* EDGE WANDER. Meaningless without a boundary to wander, so it is forced off
-     for a verge-less band — there the base material covers everything and
-     `uNearEdge.x` is parked negative so tsRoadMask() is identically 0.
-     Amplitude is capped at 35 % of the half-width as well as at 3 m: a 12 m
-     road whose edge swings ±4 m is not an irregular verge, it is a different
-     road every 20 metres. */
-  const en = (opts.edgeNoise && typeof opts.edgeNoise === 'object') ? opts.edgeNoise : null;
-  const edgeAmp = hasVerge
-    ? THREE.MathUtils.clamp(num(en && en.amplitude, 0), 0, Math.min(3, roadW * 0.175))
-    : 0;
-  const edgeScale = THREE.MathUtils.clamp(num(en && en.scale, 7), 1.5, 80);
-  const wear = THREE.MathUtils.clamp(num(opts.wear, 0), 0, 1);
-
-  /* UNDULATION. `scale` is the period in metres and the cell size follows it —
-     ~9 samples per period, which is smooth without being a vertex budget. The
-     amplitude is capped at 25 cm: past that the flat rectangle under the rig
-     stops being able to hide, and the truck sits in a visible bowl. */
-  const un = (opts.undulation && typeof opts.undulation === 'object') ? opts.undulation : null;
-  const undAmp = THREE.MathUtils.clamp(num(un && un.amplitude, 0), 0, 0.25);
-  const undScale = THREE.MathUtils.clamp(num(un && un.scale, 14), 3, 120);
-  const undul = undAmp > 0.001 ? {
-    amp: undAmp,
-    inv: 1 / undScale,
-    cell: THREE.MathUtils.clamp(undScale / 9, 0.6, 2.5),
-    inner: radius, outer,
-  } : null;
-
-  /* Geometry is only rebuilt when the SHAPE changes: the maps and the tiling
-     are material/uniform state and cost nothing to re-apply. The wander
-     amplitude is part of the shape because it decides how far the two bands
-     have to reach past each other, and so is the whole undulation, because it
-     is baked into the vertices. */
-  const overlap = edgeAmp + blend;
-  const key = [
-    outer.toFixed(3), hasVerge ? roadW.toFixed(3) : 'solid', overlap.toFixed(3),
-    undul ? undAmp.toFixed(4) + ':' + undScale.toFixed(2) + ':' + radius.toFixed(2) : 'flat',
-  ].join('|');
-  if (key !== nearGeoKey) {
-    rebuildNearGeometry({ outer, hasVerge, roadW, overlap, undul });
-    nearGeoKey = key;
-  }
-  nearUndulation = undul ? { amplitude: undAmp, scale: undScale } : null;
-
-  /* With a verge the primary set IS the road strip and the verge covers the
-     rest; without one the primary set covers the whole band and there is no
-     strip (a hardstanding has no centre line and no shoulder). */
-  if (hasVerge) {
-    applyNearBand(nearRoadMat, opts, tile);
-    applyNearBand(nearBaseMat, verge, vergeTile);
-  } else {
-    applyNearBand(nearBaseMat, opts, tile);
-    clearNearBand(nearRoadMat);
-  }
-
-  nearU.uNearIn.value = radius;
-  nearU.uNearOut.value = outer;
-  /* NO VERGE ⇒ NO ROAD. A negative edge makes tsRoadDist() negative for every
-     x, so the mask is 0, the base band keeps the whole disc and both wear terms
-     switch themselves off. It is the same uniform doing both jobs because the
-     two bands must never be able to disagree about where the road is. */
-  nearU.uNearEdge.value.set(hasVerge ? roadW / 2 : -1e4, blend);
-  nearU.uEdgeNoise.value.set(edgeAmp, 1 / edgeScale);
-  nearU.uWear.value.set(wear, THREE.MathUtils.clamp(roadW * 0.18, 0.6, 3.5));
-  /* Keep the puddle mask's lanes on the wheel tracks. Its rut positions are
-     authored as fractions of ONE tile, so the tile has to be the carriageway —
-     hard-coded to ROAD_W when it was written, which silently misaligned the
-     puddles from the tracks for any other width. Cheap to fix here, and this is
-     the only place `width` is known. applyWetness() still owns the texture
-     itself; this only re-derives the transform it was built with. */
-  const pud = puddleSpec.get(nearRoadMat);
-  if (pud) {
-    pud.u = 1 / roadW;
-    if (pud.tex) pud.tex.repeat.set(pud.u, pud.v);
-  }
-
-  nearGroup.visible = true;
-  nearOn = true;
-  nearOpaqueR = radius;
-  syncGroundReceivers();
-  warnRoadOverlap();
-  /* THE RE-BASELINE. Every band applyNearBand() just touched holds its intended
-     DRY albedo, which is resnapshotGround()'s documented precondition; it
-     rewrites dryColors from it and replays the current wetness immediately, so
-     a wet preset never multiplies against a stale dry value and the band does
-     not sit showing a dry albedo until the next tween.
-     Only the bands that were re-bound: an untouched nearRoadMat may still be
-     carrying a wet-multiplied colour, and snapshotting THAT is exactly the bug
-     this call exists to prevent. */
-  resnapshotGround(hasVerge ? [nearBaseMat, nearRoadMat] : [nearBaseMat]);
-}
 
 /* Close the lamp seam: lamps.ts calls this after setLamps()/setLampModel() so a
    unit it just parked or re-fitted picks up the current rig pose immediately
@@ -3355,6 +2200,40 @@ interface SavedScene {
 })();
 
 /* ---------------- framing / resize / loop ---------------- */
+/**
+ * A pose da câmera AGORA, normalizada pelo tamanho do que está enquadrado.
+ *
+ * Existe para fechar o laço do enquadramento padrão. `frameAll()` posiciona a
+ * câmera por três multiplicadores sobre a diagonal da caixa do conjunto, e
+ * acertar esses três olhando uma captura de tela é adivinhação. Com isto o
+ * caminho vira: gire até gostar, chame `__studio.lighting.getCameraPose()`, e
+ * cole os números de volta em `frameAll()` — eles JÁ estão na unidade certa,
+ * porque são divididos pela mesma diagonal que ele multiplica.
+ *
+ * `dist` e `elevationDeg` vão junto por serem o que se lê num print: a que
+ * distância e de que altura. `azimuthDeg` é 0 no +Z (a frente da cabine).
+ */
+export function getCameraPose() {
+  const box = new THREE.Box3();
+  for (const g of scene.children) if (g.visible) box.expandByObject(g);
+  const size = box.isEmpty() ? 1 : box.getSize(new THREE.Vector3()).length();
+  const t = controls.target;
+  const d = new THREE.Vector3().subVectors(camera.position, t);
+  const flat = Math.hypot(d.x, d.z);
+  return {
+    /* Os três multiplicadores de frameAll(), prontos para colar. */
+    fx: +(d.x / size).toFixed(4),
+    fy: +(d.y / size).toFixed(4),
+    fz: +(d.z / size).toFixed(4),
+    dist: +d.length().toFixed(2),
+    elevationDeg: +(Math.atan2(d.y, flat) * 180 / Math.PI).toFixed(1),
+    azimuthDeg: +(Math.atan2(d.x, d.z) * 180 / Math.PI).toFixed(1),
+    target: { x: +t.x.toFixed(2), y: +t.y.toFixed(2), z: +t.z.toFixed(2) },
+    size: +size.toFixed(2),
+    aspect: +camera.aspect.toFixed(3),
+  };
+}
+
 export function frameAll(groups: THREE.Object3D[]) {
   const box = new THREE.Box3();
   for (const g of groups) if (g.visible) box.expandByObject(g);
@@ -3370,6 +2249,12 @@ export function frameAll(groups: THREE.Object3D[]) {
   );
   camera.far = Math.max(size * 10, 700);         // keep the sky dome inside the frustum
   camera.updateProjectionMatrix();               // near is managed per-frame in the loop
+  /* frameAll() does NOT call controls.update(), and damping is on, so the camera
+     coasts into the new pose over several frames. One dirty frame would land it
+     part of the way there and stop. The damping-settle term in wantsFrame()
+     carries the rest, but seeding a handful here means the settle is never
+     waiting on the first of them. */
+  invalidate(8);
 }
 
 /* Ankaa: the studio can be detached from the page (route change) or resized by
@@ -3379,25 +2264,162 @@ export function frameAll(groups: THREE.Object3D[]) {
 export function resize() {
   const w = holder.clientWidth, h = holder.clientHeight;
   if (!w || !h) return;
+  /* RE-APPLIED, not just set once at module load. `devicePixelRatio` is a
+     PER-DISPLAY property: drag the window from a 1x panel to a 2x one and the
+     value changes under a renderer that sampled it exactly once, at import.
+     The symptom is a canvas rendered at half resolution on the retina screen (or
+     at double cost on the cheap one) with nothing in the console. setSize()
+     multiplies by whatever the ratio currently is, so this has to come first.
+     Cheap by construction: three's setPixelRatio() early-outs on an unchanged
+     value, so the common case is one comparison. */
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  /* A resized drawing buffer is a BLANK drawing buffer. Under the dirty loop,
+     skipping this is a white viewport that stays white. */
+  invalidate();
 }
 window.addEventListener('resize', resize);
 resize();
 
+/* ---------------- DEFERRED TEARDOWN ----------------
+   ~500 MB of GPU memory outlives the route, and that is on purpose — up to a
+   point.
+
+   The engine is a deliberate singleton (studio.ts's header says so): unmounting
+   detaches the DOM and stops the loop but keeps the WebGL context, the hundreds
+   of megabytes of downloaded geometry and every baked PMREM alive, so coming
+   back to the route is instant instead of pulling the whole implement down
+   again. That is why disposeEnvironments(), disposeReflectionProbe() and
+   disposeSetTextures() exist and are called from nowhere: wiring them into
+   unmountStudio() would throw exactly that away.
+
+   The answer is neither "free it on unmount" nor "never free it" — it is a
+   DEADLINE. Leaving the route starts a timer; coming back cancels it. A user
+   flicking to another page and back pays nothing; a user who left for good stops
+   pinning half a gigabyte of VRAM for the rest of the browser session.
+
+   The mechanism lives here because scene.ts is the only module every other one
+   can already reach without inverting an import edge (see the acyclicity note at
+   the top of the file). The POLICY — which disposers, in what order — belongs to
+   studio.ts, which is the module that knows what is mounted. */
+const IDLE_RELEASE_MS = 60_000;
+let idleReleaseTimer: ReturnType<typeof setTimeout> | 0 = 0;
+
+/**
+ * Run `fn` once, `ms` from now, unless cancelIdleRelease() gets there first.
+ *
+ * Call it from unmountStudio(); call cancelIdleRelease() from mountStudio().
+ * Replaces any release already pending rather than queueing a second one, so
+ * two unmounts in a row still schedule exactly one teardown.
+ *
+ * `fn` must be safe to run against a detached, non-rendering studio and must
+ * leave the engine re-mountable — every disposer this is meant for already is
+ * (they degrade the scene back to procedural rather than breaking it).
+ */
+export function scheduleIdleRelease(fn: () => void, ms: number = IDLE_RELEASE_MS) {
+  cancelIdleRelease();
+  idleReleaseTimer = setTimeout(() => {
+    idleReleaseTimer = 0;
+    /* A failed disposer must not take the timer's owner down with it: by
+       definition nobody is awaiting this, so a throw here would surface as an
+       unhandled rejection minutes after the user left the page. */
+    try { fn(); } catch (err) {
+      console.warn('[truck-studio] liberação diferida de memória falhou', err);
+    }
+  }, ms);
+}
+
+/** Call from mountStudio(). Idempotent. */
+export function cancelIdleRelease() {
+  if (idleReleaseTimer) { clearTimeout(idleReleaseTimer); idleReleaseTimer = 0; }
+}
+
+/** True while a deferred teardown is armed — i.e. the studio is off the page. */
+export const isIdleReleasePending = () => idleReleaseTimer !== 0;
+
+/* ---------------- instrumentation ----------------
+   `renderer.info` is free (three keeps these counters whether or not anyone
+   reads them) and, until now, read by nobody — so there was no way to answer
+   "how many draw calls is this scene actually costing" without opening a
+   profiler. It is the number every decision in this file is argued from.
+
+   `frame` is in here for the dirty loop specifically: it is the only way to tell
+   a correctly idle renderer from a frozen one. Watch it across a few seconds of
+   an untouched viewport — flat is on-demand working, climbing at 60/s is the
+   loop still running flat out. */
+export function getRenderStats() {
+  const { render, memory, programs } = renderer.info;
+  return {
+    frame: render.frame,
+    calls: render.calls,
+    triangles: render.triangles,
+    lines: render.lines,
+    points: render.points,
+    geometries: memory.geometries,
+    textures: memory.textures,
+    programs: programs ? programs.length : 0,
+    /* Not from renderer.info — this module's own procedural IBL cache, which is
+       the one pool of VRAM here that grows with USE rather than with content. */
+    envCacheSize: envCache.size,
+  };
+}
+
 const clock = new THREE.Clock();
+
+/**
+ * Is something still MOVING, as opposed to merely having moved?
+ *
+ * The whole predicate in one place, so there is exactly one list to audit when a
+ * new animated source appears. Every term is a continuous source: while any of
+ * them is true the loop draws unconditionally, which is what keeps the dirty
+ * loop from ever having to guess how long an animation lasts.
+ *
+ *   tweenT < 1        a preset/hour crossfade, ~0.8 s of lerped rig per change.
+ *   rig.rain          weather.ts's rain and ripples advance their own uTime from
+ *                     the frame hook. Read off the RIG rather than asking
+ *                     weather.ts, which would invert an import edge (see the
+ *                     acyclicity note at the top) — and `rig.rain` is the exact
+ *                     value weather.ts clamps into its own `amount`, so the two
+ *                     cannot drift. The 0.02 threshold is weather.ts's own.
+ *   the dome          skyU.uTime scrolls the cloud fbm. The shader's cloud
+ *                     branch is itself gated on `uCloud > 0.01`, so the same
+ *                     test here is not a tolerance, it is the identical
+ *                     condition: below it the dome is provably static and uTime
+ *                     changes nothing. That is what makes BOTH shipped scenarios
+ *                     idle — `armazem` has no HDRI and therefore does show the
+ *                     procedural dome, but its `estudio` preset is cloudiness 0.
+ *   autoRotate        ui/chrome.ts's "girar" button writes controls.autoRotate
+ *                     directly, with no scene.ts wrapper to hook. Reading the
+ *                     flag instead of being told about it means that button
+ *                     needs no wiring at all and cannot be forgotten.
+ */
+function wantsFrame(): boolean {
+  if (tweenT < 1) return true;
+  if (rigCur && rigCur.rain > 0.02) return true;
+  if (skyDome && skyDome.visible && skyU.uCloud.value > 0.01) return true;
+  return controls.autoRotate;
+}
 
 export function stopLoop() {
   renderer.setAnimationLoop(null);
 }
 
 export function startLoop() {
+  /* A mount must always paint, whatever the studio was doing when it was
+     detached — and capture.ts restarts the loop after a screenshot, where the
+     restored viewport is the frame that has to land. */
+  invalidate();
   renderer.setAnimationLoop(() => {
     /* A backgrounded tab returns one huge dt, which would complete every tween
        in a single frame (a visible jump) and teleport the rain field. */
     const dt = Math.min(clock.getDelta(), 0.1);
-    controls.update();
+    /* Returns true while the camera is still being transformed — a drag, inertia
+       from `enableDamping`, a zoom, autoRotate. This is the ONLY signal that
+       says "damping has not settled yet", and it is why the dirty loop does not
+       need to know how long inertia takes. */
+    if (controls.update()) invalidate();
     // hard floor guard — right-click panning can otherwise drag under the ground
     if (camera.position.y < CAM_MIN_Y) camera.position.y = CAM_MIN_Y;
     if (controls.target.y < 0.05) controls.target.y = 0.05;
@@ -3414,9 +2436,34 @@ export function startLoop() {
     if (Math.abs(near - camera.near) > near * 0.15) {
       camera.near = near;
       camera.updateProjectionMatrix();
+      invalidate();
     }
+    /* Decided BEFORE updateLighting(), which is what closes a finishing tween:
+       the frame that takes tweenT from 0.98 to 1.0 is a frame that has to be
+       drawn, and asking afterwards would skip it. */
+    const draw = !onDemand || dirtyFrames > 0 || wantsFrame();
+
     updateLighting(dt);
     for (const fn of frameHooks) fn(dt);
+    /* Hooks run even on a skipped frame: they are clamps (the interior box, the
+       body ejection, the haze shell following the camera) and a state they were
+       not allowed to correct would be a state the NEXT drawn frame renders wrong.
+       They are a few vector ops, not a draw call. */
+
+    /* Checked AFTER the hooks and BEFORE the dirty counter is spent: a frame
+       skipped because the scene graph is deliberately wrong must not consume the
+       invalidation that was asking for a correct one. */
+    if (drawSuspended > 0) return;
+    if (!draw) return;
+    if (dirtyFrames > 0) dirtyFrames--;
+    /* Pay the deferred shadow refresh a light scrub skipped — see shadowStale.
+       Here rather than in applyRig() because "the drag is over" is a fact about
+       the CLOCK, and applyRig() has stopped being called by the time it is
+       true. */
+    if (shadowStale && performance.now() > scrubUntil) {
+      renderer.shadowMap.needsUpdate = true;
+      shadowStale = false;
+    }
     renderer.render(scene, camera);
   });
 }

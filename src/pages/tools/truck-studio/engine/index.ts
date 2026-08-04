@@ -12,8 +12,13 @@
      vehicle/    the truck itself — geometry loading and coupling (models),
                  the automotive paint shader (paint), the livery canvases.
      scene/      the world around it — renderer/rig/ground (scene), and the
-                 pieces split out of it: textures, sky, lamps, presets, plate.
-                 Plus environment (HDRI scenes), scatter and weather.
+                 pieces split out of it: textures, sky, lamps, presets. Plus
+                 environment (the HDRI/scenery manifests), set (the modelled 3D
+                 scenery those manifests name), weather (rain), probe (the local
+                 reflection cubemap the chrome mirrors) and capture (the
+                 high-resolution PNG export).
+                 `plate` and `scatter` are gone: they belonged to the photo-backed
+                 scenarios deleted on 2026-08-03 — see ARCHITECTURE.md.
      ui/         the DOM chrome: the topbar/view controls (chrome), the card
                  selector — cenário, fabricante, modelo e COR —, the offscreen
                  renderer that draws the cabs onto those cards (preview), the

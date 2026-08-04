@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-import { scene, onRig } from '../scene/scene';
+import { scene, onRig, invalidate } from '../scene/scene';
 import {
   makePaintMaterial, forgetPaintMaterial, setPaint, isPaintMaterial,
 } from './paint';
@@ -160,51 +160,263 @@ export const RIG_PLACEMENT = { z: 22, yaw: Math.PI };
 function setRigPlacement(on: boolean) {
   rigGroup.position.set(0, 0, on ? RIG_PLACEMENT.z : 0);
   rigGroup.rotation.set(0, on ? RIG_PLACEMENT.yaw : 0, 0);
+  /* rigGroup roda com `matrixAutoUpdate = false` (ver freezeMatrices), então a
+     matriz local NÃO se recompõe sozinha: sem esta linha o updateWorldMatrix
+     abaixo propagaria a colocação ANTERIOR para o conjunto inteiro — que é
+     exatamente o erro de medida que o bloco acima desta função existe para
+     evitar. Chamar updateMatrix() é inócuo quando a flag está ligada, então a
+     ordem entre um e outro nunca importa. */
+  rigGroup.updateMatrix();
   rigGroup.updateWorldMatrix(true, true);
+}
+
+/* ---------------- static matrices ----------------
+   A loaded root and everything under it is FURNITURE: the implement's ~5852
+   nodes hold the pose the bake gave them and never move again relative to their
+   root. With the default `matrixAutoUpdate` three still calls `updateMatrix()`
+   on every one of them on every frame, recomposing a matrix out of a position,
+   quaternion and scale that have not changed since the download finished.
+
+   Freezing is safe here in a way it usually is not, and the reason is worth
+   writing down: the flag controls ONLY whether the LOCAL matrix is recomposed
+   from position/quaternion/scale. A frozen node whose `matrix` is already
+   correct is a node that renders correctly.
+
+   AN EARLIER VERSION OF THIS PARAGRAPH GAVE THE WRONG REASON, and the wrong
+   reason has since stopped being true — which is why it is called out instead of
+   quietly rewritten. It argued the freeze was safe because "the Scene root keeps
+   `matrixAutoUpdate` on and dirties the whole graph from the top, so `force`
+   reaches every node here regardless". `scene/scene.ts` now sets
+   `scene.matrixAutoUpdate = false` (the scene is never transformed, and leaving
+   it live forced a full `matrixWorld` cascade over ~5852 nodes every frame —
+   the other half of the cost this freeze exists to remove). So there is no
+   longer any top-down `force` to rely on.
+
+   The freeze is still safe, for the STRONGER reason below — which held all
+   along and is the one that actually carries it:
+
+   WHOEVER WRITES position, rotation OR scale ON A FROZEN NODE MUST CALL
+   updateMatrix(). `updateMatrix()` also sets `matrixWorldNeedsUpdate`, so the
+   world matrix still propagates from that node down. In this module the writers
+   are setRigPlacement(), placeTrailer() and groundAndCenter(), and all three do.
+   Readers are unaffected: Box3.expandByObject(), bboxOfMatching() and frameAll()
+   call updateWorldMatrix() themselves.
+
+   TWO OBLIGATIONS THE FREEZE CREATES, both easy to trip over:
+
+   1. REPARENTING A FROZEN NODE IS UNSAFE. `Object3D.add()` does not dirty the
+      child, so a frozen node moved to a new parent keeps a world matrix derived
+      from the old one until something calls updateMatrix() on it.
+   2. `window.__studio` publishes `cabGroup`, `trailerGroup`, `cab` and
+      `trailer`. A console user writing `.position` on any of them now has to
+      call `.updateMatrix()` too, or nothing appears to happen.
+
+   The failure mode is loud rather than subtle — the object simply does not move
+   — which is the right way for something whose entire claim is "no visual
+   change" to break. */
+function freezeMatrices(root: THREE.Object3D) {
+  root.updateMatrixWorld(true);
+  root.traverse((o) => { o.matrixAutoUpdate = false; });
 }
 
 rigGroup.add(state.cabGroup, state.trailerGroup);
 scene.add(rigGroup);
+/* Os três nós que seguram o conjunto também não se mexem sozinhos: rigGroup só é
+   escrito por setRigPlacement(), e os dois grupos ficam na identidade pela vida
+   inteira da página. Congelados pelo mesmo motivo dos nós carregados, e
+   setRigPlacement() carrega o updateMatrix() que o congelamento torna
+   obrigatório. */
+rigGroup.matrixAutoUpdate = false;
+state.cabGroup.matrixAutoUpdate = false;
+state.trailerGroup.matrixAutoUpdate = false;
 setRigPlacement(true);
 
-/* ---------------- loaders ---------------- */
+/* ---------------- loaders ----------------
+   EVERY URL THAT LEAVES THIS MODULE GOES THROUGH assetUrl(), and it happens
+   HERE instead of at the ~10 call sites. The asset tree is moving out of the web
+   app's own `public/` and behind the API, which means assetUrl() stops being the
+   pass-through it is today and starts prefixing an origin. A call site that
+   still hands a bare `VEHICLES_DIR + 'trailer.glb'` to the loader would keep
+   resolving against the site root and 404 the moment that lands, and there is no
+   type error to catch it — these are strings, not imports.
+
+   Putting it in the helper is safe because assetUrl() is IDEMPOTENT:
+   assetUrl(assetUrl(x)) === assetUrl(x). That property is load-bearing rather
+   than incidental, because scene/set.ts and scene/environment.ts call loadGLB()
+   with URLs they have ALREADY resolved — double-prefixing has to be impossible,
+   not merely unlikely.
+
+   HOW it is guaranteed changed in 2026-08-03, and the difference matters if you
+   ever touch assetUrl(). It used to fall out for free: `/` was one of the
+   alternatives in ABSOLUTE_RE, so any already-resolved path was returned
+   untouched. The move to the API removed that alternative — it HAD to, because a
+   site-root path now points at the web origin, which no longer holds the tree.
+   In the default same-origin configuration assetUrl()'s own output begins with
+   `/studio-assets/v1`, i.e. exactly the shape that stopped being a pass-through,
+   so the free version of the property died with it.
+
+   What replaces it is an explicit test in assetUrl(): it strips a leading base
+   prefix before re-adding one, so feeding it its own output is a no-op by
+   construction rather than by regex accident. See the `BASE_REL` guard and the
+   `POR QUE A IDEMPOTÊNCIA É CONTRATO` block in catalog/catalog.ts. Do not
+   "simplify" that guard away on the grounds that the output is already
+   absolute — under the same-origin default it is not. */
 const draco = new DRACOLoader().setDecoderPath(DRACO_DECODER_DIR);
+/* The 248 KB wasm decoder is fetched LAZILY on the first Draco-compressed
+   primitive — that is, in the middle of parsing the first model, where the round
+   trip has nothing to overlap with and lands squarely inside the user's wait.
+   preload() moves that fetch to module evaluation, where it runs alongside the
+   manifest reads and the HEAD probes and is paid for by nobody. If the decoder
+   is unreachable the failure simply resurfaces on the first real Draco load,
+   which is where it can be reported. */
+draco.preload();
 const loader = new GLTFLoader().setDRACOLoader(draco);
 const fbxLoader = new FBXLoader();
 
-export function loadGLB(url: string, onProgress?: (t: number) => void): Promise<THREE.Group> {
-  return new Promise((resolve, reject) => {
-    loader.load(url,
-      g => resolve(g.scene),
-      e => { if (e.total && onProgress) onProgress(e.loaded / e.total); },
-      () => reject(new Error('Falha ao carregar ' + url)));
+/* ---------------- stall guard ----------------
+   NOTHING in this engine had a deadline: no AbortController, no signal, no
+   timeout anywhere. A download that FAILS rejects and the curtain comes down
+   with a message, but a download that STALLS — socket open, bytes stopped —
+   never settles at all, and the loading curtain stays up forever over a 286 MB
+   implement with no way out but a reload.
+
+   The clock below is an INACTIVITY clock, not a total budget, and that
+   distinction is the whole design. The implement is 286 MB: a flat 90 s ceiling
+   would abort a perfectly healthy download on any link slower than ~25 Mbps,
+   which trades a real load away to catch a hypothetical one — exactly the trade
+   this engine is not allowed to make. Every progress event re-arms the timer, so
+   a slow-but-moving transfer runs as long as it needs and only true silence
+   fails. The same window covers the parse: after the last progress event the
+   decoder gets a full GEOMETRY_STALL_MS before anyone gives up on it.
+
+   three's loaders take no signal, so the socket is not actually cancelled — the
+   remaining bytes arrive into a promise nobody is waiting on any more. What this
+   buys is a curtain that comes DOWN, with an explanation, instead of one that
+   never does. */
+const GEOMETRY_STALL_MS = 90_000;
+const MANIFEST_TIMEOUT_MS = 15_000;
+
+/** Último segmento da URL — um erro que chega à tela não pode ser um caminho. */
+const fileLabel = (url: string) => (url.split(/[?#]/)[0].split('/').pop() || url);
+
+/** Mensagem em português: estas rejeições sobem para a cortina de carregamento. */
+const stallMessage = (what: string, ms: number) =>
+  `Tempo esgotado ao carregar ${what}: ${Math.round(ms / 1000)} s sem resposta do `
+  + 'servidor. Verifique a conexão e tente novamente.';
+
+/**
+ * Roda `run` sob um relógio de inatividade. `run` recebe um `ping` e deve
+ * chamá-lo a cada sinal de vida (cada evento de progresso); cada ping rearma o
+ * relógio do zero. Sem ping por `ms`, a promessa rejeita.
+ */
+function withTimeout<T>(
+  run: (ping: () => void) => Promise<T>, ms: number, what: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let settled = false;
+    const stop = () => {
+      settled = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+    };
+    const arm = () => {
+      if (settled) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { stop(); reject(new Error(stallMessage(what, ms))); }, ms);
+    };
+    arm();
+    run(arm).then(
+      (v) => { stop(); resolve(v); },
+      (e: unknown) => { stop(); reject(e); },
+    );
   });
+}
+
+export function loadGLB(url: string, onProgress?: (t: number) => void): Promise<THREE.Group> {
+  const href = assetUrl(url);
+  return withTimeout<THREE.Group>((ping) => new Promise((resolve, reject) => {
+    loader.load(href,
+      g => resolve(g.scene),
+      /* ping() ANTES do teste de `e.total`: um servidor que não manda
+         content-length continua provando que a conexão está viva. */
+      e => { ping(); if (e.total && onProgress) onProgress(e.loaded / e.total); },
+      () => reject(new Error('Falha ao carregar ' + href)));
+  }), GEOMETRY_STALL_MS, fileLabel(href));
 }
 
 export function loadFBX(url: string, onProgress?: (t: number) => void): Promise<THREE.Group> {
-  return new Promise((resolve, reject) => {
-    fbxLoader.load(url,
+  const href = assetUrl(url);
+  return withTimeout<THREE.Group>((ping) => new Promise((resolve, reject) => {
+    fbxLoader.load(href,
       root => resolve(root),
-      e => { if (e.total && onProgress) onProgress(e.loaded / e.total); },
-      (err: unknown) => reject(new Error('Falha ao carregar ' + url +
+      e => { ping(); if (e.total && onProgress) onProgress(e.loaded / e.total); },
+      (err: unknown) => reject(new Error('Falha ao carregar ' + href +
         (err ? ' — ' + errText(err) : ''))));
-  });
+  }), GEOMETRY_STALL_MS, fileLabel(href));
 }
 
-/* ---------------- manifests ---------------- */
+/* ---------------- manifests ----------------
+   A manifest is a few KB, so 15 s of silence is already a broken link — and
+   unlike the geometry there is a real fallback waiting behind it (DEFAULT_CABS,
+   the legacy coupling), which makes failing fast strictly better than waiting.
+   This one really does abort: `fetch` takes a signal, three's loaders do not. */
 async function fetchJSON(url: string) {
-  const r = await fetch(url, { cache: 'no-cache' });
-  if (!r.ok) throw new Error(url + ' → ' + r.status);
+  const href = assetUrl(url);
+  /* Detectado, não assumido: AbortSignal.timeout é Chrome 103 / Safari 16. Onde
+     não existir, a busca fica sem prazo — que é exatamente o comportamento que
+     esta linha substitui, nunca pior. */
+  const signal = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+    ? AbortSignal.timeout(MANIFEST_TIMEOUT_MS)
+    : undefined;
+  let r: Response;
+  try {
+    r = await fetch(href, { cache: 'no-cache', signal });
+  } catch (e: unknown) {
+    /* A DOMException de um sinal expirado diz "signal timed out", em inglês, e
+       estas mensagens podem chegar ao usuário. */
+    if ((e as { name?: string } | null)?.name === 'TimeoutError') {
+      throw new Error(stallMessage(fileLabel(href), MANIFEST_TIMEOUT_MS));
+    }
+    throw e;
+  }
+  if (!r.ok) throw new Error(href + ' → ' + r.status);
   return r.json();
 }
 
 export async function loadManifests() {
-  try {
-    const j = await fetchJSON(VEHICLES_DIR + 'cabs.json');
-    if (!Array.isArray(j.cabs) || !j.cabs.length) throw new Error('cabs.json vazio');
-    state.cabs = j.cabs;
-  } catch (e: unknown) {
-    console.warn('[manifest] cabs.json indisponível — usando padrão Scania.', errText(e));
+  /* THE TWO MANIFESTS ARE INDEPENDENT, so they leave together.
+     The chain used to be cabs.json → (await) → four HEAD probes → (await) →
+     trailer_meta.json, three strictly serial waits on a cold boot. But
+     trailer_meta.json describes the IMPLEMENT — the kingpin and the panel
+     outlines — and nothing in it is read to decide anything about the cabs, so
+     the only reason it went last is that it was written last. Firing both now
+     saves two round trips on every boot, and on a mobile link two RTTs is a
+     visible slice of the time before the curtain moves at all.
+
+     Each request carries its OWN catch, attached at creation. That is not style:
+     an awaited-later promise that rejects meanwhile is an unhandled rejection in
+     the console (and a hard error under some CSP/report setups), and the whole
+     point of this block is that a missing manifest is a normal, survivable
+     state. The fallbacks below are exactly the ones the serial version had. */
+  const cabsReq: Promise<CabDef[] | null> = fetchJSON(VEHICLES_DIR + 'cabs.json')
+    .then((j) => {
+      if (!Array.isArray(j.cabs) || !j.cabs.length) throw new Error('cabs.json vazio');
+      return j.cabs as CabDef[];
+    })
+    .catch((e: unknown) => {
+      console.warn('[manifest] cabs.json indisponível — usando padrão Scania.', errText(e));
+      return null;
+    });
+  const metaReq: Promise<TrailerMeta | null> = fetchJSON(VEHICLES_DIR + 'trailer_meta.json')
+    .catch((e: unknown) => {
+      console.warn('[manifest] trailer_meta.json indisponível — engate legado + painéis retangulares.', errText(e));
+      return null;
+    });
+
+  const cabs = await cabsReq;
+  if (cabs) {
+    state.cabs = cabs;
+  } else {
     state.cabs = DEFAULT_CABS.cabs;
     state.manifestFallback = true;
   }
@@ -232,23 +444,125 @@ export async function loadManifests() {
   }));
   state.byId = Object.fromEntries(state.cabs.map(c => [c.id, c]));
 
-  try { state.trailerMeta = await fetchJSON(VEHICLES_DIR + 'trailer_meta.json'); }
-  catch (e: unknown) {
-    console.warn('[manifest] trailer_meta.json indisponível — engate legado + painéis retangulares.', errText(e));
-    state.trailerMeta = null;
-  }
+  /* Já em voo desde o topo da função — este await normalmente não espera nada. */
+  state.trailerMeta = await metaReq;
   return state;
 }
 
 /* ---------------- material / mesh setup ---------------- */
 const GLASS_RE = /glass|vidro|windshield|window|winscreen|cristal|glazing/i;
 
-export function setupCommon(root: THREE.Object3D) {
+/* ANISOTROPY ON EVERY SLOT, not only on the albedo.
+   ---------------------------------------------------------------------------
+   The flanks of a tractor-trailer are what the camera spends its whole orbit
+   looking at edge-on, and a grazing angle is the one case where trilinear
+   filtering collapses: the mip level chosen for the axis that is compressed in
+   screen space blurs the axis that is not, along with it. `map` was already at
+   8, so the ALBEDO stayed sharp down the length of the truck — but normalMap,
+   roughnessMap and metalnessMap kept the default of 1, and those are the maps
+   that carry the micro-detail the specular lobe is built from. The panel grain,
+   the scuffing, the brushed direction on the rails: all of it smeared into a
+   flat wash a few metres out while the paint under it stayed crisp.
+
+   That is a LIGHTING difference, not a texture nicety, and it is a quality gain
+   rather than an optimisation — it costs sampler bandwidth and nothing else.
+   No `needsUpdate` is needed: this runs before the first render, so the textures
+   have not been uploaded yet and the value is read at upload time. three clamps
+   it to the device's own maximum there too, so 8 is a ceiling, never a demand. */
+const TEXTURE_ANISOTROPY = 8;
+
+/* SHADOW CASTERS ARE CHOSEN BY SIZE — and here is the arithmetic, so the number
+   below survives the next person who reads it.
+   ---------------------------------------------------------------------------
+   The key light is a 3072² shadow map over a ±24 m ortho frustum (scene/scene.ts
+   spells out why those two numbers are what they are): 3072 / 48 = 64 texels per
+   metre, i.e. 1.56 cm per texel. It renders through PCFSoftShadowMap with
+   `shadow.radius` running 2–12, so even at the TIGHTEST rig setting the filter
+   kernel spans roughly five texels — about 7.8 cm — and every sample it averages
+   is a sample of mostly-not-this-object.
+
+   An occluder whose world diameter is smaller than that kernel therefore cannot
+   put a visible shadow anywhere: whatever depth it writes is diluted below the
+   quantisation of the filtered result before it can reach a pixel. Drawing it
+   into the shadow map is pure cost with a provably empty output.
+
+   MEASURED on trailer.glb by walking its node hierarchy and applying each node's
+   world transform to its POSITION accessor bounds — 5852 nodes, 2151 of them
+   carrying a mesh, 2157 three.js Mesh objects once multi-primitive meshes are
+   split, 5.31 M triangles in total. At least 640 of those meshes come out under
+   5 cm across, carrying 788 k triangles — 29.7 % of the meshes and 14.8 % of the
+   triangles — and 483 of the 640 are literally named
+   `stitch_result_stitch_all_parafusos_*`. "At least", because that measurement
+   uses the diagonal of each primitive's local box as the sphere diameter, which
+   is an UPPER bound on the radius `computeBoundingSphere()` actually derives
+   from the vertices; the runtime figure can only be higher.
+
+   So this removes ~640+ draw calls and ~0.79 M triangles from every shadow pass.
+   "Every pass" is not "every frame" here: the renderer runs with
+   `shadowMap.autoUpdate = false`, so it means every load, every scenario change,
+   and every frame of a time-of-day drag — which is exactly where the frame time
+   is already worst.
+
+   5 cm sits below the 7.8 cm kernel with margin, so the cut is invisible by
+   construction and not merely by inspection. `receiveShadow` stays TRUE on
+   everything: a bolt is far too small to cast a shadow and exactly the right
+   size to be sitting in the truck's. */
+const SHADOW_CASTER_MIN_M = 0.05;
+
+const _casterSphere = new THREE.Sphere();
+
+/**
+ * Decide quem projeta sombra, pelo tamanho em ESPAÇO DE MUNDO.
+ *
+ * A medida tem de ser em MUNDO, nunca na geometria local, e não é teoria: a
+ * Scania chega do FBXLoader nas unidades da rip e é reescalada por ~1/100 na
+ * raiz (ver loadScaniaOriginal), e o próprio implemento traz nós com escala de
+ * maior eixo indo de 0,0012 a 1,0022 — três ordens de grandeza dentro do mesmo
+ * arquivo. Um diâmetro local aqui não erraria por pouco: ele diria que um
+ * parafuso tem metros.
+ */
+function setShadowCasters(root: THREE.Object3D) {
+  /* setupCommon() roda ANTES de a raiz entrar no grupo dela, e os carregadores
+     deixam `matrixWorld` por escrever (o GLTFLoader compõe `matrix` e para por
+     aí). Sem esta linha toda esfera abaixo voltaria medida pela identidade.
+     Solta do grafo, "mundo" é o espaço da própria raiz — que é onde a escala da
+     raiz vive, e é essa a escala que importa. */
+  root.updateMatrixWorld(true);
+  /* O computeBoundingSphere() abaixo não é trabalho NOVO: o three já o faria,
+     preguiçosamente, na primeira vez que o frustum testasse cada malha — ou
+     seja, no primeiro quadro. Fazê-lo aqui só o move para dentro da cortina de
+     carregamento, onde ninguém está olhando o contador de quadros. E ele lê o
+     atributo de posição, não o índice, então continua correto depois de
+     buildLiveryPanels() reescrever índices (os vértices ficam onde estão). */
+  let cast = 0, skip = 0;
   root.traverse((node) => {
     const o = node as THREE.Mesh;
     if (!o.isMesh) return;
-    o.castShadow = true;
     o.receiveShadow = true;
+    const g = o.geometry;
+    if (!g) { o.castShadow = false; return; }
+    if (!g.boundingSphere) g.computeBoundingSphere();
+    const bs = g.boundingSphere;
+    /* Geometria degenerada ou com NaN: continua projetando. A falha barata é uma
+       chamada de desenho desperdiçada; a cara é uma sombra que sumiu. */
+    if (!bs || !Number.isFinite(bs.radius)) { o.castShadow = true; cast++; return; }
+    /* Sphere.applyMatrix4 escala o raio pelo maior fator de escala da matriz —
+       é a conversão para mundo que interessa aqui. */
+    const diameter = _casterSphere.copy(bs).applyMatrix4(o.matrixWorld).radius * 2;
+    o.castShadow = diameter >= SHADOW_CASTER_MIN_M;
+    if (o.castShadow) cast++; else skip++;
+  });
+  if (skip) {
+    console.info('[sombra] emissores:', cast, '· descartados', skip,
+      `(< ${SHADOW_CASTER_MIN_M * 100} cm — abaixo do filtro PCF de ~7,8 cm)`);
+  }
+}
+
+export function setupCommon(root: THREE.Object3D) {
+  setShadowCasters(root);
+  root.traverse((node) => {
+    const o = node as THREE.Mesh;
+    if (!o.isMesh) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const raw of mats) {
       if (!raw) continue;
@@ -257,7 +571,9 @@ export function setupCommon(root: THREE.Object3D) {
          `Mesh.material` can be declared as. */
       const m = raw as THREE.MeshStandardMaterial;
       m.envMapIntensity = 1.35;
-      if (m.map) m.map.anisotropy = 8;
+      for (const tex of [m.map, m.normalMap, m.roughnessMap, m.metalnessMap]) {
+        if (tex) tex.anisotropy = TEXTURE_ANISOTROPY;
+      }
       const isGlass = GLASS_RE.test(m.name || '');
       if (isGlass) {
         m.transparent = true;
@@ -502,6 +818,12 @@ function groundAndCenter(
   const drop = groundY !== undefined ? groundY : bboxOfMatching(root, wheelRe).min.y;
   root.position.x -= (body.min.x + body.max.x) / 2;
   root.position.y -= drop;
+  /* Explícito porque escrever `position` num nó congelado não recompõe nada
+     sozinho (ver freezeMatrices). Hoje toda raiz que passa por aqui ainda está
+     com `matrixAutoUpdate` ligado — o congelamento vem no fim da carga — e a
+     chamada é inócua nesse caso; ela existe para que a ordem possa mudar sem
+     levar junto um assentamento silenciosamente errado. */
+  root.updateMatrix();
   root.updateWorldMatrix(true, true);
   return bboxOfMatching(root, bodyRe);
 }
@@ -602,15 +924,45 @@ function isWhiteBodyMat(m: THREE.Material | null | undefined) {
    buildFrontWallOverlay(). Frames/rails/posts stay on the original material. */
 const TK_PAINT_SUB = 'tk-housing-white';   // Thermo King housing joins the paint set
 
+/* O material branco de fábrica do implemento. TUDO que sai do bake com ele é
+   chapa de carroceria: as duas laterais, a traseira, a FRENTE e o TETO.
+   O nome vem do próprio .glb — ver os 38 materiais do bake. */
+const BODY_WHITE_MAT = 'cor_padrao_branco';
+
+/* Peças que carregam o branco de carroceria mas NÃO são carroceria vista: o
+   forro interno do teto e a parede interna. Pintá-las não aparece em lugar
+   nenhum e só gasta uma troca de material por malha. */
+const BODY_INTERIOR_RE = /-interno|_interno|interna/i;
+
 function trailerPanelMeshes() {
   const out: THREE.Mesh[] = [];
   if (state.trailer) {
     state.trailer.traverse((node) => {
       const o = node as THREE.Mesh;
       if (!o.isMesh) return;
+      /* As três chapas RECORTADAS pelo bake, que já vêm com nome próprio. */
       if (/^(SIDE_L|SIDE_R|REAR)$/.test(o.name)) { out.push(o); return; }
       const mats = Array.isArray(o.material) ? o.material : [o.material];
-      if (mats.some((m) => m && (m.name || '').toLowerCase().includes(TK_PAINT_SUB))) out.push(o);
+      if (mats.some((m) => m && (m.name || '').toLowerCase().includes(TK_PAINT_SUB))) {
+        out.push(o); return;
+      }
+      /* FRENTE E TETO, por MATERIAL e não por geometria.
+         ---------------------------------------------------------------------
+         A frente já tinha um caminho próprio — buildFrontWallOverlay(), que
+         extrai a pele da parede por profundidade e desenha uma cópia por cima
+         com polygonOffset. Aquilo foi escrito para um bake em que a carroceria
+         branca era UMA malha unida; o bake que roda hoje tem 2151 malhas
+         separadas, e o teto (`teto-externo_Cor_padrao_branco(metalBranco)_0`)
+         nunca esteve em lista nenhuma. Resultado: com "pintar implemento"
+         ligado, as laterais e a traseira mudavam de cor e a frente e o teto
+         continuavam brancos.
+         Casar pelo MATERIAL resolve os dois de uma vez e não depende de a
+         geometria estar unida, recortada ou nomeada de um jeito específico —
+         só de o bake continuar chamando o branco de fábrica pelo mesmo nome. */
+      if (BODY_INTERIOR_RE.test(o.name)) return;
+      if (mats.some((m) => m && (m.name || '').toLowerCase().includes(BODY_WHITE_MAT))) {
+        out.push(o);
+      }
     });
   }
   return out;
@@ -767,6 +1119,13 @@ export function setPaintTarget(mode: 'cab' | 'both') {
     }
     for (const w of state.frontWalls || []) w.visible = false;
   }
+
+  /* Trocar o alvo da tinta troca MATERIAL em malhas que já estão na cena, sem
+     passar por nenhum carregamento — então nada mais avisaria o laço
+     sob demanda de que o quadro mudou. É o gap #2 da lista em scene.ts.
+     Chamado no fim porque o overlay da parede dianteira também é refeito
+     acima, e um invalidate() antes dele perderia esse desenho. */
+  invalidate();
 }
 
 /* ---------------- Scania: original FBX + old-viewer material treatment ----- */
@@ -853,7 +1212,7 @@ function convertScaniaMaterials(root: THREE.Object3D) {
         }
       }
       const om = (out as THREE.MeshStandardMaterial).map;
-      if (om) { om.colorSpace = THREE.SRGBColorSpace; om.anisotropy = 8; }
+      if (om) { om.colorSpace = THREE.SRGBColorSpace; om.anisotropy = TEXTURE_ANISOTROPY; }
     }
     (out as THREE.MeshStandardMaterial).envMapIntensity = 1.3;
     cache.set(src.uuid, out);
@@ -863,6 +1222,8 @@ function convertScaniaMaterials(root: THREE.Object3D) {
     const o = node as THREE.Mesh;
     if (!o.isMesh) return;
     o.material = Array.isArray(o.material) ? o.material.map(convert) : convert(o.material);
+    /* Otimista de propósito: loadCab() sempre roda setupCommon() sobre esta raiz
+       depois, e é lá que setShadowCasters() decide quem realmente projeta. */
     o.castShadow = true;
     o.receiveShadow = true;
   });
@@ -1012,13 +1373,38 @@ async function loadScaniaOriginal(def: CabDef, onProgress?: (t: number) => void)
   return rig;
 }
 
-/* ---------------- cab ---------------- */
+/* ---------------- cab ----------------
+   WHY A GENERATION COUNTER WHEN applyQueue ALREADY SERIALISES.
+   ---------------------------------------------------------------------------
+   loadCab() and loadTrailer() both do their scene surgery AFTER their await —
+   remove the current object, dispose it, add the new one — with nothing in
+   between checking that they are still the load the studio wants. Today that is
+   safe only because studio.ts funnels every caller through `applyQueue`, one
+   promise chain. But `applyChoice` is ALSO published on `window.__studio` as a
+   documented console affordance, and a call from there is a second entry point
+   into the same chain in the same tick. Two loads in flight then race on
+   `state.cab`: the slower one wins the assignment and the faster one's object is
+   left inside cabGroup, drawn, undisposed and unreachable.
+
+   The token is deliberately the same shape scene/set.ts already uses
+   (`token !== loading`) — one pattern for "a newer request has superseded me"
+   across the engine. A superseded load disposes what it downloaded and returns
+   quietly; it never throws, because being superseded is not an error and the
+   caller is awaiting it inside a Promise.all that must not fail. */
+let cabGen = 0;
+let trailerGen = 0;
+
 export async function loadCab(id: string, onProgress?: (t: number) => void) {
   const def = state.byId[id];
   if (!def) throw new Error('Cabine desconhecida: ' + id);
+  const mine = ++cabGen;
   const cab = def.format === 'fbx-scania'
     ? await loadScaniaOriginal(def, onProgress)
     : await loadGLB(assetUrl(def.file), onProgress);
+  /* Uma cabine mais nova já saiu na frente: descarta esta em vez de empilhar
+     duas no cabGroup. disposeTree() respeita `tsSharedSource`, então largar um
+     clone do FBX cacheado não apaga a geometria da cabine que ficou. */
+  if (mine !== cabGen) { disposeTree(cab); return def; }
 
   setRigPlacement(false);       // assentamento e ancoragem em z medem o mundo; ver rigGroup
   if (state.cab) {
@@ -1084,6 +1470,10 @@ export async function loadCab(id: string, onProgress?: (t: number) => void) {
   reapplyVehicleWetness();     // a freshly loaded cab starts dry otherwise
   placeTrailer();
   syncTrailerPaintFromCab();   // keep painted trailer in step after a cab switch
+  /* Pose final — daqui em diante a cabine é mobília. placeTrailer() acabou de
+     repor a colocação do conjunto, então as matrizes de mundo estão certas no
+     instante em que são congeladas. */
+  freezeMatrices(cab);
   return def;
 }
 
@@ -1577,7 +1967,13 @@ function buildLiveryPanels(trailer: THREE.Object3D) {
 
 /* ---------------- trailer ---------------- */
 export async function loadTrailer(onProgress?: (t: number) => void) {
+  const mine = ++trailerGen;
   const trailer = await loadGLB(VEHICLES_DIR + 'trailer.glb', onProgress);
+  /* Mesma guarda de loadCab(), mesmo motivo — ver a nota lá. Aqui ela é ainda
+     mais barata de errar: loadTrailer() não remove um implemento anterior, então
+     duas cargas concorrentes deixariam DOIS implementos dentro do trailerGroup,
+     um deles invisível ao resto do módulo. */
+  if (mine !== trailerGen) { disposeTree(trailer); return state.trailer; }
   setRigPlacement(false);       // a conta abaixo é em espaço de mundo; ver rigGroup
   setupCommon(trailer);
   state.trailerGroup.add(trailer);
@@ -1605,6 +2001,11 @@ export async function loadTrailer(onProgress?: (t: number) => void) {
   placeTrailer();
   await attachThermoKing();   // optional — skips gracefully if the GLB is absent
   reapplyVehicleWetness();
+  /* DEPOIS do Thermo King: ele entra como filho do implemento, então congelar
+     antes deixaria a unidade recompondo a matriz dela a cada quadro e — pior —
+     fora da varredura, o que faria a intenção do congelamento mentir sobre o
+     que está congelado. */
+  freezeMatrices(trailer);
   return trailer;
 }
 
@@ -1613,6 +2014,10 @@ export async function loadTrailer(onProgress?: (t: number) => void) {
    with the Implemento toggle. Back mounting face sits flush on the front-wall
    plane, centered on X, top ~0.15 m below the trailer roof line. */
 export async function attachThermoKing() {
+  /* Lido, não incrementado: esta unidade pertence ao implemento que estava
+     carregado quando a função começou. Se um loadTrailer() novo passar por aqui
+     no meio dos dois awaits abaixo, esta unidade não tem mais em que se montar. */
+  const mine = trailerGen;
   let meta: { dims?: unknown; widthFrac?: unknown; topGap?: unknown } | null = null;
   try { meta = await fetchJSON(VEHICLES_DIR + 'thermoking_meta.json'); } catch { /* optional */ }
   let tk: THREE.Group;
@@ -1622,6 +2027,7 @@ export async function attachThermoKing() {
     console.warn('[tk] thermoking.glb indisponível —', errText(e));
     return;
   }
+  if (mine !== trailerGen || !state.trailer) { disposeTree(tk); return; }
   setRigPlacement(false);       // idem: medidas de mundo daqui para baixo
   setupCommon(tk);
   auditTransparency(tk, 'thermoking');       // only glass may be transparent
@@ -1671,6 +2077,12 @@ export async function attachThermoKing() {
       tk.updateWorldMatrix(true, true);
     }
   }
+
+  /* Refeito AGORA porque setupCommon() mediu esta unidade antes dos dois blocos
+     de escala acima, e o corte de emissores de sombra é uma medida absoluta em
+     metros: um alvo de 5 cm num modelo que ainda vai encolher (ou crescer) é uma
+     pergunta respondida cedo demais. Idempotente — só reescreve as flags. */
+  setShadowCasters(tk);
 
   const b = new THREE.Box3().setFromObject(tk);      // measured, not assumed
   const target = new THREE.Vector3(
@@ -1768,6 +2180,11 @@ export function placeTrailer() {
     t.position.add(pivot.sub(moved));
     t.position.y += halfSpan * Math.sin(theta);            // put the bogie back on the ground
   }
+  /* O implemento está congelado desde o fim de loadTrailer(), e esta função é o
+     único lugar que volta a escrever a pose dele. Sem este updateMatrix() a
+     matriz local ficaria na pose da carga e o engate simplesmente não se moveria
+     (ver freezeMatrices). */
+  t.updateMatrix();
   t.updateWorldMatrix(true, true);
   /* Engate resolvido: o conjunto volta para o lugar dele no cenário. */
   setRigPlacement(true);

@@ -69,3 +69,7 @@ public/models/vehicles/trailer_old_probe.glb
 # ENTRADA de build, do mesmo tipo que os rips em Downloads/trucks: 80 MB e
 # 950 mil linhas de texto que o app nunca serve.
 tools/env-build/_src_*/
+
+# Bytecode do Python dos scripts de build de cenário (tools/env-build).
+__pycache__/
+*.pyc
